@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: collegefootballfantasy
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  api:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/collegefootballfantasy
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      API_LOG_LEVEL: info
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    command: >-
+      sh -c "pip install uv && uv sync && uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port 8000"
+  ui:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+    environment:
+      UI_API_BASE_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+    command: >-
+      sh -c "pip install uv && uv sync && uv run streamlit run ui/app.py --server.port 8501 --server.address 0.0.0.0"
+
+volumes:
+  pgdata:

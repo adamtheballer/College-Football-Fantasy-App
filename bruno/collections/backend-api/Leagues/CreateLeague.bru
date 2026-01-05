@@ -1,0 +1,20 @@
+meta {
+  name: Create League
+  type: http
+  seq: 1
+}
+post {
+  url: {{base_url}}/leagues
+  body: json
+}
+body:json {
+  {
+    "name": "Workflow League",
+    "platform": "espn",
+    "scoring_type": "standard"
+  }
+}
+script:post-response {
+  const data = res.getBody();
+  bru.setVar("league_id", data.id);
+}
