@@ -23,5 +23,6 @@ Use the left navigation to manage leagues, teams, rosters, and players.
 - Teams: add teams under a league.
 - Rosters: assign players to a team.
 - Players: search and add players.
+- Draft: run a snake draft and apply picks.
     """
 )

@@ -44,3 +44,24 @@ Align the UI visual system and layout with the provided mobile roster screenshot
 2. Implement custom CSS for tabs, pills, headers, and list rows.
 3. Update roster and players pages to use the new components.
 4. Validate contrast and readability on mobile and desktop widths.
+
+## API Specs
+- No new endpoints required.
+- UI should consume existing league/team/player/roster endpoints to render data within the new visual system.
+
+## UI Specs
+- Global theme
+  - Apply dark theme tokens and accent colors consistently across all pages.
+  - Add page-level padding and section spacing to mimic mobile density.
+- Tabs and navigation
+  - Uppercase labels with green underline on active tab.
+  - Subtle separators between sections.
+- Roster rows
+  - Avatar + position pill + player name/meta + score aligned right.
+  - Status badges for IR/OUT and availability.
+- Buttons and pills
+  - Rounded outline buttons with blue accent.
+  - Minimal hover state change.
+
+## Database Specs
+- No database changes required; this is a presentation-layer feature.
