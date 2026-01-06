@@ -5,7 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.base import Base
-from collegefootballfantasy_api.app.models import league, player, roster, team
+from collegefootballfantasy_api.app.models import league, matchup, player, player_stat, roster, standing, team, team_week_score
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

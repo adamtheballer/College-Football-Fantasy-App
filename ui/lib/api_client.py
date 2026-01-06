@@ -68,6 +68,21 @@ def create_players(payload: list[dict]) -> list[dict]:
     return data
 
 
+def get_player_stats(player_id: int, season: int | None = None, week: int | None = None, refresh: bool = False) -> dict:
+    params = {}
+    if season is not None:
+        params["season"] = season
+    if week is not None:
+        params["week"] = week
+    if refresh:
+        params["refresh"] = "true"
+    query = urlencode(params)
+    path = f"/players/{player_id}/stats"
+    if query:
+        path = f"{path}?{query}"
+    return _request("GET", path)
+
+
 @st.cache_data(show_spinner=False)
 def get_roster(team_id: int) -> dict:
     return _request("GET", f"/teams/{team_id}/roster")

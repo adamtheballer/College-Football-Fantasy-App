@@ -24,5 +24,6 @@ Use the left navigation to manage leagues, teams, rosters, and players.
 - Rosters: assign players to a team.
 - Players: search and add players.
 - Draft: run a snake draft and apply picks.
+- Matchup: view head-to-head scoreboards.
     """
 )
