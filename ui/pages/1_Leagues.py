@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 
@@ -8,126 +7,66 @@ if ROOT_DIR not in sys.path:
 
 import streamlit as st
 
-from ui.lib import api_client
+from ui.lib.components.leagues import render_league_row
+from ui.lib.components.sidebar import render_sidebar_nav
+from ui.lib.components.top_nav import render_top_nav
+from ui.lib.mock.leagues import generate_leagues_data
 from ui.lib.theme import apply_theme
 
-st.header("Leagues")
+st.set_page_config(page_title="Leagues", layout="wide")
 apply_theme()
+render_sidebar_nav("leagues")
+render_top_nav("league")
 
-default_roster_limits = {
-    "qb": 1,
-    "rb": 2,
-    "wr": 2,
-    "te": 1,
-    "flex": 1,
-    "k": 1,
-    "dst": 1,
-    "bench": 5,
-}
-default_scoring_rules = {
-    "pass_td": 4,
-    "rush_td": 6,
-    "rec_td": 6,
-    "pass_yd": 0.04,
-    "rush_yd": 0.1,
-    "rec_yd": 0.1,
-}
+st.markdown(
+    """
+    <style>
+    .leagues-shell {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding-bottom: 2rem;
+    }
 
-with st.form("create_league"):
-    name = st.text_input("League name")
-    size = st.number_input("League size", min_value=2, max_value=24, value=10, step=1)
-    season_start_week = st.number_input("Season start week", min_value=1, max_value=17, value=1, step=1)
-    platform = st.selectbox("Platform", ["espn", "yahoo", "sleeper", "cfbd"])
-    scoring_type = st.text_input("Scoring type", value="standard")
-    with st.expander("Advanced settings", expanded=False):
-        roster_limits = st.text_area(
-            "Roster limits (JSON)",
-            value=json.dumps(default_roster_limits, indent=2),
-            help="Currently displayed for UX planning; not persisted yet.",
-        )
-        scoring_rules = st.text_area(
-            "Scoring rules (JSON)",
-            value=json.dumps(default_scoring_rules, indent=2),
-            help="Currently displayed for UX planning; not persisted yet.",
-        )
-    submitted = st.form_submit_button("Create league")
+    .leagues-header {
+        font-size: 1.4rem;
+        font-weight: 700;
+        margin-bottom: 0.4rem;
+    }
 
-if submitted:
-    if not name.strip():
-        st.error("League name is required.")
-    elif size < 2:
-        st.error("League size must be at least 2.")
+    .leagues-subtitle {
+        color: #9aa7bb;
+        font-size: 0.85rem;
+        margin-bottom: 1.2rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+def _jump_to_league(league_id: int) -> None:
+    st.session_state["selected_league_id"] = league_id
+    st.session_state["nav_target_tab"] = "My Team"
+    if hasattr(st, "switch_page"):
+        st.switch_page("pages/2_League.py")
     else:
-        with st.spinner("Creating league..."):
-            try:
-                api_client.create_league(
-                    {
-                        "name": name.strip(),
-                        "platform": platform,
-                        "scoring_type": scoring_type.strip(),
-                    }
-                )
-                st.success("League created.")
-                st.info(
-                    "League size, start week, roster limits, and scoring rules are visible in the UI but not yet saved."
-                )
-            except Exception as exc:
-                st.error(f"Failed to create league: {exc}")
+        st.info("Open the League page from the sidebar to continue.")
 
-st.subheader("Existing leagues")
-try:
-    data = api_client.get_leagues()
-    leagues = data["data"]
-    st.dataframe(leagues, use_container_width=True)
-except Exception as exc:
-    st.error(f"Failed to load leagues: {exc}")
-    leagues = []
 
-st.subheader("League settings")
-league_options = {f"{league['name']} (#{league['id']})": league for league in leagues}
-selected_label = st.selectbox("Select league to edit", list(league_options.keys()) if league_options else [])
-selected_league = league_options.get(selected_label)
+data = generate_leagues_data()
+leagues = data["leagues"]
 
-if selected_league:
-    with st.form("update_league"):
-        edit_name = st.text_input("League name", value=selected_league["name"])
-        edit_platform = st.selectbox(
-            "Platform",
-            ["espn", "yahoo", "sleeper", "cfbd"],
-            index=["espn", "yahoo", "sleeper", "cfbd"].index(selected_league["platform"]),
-        )
-        edit_scoring_type = st.text_input("Scoring type", value=selected_league["scoring_type"])
-        with st.expander("Advanced settings", expanded=False):
-            st.text_area(
-                "Roster limits (JSON)",
-                value=json.dumps(default_roster_limits, indent=2),
-                help="Editing is disabled until league settings are persisted in the API.",
-                disabled=True,
-            )
-            st.text_area(
-                "Scoring rules (JSON)",
-                value=json.dumps(default_scoring_rules, indent=2),
-                help="Editing is disabled until league settings are persisted in the API.",
-                disabled=True,
-            )
-        updated = st.form_submit_button("Save settings")
+st.markdown('<div class="leagues-shell">', unsafe_allow_html=True)
+st.markdown('<div class="leagues-header">Leagues</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="leagues-subtitle">Jump into a league or scan the standings preview.</div>',
+    unsafe_allow_html=True,
+)
 
-    if updated:
-        if not edit_name.strip():
-            st.error("League name is required.")
-        else:
-            with st.spinner("Saving settings..."):
-                try:
-                    api_client.update_league(
-                        selected_league["id"],
-                        {
-                            "name": edit_name.strip(),
-                            "platform": edit_platform,
-                            "scoring_type": edit_scoring_type.strip(),
-                        },
-                    )
-                    st.success("League updated.")
-                except Exception as exc:
-                    st.error(f"Failed to update league: {exc}")
+if not leagues:
+    st.info("No leagues available yet.")
 else:
-    st.info("Create a league to configure settings.")
+    for league in leagues:
+        render_league_row(league, _jump_to_league)
+
+st.markdown("</div>", unsafe_allow_html=True)
