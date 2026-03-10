@@ -5,7 +5,38 @@ from sqlalchemy import engine_from_config, pool
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.base import Base
-from collegefootballfantasy_api.app.models import league, matchup, player, player_stat, roster, standing, team, team_week_score
+from collegefootballfantasy_api.app.models import (
+    defense_rating,
+    defense_vs_position,
+    draft,
+    game,
+    game_odds,
+    injury,
+    injury_impact,
+    league,
+    league_invite,
+    league_member,
+    league_settings,
+    matchup,
+    notification,
+    player,
+    player_game_stat,
+    player_stat,
+    preseason_prior,
+    projection_explanation,
+    projection_input_audit,
+    roster,
+    scheduled_notification,
+    standing,
+    team,
+    team_environment,
+    team_stats_snapshot,
+    team_game_stat,
+    team_week_score,
+    user,
+    usage_share,
+    weekly_projection,
+)
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

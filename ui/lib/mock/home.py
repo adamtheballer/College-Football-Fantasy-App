@@ -163,10 +163,111 @@ def generate_home_data(seed: str | None = None) -> dict:
             }
         )
 
+    stats = [
+        {
+            "label": "Season Points",
+            "value": f"{random.uniform(4200, 5200):,.1f}",
+            "trend": f"+{random.uniform(6.0, 14.0):.1f}%",
+            "tone": "primary",
+            "icon": "T",
+        },
+        {
+            "label": "Active Leagues",
+            "value": f"{random.randint(3, 9):02d}",
+            "trend": "+1 New",
+            "tone": "emerald",
+            "icon": "L",
+        },
+        {
+            "label": "Player Efficiency",
+            "value": f"{random.uniform(76.0, 92.0):.1f}%",
+            "trend": f"-{random.uniform(1.0, 4.0):.1f}%",
+            "tone": "amber",
+            "icon": "E",
+        },
+        {
+            "label": "Global Rank",
+            "value": f"#{random.randint(900, 1600):,}",
+            "trend": f"+{random.randint(120, 520)}",
+            "tone": "purple",
+            "icon": "R",
+        },
+    ]
+
+    activity = []
+    activity_templates = [
+        ("Mike R.", "added", "D. Travis"),
+        ("Sarah J.", "dropped", "R. Wilson"),
+        ("John D.", "traded", "K. Allen"),
+        ("Alex P.", "added", "T. Etienne"),
+        ("Chris K.", "dropped", "B. Young"),
+        ("Jordan M.", "added", "M. Harrison"),
+        ("Avery S.", "traded", "J. Daniels"),
+    ]
+    for user, action, target in random.sample(activity_templates, k=5):
+        activity.append(
+            {
+                "user": user,
+                "action": action,
+                "target": target,
+                "time": _make_news_time(),
+            }
+        )
+
+    schedule = [
+        {
+            "day": "Sat",
+            "date": str(random.randint(22, 29)),
+            "title": "Waiver Deadline",
+            "detail": "11:59 PM ET",
+            "tone": "amber",
+        },
+        {
+            "day": "Sat",
+            "date": str(random.randint(22, 29)),
+            "title": "Weekly Kickoff",
+            "detail": (
+                f"{_make_team_name()} vs {_make_team_name()} &middot; "
+                f"{random.randint(1, 12):02d}:{random.choice(['00', '30'])} PM"
+            ),
+            "tone": "primary",
+        },
+        {
+            "day": "Tue",
+            "date": str(random.randint(22, 29)),
+            "title": "Standings Update",
+            "detail": "Weekly recaps finalized",
+            "tone": "emerald",
+        },
+    ]
+
+    headlines_feed = []
+    players = [
+        ("D. Bowers", "WIS", "injury"),
+        ("J. Daniels", "LSU", "update"),
+        ("M. Harrison", "OSU", "update"),
+        ("C. Williams", "USC", "injury"),
+    ]
+    for player, team, kind in players:
+        headlines_feed.append(
+            {
+                "player": player,
+                "team": team,
+                "type": kind,
+                "time": _make_news_time().upper(),
+                "news": f"{_make_team_name()} leads the 2024 surge with a statement win.",
+            }
+        )
+
     return {
         "seed": seed,
         "teams": my_teams,
         "matchups": matchups,
         "power_rankings": power_rankings,
         "news": league_news,
+        "stats": stats,
+        "activity": activity,
+        "schedule": schedule,
+        "headlines": headlines_feed,
+        "session_status": "Live - Active",
     }

@@ -55,28 +55,32 @@ st.markdown(
 
     .players-controls {
         display: grid;
-        grid-template-columns: 36px 36px 36px 1fr;
-        gap: 0.6rem;
+        grid-template-columns: 44px 44px 44px 1fr;
+        gap: 0.75rem;
         align-items: center;
-        margin-bottom: 0.6rem;
+        margin: 0.4rem 0 0.9rem;
     }
 
     .icon-wrap button {
-        width: 36px;
-        height: 36px;
+        width: 44px;
+        height: 44px;
         border-radius: 50% !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        color: #cfe1ff !important;
-        font-size: 0.85rem;
-        background: rgba(255, 255, 255, 0.04) !important;
+        color: #9fb0c7 !important;
+        font-size: 1rem;
+        background: rgba(10, 16, 26, 0.7) !important;
         padding: 0 !important;
+        box-shadow: inset 0 0 0 1px rgba(92, 167, 255, 0.08);
+        transition: all 0.2s ease;
     }
 
     .icon-wrap.active button {
-        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
+        background: rgba(92, 167, 255, 0.2) !important;
+        color: #e6f0ff !important;
+        border-color: rgba(92, 167, 255, 0.45) !important;
     }
 
     .chip-row {
@@ -84,7 +88,7 @@ st.markdown(
         gap: 0.4rem;
         overflow-x: auto;
         padding-bottom: 0.2rem;
-        margin-bottom: 0.8rem;
+        margin-bottom: 1.2rem;
     }
 
     .chip-row::-webkit-scrollbar {
@@ -92,45 +96,45 @@ st.markdown(
     }
 
     .chip {
-        padding: 0.35rem 0.8rem;
+        padding: 0.35rem 0.9rem;
         border-radius: 999px;
-        font-size: 0.7rem;
+        font-size: 0.65rem;
         text-transform: uppercase;
-        letter-spacing: 0.08rem;
-        border: 1px solid rgba(255, 255, 255, 0.16);
-        color: #9fb0c7;
-        background: transparent;
+        letter-spacing: 0.16em;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #a6b6cc;
+        background: rgba(10, 16, 26, 0.65);
         white-space: nowrap;
         text-decoration: none;
     }
 
     .chip.active {
-        background: rgba(74, 163, 255, 0.2);
-        border-color: rgba(74, 163, 255, 0.5);
-        color: #e0ecff;
+        background: rgba(92, 167, 255, 0.4);
+        border-color: rgba(92, 167, 255, 0.8);
+        color: #0b1220;
     }
 
     .watch-divider {
         height: 1px;
-        background: rgba(255, 255, 255, 0.06);
-        margin: 0.4rem 0 0.8rem;
+        background: rgba(255, 255, 255, 0.08);
+        margin: 0.8rem 0 1.2rem;
     }
 
     .watch-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0.75rem 1rem;
-        border-radius: 12px;
+        padding: 0.95rem 1.1rem;
+        border-radius: 18px;
         border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(255, 255, 255, 0.04);
+        background: linear-gradient(180deg, rgba(16, 22, 34, 0.96), rgba(10, 16, 26, 0.96));
     }
 
     .watch-title {
         font-size: 0.7rem;
         text-transform: uppercase;
-        letter-spacing: 0.12rem;
-        color: #cfe1ff;
+        letter-spacing: 0.22em;
+        color: #7fb3ff;
         font-weight: 700;
     }
 
@@ -141,17 +145,17 @@ st.markdown(
     }
 
     .watch-icon {
-        width: 30px;
-        height: 30px;
+        width: 40px;
+        height: 32px;
         border-radius: 50%;
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.12);
         display: inline-flex;
         align-items: center;
         justify-content: center;
         text-decoration: none;
-        color: #cfe1ff;
+        color: #e6f0ff;
         font-size: 0.7rem;
-        background: rgba(255, 255, 255, 0.06);
+        background: rgba(10, 16, 26, 0.75);
     }
 
     .watch-dropdown {
@@ -161,12 +165,14 @@ st.markdown(
     .watch-dropdown summary {
         list-style: none;
         cursor: pointer;
-        padding: 0.35rem 0.8rem;
+        padding: 0.45rem 1rem;
         border-radius: 999px;
         border: 1px solid rgba(255, 255, 255, 0.12);
-        background: rgba(255, 255, 255, 0.04);
-        font-size: 0.7rem;
-        color: #cfe1ff;
+        background: rgba(10, 16, 26, 0.75);
+        font-size: 0.65rem;
+        color: #e6f0ff;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
     }
 
     .watch-dropdown[open] summary {
@@ -204,9 +210,9 @@ st.markdown(
 
     .watch-list {
         position: relative;
-        background: #121820;
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 16px;
+        background: linear-gradient(180deg, rgba(14, 21, 35, 0.95), rgba(10, 16, 26, 0.95));
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 22px;
         overflow: hidden;
     }
 
@@ -214,9 +220,9 @@ st.markdown(
         display: grid;
         grid-template-columns: 1fr 70px 70px;
         gap: 0;
-        padding: 0.9rem 1rem;
+        padding: 1rem 1.2rem;
         border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        font-size: 0.8rem;
+        font-size: 0.82rem;
         align-items: center;
         cursor: pointer;
     }
@@ -228,24 +234,24 @@ st.markdown(
     .watch-header-row {
         display: grid;
         grid-template-columns: 1fr 70px 70px;
-        padding: 0.65rem 1rem;
+        padding: 0.75rem 1.2rem;
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         font-size: 0.62rem;
         text-transform: uppercase;
-        letter-spacing: 0.08rem;
+        letter-spacing: 0.18em;
         color: #7f8da3;
     }
 
     .player-left {
         display: grid;
-        grid-template-columns: 28px 38px 1fr;
-        gap: 0.7rem;
+        grid-template-columns: 44px 1fr;
+        gap: 0.9rem;
         align-items: center;
     }
 
     .add-btn {
-        width: 28px;
-        height: 28px;
+        width: 20px;
+        height: 20px;
         border-radius: 50%;
         background: #2ed158;
         color: #0b0f14;
@@ -254,6 +260,11 @@ st.markdown(
         align-items: center;
         justify-content: center;
         text-decoration: none;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.35);
+        position: absolute;
+        right: -6px;
+        bottom: -6px;
+        font-size: 0.65rem;
     }
 
     .add-btn.disabled {
@@ -263,10 +274,10 @@ st.markdown(
     }
 
     .player-avatar {
-        width: 36px;
-        height: 36px;
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(92, 167, 255, 0.14);
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -290,21 +301,21 @@ st.markdown(
 
     .player-name {
         font-weight: 700;
-        color: #f3f6ff;
+        color: #e8f1ff;
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         gap: 0.2rem;
-        font-size: 0.82rem;
+        font-size: 0.84rem;
         line-height: 1.2;
     }
 
     .player-meta {
-        color: #9fb0c7;
-        font-size: 0.65rem;
+        color: #8ea0b8;
+        font-size: 0.64rem;
         margin-left: 0.35rem;
         text-transform: uppercase;
-        letter-spacing: 0.06rem;
+        letter-spacing: 0.1em;
     }
 
     .note-icon {
@@ -317,16 +328,16 @@ st.markdown(
     }
 
     .player-sub {
-        color: #8fa0b6;
-        font-size: 0.7rem;
+        color: #9fb0c7;
+        font-size: 0.68rem;
         line-height: 1.3;
     }
 
     .player-matchup {
-        font-size: 0.7rem;
+        font-size: 0.68rem;
         line-height: 1.3;
         text-transform: uppercase;
-        letter-spacing: 0.08rem;
+        letter-spacing: 0.14em;
         color: #7f8da3;
     }
 
@@ -344,6 +355,32 @@ st.markdown(
     .trend-down {
         color: #ff6b6b;
         font-weight: 700;
+    }
+
+    .players-search [data-testid="stTextInput"] {
+        margin-top: 0;
+    }
+
+    .players-search input {
+        background: rgba(10, 16, 26, 0.75) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 999px !important;
+        padding-left: 2.4rem !important;
+        color: #e8f1ff !important;
+    }
+
+    .players-search {
+        position: relative;
+    }
+
+    .players-search::before {
+        content: "🔍";
+        position: absolute;
+        left: 0.9rem;
+        top: 0.7rem;
+        font-size: 0.85rem;
+        opacity: 0.6;
+        pointer-events: none;
     }
     </style>
     """,
@@ -394,21 +431,23 @@ watchlist_only = st.session_state.get("watchlist_only", True)
 control_cols = st.columns([1, 1, 1, 4])
 with control_cols[0]:
     st.markdown('<div class="icon-wrap">', unsafe_allow_html=True)
-    st.button("🔍", key="icon_search", disabled=True)
+    st.button("○", key="icon_search", disabled=True)
     st.markdown("</div>", unsafe_allow_html=True)
 with control_cols[1]:
     st.markdown('<div class="icon-wrap">', unsafe_allow_html=True)
-    st.button("🎚", key="icon_filter", disabled=True)
+    st.button("⋮", key="icon_filter", disabled=True)
     st.markdown("</div>", unsafe_allow_html=True)
 with control_cols[2]:
     wrap_class = "icon-wrap active" if watchlist_only else "icon-wrap"
     st.markdown(f'<div class="{wrap_class}">', unsafe_allow_html=True)
-    if st.button("⚑", key="watchlist_toggle"):
+    if st.button("+", key="watchlist_toggle"):
         st.session_state["watchlist_only"] = not watchlist_only
         watchlist_only = st.session_state["watchlist_only"]
     st.markdown("</div>", unsafe_allow_html=True)
 with control_cols[3]:
-    search_query = st.text_input("", placeholder="Search", label_visibility="collapsed")
+    st.markdown('<div class="players-search">', unsafe_allow_html=True)
+    search_query = st.text_input("", placeholder="Search players...", label_visibility="collapsed")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 chip_options = ["All", "QB", "RB", "WR", "TE", "K"]
 position_filter = pos_param if pos_param in chip_options else "All"
@@ -611,10 +650,11 @@ else:
                     f'<div class="watch-row" role="button" tabindex="0" ',
                     f'onclick="window.location.href=\'{player_link}\'">',
                     '<div class="player-left">',
+                    f'<div class="player-avatar">{first_initial}{last_name[:1]}{ir_badge}',
                     f'<a class="{action_class}" href="?{action_query}" ',
                     'onclick="event.stopPropagation();">',
                     f"{action_label}</a>",
-                    f'<div class="player-avatar">{first_initial}{last_name[:1]}{ir_badge}</div>',
+                    "</div>",
                     f'<a class="player-link" href="{player_link}" ',
                     'onclick="event.stopPropagation();">',
                     f'<div class="player-name">{first_initial} {last_name}',
