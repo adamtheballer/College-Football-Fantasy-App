@@ -19,20 +19,17 @@ DEFAULT_ROSTER_SLOTS = {
     "RB": 2,
     "WR": 2,
     "TE": 1,
-    "FLEX": 1,
     "K": 1,
     "BE": 4,
     "IR": 1,
 }
 
-FLEX_DISTRIBUTION = {"RB": 0.45, "WR": 0.45, "TE": 0.10}
 BENCH_DISTRIBUTION = {
     "QB": 0.10,
-    "RB": 0.35,
-    "WR": 0.35,
-    "TE": 0.10,
+    "RB": 0.38,
+    "WR": 0.38,
+    "TE": 0.09,
     "K": 0.05,
-    "FLEX": 0.05,
 }
 
 GRADE_MULTIPLIER = {
@@ -46,20 +43,14 @@ GRADE_MULTIPLIER = {
 
 
 def _normalize_roster_slots(roster_slots: dict[str, int] | None) -> dict[str, int]:
-    slots = DEFAULT_ROSTER_SLOTS.copy()
-    if roster_slots:
-        for key, value in roster_slots.items():
-            slots[key.upper()] = int(value)
-    return slots
+    return DEFAULT_ROSTER_SLOTS.copy()
 
 
 def _replacement_index(pos: str, league_size: int, roster_slots: dict[str, int]) -> int:
     starters = roster_slots.get(pos, 0) * league_size
-    flex_slots = roster_slots.get("FLEX", 0) * league_size
     bench_slots = (roster_slots.get("BE", 0) + roster_slots.get("IR", 0)) * league_size
-    flex_share = flex_slots * FLEX_DISTRIBUTION.get(pos, 0.0)
     bench_share = bench_slots * BENCH_DISTRIBUTION.get(pos, 0.0)
-    return max(1, round(starters + flex_share + bench_share))
+    return max(1, round(starters + bench_share))
 
 
 def _build_replacement_by_pos(

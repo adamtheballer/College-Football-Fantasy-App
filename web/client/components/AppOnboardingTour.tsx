@@ -96,6 +96,22 @@ type TooltipPosition = {
 
 const PADDING = 12;
 
+const scrollGuideContainerToTop = (behavior: ScrollBehavior = "auto") => {
+  const appMain = document.querySelector('main[data-app-scroll="true"]');
+  if (appMain instanceof HTMLElement) {
+    appMain.scrollTo({ top: 0, left: 0, behavior });
+    return;
+  }
+  window.scrollTo({ top: 0, left: 0, behavior });
+};
+
+const resetSidebarNavToTop = () => {
+  const sidebarNav = document.querySelector("aside nav");
+  if (sidebarNav instanceof HTMLElement) {
+    sidebarNav.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }
+};
+
 export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTourProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
@@ -117,8 +133,10 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
   useEffect(() => {
     if (!isOpen) return;
     const originalOverflow = document.body.style.overflow;
+    document.body.classList.add("cfb-tour-open");
     document.body.style.overflow = "hidden";
     return () => {
+      document.body.classList.remove("cfb-tour-open");
       document.body.style.overflow = originalOverflow;
     };
   }, [isOpen]);
@@ -156,7 +174,8 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
       }
 
       if (!step.target) {
-        window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+        scrollGuideContainerToTop("auto");
+        resetSidebarNavToTop();
         setTargetRect(null);
         setTooltipPosition(null);
         return;
@@ -172,7 +191,21 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
       element.classList.add("cfb-tour-active-target");
       activeTargetRef.current = element;
 
-      element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      const sidebarNav = element.closest("aside nav");
+      if (sidebarNav instanceof HTMLElement) {
+        const containerTop = sidebarNav.scrollTop;
+        const containerBottom = containerTop + sidebarNav.clientHeight;
+        const elementTop = element.offsetTop;
+        const elementBottom = elementTop + element.offsetHeight;
+        const margin = 16;
+
+        if (elementTop < containerTop + margin || elementBottom > containerBottom - margin) {
+          const targetTop = Math.max(0, elementTop - sidebarNav.clientHeight * 0.25);
+          sidebarNav.scrollTo({ top: targetTop, left: 0, behavior: "smooth" });
+        }
+      } else {
+        element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      }
       if (!element.hasAttribute("tabindex")) {
         element.setAttribute("tabindex", "-1");
       }
@@ -220,7 +253,7 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
 
   return (
     <div className="fixed inset-0 z-[1200]" role="dialog" aria-modal="true" aria-live="polite">
-      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]" />
+      <div className="absolute inset-0 bg-slate-950/28 backdrop-blur-[0.5px]" />
 
       {targetRect && (
         <>
@@ -239,7 +272,7 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
                 />
               </mask>
             </defs>
-            <rect width="100%" height="100%" fill="rgba(2,6,23,0.42)" mask="url(#app-tour-mask)" />
+            <rect width="100%" height="100%" fill="rgba(2,6,23,0.30)" mask="url(#app-tour-mask)" />
           </svg>
           <div
             aria-hidden="true"

@@ -32,32 +32,34 @@ const posStyles: Record<string, { bg: string, border: string, text: string, shad
   WR: { bg: "bg-purple-500/20", border: "border-purple-500/30", text: "text-purple-400", shadow: "shadow-[0_0_15px_rgba(168,85,247,0.3)]" },
   TE: { bg: "bg-orange-500/20", border: "border-orange-500/30", text: "text-orange-400", shadow: "shadow-[0_0_15px_rgba(249,115,22,0.3)]" },
   K: { bg: "bg-cyan-500/20", border: "border-cyan-500/30", text: "text-cyan-400", shadow: "shadow-[0_0_15px_rgba(6,182,212,0.3)]" },
-  DL: { bg: "bg-red-500/20", border: "border-red-500/30", text: "text-red-400", shadow: "shadow-[0_0_15px_rgba(239,68,68,0.3)]" },
-  DB: { bg: "bg-pink-500/20", border: "border-pink-500/30", text: "text-pink-400", shadow: "shadow-[0_0_15px_rgba(236,72,153,0.3)]" },
 };
 
 const myRosterMock = [
   { id: 101, name: "Jaxson Dart", pos: "QB", school: "OLE MISS", fpts: 312.4, status: "STARTER", wkProj: 22.5, posRank: 4 },
   { id: 102, name: "Ashton Jeanty", pos: "RB", school: "BSU", fpts: 288.8, status: "STARTER", wkProj: 24.1, posRank: 2 },
+  { id: 111, name: "Omarion Hampton", pos: "RB", school: "UNC", fpts: 245.2, status: "STARTER", wkProj: 17.8, posRank: 6 },
   { id: 103, name: "Emeka Egbuka", pos: "WR", school: "OSU", fpts: 238.3, status: "STARTER", wkProj: 18.4, posRank: 8 },
-  { id: 104, name: "Colston Loveland", pos: "TE", school: "MICHIGAN", fpts: 145.2, status: "STARTER", wkProj: 12.8, posRank: 3 },
-  { id: 105, name: "Mason Graham", pos: "DL", school: "MICHIGAN", fpts: 125.8, status: "STARTER", wkProj: 9.5, posRank: 1 },
   { id: 106, name: "Tetairoa McMillan", pos: "WR", school: "ARIZONA", fpts: 248.1, status: "STARTER", wkProj: 19.2, posRank: 5 },
-  { id: 107, name: "Omarion Hampton", pos: "RB", school: "UNC", fpts: 245.2, status: "BENCH", wkProj: 17.8, posRank: 6 },
+  { id: 104, name: "Colston Loveland", pos: "TE", school: "MICHIGAN", fpts: 145.2, status: "STARTER", wkProj: 12.8, posRank: 3 },
+  { id: 112, name: "Will Reichard", pos: "K", school: "ALABAMA", fpts: 142.6, status: "STARTER", wkProj: 11.3, posRank: 2 },
   { id: 108, name: "Tez Johnson", pos: "WR", school: "OREGON", fpts: 212.4, status: "BENCH", wkProj: 15.5, posRank: 12 },
   { id: 109, name: "Elic Ayomanor", pos: "WR", school: "STANFORD", fpts: 205.1, status: "BENCH", wkProj: 14.2, posRank: 15 },
   { id: 110, name: "KJ Jefferson", pos: "QB", school: "UCF", fpts: 265.4, status: "BENCH", wkProj: 18.1, posRank: 11 },
+  { id: 113, name: "Brock Bowers", pos: "TE", school: "GEORGIA", fpts: 189.5, status: "BENCH", wkProj: 13.6, posRank: 4 },
 ];
 
 const otherTeamRosterMock = [
   { id: 1, name: "Quinn Ewers", pos: "QB", school: "TEXAS", fpts: 345.5, status: "STARTER", wkProj: 26.4, posRank: 1 },
   { id: 2, name: "Ollie Gordon II", pos: "RB", school: "OKST", fpts: 325.2, status: "STARTER", wkProj: 25.8, posRank: 1 },
+  { id: 11, name: "TreVeyon Henderson", pos: "RB", school: "OSU", fpts: 255.5, status: "STARTER", wkProj: 16.4, posRank: 5 },
   { id: 3, name: "Luther Burden III", pos: "WR", school: "MISSOURI", fpts: 302.5, status: "STARTER", wkProj: 23.5, posRank: 1 },
-  { id: 4, name: "Dillon Gabriel", pos: "QB", school: "OREGON", fpts: 332.2, status: "STARTER", wkProj: 24.8, posRank: 2 },
-  { id: 5, name: "Tyleik Williams", pos: "DL", school: "OSU", fpts: 165.8, status: "STARTER", wkProj: 11.2, posRank: 2 },
-  { id: 6, name: "TreVeyon Henderson", pos: "RB", school: "OSU", fpts: 255.5, status: "BENCH", wkProj: 16.4, posRank: 5 },
-  { id: 7, name: "Jaxson Dart", pos: "QB", school: "OLE MISS", fpts: 312.4, status: "BENCH", wkProj: 22.5, posRank: 4 },
-  { id: 8, name: "Ashton Jeanty", pos: "RB", school: "BSU", fpts: 288.8, status: "BENCH", wkProj: 24.1, posRank: 2 },
+  { id: 12, name: "Rome Odunze", pos: "WR", school: "WASHINGTON", fpts: 271.3, status: "STARTER", wkProj: 19.8, posRank: 3 },
+  { id: 13, name: "Brock Bowers", pos: "TE", school: "GEORGIA", fpts: 189.5, status: "STARTER", wkProj: 13.6, posRank: 4 },
+  { id: 14, name: "Cam Little", pos: "K", school: "ARKANSAS", fpts: 131.1, status: "STARTER", wkProj: 10.5, posRank: 6 },
+  { id: 4, name: "Dillon Gabriel", pos: "QB", school: "OREGON", fpts: 332.2, status: "BENCH", wkProj: 24.8, posRank: 2 },
+  { id: 15, name: "Ashton Jeanty", pos: "RB", school: "BSU", fpts: 288.8, status: "BENCH", wkProj: 24.1, posRank: 2 },
+  { id: 16, name: "Evan Stewart", pos: "WR", school: "OREGON", fpts: 201.2, status: "BENCH", wkProj: 14.4, posRank: 14 },
+  { id: 17, name: "Mason Taylor", pos: "TE", school: "LSU", fpts: 143.2, status: "BENCH", wkProj: 10.2, posRank: 8 },
 ];
 
 export default function Trade() {
@@ -122,7 +124,7 @@ export default function Trade() {
         season,
         week,
         league_size: 12,
-        roster_slots: { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, K: 1, BE: 4, IR: 1 },
+        roster_slots: { QB: 1, RB: 2, WR: 2, TE: 1, K: 1, BE: 4, IR: 1 },
       }
     )
       .then((payload) => {
@@ -156,6 +158,11 @@ export default function Trade() {
   const theirSchedule = averageScheduleGrade(selectedTheirPlayers);
   const myPreview = selectedMyPlayers[0] ? getSchedulePreview(selectedMyPlayers[0].school, selectedMyPlayers[0].pos) : [];
   const theirPreview = selectedTheirPlayers[0] ? getSchedulePreview(selectedTheirPlayers[0].school, selectedTheirPlayers[0].pos) : [];
+  const fairnessScore = (() => {
+    const total = Math.max(1, tradeResult.giveValue + tradeResult.receiveValue);
+    const gap = Math.abs(tradeResult.delta);
+    return Math.max(0, Math.min(100, Math.round(100 - (gap / total) * 120)));
+  })();
 
   return (
     <div className="max-w-6xl w-full mx-auto space-y-12 animate-in fade-in duration-1000 py-10 px-4 md:px-6 relative overflow-x-hidden">
@@ -470,10 +477,24 @@ export default function Trade() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Verdict</span>
-                    <span className={cn("text-[12px] font-black uppercase tracking-widest", tradeResult.delta >= 0 ? "text-emerald-400" : "text-red-400")}>
-                      {tradeResult.verdict}
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Trade Fairness Score</span>
+                    <span className="text-[12px] font-black uppercase tracking-widest text-primary">
+                      {fairnessScore}/100
                     </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">You Gain</p>
+                      <p className={cn("text-xl font-black", tradeResult.delta >= 0 ? "text-emerald-400" : "text-red-400")}>
+                        {tradeResult.delta >= 0 ? "+" : ""}{tradeResult.delta.toFixed(1)} pts
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Verdict</p>
+                      <p className={cn("text-xl font-black uppercase", tradeResult.delta >= 0 ? "text-emerald-400" : "text-red-400")}>
+                        {tradeResult.verdict}
+                      </p>
+                    </div>
                   </div>
                 </div>
               ) : (

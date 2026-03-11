@@ -173,7 +173,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-1000 relative z-10 pb-20">
+    <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-20">
       {/* Header Section */}
       <div className="space-y-6 pt-12 relative border-b border-border/40 pb-12">
         <div className="flex items-center justify-between">

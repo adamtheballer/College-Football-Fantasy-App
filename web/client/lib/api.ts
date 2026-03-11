@@ -15,7 +15,12 @@ const buildUrl = (path: string, params?: Record<string, string | number | boolea
 };
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem("cfb_token");
+  let token: string | null = null;
+  try {
+    token = localStorage.getItem("cfb_token");
+  } catch {
+    token = null;
+  }
   return token ? { "X-User-Token": token } : {};
 };
 

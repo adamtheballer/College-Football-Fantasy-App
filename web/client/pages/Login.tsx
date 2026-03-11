@@ -38,8 +38,13 @@ export default function Login() {
     setError(null);
     try {
       await login(email, password);
-      const savedUser = localStorage.getItem("cfb_user");
-      const parsedUser = savedUser ? JSON.parse(savedUser) as { id: number } : null;
+      let parsedUser: { id: number } | null = null;
+      try {
+        const savedUser = localStorage.getItem("cfb_user");
+        parsedUser = savedUser ? (JSON.parse(savedUser) as { id: number }) : null;
+      } catch {
+        parsedUser = null;
+      }
       if (parsedUser) {
         setPendingGuide(parsedUser.id);
       }

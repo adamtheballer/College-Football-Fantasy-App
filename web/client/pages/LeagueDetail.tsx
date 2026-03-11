@@ -29,8 +29,6 @@ const PositionPill = ({ pos }: { pos: string }) => {
     RB: "border-emerald-500/50 text-emerald-400 bg-emerald-500/10",
     WR: "border-orange-500/50 text-orange-400 bg-orange-500/10",
     TE: "border-purple-500/50 text-purple-400 bg-purple-500/10",
-    FLEX: "border-amber-500/50 text-amber-400 bg-amber-500/10",
-    "D/ST": "border-slate-500/50 text-slate-400 bg-slate-500/10",
     K: "border-pink-500/50 text-pink-400 bg-pink-500/10",
     BENCH: "border-border text-muted-foreground bg-white/5",
     IR: "border-red-500/50 text-red-400 bg-red-500/10",
@@ -50,8 +48,6 @@ const RosterRow = ({ pos, name, team, rostered, start, game, score, proj, boom, 
     RB: "bg-emerald-500",
     WR: "bg-orange-500",
     TE: "bg-purple-500",
-    FLEX: "bg-amber-500",
-    "D/ST": "bg-slate-500",
     K: "bg-pink-500",
     BENCH: "bg-muted-foreground",
     IR: "bg-red-500",
@@ -171,7 +167,6 @@ const rosterSeed = {
   wr1: wrs[0] || fallbackPlayer,
   wr2: wrs[1] || wrs[0] || fallbackPlayer,
   te: tes[0] || fallbackPlayer,
-  flex: wrs[2] || rbs[2] || wrs[0] || fallbackPlayer,
   k: ks[0] || fallbackPlayer,
 };
 
@@ -219,7 +214,6 @@ const leagueMockData: any = {
       rosterRow("WR1", rosterSeed.wr1),
       rosterRow("WR2", rosterSeed.wr2),
       rosterRow("TE", rosterSeed.te),
-      rosterRow("FLEX", rosterSeed.flex),
       rosterRow("K", rosterSeed.k),
     ],
     bench: [

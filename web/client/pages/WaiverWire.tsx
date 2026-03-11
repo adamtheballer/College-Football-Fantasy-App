@@ -240,6 +240,21 @@ export default function WaiverWire() {
     return result;
   }, [activeFilter, searchQuery, sortBy]);
 
+  const waiverIntel = useMemo(() => {
+    const sortedByTrend = [...playersMock].sort((a, b) => parseFloat(b.change) - parseFloat(a.change));
+    const sortedByRostered = [...playersMock].sort((a, b) => b.rostered - a.rostered);
+    const sleepers = [...playersMock]
+      .filter((player) => player.rostered <= 40 && (player.projection.fpts ?? 0) >= 9)
+      .sort((a, b) => (b.projection.fpts ?? 0) - (a.projection.fpts ?? 0))
+      .slice(0, 3);
+    return {
+      mostAdded: sortedByTrend[0],
+      trendingPickups: sortedByTrend.slice(0, 4),
+      mostRosteredToday: sortedByRostered[0],
+      sleepers,
+    };
+  }, []);
+
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col items-center py-12 px-8">
       <PlayerDetailModal
@@ -286,6 +301,64 @@ export default function WaiverWire() {
               onClick={() => setActiveFilter(pos)} 
             />
           ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <Card className="bg-card/30 backdrop-blur-md border border-white/10 rounded-[2rem]">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-[10px] font-black tracking-[0.28em] uppercase text-primary">
+                Most Added Today
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <p className="text-[15px] font-black italic uppercase text-foreground">
+                {waiverIntel.mostAdded?.name}
+              </p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70">
+                {waiverIntel.mostAdded?.school} · {waiverIntel.mostAdded?.pos}
+              </p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">
+                Trend {waiverIntel.mostAdded?.change}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/30 backdrop-blur-md border border-white/10 rounded-[2rem]">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-[10px] font-black tracking-[0.28em] uppercase text-primary">
+                Trending Pickups
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {waiverIntel.trendingPickups.map((player) => (
+                <div key={player.id} className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em]">
+                  <span className="text-foreground">{player.name}</span>
+                  <span className="text-emerald-400">{player.change}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/30 backdrop-blur-md border border-white/10 rounded-[2rem]">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-[10px] font-black tracking-[0.28em] uppercase text-primary">
+                Sleeper Radar
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70">
+                Most Rostered: {waiverIntel.mostRosteredToday?.name}
+              </p>
+              {waiverIntel.sleepers.map((player) => (
+                <div key={player.id} className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em]">
+                  <span className="text-foreground">{player.name}</span>
+                  <span className="text-amber-300">
+                    Proj {weeklyProjection(player.projection.fpts).toFixed(1)}
+                  </span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Table Container */}

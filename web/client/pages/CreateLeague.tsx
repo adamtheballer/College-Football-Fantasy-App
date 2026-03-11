@@ -70,24 +70,20 @@ export default function CreateLeague() {
     xp: 1,
   });
 
-  const [rosterSlots, setRosterSlots] = useState({
+  const rosterSlots = {
     QB: 1,
     RB: 2,
     WR: 2,
     TE: 1,
-    FLEX: 1,
     K: 1,
     BENCH: 4,
     IR: 1,
-  });
+  };
 
   const [settings, setSettings] = useState({
     playoff_teams: 4,
     waiver_type: "faab",
     trade_review_type: "commissioner",
-    superflex_enabled: false,
-    kicker_enabled: true,
-    defense_enabled: false,
   });
 
   const [draft, setDraft] = useState({
@@ -148,9 +144,9 @@ export default function CreateLeague() {
           playoff_teams: settings.playoff_teams,
           waiver_type: settings.waiver_type,
           trade_review_type: settings.trade_review_type,
-          superflex_enabled: settings.superflex_enabled,
-          kicker_enabled: settings.kicker_enabled,
-          defense_enabled: settings.defense_enabled,
+          superflex_enabled: false,
+          kicker_enabled: true,
+          defense_enabled: false,
         },
         draft: {
           draft_datetime_utc: draftDateTime.toISOString(),
@@ -356,21 +352,21 @@ export default function CreateLeague() {
             <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">League Settings</CardTitle>
           </CardHeader>
           <CardContent className="px-10 pb-10 space-y-8">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+                Fixed Roster Format
+              </Label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {Object.entries(rosterSlots).map(([slot, value]) => (
-                <div key={slot} className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">{slot}</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={value}
-                    onChange={(e) =>
-                      setRosterSlots((prev) => ({ ...prev, [slot]: Number(e.target.value) }))
-                    }
-                    className="h-11 rounded-xl bg-white/5 border-border text-sm font-bold"
-                  />
+                <div key={slot} className="h-11 rounded-xl bg-white/5 border border-border px-4 flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/70">{slot}</span>
+                  <span className="text-sm font-black text-primary">{value}</span>
                 </div>
               ))}
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground/55">
+                Locked for all leagues: QB, RB, RB, WR, WR, TE, K + 4 Bench + 1 IR. No defensive players.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -461,28 +457,13 @@ export default function CreateLeague() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-6">
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={settings.superflex_enabled}
-                  onCheckedChange={(value) => setSettings((prev) => ({ ...prev, superflex_enabled: value }))}
-                />
-                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/70">Superflex</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={settings.kicker_enabled}
-                  onCheckedChange={(value) => setSettings((prev) => ({ ...prev, kicker_enabled: value }))}
-                />
-                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/70">Kicker</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={settings.defense_enabled}
-                  onCheckedChange={(value) => setSettings((prev) => ({ ...prev, defense_enabled: value }))}
-                />
-                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/70">Defense</span>
-              </div>
+            <div className="h-11 rounded-xl bg-white/5 border border-border px-4 flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/70">
+                Format Flags
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+                Superflex Off • Kicker On • Defense Off
+              </span>
             </div>
           </CardContent>
         </Card>

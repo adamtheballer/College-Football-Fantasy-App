@@ -49,8 +49,6 @@ const posStyles: Record<string, { bg: string, border: string, text: string, shad
   WR: { bg: "bg-purple-500/20", border: "border-purple-500/30", text: "text-purple-400", shadow: "shadow-[0_0_15px_rgba(168,85,247,0.3)]" },
   TE: { bg: "bg-orange-500/20", border: "border-orange-500/30", text: "text-orange-400", shadow: "shadow-[0_0_15px_rgba(249,115,22,0.3)]" },
   K: { bg: "bg-cyan-500/20", border: "border-cyan-500/30", text: "text-cyan-400", shadow: "shadow-[0_0_15px_rgba(6,182,212,0.3)]" },
-  DL: { bg: "bg-red-500/20", border: "border-red-500/30", text: "text-red-400", shadow: "shadow-[0_0_15px_rgba(239,68,68,0.3)]" },
-  DB: { bg: "bg-pink-500/20", border: "border-pink-500/30", text: "text-pink-400", shadow: "shadow-[0_0_15px_rgba(236,72,153,0.3)]" },
 };
 
 const DraftOrderPill = ({ name, pick, isCurrent, onClick, round, isUserTeam }: any) => (
@@ -82,7 +80,6 @@ const DEFAULT_DRAFT_CONFIG = {
     RB: 2,
     WR: 2,
     TE: 1,
-    FLEX: 1,
     K: 1,
     BE: 4,
     IR: 1,
@@ -116,7 +113,6 @@ const buildRosterSlots = (slots: DraftRosterSlots) => {
   for (let i = 1; i <= slots.RB; i += 1) roster.push({ pos: `RB${i}`, player: null });
   for (let i = 1; i <= slots.WR; i += 1) roster.push({ pos: `WR${i}`, player: null });
   if (slots.TE > 0) roster.push({ pos: "TE", player: null });
-  for (let i = 1; i <= slots.FLEX; i += 1) roster.push({ pos: "FLEX", player: null });
   if (slots.K > 0) roster.push({ pos: "K", player: null });
   for (let i = 0; i < slots.BE; i += 1) roster.push({ pos: "BE", player: null });
   for (let i = 0; i < slots.IR; i += 1) roster.push({ pos: "IR", player: null });
@@ -173,12 +169,11 @@ export default function Draft() {
     return order;
   };
 
-  const currentPicker = draftOrder[currentPick];
-  const isMyTurn = currentPicker?.name === "My Team";
-
   const initialRoster = buildRosterSlots(draftConfig.rosterSlots);
   const [myRoster, setMyRoster] = useState(initialRoster);
   const draftOrder = generateSnakeOrder(teamNames, initialRoster.length);
+  const currentPicker = draftOrder[currentPick];
+  const isMyTurn = currentPicker?.name === "My Team";
 
   const handleDraft = (p: DraftPlayer) => {
     if (!isMyTurn || draftedPlayers.includes(p.id)) return;
@@ -186,9 +181,6 @@ export default function Draft() {
     setMyRoster(prev => {
       const newRoster = [...prev];
       let slotIdx = newRoster.findIndex(s => s.pos.startsWith(p.pos) && !s.player);
-      if (slotIdx === -1 && ["RB", "WR", "TE"].includes(p.pos)) {
-        slotIdx = newRoster.findIndex(s => s.pos === "FLEX" && !s.player);
-      }
       if (slotIdx === -1) {
         slotIdx = newRoster.findIndex(s => s.pos === "BE" && !s.player);
       }
@@ -243,6 +235,57 @@ export default function Draft() {
     p.school.toLowerCase().includes(searchQuery.toLowerCase()))
   );
   const queuePlayers = sortedPlayers.filter(p => queue.includes(p.id));
+  const smartRecommendations = React.useMemo(() => {
+    const emptyStarterByPos: Record<string, number> = { QB: 0, RB: 0, WR: 0, TE: 0, K: 0 };
+    myRoster.forEach((slot) => {
+      if (slot.player) return;
+      const pos = slot.pos.replace(/[0-9]/g, "");
+      if (pos in emptyStarterByPos) {
+        emptyStarterByPos[pos] += 1;
+      }
+    });
+    const gradeToScore = (grade: string) => {
+      if (grade === "A+") return 2;
+      if (grade === "A") return 1.5;
+      if (grade === "B") return 1;
+      if (grade === "C") return 0;
+      if (grade === "D") return -1;
+      return -1.5;
+    };
+    return filteredPlayers
+      .slice(0, 80)
+      .map((player) => {
+        const needBoost = emptyStarterByPos[player.pos] > 0 ? 8 : 2;
+        const schedule = getSchedulePreview(player.school, player.pos, 5);
+        const scheduleScore =
+          schedule.length > 0
+            ? schedule.reduce((sum, game) => sum + gradeToScore(game.grade), 0) / schedule.length
+            : 0;
+        const injuryPenalty =
+          player.status && player.status !== "HEALTHY" ? 2.5 : 0;
+        const finalScore =
+          player.projectedPoints * 0.55 +
+          needBoost * 1.4 +
+          scheduleScore * 1.8 -
+          injuryPenalty;
+        const rosterReason = emptyStarterByPos[player.pos] > 0 ? "fills a starting need" : "adds depth";
+        const scheduleReason = schedule.length
+          ? `SOS ${schedule.map((g) => g.grade).join("")}`
+          : "neutral SOS";
+        return {
+          player,
+          finalScore,
+          reasons: [
+            `${player.projectedPoints.toFixed(1)} projected points`,
+            rosterReason,
+            scheduleReason,
+            injuryPenalty > 0 ? "injury risk present" : "low injury risk",
+          ],
+        };
+      })
+      .sort((a, b) => b.finalScore - a.finalScore)
+      .slice(0, 3);
+  }, [filteredPlayers, myRoster]);
 
   const openPlayerDetails = (player: Player) => {
     setSelectedPlayer(player);
@@ -408,7 +451,7 @@ export default function Draft() {
                   </thead>
                   <tbody className="divide-y divide-white/10">
                     {(activeTab === "queue" ? queuePlayers : filteredPlayers).map((p) => {
-                      const style = posStyles[p.pos] || posStyles.DB;
+                      const style = posStyles[p.pos] || posStyles.QB;
                       const isDrafted = draftedPlayers.includes(p.id);
                       if (isDrafted) return null;
 
@@ -480,6 +523,47 @@ export default function Draft() {
 
         {/* Info Column */}
         <div className="space-y-8 sticky top-8 h-fit">
+           <Card className="bg-card/40 backdrop-blur-md border border-primary/20 rounded-[3rem] overflow-hidden shadow-2xl relative">
+              <CardHeader className="p-8 border-b border-white/10 bg-gradient-to-r from-primary/10 to-transparent">
+                <CardTitle className="text-[11px] font-black tracking-[0.45em] uppercase text-primary flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  Smart Draft Assistant
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                {smartRecommendations.map((entry) => (
+                  <div key={entry.player.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[12px] font-black italic uppercase text-foreground">
+                        {entry.player.name}
+                      </p>
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+                        {entry.player.pos}
+                      </span>
+                    </div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70">
+                      {entry.player.school}
+                    </p>
+                    <ul className="space-y-1">
+                      {entry.reasons.slice(0, 3).map((reason) => (
+                        <li
+                          key={`${entry.player.id}-${reason}`}
+                          className="text-[10px] font-medium text-muted-foreground/80"
+                        >
+                          • {reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+                {smartRecommendations.length === 0 && (
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                    No draft suggestions available.
+                  </p>
+                )}
+              </CardContent>
+           </Card>
+
            <Card className="bg-card/40 backdrop-blur-md border border-white/5 rounded-[3rem] overflow-hidden shadow-2xl relative group">
               <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 blur-[80px] rounded-full -mr-24 -mt-24 group-hover:bg-amber-500/10 transition-colors" />
               <CardHeader className="p-10 border-b border-white/5 bg-gradient-to-br from-white/5 to-transparent relative z-10">

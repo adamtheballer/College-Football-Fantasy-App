@@ -1,27 +1,51 @@
 const completedGuideKey = (userId: number) => `cfb_completed_guide_${userId}`;
 const pendingGuideKey = (userId: number) => `cfb_pending_guide_${userId}`;
 
+const safeGet = (key: string) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const safeSet = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Ignore storage errors to avoid crashing app boot.
+  }
+};
+
+const safeRemove = (key: string) => {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Ignore storage errors to avoid crashing app boot.
+  }
+};
+
 export const hasCompletedGuide = (userId: number) =>
-  localStorage.getItem(completedGuideKey(userId)) === "true";
+  safeGet(completedGuideKey(userId)) === "true";
 
 export const setCompletedGuide = (userId: number) => {
-  localStorage.setItem(completedGuideKey(userId), "true");
-  localStorage.removeItem(pendingGuideKey(userId));
+  safeSet(completedGuideKey(userId), "true");
+  safeRemove(pendingGuideKey(userId));
 };
 
 export const hasPendingGuide = (userId: number) =>
-  localStorage.getItem(pendingGuideKey(userId)) === "true";
+  safeGet(pendingGuideKey(userId)) === "true";
 
 export const setPendingGuide = (userId: number) => {
   if (!hasCompletedGuide(userId)) {
-    localStorage.setItem(pendingGuideKey(userId), "true");
+    safeSet(pendingGuideKey(userId), "true");
   }
 };
 
 export const restartGuide = (userId: number) => {
-  localStorage.setItem(pendingGuideKey(userId), "true");
+  safeSet(pendingGuideKey(userId), "true");
 };
 
 export const clearPendingGuide = (userId: number) => {
-  localStorage.removeItem(pendingGuideKey(userId));
+  safeRemove(pendingGuideKey(userId));
 };

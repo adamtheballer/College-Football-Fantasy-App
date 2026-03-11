@@ -125,4 +125,19 @@
   .cfb-tour-active-target span {
     color: hsl(var(--primary-foreground)) !important;
   }
+
+  .cfb-tour-open [data-nav-item="true"][data-nav-active="true"]:not(.cfb-tour-active-target) {
+    background: transparent !important;
+    color: hsl(var(--muted-foreground)) !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
+  }
+
+  .cfb-tour-open [data-nav-item="true"][data-nav-active="true"]:not(.cfb-tour-active-target) .nav-active-overlay {
+    display: none !important;
+  }
+
+  .cfb-tour-open [data-nav-item="true"][data-nav-active="true"]:not(.cfb-tour-active-target) svg {
+    color: hsl(var(--primary)) !important;
+  }
 }

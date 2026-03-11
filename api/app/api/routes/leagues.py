@@ -33,6 +33,16 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
 
 router = APIRouter()
 
+FIXED_ROSTER_SLOTS = {
+    "QB": 1,
+    "RB": 2,
+    "WR": 2,
+    "TE": 1,
+    "K": 1,
+    "BENCH": 4,
+    "IR": 1,
+}
+
 
 def _generate_unique_invite(db: Session) -> str:
     for _ in range(20):
@@ -91,12 +101,21 @@ def _league_detail(db: Session, league: League) -> LeagueDetailRead:
     )
 
 
+def _enforce_fixed_roster_settings(payload_settings):
+    payload_settings.roster_slots_json = FIXED_ROSTER_SLOTS.copy()
+    payload_settings.superflex_enabled = False
+    payload_settings.kicker_enabled = True
+    payload_settings.defense_enabled = False
+    return payload_settings
+
+
 @router.post("/create", response_model=LeagueCreateResponse, status_code=status.HTTP_201_CREATED)
 def create_league_flow(
     payload: LeagueCreateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeagueCreateResponse:
+    payload.settings = _enforce_fixed_roster_settings(payload.settings)
     code = _generate_unique_invite(db)
     league = League(
         name=payload.basics.name,
@@ -300,6 +319,7 @@ def update_league_settings(
     settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
     if not settings_row:
         settings_row = LeagueSettings(league_id=league.id)
+    payload = _enforce_fixed_roster_settings(payload)
     settings_row.scoring_json = payload.scoring_json
     settings_row.roster_slots_json = payload.roster_slots_json
     settings_row.playoff_teams = payload.playoff_teams

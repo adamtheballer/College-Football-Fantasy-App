@@ -5,7 +5,6 @@ export type DraftRosterSlots = {
   RB: number;
   WR: number;
   TE: number;
-  FLEX: number;
   K: number;
   BE: number;
   IR: number;
@@ -132,19 +131,12 @@ const historyFantasyPoints = (player: Player) => {
   );
 };
 
-const FLEX_DISTRIBUTION: Record<string, number> = {
-  RB: 0.45,
-  WR: 0.45,
-  TE: 0.10,
-};
-
 const BENCH_DISTRIBUTION: Record<string, number> = {
   QB: 0.10,
   RB: 0.35,
   WR: 0.35,
   TE: 0.10,
   K: 0.05,
-  FLEX: 0.05,
 };
 
 const positionMultiplier: Record<string, number> = {
@@ -161,13 +153,11 @@ const computeReplacementIndex = (
   rosterSlots: DraftRosterSlots
 ) => {
   const starters = (rosterSlots[pos as keyof DraftRosterSlots] || 0) * leagueSize;
-  const flexSlots = rosterSlots.FLEX * leagueSize;
   const benchSlots = (rosterSlots.BE + rosterSlots.IR) * leagueSize;
 
-  const flexShare = FLEX_DISTRIBUTION[pos] ? flexSlots * FLEX_DISTRIBUTION[pos] : 0;
   const benchShare = BENCH_DISTRIBUTION[pos] ? benchSlots * BENCH_DISTRIBUTION[pos] : 0;
 
-  return Math.max(1, Math.round(starters + flexShare + benchShare));
+  return Math.max(1, Math.round(starters + benchShare));
 };
 
 export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPlayer[] => {
