@@ -112,3 +112,17 @@
     white-space: pre;
   }
 }
+
+@layer components {
+  .cfb-tour-active-target {
+    background: linear-gradient(to right, hsl(var(--primary)), rgb(59 130 246)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.35) !important;
+    border-color: transparent !important;
+  }
+
+  .cfb-tour-active-target svg,
+  .cfb-tour-active-target span {
+    color: hsl(var(--primary-foreground)) !important;
+  }
+}

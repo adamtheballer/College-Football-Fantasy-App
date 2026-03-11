@@ -14,6 +14,7 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -24,6 +25,7 @@ export default function Signup() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
     try {
       await signup(firstName, email, password);
       const savedUser = localStorage.getItem("cfb_user");
@@ -32,6 +34,15 @@ export default function Signup() {
         setPendingGuide(parsedUser.id);
       }
       navigate("/", { replace: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (message.includes("409")) {
+        setError("That email is already registered. Try signing in instead.");
+      } else if (message.includes("Failed to fetch")) {
+        setError("Cannot reach the server. Make sure backend is running on port 8000.");
+      } else {
+        setError("Create account failed. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -103,6 +114,12 @@ export default function Signup() {
                   </div>
                 </div>
               </div>
+
+              {error && (
+                <div className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-red-300">
+                  {error}
+                </div>
+              )}
 
               <Button 
                 type="submit" 

@@ -43,13 +43,13 @@ const TOUR_STEPS: TourStep[] = [
     target: "#nav-watchlist",
     title: "Watchlist",
     description:
-      "Track players you’re monitoring for breakouts, depth chart movement, waiver claims, and long-term fantasy value.",
+      "Use Watchlist to track trade targets, stash candidates, and players you want to monitor before making a move.",
   },
   {
     target: "#nav-waiver-wire",
     title: "Waiver Wire",
     description:
-      "Browse the best available pickups here, ordered by projection and opportunity so you can react quickly.",
+      "Use Waiver Wire to pick up available free agents and add immediate help to your roster each week.",
   },
   {
     target: "#nav-injury-center",
@@ -101,6 +101,7 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null);
   const primaryButtonRef = useRef<HTMLButtonElement | null>(null);
+  const activeTargetRef = useRef<HTMLElement | null>(null);
 
   const step = TOUR_STEPS[currentStep];
   const isFinalStep = currentStep === TOUR_STEPS.length - 1;
@@ -149,6 +150,11 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
     if (!isOpen) return;
 
     const updateTarget = () => {
+      if (activeTargetRef.current) {
+        activeTargetRef.current.classList.remove("cfb-tour-active-target");
+        activeTargetRef.current = null;
+      }
+
       if (!step.target) {
         window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
         setTargetRect(null);
@@ -162,6 +168,9 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
         setTooltipPosition(null);
         return;
       }
+
+      element.classList.add("cfb-tour-active-target");
+      activeTargetRef.current = element;
 
       element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
       if (!element.hasAttribute("tabindex")) {
@@ -187,6 +196,10 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
     window.addEventListener("resize", updateTarget);
     window.addEventListener("scroll", updateTarget, true);
     return () => {
+      if (activeTargetRef.current) {
+        activeTargetRef.current.classList.remove("cfb-tour-active-target");
+        activeTargetRef.current = null;
+      }
       window.removeEventListener("resize", updateTarget);
       window.removeEventListener("scroll", updateTarget, true);
     };
