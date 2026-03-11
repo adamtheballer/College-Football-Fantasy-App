@@ -14,6 +14,8 @@ import {
   Gauge,
   Target,
   BarChart2,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -43,6 +45,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { apiGet, apiPost } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -299,6 +303,7 @@ const POWER4_TEAMS_BY_CONFERENCE: Record<string, string[]> = {
     "Wake Forest",
   ],
 };
+const POWER4_TEAM_SET = new Set(Object.values(POWER4_TEAMS_BY_CONFERENCE).flat());
 
 const FALLBACK_TEAM_ROWS: TeamSummary[] = Object.entries(POWER4_TEAMS_BY_CONFERENCE)
   .flatMap(([conference, teams]) =>
@@ -451,6 +456,8 @@ export default function Stats() {
   const [compareB, setCompareB] = useState<string>("");
   const [compareResult, setCompareResult] = useState<CompareResponse | null>(null);
   const [compareLoading, setCompareLoading] = useState(false);
+  const [openPlayerA, setOpenPlayerA] = useState(false);
+  const [openPlayerB, setOpenPlayerB] = useState(false);
   const [comparisonTab, setComparisonTab] = useState<PlayerComparisonTab>("overview");
   const [projectionWeek, setProjectionWeek] = useState<number>(1);
   const [projectionA, setProjectionA] = useState<ProjectionRead | null>(null);
@@ -565,21 +572,42 @@ export default function Stats() {
   useEffect(() => {
     if (mode !== "players") return;
     const controller = new AbortController();
-    apiGet<{ data: Array<{ id: number; name: string; position: string; school: string }> }>(
-      "/players",
-      { limit: 200, offset: 0 },
-      controller.signal
-    )
-      .then((payload) => {
-        setPlayerOptions(
-          (payload?.data ?? []).map((row) => ({
-            id: row.id,
-            name: row.name,
-            position: row.position,
-            school: row.school,
-          }))
+    const loadPlayers = async () => {
+      const chunkSize = 500;
+      let offset = 0;
+      let hasMore = true;
+      const collected: PlayerOption[] = [];
+      while (hasMore && offset <= 5000) {
+        const payload = await apiGet<{ data: Array<{ id: number; name: string; position: string; school: string }> }>(
+          "/players",
+          { limit: chunkSize, offset },
+          controller.signal
         );
-      })
+        const rows = payload?.data ?? [];
+        if (!rows.length) {
+          hasMore = false;
+          break;
+        }
+        collected.push(
+          ...rows
+            .filter((row) => POWER4_TEAM_SET.has(row.school))
+            .map((row) => ({
+              id: row.id,
+              name: row.name,
+              position: row.position,
+              school: row.school,
+            }))
+        );
+        if (rows.length < chunkSize) {
+          hasMore = false;
+        }
+        offset += rows.length;
+      }
+      const deduped = new Map<number, PlayerOption>();
+      collected.forEach((row) => deduped.set(row.id, row));
+      setPlayerOptions(Array.from(deduped.values()).sort((a, b) => a.name.localeCompare(b.name)));
+    };
+    loadPlayers()
       .catch(() => setPlayerOptions([]));
     return () => controller.abort();
   }, [mode]);
@@ -1210,33 +1238,91 @@ export default function Stats() {
             <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr_170px] gap-4">
               <div className="space-y-2">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Player A</p>
-                <Select value={compareA} onValueChange={setCompareA}>
-                  <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl text-[11px] font-bold">
-                    <SelectValue placeholder="Select player A" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#0A0C10] border-border rounded-2xl max-h-[320px]">
-                    {playerOptions.map((player) => (
-                      <SelectItem key={player.id} value={String(player.id)}>
-                        {player.name} · {player.school} · {player.position}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={openPlayerA} onOpenChange={setOpenPlayerA}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openPlayerA}
+                      className="h-12 w-full justify-between bg-white/5 border-white/10 rounded-xl text-[11px] font-bold hover:bg-white/10 hover:text-foreground"
+                    >
+                      {playerAOption
+                        ? `${playerAOption.name} · ${playerAOption.school} · ${playerAOption.position}`
+                        : "Search Power 4 Player A"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0 border-white/10 bg-[#0A0C10]">
+                    <Command className="bg-[#0A0C10]">
+                      <CommandInput placeholder="Search player A in Power 4..." className="text-[11px] font-semibold" />
+                      <CommandList className="max-h-[320px]">
+                        <CommandEmpty>No Power 4 player found.</CommandEmpty>
+                        <CommandGroup>
+                          {playerOptions.map((player) => (
+                            <CommandItem
+                              key={player.id}
+                              value={`${player.name} ${player.school} ${player.position}`}
+                              onSelect={() => {
+                                setCompareA(String(player.id));
+                                setOpenPlayerA(false);
+                              }}
+                              className="text-[11px] font-semibold"
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", compareA === String(player.id) ? "opacity-100" : "opacity-0")} />
+                              <span>
+                                {player.name} · {player.school} · {player.position}
+                              </span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Player B</p>
-                <Select value={compareB} onValueChange={setCompareB}>
-                  <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl text-[11px] font-bold">
-                    <SelectValue placeholder="Select player B" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#0A0C10] border-border rounded-2xl max-h-[320px]">
-                    {playerOptions.map((player) => (
-                      <SelectItem key={player.id} value={String(player.id)}>
-                        {player.name} · {player.school} · {player.position}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={openPlayerB} onOpenChange={setOpenPlayerB}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openPlayerB}
+                      className="h-12 w-full justify-between bg-white/5 border-white/10 rounded-xl text-[11px] font-bold hover:bg-white/10 hover:text-foreground"
+                    >
+                      {playerBOption
+                        ? `${playerBOption.name} · ${playerBOption.school} · ${playerBOption.position}`
+                        : "Search Power 4 Player B"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0 border-white/10 bg-[#0A0C10]">
+                    <Command className="bg-[#0A0C10]">
+                      <CommandInput placeholder="Search player B in Power 4..." className="text-[11px] font-semibold" />
+                      <CommandList className="max-h-[320px]">
+                        <CommandEmpty>No Power 4 player found.</CommandEmpty>
+                        <CommandGroup>
+                          {playerOptions.map((player) => (
+                            <CommandItem
+                              key={player.id}
+                              value={`${player.name} ${player.school} ${player.position}`}
+                              onSelect={() => {
+                                setCompareB(String(player.id));
+                                setOpenPlayerB(false);
+                              }}
+                              className="text-[11px] font-semibold"
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", compareB === String(player.id) ? "opacity-100" : "opacity-0")} />
+                              <span>
+                                {player.name} · {player.school} · {player.position}
+                              </span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Week</p>
