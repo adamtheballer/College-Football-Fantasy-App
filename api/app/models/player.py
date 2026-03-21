@@ -8,8 +8,6 @@ class Player(TimestampMixin, Base):
     __tablename__ = "players"
     __table_args__ = (
         Index("ix_players_external_id", "external_id"),
-        Index("ix_players_position", "position"),
-        Index("ix_players_school", "school"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

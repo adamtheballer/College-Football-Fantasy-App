@@ -170,11 +170,11 @@ export default function Trade() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
         <div className="space-y-4">
           <div className="flex items-center gap-6">
-            <Link to={`/leagues`}>
-              <Button variant="ghost" className="h-14 w-14 rounded-[1.5rem] bg-white/5 border border-white/10 text-muted-foreground hover:text-primary transition-all hover:scale-110 flex items-center justify-center p-0">
+            <Button asChild variant="ghost" className="h-14 w-14 rounded-[1.5rem] bg-white/5 border border-white/10 text-muted-foreground hover:text-primary transition-all hover:scale-110 flex items-center justify-center p-0">
+              <Link to="/leagues">
                 <ArrowLeft className="w-6 h-6" />
-              </Button>
-            </Link>
+              </Link>
+            </Button>
             <div className="space-y-1">
               <h1 className="text-6xl font-black italic uppercase tracking-tighter text-foreground leading-none">
                 Trade Builder

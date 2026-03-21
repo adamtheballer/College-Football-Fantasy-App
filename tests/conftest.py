@@ -1,23 +1,37 @@
-import os
 from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
-from api.app.db.base import Base
-from api.app.db.session import get_db
-from api.app.main import app
-from api.app.models import league, player, roster, team  # noqa: F401
+from collegefootballfantasy_api.app.db.base import Base
+from collegefootballfantasy_api.app.db.session import get_db
+from collegefootballfantasy_api.app.main import app
+from collegefootballfantasy_api.app.models import (  # noqa: F401
+    draft,
+    league,
+    league_invite,
+    league_member,
+    league_settings,
+    player,
+    roster,
+    scheduled_notification,
+    team,
+    user,
+)
 
-TEST_DATABASE_URL = "sqlite:///./test.db"
+TEST_DATABASE_URL = "sqlite://"
+engine = create_engine(
+    TEST_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+TestingSessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 
 def override_get_db() -> Generator[Session, None, None]:
-    engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
-    TestingSessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-    Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
     try:
         yield db
@@ -27,9 +41,10 @@ def override_get_db() -> Generator[Session, None, None]:
 
 @pytest.fixture(name="client")
 def client_fixture() -> Generator[TestClient, None, None]:
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as client:
         yield client
     app.dependency_overrides.clear()
-    if os.path.exists("./test.db"):
-        os.remove("./test.db")
+    Base.metadata.drop_all(bind=engine)

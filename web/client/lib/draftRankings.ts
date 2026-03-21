@@ -1,4 +1,5 @@
 import { Player } from "@/types/player";
+import { PlayerStats } from "@/types/player";
 
 export type DraftRosterSlots = {
   QB: number;
@@ -81,7 +82,7 @@ const varianceByPos: Record<string, number> = {
 };
 
 const espnFantasyPoints = (player: Player) => {
-  const proj = player.projection || {};
+  const proj: Partial<PlayerStats> = player.projection || {};
   const passYds = proj.passingYards ?? 0;
   const passTds = proj.passingTds ?? 0;
   const ints = proj.ints ?? 0;
@@ -108,7 +109,7 @@ const espnFantasyPoints = (player: Player) => {
 };
 
 const historyFantasyPoints = (player: Player) => {
-  const latest = player.history?.[0]?.stats;
+  const latest: Partial<PlayerStats> | undefined = player.history?.[0]?.stats;
   if (!latest) return 0;
   if (latest.fpts !== undefined) return latest.fpts;
   const passYds = latest.passingYards ?? 0;

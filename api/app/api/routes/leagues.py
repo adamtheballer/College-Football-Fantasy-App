@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.api.deps import get_current_user
@@ -13,6 +14,7 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
+from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
@@ -28,6 +30,10 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     LeaguePreview,
     LeagueSettingsRead,
     LeagueSettingsUpdate,
+    LeagueWorkspaceRead,
+    LeagueWorkspaceRosterEntryRead,
+    LeagueWorkspaceStandingSummaryRead,
+    LeagueWorkspaceTeamRead,
     JoinByCodeRequest,
 )
 
@@ -107,6 +113,125 @@ def _enforce_fixed_roster_settings(payload_settings):
     payload_settings.kicker_enabled = True
     payload_settings.defense_enabled = False
     return payload_settings
+
+
+def _get_league_or_404(db: Session, league_id: int) -> League:
+    league = db.get(League, league_id)
+    if not league:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
+    return league
+
+
+def _get_league_membership(db: Session, league_id: int, user_id: int) -> LeagueMember | None:
+    return (
+        db.query(LeagueMember)
+        .filter(LeagueMember.league_id == league_id, LeagueMember.user_id == user_id)
+        .first()
+    )
+
+
+def _require_league_member(db: Session, league_id: int, user_id: int) -> LeagueMember:
+    membership = _get_league_membership(db, league_id, user_id)
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="league membership required",
+        )
+    return membership
+
+
+def _build_allowed_actions(
+    league: League, membership: LeagueMember, owned_team: Team | None
+) -> list[str]:
+    allowed_actions = {
+        "open_draft_lobby",
+        "view_members",
+        "view_standings",
+    }
+    if owned_team:
+        allowed_actions.update({"view_roster", "manage_roster", "manage_team"})
+    if membership.role == "commissioner" or league.commissioner_user_id == membership.user_id:
+        allowed_actions.update(
+            {"update_settings", "regenerate_invite", "reschedule_draft", "delete_league"}
+        )
+    return sorted(allowed_actions)
+
+
+def _league_workspace(
+    db: Session,
+    league: League,
+    membership: LeagueMember,
+    current_user: User,
+) -> LeagueWorkspaceRead:
+    owned_team = (
+        db.query(Team)
+        .filter(Team.league_id == league.id, Team.owner_user_id == current_user.id)
+        .first()
+    )
+    roster_entries = []
+    if owned_team:
+        roster_rows = (
+            db.query(RosterEntry)
+            .filter(RosterEntry.team_id == owned_team.id)
+            .all()
+        )
+        roster_entries = [
+            LeagueWorkspaceRosterEntryRead(
+                id=row.id,
+                team_id=row.team_id,
+                player_id=row.player_id,
+                slot=row.slot,
+                status=row.status,
+                player_name=row.player.name if row.player else None,
+                player_school=row.player.school if row.player else None,
+                player_position=row.player.position if row.player else None,
+            )
+            for row in roster_rows
+        ]
+
+    teams = db.query(Team).filter(Team.league_id == league.id).all()
+    roster_counts = dict(
+        db.query(RosterEntry.team_id, func.count(RosterEntry.id))
+        .join(Team, Team.id == RosterEntry.team_id)
+        .filter(Team.league_id == league.id)
+        .group_by(RosterEntry.team_id)
+        .all()
+    )
+    sorted_teams = sorted(
+        teams,
+        key=lambda team: (-roster_counts.get(team.id, 0), team.created_at, team.id),
+    )
+    standings_summary = [
+        LeagueWorkspaceStandingSummaryRead(
+            team_id=team.id,
+            team_name=team.name,
+            wins=0,
+            losses=0,
+            ties=0,
+            points_for=None,
+            rank=index,
+        )
+        for index, team in enumerate(sorted_teams, start=1)
+    ]
+
+    return LeagueWorkspaceRead(
+        league=_league_detail(db, league),
+        membership=LeagueMemberRead.model_validate(membership),
+        owned_team=(
+            LeagueWorkspaceTeamRead(
+                id=owned_team.id,
+                league_id=owned_team.league_id,
+                name=owned_team.name,
+                owner_user_id=owned_team.owner_user_id,
+            )
+            if owned_team
+            else None
+        ),
+        roster=roster_entries,
+        matchup_summary=None,
+        standings_summary=standings_summary,
+        allowed_actions=_build_allowed_actions(league, membership, owned_team),
+    )
 
 
 @router.post("/create", response_model=LeagueCreateResponse, status_code=status.HTTP_201_CREATED)
@@ -201,10 +326,19 @@ def list_leagues_endpoint(
 
 @router.get("/{league_id}", response_model=LeagueDetailRead)
 def get_league_endpoint(league_id: int, db: Session = Depends(get_db)) -> LeagueDetailRead:
-    league = db.get(League, league_id)
-    if not league:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
+    league = _get_league_or_404(db, league_id)
     return _league_detail(db, league)
+
+
+@router.get("/{league_id}/workspace", response_model=LeagueWorkspaceRead)
+def get_league_workspace_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeagueWorkspaceRead:
+    league = _get_league_or_404(db, league_id)
+    membership = _require_league_member(db, league.id, current_user.id)
+    return _league_workspace(db, league, membership, current_user)
 
 
 @router.get("/{league_id}/members", response_model=LeagueMembersList)

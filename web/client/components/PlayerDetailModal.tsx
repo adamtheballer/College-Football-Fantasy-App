@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { X, Trophy, Activity, Target, Shield, ArrowLeft, Bookmark, ChevronDown, Quote, TrendingUp, Check, ChevronRight } from "lucide-react";
+import { X, Trophy, Activity, Target, Shield, ArrowLeft, Bookmark, ChevronDown, Quote, TrendingUp, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Player } from "@/types/player";
-import { useNavigate } from "react-router-dom";
 import { getMatchupGrade, matchupGradeColor } from "@/lib/matchupGrades";
 import { buildProjectionReasons } from "@/lib/projectionReasons";
 import { getSchedulePreview } from "@/lib/strengthOfSchedule";
@@ -15,19 +14,6 @@ interface PlayerDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-const myLeagues = [
-  {
-    id: "saturday-league",
-    name: "Saturday League",
-    teamName: "Mountain Falcons",
-  },
-  {
-    id: "pro-scout-elite",
-    name: "Pro Scout Elite",
-    teamName: "Steel Warriors",
-  }
-];
 
 const posStyles: Record<string, { bg: string, border: string, text: string, shadow: string, accent: string }> = {
   QB: { bg: "bg-blue-500/20", border: "border-blue-500/30", text: "text-blue-400", shadow: "shadow-[0_0_15px_rgba(59,130,246,0.3)]", accent: "blue" },
@@ -47,8 +33,6 @@ const posStyles: Record<string, { bg: string, border: string, text: string, shad
 export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModalProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "stats" | "history">("overview");
   const [historyYear, setHistoryYear] = useState<number>(2025);
-  const [showLeagueDropdown, setShowLeagueDropdown] = useState(false);
-  const navigate = useNavigate();
   const [matchup, setMatchup] = useState(() => getMatchupGrade("TEAM", "QB"));
   const [reasons, setReasons] = useState<string[]>([]);
   const [schedule, setSchedule] = useState(() => getSchedulePreview("TEAM", "QB"));
@@ -124,20 +108,6 @@ export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModal
     player.history.find((h) => h.year === historyYear) ||
     player.history[0] ||
     { year: historyYear, stats: { fpts: 0 } };
-
-  const handleTradeClick = () => {
-    if (myLeagues.length === 1) {
-      navigate(`/trade/${myLeagues[0].id}/${player.id}`);
-      onClose();
-    } else {
-      setShowLeagueDropdown(!showLeagueDropdown);
-    }
-  };
-
-  const selectLeague = (leagueId: string) => {
-    navigate(`/trade/${leagueId}/${player.id}`);
-    onClose();
-  };
 
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300 backdrop-blur-2xl bg-black/80">
@@ -533,32 +503,12 @@ export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModal
            </div>
 
            <div className="flex gap-6 relative">
-              {showLeagueDropdown && (
-                <div className="absolute bottom-full right-0 mb-6 w-72 bg-card/95 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-2xl z-[400] shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
-                  <div className="p-5 border-b border-white/5 bg-white/5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Select Roster to Trade</p>
-                  </div>
-                  {myLeagues.map((league) => (
-                    <button
-                      key={league.id}
-                      onClick={() => selectLeague(league.id)}
-                      className="w-full px-8 py-5 text-left hover:bg-primary/10 transition-colors border-b border-white/5 last:border-0 group flex items-center justify-between"
-                    >
-                      <div className="space-y-1">
-                        <p className="text-[12px] font-black uppercase tracking-widest text-foreground group-hover:text-primary transition-colors">{league.name}</p>
-                        <p className="text-[10px] font-medium text-muted-foreground/60">{league.teamName}</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground/20 group-hover:text-primary transition-all group-hover:translate-x-1" />
-                    </button>
-                  ))}
-                </div>
-              )}
-
               <Button
-                onClick={handleTradeClick}
+                disabled
+                title="Trade flow is not part of the supported React surface yet."
                 className="h-16 px-12 bg-primary text-primary-foreground rounded-2xl text-[11px] font-black uppercase tracking-[0.3em] shadow-[0_20px_40px_rgba(var(--primary),0.3)] hover:scale-105 transition-all duration-500 border border-white/10"
               >
-                Trade for Player
+                Trade Flow Coming Soon
               </Button>
            </div>
         </div>

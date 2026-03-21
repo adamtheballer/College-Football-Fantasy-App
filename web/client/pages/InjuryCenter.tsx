@@ -4,8 +4,9 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PlayerDetailModal } from "@/components/PlayerDetailModal";
-import { allPlayersMock } from "@/data/playersMock";
 import { apiGet } from "@/lib/api";
+import { usePlayerDetail } from "@/hooks/use-players";
+import type { Player } from "@/types/player";
 import {
   Select,
   SelectContent,
@@ -60,14 +61,16 @@ const statusSortOrder: Record<string, number> = {
   FULL: 5,
 };
 
-const statusLabel = (value: string) => value.replaceAll("_", " ");
+const statusLabel = (value: string) => value.split("_").join(" ");
 
 export default function InjuryCenter() {
   const [searchQuery, setSearchQuery] = useState("");
   const [conferenceFilter, setConferenceFilter] = useState("ALL");
-  const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false);
   const [injuries, setInjuries] = useState<InjuryItem[]>([]);
+  const { data: playerDetail } = usePlayerDetail(selectedPlayerId, selectedPlayerId !== null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -105,6 +108,12 @@ export default function InjuryCenter() {
     return () => controller.abort();
   }, [conferenceFilter]);
 
+  useEffect(() => {
+    if (!playerDetail) return;
+    setSelectedPlayer(playerDetail);
+    setIsPlayerModalOpen(true);
+  }, [playerDetail]);
+
   const filtered = useMemo(() => {
     return injuries
       .filter((row) =>
@@ -141,12 +150,9 @@ export default function InjuryCenter() {
       });
   }, [injuries, searchQuery]);
 
-  const openPlayer = (name: string) => {
-    const player = allPlayersMock.find((p) => p.name.toLowerCase() === name.toLowerCase());
-    if (player) {
-      setSelectedPlayer(player);
-      setIsPlayerModalOpen(true);
-    }
+  const openPlayer = (playerId: number) => {
+    setSelectedPlayer(null);
+    setSelectedPlayerId(playerId);
   };
 
   return (
@@ -210,7 +216,7 @@ export default function InjuryCenter() {
             {filtered.map((row) => (
               <div
                 key={row.id}
-                onClick={() => openPlayer(row.name)}
+                onClick={() => openPlayer(row.id)}
                 className="grid grid-cols-1 md:grid-cols-[1.3fr_0.6fr_0.9fr_0.9fr_0.6fr] gap-6 items-center px-10 py-6 hover:bg-white/[0.04] transition-all cursor-pointer"
               >
                 <div className="space-y-2">

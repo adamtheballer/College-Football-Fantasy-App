@@ -21,15 +21,15 @@ export function FloatingQuickActions() {
   const actions = useMemo<QuickAction[]>(
     () => [
       {
-        label: "Add Player",
+        label: "Create League",
         icon: UserPlus,
-        onClick: () => navigate("/waiver-wire"),
+        onClick: () => navigate("/leagues/create"),
         styleClass: "from-primary/90 to-blue-500/90",
       },
       {
-        label: "Propose Trade",
+        label: "Join League",
         icon: ArrowRightLeft,
-        onClick: () => navigate("/leagues"),
+        onClick: () => navigate("/leagues/join"),
         styleClass: "from-emerald-500/90 to-teal-500/90",
       },
       {

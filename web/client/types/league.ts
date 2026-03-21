@@ -11,6 +11,22 @@ export interface LeagueSettings {
   defense_enabled: boolean;
 }
 
+export interface LeagueListItem {
+  id: number;
+  name: string;
+  platform: string;
+  scoring_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LeagueListResponse {
+  data: LeagueListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface DraftInfo {
   id: number;
   league_id: number;
@@ -62,4 +78,50 @@ export interface LeagueCreateResponse {
   league: LeagueDetail;
   invite_code: string;
   invite_link: string;
+}
+
+export interface LeagueWorkspaceTeam {
+  id: number;
+  league_id: number;
+  name: string;
+  owner_user_id: number | null;
+}
+
+export interface LeagueWorkspaceRosterEntry {
+  id: number;
+  team_id: number;
+  player_id: number;
+  slot: string | null;
+  status?: string | null;
+  player_name?: string | null;
+  player_school?: string | null;
+  player_position?: string | null;
+}
+
+export interface LeagueWorkspaceMatchupSummary {
+  week?: number | null;
+  opponent_team_name?: string | null;
+  status?: string | null;
+  projected_points_for?: number | null;
+  projected_points_against?: number | null;
+}
+
+export interface LeagueWorkspaceStandingSummary {
+  team_id: number;
+  team_name: string;
+  wins?: number;
+  losses?: number;
+  ties?: number;
+  points_for?: number;
+  rank?: number;
+}
+
+export interface LeagueWorkspace {
+  league: LeagueDetail;
+  membership: LeagueMember | null;
+  owned_team: LeagueWorkspaceTeam | null;
+  roster: LeagueWorkspaceRosterEntry[];
+  matchup_summary: LeagueWorkspaceMatchupSummary | null;
+  standings_summary: LeagueWorkspaceStandingSummary[];
+  allowed_actions: string[] | Record<string, boolean> | null;
 }

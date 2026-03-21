@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { Copy, Search, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 export default function JoinLeague() {
   const { inviteCode } = useParams();
+  const queryClient = useQueryClient();
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
   const [code, setCode] = useState(inviteCode || "");
@@ -53,7 +55,9 @@ export default function JoinLeague() {
     setLoading(true);
     setError(null);
     try {
-      await apiPost(`/leagues/${preview.id}/join`, {});
+      const joinedLeague = await apiPost(`/leagues/${preview.id}/join`, {});
+      queryClient.invalidateQueries({ queryKey: ["leagues"] });
+      queryClient.setQueryData(["league", preview.id], joinedLeague);
       navigate(`/league/${preview.id}`);
     } catch (err: any) {
       setError(err.message || "Unable to join league.");

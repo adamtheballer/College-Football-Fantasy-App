@@ -42,6 +42,7 @@ import { Player } from "@/types/player";
 import { allPlayersMock } from "@/data/playersMock";
 import { buildDraftPlayerPool } from "@/lib/draftPlayerPool";
 import { buildDraftBoard, DraftPlayer, DraftRosterSlots } from "@/lib/draftRankings";
+import { getSchedulePreview } from "@/lib/strengthOfSchedule";
 
 const posStyles: Record<string, { bg: string, border: string, text: string, shadow: string }> = {
   QB: { bg: "bg-blue-500/20", border: "border-blue-500/30", text: "text-blue-400", shadow: "shadow-[0_0_15px_rgba(59,130,246,0.3)]" },
@@ -332,14 +333,15 @@ export default function Draft() {
 
   return (
     <div className="min-h-screen flex flex-col p-8 space-y-8 relative">
-      <Link to="/leagues" className="fixed top-8 left-8 z-[150]">
-        <Button
-          variant="ghost"
-          className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 text-muted-foreground hover:text-primary transition-all hover:scale-110 flex items-center justify-center p-0"
-        >
+      <Button
+        asChild
+        variant="ghost"
+        className="fixed top-8 left-8 z-[150] h-12 w-12 rounded-2xl bg-white/5 border border-white/10 text-muted-foreground hover:text-primary transition-all hover:scale-110 flex items-center justify-center p-0"
+      >
+        <Link to="/leagues">
           <ArrowLeft className="w-5 h-5" />
-        </Button>
-      </Link>
+        </Link>
+      </Button>
 
       <PlayerDetailModal
         player={selectedPlayer}

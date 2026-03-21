@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Calendar, Check, ChevronLeft, ChevronRight, Copy, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +39,9 @@ const getDefaultDraftTime = () => "19:00";
 
 export default function CreateLeague() {
   const navigate = useNavigate();
-  const { isLoggedIn, user } = useAuth();
+  const queryClient = useQueryClient();
+  const { isLoggedIn } = useAuth();
+  const stepTransitionLockRef = useRef(false);
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,8 +120,22 @@ export default function CreateLeague() {
     return true;
   }, [basics.name, basics.max_teams, draft.draft_date, draft.draft_time, step]);
 
+  useEffect(() => {
+    if (!stepTransitionLockRef.current || typeof window === "undefined") {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      stepTransitionLockRef.current = false;
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [step]);
+
   const handleNext = () => {
-    if (!canContinue) return;
+    if (!canContinue || stepTransitionLockRef.current) return;
+
+    stepTransitionLockRef.current = true;
     setStep((prev) => Math.min(prev + 1, steps.length - 1));
   };
 
@@ -156,6 +173,8 @@ export default function CreateLeague() {
         },
       };
       const response = await apiPost<LeagueCreateResponse>("/leagues/create", payload);
+      queryClient.invalidateQueries({ queryKey: ["leagues"] });
+      queryClient.setQueryData(["league", response.league.id], response.league);
       setSuccess(response);
     } catch (err: any) {
       setError(err.message || "Unable to create league.");
@@ -172,7 +191,7 @@ export default function CreateLeague() {
           <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
             Please sign in to create a league.
           </p>
-          <Button onClick={() => navigate("/login")} className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black tracking-[0.2em] uppercase">
+          <Button type="button" onClick={() => navigate("/login")} className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black tracking-[0.2em] uppercase">
             Go to Login
           </Button>
         </Card>
@@ -197,6 +216,7 @@ export default function CreateLeague() {
               <div className="flex items-center justify-between gap-4">
                 <span className="text-xl font-black tracking-[0.2em] text-primary">{success.invite_code}</span>
                 <Button
+                  type="button"
                   variant="outline"
                   className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest"
                   onClick={() => navigator.clipboard.writeText(success.invite_code)}
@@ -212,6 +232,7 @@ export default function CreateLeague() {
               <div className="flex items-center justify-between gap-4">
                 <span className="text-xs font-bold text-muted-foreground truncate">{success.invite_link}</span>
                 <Button
+                  type="button"
                   variant="outline"
                   className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest"
                   onClick={() => navigator.clipboard.writeText(success.invite_link)}
@@ -225,12 +246,14 @@ export default function CreateLeague() {
 
           <div className="flex flex-wrap items-center gap-4">
             <Button
+              type="button"
               className="h-12 px-6 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em]"
               onClick={() => navigate(`/league/${success.league.id}`)}
             >
               Go to League Home
             </Button>
             <Button
+              type="button"
               variant="outline"
               className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
               onClick={() => navigate("/leagues")}
@@ -244,7 +267,7 @@ export default function CreateLeague() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-12 space-y-8">
+    <div className="max-w-5xl mx-auto py-12 space-y-8" data-create-step={step}>
       <div className="space-y-4">
         <h1 className="text-6xl font-black italic uppercase text-foreground">Create League</h1>
         <p className="text-sm font-medium text-muted-foreground uppercase tracking-[0.2em]">
@@ -561,7 +584,7 @@ export default function CreateLeague() {
               </div>
               <div>
                 <p className="text-[10px] text-muted-foreground/60">Commissioner</p>
-                <p className="text-primary">{user?.firstName || "You"}</p>
+                <p className="text-primary">You</p>
               </div>
             </div>
           </CardContent>
@@ -570,6 +593,7 @@ export default function CreateLeague() {
 
       <div className="flex items-center justify-between">
         <Button
+          type="button"
           variant="outline"
           className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
           onClick={step === 0 ? () => navigate("/leagues") : handleBack}
@@ -579,6 +603,7 @@ export default function CreateLeague() {
         </Button>
         {step < steps.length - 1 ? (
           <Button
+            type="button"
             className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em]"
             disabled={!canContinue}
             onClick={handleNext}
@@ -588,6 +613,7 @@ export default function CreateLeague() {
           </Button>
         ) : (
           <Button
+            type="button"
             className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em]"
             onClick={handleCreate}
             disabled={loading}

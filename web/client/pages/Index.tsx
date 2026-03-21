@@ -137,11 +137,11 @@ export default function Index() {
              </h1>
           </div>
           {!isLoggedIn && (
-            <Link to="/login">
-              <Button className="h-16 px-10 rounded-2xl bg-primary text-primary-foreground font-black tracking-[0.2em] text-xs uppercase shadow-[0_15px_30px_rgba(var(--primary),0.3)] hover:scale-105 transition-all">
+            <Button asChild className="h-16 px-10 rounded-2xl bg-primary text-primary-foreground font-black tracking-[0.2em] text-xs uppercase shadow-[0_15px_30px_rgba(var(--primary),0.3)] hover:scale-105 transition-all">
+              <Link to="/login">
                 Get Started Now
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           )}
         </div>
         <p className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-400 to-emerald-400 italic font-black uppercase tracking-[0.4em] text-3xl max-w-3xl leading-none py-2">
@@ -271,11 +271,11 @@ export default function Index() {
                       />
                     </div>
                     <div className="mt-6 px-4">
-                      <Link to="/leagues">
-                        <Button variant="ghost" className="w-full h-14 rounded-3xl border border-border/40 text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all">
+                      <Button asChild variant="ghost" className="w-full h-14 rounded-3xl border border-border/40 text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all">
+                        <Link to="/leagues">
                           Manage League
-                        </Button>
-                      </Link>
+                        </Link>
+                      </Button>
                     </div>
                   </>
                 ) : (
@@ -287,11 +287,11 @@ export default function Index() {
                        <h4 className="text-xl font-black italic uppercase text-foreground">No active teams</h4>
                        <p className="text-[11px] font-medium text-muted-foreground/40 uppercase tracking-widest max-w-[200px] mx-auto">Sign in to create your first team and start drafting players</p>
                     </div>
-                    <Link to="/login" className="block">
-                       <Button variant="outline" className="border-primary/20 text-primary text-[9px] font-black uppercase tracking-widest h-10 px-8 rounded-xl hover:bg-primary/5">
+                    <Button asChild variant="outline" className="border-primary/20 text-primary text-[9px] font-black uppercase tracking-widest h-10 px-8 rounded-xl hover:bg-primary/5">
+                       <Link to="/login" className="block">
                           Login to Sync
-                       </Button>
-                    </Link>
+                       </Link>
+                    </Button>
                   </div>
                 )}
               </CardContent>
