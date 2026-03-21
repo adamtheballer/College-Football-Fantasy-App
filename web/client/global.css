@@ -114,6 +114,36 @@
 }
 
 @layer components {
+  .cfb-panel {
+    @apply rounded-[2rem] border border-white/10 bg-card/40 text-card-foreground backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.28)];
+  }
+
+  .cfb-panel-strong {
+    @apply rounded-[2.5rem] border border-white/10 bg-card/40 text-card-foreground backdrop-blur-xl shadow-[0_28px_70px_rgba(0,0,0,0.35)];
+  }
+
+  .cfb-control {
+    @apply rounded-2xl border border-white/10 bg-white/[0.04] text-foreground backdrop-blur-md transition-all duration-300;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .cfb-control:hover {
+    @apply border-white/15 bg-white/[0.06];
+  }
+
+  .cfb-control:focus-visible,
+  .cfb-control[data-state="open"] {
+    @apply border-primary/40 ring-2 ring-primary/20;
+  }
+
+  .cfb-micro-label {
+    @apply text-[10px] font-black uppercase tracking-[0.32em] text-muted-foreground/60;
+  }
+
+  .cfb-section-title {
+    @apply text-foreground font-black uppercase italic tracking-tight;
+  }
+
   .cfb-tour-active-target {
     background: linear-gradient(to right, hsl(var(--primary)), rgb(59 130 246)) !important;
     color: hsl(var(--primary-foreground)) !important;

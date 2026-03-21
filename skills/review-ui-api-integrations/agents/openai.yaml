@@ -1,0 +1,4 @@
+interface:
+  display_name: "Full-Stack Code Review"
+  short_description: "Cross-layer review and consistency checks"
+  default_prompt: "Use $review-ui-api-integrations to review changes for regressions, contract mismatches, and missing follow-through across UI, API, and integrations."
