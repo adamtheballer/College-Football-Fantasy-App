@@ -35,6 +35,13 @@ from collegefootballfantasy_api.app.services.matchup_grades import build_matchup
 router = APIRouter()
 
 
+def _notification_log_user_filter(user_id: int):
+    return or_(
+        NotificationLog.user_id == user_id,
+        and_(NotificationLog.user_id.is_(None), NotificationLog.user_key == str(user_id)),
+    )
+
+
 def _build_user_matchup_stats(db: Session) -> dict[int, dict[str, float | int]]:
     home_team = aliased(Team)
     away_team = aliased(Team)
@@ -166,7 +173,7 @@ def get_accolades(
         db.query(NotificationLog)
         .filter(
             and_(
-                NotificationLog.user_key == str(current_user.id),
+                _notification_log_user_filter(current_user.id),
                 or_(
                     NotificationLog.alert_type == "TRADE",
                     NotificationLog.alert_type == "TRADE_SENT",
@@ -194,7 +201,7 @@ def get_accolades(
             db.query(NotificationLog)
             .filter(
                 and_(
-                    NotificationLog.user_key == str(uid),
+                    _notification_log_user_filter(uid),
                     or_(
                         NotificationLog.alert_type == "TRADE",
                         NotificationLog.alert_type == "TRADE_SENT",
@@ -265,7 +272,7 @@ def get_dynasty_career(
         db.query(NotificationLog)
         .filter(
             and_(
-                NotificationLog.user_key == str(current_user.id),
+                _notification_log_user_filter(current_user.id),
                 or_(
                     NotificationLog.alert_type == "TRADE_ACCEPTED",
                     NotificationLog.alert_type == "TRADE",
@@ -397,7 +404,7 @@ def get_user_analytics_leaderboard(
             db.query(NotificationLog)
             .filter(
                 and_(
-                    NotificationLog.user_key == str(user.id),
+                    _notification_log_user_filter(user.id),
                     or_(NotificationLog.alert_type == "TRADE", NotificationLog.alert_type == "TRADE_ACCEPTED"),
                 )
             )

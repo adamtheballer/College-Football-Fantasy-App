@@ -16,6 +16,7 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     league_invite,
     league_member,
     league_settings,
+    notification,
     player,
     roster,
     scheduled_notification,

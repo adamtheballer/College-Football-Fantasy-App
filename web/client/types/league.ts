@@ -11,17 +11,8 @@ export interface LeagueSettings {
   defense_enabled: boolean;
 }
 
-export interface LeagueListItem {
-  id: number;
-  name: string;
-  platform: string;
-  scoring_type: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface LeagueListResponse {
-  data: LeagueListItem[];
+  data: LeagueDetail[];
   total: number;
   limit: number;
   offset: number;

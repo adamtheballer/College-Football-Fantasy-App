@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagueDetail, useLeagueWorkspace } from "@/hooks/use-leagues";
-import { ApiError } from "@/lib/api";
 
 const SummaryCard = ({
   label,
@@ -89,8 +88,6 @@ export default function LeagueDetail() {
 
   const membership = league.members.find((member) => member.user_id === user?.id) || null;
   const isCommissioner = league.commissioner_user_id === user?.id;
-  const workspaceUnsupported =
-    workspaceError instanceof ApiError && [404, 405, 501].includes(workspaceError.status);
   const draftDate = league.draft?.draft_datetime_utc
     ? new Date(league.draft.draft_datetime_utc).toLocaleString()
     : "Draft not scheduled";
@@ -218,10 +215,10 @@ export default function LeagueDetail() {
             ) : (
               <div className="rounded-[2rem] border border-amber-500/20 bg-amber-500/10 p-6 space-y-2">
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-300">
-                  {workspaceUnsupported ? "Workspace Contract Pending" : "Workspace Unavailable"}
+                  Workspace Unavailable
                 </p>
                 <p className="text-sm text-amber-50/90 leading-7">
-                  Synthetic roster, matchup, and standings fillers have been removed. This page is ready to consume `GET /leagues/:league_id/workspace`, but the backend contract is not available in this environment yet.
+                  The canonical workspace contract is live, but this league hub could not load it right now. Check your permissions or refresh the page to retry.
                 </p>
               </div>
             )}

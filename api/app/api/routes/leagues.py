@@ -562,7 +562,12 @@ def list_leagues_endpoint(
         user_id=current_user.id,
         scope=scope,
     )
-    return LeagueList(data=leagues, total=total, limit=limit, offset=offset)
+    return LeagueList(
+        data=[_league_detail(db, league) for league in leagues],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/{league_id}", response_model=LeagueDetailRead)

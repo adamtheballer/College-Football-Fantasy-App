@@ -30,6 +30,16 @@ from collegefootballfantasy_api.app.schemas.notification import (
 router = APIRouter()
 
 
+def _legacy_user_key(user_id: int) -> str:
+    return str(user_id)
+
+
+def _log_matches_user(log: NotificationLog, user_id: int) -> bool:
+    if log.user_id is not None:
+        return log.user_id == user_id
+    return log.user_key == _legacy_user_key(user_id)
+
+
 def _global_pref_allows(alert_type: str, prefs: NotificationPreference | None) -> bool:
     if not prefs:
         return True
@@ -63,10 +73,15 @@ def _league_pref_allows(alert_type: str, pref: NotificationLeaguePreference | No
 
 
 @router.post("/tokens", response_model=PushTokenRead)
-def register_push_token(payload: PushTokenCreate, db: Session = Depends(get_db)) -> PushTokenRead:
+def register_push_token(
+    payload: PushTokenCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> PushTokenRead:
     existing = db.query(PushToken).filter(PushToken.device_token == payload.device_token).first()
     if existing:
-        existing.user_key = payload.user_key
+        existing.user_id = current_user.id
+        existing.user_key = _legacy_user_key(current_user.id)
         existing.platform = payload.platform
         existing.enabled = True
         db.add(existing)
@@ -74,7 +89,8 @@ def register_push_token(payload: PushTokenCreate, db: Session = Depends(get_db))
         db.refresh(existing)
         return existing
     token = PushToken(
-        user_key=payload.user_key,
+        user_id=current_user.id,
+        user_key=_legacy_user_key(current_user.id),
         device_token=payload.device_token,
         platform=payload.platform,
         enabled=True,
@@ -90,12 +106,10 @@ def get_preferences(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> NotificationPreferences:
-    resolved_user_key = str(current_user.id)
-    prefs = db.query(NotificationPreference).filter(NotificationPreference.user_key == resolved_user_key).first()
+    prefs = db.query(NotificationPreference).filter(NotificationPreference.user_id == current_user.id).first()
     if not prefs:
-        return NotificationPreferences(user_key=resolved_user_key)
+        return NotificationPreferences()
     return NotificationPreferences(
-        user_key=prefs.user_key,
         push_enabled=prefs.push_enabled,
         email_enabled=prefs.email_enabled,
         draft_alerts=prefs.draft_alerts,
@@ -116,10 +130,12 @@ def update_preferences(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> NotificationPreferences:
-    user_key = str(current_user.id)
-    prefs = db.query(NotificationPreference).filter(NotificationPreference.user_key == user_key).first()
+    prefs = db.query(NotificationPreference).filter(NotificationPreference.user_id == current_user.id).first()
     if not prefs:
-        prefs = NotificationPreference(user_key=user_key)
+        prefs = NotificationPreference(user_id=current_user.id, user_key=_legacy_user_key(current_user.id))
+    else:
+        prefs.user_id = current_user.id
+        prefs.user_key = _legacy_user_key(current_user.id)
     prefs.push_enabled = payload.push_enabled
     prefs.email_enabled = payload.email_enabled
     prefs.draft_alerts = payload.draft_alerts
@@ -135,7 +151,6 @@ def update_preferences(
     db.commit()
     db.refresh(prefs)
     return NotificationPreferences(
-        user_key=user_key,
         push_enabled=prefs.push_enabled,
         email_enabled=prefs.email_enabled,
         draft_alerts=prefs.draft_alerts,
@@ -156,8 +171,7 @@ def list_alerts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> NotificationList:
-    user_key = str(current_user.id)
-    global_prefs = db.query(NotificationPreference).filter(NotificationPreference.user_key == user_key).first()
+    global_prefs = db.query(NotificationPreference).filter(NotificationPreference.user_id == current_user.id).first()
     rostered_player_rows = (
         db.query(RosterEntry.player_id, Team.league_id)
         .join(Team, Team.id == RosterEntry.team_id)
@@ -175,14 +189,14 @@ def list_alerts(
     league_pref_by_id = {
         pref.league_id: pref
         for pref in db.query(NotificationLeaguePreference)
-        .filter(NotificationLeaguePreference.user_key == user_key)
+        .filter(NotificationLeaguePreference.user_id == current_user.id)
         .all()
     }
 
     rows = db.query(NotificationLog).order_by(NotificationLog.sent_at.desc()).limit(limit * 8).all()
     data: list[NotificationRead] = []
     for row in rows:
-        if row.user_key and row.user_key != user_key:
+        if not _log_matches_user(row, current_user.id):
             continue
         if not _global_pref_allows(row.alert_type, global_prefs):
             continue
@@ -234,7 +248,8 @@ def create_test_alert(
         payload["player_id"] = int(roster_row[0])
         payload["league_id"] = int(roster_row[1])
     alert = NotificationLog(
-        user_key=str(current_user.id),
+        user_id=current_user.id,
+        user_key=_legacy_user_key(current_user.id),
         alert_type="PROJECTION",
         title="Projection Change",
         body="Test projection alert created.",
@@ -259,7 +274,6 @@ def get_league_preferences(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeagueNotificationPreferences:
-    user_key = str(current_user.id)
     memberships = (
         db.query(LeagueMember, League)
         .join(League, League.id == LeagueMember.league_id)
@@ -269,7 +283,7 @@ def get_league_preferences(
     pref_by_league = {
         pref.league_id: pref
         for pref in db.query(NotificationLeaguePreference)
-        .filter(NotificationLeaguePreference.user_key == user_key)
+        .filter(NotificationLeaguePreference.user_id == current_user.id)
         .all()
     }
     data: list[LeagueNotificationPreference] = []
@@ -294,7 +308,6 @@ def update_league_preferences(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeagueNotificationPreferences:
-    user_key = str(current_user.id)
     allowed_league_ids = {
         row[0]
         for row in db.query(LeagueMember.league_id)
@@ -307,13 +320,20 @@ def update_league_preferences(
         pref = (
             db.query(NotificationLeaguePreference)
             .filter(
-                NotificationLeaguePreference.user_key == user_key,
+                NotificationLeaguePreference.user_id == current_user.id,
                 NotificationLeaguePreference.league_id == item.league_id,
             )
             .first()
         )
         if not pref:
-            pref = NotificationLeaguePreference(user_key=user_key, league_id=item.league_id)
+            pref = NotificationLeaguePreference(
+                user_id=current_user.id,
+                user_key=_legacy_user_key(current_user.id),
+                league_id=item.league_id,
+            )
+        else:
+            pref.user_id = current_user.id
+            pref.user_key = _legacy_user_key(current_user.id)
         pref.enabled = item.enabled
         pref.injury_alerts = item.injury_alerts
         pref.big_play_alerts = item.big_play_alerts

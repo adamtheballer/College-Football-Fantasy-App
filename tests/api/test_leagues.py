@@ -56,11 +56,14 @@ def test_create_and_list_leagues(client):
     token = create_user_and_token(client)
     created = create_league(client, token)
 
-    response = client.get("/leagues")
+    response = client.get("/leagues", headers={"X-User-Token": token})
     assert response.status_code == 200
     data = response.json()
     assert data["total"] == 1
     assert data["data"][0]["name"] == created["name"]
+    assert data["data"][0]["max_teams"] == created["max_teams"]
+    assert len(data["data"][0]["members"]) == 1
+    assert data["data"][0]["draft"]["draft_type"] == "snake"
 
 
 def test_legacy_create_alias_still_works(client):

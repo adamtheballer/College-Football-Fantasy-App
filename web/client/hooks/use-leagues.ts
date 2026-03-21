@@ -5,15 +5,12 @@ import type { LeagueDetail, LeagueListResponse, LeagueWorkspace } from "@/types/
 
 export function useLeagues(limit = 20, enabled = true) {
   return useQuery({
-    queryKey: ["leagues", "detail", limit],
+    queryKey: ["leagues", limit],
     enabled,
     staleTime: 30_000,
     queryFn: async () => {
       const payload = await apiGet<LeagueListResponse>("/leagues", { limit });
-      const details = await Promise.all(
-        payload.data.map((row) => apiGet<LeagueDetail>(`/leagues/${row.id}`))
-      );
-      return details.sort(
+      return payload.data.sort(
         (left, right) =>
           new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime()
       );

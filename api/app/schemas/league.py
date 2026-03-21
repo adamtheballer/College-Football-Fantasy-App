@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from collegefootballfantasy_api.app.schemas.league_flow import LeagueDetailRead
+
 
 class LeagueBase(BaseModel):
     name: str
@@ -28,7 +30,7 @@ class LeagueRead(LeagueBase):
 
 
 class LeagueList(BaseModel):
-    data: list[LeagueRead]
+    data: list[LeagueDetailRead]
     total: int
     limit: int
     offset: int
