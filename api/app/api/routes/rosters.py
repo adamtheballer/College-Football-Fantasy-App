@@ -166,7 +166,13 @@ def add_roster_entry_endpoint(
     slots = [entry.slot for entry in _load_roster_entry_rows(db, team.id)] + [entry_in.slot]
     _validate_slot_counts(slot_limits, slots)
 
-    entry = RosterEntry(team_id=team.id, player_id=entry_in.player_id, slot=entry_in.slot, status=entry_in.status)
+    entry = RosterEntry(
+        league_id=team.league_id,
+        team_id=team.id,
+        player_id=entry_in.player_id,
+        slot=entry_in.slot,
+        status=entry_in.status,
+    )
     db.add(entry)
     _record_transaction(
         db,
@@ -299,6 +305,7 @@ def add_drop_endpoint(
 
     db.add(
         RosterEntry(
+            league_id=team.league_id,
             team_id=team.id,
             player_id=add_player.id,
             slot=new_slot,

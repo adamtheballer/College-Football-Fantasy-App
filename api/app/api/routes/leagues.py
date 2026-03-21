@@ -322,6 +322,7 @@ def create_draft_pick_endpoint(
 
     db.add(
         RosterEntry(
+            league_id=league.id,
             team_id=current_team.id,
             player_id=player.id,
             slot=slot,

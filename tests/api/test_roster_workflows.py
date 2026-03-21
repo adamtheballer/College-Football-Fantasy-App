@@ -1,3 +1,7 @@
+import pytest
+from sqlalchemy.exc import IntegrityError
+
+from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 
 
@@ -141,3 +145,52 @@ def test_add_drop_lineup_and_transactions_workflow(client, db_session):
     assert "add" in types
     assert "lineup" in types
     assert "add_drop" in types
+
+
+def test_team_and_roster_db_constraints_enforce_league_invariants(client, db_session):
+    owner_token = create_user_and_token(client, "owner")
+    member_token = create_user_and_token(client, "member")
+    league = create_league(client, owner_token)
+    join_response = client.post(f"/leagues/{league['id']}/join", headers={"X-User-Token": member_token})
+    assert join_response.status_code == 200
+
+    teams = db_session.query(Team).filter(Team.league_id == league["id"]).order_by(Team.id.asc()).all()
+    assert len(teams) == 2
+    owner_team, member_team = teams
+
+    db_session.add(
+        Team(
+            league_id=league["id"],
+            name="Duplicate Owner Team",
+            owner_name=owner_team.owner_name,
+            owner_user_id=owner_team.owner_user_id,
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+    player_id, _ = create_players(client)
+    db_session.add(
+        RosterEntry(
+            league_id=league["id"],
+            team_id=owner_team.id,
+            player_id=player_id,
+            slot="RB",
+            status="active",
+        )
+    )
+    db_session.commit()
+
+    db_session.add(
+        RosterEntry(
+            league_id=league["id"],
+            team_id=member_team.id,
+            player_id=player_id,
+            slot="RB",
+            status="active",
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()

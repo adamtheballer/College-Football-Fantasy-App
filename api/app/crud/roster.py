@@ -2,11 +2,15 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.schemas.roster import RosterEntryCreate
 
 
 def add_roster_entry(db: Session, team_id: int, entry_in: RosterEntryCreate) -> RosterEntry:
-    entry = RosterEntry(team_id=team_id, **entry_in.model_dump())
+    team = db.get(Team, team_id)
+    if not team:
+        raise ValueError(f"team {team_id} not found")
+    entry = RosterEntry(team_id=team_id, league_id=team.league_id, **entry_in.model_dump())
     db.add(entry)
     db.commit()
     db.refresh(entry)

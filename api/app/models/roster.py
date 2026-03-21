@@ -8,11 +8,15 @@ class RosterEntry(TimestampMixin, Base):
     __tablename__ = "roster_entries"
     __table_args__ = (
         UniqueConstraint("team_id", "player_id", name="uq_roster_team_player"),
+        UniqueConstraint("league_id", "player_id", name="uq_roster_league_player"),
+        Index("ix_roster_entries_league_id", "league_id"),
+        Index("ix_roster_entries_league_player", "league_id", "player_id"),
         Index("ix_roster_entries_team_id", "team_id"),
         Index("ix_roster_entries_player_id", "player_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    league_id: Mapped[int] = mapped_column(ForeignKey("leagues.id", ondelete="CASCADE"))
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"))
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"))
     slot: Mapped[str] = mapped_column(String(50))
