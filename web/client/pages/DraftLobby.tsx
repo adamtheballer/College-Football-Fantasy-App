@@ -28,7 +28,6 @@ export default function DraftLobby() {
   }, [draftTime]);
 
   const isFull = league ? league.members.length >= league.max_teams : false;
-  const canEnter = canEnterDraft && isFull;
 
   if (!parsedLeagueId) {
     return (
@@ -59,6 +58,8 @@ export default function DraftLobby() {
       </div>
     );
   }
+
+  const draftRoomPath = `/league/${league.id}/draft`;
 
   return (
     <div className="max-w-5xl mx-auto py-12 space-y-10">
@@ -125,11 +126,16 @@ export default function DraftLobby() {
         </CardContent>
       </Card>
 
+      {(!isFull || !canEnterDraft) && (
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground/70">
+          Draft room is available in preview mode until the league is full and the scheduled draft window opens.
+        </p>
+      )}
+
       <div className="flex items-center gap-4">
         <Button
           className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em]"
-          disabled={!canEnter}
-          onClick={() => navigate(`/league/${league.id}`)}
+          onClick={() => navigate(draftRoomPath)}
         >
           Enter Draft Room
         </Button>

@@ -18,6 +18,7 @@ import Signup from "./pages/Signup";
 import CreateLeague from "./pages/CreateLeague";
 import JoinLeague from "./pages/JoinLeague";
 import DraftLobby from "./pages/DraftLobby";
+import Draft from "./pages/Draft";
 import Rosters from "./pages/Rosters";
 import Alerts from "./pages/Alerts";
 import Stats from "./pages/Stats";
@@ -75,6 +76,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <DraftLobby />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/league/:leagueId/draft"
+                element={
+                  <ProtectedRoute>
+                    <Draft />
                   </ProtectedRoute>
                 }
               />

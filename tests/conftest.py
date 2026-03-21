@@ -11,6 +11,7 @@ from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.main import app
 from collegefootballfantasy_api.app.models import (  # noqa: F401
     draft,
+    draft_pick,
     league,
     league_invite,
     league_member,

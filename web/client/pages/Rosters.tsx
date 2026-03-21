@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ClipboardList, Trophy, ArrowRight, Users, ShieldAlert } from "lucide-react";
 
@@ -160,10 +160,17 @@ const LeagueSelectorCard = ({
   isActive: boolean;
   onSelect: (leagueId: number) => void;
 }) => (
-  <button type="button" onClick={() => onSelect(id)} className="w-full text-left">
+  <button
+    type="button"
+    onClick={() => onSelect(id)}
+    aria-pressed={isActive}
+    className="w-full text-left"
+  >
     <Card
-      className={`bg-card/40 backdrop-blur-md border rounded-[3rem] overflow-hidden transition-all duration-500 hover:scale-[1.02] cursor-pointer ${
-        isActive ? "border-primary/40 shadow-[0_0_0_1px_rgba(59,130,246,0.3)]" : "border-white/5"
+      className={`bg-card/60 backdrop-blur-md border rounded-[3rem] overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-primary/40 cursor-pointer ${
+        isActive
+          ? "border-primary/50 shadow-[0_0_0_1px_rgba(59,130,246,0.35)]"
+          : "border-white/10"
       }`}
     >
       <CardContent className="p-10 relative z-10 flex items-center justify-between">
@@ -172,9 +179,20 @@ const LeagueSelectorCard = ({
             <Trophy className="w-10 h-10 text-white" />
           </div>
           <div className="space-y-2">
-            <h3 className="text-3xl font-black italic uppercase tracking-tight text-foreground group-hover:text-primary transition-colors">
+            <div className="flex flex-wrap items-center gap-3">
+              <h3 className="text-3xl font-black italic uppercase tracking-tight text-foreground">
               {name}
-            </h3>
+              </h3>
+              <span
+                className={`rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.24em] ${
+                  isActive
+                    ? "border-primary/40 bg-primary/15 text-primary"
+                    : "border-white/10 bg-white/5 text-foreground/80"
+                }`}
+              >
+                {isActive ? "Selected" : "Select Roster"}
+              </span>
+            </div>
             <div className="flex items-center gap-4">
               <span className="text-[10px] font-black tracking-[0.3em] text-primary uppercase">
                 {status.replace(/_/g, " ")}
@@ -186,8 +204,18 @@ const LeagueSelectorCard = ({
             </div>
           </div>
         </div>
-        <div className="w-16 h-16 rounded-[1.5rem] bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-primary/20 group-hover:border-primary/40 transition-all duration-500">
-          <ArrowRight className="w-6 h-6 text-muted-foreground/20 group-hover:text-primary transition-all" />
+        <div
+          className={`w-16 h-16 rounded-[1.5rem] border flex items-center justify-center transition-all duration-300 ${
+            isActive
+              ? "bg-primary/15 border-primary/40"
+              : "bg-white/5 border-white/10"
+          }`}
+        >
+          <ArrowRight
+            className={`w-6 h-6 transition-colors ${
+              isActive ? "text-primary" : "text-foreground/75"
+            }`}
+          />
         </div>
       </CardContent>
     </Card>
@@ -197,6 +225,7 @@ const LeagueSelectorCard = ({
 export default function Rosters() {
   const { data: leagueRows = [], isLoading, isError } = useLeagues();
   const [selectedLeagueId, setSelectedLeagueId] = useState<number | null>(null);
+  const activeLeagueRef = useRef<HTMLDivElement | null>(null);
   const selectedLeague = useMemo(
     () => leagueRows.find((league) => league.id === selectedLeagueId) ?? leagueRows[0] ?? null,
     [leagueRows, selectedLeagueId]
@@ -221,6 +250,17 @@ export default function Rosters() {
       return leagueRows[0].id;
     });
   }, [leagueRows]);
+
+  useEffect(() => {
+    if (!selectedLeagueId || !activeLeagueRef.current) {
+      return;
+    }
+
+    activeLeagueRef.current.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [selectedLeagueId]);
 
   return (
     <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in duration-1000 py-12">
@@ -286,7 +326,8 @@ export default function Rosters() {
           </div>
 
           {selectedLeague && (
-            <Card className="bg-card/40 backdrop-blur-md border border-white/5 rounded-[3rem] overflow-hidden">
+            <div ref={activeLeagueRef}>
+              <Card className="bg-card/40 backdrop-blur-md border border-white/5 rounded-[3rem] overflow-hidden">
               <CardContent className="p-10 space-y-6">
                 <div className="flex flex-wrap items-start justify-between gap-6">
                   <div className="space-y-2">
@@ -343,7 +384,8 @@ export default function Rosters() {
                   </div>
                 )}
               </CardContent>
-            </Card>
+              </Card>
+            </div>
           )}
         </>
       )}
