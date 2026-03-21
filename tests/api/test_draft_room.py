@@ -39,7 +39,7 @@ def create_league(client, token: str) -> dict:
         },
     }
     response = client.post(
-        "/leagues/create",
+        "/leagues",
         json=payload,
         headers={"X-User-Token": token},
     )
@@ -90,7 +90,10 @@ def test_draft_pick_persists_and_creates_roster_entry(client):
     assert updated_room["picks"][0]["player_id"] == player_id
     assert updated_room["picks"][0]["team_id"] == updated_room["user_team_id"]
 
-    roster_response = client.get(f"/teams/{updated_room['user_team_id']}/roster")
+    roster_response = client.get(
+        f"/teams/{updated_room['user_team_id']}/roster",
+        headers={"X-User-Token": token},
+    )
     assert roster_response.status_code == 200
     roster = roster_response.json()
     assert roster["total"] == 1

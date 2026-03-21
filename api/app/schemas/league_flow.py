@@ -127,6 +127,8 @@ class LeagueWorkspaceRosterEntryRead(BaseModel):
 
 class LeagueWorkspaceMatchupSummaryRead(BaseModel):
     week: int | None = None
+    team_id: int | None = None
+    opponent_team_id: int | None = None
     opponent_team_name: str | None = None
     status: str | None = None
     projected_points_for: float | None = None

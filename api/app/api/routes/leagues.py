@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from collegefootballfantasy_api.app.api.deps import get_current_user
+from collegefootballfantasy_api.app.api.deps import (
+    get_current_user,
+    get_league_or_404,
+    require_commissioner,
+    require_league_member,
+)
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.security import generate_invite_code
 from collegefootballfantasy_api.app.crud.league import delete_league, list_leagues
@@ -15,9 +20,11 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
+from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
+from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.draft_room import (
@@ -38,6 +45,7 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     LeaguePreview,
     LeagueSettingsRead,
     LeagueSettingsUpdate,
+    LeagueWorkspaceMatchupSummaryRead,
     LeagueWorkspaceRead,
     LeagueWorkspaceRosterEntryRead,
     LeagueWorkspaceStandingSummaryRead,
@@ -123,31 +131,6 @@ def _enforce_fixed_roster_settings(payload_settings):
     return payload_settings
 
 
-def _get_league_or_404(db: Session, league_id: int) -> League:
-    league = db.get(League, league_id)
-    if not league:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
-    return league
-
-
-def _get_league_membership(db: Session, league_id: int, user_id: int) -> LeagueMember | None:
-    return (
-        db.query(LeagueMember)
-        .filter(LeagueMember.league_id == league_id, LeagueMember.user_id == user_id)
-        .first()
-    )
-
-
-def _require_league_member(db: Session, league_id: int, user_id: int) -> LeagueMember:
-    membership = _get_league_membership(db, league_id, user_id)
-    if not membership:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="league membership required",
-        )
-    return membership
-
-
 def _build_allowed_actions(
     league: League, membership: LeagueMember, owned_team: Team | None
 ) -> list[str]:
@@ -211,7 +194,7 @@ def _assign_roster_slot(
 
 
 def _draft_room_state(db: Session, league: League, current_user: User) -> DraftRoomRead:
-    membership = _require_league_member(db, league.id, current_user.id)
+    membership = require_league_member(db, league.id, current_user)
     draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
     if not draft_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
@@ -288,6 +271,133 @@ def _draft_room_state(db: Session, league: League, current_user: User) -> DraftR
     )
 
 
+def _build_matchup_summary(
+    db: Session,
+    league: League,
+    owned_team: Team | None,
+) -> LeagueWorkspaceMatchupSummaryRead | None:
+    if not owned_team:
+        return None
+
+    matchup_rows = (
+        db.query(Matchup)
+        .filter(
+            Matchup.league_id == league.id,
+            Matchup.season == league.season_year,
+            (Matchup.home_team_id == owned_team.id) | (Matchup.away_team_id == owned_team.id),
+        )
+        .all()
+    )
+    if not matchup_rows:
+        return None
+
+    def matchup_sort_key(row: Matchup) -> tuple[int, int]:
+        status_priority = 0 if row.status in {"scheduled", "live", "projected"} else 1
+        return (status_priority, row.week)
+
+    matchup = sorted(matchup_rows, key=matchup_sort_key)[0]
+    is_home = matchup.home_team_id == owned_team.id
+    opponent_team_id = matchup.away_team_id if is_home else matchup.home_team_id
+    opponent = db.get(Team, opponent_team_id)
+
+    return LeagueWorkspaceMatchupSummaryRead(
+        week=matchup.week,
+        team_id=owned_team.id,
+        opponent_team_id=opponent_team_id,
+        opponent_team_name=opponent.name if opponent else None,
+        status=matchup.status,
+        projected_points_for=matchup.home_score if is_home else matchup.away_score,
+        projected_points_against=matchup.away_score if is_home else matchup.home_score,
+    )
+
+
+def _build_standings_summary(db: Session, league: League) -> list[LeagueWorkspaceStandingSummaryRead]:
+    latest_week = (
+        db.query(func.max(Standing.week))
+        .filter(Standing.league_id == league.id, Standing.season == league.season_year)
+        .scalar()
+    )
+    if latest_week is not None:
+        standings_rows = (
+            db.query(Standing, Team)
+            .join(Team, Team.id == Standing.team_id)
+            .filter(
+                Standing.league_id == league.id,
+                Standing.season == league.season_year,
+                Standing.week == latest_week,
+            )
+            .all()
+        )
+        ordered_rows = sorted(
+            standings_rows,
+            key=lambda row: (-row[0].wins, row[0].losses, -row[0].points_for, row[1].name),
+        )
+        return [
+            LeagueWorkspaceStandingSummaryRead(
+                team_id=standing.team_id,
+                team_name=team.name,
+                wins=standing.wins,
+                losses=standing.losses,
+                ties=standing.ties,
+                points_for=standing.points_for,
+                rank=index,
+            )
+            for index, (standing, team) in enumerate(ordered_rows, start=1)
+        ]
+
+    teams = db.query(Team).filter(Team.league_id == league.id).all()
+    team_stats = {
+        team.id: {
+            "team": team,
+            "wins": 0,
+            "losses": 0,
+            "ties": 0,
+            "points_for": 0.0,
+        }
+        for team in teams
+    }
+    matchup_rows = (
+        db.query(Matchup)
+        .filter(Matchup.league_id == league.id, Matchup.season == league.season_year)
+        .all()
+    )
+    for matchup in matchup_rows:
+        home_stats = team_stats.get(matchup.home_team_id)
+        away_stats = team_stats.get(matchup.away_team_id)
+        if not home_stats or not away_stats:
+            continue
+        home_stats["points_for"] += float(matchup.home_score or 0.0)
+        away_stats["points_for"] += float(matchup.away_score or 0.0)
+        if matchup.status != "final":
+            continue
+        if matchup.home_score > matchup.away_score:
+            home_stats["wins"] += 1
+            away_stats["losses"] += 1
+        elif matchup.home_score < matchup.away_score:
+            away_stats["wins"] += 1
+            home_stats["losses"] += 1
+        else:
+            home_stats["ties"] += 1
+            away_stats["ties"] += 1
+
+    ordered_rows = sorted(
+        team_stats.values(),
+        key=lambda row: (-row["wins"], row["losses"], -row["points_for"], row["team"].name),
+    )
+    return [
+        LeagueWorkspaceStandingSummaryRead(
+            team_id=row["team"].id,
+            team_name=row["team"].name,
+            wins=int(row["wins"]),
+            losses=int(row["losses"]),
+            ties=int(row["ties"]),
+            points_for=float(row["points_for"]),
+            rank=index,
+        )
+        for index, row in enumerate(ordered_rows, start=1)
+    ]
+
+
 def _league_workspace(
     db: Session,
     league: League,
@@ -320,31 +430,6 @@ def _league_workspace(
             for row in roster_rows
         ]
 
-    teams = db.query(Team).filter(Team.league_id == league.id).all()
-    roster_counts = dict(
-        db.query(RosterEntry.team_id, func.count(RosterEntry.id))
-        .join(Team, Team.id == RosterEntry.team_id)
-        .filter(Team.league_id == league.id)
-        .group_by(RosterEntry.team_id)
-        .all()
-    )
-    sorted_teams = sorted(
-        teams,
-        key=lambda team: (-roster_counts.get(team.id, 0), team.created_at, team.id),
-    )
-    standings_summary = [
-        LeagueWorkspaceStandingSummaryRead(
-            team_id=team.id,
-            team_name=team.name,
-            wins=0,
-            losses=0,
-            ties=0,
-            points_for=None,
-            rank=index,
-        )
-        for index, team in enumerate(sorted_teams, start=1)
-    ]
-
     return LeagueWorkspaceRead(
         league=_league_detail(db, league),
         membership=LeagueMemberRead.model_validate(membership),
@@ -359,17 +444,16 @@ def _league_workspace(
             else None
         ),
         roster=roster_entries,
-        matchup_summary=None,
-        standings_summary=standings_summary,
+        matchup_summary=_build_matchup_summary(db, league, owned_team),
+        standings_summary=_build_standings_summary(db, league),
         allowed_actions=_build_allowed_actions(league, membership, owned_team),
     )
 
 
-@router.post("/create", response_model=LeagueCreateResponse, status_code=status.HTTP_201_CREATED)
-def create_league_flow(
+def _create_league_flow(
     payload: LeagueCreateRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: Session,
+    current_user: User,
 ) -> LeagueCreateResponse:
     payload.settings = _enforce_fixed_roster_settings(payload.settings)
     code = _generate_unique_invite(db)
@@ -445,19 +529,50 @@ def create_league_flow(
     return LeagueCreateResponse(league=detail, invite_code=code, invite_link=invite_link)
 
 
+@router.post("", response_model=LeagueCreateResponse, status_code=status.HTTP_201_CREATED)
+def create_league_endpoint(
+    payload: LeagueCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeagueCreateResponse:
+    return _create_league_flow(payload, db, current_user)
+
+
+@router.post("/create", response_model=LeagueCreateResponse, status_code=status.HTTP_201_CREATED)
+def create_league_flow(
+    payload: LeagueCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeagueCreateResponse:
+    return _create_league_flow(payload, db, current_user)
+
+
 @router.get("", response_model=LeagueList)
 def list_leagues_endpoint(
     limit: int = 50,
     offset: int = 0,
+    scope: str = "member",
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> LeagueList:
-    leagues, total = list_leagues(db, limit=limit, offset=offset)
+    leagues, total = list_leagues(
+        db,
+        limit=limit,
+        offset=offset,
+        user_id=current_user.id,
+        scope=scope,
+    )
     return LeagueList(data=leagues, total=total, limit=limit, offset=offset)
 
 
 @router.get("/{league_id}", response_model=LeagueDetailRead)
-def get_league_endpoint(league_id: int, db: Session = Depends(get_db)) -> LeagueDetailRead:
-    league = _get_league_or_404(db, league_id)
+def get_league_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeagueDetailRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league_id, current_user)
     return _league_detail(db, league)
 
 
@@ -467,8 +582,8 @@ def get_league_workspace_endpoint(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeagueWorkspaceRead:
-    league = _get_league_or_404(db, league_id)
-    membership = _require_league_member(db, league.id, current_user.id)
+    league = get_league_or_404(db, league_id)
+    membership = require_league_member(db, league.id, current_user)
     return _league_workspace(db, league, membership, current_user)
 
 
@@ -478,7 +593,7 @@ def get_draft_room_endpoint(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> DraftRoomRead:
-    league = _get_league_or_404(db, league_id)
+    league = get_league_or_404(db, league_id)
     return _draft_room_state(db, league, current_user)
 
 
@@ -489,8 +604,8 @@ def create_draft_pick_endpoint(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> DraftRoomRead:
-    league = _get_league_or_404(db, league_id)
-    _require_league_member(db, league.id, current_user.id)
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
     draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
     if not draft_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
@@ -573,7 +688,12 @@ def create_draft_pick_endpoint(
 
 
 @router.get("/{league_id}/members", response_model=LeagueMembersList)
-def list_league_members(league_id: int, db: Session = Depends(get_db)) -> LeagueMembersList:
+def list_league_members(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeagueMembersList:
+    require_league_member(db, league_id, current_user)
     members = db.query(LeagueMember).filter(LeagueMember.league_id == league_id).all()
     return LeagueMembersList(data=[LeagueMemberRead.model_validate(m) for m in members], total=len(members))
 
@@ -650,11 +770,7 @@ def regenerate_invite(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeagueCreateResponse:
-    league = db.get(League, league_id)
-    if not league:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
-    if league.commissioner_user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="commissioner only")
+    league, _ = require_commissioner(db, league_id, current_user)
     code = _generate_unique_invite(db)
     db.query(LeagueInvite).filter(LeagueInvite.league_id == league.id, LeagueInvite.active.is_(True)).update(
         {"active": False, "disabled_at": datetime.utcnow()}
@@ -676,11 +792,7 @@ def update_league_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeagueDetailRead:
-    league = db.get(League, league_id)
-    if not league:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
-    if league.commissioner_user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="commissioner only")
+    league, _ = require_commissioner(db, league_id, current_user)
     settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
     if not settings_row:
         settings_row = LeagueSettings(league_id=league.id)
@@ -705,11 +817,7 @@ def reschedule_draft(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> DraftRead:
-    league = db.get(League, league_id)
-    if not league:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
-    if league.commissioner_user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="commissioner only")
+    league, _ = require_commissioner(db, league_id, current_user)
     draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
     if not draft_row:
         draft_row = Draft(league_id=league.id)
@@ -733,8 +841,10 @@ def reschedule_draft(
 
 
 @router.delete("/{league_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_league_endpoint(league_id: int, db: Session = Depends(get_db)) -> None:
-    league = db.get(League, league_id)
-    if not league:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
+def delete_league_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    league, _ = require_commissioner(db, league_id, current_user)
     delete_league(db, league)

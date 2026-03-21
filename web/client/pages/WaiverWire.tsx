@@ -1,8 +1,18 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Activity, Filter, Search, TrendingUp, User } from "lucide-react";
 
+import { PlayerDetailModal } from "@/components/PlayerDetailModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -11,8 +21,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PlayerDetailModal } from "@/components/PlayerDetailModal";
+import { toast } from "@/components/ui/use-toast";
+import { useLeagueWorkspace, useLeagues } from "@/hooks/use-leagues";
+import { useAddDrop } from "@/hooks/use-roster-actions";
 import { usePlayers } from "@/hooks/use-players";
+import { useTeamRoster } from "@/hooks/use-teams";
 import { cn } from "@/lib/utils";
 import type { Player } from "@/types/player";
 
@@ -49,10 +62,14 @@ const PositionPill = ({
 
 const PlayerRow = ({
   player,
-  onClick,
+  canAdd,
+  onOpen,
+  onAdd,
 }: {
   player: Player;
-  onClick: () => void;
+  canAdd: boolean;
+  onOpen: () => void;
+  onAdd: () => void;
 }) => {
   const style = posStyles[player.pos] || {
     bg: "bg-white/10",
@@ -61,12 +78,8 @@ const PlayerRow = ({
   };
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="grid w-full grid-cols-[1fr_120px] items-center gap-4 border-b border-white/10 px-8 py-5 text-left transition-colors hover:bg-white/[0.03]"
-    >
-      <div className="flex items-center gap-4">
+    <div className="grid w-full grid-cols-[minmax(0,1fr)_140px] items-center gap-4 border-b border-white/10 px-8 py-5">
+      <button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-4 text-left">
         <Avatar className="h-14 w-14 rounded-2xl border border-white/10 bg-white/5">
           <AvatarImage src={player.imageUrl} alt={player.name} className="object-cover" />
           <AvatarFallback className="rounded-2xl bg-white/5 text-[11px] font-black uppercase tracking-[0.2em] text-primary">
@@ -77,62 +90,81 @@ const PlayerRow = ({
               .join("")}
           </AvatarFallback>
         </Avatar>
-        <div className="space-y-2">
-          <h4 className="text-[15px] font-black italic uppercase tracking-tight text-foreground">
+        <div className="min-w-0 space-y-2">
+          <h4 className="truncate text-[15px] font-black italic uppercase tracking-tight text-foreground">
             {player.name}
           </h4>
-          <span
-            className={cn(
-              "rounded-md border px-2 py-1 text-[9px] font-black uppercase tracking-widest",
-              style.bg,
-              style.border,
-              style.text
-            )}
-          >
-            {player.pos}
-          </span>
+          <div className="flex flex-wrap items-center gap-3 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/70">
+            <span>{player.school}</span>
+            <span
+              className={cn(
+                "rounded-md border px-2 py-1 text-[9px] font-black uppercase tracking-widest",
+                style.bg,
+                style.border,
+                style.text
+              )}
+            >
+              {player.pos}
+            </span>
+            <span>Available</span>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/70">
-          <span>{player.school}</span>
-          <span>Projection pending</span>
-          <span>Availability pending</span>
-        </div>
+      </button>
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant={canAdd ? "default" : "outline"}
+          onClick={onAdd}
+          disabled={!canAdd}
+          className="rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
+        >
+          Add
+        </Button>
       </div>
-      <div className="text-right">
-        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-          View profile
-        </span>
-      </div>
-    </button>
+    </div>
   );
 };
 
 export default function WaiverWire() {
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState("name-asc");
+  const [sortBy, setSortBy] = useState("name");
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false);
+  const [selectedLeagueId, setSelectedLeagueId] = useState<number | null>(null);
+  const [pendingAddPlayer, setPendingAddPlayer] = useState<Player | null>(null);
+  const [dropEntryId, setDropEntryId] = useState<string>("");
+
+  const { data: leagueRows = [] } = useLeagues();
+
+  useEffect(() => {
+    if (!leagueRows.length) {
+      setSelectedLeagueId(null);
+      return;
+    }
+    setSelectedLeagueId((current) => {
+      if (current && leagueRows.some((league) => league.id === current)) {
+        return current;
+      }
+      return leagueRows[0].id;
+    });
+  }, [leagueRows]);
+
+  const { data: workspace } = useLeagueWorkspace(selectedLeagueId ?? undefined, Boolean(selectedLeagueId));
+  const ownedTeamId = workspace?.owned_team?.id;
+  const { data: rosterPayload } = useTeamRoster(ownedTeamId, Boolean(ownedTeamId));
+  const addDropMutation = useAddDrop(ownedTeamId, selectedLeagueId ?? undefined);
   const { data, isLoading, isError } = usePlayers({
     search: searchQuery || undefined,
     position: activeFilter === "ALL" ? undefined : activeFilter,
+    league_id: selectedLeagueId ?? undefined,
+    available_only: Boolean(selectedLeagueId),
+    sort: sortBy,
     limit: 100,
   });
 
-  const players = useMemo(() => {
-    const rows = [...(data?.data ?? [])];
-    if (sortBy === "name-desc") {
-      rows.sort((left, right) => right.name.localeCompare(left.name));
-    } else if (sortBy === "school-asc") {
-      rows.sort((left, right) => left.school.localeCompare(right.school));
-    } else if (sortBy === "school-desc") {
-      rows.sort((left, right) => right.school.localeCompare(left.school));
-    } else {
-      rows.sort((left, right) => left.name.localeCompare(right.name));
-    }
-    return rows;
-  }, [data?.data, sortBy]);
-
+  const players = useMemo(() => data?.data ?? [], [data?.data]);
+  const rosterEntries = rosterPayload?.data ?? [];
   const schoolsCount = useMemo(
     () => new Set(players.map((player) => player.school)).size,
     [players]
@@ -147,6 +179,33 @@ export default function WaiverWire() {
     setIsPlayerModalOpen(true);
   };
 
+  const openAddDrop = (player: Player) => {
+    setPendingAddPlayer(player);
+    setDropEntryId(rosterEntries[0] ? String(rosterEntries[0].id) : "");
+  };
+
+  const submitAddDrop = async () => {
+    if (!pendingAddPlayer || !dropEntryId) return;
+    try {
+      await addDropMutation.mutateAsync({
+        add_player_id: pendingAddPlayer.id,
+        drop_roster_entry_id: Number(dropEntryId),
+      });
+      toast({
+        title: "Roster updated",
+        description: `${pendingAddPlayer.name} was added to your team.`,
+      });
+      setPendingAddPlayer(null);
+      setDropEntryId("");
+    } catch (error) {
+      toast({
+        title: "Unable to complete add/drop",
+        description: error instanceof Error ? error.message : "Try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen px-8 py-12">
       <PlayerDetailModal
@@ -154,6 +213,46 @@ export default function WaiverWire() {
         isOpen={isPlayerModalOpen}
         onClose={() => setIsPlayerModalOpen(false)}
       />
+
+      <Dialog open={Boolean(pendingAddPlayer)} onOpenChange={(open) => !open && setPendingAddPlayer(null)}>
+        <DialogContent className="border-white/10 bg-[#090d14]/95 text-foreground">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black uppercase tracking-[0.16em]">
+              Add / Drop
+            </DialogTitle>
+            <DialogDescription>
+              {pendingAddPlayer
+                ? `Add ${pendingAddPlayer.name} and select the roster entry to drop from ${workspace?.owned_team?.name || "your team"}.`
+                : "Choose a player to add."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground/60">
+              Drop Player
+            </p>
+            <Select value={dropEntryId} onValueChange={setDropEntryId}>
+              <SelectTrigger className="rounded-2xl border-white/10 bg-white/5">
+                <SelectValue placeholder="Choose roster entry" />
+              </SelectTrigger>
+              <SelectContent>
+                {rosterEntries.map((entry) => (
+                  <SelectItem key={entry.id} value={String(entry.id)}>
+                    {entry.player.name} • {entry.slot}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter className="sm:justify-between">
+            <Button variant="ghost" onClick={() => setPendingAddPlayer(null)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void submitAddDrop()} disabled={!dropEntryId || addDropMutation.isPending}>
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="mx-auto max-w-6xl space-y-10">
         <div className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
@@ -163,25 +262,39 @@ export default function WaiverWire() {
                 <TrendingUp className="h-5 w-5 text-primary" />
               </div>
               <span className="text-[10px] font-black uppercase tracking-[0.4em] text-primary">
-                Live Player Index
+                League Waivers
               </span>
             </div>
             <h1 className="text-7xl font-black italic uppercase tracking-tighter text-foreground">
               Waiver Wire
             </h1>
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground/60">
-              Search backend player records instead of seeded mock waiver data.
+              Filter to players who are actually available in your selected league.
             </p>
           </div>
 
-          <div className="relative w-full md:w-[420px]">
-            <Search className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search by player or school..."
-              className="h-16 rounded-[2rem] border-white/10 bg-white/5 pl-14 text-xs font-bold uppercase tracking-widest"
-            />
+          <div className="grid w-full gap-3 md:w-[460px]">
+            <Select value={selectedLeagueId ? String(selectedLeagueId) : ""} onValueChange={(value) => setSelectedLeagueId(Number(value))}>
+              <SelectTrigger className="h-14 rounded-[1.5rem] border-white/10 bg-white/5 text-[10px] font-black uppercase tracking-widest">
+                <SelectValue placeholder="Select League" />
+              </SelectTrigger>
+              <SelectContent>
+                {leagueRows.map((league) => (
+                  <SelectItem key={league.id} value={String(league.id)}>
+                    {league.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="relative">
+              <Search className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search by player or school..."
+                className="h-16 rounded-[2rem] border-white/10 bg-white/5 pl-14 text-xs font-bold uppercase tracking-widest"
+              />
+            </div>
           </div>
         </div>
 
@@ -200,13 +313,11 @@ export default function WaiverWire() {
           <Card className="rounded-[2rem] border border-white/10 bg-card/30 backdrop-blur-md">
             <CardHeader className="pb-3">
               <CardTitle className="text-[10px] font-black uppercase tracking-[0.28em] text-primary">
-                Indexed Players
+                Available Players
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-black italic text-foreground">
-                {data?.total ?? 0}
-              </p>
+              <p className="text-3xl font-black italic text-foreground">{data?.total ?? 0}</p>
             </CardContent>
           </Card>
 
@@ -217,9 +328,7 @@ export default function WaiverWire() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-black italic text-foreground">
-                {schoolsCount}
-              </p>
+              <p className="text-3xl font-black italic text-foreground">{schoolsCount}</p>
             </CardContent>
           </Card>
 
@@ -230,9 +339,7 @@ export default function WaiverWire() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-black italic text-foreground">
-                {positionsCount}
-              </p>
+              <p className="text-3xl font-black italic text-foreground">{positionsCount}</p>
             </CardContent>
           </Card>
         </div>
@@ -250,10 +357,9 @@ export default function WaiverWire() {
                 <SelectValue placeholder="Sort By" />
               </SelectTrigger>
               <SelectContent className="border-white/10 bg-[#0A0C10]">
-                <SelectItem value="name-asc">Name A-Z</SelectItem>
-                <SelectItem value="name-desc">Name Z-A</SelectItem>
-                <SelectItem value="school-asc">School A-Z</SelectItem>
-                <SelectItem value="school-desc">School Z-A</SelectItem>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="school">School</SelectItem>
+                <SelectItem value="position">Position</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -279,7 +385,7 @@ export default function WaiverWire() {
                     No players found
                   </p>
                   <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground/60">
-                    Seed player records or widen your search to populate this view.
+                    Widen your filters or seed more player records.
                   </p>
                 </div>
               </div>
@@ -289,7 +395,9 @@ export default function WaiverWire() {
                   <PlayerRow
                     key={player.id}
                     player={player}
-                    onClick={() => openPlayerDetails(player)}
+                    canAdd={Boolean(ownedTeamId) && rosterEntries.length > 0}
+                    onOpen={() => openPlayerDetails(player)}
+                    onAdd={() => openAddDrop(player)}
                   />
                 ))}
               </div>
@@ -297,16 +405,15 @@ export default function WaiverWire() {
           </div>
         </Card>
 
-        <Card className="rounded-[2rem] border border-amber-500/20 bg-amber-500/10">
+        <Card className="rounded-[2rem] border border-emerald-500/20 bg-emerald-500/10">
           <CardContent className="flex items-start gap-4 p-6">
-            <Activity className="mt-0.5 h-5 w-5 text-amber-300" />
+            <Activity className="mt-0.5 h-5 w-5 text-emerald-300" />
             <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-amber-300">
-                Contract Note
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-emerald-300">
+                Live Contract
               </p>
-              <p className="text-sm leading-7 text-amber-50/90">
-                Projection, rostered percentage, and add-drop availability still need backend support.
-                This screen now avoids fake market movement and uses the real player index instead.
+              <p className="text-sm leading-7 text-emerald-50/90">
+                This screen now filters by real league availability and can submit add/drop transactions for your owned team.
               </p>
             </div>
           </CardContent>

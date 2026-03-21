@@ -16,6 +16,7 @@ from collegefootballfantasy_api.app.api.routes import (
     stats,
     teams,
     trades,
+    watchlists,
 )
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.logging import configure_logging
@@ -52,5 +53,6 @@ app.include_router(matchups.router, prefix="/matchups", tags=["matchups"])
 app.include_router(schedule.router, prefix="/schedule", tags=["schedule"])
 app.include_router(stats.router, prefix="/stats", tags=["stats"])
 app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+app.include_router(watchlists.router, prefix="/watchlists", tags=["watchlists"])
 app.include_router(trades.router, prefix="/trade", tags=["trade"])
 app.include_router(insights.router, prefix="/insights", tags=["insights"])

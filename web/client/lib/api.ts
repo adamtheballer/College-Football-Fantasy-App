@@ -114,3 +114,17 @@ export const apiPatch = async <T>(
   }
   return parseJson<T>(res);
 };
+
+export const apiDelete = async <T>(
+  path: string,
+  params?: Record<string, string | number | boolean | undefined>
+): Promise<T> => {
+  const res = await fetch(buildUrl(path, params), {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return parseJson<T>(res);
+};

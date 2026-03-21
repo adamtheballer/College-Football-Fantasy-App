@@ -3,6 +3,7 @@ export interface Team {
   league_id: number;
   name: string;
   owner_name: string | null;
+  owner_user_id?: number | null;
   created_at: string;
   updated_at: string;
 }

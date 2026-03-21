@@ -2,6 +2,8 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.schemas.player import PlayerCreate
 
 
@@ -21,6 +23,9 @@ def list_players(
     position: str | None,
     school: str | None,
     search: str | None,
+    league_id: int | None = None,
+    available_only: bool = False,
+    sort: str | None = None,
 ) -> tuple[list[Player], int]:
     stmt: Select = select(Player)
     if position:
@@ -28,7 +33,23 @@ def list_players(
     if school:
         stmt = stmt.where(Player.school == school)
     if search:
-        stmt = stmt.where(Player.name.ilike(f"%{search}%"))
+        pattern = f"%{search}%"
+        stmt = stmt.where(Player.name.ilike(pattern) | Player.school.ilike(pattern))
+    if league_id is not None and available_only:
+        unavailable_players = (
+            select(RosterEntry.player_id)
+            .join(Team, Team.id == RosterEntry.team_id)
+            .where(Team.league_id == league_id)
+        )
+        stmt = stmt.where(Player.id.not_in(unavailable_players))
+
+    if sort == "school":
+        stmt = stmt.order_by(Player.school.asc(), Player.name.asc())
+    elif sort == "position":
+        stmt = stmt.order_by(Player.position.asc(), Player.name.asc())
+    else:
+        stmt = stmt.order_by(Player.name.asc())
+
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = db.scalar(count_stmt)
     players = db.scalars(stmt.offset(offset).limit(limit)).all()

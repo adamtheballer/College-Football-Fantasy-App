@@ -4,30 +4,17 @@ import { Bookmark, ChevronLeft, Plus, Search, X } from "lucide-react";
 import { PlayerDetailModal } from "@/components/PlayerDetailModal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/hooks/use-auth";
+import { toast } from "@/components/ui/use-toast";
 import { usePlayers } from "@/hooks/use-players";
+import {
+  useCreateWatchlist,
+  useToggleWatchlistPlayer,
+  useWatchlists,
+} from "@/hooks/use-watchlists";
 import { cn } from "@/lib/utils";
 import type { Player } from "@/types/player";
-
-type WatchlistRecord = {
-  id: string;
-  name: string;
-  playerIds: number[];
-};
-
-type WatchlistState = {
-  lists: WatchlistRecord[];
-  activeListId: string | null;
-};
-
-const EMPTY_STATE: WatchlistState = {
-  lists: [],
-  activeListId: null,
-};
-
-const storageKeyForUser = (userId: number) => `cfb-watchlists:${userId}`;
 
 const posStyles: Record<string, { bg: string; border: string; text: string }> = {
   QB: { bg: "bg-blue-500/20", border: "border-blue-500/30", text: "text-blue-400" },
@@ -38,104 +25,104 @@ const posStyles: Record<string, { bg: string; border: string; text: string }> = 
 };
 
 export default function Watchlist() {
-  const { user } = useAuth();
   const [view, setView] = useState<"browse" | "watchlists">("browse");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false);
-  const [watchlists, setWatchlists] = useState<WatchlistState>(EMPTY_STATE);
   const [showNamingModal, setShowNamingModal] = useState(false);
   const [newWatchlistName, setNewWatchlistName] = useState("");
   const [pendingPlayerId, setPendingPlayerId] = useState<number | null>(null);
+  const [activeListId, setActiveListId] = useState<number | null>(null);
+
+  const { data: watchlistsPayload, isLoading: watchlistsLoading } = useWatchlists();
+  const createWatchlist = useCreateWatchlist();
+  const toggleWatchlistPlayer = useToggleWatchlistPlayer();
   const { data, isLoading, isError } = usePlayers({
     search: searchQuery || undefined,
     limit: 100,
   });
 
+  const watchlists = watchlistsPayload?.data ?? [];
+  const players = data?.data ?? [];
+
   useEffect(() => {
-    if (!user) {
-      setWatchlists(EMPTY_STATE);
+    if (!watchlists.length) {
+      setActiveListId(null);
       return;
     }
-
-    try {
-      const raw = localStorage.getItem(storageKeyForUser(user.id));
-      if (!raw) {
-        setWatchlists(EMPTY_STATE);
-        return;
+    setActiveListId((current) => {
+      if (current && watchlists.some((watchlist) => watchlist.id === current)) {
+        return current;
       }
-      const parsed = JSON.parse(raw) as WatchlistState;
-      setWatchlists({
-        lists: parsed.lists ?? [],
-        activeListId: parsed.activeListId ?? parsed.lists?.[0]?.id ?? null,
-      });
-    } catch {
-      setWatchlists(EMPTY_STATE);
-    }
-  }, [user]);
+      return watchlists[0].id;
+    });
+  }, [watchlists]);
 
-  useEffect(() => {
-    if (!user) return;
-    try {
-      localStorage.setItem(storageKeyForUser(user.id), JSON.stringify(watchlists));
-    } catch {
-      // Ignore storage failures to keep browse mode functional.
-    }
-  }, [user, watchlists]);
+  const activeWatchlist = watchlists.find((list) => list.id === activeListId) ?? null;
+  const favoritePlayers = activeWatchlist?.players ?? [];
+  const favoriteIds = new Set(favoritePlayers.map((player) => player.id));
 
-  const players = data?.data ?? [];
-  const activeWatchlist =
-    watchlists.lists.find((list) => list.id === watchlists.activeListId) ?? null;
-  const favoriteIds = activeWatchlist?.playerIds ?? [];
-  const favoritePlayers = useMemo(
-    () => players.filter((player) => favoriteIds.includes(player.id)),
-    [favoriteIds, players]
-  );
-
-  const createWatchlist = () => {
+  const createAndMaybeSavePlayer = async () => {
     const trimmedName = newWatchlistName.trim();
     if (!trimmedName) return;
-    const nextList: WatchlistRecord = {
-      id: `watchlist-${Date.now()}`,
-      name: trimmedName,
-      playerIds: pendingPlayerId ? [pendingPlayerId] : [],
-    };
-    setWatchlists((prev) => ({
-      lists: [...prev.lists, nextList],
-      activeListId: nextList.id,
-    }));
-    setShowNamingModal(false);
-    setNewWatchlistName("");
-    setPendingPlayerId(null);
-    setView("watchlists");
+    try {
+      const created = await createWatchlist.mutateAsync({ name: trimmedName });
+      setActiveListId(created.id);
+      setView("watchlists");
+      if (pendingPlayerId) {
+        await toggleWatchlistPlayer.mutateAsync({
+          watchlistId: created.id,
+          playerId: pendingPlayerId,
+          isSaved: false,
+        });
+      }
+      setShowNamingModal(false);
+      setNewWatchlistName("");
+      setPendingPlayerId(null);
+      toast({
+        title: "Watchlist saved",
+        description: "Your watchlist now persists on the backend.",
+      });
+    } catch (error) {
+      toast({
+        title: "Unable to save watchlist",
+        description: error instanceof Error ? error.message : "Try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const ensureActiveWatchlist = (playerId: number) => {
-    if (activeWatchlist) {
-      setWatchlists((prev) => ({
-        ...prev,
-        lists: prev.lists.map((list) =>
-          list.id !== activeWatchlist.id
-            ? list
-            : {
-                ...list,
-                playerIds: list.playerIds.includes(playerId)
-                  ? list.playerIds.filter((id) => id !== playerId)
-                  : [...list.playerIds, playerId],
-              }
-        ),
-      }));
+  const togglePlayer = async (playerId: number) => {
+    if (!activeWatchlist) {
+      setPendingPlayerId(playerId);
+      setShowNamingModal(true);
       return;
     }
-
-    setPendingPlayerId(playerId);
-    setShowNamingModal(true);
+    try {
+      await toggleWatchlistPlayer.mutateAsync({
+        watchlistId: activeWatchlist.id,
+        playerId,
+        isSaved: favoriteIds.has(playerId),
+      });
+    } catch (error) {
+      toast({
+        title: "Unable to update watchlist",
+        description: error instanceof Error ? error.message : "Try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const openPlayerDetails = (player: Player) => {
     setSelectedPlayer(player);
     setIsPlayerModalOpen(true);
   };
+
+  const emptyWatchlistMessage = useMemo(() => {
+    if (watchlistsLoading) return "Loading watchlists...";
+    if (watchlists.length === 0) return "Create your first watchlist.";
+    return "Add players from browse mode to build this list.";
+  }, [watchlists.length, watchlistsLoading]);
 
   return (
     <div className="mx-auto max-w-7xl space-y-12 pb-12 pt-8">
@@ -153,7 +140,7 @@ export default function Watchlist() {
                 Create Watchlist
               </h2>
               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
-                Save this list on the current device
+                Persist this list to your account
               </p>
             </div>
             <div className="mt-8 space-y-4">
@@ -163,7 +150,7 @@ export default function Watchlist() {
                 placeholder="e.g. Late-Round Targets"
                 className="h-14 rounded-2xl border-white/10 bg-white/5"
                 autoFocus
-                onKeyDown={(event) => event.key === "Enter" && createWatchlist()}
+                onKeyDown={(event) => event.key === "Enter" && createAndMaybeSavePlayer()}
               />
               <div className="flex gap-4">
                 <Button
@@ -179,8 +166,8 @@ export default function Watchlist() {
                 </Button>
                 <Button
                   type="button"
-                  onClick={createWatchlist}
-                  disabled={!newWatchlistName.trim()}
+                  onClick={createAndMaybeSavePlayer}
+                  disabled={!newWatchlistName.trim() || createWatchlist.isPending}
                   className="h-12 flex-1 rounded-xl text-[10px] font-black uppercase tracking-[0.2em]"
                 >
                   Create
@@ -199,7 +186,7 @@ export default function Watchlist() {
           <p className="text-[10px] font-black uppercase tracking-[0.35em] text-muted-foreground/60">
             {view === "browse"
               ? "Search real backend player records"
-              : "Saved locally for the signed-in browser session"}
+              : "Persisted watchlists for your signed-in account"}
           </p>
         </div>
 
@@ -224,14 +211,13 @@ export default function Watchlist() {
         )}
       </div>
 
-      <Card className="rounded-[2rem] border border-amber-500/20 bg-amber-500/10">
+      <Card className="rounded-[2rem] border border-emerald-500/20 bg-emerald-500/10">
         <CardContent className="p-6">
-          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-amber-300">
-            Cleanup Status
+          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-emerald-300">
+            Persistence Online
           </p>
-          <p className="mt-2 text-sm leading-7 text-amber-50/90">
-            The SEC depth-chart mock pool has been removed. Watchlist browsing now uses the backend player index.
-            True cross-device watchlist persistence still needs dedicated backend endpoints.
+          <p className="mt-2 text-sm leading-7 text-emerald-50/90">
+            Watchlists now load from backend storage, survive refresh and re-login, and share the same player index as the rest of the app.
           </p>
         </CardContent>
       </Card>
@@ -239,14 +225,12 @@ export default function Watchlist() {
       {view === "watchlists" ? (
         <div className="space-y-8">
           <div className="flex flex-wrap gap-3">
-            {watchlists.lists.map((list) => (
+            {watchlists.map((list) => (
               <Button
                 key={list.id}
                 type="button"
-                variant={watchlists.activeListId === list.id ? "default" : "outline"}
-                onClick={() =>
-                  setWatchlists((prev) => ({ ...prev, activeListId: list.id }))
-                }
+                variant={activeListId === list.id ? "default" : "outline"}
+                onClick={() => setActiveListId(list.id)}
                 className="rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
               >
                 {list.name}
@@ -264,7 +248,7 @@ export default function Watchlist() {
                 <Plus className="h-10 w-10" />
               </div>
               <span className="text-[11px] font-black uppercase tracking-[0.35em] text-muted-foreground">
-                Add Players
+                {emptyWatchlistMessage}
               </span>
             </button>
           ) : (
@@ -307,7 +291,7 @@ export default function Watchlist() {
                         variant="ghost"
                         onClick={(event) => {
                           event.stopPropagation();
-                          ensureActiveWatchlist(player.id);
+                          void togglePlayer(player.id);
                         }}
                         className="h-10 w-10 rounded-xl border border-white/10 bg-white/5 p-0 text-primary"
                       >
@@ -360,63 +344,51 @@ export default function Watchlist() {
                 Player Pool
               </h3>
             </div>
-            <div className="max-h-[620px] overflow-y-auto">
+
+            <div className="max-h-[640px] overflow-y-auto">
               {isLoading ? (
-                <div className="px-8 py-20 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
-                    Loading players...
-                  </p>
+                <div className="px-8 py-20 text-center text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+                  Loading players...
                 </div>
               ) : isError ? (
-                <div className="px-8 py-20 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-red-300">
-                    Unable to load backend player records.
-                  </p>
-                </div>
-              ) : players.length === 0 ? (
-                <div className="px-8 py-20 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
-                    No players found.
-                  </p>
+                <div className="px-8 py-20 text-center text-[10px] font-black uppercase tracking-[0.3em] text-red-300">
+                  Unable to load backend player records.
                 </div>
               ) : (
-                <div className="divide-y divide-white/10">
-                  {players.map((player) => {
-                    const style = posStyles[player.pos] || {
-                      bg: "bg-white/10",
-                      border: "border-white/10",
-                      text: "text-foreground",
-                    };
-                    const isSaved = favoriteIds.includes(player.id);
-                    return (
-                      <div
-                        key={player.id}
-                        role="button"
-                        tabIndex={0}
+                players.map((player) => {
+                  const style = posStyles[player.pos] || {
+                    bg: "bg-white/10",
+                    border: "border-white/10",
+                    text: "text-foreground",
+                  };
+                  const isSaved = favoriteIds.has(player.id);
+
+                  return (
+                    <div
+                      key={player.id}
+                      className="grid grid-cols-[minmax(0,1fr)_160px] items-center gap-4 border-b border-white/10 px-8 py-5 last:border-b-0"
+                    >
+                      <button
+                        type="button"
                         onClick={() => openPlayerDetails(player)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            openPlayerDetails(player);
-                          }
-                        }}
-                        className="grid w-full grid-cols-[1fr_120px] items-center gap-4 px-8 py-5 text-left transition-colors hover:bg-white/[0.03]"
+                        className="flex min-w-0 items-center gap-4 text-left"
                       >
-                        <div className="flex items-center gap-4">
-                          <Avatar className="h-12 w-12 rounded-2xl border border-white/10 bg-white/5">
-                            <AvatarImage src={player.imageUrl} alt={player.name} className="object-cover" />
-                            <AvatarFallback className="rounded-2xl bg-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-                              {player.name
-                                .split(" ")
-                                .slice(0, 2)
-                                .map((part) => part[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="space-y-2">
-                            <h4 className="text-[15px] font-black italic uppercase tracking-tight text-foreground">
-                              {player.name}
-                            </h4>
+                        <Avatar className="h-14 w-14 rounded-2xl border border-white/10 bg-white/5">
+                          <AvatarImage src={player.imageUrl} alt={player.name} className="object-cover" />
+                          <AvatarFallback className="rounded-2xl bg-white/5 text-[11px] font-black uppercase tracking-[0.2em] text-primary">
+                            {player.name
+                              .split(" ")
+                              .slice(0, 2)
+                              .map((part) => part[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 space-y-2">
+                          <h4 className="truncate text-[15px] font-black italic uppercase tracking-tight text-foreground">
+                            {player.name}
+                          </h4>
+                          <div className="flex flex-wrap items-center gap-3 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/70">
+                            <span>{player.school}</span>
                             <span
                               className={cn(
                                 "rounded-md border px-2 py-1 text-[9px] font-black uppercase tracking-widest",
@@ -428,32 +400,23 @@ export default function Watchlist() {
                               {player.pos}
                             </span>
                           </div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/70">
-                            {player.school}
-                          </p>
                         </div>
-                        <div className="flex justify-end">
-                          <Button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              ensureActiveWatchlist(player.id);
-                            }}
-                            className={cn(
-                              "h-10 rounded-xl px-4 text-[9px] font-black uppercase tracking-[0.2em]",
-                              isSaved
-                                ? "bg-primary text-primary-foreground"
-                                : "border border-white/10 bg-white/5 text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                            )}
-                          >
-                            <Bookmark className={cn("mr-2 h-4 w-4", isSaved ? "fill-current" : "")} />
-                            {isSaved ? "Saved" : "Save"}
-                          </Button>
-                          </div>
-                        </div>
-                    );
-                  })}
-                </div>
+                      </button>
+
+                      <div className="flex justify-end">
+                        <Button
+                          type="button"
+                          variant={isSaved ? "default" : "outline"}
+                          onClick={() => void togglePlayer(player.id)}
+                          disabled={toggleWatchlistPlayer.isPending}
+                          className="rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
+                        >
+                          {isSaved ? "Saved" : "Save"}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           </Card>

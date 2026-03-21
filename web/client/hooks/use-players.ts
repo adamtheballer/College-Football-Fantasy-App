@@ -41,20 +41,47 @@ export function usePlayers(
     search?: string;
     position?: string;
     school?: string;
+    league_id?: number;
+    available_only?: boolean;
+    sort?: string;
     limit?: number;
     offset?: number;
   } = {}
 ) {
-  const { search, position, school, limit = 100, offset = 0 } = params;
+  const {
+    search,
+    position,
+    school,
+    league_id,
+    available_only,
+    sort,
+    limit = 100,
+    offset = 0,
+  } = params;
 
   return useQuery({
-    queryKey: ["players", { search: search || "", position: position || "", school: school || "", limit, offset }],
+    queryKey: [
+      "players",
+      {
+        search: search || "",
+        position: position || "",
+        school: school || "",
+        league_id: league_id || 0,
+        available_only: available_only ? "true" : "false",
+        sort: sort || "",
+        limit,
+        offset,
+      },
+    ],
     staleTime: 30_000,
     queryFn: async () => {
       const payload = await apiGet<BackendPlayerListResponse>("/players", {
         search: search || undefined,
         position: position || undefined,
         school: school || undefined,
+        league_id,
+        available_only,
+        sort,
         limit,
         offset,
       });

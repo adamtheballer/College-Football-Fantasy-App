@@ -27,6 +27,9 @@ def list_players_endpoint(
     position: str | None = None,
     school: str | None = None,
     search: str | None = None,
+    league_id: int | None = None,
+    available_only: bool = False,
+    sort: str | None = None,
     db: Session = Depends(get_db),
 ) -> PlayerList:
     players, total = list_players(
@@ -36,6 +39,9 @@ def list_players_endpoint(
         position=position,
         school=school,
         search=search,
+        league_id=league_id,
+        available_only=available_only,
+        sort=sort,
     )
     return PlayerList(data=players, total=total, limit=limit, offset=offset)
 

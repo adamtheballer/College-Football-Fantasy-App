@@ -157,7 +157,7 @@ export default function CreateLeague() {
           pick_timer_seconds: draft.pick_timer_seconds,
         },
       };
-      const response = await apiPost<LeagueCreateResponse>("/leagues/create", payload);
+      const response = await apiPost<LeagueCreateResponse>("/leagues", payload);
       queryClient.invalidateQueries({ queryKey: ["leagues"] });
       queryClient.setQueryData(["league", response.league.id], response.league);
       setSuccess(response);

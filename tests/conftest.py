@@ -19,8 +19,10 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     player,
     roster,
     scheduled_notification,
+    transaction,
     team,
     user,
+    watchlist,
 )
 
 TEST_DATABASE_URL = "sqlite://"
@@ -49,3 +51,12 @@ def client_fixture() -> Generator[TestClient, None, None]:
         yield client
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture(name="db_session")
+def db_session_fixture() -> Generator[Session, None, None]:
+    session = TestingSessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()

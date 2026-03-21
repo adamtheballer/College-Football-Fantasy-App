@@ -100,6 +100,8 @@ export interface LeagueWorkspaceRosterEntry {
 
 export interface LeagueWorkspaceMatchupSummary {
   week?: number | null;
+  team_id?: number | null;
+  opponent_team_id?: number | null;
   opponent_team_name?: string | null;
   status?: string | null;
   projected_points_for?: number | null;
