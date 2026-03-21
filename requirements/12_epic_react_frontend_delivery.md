@@ -27,6 +27,9 @@ Make `web/` the only supported frontend, replace mock-backed league workflows wi
 ### Description
 Standardize the product on `web/` so navigation, requirements, and contracts no longer split across React and Streamlit.
 
+### Status
+Complete. Remaining frontend delivery work continues in GitHub issues `#10` (Story 3), `#11` (Story 4), and `#9` (Story 5). Story 2 is complete and tracked in closed issue `#2`.
+
 ### User Stories
 - As a user, I only see one frontend path for the app.
 - As an engineer, I can make UI changes in one surface without matching behavior in a second unsupported UI.
