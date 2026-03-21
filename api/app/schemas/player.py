@@ -8,6 +8,7 @@ class PlayerBase(BaseModel):
     name: str
     position: str
     school: str
+    image_url: str | None = None
 
 
 class PlayerCreate(PlayerBase):

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { X, Trophy, Activity, Target, Shield, ArrowLeft, Bookmark, ChevronDown, Quote, TrendingUp, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Player } from "@/types/player";
@@ -254,11 +255,24 @@ export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModal
                  <div className="aspect-[4/5] rounded-[4rem] bg-gradient-to-b from-white/10 via-white/5 to-transparent border border-white/10 flex items-center justify-center relative group overflow-hidden shadow-2xl">
                     <div className="absolute inset-0 bg-primary/5 group-hover:bg-primary/10 transition-all duration-700" />
 
-                    {/* Abstract Decorative Elements */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-20 group-hover:opacity-30 transition-opacity">
-                       <div className="w-[150%] h-1 bg-gradient-to-r from-transparent via-primary to-transparent rotate-[35deg] blur-sm animate-pulse" />
-                       <div className="w-[150%] h-1 bg-gradient-to-r from-transparent via-blue-400 to-transparent -rotate-[35deg] blur-sm animate-pulse delay-700" />
-                    </div>
+                    {player.imageUrl ? (
+                      <img
+                        src={player.imageUrl}
+                        alt={player.name}
+                        className="relative z-10 h-full w-full object-cover"
+                      />
+                    ) : (
+                      <Avatar className="relative z-10 h-40 w-40 rounded-[2.5rem] border border-white/10 bg-white/5">
+                        <AvatarFallback className="rounded-[2.5rem] bg-white/5 text-5xl font-black italic uppercase text-primary">
+                          {player.name
+                            .split(" ")
+                            .slice(0, 2)
+                            .map((part) => part[0])
+                            .join("")}
+                        </AvatarFallback>
+                        <AvatarImage src="" alt={player.name} />
+                      </Avatar>
+                    )}
 
                     <div className="text-white/10 scale-[5] relative z-10 transition-transform duration-700 group-hover:scale-[5.5]">
                       <Activity className="w-12 h-12 stroke-[0.5] animate-pulse" />

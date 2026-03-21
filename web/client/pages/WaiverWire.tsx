@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Activity, Filter, Search, TrendingUp, User } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -65,8 +66,18 @@ const PlayerRow = ({
       onClick={onClick}
       className="grid w-full grid-cols-[1fr_120px] items-center gap-4 border-b border-white/10 px-8 py-5 text-left transition-colors hover:bg-white/[0.03]"
     >
-      <div className="space-y-2">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
+        <Avatar className="h-14 w-14 rounded-2xl border border-white/10 bg-white/5">
+          <AvatarImage src={player.imageUrl} alt={player.name} className="object-cover" />
+          <AvatarFallback className="rounded-2xl bg-white/5 text-[11px] font-black uppercase tracking-[0.2em] text-primary">
+            {player.name
+              .split(" ")
+              .slice(0, 2)
+              .map((part) => part[0])
+              .join("")}
+          </AvatarFallback>
+        </Avatar>
+        <div className="space-y-2">
           <h4 className="text-[15px] font-black italic uppercase tracking-tight text-foreground">
             {player.name}
           </h4>

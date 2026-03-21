@@ -8,6 +8,7 @@ type BackendPlayerRead = {
   name: string;
   position: string;
   school: string;
+  image_url?: string | null;
 };
 
 type BackendPlayerListResponse = {
@@ -22,6 +23,7 @@ export const normalizePlayer = (player: BackendPlayerRead): Player => ({
   name: player.name,
   school: player.school,
   pos: player.position,
+  imageUrl: player.image_url ?? undefined,
   conf: "UNKNOWN",
   rank: 0,
   adp: 0,

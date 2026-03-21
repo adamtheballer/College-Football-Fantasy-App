@@ -28,6 +28,7 @@ export interface Player {
   name: string;
   school: string;
   pos: string;
+  imageUrl?: string;
   conf: string;
   rank: number;
   adp: number;

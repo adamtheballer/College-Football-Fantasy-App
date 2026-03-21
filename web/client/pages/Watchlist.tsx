@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Bookmark, ChevronLeft, Plus, Search, X } from "lucide-react";
 
 import { PlayerDetailModal } from "@/components/PlayerDetailModal";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -281,13 +282,25 @@ export default function Watchlist() {
                     className="cursor-pointer rounded-[2.5rem] border border-white/10 bg-card/40 p-8 transition-all duration-300 hover:border-primary/40"
                   >
                     <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-2">
-                        <h3 className="text-xl font-black italic uppercase text-foreground">
-                          {player.name}
-                        </h3>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
-                          {player.school}
-                        </p>
+                      <div className="flex items-start gap-4">
+                        <Avatar className="h-14 w-14 rounded-2xl border border-white/10 bg-white/5">
+                          <AvatarImage src={player.imageUrl} alt={player.name} className="object-cover" />
+                          <AvatarFallback className="rounded-2xl bg-white/5 text-[11px] font-black uppercase tracking-[0.2em] text-primary">
+                            {player.name
+                              .split(" ")
+                              .slice(0, 2)
+                              .map((part) => part[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="space-y-2">
+                          <h3 className="text-xl font-black italic uppercase text-foreground">
+                            {player.name}
+                          </h3>
+                          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+                            {player.school}
+                          </p>
+                        </div>
                       </div>
                       <Button
                         type="button"
@@ -389,8 +402,18 @@ export default function Watchlist() {
                         }}
                         className="grid w-full grid-cols-[1fr_120px] items-center gap-4 px-8 py-5 text-left transition-colors hover:bg-white/[0.03]"
                       >
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-4">
+                          <Avatar className="h-12 w-12 rounded-2xl border border-white/10 bg-white/5">
+                            <AvatarImage src={player.imageUrl} alt={player.name} className="object-cover" />
+                            <AvatarFallback className="rounded-2xl bg-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+                              {player.name
+                                .split(" ")
+                                .slice(0, 2)
+                                .map((part) => part[0])
+                                .join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="space-y-2">
                             <h4 className="text-[15px] font-black italic uppercase tracking-tight text-foreground">
                               {player.name}
                             </h4>
@@ -426,8 +449,8 @@ export default function Watchlist() {
                             <Bookmark className={cn("mr-2 h-4 w-4", isSaved ? "fill-current" : "")} />
                             {isSaved ? "Saved" : "Save"}
                           </Button>
+                          </div>
                         </div>
-                      </div>
                     );
                   })}
                 </div>

@@ -15,5 +15,6 @@ class Player(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(200), index=True)
     position: Mapped[str] = mapped_column(String(10), index=True)
     school: Mapped[str] = mapped_column(String(200), index=True)
+    image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     roster_entries = relationship("RosterEntry", back_populates="player", cascade="all, delete-orphan")
