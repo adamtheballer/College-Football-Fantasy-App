@@ -12,6 +12,7 @@ class ScheduledNotification(TimestampMixin, Base):
         Index("ix_scheduled_notifications_league_id", "league_id"),
         Index("ix_scheduled_notifications_user_id", "user_id"),
         Index("ix_scheduled_notifications_type", "notification_type"),
+        Index("ix_scheduled_notifications_delivery_state", "scheduled_for", "sent_at", "canceled_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

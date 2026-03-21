@@ -10,7 +10,6 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
-from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.league_flow import (
@@ -22,6 +21,10 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueSettingsUpdate,
 )
 from collegefootballfantasy_api.app.services.league_workspace import get_league_detail
+from collegefootballfantasy_api.app.services.notification_service import (
+    cancel_scheduled_notifications,
+    schedule_draft_notifications,
+)
 
 FIXED_ROSTER_SLOTS = {
     "QB": 1,
@@ -49,30 +52,6 @@ def generate_unique_invite(db: Session) -> str:
         if not exists:
             return code
     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="unable to generate invite code")
-
-
-def schedule_draft_notifications(
-    db: Session, league_id: int, user_id: int, draft_time: datetime
-) -> None:
-    draft_time = draft_time.astimezone(timezone.utc)
-    one_hour_before = draft_time - timedelta(hours=1)
-    notifications = [
-        ScheduledNotification(
-            league_id=league_id,
-            user_id=user_id,
-            notification_type="draft_1h",
-            scheduled_for=one_hour_before,
-        ),
-        ScheduledNotification(
-            league_id=league_id,
-            user_id=user_id,
-            notification_type="draft_start",
-            scheduled_for=draft_time,
-        ),
-    ]
-    db.add_all(notifications)
-
-
 def create_league(
     payload: LeagueCreateRequest,
     db: Session,
@@ -239,9 +218,7 @@ def reschedule_draft(
     draft_row.status = payload.status
     db.add(draft_row)
 
-    db.query(ScheduledNotification).filter(ScheduledNotification.league_id == league.id).update(
-        {"canceled_at": datetime.utcnow()}
-    )
+    cancel_scheduled_notifications(db, league.id, reason="draft rescheduled")
     members = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).all()
     for member in members:
         schedule_draft_notifications(db, league.id, member.user_id, draft_row.draft_datetime_utc)
