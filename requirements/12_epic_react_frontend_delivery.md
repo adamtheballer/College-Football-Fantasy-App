@@ -68,6 +68,9 @@ Standardize the product on `web/` so navigation, requirements, and contracts no 
 ### Description
 Replace local mock seeding in league, roster, waiver, injury-detail, and related pages with a single backend-backed read model and supporting research queries.
 
+### Status
+Complete. Residual cleanup that is not required to keep Story 2 closed is tracked in GitHub issue `#8` (`Tech Debt - Adam to Fix`).
+
 ### User Stories
 - As a league member, I can open a league and see my real roster, matchup context, standings, and available actions.
 - As a user, I can trust that player details and waiver recommendations reflect backend data rather than demo content.
