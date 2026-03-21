@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Calendar, Check, ChevronLeft, ChevronRight, Copy, Loader2 } from "lucide-react";
@@ -41,7 +41,6 @@ export default function CreateLeague() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isLoggedIn } = useAuth();
-  const stepTransitionLockRef = useRef(false);
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,22 +119,8 @@ export default function CreateLeague() {
     return true;
   }, [basics.name, basics.max_teams, draft.draft_date, draft.draft_time, step]);
 
-  useEffect(() => {
-    if (!stepTransitionLockRef.current || typeof window === "undefined") {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      stepTransitionLockRef.current = false;
-    }, 0);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [step]);
-
   const handleNext = () => {
-    if (!canContinue || stepTransitionLockRef.current) return;
-
-    stepTransitionLockRef.current = true;
+    if (!canContinue) return;
     setStep((prev) => Math.min(prev + 1, steps.length - 1));
   };
 

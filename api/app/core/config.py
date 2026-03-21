@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     api_log_level: str = "info"
-    ui_base_url: str = "http://localhost:5173"
+    ui_base_url: str = "http://localhost:8080"
     cfbd_api_key: str | None = None
     cfbd_base_url: str = "https://api.collegefootballdata.com"
     resend_api_key: str | None = None
