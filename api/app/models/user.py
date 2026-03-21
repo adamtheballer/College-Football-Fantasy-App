@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Index, String
+from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -8,10 +8,6 @@ from collegefootballfantasy_api.app.models import Base, TimestampMixin
 
 class User(TimestampMixin, Base):
     __tablename__ = "users"
-    __table_args__ = (
-        Index("ix_users_email", "email"),
-        Index("ix_users_token", "api_token"),
-    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(200), unique=True, index=True)

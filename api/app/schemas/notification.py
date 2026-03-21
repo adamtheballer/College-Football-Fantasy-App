@@ -4,7 +4,6 @@ from pydantic import BaseModel, ConfigDict
 
 
 class PushTokenCreate(BaseModel):
-    user_key: str | None = None
     device_token: str
     platform: str = "unknown"
 
@@ -12,10 +11,11 @@ class PushTokenCreate(BaseModel):
 class PushTokenRead(PushTokenCreate):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    user_id: int | None = None
+    enabled: bool = True
 
 
 class NotificationPreferences(BaseModel):
-    user_key: str
     push_enabled: bool = True
     email_enabled: bool = True
     draft_alerts: bool = True

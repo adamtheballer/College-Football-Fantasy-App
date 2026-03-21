@@ -91,7 +91,6 @@ const CheckboxItem = ({ id, label, description, checked, onCheckedChange, disabl
 export default function Settings() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const userKey = user?.id ? String(user.id) : "guest";
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [leaguePrefs, setLeaguePrefs] = useState<LeagueNotificationPreference[]>([]);
   const [prefs, setPrefs] = useState({
@@ -108,7 +107,7 @@ export default function Settings() {
 
   useEffect(() => {
     if (!user) return;
-    apiGet<any>("/notifications/preferences", { user_key: userKey })
+    apiGet<any>("/notifications/preferences")
       .then((payload) => {
         setPrefs({
           push_enabled: payload.push_enabled ?? true,
@@ -130,13 +129,13 @@ export default function Settings() {
       .catch(() => {
         setLeaguePrefs([]);
       });
-  }, [user, userKey]);
+  }, [user]);
 
   const handleSave = async () => {
     if (!user) return;
     setSaveState("saving");
     try {
-      await apiPost("/notifications/preferences", { user_key: userKey, ...prefs });
+      await apiPost("/notifications/preferences", prefs);
       await apiPost("/notifications/league-preferences", {
         items: leaguePrefs.map((league) => ({
           league_id: league.league_id,

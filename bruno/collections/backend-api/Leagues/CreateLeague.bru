@@ -9,12 +9,37 @@ post {
 }
 body:json {
   {
-    "name": "Workflow League",
-    "platform": "espn",
-    "scoring_type": "standard"
+    "basics": {
+      "name": "Workflow League",
+      "season_year": 2026,
+      "max_teams": 12,
+      "is_private": true,
+      "description": "Workflow-created league",
+      "icon_url": null
+    },
+    "settings": {
+      "scoring_json": {
+        "ppr": 1
+      },
+      "roster_slots_json": {
+        "QB": 1
+      },
+      "playoff_teams": 4,
+      "waiver_type": "faab",
+      "trade_review_type": "commissioner",
+      "superflex_enabled": false,
+      "kicker_enabled": true,
+      "defense_enabled": false
+    },
+    "draft": {
+      "draft_datetime_utc": "2026-08-19T18:00:00Z",
+      "timezone": "America/Los_Angeles",
+      "draft_type": "snake",
+      "pick_timer_seconds": 90
+    }
   }
 }
 script:post-response {
   const data = res.getBody();
-  bru.setVar("league_id", data.id);
+  bru.setVar("league_id", data.league.id);
 }

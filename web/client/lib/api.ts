@@ -1,6 +1,18 @@
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
+export class ApiError extends Error {
+  status: number;
+  detail: unknown;
+
+  constructor(status: number, message: string, detail?: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
 const buildUrl = (path: string, params?: Record<string, string | number | boolean | undefined>) => {
   const base = API_BASE.replace(/\/+$/, "");
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
@@ -24,6 +36,41 @@ const getAuthHeaders = () => {
   return token ? { "X-User-Token": token } : {};
 };
 
+const buildError = async (res: Response) => {
+  let detail: unknown = null;
+  try {
+    detail = await res.clone().json();
+  } catch {
+    try {
+      detail = await res.text();
+    } catch {
+      detail = null;
+    }
+  }
+
+  if (
+    detail &&
+    typeof detail === "object" &&
+    "detail" in detail &&
+    typeof detail.detail === "string"
+  ) {
+    return new ApiError(res.status, detail.detail, detail);
+  }
+
+  if (typeof detail === "string" && detail.trim()) {
+    return new ApiError(res.status, detail, detail);
+  }
+
+  return new ApiError(res.status, `API ${res.status}: ${res.statusText}`, detail);
+};
+
+const parseJson = async <T>(res: Response): Promise<T> => {
+  if (res.status === 204) {
+    return null as T;
+  }
+  return res.json();
+};
+
 export const apiGet = async <T>(
   path: string,
   params?: Record<string, string | number | boolean | undefined>,
@@ -31,9 +78,9 @@ export const apiGet = async <T>(
 ): Promise<T> => {
   const res = await fetch(buildUrl(path, params), { signal, headers: getAuthHeaders() });
   if (!res.ok) {
-    throw new Error(`API ${res.status}: ${res.statusText}`);
+    throw await buildError(res);
   }
-  return res.json();
+  return parseJson<T>(res);
 };
 
 export const apiPost = async <T>(
@@ -47,9 +94,9 @@ export const apiPost = async <T>(
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`API ${res.status}: ${res.statusText}`);
+    throw await buildError(res);
   }
-  return res.json();
+  return parseJson<T>(res);
 };
 
 export const apiPatch = async <T>(
@@ -63,7 +110,21 @@ export const apiPatch = async <T>(
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`API ${res.status}: ${res.statusText}`);
+    throw await buildError(res);
   }
-  return res.json();
+  return parseJson<T>(res);
+};
+
+export const apiDelete = async <T>(
+  path: string,
+  params?: Record<string, string | number | boolean | undefined>
+): Promise<T> => {
+  const res = await fetch(buildUrl(path, params), {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return parseJson<T>(res);
 };

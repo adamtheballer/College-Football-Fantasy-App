@@ -1,26 +1,16 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Clock, Users, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { apiGet } from "@/lib/api";
-import { LeagueDetail } from "@/types/league";
+import { useLeagueDetail } from "@/hooks/use-leagues";
 
 export default function DraftLobby() {
   const { leagueId } = useParams();
   const navigate = useNavigate();
-  const [league, setLeague] = useState<LeagueDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!leagueId || Number.isNaN(Number(leagueId))) {
-      setError("Invalid league ID.");
-      return;
-    }
-    apiGet<LeagueDetail>(`/leagues/${leagueId}`)
-      .then((data) => setLeague(data))
-      .catch((err: any) => setError(err.message || "Unable to load league."));
-  }, [leagueId]);
+  const parsedLeagueId =
+    leagueId && !Number.isNaN(Number(leagueId)) ? Number(leagueId) : undefined;
+  const { data: league, error, isLoading } = useLeagueDetail(parsedLeagueId);
 
   const draftTime = league?.draft?.draft_datetime_utc ? new Date(league.draft.draft_datetime_utc) : null;
   const countdown = useMemo(() => {
@@ -37,20 +27,29 @@ export default function DraftLobby() {
     return diff <= 15 * 60 * 1000;
   }, [draftTime]);
 
-  const isFull = league.members.length >= league.max_teams;
-  const canEnter = canEnterDraft && isFull;
+  const isFull = league ? league.members.length >= league.max_teams : false;
 
-  if (error) {
+  if (!parsedLeagueId) {
     return (
       <div className="max-w-3xl mx-auto py-20 text-center">
         <Card className="bg-card/40 border-border/60 rounded-[2.5rem] p-12">
-          <h1 className="text-3xl font-black uppercase text-red-400">{error}</h1>
+          <h1 className="text-3xl font-black uppercase text-red-400">Invalid league ID.</h1>
         </Card>
       </div>
     );
   }
 
-  if (!league) {
+  if (error) {
+    return (
+      <div className="max-w-3xl mx-auto py-20 text-center">
+        <Card className="bg-card/40 border-border/60 rounded-[2.5rem] p-12">
+          <h1 className="text-3xl font-black uppercase text-red-400">Unable to load league.</h1>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isLoading || !league) {
     return (
       <div className="max-w-3xl mx-auto py-20 text-center">
         <Card className="bg-card/40 border-border/60 rounded-[2.5rem] p-12">
@@ -59,6 +58,8 @@ export default function DraftLobby() {
       </div>
     );
   }
+
+  const draftRoomPath = `/league/${league.id}/draft`;
 
   return (
     <div className="max-w-5xl mx-auto py-12 space-y-10">
@@ -125,11 +126,16 @@ export default function DraftLobby() {
         </CardContent>
       </Card>
 
+      {(!isFull || !canEnterDraft) && (
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground/70">
+          Draft room is available in preview mode until the league is full and the scheduled draft window opens.
+        </p>
+      )}
+
       <div className="flex items-center gap-4">
         <Button
           className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em]"
-          disabled={!canEnter}
-          onClick={() => navigate(`/league/${league.id}`)}
+          onClick={() => navigate(draftRoomPath)}
         >
           Enter Draft Room
         </Button>

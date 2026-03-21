@@ -31,6 +31,9 @@ dist/
 # UV cache
 .uv-cache/
 
+# Node/npm caches
+.npm-cache/
+
 # Logs
 *.log
 

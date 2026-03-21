@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Home, Trophy, UserPlus, Settings, LogIn, LogOut, Users, TrendingUp, Newspaper, ClipboardList, PlusCircle, MessageSquare, Bookmark, ShieldAlert, Bell, BarChart3 } from "lucide-react";
+import { Home, Trophy, Settings, LogIn, LogOut, ClipboardList, Bell, BarChart3 } from "lucide-react";
 
 import { BackgroundEffects } from "./BackgroundEffects";
-import { CursorTracker } from "./CursorTracker";
 import { useAuth } from "@/hooks/use-auth";
 import { AppOnboardingTour } from "./AppOnboardingTour";
 import { clearPendingGuide, hasPendingGuide } from "@/lib/onboarding";
@@ -21,24 +20,27 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isGuideActive, setIsGuideActive] = useState(false);
   const mainScrollRef = useRef<HTMLElement | null>(null);
 
-  const sidebarItems = [
-    { name: "HOME", path: "/", icon: Home },
-    { name: "LEAGUES", path: "/leagues", icon: Trophy },
-    { name: "ROSTER", path: "/rosters", icon: ClipboardList },
-    { name: "CHATS", path: "/chats", icon: MessageSquare },
-    { name: "WATCHLIST", path: "/watchlist", icon: Bookmark },
-    { name: "WAIVER WIRE", path: "/waiver-wire", icon: UserPlus },
-    { name: "INJURY CENTER", path: "/injuries", icon: ShieldAlert },
-    { name: "ALERTS", path: "/alerts", icon: Bell },
-    { name: "STATS", path: "/stats", icon: BarChart3 },
-    { name: "SETTINGS", path: "/settings", icon: Settings },
-    {
-      name: isLoggedIn ? "SIGN OUT" : "SIGN IN",
-      path: isLoggedIn ? "#" : "/login",
-      icon: isLoggedIn ? LogOut : LogIn,
-      onClick: isLoggedIn ? logout : undefined
-    },
-  ];
+  const sidebarItems = isLoggedIn
+    ? [
+        { name: "HOME", path: "/", icon: Home },
+        { name: "LEAGUES", path: "/leagues", icon: Trophy },
+        { name: "ROSTER", path: "/rosters", icon: ClipboardList },
+        { name: "ALERTS", path: "/alerts", icon: Bell },
+        { name: "STATS", path: "/stats", icon: BarChart3 },
+        { name: "SETTINGS", path: "/settings", icon: Settings },
+        {
+          name: "SIGN OUT",
+          path: "#",
+          icon: LogOut,
+          onClick: logout,
+        },
+      ]
+    : [
+        { name: "HOME", path: "/", icon: Home },
+        { name: "LEAGUES", path: "/leagues", icon: Trophy },
+        { name: "STATS", path: "/stats", icon: BarChart3 },
+        { name: "SIGN IN", path: "/login", icon: LogIn },
+      ];
 
   const isDraftPage = location.pathname.startsWith("/draft");
 
@@ -81,7 +83,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Reusable Dramatic Background Effects */}
       <BackgroundEffects />
-      <CursorTracker />
       <FloatingQuickActions />
 
       {/* Sidebar - Conditionally Hidden on Draft Page */}

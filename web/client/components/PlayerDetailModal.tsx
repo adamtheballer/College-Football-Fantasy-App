@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { X, Trophy, Activity, Target, Shield, ArrowLeft, Bookmark, ChevronDown, Quote, TrendingUp, Check, ChevronRight } from "lucide-react";
+import { X, Trophy, Activity, Target, Shield, ArrowLeft, Bookmark, ChevronDown, Quote, TrendingUp, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Player } from "@/types/player";
-import { useNavigate } from "react-router-dom";
 import { getMatchupGrade, matchupGradeColor } from "@/lib/matchupGrades";
 import { buildProjectionReasons } from "@/lib/projectionReasons";
 import { getSchedulePreview } from "@/lib/strengthOfSchedule";
@@ -15,19 +15,6 @@ interface PlayerDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-const myLeagues = [
-  {
-    id: "saturday-league",
-    name: "Saturday League",
-    teamName: "Mountain Falcons",
-  },
-  {
-    id: "pro-scout-elite",
-    name: "Pro Scout Elite",
-    teamName: "Steel Warriors",
-  }
-];
 
 const posStyles: Record<string, { bg: string, border: string, text: string, shadow: string, accent: string }> = {
   QB: { bg: "bg-blue-500/20", border: "border-blue-500/30", text: "text-blue-400", shadow: "shadow-[0_0_15px_rgba(59,130,246,0.3)]", accent: "blue" },
@@ -47,8 +34,6 @@ const posStyles: Record<string, { bg: string, border: string, text: string, shad
 export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModalProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "stats" | "history">("overview");
   const [historyYear, setHistoryYear] = useState<number>(2025);
-  const [showLeagueDropdown, setShowLeagueDropdown] = useState(false);
-  const navigate = useNavigate();
   const [matchup, setMatchup] = useState(() => getMatchupGrade("TEAM", "QB"));
   const [reasons, setReasons] = useState<string[]>([]);
   const [schedule, setSchedule] = useState(() => getSchedulePreview("TEAM", "QB"));
@@ -124,20 +109,6 @@ export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModal
     player.history.find((h) => h.year === historyYear) ||
     player.history[0] ||
     { year: historyYear, stats: { fpts: 0 } };
-
-  const handleTradeClick = () => {
-    if (myLeagues.length === 1) {
-      navigate(`/trade/${myLeagues[0].id}/${player.id}`);
-      onClose();
-    } else {
-      setShowLeagueDropdown(!showLeagueDropdown);
-    }
-  };
-
-  const selectLeague = (leagueId: string) => {
-    navigate(`/trade/${leagueId}/${player.id}`);
-    onClose();
-  };
 
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300 backdrop-blur-2xl bg-black/80">
@@ -284,11 +255,24 @@ export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModal
                  <div className="aspect-[4/5] rounded-[4rem] bg-gradient-to-b from-white/10 via-white/5 to-transparent border border-white/10 flex items-center justify-center relative group overflow-hidden shadow-2xl">
                     <div className="absolute inset-0 bg-primary/5 group-hover:bg-primary/10 transition-all duration-700" />
 
-                    {/* Abstract Decorative Elements */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-20 group-hover:opacity-30 transition-opacity">
-                       <div className="w-[150%] h-1 bg-gradient-to-r from-transparent via-primary to-transparent rotate-[35deg] blur-sm animate-pulse" />
-                       <div className="w-[150%] h-1 bg-gradient-to-r from-transparent via-blue-400 to-transparent -rotate-[35deg] blur-sm animate-pulse delay-700" />
-                    </div>
+                    {player.imageUrl ? (
+                      <img
+                        src={player.imageUrl}
+                        alt={player.name}
+                        className="relative z-10 h-full w-full object-cover"
+                      />
+                    ) : (
+                      <Avatar className="relative z-10 h-40 w-40 rounded-[2.5rem] border border-white/10 bg-white/5">
+                        <AvatarFallback className="rounded-[2.5rem] bg-white/5 text-5xl font-black italic uppercase text-primary">
+                          {player.name
+                            .split(" ")
+                            .slice(0, 2)
+                            .map((part) => part[0])
+                            .join("")}
+                        </AvatarFallback>
+                        <AvatarImage src="" alt={player.name} />
+                      </Avatar>
+                    )}
 
                     <div className="text-white/10 scale-[5] relative z-10 transition-transform duration-700 group-hover:scale-[5.5]">
                       <Activity className="w-12 h-12 stroke-[0.5] animate-pulse" />
@@ -533,32 +517,12 @@ export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModal
            </div>
 
            <div className="flex gap-6 relative">
-              {showLeagueDropdown && (
-                <div className="absolute bottom-full right-0 mb-6 w-72 bg-card/95 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-2xl z-[400] shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
-                  <div className="p-5 border-b border-white/5 bg-white/5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Select Roster to Trade</p>
-                  </div>
-                  {myLeagues.map((league) => (
-                    <button
-                      key={league.id}
-                      onClick={() => selectLeague(league.id)}
-                      className="w-full px-8 py-5 text-left hover:bg-primary/10 transition-colors border-b border-white/5 last:border-0 group flex items-center justify-between"
-                    >
-                      <div className="space-y-1">
-                        <p className="text-[12px] font-black uppercase tracking-widest text-foreground group-hover:text-primary transition-colors">{league.name}</p>
-                        <p className="text-[10px] font-medium text-muted-foreground/60">{league.teamName}</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground/20 group-hover:text-primary transition-all group-hover:translate-x-1" />
-                    </button>
-                  ))}
-                </div>
-              )}
-
               <Button
-                onClick={handleTradeClick}
+                disabled
+                title="Trade flow is not part of the supported React surface yet."
                 className="h-16 px-12 bg-primary text-primary-foreground rounded-2xl text-[11px] font-black uppercase tracking-[0.3em] shadow-[0_20px_40px_rgba(var(--primary),0.3)] hover:scale-105 transition-all duration-500 border border-white/10"
               >
-                Trade for Player
+                Trade Flow Coming Soon
               </Button>
            </div>
         </div>

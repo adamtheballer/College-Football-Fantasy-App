@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,13 +19,21 @@ import {
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, isLoggedIn } = useAuth();
+  const redirectTarget =
+    typeof location.state === "object" &&
+    location.state &&
+    "from" in location.state &&
+    typeof location.state.from === "string"
+      ? location.state.from
+      : "/";
 
   useEffect(() => {
     if (isLoggedIn) {
-      navigate("/", { replace: true });
+      navigate(redirectTarget, { replace: true });
     }
-  }, [isLoggedIn, navigate]);
+  }, [isLoggedIn, navigate, redirectTarget]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,20 +45,20 @@ export default function Login() {
     setIsLoading(true);
     setError(null);
     try {
-      await login(email, password);
-      let parsedUser: { id: number } | null = null;
-      try {
-        const savedUser = localStorage.getItem("cfb_user");
-        parsedUser = savedUser ? (JSON.parse(savedUser) as { id: number }) : null;
-      } catch {
-        parsedUser = null;
+      const signedInUser = await login(email, password);
+      if (signedInUser) {
+        setPendingGuide(signedInUser.id);
       }
-      if (parsedUser) {
-        setPendingGuide(parsedUser.id);
+      navigate(redirectTarget, { replace: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (message.includes("invalid credentials")) {
+        setError("Sign in failed. Check email/password and try again.");
+      } else if (message.includes("Failed to fetch")) {
+        setError("Cannot reach the server. Make sure backend is running on port 8000.");
+      } else {
+        setError("Sign in failed. Check email/password and try again.");
       }
-      navigate("/", { replace: true });
-    } catch {
-      setError("Sign in failed. Check email/password and try again.");
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +68,11 @@ export default function Login() {
     <div className="min-h-[80vh] flex items-center justify-center p-6 relative overflow-hidden">
       <div className="w-full max-w-[450px] space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
         <div className="flex flex-col items-center text-center space-y-4">
-          <Link to="/" className="group flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity">
+          <Link
+            to="/"
+            aria-label="Back to home"
+            className="group flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity"
+          >
             <div className="p-3 rounded-2xl bg-primary shadow-[0_0_25px_rgba(var(--primary),0.4)] group-hover:scale-110 transition-transform duration-500">
               <Trophy className="w-6 h-6 text-primary-foreground" />
             </div>

@@ -8,6 +8,7 @@ class Team(TimestampMixin, Base):
     __tablename__ = "teams"
     __table_args__ = (
         UniqueConstraint("league_id", "name", name="uq_team_league_name"),
+        UniqueConstraint("league_id", "owner_user_id", name="uq_team_league_owner"),
         Index("ix_teams_league_id", "league_id"),
     )
 

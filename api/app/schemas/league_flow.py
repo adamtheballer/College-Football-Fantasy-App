@@ -107,6 +107,54 @@ class LeagueDetailRead(BaseModel):
     members: list[LeagueMemberRead]
 
 
+class LeagueWorkspaceTeamRead(BaseModel):
+    id: int
+    league_id: int
+    name: str
+    owner_user_id: int | None = None
+
+
+class LeagueWorkspaceRosterEntryRead(BaseModel):
+    id: int
+    team_id: int
+    player_id: int
+    slot: str
+    status: str
+    player_name: str | None = None
+    player_school: str | None = None
+    player_position: str | None = None
+
+
+class LeagueWorkspaceMatchupSummaryRead(BaseModel):
+    week: int | None = None
+    team_id: int | None = None
+    opponent_team_id: int | None = None
+    opponent_team_name: str | None = None
+    status: str | None = None
+    projected_points_for: float | None = None
+    projected_points_against: float | None = None
+
+
+class LeagueWorkspaceStandingSummaryRead(BaseModel):
+    team_id: int
+    team_name: str
+    wins: int | None = None
+    losses: int | None = None
+    ties: int | None = None
+    points_for: float | None = None
+    rank: int | None = None
+
+
+class LeagueWorkspaceRead(BaseModel):
+    league: LeagueDetailRead
+    membership: LeagueMemberRead | None = None
+    owned_team: LeagueWorkspaceTeamRead | None = None
+    roster: list[LeagueWorkspaceRosterEntryRead]
+    matchup_summary: LeagueWorkspaceMatchupSummaryRead | None = None
+    standings_summary: list[LeagueWorkspaceStandingSummaryRead]
+    allowed_actions: list[str]
+
+
 class LeagueCreateResponse(BaseModel):
     league: LeagueDetailRead
     invite_code: str

@@ -13,7 +13,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     title: "Welcome to College Football Fantasy",
     description:
-      "This app helps you manage leagues, research teams, track injuries, study projections, and make better lineup decisions all season.",
+      "This app helps you manage leagues, review roster access, track alerts, study stats, and configure your settings from one supported React app.",
   },
   {
     target: "#nav-home",
@@ -31,37 +31,13 @@ const TOUR_STEPS: TourStep[] = [
     target: "#nav-roster",
     title: "Roster",
     description:
-      "Your roster tab is where you review your players, lineup decisions, projections, and team structure each week.",
-  },
-  {
-    target: "#nav-chats",
-    title: "Chats",
-    description:
-      "Chats keeps league communication in one place so your league stays active before, during, and after games.",
-  },
-  {
-    target: "#nav-watchlist",
-    title: "Watchlist",
-    description:
-      "Use Watchlist to track trade targets, stash candidates, and players you want to monitor before making a move.",
-  },
-  {
-    target: "#nav-waiver-wire",
-    title: "Waiver Wire",
-    description:
-      "Use Waiver Wire to pick up available free agents and add immediate help to your roster each week.",
-  },
-  {
-    target: "#nav-injury-center",
-    title: "Injury Center",
-    description:
-      "Use the injury center to follow fantasy-relevant injuries, status changes, and projected impact on teammates.",
+      "Roster now takes you into supported league entry points instead of demo lineup screens and mock matchup pages.",
   },
   {
     target: "#nav-alerts",
     title: "Alerts",
     description:
-      "Alerts show the most important updates for your players and leagues, including injuries, projection shifts, and big plays.",
+      "Alerts keeps league and player notifications in one supported workflow so you can review important changes quickly.",
   },
   {
     target: "#nav-stats",
