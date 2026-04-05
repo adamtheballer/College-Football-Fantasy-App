@@ -1,510 +1,509 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
-import { 
-  ArrowLeft, 
-  Check, 
-  ChevronRight, 
-  Users, 
-  Trophy, 
-  ArrowRightLeft, 
-  Shield, 
-  Target, 
-  Activity,
-  User,
-  ArrowRight,
-  ChevronLeft,
-  Star,
-  Zap,
-  TrendingUp
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { allPlayersMock } from "@/data/playersMock";
-import { Player } from "@/types/player";
-import { evaluateTrade } from "@/lib/tradeAnalyzer";
-import { getSchedulePreview } from "@/lib/strengthOfSchedule";
-import { apiPost } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, ArrowRightLeft, ChevronRight, ShieldAlert, Users } from "lucide-react";
 
-const posStyles: Record<string, { bg: string, border: string, text: string, shadow: string }> = {
-  QB: { bg: "bg-blue-500/20", border: "border-blue-500/30", text: "text-blue-400", shadow: "shadow-[0_0_15px_rgba(59,130,246,0.3)]" },
-  RB: { bg: "bg-emerald-500/20", border: "border-emerald-500/30", text: "text-emerald-400", shadow: "shadow-[0_0_15px_rgba(16,185,129,0.3)]" },
-  WR: { bg: "bg-purple-500/20", border: "border-purple-500/30", text: "text-purple-400", shadow: "shadow-[0_0_15px_rgba(168,85,247,0.3)]" },
-  TE: { bg: "bg-orange-500/20", border: "border-orange-500/30", text: "text-orange-400", shadow: "shadow-[0_0_15px_rgba(249,115,22,0.3)]" },
-  K: { bg: "bg-cyan-500/20", border: "border-cyan-500/30", text: "text-cyan-400", shadow: "shadow-[0_0_15px_rgba(6,182,212,0.3)]" },
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useActiveLeagueId } from "@/hooks/use-active-league";
+import {
+  useLeagueDetail,
+  useLeagues,
+  useLeagueWorkspace,
+} from "@/hooks/use-leagues";
+import { useLeagueTeams, useTeamRoster } from "@/hooks/use-teams";
+import { apiPost } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import type { RosterEntry } from "@/types/roster";
+import type { Team } from "@/types/team";
+
+const OFFENSE_POSITIONS = new Set(["QB", "RB", "WR", "TE", "K"]);
+
+type TradeAnalyzePayload = {
+  receive_ids: number[];
+  give_ids: number[];
+  season: number;
+  week: number;
+  league_size: number;
+  roster_slots: Record<string, number>;
 };
 
-const myRosterMock = [
-  { id: 101, name: "Jaxson Dart", pos: "QB", school: "OLE MISS", fpts: 312.4, status: "STARTER", wkProj: 22.5, posRank: 4 },
-  { id: 102, name: "Ashton Jeanty", pos: "RB", school: "BSU", fpts: 288.8, status: "STARTER", wkProj: 24.1, posRank: 2 },
-  { id: 111, name: "Omarion Hampton", pos: "RB", school: "UNC", fpts: 245.2, status: "STARTER", wkProj: 17.8, posRank: 6 },
-  { id: 103, name: "Emeka Egbuka", pos: "WR", school: "OSU", fpts: 238.3, status: "STARTER", wkProj: 18.4, posRank: 8 },
-  { id: 106, name: "Tetairoa McMillan", pos: "WR", school: "ARIZONA", fpts: 248.1, status: "STARTER", wkProj: 19.2, posRank: 5 },
-  { id: 104, name: "Colston Loveland", pos: "TE", school: "MICHIGAN", fpts: 145.2, status: "STARTER", wkProj: 12.8, posRank: 3 },
-  { id: 112, name: "Will Reichard", pos: "K", school: "ALABAMA", fpts: 142.6, status: "STARTER", wkProj: 11.3, posRank: 2 },
-  { id: 108, name: "Tez Johnson", pos: "WR", school: "OREGON", fpts: 212.4, status: "BENCH", wkProj: 15.5, posRank: 12 },
-  { id: 109, name: "Elic Ayomanor", pos: "WR", school: "STANFORD", fpts: 205.1, status: "BENCH", wkProj: 14.2, posRank: 15 },
-  { id: 110, name: "KJ Jefferson", pos: "QB", school: "UCF", fpts: 265.4, status: "BENCH", wkProj: 18.1, posRank: 11 },
-  { id: 113, name: "Brock Bowers", pos: "TE", school: "GEORGIA", fpts: 189.5, status: "BENCH", wkProj: 13.6, posRank: 4 },
-];
+type TradeAnalyzeResult = {
+  receive_value: number;
+  give_value: number;
+  delta: number;
+  verdict: string;
+};
 
-const otherTeamRosterMock = [
-  { id: 1, name: "Quinn Ewers", pos: "QB", school: "TEXAS", fpts: 345.5, status: "STARTER", wkProj: 26.4, posRank: 1 },
-  { id: 2, name: "Ollie Gordon II", pos: "RB", school: "OKST", fpts: 325.2, status: "STARTER", wkProj: 25.8, posRank: 1 },
-  { id: 11, name: "TreVeyon Henderson", pos: "RB", school: "OSU", fpts: 255.5, status: "STARTER", wkProj: 16.4, posRank: 5 },
-  { id: 3, name: "Luther Burden III", pos: "WR", school: "MISSOURI", fpts: 302.5, status: "STARTER", wkProj: 23.5, posRank: 1 },
-  { id: 12, name: "Rome Odunze", pos: "WR", school: "WASHINGTON", fpts: 271.3, status: "STARTER", wkProj: 19.8, posRank: 3 },
-  { id: 13, name: "Brock Bowers", pos: "TE", school: "GEORGIA", fpts: 189.5, status: "STARTER", wkProj: 13.6, posRank: 4 },
-  { id: 14, name: "Cam Little", pos: "K", school: "ARKANSAS", fpts: 131.1, status: "STARTER", wkProj: 10.5, posRank: 6 },
-  { id: 4, name: "Dillon Gabriel", pos: "QB", school: "OREGON", fpts: 332.2, status: "BENCH", wkProj: 24.8, posRank: 2 },
-  { id: 15, name: "Ashton Jeanty", pos: "RB", school: "BSU", fpts: 288.8, status: "BENCH", wkProj: 24.1, posRank: 2 },
-  { id: 16, name: "Evan Stewart", pos: "WR", school: "OREGON", fpts: 201.2, status: "BENCH", wkProj: 14.4, posRank: 14 },
-  { id: 17, name: "Mason Taylor", pos: "TE", school: "LSU", fpts: 143.2, status: "BENCH", wkProj: 10.2, posRank: 8 },
-];
+type TradeRow = {
+  rosterEntryId: number;
+  playerId: number;
+  name: string;
+  position: string;
+  school: string;
+  slot: string;
+};
 
-export default function Trade() {
-  const { leagueId, playerId } = useParams();
-  const navigate = useNavigate();
-  const [step, setStep] = useState<1 | 2>(1);
-  const [mySelectedIds, setMySelectedIds] = useState<number[]>([]);
-  const [theirSelectedIds, setTheirSelectedIds] = useState<number[]>([]);
+const POS_STYLES: Record<string, string> = {
+  QB: "bg-blue-500/20 border-blue-400/30 text-blue-300",
+  RB: "bg-emerald-500/20 border-emerald-400/30 text-emerald-300",
+  WR: "bg-violet-500/20 border-violet-400/30 text-violet-300",
+  TE: "bg-amber-500/20 border-amber-400/30 text-amber-300",
+  K: "bg-cyan-500/20 border-cyan-400/30 text-cyan-300",
+};
 
-  const targetPlayer = useMemo(() => {
-    return allPlayersMock.find(p => p.id === Number(playerId)) || otherTeamRosterMock[0];
-  }, [playerId]);
+const toTradeRows = (entries: RosterEntry[] | undefined): TradeRow[] => {
+  if (!entries?.length) return [];
+  return entries
+    .filter((entry) => OFFENSE_POSITIONS.has((entry.player.position ?? "").toUpperCase()))
+    .map((entry) => ({
+      rosterEntryId: entry.id,
+      playerId: entry.player.id,
+      name: entry.player.name,
+      position: entry.player.position.toUpperCase(),
+      school: entry.player.school,
+      slot: (entry.slot || "BENCH").toUpperCase(),
+    }))
+    .sort((a, b) => {
+      const starterA = a.slot !== "BENCH" ? 0 : 1;
+      const starterB = b.slot !== "BENCH" ? 0 : 1;
+      if (starterA !== starterB) return starterA - starterB;
+      return a.name.localeCompare(b.name);
+    });
+};
 
-  const toggleMySelection = (id: number) => {
-    setMySelectedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+const toTradeRosterSlots = (slots: Record<string, number> | undefined): Record<string, number> => {
+  if (!slots) {
+    return { QB: 1, RB: 2, WR: 2, TE: 1, K: 1, BE: 4, IR: 1 };
+  }
+  return {
+    QB: Number(slots.QB ?? 1),
+    RB: Number(slots.RB ?? 2),
+    WR: Number(slots.WR ?? 2),
+    TE: Number(slots.TE ?? 1),
+    K: Number(slots.K ?? 1),
+    BE: Number(slots.BENCH ?? slots.BE ?? 4),
+    IR: Number(slots.IR ?? 1),
+  };
+};
+
+const TradeList = ({
+  title,
+  subtitle,
+  rows,
+  selectedIds,
+  onToggle,
+}: {
+  title: string;
+  subtitle: string;
+  rows: TradeRow[];
+  selectedIds: Set<number>;
+  onToggle: (playerId: number) => void;
+}) => {
+  if (!rows.length) {
+    return (
+      <Card className="rounded-[2rem] border border-white/10 bg-card/40">
+        <CardHeader>
+          <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">
+            {title}
+          </CardTitle>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
+            {subtitle}
+          </p>
+        </CardHeader>
+        <CardContent className="pb-8">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+            No offensive players found on this roster.
+          </p>
+        </CardContent>
+      </Card>
     );
-  };
-
-  const toggleTheirSelection = (id: number) => {
-    setTheirSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
-
-  const handleMakeOffer = () => {
-    if (mySelectedIds.length > 0) {
-      setStep(2);
-    }
-  };
-
-  const handleSendTrade = () => {
-    if (theirSelectedIds.length > 0) {
-      navigate(`/league/${leagueId}`);
-    }
-  };
-
-  const teamNames: Record<string, string> = {
-    "saturday-league": "Tiger Kings",
-    "pro-scout-elite": "Crimson Tide Elite",
-    "default": "The Dynasty Team"
-  };
-
-  const opponentTeamName = teamNames[leagueId || "default"] || teamNames["default"];
-
-  const selectedMyPlayers = myRosterMock.filter(p => mySelectedIds.includes(p.id));
-  const selectedTheirPlayers = otherTeamRosterMock.filter(p => theirSelectedIds.includes(p.id));
-  const [tradeResult, setTradeResult] = useState(() => evaluateTrade(selectedTheirPlayers, selectedMyPlayers));
-
-  useEffect(() => {
-    if (!selectedTheirPlayers.length || !selectedMyPlayers.length) {
-      setTradeResult(evaluateTrade(selectedTheirPlayers, selectedMyPlayers));
-      return;
-    }
-    const season = new Date().getFullYear();
-    const week = 1;
-    apiPost<{ receive_value: number; give_value: number; delta: number; verdict: string }>(
-      "/trade/analyze",
-      {
-        receive_ids: selectedTheirPlayers.map((p) => p.id),
-        give_ids: selectedMyPlayers.map((p) => p.id),
-        season,
-        week,
-        league_size: 12,
-        roster_slots: { QB: 1, RB: 2, WR: 2, TE: 1, K: 1, BE: 4, IR: 1 },
-      }
-    )
-      .then((payload) => {
-        setTradeResult({
-          receiveValue: payload.receive_value,
-          giveValue: payload.give_value,
-          delta: payload.delta,
-          verdict: payload.verdict,
-        });
-      })
-      .catch(() => {
-        setTradeResult(evaluateTrade(selectedTheirPlayers, selectedMyPlayers));
-      });
-  }, [selectedTheirPlayers, selectedMyPlayers]);
-
-  const averageScheduleGrade = (players: typeof selectedMyPlayers) => {
-    if (!players.length) return { label: "Neutral", color: "text-amber-300" };
-    const grades = players.flatMap((p) => getSchedulePreview(p.school, p.pos).map((g) => g.grade));
-    const score = grades.reduce((sum, g) => {
-      if (g === "A+" || g === "A") return sum + 2;
-      if (g === "B") return sum + 1;
-      if (g === "D") return sum - 1;
-      if (g === "F") return sum - 2;
-      return sum;
-    }, 0);
-    if (score >= 4) return { label: "Easy", color: "text-emerald-400" };
-    if (score <= -4) return { label: "Hard", color: "text-red-400" };
-    return { label: "Neutral", color: "text-amber-300" };
-  };
-  const mySchedule = averageScheduleGrade(selectedMyPlayers);
-  const theirSchedule = averageScheduleGrade(selectedTheirPlayers);
-  const myPreview = selectedMyPlayers[0] ? getSchedulePreview(selectedMyPlayers[0].school, selectedMyPlayers[0].pos) : [];
-  const theirPreview = selectedTheirPlayers[0] ? getSchedulePreview(selectedTheirPlayers[0].school, selectedTheirPlayers[0].pos) : [];
-  const fairnessScore = (() => {
-    const total = Math.max(1, tradeResult.giveValue + tradeResult.receiveValue);
-    const gap = Math.abs(tradeResult.delta);
-    return Math.max(0, Math.min(100, Math.round(100 - (gap / total) * 120)));
-  })();
+  }
 
   return (
-    <div className="max-w-6xl w-full mx-auto space-y-12 animate-in fade-in duration-1000 py-10 px-4 md:px-6 relative overflow-x-hidden">
-      {/* Reorganized Header - Dashboard Style */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-        <div className="space-y-4">
-          <div className="flex items-center gap-6">
-            <Button asChild variant="ghost" className="h-14 w-14 rounded-[1.5rem] bg-white/5 border border-white/10 text-muted-foreground hover:text-primary transition-all hover:scale-110 flex items-center justify-center p-0">
-              <Link to="/leagues">
-                <ArrowLeft className="w-6 h-6" />
-              </Link>
-            </Button>
-            <div className="space-y-1">
-              <h1 className="text-6xl font-black italic uppercase tracking-tighter text-foreground leading-none">
-                Trade Builder
-              </h1>
-              <div className="flex items-center gap-3">
-                <div className="px-5 py-2 rounded-xl bg-primary/10 border border-primary/20 backdrop-blur-md">
-                   <span className="text-[10px] font-black tracking-[0.4em] text-primary uppercase leading-none block">
-                     {leagueId?.replace(/-/g, ' ')}
-                   </span>
+    <Card className="rounded-[2rem] border border-white/10 bg-card/40">
+      <CardHeader>
+        <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">
+          {title}
+        </CardTitle>
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
+          {subtitle}
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {rows.map((row) => {
+          const selected = selectedIds.has(row.playerId);
+          return (
+            <button
+              key={row.rosterEntryId}
+              type="button"
+              onClick={() => onToggle(row.playerId)}
+              className={cn(
+                "w-full rounded-2xl border px-4 py-3 text-left transition-all",
+                selected
+                  ? "border-primary/40 bg-primary/10"
+                  : "border-white/10 bg-white/[0.03] hover:border-white/20"
+              )}
+            >
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black italic uppercase tracking-tight text-foreground">
+                    {row.name}
+                  </p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">
+                    {row.school} • {row.slot}
+                  </p>
                 </div>
-                <div className="w-1 h-1 rounded-full bg-primary/40" />
-                <span className="text-[10px] font-black tracking-[0.4em] text-muted-foreground uppercase">
-                  Negotiating with {opponentTeamName}'s Owner
+                <span
+                  className={cn(
+                    "rounded-xl border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]",
+                    POS_STYLES[row.position] ?? POS_STYLES.QB
+                  )}
+                >
+                  {row.position}
                 </span>
               </div>
+            </button>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default function Trade() {
+  const { leagueId: leagueIdParam, playerId: playerIdParam } = useParams();
+  const navigate = useNavigate();
+  const { data: leagues = [] } = useLeagues(50, true);
+  const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
+
+  const parsedLeagueId =
+    leagueIdParam && /^\d+$/.test(leagueIdParam) ? Number(leagueIdParam) : undefined;
+  const fallbackLeagueId = activeLeagueId ?? leagues[0]?.id;
+  const leagueId = parsedLeagueId ?? fallbackLeagueId;
+
+  const { data: league } = useLeagueDetail(leagueId, Boolean(leagueId));
+  const { data: workspace } = useLeagueWorkspace(leagueId, Boolean(leagueId));
+  const { data: teamsPayload } = useLeagueTeams(leagueId, Boolean(leagueId));
+
+  const teams = teamsPayload?.data ?? [];
+  const ownedTeamId = workspace?.owned_team?.id ?? null;
+  const opponentTeams = useMemo(
+    () => teams.filter((team) => team.id !== ownedTeamId),
+    [ownedTeamId, teams]
+  );
+
+  const [opponentTeamId, setOpponentTeamId] = useState<number | null>(null);
+  const [giveIds, setGiveIds] = useState<number[]>([]);
+  const [receiveIds, setReceiveIds] = useState<number[]>([]);
+  const [analysis, setAnalysis] = useState<TradeAnalyzeResult | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  useEffect(() => {
+    if (!leagueId) return;
+    if (activeLeagueId !== leagueId) {
+      setActiveLeagueId(leagueId);
+    }
+  }, [activeLeagueId, leagueId, setActiveLeagueId]);
+
+  useEffect(() => {
+    if (!opponentTeams.length) {
+      setOpponentTeamId(null);
+      return;
+    }
+    setOpponentTeamId((current) => {
+      if (current && opponentTeams.some((team) => team.id === current)) return current;
+      return opponentTeams[0].id;
+    });
+  }, [opponentTeams]);
+
+  const {
+    data: myRosterPayload,
+    isLoading: myRosterLoading,
+    isError: myRosterError,
+  } = useTeamRoster(ownedTeamId ?? undefined, Boolean(ownedTeamId));
+
+  const {
+    data: theirRosterPayload,
+    isLoading: theirRosterLoading,
+    isError: theirRosterError,
+  } = useTeamRoster(opponentTeamId ?? undefined, Boolean(opponentTeamId));
+
+  const myRows = useMemo(() => toTradeRows(myRosterPayload?.data), [myRosterPayload?.data]);
+  const theirRows = useMemo(() => toTradeRows(theirRosterPayload?.data), [theirRosterPayload?.data]);
+  const giveSet = useMemo(() => new Set(giveIds), [giveIds]);
+  const receiveSet = useMemo(() => new Set(receiveIds), [receiveIds]);
+
+  useEffect(() => {
+    const parsedPlayerId =
+      playerIdParam && /^\d+$/.test(playerIdParam) ? Number(playerIdParam) : null;
+    if (!parsedPlayerId || !theirRows.length) return;
+    if (theirRows.some((row) => row.playerId === parsedPlayerId)) {
+      setReceiveIds((current) =>
+        current.includes(parsedPlayerId) ? current : [...current, parsedPlayerId]
+      );
+    }
+  }, [playerIdParam, theirRows]);
+
+  useEffect(() => {
+    setAnalysis(null);
+    setAnalysisError(null);
+  }, [giveIds, receiveIds, opponentTeamId, leagueId]);
+
+  const opponentTeam = teams.find((team) => team.id === opponentTeamId) ?? null;
+  const ownedTeam = teams.find((team) => team.id === ownedTeamId) ?? null;
+
+  const toggleGive = (playerId: number) => {
+    setGiveIds((current) =>
+      current.includes(playerId)
+        ? current.filter((id) => id !== playerId)
+        : [...current, playerId]
+    );
+  };
+
+  const toggleReceive = (playerId: number) => {
+    setReceiveIds((current) =>
+      current.includes(playerId)
+        ? current.filter((id) => id !== playerId)
+        : [...current, playerId]
+    );
+  };
+
+  const handleAnalyze = async () => {
+    if (!league || !workspace || !giveIds.length || !receiveIds.length) {
+      return;
+    }
+    const payload: TradeAnalyzePayload = {
+      receive_ids: receiveIds,
+      give_ids: giveIds,
+      season: league.season_year,
+      week: Number(workspace.matchup_summary?.week ?? 1),
+      league_size: league.max_teams,
+      roster_slots: toTradeRosterSlots(league.settings?.roster_slots_json),
+    };
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+    try {
+      const result = await apiPost<TradeAnalyzeResult>("/trade/analyze", payload);
+      setAnalysis(result);
+    } catch (error) {
+      setAnalysis(null);
+      setAnalysisError(error instanceof Error ? error.message : "Unable to analyze trade.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  if (!leagueId) {
+    return (
+      <div className="mx-auto max-w-4xl py-12">
+        <Card className="rounded-[2rem] border border-white/10 bg-card/40">
+          <CardContent className="space-y-4 p-10 text-center">
+            <p className="text-[11px] font-black uppercase tracking-[0.25em] text-muted-foreground/70">
+              No active league selected.
+            </p>
+            <Button
+              className="rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
+              onClick={() => navigate("/leagues")}
+            >
+              Open Leagues
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-8 pb-16 pt-8">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">
+            Trade Analyzer
+          </p>
+          <h1 className="text-6xl font-black italic uppercase tracking-tight text-foreground">
+            Trade Builder
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Select players from both rosters and compare trade value.
+          </p>
+        </div>
+        <Button
+          asChild
+          variant="outline"
+          className="h-11 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
+        >
+          <Link to={`/league/${leagueId}`}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to League
+          </Link>
+        </Button>
+      </div>
+
+      <Card className="rounded-[2rem] border border-white/10 bg-card/40">
+        <CardContent className="grid gap-4 p-6 md:grid-cols-2">
+          <div className="space-y-2">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+              Your Team
+            </p>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-black uppercase tracking-[0.14em] text-foreground">
+              {ownedTeam?.name ?? "Loading team..."}
             </div>
           </div>
-        </div>
-
-        {/* Progress Bar - Top Right Pill */}
-        <div
-          className={cn(
-            "relative overflow-hidden rounded-[2.5rem] border transition-all duration-500 group/prog h-fit",
-            step === 1
-              ? "bg-white/5 border-blue-400/20 shadow-[0_20px_50px_rgba(59,130,246,0.25)]"
-              : "bg-white/5 border-emerald-400/20 shadow-[0_20px_50px_rgba(16,185,129,0.25)]"
-          )}
-        >
-          <div
-            className={cn(
-              "absolute inset-y-0 left-0 transition-all duration-500",
-              step === 1
-                ? "bg-gradient-to-r from-blue-700 via-blue-400 to-blue-700"
-                : "bg-gradient-to-r from-emerald-700 via-emerald-400 to-emerald-700"
-            )}
-            style={{ width: step === 1 ? "50%" : "100%" }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/prog:translate-x-full transition-transform duration-1000" />
-          <div className="relative z-10 h-12 px-14 flex items-center justify-center text-[10px] font-black uppercase tracking-[0.4em] text-white select-none">
-            Offer
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-8 xl:gap-10 min-w-0">
-        {/* Main Selection Area */}
-        <div className="space-y-8">
-           <div className="flex items-center justify-between px-2">
-              <div className="space-y-1">
-                 <h2 className="text-3xl font-black italic uppercase text-foreground">
-                   {step === 1 ? "Select players to trade away" : "Select players to acquire"}
-                 </h2>
-                 <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground uppercase opacity-40">
-                   {step === 1 ? "Your Full Roster" : `${targetPlayer.name}'s Full Roster`}
-                 </p>
-              </div>
-              <div className="flex items-center gap-4">
-                 <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
-                    <Trophy className="w-3.5 h-3.5 text-primary" />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Season Stats Enabled</span>
-                 </div>
-              </div>
-           </div>
-
-           <Card className="bg-card/30 backdrop-blur-sm border border-white/10 rounded-[2.75rem] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
-              <div className="divide-y divide-white/10">
-                {["STARTER", "BENCH"].map((status) => (
-                  <div key={status} className="flex flex-col">
-                    <div className="px-8 py-4 border-b border-white/10 grid grid-cols-[24px_1fr] lg:grid-cols-[24px_minmax(0,1fr)_88px_88px_88px] items-center">
-                      <div />
-                      <div className="text-[10px] font-black tracking-[0.35em] text-primary uppercase italic">{status}S</div>
-                      <div className="hidden lg:block text-center text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.25em]">WK PROJ</div>
-                      <div className="hidden lg:block text-center text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.25em]">SEASON</div>
-                      <div className="hidden lg:block text-center text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.25em] whitespace-nowrap">POS RK</div>
-                    </div>
-                    {(step === 1 ? myRosterMock : otherTeamRosterMock).filter(p => p.status === status).map((player) => {
-                      const isSelected = step === 1 ? mySelectedIds.includes(player.id) : theirSelectedIds.includes(player.id);
-                      const style = posStyles[player.pos] || posStyles.QB;
-
-                      return (
-                        <div
-                          key={player.id}
-                          onClick={() =>
-                            step === 1
-                              ? toggleMySelection(player.id)
-                              : toggleTheirSelection(player.id)
-                          }
-                          className={cn(
-                            "px-8 py-4 grid grid-cols-[24px_1fr] items-center gap-x-4 gap-y-2 cursor-pointer transition-colors hover:bg-white/[0.03] border-b border-white/10 last:border-0",
-                            isSelected && "bg-white/[0.02]"
-                          )}
-                        >
-                          {/* Checkbox */}
-                          <div
-                            className={cn(
-                              "h-5 w-5 rounded-[6px] border flex items-center justify-center",
-                              isSelected
-                                ? "bg-primary/20 border-primary/40 text-primary"
-                                : "bg-white/5 border-white/10 text-transparent"
-                            )}
-                          >
-                            <Check className="w-3.5 h-3.5 stroke-[3]" />
-                          </div>
-
-                          {/* Player */}
-                          <div className="min-w-0 flex items-center justify-between gap-6">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <span
-                                  className={cn(
-                                    "text-[14px] font-black tracking-tight text-foreground truncate",
-                                    player.name.length > 22 ? "text-[13px]" : "text-[14px]"
-                                  )}
-                                >
-                                  {player.name}
-                                </span>
-                                <span
-                                  className={cn(
-                                    "px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest shrink-0 drop-shadow-[0_0_8px_currentColor]",
-                                    style.text
-                                  )}
-                                >
-                                  {player.pos}
-                                </span>
-                              </div>
-                              <div className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-[0.2em] truncate mt-0.5">
-                                {player.school}
-                              </div>
-                            </div>
-
-                            {/* Stats */}
-                            <div className="hidden lg:grid grid-cols-3 gap-0 text-center shrink-0">
-                              <div className="w-[88px] text-[12px] font-black text-foreground">{player.wkProj}</div>
-                              <div className="w-[88px] text-[12px] font-black text-foreground">{player.fpts}</div>
-                              <div className="w-[88px] text-[12px] font-black text-primary whitespace-nowrap">#{player.posRank}</div>
-                            </div>
-                          </div>
-
-                          {/* Mobile stats */}
-                          <div className="col-span-2 grid grid-cols-3 gap-4 pl-[28px] lg:hidden pt-1">
-                            <div className="text-center">
-                              <div className="text-[9px] font-black text-muted-foreground/50 uppercase tracking-[0.25em]">WK</div>
-                              <div className="text-[12px] font-black text-foreground">{player.wkProj}</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-[9px] font-black text-muted-foreground/50 uppercase tracking-[0.25em]">SEASON</div>
-                              <div className="text-[12px] font-black text-foreground">{player.fpts}</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-[9px] font-black text-muted-foreground/50 uppercase tracking-[0.25em]">POS</div>
-                              <div className="text-[12px] font-black text-primary whitespace-nowrap">#{player.posRank}</div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+          <div className="space-y-2">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+              Trade Partner
+            </p>
+            <Select
+              value={opponentTeamId ? String(opponentTeamId) : ""}
+              onValueChange={(value) => setOpponentTeamId(Number(value))}
+            >
+              <SelectTrigger className="h-12 rounded-xl border-white/10 bg-white/[0.03] text-[10px] font-black uppercase tracking-[0.16em]">
+                <SelectValue placeholder="Select team" />
+              </SelectTrigger>
+              <SelectContent>
+                {opponentTeams.map((team: Team) => (
+                  <SelectItem key={team.id} value={String(team.id)}>
+                    {team.name}
+                  </SelectItem>
                 ))}
-              </div>
-           </Card>
-        </div>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Sidebar Summary Area */}
-        <div className="space-y-8 h-fit xl:sticky xl:top-12 min-w-0">
-           <Card className="bg-[#0A0C10]/80 backdrop-blur-2xl border border-white/10 rounded-[3.5rem] p-8 md:p-10 space-y-10 relative overflow-hidden group shadow-[0_20px_60px_rgba(0,0,0,0.4)]">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[100px] rounded-full -mr-32 -mt-32 pointer-events-none" />
-              
-              <div className="space-y-8 relative z-10">
-                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                       <ArrowRightLeft className="w-5 h-5 text-primary" />
-                       <h3 className="text-[11px] font-black tracking-[0.5em] text-primary uppercase italic">Trade Overview</h3>
-                    </div>
-                    <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest">Sync Active</span>
-                 </div>
-                 
-                 <div className="space-y-10">
-                    <div className="space-y-4">
-                       <div className="flex items-center justify-between">
-                          <p className="text-[9px] font-black text-red-400 uppercase tracking-widest">Sending Away</p>
-                       </div>
-                       <div className="flex flex-wrap gap-2">
-                          {mySelectedIds.length > 0 ? mySelectedIds.map(id => {
-                            const p = myRosterMock.find(x => x.id === id);
-                            return (
-                              <div key={id} className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-foreground uppercase tracking-widest hover:border-red-500/40 transition-colors">
-                                {p?.name}
-                              </div>
-                            );
-                          }) : <div className="w-full py-8 rounded-[2rem] border border-dashed border-white/5 flex items-center justify-center text-[10px] font-black text-muted-foreground/20 italic uppercase tracking-[0.3em]">Empty Offer</div>}
-                       </div>
-                    </div>
-
-                    <div className="h-[1px] w-full bg-white/5" />
-
-                    <div className="space-y-4">
-                       <div className="flex items-center justify-between">
-                          <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Receiving</p>
-                       </div>
-                       <div className="flex flex-wrap gap-2">
-                          {theirSelectedIds.length > 0 ? theirSelectedIds.map(id => {
-                            const p = otherTeamRosterMock.find(x => x.id === id);
-                            return (
-                              <div key={id} className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-foreground uppercase tracking-widest hover:border-emerald-500/40 transition-colors">
-                                {p?.name}
-                              </div>
-                            );
-                          }) : <div className="w-full py-8 rounded-[2rem] border border-dashed border-white/5 flex items-center justify-center text-[10px] font-black text-muted-foreground/20 italic uppercase tracking-[0.3em]">Empty Selection</div>}
-                       </div>
-                    </div>
-                 </div>
-              </div>
-
-              <div className="pt-4 relative z-10">
-                 {step === 1 ? (
-                   <Button
-                    disabled={mySelectedIds.length === 0}
-                    onClick={handleMakeOffer}
-                    className={cn(
-                      "w-full h-20 rounded-[2.5rem] text-[12px] font-black uppercase tracking-[0.4em] transition-all duration-500 relative overflow-hidden group/btn",
-                      mySelectedIds.length > 0
-                        ? "bg-gradient-to-r from-blue-700 via-blue-400 to-blue-700 text-white shadow-[0_20px_50px_rgba(59,130,246,0.4)] hover:scale-[1.02] active:scale-95 border border-blue-400/20"
-                        : "bg-white/5 text-muted-foreground/20 cursor-not-allowed border border-white/5"
-                    )}
-                   >
-                     {mySelectedIds.length > 0 && (
-                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-1000" />
-                     )}
-                     <span className="relative z-10 flex items-center justify-center gap-3">
-                        Continue <ArrowRight className="w-4 h-4" />
-                     </span>
-                   </Button>
-                 ) : (
-                   <div className="flex flex-col gap-6">
-                      <Button
-                        disabled={theirSelectedIds.length === 0}
-                        onClick={handleSendTrade}
-                        className={cn(
-                          "w-full h-20 rounded-[2.5rem] text-[12px] font-black uppercase tracking-[0.4em] transition-all duration-500 relative overflow-hidden group/btn",
-                          theirSelectedIds.length > 0
-                            ? "bg-gradient-to-r from-emerald-700 via-emerald-400 to-emerald-700 text-white shadow-[0_20px_50px_rgba(16,185,129,0.4)] hover:scale-[1.02] active:scale-95 border border-emerald-400/20"
-                            : "bg-white/5 text-muted-foreground/20 cursor-not-allowed border border-white/5"
-                        )}
-                      >
-                        <span className="relative z-10 flex items-center justify-center gap-3">
-                           Send Trade
-                        </span>
-                      </Button>
-                      <Button 
-                        variant="ghost"
-                        onClick={() => setStep(1)}
-                        className="h-12 text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        <ChevronLeft className="w-4 h-4 mr-2" /> Adjust Offer
-                      </Button>
-                   </div>
-                 )}
-              </div>
-           </Card>
-
-           <Card className="bg-gradient-to-br from-primary/5 to-transparent border border-white/5 rounded-[2.5rem] p-8 space-y-6">
-              <div className="flex items-center gap-3">
-                 <Shield className="w-5 h-5 text-primary" />
-                 <h3 className="text-sm font-black italic uppercase text-white">Trade Analysis</h3>
-              </div>
-              {(selectedMyPlayers.length > 0 || selectedTheirPlayers.length > 0) ? (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">You Give</p>
-                      <p className="text-2xl font-black text-foreground">{tradeResult.giveValue}</p>
-                      <p className={cn("text-[9px] font-black uppercase tracking-widest", mySchedule.color)}>
-                        Schedule {mySchedule.label}
-                      </p>
-                      {myPreview.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {myPreview.map((game) => (
-                            <span key={`my-${game.opponent}`} className={cn("text-[9px] font-black uppercase tracking-widest", game.colorClass)}>
-                              {game.grade}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">You Receive</p>
-                      <p className="text-2xl font-black text-foreground">{tradeResult.receiveValue}</p>
-                      <p className={cn("text-[9px] font-black uppercase tracking-widest", theirSchedule.color)}>
-                        Schedule {theirSchedule.label}
-                      </p>
-                      {theirPreview.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {theirPreview.map((game) => (
-                            <span key={`their-${game.opponent}`} className={cn("text-[9px] font-black uppercase tracking-widest", game.colorClass)}>
-                              {game.grade}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Trade Fairness Score</span>
-                    <span className="text-[12px] font-black uppercase tracking-widest text-primary">
-                      {fairnessScore}/100
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">You Gain</p>
-                      <p className={cn("text-xl font-black", tradeResult.delta >= 0 ? "text-emerald-400" : "text-red-400")}>
-                        {tradeResult.delta >= 0 ? "+" : ""}{tradeResult.delta.toFixed(1)} pts
-                      </p>
-                    </div>
-                    <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Verdict</p>
-                      <p className={cn("text-xl font-black uppercase", tradeResult.delta >= 0 ? "text-emerald-400" : "text-red-400")}>
-                        {tradeResult.verdict}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-[10px] font-medium text-muted-foreground/60 leading-loose tracking-widest uppercase">
-                  Our AI Evaluator is analyzing this trade. Fair value indicators will appear once both teams select athletes.
-                </p>
-              )}
-           </Card>
-        </div>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <TradeList
+          title="Players You Give"
+          subtitle={myRosterLoading ? "Loading roster..." : "Select one or more players"}
+          rows={myRows}
+          selectedIds={giveSet}
+          onToggle={toggleGive}
+        />
+        <TradeList
+          title={`Players You Receive${opponentTeam ? ` (${opponentTeam.name})` : ""}`}
+          subtitle={theirRosterLoading ? "Loading roster..." : "Select one or more players"}
+          rows={theirRows}
+          selectedIds={receiveSet}
+          onToggle={toggleReceive}
+        />
       </div>
+
+      {(myRosterError || theirRosterError) && (
+        <Card className="rounded-[2rem] border border-red-400/30 bg-red-500/10">
+          <CardContent className="flex items-center gap-3 p-6 text-sm text-red-200">
+            <ShieldAlert className="h-5 w-5" />
+            Unable to load one or more rosters. Please retry or switch leagues.
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="rounded-[2rem] border border-white/10 bg-card/40">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-white/10">
+          <CardTitle className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-primary">
+            <ArrowRightLeft className="h-4 w-4" />
+            Trade Analysis
+          </CardTitle>
+          <Button
+            className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
+            disabled={isAnalyzing || !giveIds.length || !receiveIds.length || !league || !workspace}
+            onClick={handleAnalyze}
+          >
+            {isAnalyzing ? "Analyzing..." : "Analyze Trade"}
+            {!isAnalyzing && <ChevronRight className="ml-2 h-4 w-4" />}
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-6 p-6">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                Giving
+              </p>
+              <p className="mt-2 text-2xl font-black italic text-foreground">{giveIds.length}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                Receiving
+              </p>
+              <p className="mt-2 text-2xl font-black italic text-foreground">{receiveIds.length}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                League Size
+              </p>
+              <p className="mt-2 text-2xl font-black italic text-foreground">
+                {league?.max_teams ?? "-"}
+              </p>
+            </div>
+          </div>
+
+          {analysisError && (
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-300">
+              {analysisError}
+            </p>
+          )}
+
+          {analysis ? (
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                  Give Value
+                </p>
+                <p className="mt-2 text-xl font-black text-foreground">{analysis.give_value.toFixed(2)}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                  Receive Value
+                </p>
+                <p className="mt-2 text-xl font-black text-foreground">
+                  {analysis.receive_value.toFixed(2)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                  Delta
+                </p>
+                <p
+                  className={cn(
+                    "mt-2 text-xl font-black",
+                    analysis.delta >= 0 ? "text-emerald-300" : "text-red-300"
+                  )}
+                >
+                  {analysis.delta >= 0 ? "+" : ""}
+                  {analysis.delta.toFixed(2)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                  Verdict
+                </p>
+                <p className="mt-2 text-xl font-black text-primary">{analysis.verdict}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                Select players from both sides, then run analysis to see value differential.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-[2rem] border border-emerald-400/20 bg-emerald-500/10">
+        <CardContent className="flex items-center gap-3 p-5 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-100">
+          <Users className="h-4 w-4" />
+          Trade value is calculated from your league rosters and weekly projections.
+        </CardContent>
+      </Card>
     </div>
   );
 }
