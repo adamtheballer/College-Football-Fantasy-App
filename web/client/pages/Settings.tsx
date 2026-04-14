@@ -18,6 +18,8 @@ import { useNavigate } from "react-router-dom";
 import { apiGet, apiPost } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { restartGuide } from "@/lib/onboarding";
+import { useLeagues } from "@/hooks/use-leagues";
+import { useActiveLeagueId } from "@/hooks/use-active-league";
 
 type LeagueNotificationPreference = {
   league_id: number;
@@ -91,8 +93,12 @@ const CheckboxItem = ({ id, label, description, checked, onCheckedChange, disabl
 export default function Settings() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { data: leagues = [] } = useLeagues(50, Boolean(user));
+  const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [leaguePrefs, setLeaguePrefs] = useState<LeagueNotificationPreference[]>([]);
+  const [profileName, setProfileName] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
   const [prefs, setPrefs] = useState({
     push_enabled: true,
     email_enabled: true,
@@ -104,6 +110,12 @@ export default function Settings() {
     projection_alerts: true,
     lineup_reminders: true,
   });
+
+  useEffect(() => {
+    if (!user) return;
+    setProfileName(user.firstName || "");
+    setProfileEmail(user.email || "");
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -161,10 +173,6 @@ export default function Settings() {
     );
   };
 
-  const teams = [
-    "Alabama", "Georgia", "Ohio State", "Michigan", "Texas", "Florida State", "LSU", "Oregon"
-  ];
-
   const handleReplayGuide = () => {
     if (!user) return;
     restartGuide(user.id);
@@ -204,14 +212,18 @@ export default function Settings() {
             <div className="space-y-4">
               <Label className="text-[10px] font-black tracking-[0.2em] text-muted-foreground uppercase opacity-60">Full Name</Label>
               <Input 
-                placeholder="Adam Bajdechi" 
+                value={profileName}
+                onChange={(event) => setProfileName(event.target.value)}
+                placeholder="Your name"
                 className="bg-white/5 border-border rounded-2xl h-14 focus:ring-primary/20 focus:border-primary/40 transition-all text-xs font-bold tracking-wider"
               />
             </div>
             <div className="space-y-4">
               <Label className="text-[10px] font-black tracking-[0.2em] text-muted-foreground uppercase opacity-60">Email Address</Label>
               <Input 
-                placeholder="adam@example.com" 
+                value={profileEmail}
+                onChange={(event) => setProfileEmail(event.target.value)}
+                placeholder="you@example.com"
                 className="bg-white/5 border-border rounded-2xl h-14 focus:ring-primary/20 focus:border-primary/40 transition-all text-xs font-bold tracking-wider"
               />
             </div>
@@ -401,17 +413,24 @@ export default function Settings() {
         >
           <div className="space-y-10">
             <SettingItem 
-              label="Favorite Team" 
-              description="Personalize your dashboard with team colors"
+              label="Default Active League"
+              description="Choose which league opens first across roster/waiver/watchlist views"
             >
-              <Select defaultValue="Alabama">
+              <Select
+                value={activeLeagueId ? String(activeLeagueId) : ""}
+                onValueChange={(value) => setActiveLeagueId(Number(value))}
+              >
                 <SelectTrigger className="w-60 bg-white/5 border-border rounded-2xl h-14 focus:ring-primary/20 focus:border-primary/40 transition-all text-xs font-bold tracking-wider uppercase">
-                  <SelectValue placeholder="Select team" />
+                  <SelectValue placeholder="Select league" />
                 </SelectTrigger>
                 <SelectContent className="bg-[#0A0C10] border-border rounded-2xl">
-                  {teams.map(team => (
-                    <SelectItem key={team} value={team} className="text-xs font-bold uppercase tracking-widest focus:bg-primary focus:text-primary-foreground">
-                      {team}
+                  {leagues.map((league) => (
+                    <SelectItem
+                      key={league.id}
+                      value={String(league.id)}
+                      className="text-xs font-bold uppercase tracking-widest focus:bg-primary focus:text-primary-foreground"
+                    >
+                      {league.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

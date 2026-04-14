@@ -35,9 +35,12 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueCreateRequest,
     LeagueCreateResponse,
     LeagueDetailRead,
+    LeagueNewsList,
     LeagueMemberRead,
     LeagueMembersList,
+    LeaguePowerRankingList,
     LeaguePreview,
+    LeagueScoreboardList,
     LeagueSettingsUpdate,
     LeagueWorkspaceRead,
     JoinByCodeRequest,
@@ -51,6 +54,9 @@ from collegefootballfantasy_api.app.services.league_flow import (
     update_league_settings as update_league_settings_flow,
 )
 from collegefootballfantasy_api.app.services.league_workspace import (
+    build_league_news_items,
+    build_power_rankings_rows,
+    build_scoreboard_rows,
     build_league_workspace,
     get_league_detail,
 )
@@ -240,6 +246,44 @@ def get_league_workspace_endpoint(
     league = get_league_or_404(db, league_id)
     membership = require_league_member(db, league.id, current_user)
     return build_league_workspace(db, league, membership, current_user)
+
+
+@router.get("/{league_id}/matchups", response_model=LeagueScoreboardList)
+def get_league_matchups_endpoint(
+    league_id: int,
+    week: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeagueScoreboardList:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    rows = build_scoreboard_rows(db, league, week=week)
+    return LeagueScoreboardList(data=rows, total=len(rows))
+
+
+@router.get("/{league_id}/power-rankings", response_model=LeaguePowerRankingList)
+def get_league_power_rankings_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeaguePowerRankingList:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    rows = build_power_rankings_rows(db, league)
+    return LeaguePowerRankingList(data=rows, total=len(rows))
+
+
+@router.get("/{league_id}/news", response_model=LeagueNewsList)
+def get_league_news_endpoint(
+    league_id: int,
+    limit: int = 25,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeagueNewsList:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    rows = build_league_news_items(db, league, limit=max(1, min(limit, 100)))
+    return LeagueNewsList(data=rows, total=len(rows), limit=max(1, min(limit, 100)))
 
 
 @router.get("/{league_id}/draft-room", response_model=DraftRoomRead)

@@ -24,6 +24,9 @@ import Alerts from "./pages/Alerts";
 import Stats from "./pages/Stats";
 import WaiverWire from "./pages/WaiverWire";
 import Watchlist from "./pages/Watchlist";
+import Chats from "./pages/Chats";
+import InjuryCenter from "./pages/InjuryCenter";
+import Trade from "./pages/Trade";
 
 const queryClient = new QueryClient();
 
@@ -89,9 +92,13 @@ const App = () => (
               />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/rosters" element={<ProtectedRoute><Rosters /></ProtectedRoute>} />
+              <Route path="/chats" element={<ProtectedRoute><Chats /></ProtectedRoute>} />
               <Route path="/waivers" element={<ProtectedRoute><WaiverWire /></ProtectedRoute>} />
               <Route path="/watchlists" element={<ProtectedRoute><Watchlist /></ProtectedRoute>} />
+              <Route path="/injury-center" element={<ProtectedRoute><InjuryCenter /></ProtectedRoute>} />
               <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
+              <Route path="/trade" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
+              <Route path="/trade/:leagueId/:playerId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
               <Route path="/stats" element={<Stats />} />
               <Route path="/stats/players" element={<Stats />} />
               <Route path="/login" element={<Login />} />

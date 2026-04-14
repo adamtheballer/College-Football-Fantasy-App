@@ -13,7 +13,7 @@ fi
 DB_PORT="${DB_PORT:-5433}"
 export DB_PORT
 export DATABASE_URL="${DATABASE_URL:-postgresql+psycopg://postgres:postgres@localhost:${DB_PORT}/collegefootballfantasy}"
-export UI_BASE_URL="${UI_BASE_URL:-http://localhost:8080}"
+export UI_BASE_URL="${UI_BASE_URL:-http://localhost:5173}"
 
 echo "Starting postgres..."
 "${COMPOSE_BIN[@]}" up -d db --remove-orphans
@@ -45,6 +45,9 @@ API_PID=$!
 
 npm --prefix web run dev -- --host 0.0.0.0 &
 UI_PID=$!
+
+echo "API -> http://localhost:8000"
+echo "UI  -> http://localhost:5173"
 
 trap 'kill "$API_PID" "$UI_PID"' EXIT
 wait

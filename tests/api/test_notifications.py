@@ -5,6 +5,10 @@ from collegefootballfantasy_api.app.models.scheduled_notification import Schedul
 from collegefootballfantasy_api.app.services.notification_service import record_delivery_attempt
 
 
+def auth_headers(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
 def create_user(client, suffix: str = "one") -> dict:
     response = client.post(
         "/auth/signup",
@@ -15,7 +19,8 @@ def create_user(client, suffix: str = "one") -> dict:
         },
     )
     assert response.status_code == 201
-    return response.json()["user"]
+    payload = response.json()
+    return {"user": payload["user"], "access_token": payload["access_token"]}
 
 
 def create_league(client, token: str, name: str = "Notify League") -> dict:
@@ -45,16 +50,17 @@ def create_league(client, token: str, name: str = "Notify League") -> dict:
             "pick_timer_seconds": 90,
         },
     }
-    response = client.post("/leagues", json=payload, headers={"X-User-Token": token})
+    response = client.post("/leagues", json=payload, headers=auth_headers(token))
     assert response.status_code == 201
     return response.json()["league"]
 
 
 def test_notification_preferences_are_auth_scoped_without_user_key(client):
-    user = create_user(client, "prefs")
-    token = user["api_token"]
+    identity = create_user(client, "prefs")
+    user = identity["user"]
+    token = identity["access_token"]
 
-    initial_response = client.get("/notifications/preferences", headers={"X-User-Token": token})
+    initial_response = client.get("/notifications/preferences", headers=auth_headers(token))
     assert initial_response.status_code == 200
     assert "user_key" not in initial_response.json()
 
@@ -73,7 +79,7 @@ def test_notification_preferences_are_auth_scoped_without_user_key(client):
             "quiet_hours_start": "22:00",
             "quiet_hours_end": "07:00",
         },
-        headers={"X-User-Token": token},
+        headers=auth_headers(token),
     )
     assert update_response.status_code == 200
     body = update_response.json()
@@ -84,19 +90,20 @@ def test_notification_preferences_are_auth_scoped_without_user_key(client):
 
 
 def test_push_tokens_and_league_preferences_resolve_identity_from_auth(client):
-    user = create_user(client, "notify")
-    token = user["api_token"]
+    identity = create_user(client, "notify")
+    user = identity["user"]
+    token = identity["access_token"]
     league = create_league(client, token)
 
     token_response = client.post(
         "/notifications/tokens",
         json={"device_token": "device-123", "platform": "ios"},
-        headers={"X-User-Token": token},
+        headers=auth_headers(token),
     )
     assert token_response.status_code == 200
     assert token_response.json()["user_id"] == user["id"]
 
-    prefs_response = client.get("/notifications/league-preferences", headers={"X-User-Token": token})
+    prefs_response = client.get("/notifications/league-preferences", headers=auth_headers(token))
     assert prefs_response.status_code == 200
     assert prefs_response.json()["data"][0]["league_id"] == league["id"]
 
@@ -113,7 +120,7 @@ def test_push_tokens_and_league_preferences_resolve_identity_from_auth(client):
                 }
             ]
         },
-        headers={"X-User-Token": token},
+        headers=auth_headers(token),
     )
     assert update_response.status_code == 200
     updated = update_response.json()["data"][0]
@@ -123,8 +130,9 @@ def test_push_tokens_and_league_preferences_resolve_identity_from_auth(client):
 
 
 def test_league_create_queues_pending_notification_delivery_attempts(client, db_session):
-    user = create_user(client, "deliveries")
-    league = create_league(client, user["api_token"], "Delivery League")
+    identity = create_user(client, "deliveries")
+    user = identity["user"]
+    league = create_league(client, identity["access_token"], "Delivery League")
 
     scheduled_rows = (
         db_session.query(ScheduledNotification)
@@ -155,8 +163,9 @@ def test_league_create_queues_pending_notification_delivery_attempts(client, db_
 
 
 def test_draft_reschedule_cancels_old_notification_attempts_and_queues_new_ones(client, db_session):
-    user = create_user(client, "reschedule")
-    league = create_league(client, user["api_token"], "Reschedule League")
+    identity = create_user(client, "reschedule")
+    user = identity["user"]
+    league = create_league(client, identity["access_token"], "Reschedule League")
     original_ids = {
         row.id
         for row in db_session.query(ScheduledNotification)
@@ -174,7 +183,7 @@ def test_draft_reschedule_cancels_old_notification_attempts_and_queues_new_ones(
             "pick_timer_seconds": 120,
             "status": "scheduled",
         },
-        headers={"X-User-Token": user["api_token"]},
+        headers=auth_headers(identity["access_token"]),
     )
     assert response.status_code == 200
 
@@ -213,8 +222,9 @@ def test_draft_reschedule_cancels_old_notification_attempts_and_queues_new_ones(
 
 
 def test_delivery_attempts_only_mark_scheduled_row_sent_after_terminal_results(client, db_session):
-    user = create_user(client, "finalize")
-    league = create_league(client, user["api_token"], "Finalize League")
+    identity = create_user(client, "finalize")
+    user = identity["user"]
+    league = create_league(client, identity["access_token"], "Finalize League")
     scheduled = (
         db_session.query(ScheduledNotification)
         .filter(

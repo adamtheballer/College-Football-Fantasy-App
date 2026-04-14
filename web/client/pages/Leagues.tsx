@@ -12,6 +12,7 @@ import {
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagues } from "@/hooks/use-leagues";
 
@@ -23,7 +24,9 @@ const LeagueCard = ({
   memberCount,
   draftLabel,
   isPrivate,
+  draftStatus,
   onOpen,
+  onOpenDraft,
 }: {
   id: number;
   name: string;
@@ -32,7 +35,9 @@ const LeagueCard = ({
   memberCount: number;
   draftLabel: string;
   isPrivate: boolean;
+  draftStatus: string;
   onOpen: (leagueId: number) => void;
+  onOpenDraft: (leagueId: number, draftStatus: string) => void;
 }) => (
   <Card className="bg-card/40 backdrop-blur-md border-border/60 rounded-[2.5rem] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] group hover:border-primary/40 transition-all duration-500 relative">
     <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-primary/10 transition-colors" />
@@ -80,10 +85,10 @@ const LeagueCard = ({
             </div>
             <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
               <p className="text-[10px] font-black tracking-[0.2em] uppercase text-muted-foreground/60">
-                Supported Flow
+                League Context
               </p>
               <p className="mt-2 text-sm font-bold text-foreground">
-                League hub now uses live backend league metadata only.
+                Open your league hub for roster, matchup, scoreboard, and settings.
               </p>
             </div>
           </div>
@@ -99,6 +104,16 @@ const LeagueCard = ({
           League Hub
           <ChevronRight className="w-3 h-3 ml-2" />
         </Button>
+        {(draftStatus === "draft_live" || draftStatus === "draft_scheduled") && (
+          <Button
+            variant="outline"
+            className="w-full border-primary/30 bg-primary/10 text-primary font-black tracking-[0.2em] text-[10px] uppercase h-12 px-8 rounded-2xl hover:bg-primary/15 transition-all duration-300"
+            onClick={() => onOpenDraft(id, draftStatus)}
+          >
+            {draftStatus === "draft_live" ? "Enter Draft Room" : "Open Draft Lobby"}
+            <ChevronRight className="w-3 h-3 ml-2" />
+          </Button>
+        )}
       </div>
     </div>
   </Card>
@@ -107,6 +122,7 @@ const LeagueCard = ({
 export default function Leagues() {
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
+  const { setActiveLeagueId } = useActiveLeagueId();
   const { data: leagueRows = [], isLoading, isError } = useLeagues(20, isLoggedIn);
 
   return (
@@ -137,7 +153,7 @@ export default function Leagues() {
         </div>
         <p className="text-muted-foreground text-xl font-medium max-w-2xl leading-relaxed">
           {isLoggedIn
-            ? "Your supported league workflows now load from live backend league contracts instead of local mock state."
+            ? "Manage your active leagues, jump into drafts, and navigate to the right league context in one tap."
             : "Sign in to create or join a league and use the supported React experience."}
         </p>
       </div>
@@ -170,7 +186,19 @@ export default function Leagues() {
                   : "Draft not scheduled"
               }
               isPrivate={league.is_private}
-              onOpen={(leagueId) => navigate(`/league/${leagueId}`)}
+              draftStatus={league.draft?.status || "none"}
+              onOpen={(leagueId) => {
+                setActiveLeagueId(leagueId);
+                navigate(`/league/${leagueId}`);
+              }}
+              onOpenDraft={(leagueId, draftStatus) => {
+                setActiveLeagueId(leagueId);
+                if (draftStatus === "draft_live") {
+                  navigate(`/league/${leagueId}/draft`);
+                  return;
+                }
+                navigate(`/league/${leagueId}/lobby`);
+              }}
             />
           ))}
           {!isLoading && !isError && leagueRows.length === 0 && (

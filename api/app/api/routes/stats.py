@@ -3,6 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.integrations.cfbd import CFBDClient
 from collegefootballfantasy_api.app.integrations.espn import ESPNClient
@@ -20,11 +21,18 @@ from collegefootballfantasy_api.app.schemas.stats import (
     TeamStatsSummary,
     TeamStatsSummaryList,
 )
+from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
 from collegefootballfantasy_api.app.services.power4 import (
     canonical_school_name,
     conference_for_school,
     list_power4_teams,
     resolve_power4_school,
+)
+from collegefootballfantasy_api.app.services.sportsdata_sync import (
+    read_power4_standings_snapshot,
+    sync_power4_injuries,
+    sync_power4_standings_from_sportsdata,
+    upsert_power4_standings_snapshot,
 )
 
 router = APIRouter()
@@ -329,6 +337,60 @@ def _standings_from_espn(season: int, conference_key: str) -> list[TeamStandingR
     return rows_out if rows_out else None
 
 
+def _standing_rows_to_map(rows: list[TeamStandingRow]) -> dict[str, dict[str, int | None]]:
+    return {
+        row.team: {
+            "conference_rank": row.conference_rank,
+            "conference_wins": row.conference_wins,
+            "conference_losses": row.conference_losses,
+            "overall_wins": row.overall_wins,
+            "overall_losses": row.overall_losses,
+        }
+        for row in rows
+    }
+
+
+def _refresh_standings_snapshot(db: Session, season: int, conference_key: str) -> str:
+    sportsdata_rows = sync_power4_standings_from_sportsdata(
+        db,
+        season=season,
+        conference=conference_key,
+    )
+    if sportsdata_rows:
+        return "sportsdata"
+
+    espn_rows = _standings_from_espn(season, conference_key)
+    if espn_rows is not None:
+        upsert_power4_standings_snapshot(
+            db,
+            season=season,
+            conference=conference_key,
+            rows=_standing_rows_to_map(espn_rows),
+            source="espn",
+        )
+        return "espn"
+
+    cfbd_rows = _standings_from_cfbd(season, conference_key)
+    if cfbd_rows is not None:
+        upsert_power4_standings_snapshot(
+            db,
+            season=season,
+            conference=conference_key,
+            rows=_standing_rows_to_map(cfbd_rows),
+            source="cfbd",
+        )
+        return "cfbd"
+
+    upsert_power4_standings_snapshot(
+        db,
+        season=season,
+        conference=conference_key,
+        rows={team: {} for team in list_power4_teams(conference_key)},
+        source="none",
+    )
+    return "none"
+
+
 @router.get("/teams", response_model=TeamStatsSummaryList)
 def list_power4_team_stats(
     season: int,
@@ -416,13 +478,44 @@ def get_power4_standings(
     if not teams:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid conference")
 
-    espn_rows = _standings_from_espn(season, conference_key)
-    if espn_rows is not None:
-        return TeamStandingsList(data=espn_rows, total=len(espn_rows))
+    existing_rows = read_power4_standings_snapshot(db, season=season, conference=conference_key)
+    force_refresh = not existing_rows
+    if settings.sportsdata_enabled:
+        try:
+            ensure_feed_fresh(
+                db,
+                provider="sportsdata",
+                feed="standings_conference",
+                scope={"season": season, "conference": conference_key},
+                refresh_fn=lambda: _refresh_standings_snapshot(db, season, conference_key),
+                ttl_days=settings.sportsdata_standings_ttl_days,
+                force_refresh=force_refresh,
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            if force_refresh:
+                _refresh_standings_snapshot(db, season, conference_key)
+                db.commit()
+    elif force_refresh:
+        _refresh_standings_snapshot(db, season, conference_key)
+        db.commit()
 
-    cfbd_rows = _standings_from_cfbd(season, conference_key)
-    if cfbd_rows is not None:
-        return TeamStandingsList(data=cfbd_rows, total=len(cfbd_rows))
+    cached_rows = read_power4_standings_snapshot(db, season=season, conference=conference_key)
+    if cached_rows:
+        data = [
+            TeamStandingRow(
+                team=row.team_name,
+                conference=row.conference,
+                conference_rank=row.conference_rank,
+                conference_wins=row.conference_wins,
+                conference_losses=row.conference_losses,
+                overall_wins=row.overall_wins,
+                overall_losses=row.overall_losses,
+            )
+            for row in cached_rows
+        ]
+        return TeamStandingsList(data=data, total=len(data))
 
     records: dict[str, dict[str, int]] = {
         team: {"ow": 0, "ol": 0, "ot": 0, "cw": 0, "cl": 0, "ct": 0, "overall_games": 0, "conference_games": 0}
@@ -555,6 +648,43 @@ def list_power4_injuries(
     db: Session = Depends(get_db),
 ) -> TeamInjuriesList:
     conference_key = _normalize_conference(conference)
+    existing_rows = (
+        db.query(Injury.id)
+        .filter(Injury.season == season, Injury.week == week)
+        .count()
+    )
+    force_refresh = existing_rows == 0
+
+    try:
+        ensure_feed_fresh(
+            db,
+            provider="sportsdata",
+            feed="injuries_week",
+            scope={"season": season, "week": week},
+            refresh_fn=lambda: sync_power4_injuries(
+                db,
+                season=season,
+                week=week,
+                conference=conference_key,
+            ),
+            ttl_days=settings.sportsdata_injury_ttl_days,
+            force_refresh=force_refresh,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        if force_refresh:
+            try:
+                sync_power4_injuries(
+                    db,
+                    season=season,
+                    week=week,
+                    conference=conference_key,
+                )
+                db.commit()
+            except Exception:
+                db.rollback()
+
     query = db.query(Injury, Player).join(Player, Injury.player_id == Player.id)
     query = query.filter(Injury.season == season, Injury.week == week)
     if team:

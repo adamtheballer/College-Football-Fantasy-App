@@ -8,21 +8,28 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, apiPost, ApiError } from "@/lib/api";
+import {
+  ApiError,
+  apiGet,
+  apiPost,
+  clearAccessTokenSession,
+  getStoredAccessToken,
+  storeAccessTokenSession,
+} from "@/lib/api";
 
 export interface User {
   firstName: string;
   email: string;
-  token: string;
   id: number;
 }
 
 type AuthPayload = {
+  access_token: string;
+  access_token_expires_at: string;
   user: {
     id: number;
     first_name: string;
     email: string;
-    api_token: string;
   };
 };
 
@@ -37,7 +44,6 @@ type AuthContextValue = {
 
 const AUTH_CHANGED_EVENT = "cfb-auth-changed";
 const USER_STORAGE_KEY = "cfb_user";
-const TOKEN_STORAGE_KEY = "cfb_token";
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -71,13 +77,13 @@ const dispatchAuthChanged = () => {
 
 const clearStoredAuth = () => {
   safeStorageRemove(USER_STORAGE_KEY);
-  safeStorageRemove(TOKEN_STORAGE_KEY);
+  clearAccessTokenSession();
 };
 
 const loadStoredUser = (): User | null => {
   const savedUser = safeStorageGet(USER_STORAGE_KEY);
-  const savedToken = safeStorageGet(TOKEN_STORAGE_KEY);
-  if (!savedUser || !savedToken) {
+  const storedToken = getStoredAccessToken();
+  if (!savedUser || !storedToken) {
     clearStoredAuth();
     return null;
   }
@@ -88,23 +94,22 @@ const loadStoredUser = (): User | null => {
       clearStoredAuth();
       return null;
     }
-    return { ...parsedUser, token: savedToken };
+    return parsedUser;
   } catch {
     clearStoredAuth();
     return null;
   }
 };
 
-const persistUser = (user: User) => {
+const persistUser = (user: User, accessToken: string, accessTokenExpiresAt: string) => {
   safeStorageSet(USER_STORAGE_KEY, JSON.stringify(user));
-  safeStorageSet(TOKEN_STORAGE_KEY, user.token);
+  storeAccessTokenSession(accessToken, accessTokenExpiresAt);
 };
 
 const mapAuthPayload = (payload: AuthPayload): User => ({
   id: payload.user.id,
   firstName: payload.user.first_name,
   email: payload.user.email,
-  token: payload.user.api_token,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -122,16 +127,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     let cancelled = false;
-    const validatingToken = storedUser.token;
     apiGet("/notifications/preferences")
       .catch((error) => {
         if (cancelled) return;
         if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-          const currentToken = safeStorageGet(TOKEN_STORAGE_KEY);
-          if (currentToken === validatingToken) {
-            clearStoredAuth();
-            setUser(null);
-          }
+          clearStoredAuth();
+          setUser(null);
         }
       })
       .finally(() => {
@@ -158,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const payload = await apiPost<AuthPayload>("/auth/login", { email, password });
     const nextUser = mapAuthPayload(payload);
-    persistUser(nextUser);
+    persistUser(nextUser, payload.access_token, payload.access_token_expires_at);
     queryClient.clear();
     setUser(nextUser);
     dispatchAuthChanged();
@@ -172,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
     });
     const nextUser = mapAuthPayload(payload);
-    persistUser(nextUser);
+    persistUser(nextUser, payload.access_token, payload.access_token_expires_at);
     queryClient.clear();
     setUser(nextUser);
     dispatchAuthChanged();
@@ -180,6 +181,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    void apiPost("/auth/logout", {}).catch(() => {
+      // Ignore network failures; local logout must still complete.
+    });
     clearStoredAuth();
     queryClient.clear();
     setUser(null);

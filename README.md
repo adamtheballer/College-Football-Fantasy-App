@@ -50,6 +50,18 @@ Or run the helper script:
 ./scripts/dev.sh
 ```
 
+Or use Make targets:
+
+```bash
+make bootstrap
+make dev
+```
+
+Local dev URLs:
+
+- UI: `http://localhost:5173`
+- API: `http://localhost:8000`
+
 ## Environment variables
 
 See `.env.example` for the full list.
@@ -60,6 +72,18 @@ See `.env.example` for the full list.
 - `API_PORT`
 - `API_LOG_LEVEL`
 - `UI_BASE_URL`
+
+`UI_BASE_URL` should match your local web origin (`http://localhost:5173` for Vite dev).
+
+Sports provider/cache variables:
+
+- `SPORTSDATA_API_KEY`
+- `SPORTSDATA_ENABLED`
+- `SPORTSDATA_*_PATH` endpoint templates
+- `SPORTSDATA_*_TTL_DAYS` per-feed cache TTL
+- `PROVIDER_DEFAULT_CACHE_TTL_DAYS` fallback TTL
+
+The API uses DB-backed provider cache state (`provider_sync_states`) with feed+scope keys, expiry, status, and failure metadata.
 
 ## Migrations (Alembic)
 
@@ -80,6 +104,36 @@ uv run alembic -c api/alembic.ini upgrade head
 ```bash
 uv run pytest
 ```
+
+## SportsData sync + DB cache workflow
+
+Manual feed sync (DB-backed, idempotent):
+
+```bash
+PYTHONPATH=. uv run python scripts/sync_sportsdata_feeds.py --feed all --season 2025 --week 1
+```
+
+Useful scoped runs:
+
+```bash
+# reference players
+PYTHONPATH=. uv run python scripts/sync_sportsdata_feeds.py --feed players
+
+# schedule only
+PYTHONPATH=. uv run python scripts/sync_sportsdata_feeds.py --feed schedule --season 2025
+
+# standings for one conference
+PYTHONPATH=. uv run python scripts/sync_sportsdata_feeds.py --feed standings --season 2025 --conference SEC
+
+# injuries with fallback behavior
+PYTHONPATH=. uv run python scripts/sync_sportsdata_feeds.py --feed injuries --season 2025 --week 1 --conference ALL
+```
+
+Injury provider preference:
+
+1. Try SportsData injuries feed when enabled and key is configured.
+2. If SportsData is unavailable/empty, fallback to Rotowire ingestion.
+3. Persist normalized Power-4 injury rows in DB and serve from DB/API cache.
 
 ## Bruno workflow tests
 

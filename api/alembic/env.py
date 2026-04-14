@@ -6,6 +6,7 @@ from sqlalchemy import engine_from_config, pool
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.base import Base
 from collegefootballfantasy_api.app.models import (
+    cfb_standing_snapshot,
     defense_rating,
     defense_vs_position,
     draft,
@@ -23,8 +24,10 @@ from collegefootballfantasy_api.app.models import (
     player_game_stat,
     player_stat,
     preseason_prior,
+    provider_sync_state,
     projection_explanation,
     projection_input_audit,
+    refresh_session,
     roster,
     scheduled_notification,
     standing,

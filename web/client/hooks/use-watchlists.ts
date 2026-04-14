@@ -33,8 +33,11 @@ export function useRenameWatchlist() {
   return useMutation({
     mutationFn: ({ watchlistId, name }: { watchlistId: number; name: string }) =>
       apiPatch<Watchlist>(`/watchlists/${watchlistId}`, { name }),
-    onSuccess: () => {
+    onSuccess: (watchlist) => {
       queryClient.invalidateQueries({ queryKey: ["watchlists"] });
+      if (watchlist.league_id) {
+        queryClient.invalidateQueries({ queryKey: ["watchlists", watchlist.league_id] });
+      }
     },
   });
 }
@@ -56,8 +59,11 @@ export function useToggleWatchlistPlayer() {
       }
       return apiPost<Watchlist>(`/watchlists/${watchlistId}/players`, { player_id: playerId });
     },
-    onSuccess: () => {
+    onSuccess: (watchlist) => {
       queryClient.invalidateQueries({ queryKey: ["watchlists"] });
+      if (watchlist.league_id) {
+        queryClient.invalidateQueries({ queryKey: ["watchlists", watchlist.league_id] });
+      }
     },
   });
 }

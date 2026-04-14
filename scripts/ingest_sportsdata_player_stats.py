@@ -10,9 +10,15 @@ if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
 from collegefootballfantasy_api.app.crud.player_stat import upsert_player_stat
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.integrations.sportsdata import SportsDataClient
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.services.provider_cache import (
+    get_or_create_sync_state,
+    mark_sync_attempt,
+    scope_dict_to_key,
+)
 
 
 def main() -> None:
@@ -21,11 +27,20 @@ def main() -> None:
     parser.add_argument("--week", type=int, required=True)
     args = parser.parse_args()
 
-    client = SportsDataClient()
-    stats_rows = client.get_weekly_player_stats(args.season, args.week)
-
     session = SessionLocal()
     try:
+        scope = {"season": args.season, "week": args.week}
+        state = get_or_create_sync_state(
+            session,
+            provider="sportsdata",
+            feed="player_game_stats_week",
+            scope_key=scope_dict_to_key(scope),
+        )
+        mark_sync_attempt(session, state=state, status="syncing")
+        session.commit()
+
+        client = SportsDataClient()
+        stats_rows = client.get_weekly_player_stats(args.season, args.week)
         players = session.scalars(select(Player)).all()
         player_index = {str(player.external_id): player for player in players if player.external_id}
         created = 0
@@ -48,7 +63,32 @@ def main() -> None:
                 source="sportsdata",
             )
             created += 1
+
+        state.meta = {
+            "season": args.season,
+            "week": args.week,
+            "rows_seen": len(stats_rows),
+            "upserted": created,
+            "skipped": skipped,
+        }
+        mark_sync_attempt(
+            session,
+            state=state,
+            status="ready",
+            ttl_days=settings.sportsdata_cache_ttl_days,
+        )
+        session.commit()
         print(f"Ingested stats for {created} players (skipped {skipped}).")
+    except Exception as exc:
+        state = get_or_create_sync_state(
+            session,
+            provider="sportsdata",
+            feed="player_game_stats_week",
+            scope_key=scope_dict_to_key({"season": args.season, "week": args.week}),
+        )
+        mark_sync_attempt(session, state=state, status="failed", error_message=str(exc))
+        session.commit()
+        raise
     finally:
         session.close()
 

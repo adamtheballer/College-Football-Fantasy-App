@@ -118,3 +118,51 @@ export interface LeagueWorkspace {
   standings_summary: LeagueWorkspaceStandingSummary[];
   allowed_actions: string[] | Record<string, boolean> | null;
 }
+
+export interface LeagueScoreboardRow {
+  matchup_id: number;
+  week: number;
+  status: string;
+  home_team_id: number;
+  home_team_name: string;
+  home_score: number;
+  away_team_id: number;
+  away_team_name: string;
+  away_score: number;
+}
+
+export interface LeagueScoreboardResponse {
+  data: LeagueScoreboardRow[];
+  total: number;
+}
+
+export interface LeaguePowerRankingRow {
+  team_id: number;
+  team_name: string;
+  rank: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  points_for: number;
+}
+
+export interface LeaguePowerRankingResponse {
+  data: LeaguePowerRankingRow[];
+  total: number;
+}
+
+export interface LeagueNewsItem {
+  id: number;
+  team_id: number;
+  team_name: string | null;
+  transaction_type: string;
+  headline: string;
+  detail: string | null;
+  created_at: string;
+}
+
+export interface LeagueNewsResponse {
+  data: LeagueNewsItem[];
+  total: number;
+  limit: number;
+}

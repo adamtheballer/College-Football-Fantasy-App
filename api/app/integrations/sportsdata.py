@@ -38,3 +38,30 @@ class SportsDataClient:
         if isinstance(data, list):
             return data
         return [data]
+
+    def get_players(self) -> list[dict[str, Any]]:
+        data = self._request(settings.sportsdata_players_path)
+        if isinstance(data, list):
+            return data
+        return [data]
+
+    def get_schedule(self, season: int) -> list[dict[str, Any]]:
+        path = settings.sportsdata_schedule_season_path.format(season=season)
+        data = self._request(path)
+        if isinstance(data, list):
+            return data
+        return [data]
+
+    def get_standings(self, season: int) -> list[dict[str, Any]]:
+        path = settings.sportsdata_standings_path.format(season=season)
+        data = self._request(path)
+        if isinstance(data, list):
+            return data
+        return [data]
+
+    def get_injuries(self, season: int) -> list[dict[str, Any]]:
+        path = settings.sportsdata_injuries_season_path.format(season=season)
+        data = self._request(path)
+        if isinstance(data, list):
+            return data
+        return [data]

@@ -16,7 +16,8 @@
     "build:client": "vite build",
     "build:server": "vite build --config vite.config.server.ts",
     "start": "node dist/server/node-build.mjs",
-    "test": "vitest --run",
+    "test": "vitest --run --exclude tests/e2e/** --maxWorkers=1",
+    "test:e2e": "playwright test",
     "format.fix": "prettier --write .",
     "typecheck": "tsc"
   },
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@hookform/resolvers": "^5.2.1",
+    "@playwright/test": "^1.59.1",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.1.7",

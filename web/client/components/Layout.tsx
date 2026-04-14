@@ -1,7 +1,20 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Home, Trophy, Settings, LogIn, LogOut, ClipboardList, Bell, BarChart3 } from "lucide-react";
+import {
+  Home,
+  Trophy,
+  Settings,
+  LogIn,
+  LogOut,
+  ClipboardList,
+  Bell,
+  BarChart3,
+  MessageSquare,
+  Bookmark,
+  UserPlus,
+  ShieldAlert,
+} from "lucide-react";
 
 import { BackgroundEffects } from "./BackgroundEffects";
 import { useAuth } from "@/hooks/use-auth";
@@ -13,6 +26,13 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+type SidebarItem = {
+  name: string;
+  path: string;
+  icon: React.ComponentType<{ className?: string }>;
+  onClick?: () => void;
+};
+
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -20,11 +40,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isGuideActive, setIsGuideActive] = useState(false);
   const mainScrollRef = useRef<HTMLElement | null>(null);
 
-  const sidebarItems = isLoggedIn
+  const sidebarItems: SidebarItem[] = isLoggedIn
     ? [
         { name: "HOME", path: "/", icon: Home },
         { name: "LEAGUES", path: "/leagues", icon: Trophy },
         { name: "ROSTER", path: "/rosters", icon: ClipboardList },
+        { name: "CHATS", path: "/chats", icon: MessageSquare },
+        { name: "WATCHLIST", path: "/watchlists", icon: Bookmark },
+        { name: "WAIVER WIRE", path: "/waivers", icon: UserPlus },
+        { name: "INJURY CENTER", path: "/injury-center", icon: ShieldAlert },
         { name: "ALERTS", path: "/alerts", icon: Bell },
         { name: "STATS", path: "/stats", icon: BarChart3 },
         { name: "SETTINGS", path: "/settings", icon: Settings },
@@ -109,19 +133,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   className={cn(
                     "flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black tracking-[0.1em] transition-all duration-300 uppercase relative overflow-hidden group w-full text-left",
                     isActive
-                      ? "bg-gradient-to-r from-primary to-blue-500 text-primary-foreground shadow-[0_0_20px_rgba(var(--primary),0.3)]"
-                      : item.name === "SIGN OUT"
-                        ? "text-red-400/40 hover:text-red-400 hover:bg-red-500/5"
-                        : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                      ? "text-primary-foreground shadow-[0_0_26px_rgba(var(--primary),0.25)] border border-white/10 bg-gradient-to-r from-primary to-blue-500"
+                      : "text-muted-foreground hover:text-primary-foreground hover:shadow-[0_0_22px_rgba(var(--primary),0.20)] hover:border hover:border-white/10 hover:bg-gradient-to-r hover:from-primary hover:to-blue-500"
                   )}
                 >
                   <item.icon className={cn(
                     "w-4 h-4 transition-all duration-300",
                     isActive
                       ? "text-primary-foreground"
-                      : item.name === "SIGN OUT"
-                        ? "text-red-400/50 scale-x-[-1] group-hover:scale-x-[1] group-hover:text-red-400 group-hover:scale-110"
-                        : "text-primary group-hover:scale-110"
+                      : "text-primary group-hover:text-primary-foreground group-hover:scale-110"
                   )} />
                   {item.name}
                   {isActive && (

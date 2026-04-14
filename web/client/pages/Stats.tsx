@@ -6,7 +6,6 @@ import {
   CalendarDays,
   Stethoscope,
   Trophy,
-  Users,
   UserRoundSearch,
   TrendingUp,
   Waves,
@@ -90,16 +89,6 @@ type TeamInjury = {
   position: string;
   status: string;
   injury: string | null;
-};
-
-type UserAnalyticsRow = {
-  user_id: number;
-  name: string;
-  championships: number;
-  win_pct: number;
-  total_points: number;
-  trades_completed: number;
-  dynasty_power_rating: number;
 };
 
 type CompareSide = {
@@ -187,44 +176,12 @@ type PlayerOption = {
 };
 
 type StatsTab = "offense" | "defense" | "advanced" | "injuries" | "standings";
-type Mode = "teams" | "users" | "players";
+type Mode = "teams" | "players";
 type PlayerComparisonTab = "overview" | "advanced" | "matchup" | "trends" | "projections";
 
 const CONFERENCES = ["ALL", "SEC", "BIG10", "BIG12", "ACC"] as const;
 const CURRENT_YEAR = new Date().getFullYear();
 const SEASONS = Array.from({ length: CURRENT_YEAR - 2003 }, (_, idx) => CURRENT_YEAR - idx);
-
-const TEAM_COLOR_CLASSES: Record<string, string> = {
-  Alabama: "border-l-red-500",
-  Auburn: "border-l-blue-500",
-  Florida: "border-l-blue-600",
-  Georgia: "border-l-red-600",
-  LSU: "border-l-yellow-400",
-  Tennessee: "border-l-orange-500",
-  Texas: "border-l-orange-600",
-  "Texas A&M": "border-l-red-700",
-  Oklahoma: "border-l-rose-600",
-  "Ole Miss": "border-l-sky-400",
-  Missouri: "border-l-amber-300",
-  Vanderbilt: "border-l-amber-500",
-  Kentucky: "border-l-blue-700",
-  "Mississippi State": "border-l-red-700",
-  Arkansas: "border-l-red-500",
-  "South Carolina": "border-l-red-700",
-  "Ohio State": "border-l-red-600",
-  Michigan: "border-l-blue-500",
-  Oregon: "border-l-emerald-500",
-  USC: "border-l-red-500",
-  UCLA: "border-l-blue-500",
-  Washington: "border-l-purple-500",
-  "Penn State": "border-l-blue-700",
-  Wisconsin: "border-l-red-700",
-  Clemson: "border-l-orange-500",
-  Miami: "border-l-emerald-500",
-  "Florida State": "border-l-amber-500",
-  "North Carolina": "border-l-sky-400",
-  Duke: "border-l-blue-600",
-};
 
 const POWER4_TEAMS_BY_CONFERENCE: Record<string, string[]> = {
   SEC: [
@@ -304,20 +261,6 @@ const POWER4_TEAMS_BY_CONFERENCE: Record<string, string[]> = {
   ],
 };
 const POWER4_TEAM_SET = new Set(Object.values(POWER4_TEAMS_BY_CONFERENCE).flat());
-
-const FALLBACK_TEAM_ROWS: TeamSummary[] = Object.entries(POWER4_TEAMS_BY_CONFERENCE)
-  .flatMap(([conference, teams]) =>
-    teams.map((team) => ({
-      team,
-      conference,
-      bye_week: null,
-      has_offense_data: false,
-      has_defense_data: false,
-      has_advanced_data: false,
-      updated_at: null,
-    }))
-  )
-  .sort((a, b) => a.team.localeCompare(b.team));
 
 const formatLabel = (value: string) =>
   value
@@ -450,7 +393,6 @@ export default function Stats() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [teamsError, setTeamsError] = useState<string | null>(null);
 
-  const [userRows, setUserRows] = useState<UserAnalyticsRow[]>([]);
   const [playerOptions, setPlayerOptions] = useState<PlayerOption[]>([]);
   const [compareA, setCompareA] = useState<string>("");
   const [compareB, setCompareB] = useState<string>("");
@@ -488,27 +430,17 @@ export default function Stats() {
     apiGet<{ data: TeamSummary[] }>("/stats/teams", { season, conference }, controller.signal)
       .then((payload) => {
         const apiRows = payload?.data ?? [];
-        const rows =
-          apiRows.length > 0
-            ? apiRows
-            : conference === "ALL"
-              ? FALLBACK_TEAM_ROWS
-              : FALLBACK_TEAM_ROWS.filter((row) => row.conference === conference);
-        setTeams(rows);
+        setTeams(apiRows);
         setTeamsError(null);
-        if (!selectedTeam || !rows.some((row) => row.team === selectedTeam)) {
-          setSelectedTeam(rows[0]?.team ?? "");
+        if (!selectedTeam || !apiRows.some((row) => row.team === selectedTeam)) {
+          setSelectedTeam(apiRows[0]?.team ?? "");
         }
       })
       .catch(() => {
-        const fallback =
-          conference === "ALL"
-            ? FALLBACK_TEAM_ROWS
-            : FALLBACK_TEAM_ROWS.filter((row) => row.conference === conference);
-        setTeams(fallback);
-        setSelectedTeam(fallback[0]?.team ?? "");
+        setTeams([]);
+        setSelectedTeam("");
         setTeamDetail(null);
-        setTeamsError("Backend unavailable. Showing static Power 4 team list.");
+        setTeamsError("Unable to load team data from backend.");
       })
       .finally(() => setLoadingTeams(false));
     return () => controller.abort();
@@ -559,15 +491,6 @@ export default function Stats() {
       .catch(() => setInjuries([]));
     return () => controller.abort();
   }, [mode, season, conference, selectedTeam, teams]);
-
-  useEffect(() => {
-    if (mode !== "users") return;
-    const controller = new AbortController();
-    apiGet<{ data: UserAnalyticsRow[] }>("/insights/users/leaderboard", { limit: 100 }, controller.signal)
-      .then((payload) => setUserRows(payload?.data ?? []))
-      .catch(() => setUserRows([]));
-    return () => controller.abort();
-  }, [mode]);
 
   useEffect(() => {
     if (mode !== "players") return;
@@ -887,8 +810,6 @@ export default function Stats() {
     return "Neutral script expected: projection driven by baseline role.";
   }, [projectionB, compareResult]);
 
-  const panelColorClass = TEAM_COLOR_CLASSES[selectedTeam] ?? "border-l-primary";
-
   return (
     <div className="max-w-[1500px] mx-auto space-y-8 animate-in fade-in duration-700">
       <div className="space-y-2">
@@ -913,17 +834,6 @@ export default function Stats() {
                 onClick={() => changeMode("teams")}
               >
                 Teams
-              </Button>
-              <Button
-                className={cn(
-                  "h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em]",
-                  mode === "users"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-white/5 border border-white/10 text-muted-foreground"
-                )}
-                onClick={() => changeMode("users")}
-              >
-                Users
               </Button>
               <Button
                 className={cn(
@@ -1011,13 +921,12 @@ export default function Stats() {
                   {teamsError}
                 </div>
               )}
-              {filteredTeams.map((team) => (
-                <button
-                  key={team.team}
-                  onClick={() => setSelectedTeam(team.team)}
-                  className={cn(
-                    "w-full text-left px-5 py-4 border-b border-white/5 hover:bg-white/5 transition-colors border-l-4",
-                    TEAM_COLOR_CLASSES[team.team] ?? "border-l-primary",
+                {filteredTeams.map((team) => (
+                  <button
+                    key={team.team}
+                    onClick={() => setSelectedTeam(team.team)}
+                    className={cn(
+                    "w-full text-left px-5 py-4 border-b border-white/5 hover:bg-white/5 transition-colors",
                     selectedTeam === team.team && "bg-primary/10"
                   )}
                 >
@@ -1031,7 +940,7 @@ export default function Stats() {
             </CardContent>
           </Card>
 
-          <Card className={cn("bg-card/40 backdrop-blur-md border border-white/10 rounded-[2.5rem] overflow-hidden border-l-4", panelColorClass)} id="team-analytics-panel">
+          <Card className="bg-card/40 backdrop-blur-md border border-white/10 rounded-[2.5rem] overflow-hidden" id="team-analytics-panel">
             <CardHeader className="border-b border-white/10">
               <div className="flex flex-col gap-3">
                 <CardTitle className="text-2xl font-black italic uppercase tracking-tight text-foreground">
@@ -1183,47 +1092,6 @@ export default function Stats() {
                     </table>
                   )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      ) : mode === "users" ? (
-        <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-6">
-          <Card className="bg-card/40 backdrop-blur-md border border-white/10 rounded-[2.5rem] overflow-hidden">
-            <CardHeader className="border-b border-white/10">
-              <CardTitle className="text-[11px] font-black tracking-[0.28em] uppercase text-primary flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                User Analytics
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {userRows.length === 0 ? (
-                <div className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                  No user analytics rows yet.
-                </div>
-              ) : (
-                <table className="w-full">
-                  <thead className="bg-white/5 border-b border-white/10">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Rank</th>
-                      <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">User</th>
-                      <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Power</th>
-                      <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Win%</th>
-                      <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Titles</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/10">
-                    {userRows.map((row, idx) => (
-                      <tr key={row.user_id}>
-                        <td className="px-6 py-3 text-[11px] font-black text-primary">#{idx + 1}</td>
-                        <td className="px-6 py-3 text-[11px] font-black uppercase tracking-[0.12em] text-foreground">{row.name}</td>
-                        <td className="px-6 py-3 text-[11px] font-black text-foreground">{row.dynasty_power_rating.toFixed(1)}</td>
-                        <td className="px-6 py-3 text-[11px] font-bold text-muted-foreground/80">{row.win_pct.toFixed(1)}%</td>
-                        <td className="px-6 py-3 text-[11px] font-bold text-muted-foreground/80">{row.championships}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               )}
             </CardContent>
           </Card>

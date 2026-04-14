@@ -2,12 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.defense_rating import DefenseRating
 from collegefootballfantasy_api.app.schemas.schedule import SchedulePreviewList, SchedulePreview
 from collegefootballfantasy_api.app.services.matchup_grades import build_matchup_row
+from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
+from collegefootballfantasy_api.app.services.sportsdata_sync import sync_power4_schedule_from_sportsdata
 
 router = APIRouter()
 
@@ -23,6 +26,22 @@ def schedule_preview(
     player = db.query(Player).filter(Player.id == player_id).first()
     if not player:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
+
+    existing_schedule = db.query(Game.id).filter(Game.season == season).first()
+    force_refresh = existing_schedule is None
+    try:
+        ensure_feed_fresh(
+            db,
+            provider="sportsdata",
+            feed="schedule_season",
+            scope={"season": season},
+            refresh_fn=lambda: sync_power4_schedule_from_sportsdata(db, season=season),
+            ttl_days=settings.sportsdata_schedule_ttl_days,
+            force_refresh=force_refresh,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
 
     games = (
         db.query(Game)

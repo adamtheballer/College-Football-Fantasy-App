@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
+import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useLeagueWorkspace, useLeagues } from "@/hooks/use-leagues";
 import { useAddDrop } from "@/hooks/use-roster-actions";
 import { usePlayers } from "@/hooks/use-players";
@@ -136,6 +137,7 @@ export default function WaiverWire() {
   const [dropEntryId, setDropEntryId] = useState<string>("");
 
   const { data: leagueRows = [] } = useLeagues();
+  const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
 
   useEffect(() => {
     if (!leagueRows.length) {
@@ -146,9 +148,17 @@ export default function WaiverWire() {
       if (current && leagueRows.some((league) => league.id === current)) {
         return current;
       }
+      if (activeLeagueId && leagueRows.some((league) => league.id === activeLeagueId)) {
+        return activeLeagueId;
+      }
       return leagueRows[0].id;
     });
-  }, [leagueRows]);
+  }, [activeLeagueId, leagueRows]);
+
+  useEffect(() => {
+    if (!selectedLeagueId) return;
+    setActiveLeagueId(selectedLeagueId);
+  }, [selectedLeagueId, setActiveLeagueId]);
 
   const { data: workspace } = useLeagueWorkspace(selectedLeagueId ?? undefined, Boolean(selectedLeagueId));
   const ownedTeamId = workspace?.owned_team?.id;

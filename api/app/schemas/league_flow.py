@@ -155,6 +155,54 @@ class LeagueWorkspaceRead(BaseModel):
     allowed_actions: list[str]
 
 
+class LeagueScoreboardRow(BaseModel):
+    matchup_id: int
+    week: int
+    status: str
+    home_team_id: int
+    home_team_name: str
+    home_score: float
+    away_team_id: int
+    away_team_name: str
+    away_score: float
+
+
+class LeagueScoreboardList(BaseModel):
+    data: list[LeagueScoreboardRow]
+    total: int
+
+
+class LeaguePowerRankingRow(BaseModel):
+    team_id: int
+    team_name: str
+    rank: int
+    wins: int
+    losses: int
+    ties: int
+    points_for: float
+
+
+class LeaguePowerRankingList(BaseModel):
+    data: list[LeaguePowerRankingRow]
+    total: int
+
+
+class LeagueNewsItem(BaseModel):
+    id: int
+    team_id: int
+    team_name: str | None = None
+    transaction_type: str
+    headline: str
+    detail: str | None = None
+    created_at: datetime
+
+
+class LeagueNewsList(BaseModel):
+    data: list[LeagueNewsItem]
+    total: int
+    limit: int
+
+
 class LeagueCreateResponse(BaseModel):
     league: LeagueDetailRead
     invite_code: str

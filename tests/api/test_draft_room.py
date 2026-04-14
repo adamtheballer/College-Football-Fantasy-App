@@ -1,3 +1,7 @@
+def auth_headers(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
 def create_user_and_token(client, suffix: str = "one") -> str:
     response = client.post(
         "/auth/signup",
@@ -8,7 +12,7 @@ def create_user_and_token(client, suffix: str = "one") -> str:
         },
     )
     assert response.status_code == 201
-    return response.json()["user"]["api_token"]
+    return response.json()["access_token"]
 
 
 def create_league(client, token: str) -> dict:
@@ -41,7 +45,7 @@ def create_league(client, token: str) -> dict:
     response = client.post(
         "/leagues",
         json=payload,
-        headers={"X-User-Token": token},
+        headers=auth_headers(token),
     )
     assert response.status_code == 201
     return response.json()["league"]
@@ -71,7 +75,7 @@ def test_draft_pick_persists_and_creates_roster_entry(client):
 
     room_response = client.get(
         f"/leagues/{league['id']}/draft-room",
-        headers={"X-User-Token": token},
+        headers=auth_headers(token),
     )
     assert room_response.status_code == 200
     room = room_response.json()
@@ -82,7 +86,7 @@ def test_draft_pick_persists_and_creates_roster_entry(client):
     pick_response = client.post(
         f"/leagues/{league['id']}/draft-picks",
         json={"player_id": player_id},
-        headers={"X-User-Token": token},
+        headers=auth_headers(token),
     )
     assert pick_response.status_code == 201
     updated_room = pick_response.json()
@@ -92,7 +96,7 @@ def test_draft_pick_persists_and_creates_roster_entry(client):
 
     roster_response = client.get(
         f"/teams/{updated_room['user_team_id']}/roster",
-        headers={"X-User-Token": token},
+        headers=auth_headers(token),
     )
     assert roster_response.status_code == 200
     roster = roster_response.json()
@@ -107,7 +111,7 @@ def test_draft_room_requires_membership(client):
 
     response = client.get(
         f"/leagues/{league['id']}/draft-room",
-        headers={"X-User-Token": outsider_token},
+        headers=auth_headers(outsider_token),
     )
     assert response.status_code == 403
     assert response.json()["detail"] == "league membership required"

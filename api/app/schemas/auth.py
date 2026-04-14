@@ -19,9 +19,21 @@ class UserRead(BaseModel):
     id: int
     first_name: str
     email: str
-    api_token: str
     created_at: datetime
 
 
 class AuthResponse(BaseModel):
+    access_token: str
+    access_token_expires_at: datetime
+    token_type: str = "bearer"
     user: UserRead
+
+
+class RefreshResponse(BaseModel):
+    access_token: str
+    access_token_expires_at: datetime
+    token_type: str = "bearer"
+
+
+class LogoutResponse(BaseModel):
+    success: bool

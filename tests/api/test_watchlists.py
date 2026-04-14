@@ -1,3 +1,7 @@
+def auth_headers(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
 def create_user_and_token(client, suffix: str = "one") -> str:
     response = client.post(
         "/auth/signup",
@@ -8,7 +12,7 @@ def create_user_and_token(client, suffix: str = "one") -> str:
         },
     )
     assert response.status_code == 201
-    return response.json()["user"]["api_token"]
+    return response.json()["access_token"]
 
 
 def create_player(client, name: str = "Watch Player") -> int:
@@ -36,7 +40,7 @@ def test_watchlists_persist_per_user(client):
     create_response = client.post(
         "/watchlists",
         json={"name": "Targets"},
-        headers={"X-User-Token": token},
+        headers=auth_headers(token),
     )
     assert create_response.status_code == 201
     watchlist = create_response.json()
@@ -44,23 +48,23 @@ def test_watchlists_persist_per_user(client):
     add_response = client.post(
         f"/watchlists/{watchlist['id']}/players",
         json={"player_id": player_id},
-        headers={"X-User-Token": token},
+        headers=auth_headers(token),
     )
     assert add_response.status_code == 200
     assert add_response.json()["players"][0]["id"] == player_id
 
-    owner_list_response = client.get("/watchlists", headers={"X-User-Token": token})
+    owner_list_response = client.get("/watchlists", headers=auth_headers(token))
     assert owner_list_response.status_code == 200
     assert owner_list_response.json()["total"] == 1
     assert owner_list_response.json()["data"][0]["players"][0]["id"] == player_id
 
-    outsider_list_response = client.get("/watchlists", headers={"X-User-Token": outsider_token})
+    outsider_list_response = client.get("/watchlists", headers=auth_headers(outsider_token))
     assert outsider_list_response.status_code == 200
     assert outsider_list_response.json()["total"] == 0
 
     outsider_add_response = client.post(
         f"/watchlists/{watchlist['id']}/players",
         json={"player_id": player_id},
-        headers={"X-User-Token": outsider_token},
+        headers=auth_headers(outsider_token),
     )
     assert outsider_add_response.status_code == 404

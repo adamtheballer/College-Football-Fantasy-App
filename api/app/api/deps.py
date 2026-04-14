@@ -1,6 +1,7 @@
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.core.security import JWTError, JWTExpiredError, verify_access_token
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
@@ -11,14 +12,31 @@ from collegefootballfantasy_api.app.models.user import User
 
 def get_current_user(
     db: Session = Depends(get_db),
-    x_user_token: str | None = Header(default=None),
+    authorization: str | None = Header(default=None),
 ) -> User:
-    if not x_user_token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing auth token")
-    user = db.query(User).filter(User.api_token == x_user_token).first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid auth token")
-    return user
+    if authorization:
+        scheme, _, token = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not token:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid auth token")
+        try:
+            payload = verify_access_token(token)
+        except JWTExpiredError as exc:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="expired access token") from exc
+        except JWTError as exc:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid access token") from exc
+
+        user_id_raw = payload.get("sub")
+        try:
+            user_id = int(user_id_raw)  # type: ignore[arg-type]
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid access token") from exc
+
+        user = db.get(User, user_id)
+        if not user or not user.is_active:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid access token")
+        return user
+
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing auth token")
 
 
 def get_league_or_404(db: Session, league_id: int) -> League:

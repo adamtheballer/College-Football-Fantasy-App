@@ -4,6 +4,7 @@ import { ClipboardList, Trophy, ArrowRight, Users, ShieldAlert } from "lucide-re
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useLeagues } from "@/hooks/use-leagues";
 import { useLeagueTeams, useTeamRoster } from "@/hooks/use-teams";
 import { ApiError } from "@/lib/api";
@@ -224,6 +225,7 @@ const LeagueSelectorCard = ({
 
 export default function Rosters() {
   const { data: leagueRows = [], isLoading, isError } = useLeagues();
+  const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
   const [selectedLeagueId, setSelectedLeagueId] = useState<number | null>(null);
   const activeLeagueRef = useRef<HTMLDivElement | null>(null);
   const selectedLeague = useMemo(
@@ -247,9 +249,17 @@ export default function Rosters() {
       if (current && leagueRows.some((league) => league.id === current)) {
         return current;
       }
+      if (activeLeagueId && leagueRows.some((league) => league.id === activeLeagueId)) {
+        return activeLeagueId;
+      }
       return leagueRows[0].id;
     });
-  }, [leagueRows]);
+  }, [activeLeagueId, leagueRows]);
+
+  useEffect(() => {
+    if (!selectedLeagueId) return;
+    setActiveLeagueId(selectedLeagueId);
+  }, [selectedLeagueId, setActiveLeagueId]);
 
   useEffect(() => {
     if (!selectedLeagueId || !activeLeagueRef.current) {
