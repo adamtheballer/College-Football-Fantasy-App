@@ -1,5 +1,3 @@
-import { getSchedulePreview } from "@/lib/strengthOfSchedule";
-
 export type TradePlayer = {
   id: number;
   name: string;
@@ -18,13 +16,9 @@ const positionScarcity: Record<string, number> = {
   K: 0.6,
 };
 
-const scheduleModifier = (team: string, pos: string) => {
-  const schedule = getSchedulePreview(team, pos, 4);
-  const grades = schedule.map((g) => g.grade);
-  const good = grades.filter((g) => g === "A+" || g === "A" || g === "B").length;
-  const bad = grades.filter((g) => g === "D" || g === "F").length;
-  return 1 + good * 0.02 - bad * 0.03;
-};
+// Schedule adjustments are now sourced from backend comparison endpoints.
+// Keep neutral weighting in this utility to avoid synthetic client-only matchup data.
+const scheduleModifier = () => 1;
 
 const injuryPenalty = (status?: string) => {
   if (!status) return 1;
@@ -37,7 +31,7 @@ const injuryPenalty = (status?: string) => {
 
 export const computeTradeValue = (player: TradePlayer) => {
   const scarcity = positionScarcity[player.pos] ?? 1;
-  const schedule = scheduleModifier(player.school, player.pos);
+  const schedule = scheduleModifier();
   const injury = injuryPenalty(player.status);
   const rankBoost = 1 + Math.max(0, (12 - player.posRank)) * 0.01;
   const value = player.fpts * scarcity * schedule * injury * rankBoost;

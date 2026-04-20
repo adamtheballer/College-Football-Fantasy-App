@@ -5,9 +5,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Player } from "@/types/player";
-import { getMatchupGrade, matchupGradeColor } from "@/lib/matchupGrades";
-import { buildProjectionReasons } from "@/lib/projectionReasons";
-import { getSchedulePreview } from "@/lib/strengthOfSchedule";
 import { apiGet } from "@/lib/api";
 
 interface PlayerDetailModalProps {
@@ -15,6 +12,23 @@ interface PlayerDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+type MatchupSnapshot = {
+  grade: string;
+  rank: number | null;
+  yardsPerTarget: number | null;
+  yardsPerRush: number | null;
+  pressureRate: number | null;
+};
+
+const matchupGradeColor = (grade?: string) => {
+  if (grade === "A+" || grade === "A") return "text-emerald-400";
+  if (grade === "B") return "text-lime-300";
+  if (grade === "C") return "text-amber-300";
+  if (grade === "D") return "text-orange-400";
+  if (grade === "F") return "text-red-400";
+  return "text-muted-foreground";
+};
 
 const posStyles: Record<string, { bg: string, border: string, text: string, shadow: string, accent: string }> = {
   QB: { bg: "bg-blue-500/20", border: "border-blue-500/30", text: "text-blue-400", shadow: "shadow-[0_0_15px_rgba(59,130,246,0.3)]", accent: "blue" },
@@ -34,9 +48,11 @@ const posStyles: Record<string, { bg: string, border: string, text: string, shad
 export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModalProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "stats" | "history">("overview");
   const [historyYear, setHistoryYear] = useState<number>(2025);
-  const [matchup, setMatchup] = useState(() => getMatchupGrade("TEAM", "QB"));
+  const [matchup, setMatchup] = useState<MatchupSnapshot | null>(null);
   const [reasons, setReasons] = useState<string[]>([]);
-  const [schedule, setSchedule] = useState(() => getSchedulePreview("TEAM", "QB"));
+  const [schedule, setSchedule] = useState<
+    { week: number; opponent: string; homeAway: string; grade: string; colorClass: string }[]
+  >([]);
 
   useEffect(() => {
     if (!player || !isOpen) return;
@@ -44,9 +60,9 @@ export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModal
     const season = new Date().getFullYear();
     const week = 1;
 
-    setMatchup(getMatchupGrade(player.school || "TEAM", player.pos));
-    setReasons(buildProjectionReasons(player));
-    setSchedule(getSchedulePreview(player.school || "TEAM", player.pos));
+    setMatchup(null);
+    setReasons([]);
+    setSchedule([]);
 
     apiGet<{ data: any[] }>(`/schedule/player/${player.id}`, { season, week, weeks: 4 }, controller.signal)
       .then((payload) => {
@@ -369,26 +385,26 @@ export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModal
                       Matchup Grade
                     </p>
                     <div className="flex items-center gap-4">
-                      <span className={cn("text-4xl font-black italic", matchupGradeColor(matchup.grade))}>
-                        {matchup.grade}
+                      <span className={cn("text-4xl font-black italic", matchupGradeColor(matchup?.grade))}>
+                        {matchup?.grade ?? "-"}
                       </span>
                       <span className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                        Defense Rank {matchup.rank}
+                        {matchup?.rank ? `Defense Rank ${matchup.rank}` : "No matchup data"}
                       </span>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
                       Yards/Target
-                      <div className="text-lg font-black text-foreground">{matchup.yardsPerTarget}</div>
+                      <div className="text-lg font-black text-foreground">{matchup?.yardsPerTarget ?? "-"}</div>
                     </div>
                     <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
                       Yards/Rush
-                      <div className="text-lg font-black text-foreground">{matchup.yardsPerRush}</div>
+                      <div className="text-lg font-black text-foreground">{matchup?.yardsPerRush ?? "-"}</div>
                     </div>
                     <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
                       Pressure Rate
-                      <div className="text-lg font-black text-foreground">{matchup.pressureRate}</div>
+                      <div className="text-lg font-black text-foreground">{matchup?.pressureRate ?? "-"}</div>
                     </div>
                   </div>
                 </div>
@@ -476,12 +492,16 @@ export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModal
                     Projection Reasons
                   </p>
                   <ul className="space-y-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/70">
-                    {reasons.map((reason) => (
+                    {reasons.length ? reasons.map((reason) => (
                       <li key={reason} className="flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-primary" />
                         {reason}
                       </li>
-                    ))}
+                    )) : (
+                      <li className="text-muted-foreground/50 normal-case tracking-normal">
+                        No projection explanation data yet.
+                      </li>
+                    )}
                   </ul>
                 </Card>
 
@@ -490,12 +510,16 @@ export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModal
                     Next 4 Games
                   </p>
                   <div className="space-y-2">
-                    {schedule.map((game) => (
-                      <div key={`${game.opponent}-${game.grade}`} className="flex items-center justify-between text-[11px] font-black uppercase tracking-widest">
+                    {schedule.length ? schedule.map((game) => (
+                      <div key={`${game.week}-${game.opponent}-${game.grade}`} className="flex items-center justify-between text-[11px] font-black uppercase tracking-widest">
                         <span className="text-muted-foreground/70">vs {game.opponent}</span>
                         <span className={cn("font-black", game.colorClass)}>{game.grade}</span>
                       </div>
-                    ))}
+                    )) : (
+                      <div className="text-[11px] text-muted-foreground/50 normal-case tracking-normal">
+                        No upcoming schedule data available.
+                      </div>
+                    )}
                   </div>
                 </Card>
               </div>
