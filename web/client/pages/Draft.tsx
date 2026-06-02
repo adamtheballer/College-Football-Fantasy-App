@@ -64,6 +64,7 @@ type DraftBoardPlayer = Player & {
 };
 
 type DraftSortMode = "projection_desc" | "adp_asc" | "position_asc";
+type DraftStatRow = { key: string; label: string; value: number };
 
 const positionPillClass: Record<string, string> = {
   QB: "border-blue-300/40 bg-blue-500/15 text-blue-100",
@@ -99,6 +100,11 @@ const formatProjectionCardNumber = (value: number) => {
   const rounded = Math.round(value * 10) / 10;
   if (Number.isInteger(rounded)) return String(Math.trunc(rounded));
   return rounded.toFixed(1);
+};
+
+const asFiniteNumber = (value: unknown): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 };
 
 const clampTimerSeconds = (value: unknown, fallback = 90): number => {
@@ -796,37 +802,99 @@ export default function Draft() {
           : "Fallback";
   const selectedPlayerRank = selectedPlayer ? Math.max(1, Math.round(selectedPlayer.adpRank || selectedPlayer.draftRank || 1)) : 1;
   const selectedPlayerStatsRows = useMemo(() => {
-    const asNumber = (value: unknown) => {
-      const n = Number(value);
-      return Number.isFinite(n) ? n : 0;
-    };
-    if (!selectedPlayer) return [] as Array<{ label: string; value: number; key: string }>;
+    if (!selectedPlayer) return [] as DraftStatRow[];
     const pos = selectedPlayerPosition;
     if (pos === "QB") {
       return [
-        { key: "comp", label: "Completions", value: asNumber(selectedProjectionStats.comp) },
-        { key: "attempts", label: "Attempts", value: asNumber(selectedProjectionStats.attempts) },
-        { key: "pass_yds", label: "Pass Yards", value: asNumber(selectedProjectionStats.pass_yds) },
-        { key: "pass_tds", label: "Pass TD", value: asNumber(selectedProjectionStats.pass_tds) },
-        { key: "ints", label: "Interceptions", value: asNumber(selectedProjectionStats.ints) },
-        { key: "rush_yds", label: "Rush Yards", value: asNumber(selectedProjectionStats.rush_yds) },
-        { key: "rush_tds", label: "Rush TD", value: asNumber(selectedProjectionStats.rush_tds) },
+        { key: "comp", label: "Completions", value: asFiniteNumber(selectedProjectionStats.comp) },
+        { key: "attempts", label: "Attempts", value: asFiniteNumber(selectedProjectionStats.attempts) },
+        { key: "pass_yds", label: "Pass Yards", value: asFiniteNumber(selectedProjectionStats.pass_yds) },
+        { key: "pass_tds", label: "Pass TD", value: asFiniteNumber(selectedProjectionStats.pass_tds) },
+        { key: "ints", label: "Interceptions", value: asFiniteNumber(selectedProjectionStats.ints) },
+        { key: "rush_yds", label: "Rush Yards", value: asFiniteNumber(selectedProjectionStats.rush_yds) },
+        { key: "rush_tds", label: "Rush TD", value: asFiniteNumber(selectedProjectionStats.rush_tds) },
+      ];
+    }
+    if (pos === "RB") {
+      return [
+        { key: "rush_yds", label: "Rush Yards", value: asFiniteNumber(selectedProjectionStats.rush_yds) },
+        { key: "rush_tds", label: "Rush TD", value: asFiniteNumber(selectedProjectionStats.rush_tds) },
+        { key: "receptions", label: "Receptions", value: asFiniteNumber(selectedProjectionStats.receptions) },
+        { key: "rec_yds", label: "Receiving Yards", value: asFiniteNumber(selectedProjectionStats.rec_yds) },
+        { key: "rec_tds", label: "Receiving TD", value: asFiniteNumber(selectedProjectionStats.rec_tds) },
+      ];
+    }
+    if (pos === "WR" || pos === "TE") {
+      return [
+        { key: "receptions", label: "Receptions", value: asFiniteNumber(selectedProjectionStats.receptions) },
+        { key: "rec_yds", label: "Receiving Yards", value: asFiniteNumber(selectedProjectionStats.rec_yds) },
+        { key: "rec_tds", label: "Receiving TD", value: asFiniteNumber(selectedProjectionStats.rec_tds) },
       ];
     }
     if (pos === "K") {
       return [
-        { key: "fg", label: "FG Made", value: asNumber(selectedProjectionStats.fg) },
-        { key: "xp", label: "XP Made", value: asNumber(selectedProjectionStats.xp) },
+        { key: "fg", label: "FG Made", value: asFiniteNumber(selectedProjectionStats.fg) },
+        { key: "xp", label: "XP Made", value: asFiniteNumber(selectedProjectionStats.xp) },
       ];
     }
     return [
-      { key: "rush_yds", label: "Rush Yards", value: asNumber(selectedProjectionStats.rush_yds) },
-      { key: "rush_tds", label: "Rush TD", value: asNumber(selectedProjectionStats.rush_tds) },
-      { key: "receptions", label: "Receptions", value: asNumber(selectedProjectionStats.receptions) },
-      { key: "rec_yds", label: "Receiving Yards", value: asNumber(selectedProjectionStats.rec_yds) },
-      { key: "rec_tds", label: "Receiving TD", value: asNumber(selectedProjectionStats.rec_tds) },
+      { key: "rush_yds", label: "Rush Yards", value: asFiniteNumber(selectedProjectionStats.rush_yds) },
+      { key: "rush_tds", label: "Rush TD", value: asFiniteNumber(selectedProjectionStats.rush_tds) },
+      { key: "receptions", label: "Receptions", value: asFiniteNumber(selectedProjectionStats.receptions) },
+      { key: "rec_yds", label: "Receiving Yards", value: asFiniteNumber(selectedProjectionStats.rec_yds) },
+      { key: "rec_tds", label: "Receiving TD", value: asFiniteNumber(selectedProjectionStats.rec_tds) },
     ];
   }, [selectedPlayer, selectedPlayerPosition, selectedProjectionStats]);
+  const selectedPlayerSeasonRows = useMemo(() => {
+    if (!playerSeasonSummary) return [] as DraftStatRow[];
+    const totals = playerSeasonSummary.totals;
+    if (selectedPlayerPosition === "QB") {
+      return [
+        { key: "games", label: "Games", value: asFiniteNumber(totals.games) },
+        { key: "passing_completions", label: "Completions", value: asFiniteNumber(totals.passing_completions) },
+        { key: "passing_attempts", label: "Attempts", value: asFiniteNumber(totals.passing_attempts) },
+        { key: "passing_yards", label: "Pass Yards", value: asFiniteNumber(totals.passing_yards) },
+        { key: "passing_tds", label: "Pass TD", value: asFiniteNumber(totals.passing_tds) },
+        { key: "interceptions", label: "INT", value: asFiniteNumber(totals.interceptions) },
+        { key: "rushing_yards", label: "Rush Yards", value: asFiniteNumber(totals.rushing_yards) },
+        { key: "rushing_tds", label: "Rush TD", value: asFiniteNumber(totals.rushing_tds) },
+      ];
+    }
+    if (selectedPlayerPosition === "RB") {
+      return [
+        { key: "games", label: "Games", value: asFiniteNumber(totals.games) },
+        { key: "rushing_attempts", label: "Rush Attempts", value: asFiniteNumber(totals.rushing_attempts) },
+        { key: "rushing_yards", label: "Rush Yards", value: asFiniteNumber(totals.rushing_yards) },
+        { key: "rushing_tds", label: "Rush TD", value: asFiniteNumber(totals.rushing_tds) },
+        { key: "receptions", label: "Receptions", value: asFiniteNumber(totals.receptions) },
+        { key: "receiving_yards", label: "Rec Yards", value: asFiniteNumber(totals.receiving_yards) },
+        { key: "receiving_tds", label: "Rec TD", value: asFiniteNumber(totals.receiving_tds) },
+      ];
+    }
+    if (selectedPlayerPosition === "WR" || selectedPlayerPosition === "TE") {
+      return [
+        { key: "games", label: "Games", value: asFiniteNumber(totals.games) },
+        { key: "receptions", label: "Receptions", value: asFiniteNumber(totals.receptions) },
+        { key: "receiving_yards", label: "Rec Yards", value: asFiniteNumber(totals.receiving_yards) },
+        { key: "receiving_tds", label: "Rec TD", value: asFiniteNumber(totals.receiving_tds) },
+      ];
+    }
+    if (selectedPlayerPosition === "K") {
+      return [
+        { key: "games", label: "Games", value: asFiniteNumber(totals.games) },
+        { key: "field_goals_made", label: "FG Made", value: asFiniteNumber(totals.field_goals_made) },
+        { key: "extra_points_made", label: "XP Made", value: asFiniteNumber(totals.extra_points_made) },
+      ];
+    }
+    return [
+      { key: "games", label: "Games", value: asFiniteNumber(totals.games) },
+      { key: "rushing_yards", label: "Rush Yards", value: asFiniteNumber(totals.rushing_yards) },
+      { key: "rushing_tds", label: "Rush TD", value: asFiniteNumber(totals.rushing_tds) },
+      { key: "receptions", label: "Receptions", value: asFiniteNumber(totals.receptions) },
+      { key: "receiving_yards", label: "Rec Yards", value: asFiniteNumber(totals.receiving_yards) },
+      { key: "receiving_tds", label: "Rec TD", value: asFiniteNumber(totals.receiving_tds) },
+    ];
+  }, [playerSeasonSummary, selectedPlayerPosition]);
   const selectedSchoolPalette = useMemo(
     () => (selectedPlayer ? getSchoolPalette(selectedPlayer.school) : { primary: "#2563EB", secondary: "#1E3A8A" }),
     [selectedPlayer]
@@ -1559,20 +1627,8 @@ export default function Draft() {
                   </div>
                 ) : playerSeasonSummary ? (
                   <div className="mt-3 space-y-2.5">
-                    {[
-                      { label: "Games", value: playerSeasonSummary.totals.games },
-                      { label: "Pass Yards", value: playerSeasonSummary.totals.passing_yards },
-                      { label: "Pass TD", value: playerSeasonSummary.totals.passing_tds },
-                      { label: "INT", value: playerSeasonSummary.totals.interceptions },
-                      { label: "Rush Yards", value: playerSeasonSummary.totals.rushing_yards },
-                      { label: "Rush TD", value: playerSeasonSummary.totals.rushing_tds },
-                      { label: "Receptions", value: playerSeasonSummary.totals.receptions },
-                      { label: "Rec Yards", value: playerSeasonSummary.totals.receiving_yards },
-                      { label: "Rec TD", value: playerSeasonSummary.totals.receiving_tds },
-                      { label: "FG Made", value: playerSeasonSummary.totals.field_goals_made },
-                      { label: "XP Made", value: playerSeasonSummary.totals.extra_points_made },
-                    ].map((row) => (
-                      <div key={row.label} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                    {selectedPlayerSeasonRows.map((row) => (
+                      <div key={row.key} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
                         <p className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">{row.label}</p>
                         <p className="text-2xl font-black text-foreground tabular-nums">{formatProjectionCardNumber(row.value)}</p>
                       </div>
