@@ -20,6 +20,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { restartGuide } from "@/lib/onboarding";
 import { useLeagues } from "@/hooks/use-leagues";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
+import { ensureBrowserPushRegistration } from "@/lib/push";
 
 type LeagueNotificationPreference = {
   league_id: number;
@@ -99,6 +100,7 @@ export default function Settings() {
   const [leaguePrefs, setLeaguePrefs] = useState<LeagueNotificationPreference[]>([]);
   const [profileName, setProfileName] = useState("");
   const [profileEmail, setProfileEmail] = useState("");
+  const [pushPermissionWarning, setPushPermissionWarning] = useState<string | null>(null);
   const [prefs, setPrefs] = useState({
     push_enabled: true,
     email_enabled: true,
@@ -179,6 +181,21 @@ export default function Settings() {
     navigate("/", { replace: true });
   };
 
+  const handlePushToggle = async (enabled: boolean) => {
+    setPrefs((prev) => ({ ...prev, push_enabled: enabled }));
+    if (!enabled) {
+      setPushPermissionWarning(null);
+      return;
+    }
+    const registered = await ensureBrowserPushRegistration(true);
+    if (!registered) {
+      setPrefs((prev) => ({ ...prev, push_enabled: false }));
+      setPushPermissionWarning("Browser push permission is blocked. Enable notifications in browser settings to receive live alerts.");
+      return;
+    }
+    setPushPermissionWarning(null);
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-20">
       {/* Header Section */}
@@ -253,7 +270,9 @@ export default function Settings() {
             <SettingItem label="Push Notifications" description="Receive mobile push alerts">
               <Switch
                 checked={prefs.push_enabled}
-                onCheckedChange={(value) => setPrefs((prev) => ({ ...prev, push_enabled: value }))}
+                onCheckedChange={(value) => {
+                  void handlePushToggle(value);
+                }}
               />
             </SettingItem>
             <SettingItem label="Email Alerts" description="Send notifications to your email">
@@ -328,6 +347,11 @@ export default function Settings() {
               }
             />
           </div>
+          {pushPermissionWarning && (
+            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-amber-300">
+              {pushPermissionWarning}
+            </p>
+          )}
           {saveState === "error" && (
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-red-400">
               Unable to save preferences.

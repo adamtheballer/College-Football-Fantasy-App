@@ -20,17 +20,21 @@ def upsert_player_stat(
     week: int,
     stats: dict,
     source: str,
+    *,
+    auto_commit: bool = True,
 ) -> PlayerStat:
     existing = get_player_stat(db, player_id, season, week)
     if existing:
         existing.stats = stats
         existing.source = source
         db.add(existing)
-        db.commit()
-        db.refresh(existing)
+        if auto_commit:
+            db.commit()
+            db.refresh(existing)
         return existing
     entry = PlayerStat(player_id=player_id, season=season, week=week, stats=stats, source=source)
     db.add(entry)
-    db.commit()
-    db.refresh(entry)
+    if auto_commit:
+        db.commit()
+        db.refresh(entry)
     return entry

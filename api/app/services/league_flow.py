@@ -31,8 +31,9 @@ FIXED_ROSTER_SLOTS = {
     "RB": 2,
     "WR": 2,
     "TE": 1,
+    "FLEX": 1,
     "K": 1,
-    "BENCH": 4,
+    "BENCH": 5,
     "IR": 1,
 }
 
@@ -43,6 +44,23 @@ def enforce_fixed_roster_settings(payload_settings):
     payload_settings.kicker_enabled = True
     payload_settings.defense_enabled = False
     return payload_settings
+
+
+def _scoring_with_meta(
+    scoring_json: dict,
+    *,
+    draft_order_strategy: str | None = None,
+    skill_mode: str | None = None,
+) -> dict:
+    payload = dict(scoring_json or {})
+    existing_meta = payload.get("__meta__")
+    meta = dict(existing_meta) if isinstance(existing_meta, dict) else {}
+    if draft_order_strategy:
+        meta["draft_order_strategy"] = draft_order_strategy
+    if skill_mode:
+        meta["skill_mode"] = skill_mode
+    payload["__meta__"] = meta
+    return payload
 
 
 def generate_unique_invite(db: Session) -> str:
@@ -57,6 +75,8 @@ def create_league(
     db: Session,
     current_user: User,
 ) -> LeagueCreateResponse:
+    if payload.draft.draft_type != "snake":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="only snake draft is supported")
     payload.settings = enforce_fixed_roster_settings(payload.settings)
     code = generate_unique_invite(db)
     league = League(
@@ -78,7 +98,11 @@ def create_league(
     db.add(
         LeagueSettings(
             league_id=league.id,
-            scoring_json=payload.settings.scoring_json,
+            scoring_json=_scoring_with_meta(
+                payload.settings.scoring_json,
+                draft_order_strategy=payload.draft.order_strategy,
+                skill_mode="custom",
+            ),
             roster_slots_json=payload.settings.roster_slots_json,
             playoff_teams=payload.settings.playoff_teams,
             waiver_type=payload.settings.waiver_type,
@@ -189,7 +213,15 @@ def update_league_settings(
         settings_row = LeagueSettings(league_id=league.id)
 
     payload = enforce_fixed_roster_settings(payload)
-    settings_row.scoring_json = payload.scoring_json
+    existing_meta = (
+        dict(settings_row.scoring_json.get("__meta__", {}))
+        if isinstance(settings_row.scoring_json, dict)
+        else {}
+    )
+    merged_scoring = dict(payload.scoring_json or {})
+    if existing_meta:
+        merged_scoring["__meta__"] = existing_meta
+    settings_row.scoring_json = merged_scoring
     settings_row.roster_slots_json = payload.roster_slots_json
     settings_row.playoff_teams = payload.playoff_teams
     settings_row.waiver_type = payload.waiver_type
@@ -207,6 +239,8 @@ def reschedule_draft(
     league: League,
     payload: DraftUpdate,
 ) -> DraftRead:
+    if payload.draft_type != "snake":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="only snake draft is supported")
     draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
     if not draft_row:
         draft_row = Draft(league_id=league.id)
@@ -217,6 +251,14 @@ def reschedule_draft(
     draft_row.pick_timer_seconds = payload.pick_timer_seconds
     draft_row.status = payload.status
     db.add(draft_row)
+
+    settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
+    if settings_row:
+        settings_row.scoring_json = _scoring_with_meta(
+            settings_row.scoring_json or {},
+            draft_order_strategy=payload.order_strategy,
+        )
+        db.add(settings_row)
 
     cancel_scheduled_notifications(db, league.id, reason="draft rescheduled")
     members = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).all()

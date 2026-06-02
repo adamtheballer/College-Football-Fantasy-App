@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
@@ -17,10 +17,10 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import CreateLeague from "./pages/CreateLeague";
 import JoinLeague from "./pages/JoinLeague";
-import DraftLobby from "./pages/DraftLobby";
 import Draft from "./pages/Draft";
+import DraftHub from "./pages/DraftHub";
+import DraftLobby from "./pages/DraftLobby";
 import Rosters from "./pages/Rosters";
-import Alerts from "./pages/Alerts";
 import Stats from "./pages/Stats";
 import WaiverWire from "./pages/WaiverWire";
 import Watchlist from "./pages/Watchlist";
@@ -65,7 +65,14 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
-              <Route path="/draft" element={<Navigate to="/leagues" replace />} />
+              <Route
+                path="/draft"
+                element={
+                  <ProtectedRoute>
+                    <DraftHub />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/league/:leagueId"
                 element={
@@ -96,8 +103,8 @@ const App = () => (
               <Route path="/waivers" element={<ProtectedRoute><WaiverWire /></ProtectedRoute>} />
               <Route path="/watchlists" element={<ProtectedRoute><Watchlist /></ProtectedRoute>} />
               <Route path="/injury-center" element={<ProtectedRoute><InjuryCenter /></ProtectedRoute>} />
-              <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
               <Route path="/trade" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
+              <Route path="/trade/:leagueId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
               <Route path="/trade/:leagueId/:playerId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
               <Route path="/stats" element={<Stats />} />
               <Route path="/stats/players" element={<Stats />} />

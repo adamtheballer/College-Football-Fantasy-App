@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRightLeft, ChevronRight, ShieldAlert, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRightLeft,
+  ChevronRight,
+  SendHorizontal,
+  ShieldAlert,
+  Users,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +25,7 @@ import {
   useLeagueWorkspace,
 } from "@/hooks/use-leagues";
 import { useLeagueTeams, useTeamRoster } from "@/hooks/use-teams";
+import { toast } from "@/components/ui/use-toast";
 import { apiPost } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { RosterEntry } from "@/types/roster";
@@ -39,6 +47,20 @@ type TradeAnalyzeResult = {
   give_value: number;
   delta: number;
   verdict: string;
+};
+
+type TradeProposalPayload = {
+  league_id: number;
+  from_team_id: number;
+  to_team_id: number;
+  give_ids: number[];
+  receive_ids: number[];
+  note?: string;
+};
+
+type TradeProposalResponse = {
+  proposal_ref: string;
+  message: string;
 };
 
 type TradeRow = {
@@ -180,7 +202,7 @@ const TradeList = ({
 export default function Trade() {
   const { leagueId: leagueIdParam, playerId: playerIdParam } = useParams();
   const navigate = useNavigate();
-  const { data: leagues = [] } = useLeagues(50, true);
+  const { data: leagues = [], isLoading: leaguesLoading } = useLeagues(50, true);
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
 
   const parsedLeagueId =
@@ -205,6 +227,9 @@ export default function Trade() {
   const [analysis, setAnalysis] = useState<TradeAnalyzeResult | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [proposalMessage, setProposalMessage] = useState<string | null>(null);
+  const [proposalError, setProposalError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!leagueId) return;
@@ -255,10 +280,15 @@ export default function Trade() {
   useEffect(() => {
     setAnalysis(null);
     setAnalysisError(null);
+    setProposalMessage(null);
+    setProposalError(null);
   }, [giveIds, receiveIds, opponentTeamId, leagueId]);
 
   const opponentTeam = teams.find((team) => team.id === opponentTeamId) ?? null;
   const ownedTeam = teams.find((team) => team.id === ownedTeamId) ?? null;
+  const canSubmitTrade = Boolean(
+    league && ownedTeamId && opponentTeamId && giveIds.length && receiveIds.length
+  );
 
   const toggleGive = (playerId: number) => {
     setGiveIds((current) =>
@@ -277,14 +307,14 @@ export default function Trade() {
   };
 
   const handleAnalyze = async () => {
-    if (!league || !workspace || !giveIds.length || !receiveIds.length) {
+    if (!league || !giveIds.length || !receiveIds.length) {
       return;
     }
     const payload: TradeAnalyzePayload = {
       receive_ids: receiveIds,
       give_ids: giveIds,
       season: league.season_year,
-      week: Number(workspace.matchup_summary?.week ?? 1),
+      week: Number(workspace?.matchup_summary?.week ?? 1),
       league_size: league.max_teams,
       roster_slots: toTradeRosterSlots(league.settings?.roster_slots_json),
     };
@@ -295,9 +325,51 @@ export default function Trade() {
       setAnalysis(result);
     } catch (error) {
       setAnalysis(null);
-      setAnalysisError(error instanceof Error ? error.message : "Unable to analyze trade.");
+      const detail =
+        error instanceof Error ? error.message : "Unable to analyze trade.";
+      if (detail.toLowerCase().includes("draft")) {
+        setAnalysisError(
+          "Trade analysis should not be blocked by draft status. Try sending the offer directly in this trade branch."
+        );
+        return;
+      }
+      setAnalysisError(detail);
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const handleSendOffer = async () => {
+    if (!league || !ownedTeamId || !opponentTeamId || !giveIds.length || !receiveIds.length) {
+      return;
+    }
+    const payload: TradeProposalPayload = {
+      league_id: league.id,
+      from_team_id: ownedTeamId,
+      to_team_id: opponentTeamId,
+      give_ids: giveIds,
+      receive_ids: receiveIds,
+    };
+    setIsSubmitting(true);
+    setProposalError(null);
+    setProposalMessage(null);
+    try {
+      const response = await apiPost<TradeProposalResponse>("/trade/propose", payload);
+      setProposalMessage(response.message);
+      toast({
+        title: "Trade offer sent",
+        description: response.message,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Unable to send trade offer.";
+      setProposalError(detail);
+      toast({
+        title: "Unable to send trade offer",
+        description: detail,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -307,14 +379,23 @@ export default function Trade() {
         <Card className="rounded-[2rem] border border-white/10 bg-card/40">
           <CardContent className="space-y-4 p-10 text-center">
             <p className="text-[11px] font-black uppercase tracking-[0.25em] text-muted-foreground/70">
-              No active league selected.
+              {leaguesLoading ? "Loading leagues..." : "No leagues available for trade yet."}
             </p>
-            <Button
-              className="rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
-              onClick={() => navigate("/leagues")}
-            >
-              Open Leagues
-            </Button>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Button
+                className="rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
+                onClick={() => navigate("/leagues")}
+              >
+                Open Leagues
+              </Button>
+              <Button
+                variant="outline"
+                className="rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
+                onClick={() => navigate("/draft")}
+              >
+                Open Draft Tab
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -347,6 +428,31 @@ export default function Trade() {
         </Button>
       </div>
 
+      {league?.status === "pre_draft" && (
+        <Card className="rounded-[2rem] border border-blue-400/20 bg-blue-500/10">
+          <CardContent className="p-5 text-[10px] font-black uppercase tracking-[0.18em] text-blue-100">
+            This branch keeps trade planning and offer flow available even before the draft starts.
+          </CardContent>
+        </Card>
+      )}
+
+      {!ownedTeamId && (
+        <Card className="rounded-[2rem] border border-amber-400/30 bg-amber-500/10">
+          <CardContent className="space-y-3 p-6">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-100">
+              You need a team in this league before proposing trades.
+            </p>
+            <Button
+              asChild
+              variant="outline"
+              className="h-10 rounded-xl border-amber-300/30 text-[10px] font-black uppercase tracking-[0.18em] text-amber-100"
+            >
+              <Link to={`/league/${leagueId}`}>Open League Setup</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="rounded-[2rem] border border-white/10 bg-card/40">
         <CardContent className="grid gap-4 p-6 md:grid-cols-2">
           <div className="space-y-2">
@@ -364,16 +470,23 @@ export default function Trade() {
             <Select
               value={opponentTeamId ? String(opponentTeamId) : ""}
               onValueChange={(value) => setOpponentTeamId(Number(value))}
+              disabled={!opponentTeams.length}
             >
               <SelectTrigger className="h-12 rounded-xl border-white/10 bg-white/[0.03] text-[10px] font-black uppercase tracking-[0.16em]">
                 <SelectValue placeholder="Select team" />
               </SelectTrigger>
               <SelectContent>
-                {opponentTeams.map((team: Team) => (
-                  <SelectItem key={team.id} value={String(team.id)}>
-                    {team.name}
+                {opponentTeams.length > 0 ? (
+                  opponentTeams.map((team: Team) => (
+                    <SelectItem key={team.id} value={String(team.id)}>
+                      {team.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="no-opponents" disabled>
+                    No opponent teams available
                   </SelectItem>
-                ))}
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -412,14 +525,25 @@ export default function Trade() {
             <ArrowRightLeft className="h-4 w-4" />
             Trade Analysis
           </CardTitle>
-          <Button
-            className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
-            disabled={isAnalyzing || !giveIds.length || !receiveIds.length || !league || !workspace}
-            onClick={handleAnalyze}
-          >
-            {isAnalyzing ? "Analyzing..." : "Analyze Trade"}
-            {!isAnalyzing && <ChevronRight className="ml-2 h-4 w-4" />}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
+              disabled={!canSubmitTrade || isSubmitting}
+              onClick={handleSendOffer}
+            >
+              <SendHorizontal className="mr-2 h-4 w-4" />
+              {isSubmitting ? "Sending..." : "Send Offer"}
+            </Button>
+            <Button
+              className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
+              disabled={isAnalyzing || !giveIds.length || !receiveIds.length || !league}
+              onClick={handleAnalyze}
+            >
+              {isAnalyzing ? "Analyzing..." : "Analyze Trade"}
+              {!isAnalyzing && <ChevronRight className="ml-2 h-4 w-4" />}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6 p-6">
           <div className="grid gap-4 md:grid-cols-3">
@@ -448,6 +572,18 @@ export default function Trade() {
           {analysisError && (
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-300">
               {analysisError}
+            </p>
+          )}
+
+          {proposalError && (
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-300">
+              {proposalError}
+            </p>
+          )}
+
+          {proposalMessage && (
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">
+              {proposalMessage}
             </p>
           )}
 

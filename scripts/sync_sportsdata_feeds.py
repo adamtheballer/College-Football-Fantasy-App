@@ -9,6 +9,7 @@ if ROOT_DIR not in sys.path:
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.session import SessionLocal
+from collegefootballfantasy_api.app.models import load_model_registry
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
 from collegefootballfantasy_api.app.services.power4 import CANONICAL_POWER4_TEAMS
 from collegefootballfantasy_api.app.services.sportsdata_sync import (
@@ -106,6 +107,7 @@ def main() -> None:
     parser.add_argument("--force-refresh", action="store_true")
     args = parser.parse_args()
 
+    load_model_registry()
     session = SessionLocal()
     try:
         if args.feed in {"players", "all"}:

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, JSON, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -17,7 +17,7 @@ class PushToken(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     user_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    device_token: Mapped[str] = mapped_column(String(255))
+    device_token: Mapped[str] = mapped_column(Text)
     platform: Mapped[str] = mapped_column(String(30), default="unknown")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 

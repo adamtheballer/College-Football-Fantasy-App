@@ -210,9 +210,9 @@ export default function Index() {
                 <Button
                   variant="outline"
                   className="h-11 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] border-primary/30 text-primary"
-                  onClick={() => navigate(`/league/${selectedLeague.id}/draft`)}
+                  onClick={() => navigate(`/league/${selectedLeague.id}/lobby`)}
                 >
-                  Enter Draft Room
+                  Open Draft Lobby
                 </Button>
               )}
               {selectedLeague.draft?.status === "scheduled" && (
@@ -221,7 +221,7 @@ export default function Index() {
                   className="h-11 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] border-primary/30 text-primary"
                   onClick={() => navigate(`/league/${selectedLeague.id}/lobby`)}
                 >
-                  Open Draft Lobby
+                  Join Draft Lobby
                 </Button>
               )}
             </div>

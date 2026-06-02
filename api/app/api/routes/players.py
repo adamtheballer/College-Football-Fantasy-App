@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.core.config import settings
@@ -8,9 +9,11 @@ from collegefootballfantasy_api.app.crud.player import create_players, get_playe
 from collegefootballfantasy_api.app.crud.player_stat import get_player_stat, upsert_player_stat
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.integrations.sportsdata import SportsDataClient
+from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.schemas.player import PlayerCreate, PlayerList, PlayerRead
-from collegefootballfantasy_api.app.schemas.player_stat import PlayerStatResponse
+from collegefootballfantasy_api.app.schemas.player_stat import PlayerSeasonSummaryResponse, PlayerSeasonTotals, PlayerStatResponse
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
+from collegefootballfantasy_api.app.services.player_news import build_player_latest_news
 
 router = APIRouter()
 
@@ -22,6 +25,18 @@ def _is_stale(updated_at: datetime | None, ttl_days: int) -> bool:
         updated_at = updated_at.replace(tzinfo=timezone.utc)
     now = datetime.now(timezone.utc)
     return updated_at <= now - timedelta(days=max(1, ttl_days))
+
+
+def _stat_value(stats: dict, keys: list[str]) -> float:
+    for key in keys:
+        value = stats.get(key)
+        if value is None:
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            continue
+    return 0.0
 
 
 @router.post("", response_model=list[PlayerRead], status_code=status.HTTP_201_CREATED)
@@ -172,4 +187,128 @@ def get_player_stats_endpoint(
         cached=not refreshed,
         stats=stored.stats,
         message=stale_fallback_message,
+    )
+
+
+@router.get("/{player_id}/season-summary", response_model=PlayerSeasonSummaryResponse)
+def get_player_season_summary_endpoint(
+    player_id: int,
+    season: int = 2025,
+    db: Session = Depends(get_db),
+) -> PlayerSeasonSummaryResponse:
+    player = get_player(db, player_id)
+    if not player:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
+
+    stat_rows = (
+        db.query(PlayerStat)
+        .filter(PlayerStat.player_id == player_id, PlayerStat.season == season, PlayerStat.week > 0)
+        .order_by(PlayerStat.week.asc())
+        .all()
+    )
+
+    source = "sportsdata_cached"
+    message: str | None = None
+    if not stat_rows:
+        source = "unavailable"
+        message = "No cached season stats were found for this player yet."
+
+    totals_map = {
+        "passing_completions": 0.0,
+        "passing_attempts": 0.0,
+        "passing_yards": 0.0,
+        "passing_tds": 0.0,
+        "interceptions": 0.0,
+        "rushing_attempts": 0.0,
+        "rushing_yards": 0.0,
+        "rushing_tds": 0.0,
+        "receptions": 0.0,
+        "receiving_yards": 0.0,
+        "receiving_tds": 0.0,
+        "field_goals_made": 0.0,
+        "extra_points_made": 0.0,
+    }
+
+    for row in stat_rows:
+        stats = row.stats or {}
+        totals_map["passing_completions"] += _stat_value(stats, ["PassingCompletions", "Completions", "PassCompletions"])
+        totals_map["passing_attempts"] += _stat_value(stats, ["PassingAttempts", "Attempts", "PassAttempts"])
+        totals_map["passing_yards"] += _stat_value(stats, ["PassingYards", "PassYards"])
+        totals_map["passing_tds"] += _stat_value(stats, ["PassingTouchdowns", "PassTD", "PassingTDs"])
+        totals_map["interceptions"] += _stat_value(stats, ["Interceptions", "INT", "Ints"])
+        totals_map["rushing_attempts"] += _stat_value(stats, ["RushingAttempts", "RushAttempts", "Carries"])
+        totals_map["rushing_yards"] += _stat_value(stats, ["RushingYards", "RushYards"])
+        totals_map["rushing_tds"] += _stat_value(stats, ["RushingTouchdowns", "RushTD", "RushingTDs"])
+        totals_map["receptions"] += _stat_value(stats, ["Receptions", "Rec"])
+        totals_map["receiving_yards"] += _stat_value(stats, ["ReceivingYards", "RecYards"])
+        totals_map["receiving_tds"] += _stat_value(stats, ["ReceivingTouchdowns", "RecTD", "ReceivingTDs"])
+        totals_map["field_goals_made"] += _stat_value(stats, ["FieldGoalsMade", "FieldGoals", "FGM"])
+        totals_map["extra_points_made"] += _stat_value(stats, ["ExtraPointsMade", "ExtraPoints", "XPM"])
+
+    games_count = (
+        db.query(func.count(func.distinct(PlayerStat.week)))
+        .filter(PlayerStat.player_id == player_id, PlayerStat.season == season, PlayerStat.week > 0)
+        .scalar()
+        or 0
+    )
+
+    attempts = totals_map["passing_attempts"]
+    completions = totals_map["passing_completions"]
+    rushing_attempts = totals_map["rushing_attempts"]
+    receptions = totals_map["receptions"]
+    completion_pct = round((completions / attempts) * 100.0, 1) if attempts > 0 else None
+    yards_per_carry = round(totals_map["rushing_yards"] / rushing_attempts, 2) if rushing_attempts > 0 else None
+    yards_per_reception = round(totals_map["receiving_yards"] / receptions, 2) if receptions > 0 else None
+
+    fantasy_points = (
+        totals_map["passing_yards"] / 25.0
+        + totals_map["passing_tds"] * 4.0
+        - totals_map["interceptions"] * 2.0
+        + totals_map["rushing_yards"] / 10.0
+        + totals_map["rushing_tds"] * 6.0
+        + totals_map["receptions"] * 1.0
+        + totals_map["receiving_yards"] / 10.0
+        + totals_map["receiving_tds"] * 6.0
+        + totals_map["field_goals_made"] * 3.0
+        + totals_map["extra_points_made"] * 1.0
+    )
+
+    totals = PlayerSeasonTotals(
+        games=int(games_count),
+        passing_completions=round(totals_map["passing_completions"], 1),
+        passing_attempts=round(totals_map["passing_attempts"], 1),
+        passing_yards=round(totals_map["passing_yards"], 1),
+        passing_tds=round(totals_map["passing_tds"], 1),
+        interceptions=round(totals_map["interceptions"], 1),
+        rushing_attempts=round(totals_map["rushing_attempts"], 1),
+        rushing_yards=round(totals_map["rushing_yards"], 1),
+        rushing_tds=round(totals_map["rushing_tds"], 1),
+        receptions=round(totals_map["receptions"], 1),
+        receiving_yards=round(totals_map["receiving_yards"], 1),
+        receiving_tds=round(totals_map["receiving_tds"], 1),
+        field_goals_made=round(totals_map["field_goals_made"], 1),
+        extra_points_made=round(totals_map["extra_points_made"], 1),
+        completion_pct=completion_pct,
+        yards_per_carry=yards_per_carry,
+        yards_per_reception=yards_per_reception,
+        fantasy_points=round(fantasy_points, 1),
+    )
+
+    latest_news_result = build_player_latest_news(
+        db,
+        player=player,
+        season=season,
+        totals=totals,
+    )
+
+    return PlayerSeasonSummaryResponse(
+        player_id=player_id,
+        season=season,
+        source=source,
+        totals=totals,
+        latest_news=latest_news_result.text,
+        latest_news_source_type=latest_news_result.source_type,
+        latest_news_sources=latest_news_result.sources,
+        latest_news_verified_at=latest_news_result.verified_at,
+        message=message,
     )

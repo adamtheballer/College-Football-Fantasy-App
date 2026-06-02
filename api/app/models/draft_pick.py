@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Index, Integer, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -9,9 +9,11 @@ class DraftPick(TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("draft_id", "overall_pick", name="uq_draft_picks_draft_overall_pick"),
         UniqueConstraint("draft_id", "player_id", name="uq_draft_picks_draft_player"),
+        UniqueConstraint("draft_id", "idempotency_key", name="uq_draft_picks_draft_idempotency_key"),
         Index("ix_draft_picks_draft_id", "draft_id"),
         Index("ix_draft_picks_team_id", "team_id"),
         Index("ix_draft_picks_player_id", "player_id"),
+        Index("ix_draft_picks_draft_id_idempotency_key", "draft_id", "idempotency_key"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -24,3 +26,4 @@ class DraftPick(TimestampMixin, Base):
     round_number: Mapped[int] = mapped_column(Integer)
     round_pick: Mapped[int] = mapped_column(Integer)
     overall_pick: Mapped[int] = mapped_column(Integer)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)

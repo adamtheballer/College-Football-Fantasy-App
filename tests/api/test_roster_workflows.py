@@ -28,7 +28,7 @@ def create_league(client, token: str) -> dict:
             "name": "Roster League",
             "season_year": 2026,
             "max_teams": 12,
-            "is_private": True,
+            "is_private": False,
             "description": "Roster league",
             "icon_url": None,
         },
@@ -198,3 +198,34 @@ def test_team_and_roster_db_constraints_enforce_league_invariants(client, db_ses
     with pytest.raises(IntegrityError):
         db_session.commit()
     db_session.rollback()
+
+
+def test_lineup_updates_block_when_week_is_locked(client, db_session):
+    token = create_user_and_token(client, "owner-lock")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    player_id, _ = create_players(client)
+
+    add_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": player_id, "slot": "RB", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert add_response.status_code == 201
+    added_entry = add_response.json()
+
+    lock_response = client.post(
+        f"/leagues/{league['id']}/weeks/2026/1/status",
+        json={"status": "locked"},
+        headers=auth_headers(token),
+    )
+    assert lock_response.status_code == 200
+    assert lock_response.json()["status"] == "locked"
+
+    lineup_response = client.patch(
+        f"/teams/{team.id}/lineup",
+        json={"assignments": [{"roster_entry_id": added_entry["id"], "slot": "BENCH"}]},
+        headers=auth_headers(token),
+    )
+    assert lineup_response.status_code == 409
+    assert "lineups are locked for week 1" in lineup_response.json()["detail"]

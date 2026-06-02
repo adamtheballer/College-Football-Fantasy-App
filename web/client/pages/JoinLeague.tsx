@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { Copy, Search, Users } from "lucide-react";
+import { Copy, Loader2, Search, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiPost } from "@/lib/api";
-import { LeaguePreview } from "@/types/league";
+import { ensureBrowserPushRegistration } from "@/lib/push";
+import { LeagueDetail, LeaguePreview } from "@/types/league";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function JoinLeague() {
@@ -18,6 +21,10 @@ export default function JoinLeague() {
   const [preview, setPreview] = useState<LeaguePreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [matchmakingLoading, setMatchmakingLoading] = useState(false);
+  const [randomTeamCount, setRandomTeamCount] = useState("12");
+  const [randomSkillMode, setRandomSkillMode] = useState<"beginner" | "pro">("beginner");
+  const [matchmakingError, setMatchmakingError] = useState<string | null>(null);
 
   useEffect(() => {
     if (inviteCode) {
@@ -55,14 +62,39 @@ export default function JoinLeague() {
     setLoading(true);
     setError(null);
     try {
-      const joinedLeague = await apiPost(`/leagues/${preview.id}/join`, {});
+      const joinedLeague = await apiPost<LeagueDetail>(`/leagues/join-with-code`, {
+        invite_code: code.trim().toUpperCase(),
+      });
+      void ensureBrowserPushRegistration();
       queryClient.invalidateQueries({ queryKey: ["leagues"] });
-      queryClient.setQueryData(["league", preview.id], joinedLeague);
-      navigate(`/league/${preview.id}`);
+      queryClient.setQueryData(["league", joinedLeague.id], joinedLeague);
+      navigate(`/league/${joinedLeague.id}`);
     } catch (err: any) {
       setError(err.message || "Unable to join league.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleJoinRandomLeague = async () => {
+    setMatchmakingLoading(true);
+    setMatchmakingError(null);
+    try {
+      const joinedLeague = await apiPost<LeagueDetail>("/leagues/matchmaking/join", {
+        team_count: Number(randomTeamCount),
+        skill_mode: randomSkillMode,
+      });
+      void ensureBrowserPushRegistration();
+      queryClient.invalidateQueries({ queryKey: ["leagues"] });
+      queryClient.setQueryData(["league", joinedLeague.id], joinedLeague);
+
+      const shouldOpenDraft =
+        joinedLeague.status === "draft_scheduled" || joinedLeague.status === "draft_live";
+      navigate(shouldOpenDraft ? `/league/${joinedLeague.id}/lobby` : `/league/${joinedLeague.id}`);
+    } catch (err: any) {
+      setMatchmakingError(err.message || "Unable to join random league.");
+    } finally {
+      setMatchmakingLoading(false);
     }
   };
 
@@ -115,6 +147,64 @@ export default function JoinLeague() {
             </Button>
           </div>
           {error && <p className="text-sm font-bold text-red-400 uppercase tracking-[0.2em]">{error}</p>}
+        </CardContent>
+      </Card>
+
+      <Card className="bg-card/40 border-border/60 rounded-[2.5rem]">
+        <CardHeader className="px-10 pt-10">
+          <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">Join Random League</CardTitle>
+        </CardHeader>
+        <CardContent className="px-10 pb-10 space-y-6">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/70">
+            Pick size + skill mode. When the room fills, draft room opens immediately and draft starts in 2 minutes.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+                League Size
+              </Label>
+              <Select value={randomTeamCount} onValueChange={setRandomTeamCount}>
+                <SelectTrigger className="h-12 rounded-xl border-white/10 bg-white/[0.03] text-[10px] font-black uppercase tracking-[0.16em]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[4, 6, 8, 10, 12, 14, 16].map((size) => (
+                    <SelectItem key={size} value={String(size)}>
+                      {size} Teams
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+                Skill Mode
+              </Label>
+              <Select
+                value={randomSkillMode}
+                onValueChange={(value: "beginner" | "pro") => setRandomSkillMode(value)}
+              >
+                <SelectTrigger className="h-12 rounded-xl border-white/10 bg-white/[0.03] text-[10px] font-black uppercase tracking-[0.16em]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="beginner">Beginner</SelectItem>
+                  <SelectItem value="pro">Pro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {matchmakingError && (
+            <p className="text-sm font-bold text-red-400 uppercase tracking-[0.2em]">{matchmakingError}</p>
+          )}
+          <Button
+            className="h-12 px-6 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em]"
+            onClick={handleJoinRandomLeague}
+            disabled={matchmakingLoading}
+          >
+            {matchmakingLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Join Random League
+          </Button>
         </CardContent>
       </Card>
 

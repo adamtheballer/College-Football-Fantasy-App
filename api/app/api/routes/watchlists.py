@@ -7,6 +7,8 @@ from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.watchlist import Watchlist, WatchlistPlayer
 from collegefootballfantasy_api.app.schemas.watchlist import (
+    WatchlistBulkSyncRequest,
+    WatchlistBulkSyncResponse,
     WatchlistCreate,
     WatchlistList,
     WatchlistPlayerCreate,
@@ -153,3 +155,64 @@ def remove_watchlist_player_endpoint(
         db.delete(row)
         db.commit()
     return _serialize_watchlist(db, watchlist.id)
+
+
+@router.post("/{watchlist_id}/players/bulk-sync", response_model=WatchlistBulkSyncResponse)
+def bulk_sync_watchlist_players_endpoint(
+    watchlist_id: int,
+    payload: WatchlistBulkSyncRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> WatchlistBulkSyncResponse:
+    watchlist = _owned_watchlist_or_404(db, watchlist_id, current_user)
+    requested_ids = {
+        int(player_id)
+        for player_id in payload.player_ids
+        if isinstance(player_id, int) or (isinstance(player_id, str) and str(player_id).isdigit())
+    }
+    if requested_ids:
+        existing_players = (
+            db.query(Player.id)
+            .filter(Player.id.in_(requested_ids))
+            .all()
+        )
+        valid_requested_ids = {int(player_id) for (player_id,) in existing_players}
+    else:
+        valid_requested_ids = set()
+
+    current_rows = (
+        db.query(WatchlistPlayer)
+        .filter(WatchlistPlayer.watchlist_id == watchlist.id)
+        .all()
+    )
+    current_ids = {row.player_id for row in current_rows}
+
+    add_ids = valid_requested_ids - current_ids
+    remove_ids = current_ids - valid_requested_ids if payload.replace else set()
+
+    for player_id in add_ids:
+        db.add(WatchlistPlayer(watchlist_id=watchlist.id, player_id=player_id))
+    if remove_ids:
+        (
+            db.query(WatchlistPlayer)
+            .filter(
+                WatchlistPlayer.watchlist_id == watchlist.id,
+                WatchlistPlayer.player_id.in_(remove_ids),
+            )
+            .delete(synchronize_session=False)
+        )
+
+    if add_ids or remove_ids:
+        db.commit()
+
+    total = (
+        db.query(WatchlistPlayer)
+        .filter(WatchlistPlayer.watchlist_id == watchlist.id)
+        .count()
+    )
+    return WatchlistBulkSyncResponse(
+        watchlist_id=watchlist.id,
+        added=len(add_ids),
+        removed=len(remove_ids),
+        total=total,
+    )

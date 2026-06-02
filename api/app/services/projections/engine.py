@@ -64,7 +64,20 @@ def build_weekly_projections(
     for player in players:
         team_env = team_env_by_team.get(player.school)
         if not team_env:
-            continue
+            team_env = TeamEnvironment(
+                team_name=player.school,
+                season=season,
+                week=week,
+                expected_plays=68.0,
+                expected_points=27.0,
+                pass_rate=0.52,
+                rush_rate=0.48,
+                red_zone_trips=3.0,
+                red_zone_td_rate=0.58,
+                pace_seconds_per_play=27.0,
+                implied_team_total=None,
+                spread=None,
+            )
 
         usage = usage_by_player.get(player.id)
         if not usage:
@@ -87,17 +100,23 @@ def build_weekly_projections(
 
         if player.position.upper() == "QB":
             baseline = DEFAULT_QB | eff
-            pass_td_rate = baseline["pass_td_rate"]
-            int_rate = baseline["int_rate"]
-            ypa = baseline["ypa"]
-            comp_pct = baseline["comp_pct"]
+            # Regress QB rates toward stable priors so one hot/cold sample week
+            # does not produce unrealistic season-long touchdown or yardage spikes.
+            pass_td_rate = (DEFAULT_QB["pass_td_rate"] * 0.55) + (baseline["pass_td_rate"] * 0.45)
+            int_rate = (DEFAULT_QB["int_rate"] * 0.45) + (baseline["int_rate"] * 0.55)
+            ypa = (DEFAULT_QB["ypa"] * 0.45) + (baseline["ypa"] * 0.55)
+            comp_pct = (DEFAULT_QB["comp_pct"] * 0.35) + (baseline["comp_pct"] * 0.65)
 
             if defense:
                 ypa *= defense.pass_yards_multiplier
                 pass_td_rate *= defense.pass_td_multiplier
                 int_rate *= defense.pass_turnover_multiplier
 
-            pass_attempts = team_pass_attempts * health
+            qb_share = usage.snap_share if usage.snap_share > 0 else usage.route_share
+            if qb_share <= 0:
+                qb_share = 1.0
+            qb_share = max(0.0, min(qb_share, 1.0))
+            pass_attempts = team_pass_attempts * qb_share * health
             pass_yards = pass_attempts * ypa
             pass_tds = pass_attempts * pass_td_rate
             interceptions = pass_attempts * int_rate

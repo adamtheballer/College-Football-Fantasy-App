@@ -351,13 +351,16 @@ def _standing_rows_to_map(rows: list[TeamStandingRow]) -> dict[str, dict[str, in
 
 
 def _refresh_standings_snapshot(db: Session, season: int, conference_key: str) -> str:
-    sportsdata_rows = sync_power4_standings_from_sportsdata(
-        db,
-        season=season,
-        conference=conference_key,
-    )
-    if sportsdata_rows:
-        return "sportsdata"
+    try:
+        sportsdata_rows = sync_power4_standings_from_sportsdata(
+            db,
+            season=season,
+            conference=conference_key,
+        )
+        if sportsdata_rows:
+            return "sportsdata"
+    except Exception:
+        sportsdata_rows = []
 
     espn_rows = _standings_from_espn(season, conference_key)
     if espn_rows is not None:

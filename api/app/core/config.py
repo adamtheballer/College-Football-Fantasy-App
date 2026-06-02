@@ -25,7 +25,9 @@ class Settings(BaseSettings):
     sportsdata_players_path: str = "scores/json/Players"
     sportsdata_schedule_season_path: str = "scores/json/Games/{season}"
     sportsdata_standings_path: str = "scores/json/Standings/{season}"
+    sportsdata_team_season_stats_path: str = "scores/json/TeamSeasonStats/{season}"
     sportsdata_injuries_season_path: str = "scores/json/Injuries/{season}"
+    sportsdata_injured_players_path: str = "scores/json/InjuredPlayers"
     sportsdata_cache_ttl_days: int = 30
     sportsdata_reference_ttl_days: int = 30
     sportsdata_schedule_ttl_days: int = 30
@@ -41,6 +43,18 @@ class Settings(BaseSettings):
     refresh_cookie_samesite: str = "lax"
     refresh_cookie_domain: str | None = None
     allow_legacy_api_token_auth: bool = False
+    realtime_relay_enabled: bool = True
+    realtime_relay_poll_interval_ms: int = 350
+    realtime_relay_batch_size: int = 200
+    realtime_relay_start_from_latest: bool = True
+    realtime_immediate_broadcast_enabled: bool = False
+    draft_timeout_runner_enabled: bool = True
+    draft_timeout_runner_interval_ms: int = 1000
+    draft_timeout_batch_limit: int = 200
+    draft_autopick_delay_seconds: int = 3
+    web_push_vapid_public_key: str | None = None
+    web_push_vapid_private_key: str | None = None
+    web_push_vapid_subject: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=(str(PROJECT_ROOT / ".env"), ".env"),

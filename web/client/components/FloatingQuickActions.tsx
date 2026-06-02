@@ -43,7 +43,11 @@ export function FloatingQuickActions() {
   );
 
   const hiddenRoutes = ["/login", "/signup", "/leagues/create", "/leagues/join"];
-  if (!isLoggedIn || hiddenRoutes.includes(location.pathname)) {
+  const isDraftRoute =
+    location.pathname === "/draft" ||
+    /^\/league\/\d+\/draft\/?$/.test(location.pathname) ||
+    /^\/league\/\d+\/lobby\/?$/.test(location.pathname);
+  if (!isLoggedIn || hiddenRoutes.includes(location.pathname) || isDraftRoute) {
     return null;
   }
 

@@ -111,6 +111,71 @@ def test_player_stats_endpoint_falls_back_to_stale_cache_when_provider_fails(cli
     assert "Using stale cached stats" in payload["message"]
 
 
+def test_player_season_summary_aggregates_2025_stats_and_generates_news(client, db_session):
+    create_response = client.post(
+        "/players",
+        json=[
+            {
+                "external_id": "3003",
+                "name": "Summary Runner",
+                "position": "RB",
+                "school": "Texas",
+            }
+        ],
+    )
+    assert create_response.status_code == 201
+    player_id = create_response.json()[0]["id"]
+
+    db_session.add(
+        PlayerStat(
+            player_id=player_id,
+            season=2025,
+            week=1,
+            source="sportsdata",
+            stats={
+                "RushingAttempts": 20,
+                "RushingYards": 120,
+                "RushingTouchdowns": 2,
+                "Receptions": 3,
+                "ReceivingYards": 25,
+                "ReceivingTouchdowns": 0,
+            },
+        )
+    )
+    db_session.add(
+        PlayerStat(
+            player_id=player_id,
+            season=2025,
+            week=2,
+            source="sportsdata",
+            stats={
+                "RushingAttempts": 18,
+                "RushingYards": 95,
+                "RushingTouchdowns": 1,
+                "Receptions": 5,
+                "ReceivingYards": 42,
+                "ReceivingTouchdowns": 1,
+            },
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/players/{player_id}/season-summary?season=2025")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["player_id"] == player_id
+    assert payload["season"] == 2025
+    assert payload["source"] == "sportsdata_cached"
+    assert payload["totals"]["games"] == 2
+    assert payload["totals"]["rushing_yards"] == 215.0
+    assert payload["totals"]["rushing_tds"] == 3.0
+    assert payload["totals"]["receptions"] == 8.0
+    assert payload["totals"]["receiving_yards"] == 67.0
+    assert payload["totals"]["receiving_tds"] == 1.0
+    assert payload["totals"]["fantasy_points"] > 0
+    assert "Summary Runner" in payload["latest_news"]
+
+
 def test_standings_endpoint_uses_db_snapshot_cache(client, db_session, monkeypatch):
     calls = {"count": 0}
 

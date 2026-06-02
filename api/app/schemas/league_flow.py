@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
+from typing import Literal
 
 
 class LeagueBasics(BaseModel):
@@ -26,8 +27,9 @@ class LeagueSettingsInput(BaseModel):
 class DraftScheduleInput(BaseModel):
     draft_datetime_utc: datetime
     timezone: str
-    draft_type: str
+    draft_type: Literal["snake"] = "snake"
     pick_timer_seconds: int
+    order_strategy: Literal["fixed", "random"] = "fixed"
 
 
 class LeagueCreateRequest(BaseModel):
@@ -83,9 +85,10 @@ class LeagueSettingsUpdate(BaseModel):
 class DraftUpdate(BaseModel):
     draft_datetime_utc: datetime
     timezone: str
-    draft_type: str
+    draft_type: Literal["snake"] = "snake"
     pick_timer_seconds: int
     status: str = "scheduled"
+    order_strategy: Literal["fixed", "random"] = "fixed"
 
 
 class LeagueDetailRead(BaseModel):
@@ -229,6 +232,103 @@ class JoinLeagueRequest(BaseModel):
     league_id: int
 
 
+class MatchmakingJoinRequest(BaseModel):
+    team_count: int
+    skill_mode: Literal["beginner", "pro"] = "beginner"
+
+
 class LeagueMembersList(BaseModel):
     data: list[LeagueMemberRead]
     total: int
+
+
+class LeagueWeekStateRead(BaseModel):
+    league_id: int
+    season: int
+    week: int
+    status: Literal["open", "locked", "finalized", "corrected"]
+    locked_at: datetime | None = None
+    finalized_at: datetime | None = None
+    corrected_at: datetime | None = None
+    updated_at: datetime
+
+
+class LeagueWeekStateUpdate(BaseModel):
+    status: Literal["open", "locked", "finalized", "corrected"]
+
+
+class LeagueWeekFinalizeStandingRead(BaseModel):
+    team_id: int
+    wins: int
+    losses: int
+    ties: int
+    points_for: float
+    points_against: float
+
+
+class LeagueWeekFinalizeResponse(BaseModel):
+    league_id: int
+    season: int
+    week: int
+    status: Literal["finalized", "corrected"]
+    finalized_at: datetime | None = None
+    standings: list[LeagueWeekFinalizeStandingRead]
+
+
+class LeagueWeekScoringRunRequest(BaseModel):
+    source_mode: Literal["actual_then_projection", "projection_only", "actual_only"] = "actual_then_projection"
+    finalize_matchups: bool = False
+    finalize_week: bool = False
+    note: str | None = None
+
+
+class LeagueWeekScoreRowRead(BaseModel):
+    team_id: int
+    team_name: str
+    starters_points: float
+    bench_points: float
+    total_points: float
+
+
+class LeagueWeekMatchupScoreRead(BaseModel):
+    matchup_id: int
+    home_team_id: int
+    away_team_id: int
+    home_score: float
+    away_score: float
+    status: str
+
+
+class LeagueWeekScoringRunResponse(BaseModel):
+    scoring_run_id: int
+    league_id: int
+    season: int
+    week: int
+    source_mode: Literal["actual_then_projection", "projection_only", "actual_only"]
+    finalize_matchups: bool
+    finalize_week: bool
+    week_state: Literal["open", "locked", "finalized", "corrected"]
+    standings_count: int
+    player_actual_points_used: int
+    player_projection_points_used: int
+    team_scores: list[LeagueWeekScoreRowRead]
+    matchup_scores: list[LeagueWeekMatchupScoreRead]
+
+
+class LeagueWeekScoringRunHistoryRow(BaseModel):
+    scoring_run_id: int
+    source_mode: str
+    status: str
+    finalize_matchups: bool
+    finalized_week_state: bool
+    started_at: datetime
+    completed_at: datetime | None = None
+    created_by_user_id: int | None = None
+    note: str | None = None
+
+
+class LeagueWeekScoringRunHistoryResponse(BaseModel):
+    league_id: int
+    season: int
+    week: int
+    data: list[LeagueWeekScoringRunHistoryRow]

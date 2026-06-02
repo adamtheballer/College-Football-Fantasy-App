@@ -18,6 +18,8 @@ class TeamRead(TeamBase):
     id: int
     league_id: int
     owner_user_id: int | None = None
+    waiver_priority: int
+    faab_balance: int
     created_at: datetime
     updated_at: datetime
 

@@ -9,6 +9,12 @@ type BackendPlayerRead = {
   position: string;
   school: string;
   image_url?: string | null;
+  player_class?: string | null;
+  sheet_adp?: number | null;
+  sheet_projected_season_points?: number | null;
+  sheet_projection_stats?: Record<string, number | null> | null;
+  sheet_source_sheet_id?: string | null;
+  sheet_synced_at?: string | null;
 };
 
 type BackendPlayerListResponse = {
@@ -41,6 +47,39 @@ type BackendProjectionRead = {
 
 type BackendProjectionListResponse = {
   data: BackendProjectionRead[];
+};
+
+export type PlayerSeasonTotals = {
+  games: number;
+  passing_completions: number;
+  passing_attempts: number;
+  passing_yards: number;
+  passing_tds: number;
+  interceptions: number;
+  rushing_attempts: number;
+  rushing_yards: number;
+  rushing_tds: number;
+  receptions: number;
+  receiving_yards: number;
+  receiving_tds: number;
+  field_goals_made: number;
+  extra_points_made: number;
+  completion_pct: number | null;
+  yards_per_carry: number | null;
+  yards_per_reception: number | null;
+  fantasy_points: number;
+};
+
+export type PlayerSeasonSummary = {
+  player_id: number;
+  season: number;
+  source: string;
+  totals: PlayerSeasonTotals;
+  latest_news: string;
+  latest_news_source_type: "verified_override" | "sheet" | "generated_stats" | "fallback_context";
+  latest_news_sources: string[];
+  latest_news_verified_at: string | null;
+  message: string | null;
 };
 
 type BackendTeamSummary = {
@@ -116,6 +155,12 @@ export const normalizePlayer = (
   projection: mapProjection(context?.projection),
   history: [],
   analysis: "",
+  playerClass: player.player_class ?? undefined,
+  sheetAdp: player.sheet_adp ?? undefined,
+  sheetProjectedSeasonPoints: player.sheet_projected_season_points ?? undefined,
+  sheetProjectionStats: player.sheet_projection_stats ?? undefined,
+  sheetSourceSheetId: player.sheet_source_sheet_id ?? undefined,
+  sheetSyncedAt: player.sheet_synced_at ?? undefined,
 });
 
 export function usePlayers(
@@ -206,19 +251,19 @@ export function usePlayers(
       const projectionByPlayerId = new Map<number, BackendProjectionRead>();
       const overallRankByPlayer = new Map<number, number>();
       const posRankByPlayer = new Map<number, number>();
+      const playerById = new Map<number, BackendPlayerRead>(
+        payload.data.map((player): [number, BackendPlayerRead] => [player.id, player])
+      );
 
       const sortedProjections = [...projections.data].sort((a, b) => b.fantasy_points - a.fantasy_points);
       const positionCounters = new Map<string, number>();
       sortedProjections.forEach((row, index) => {
         projectionByPlayerId.set(row.player_id, row);
         overallRankByPlayer.set(row.player_id, index + 1);
-      });
-
-      payload.data.forEach((player) => {
-        const projection = projectionByPlayerId.get(player.id);
-        if (!projection) return;
-        const current = positionCounters.get(player.position) ?? 0;
-        const nextRank = current + 1;
+        const player = playerById.get(row.player_id);
+        if (!player) return;
+        const currentRank = positionCounters.get(player.position) ?? 0;
+        const nextRank = currentRank + 1;
         positionCounters.set(player.position, nextRank);
         posRankByPlayer.set(player.id, nextRank);
       });
@@ -296,6 +341,17 @@ export function usePlayerDetail(playerId?: number | null, enabled = true) {
         status: injuryByPlayerId.get(payload.id),
         projection,
       });
+    },
+  });
+}
+
+export function usePlayerSeasonSummary(playerId?: number | null, season = 2025, enabled = true) {
+  return useQuery({
+    queryKey: ["player", playerId, "season-summary", season],
+    enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
+    staleTime: 60_000,
+    queryFn: async () => {
+      return apiGet<PlayerSeasonSummary>(`/players/${playerId}/season-summary`, { season });
     },
   });
 }

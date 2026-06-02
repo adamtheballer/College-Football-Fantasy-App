@@ -1,13 +1,23 @@
 import React, { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Calendar, Check, ChevronLeft, ChevronRight, Copy, Loader2 } from "lucide-react";
+import {
+  Calendar,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Info,
+  Loader2,
+  Lock,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { apiPost } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
@@ -27,6 +37,37 @@ const tradeReviewOptions = [
   { label: "League Vote", value: "league_vote" },
   { label: "None", value: "none" },
 ];
+const SETTINGS_PRESET_KEYS = ["casual", "competitive", "high_scoring", "custom"] as const;
+type SettingsPreset = (typeof SETTINGS_PRESET_KEYS)[number];
+
+const SETTINGS_PRESETS: Record<
+  Exclude<SettingsPreset, "custom">,
+  {
+    label: string;
+    scoring: { ppr: number; pass_td: number; int: number };
+    waiver_type: string;
+    trade_review_type: string;
+  }
+> = {
+  casual: {
+    label: "Casual",
+    scoring: { ppr: 1, pass_td: 4, int: -2 },
+    waiver_type: "rolling",
+    trade_review_type: "none",
+  },
+  competitive: {
+    label: "Competitive",
+    scoring: { ppr: 1, pass_td: 4, int: -2 },
+    waiver_type: "faab",
+    trade_review_type: "commissioner",
+  },
+  high_scoring: {
+    label: "High Scoring",
+    scoring: { ppr: 1.5, pass_td: 6, int: -1 },
+    waiver_type: "faab",
+    trade_review_type: "league_vote",
+  },
+};
 
 const getDefaultDraftDate = () => {
   const now = new Date();
@@ -36,6 +77,40 @@ const getDefaultDraftDate = () => {
 };
 
 const getDefaultDraftTime = () => "19:00";
+
+const labelClassName = "text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground/80";
+
+function SettingLabel({
+  htmlFor,
+  label,
+  description,
+}: {
+  htmlFor?: string;
+  label: string;
+  description: string;
+}) {
+  return (
+    <Label htmlFor={htmlFor} className={labelClassName}>
+      <span className="inline-flex items-center gap-2">
+        {label}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label={`${label} help`}
+              className="rounded-full p-0.5 text-muted-foreground/60 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            >
+              <Info className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-[220px] border-white/15 bg-[#0b1220] text-[11px] leading-5 text-foreground">
+            {description}
+          </TooltipContent>
+        </Tooltip>
+      </span>
+    </Label>
+  );
+}
 
 export default function CreateLeague() {
   const navigate = useNavigate();
@@ -87,6 +162,7 @@ export default function CreateLeague() {
     waiver_type: "faab",
     trade_review_type: "commissioner",
   });
+  const [settingsPreset, setSettingsPreset] = useState<SettingsPreset>("competitive");
 
   const [draft, setDraft] = useState({
     draft_date: getDefaultDraftDate(),
@@ -94,6 +170,7 @@ export default function CreateLeague() {
     timezone,
     draft_type: "snake",
     pick_timer_seconds: 90,
+    order_strategy: "fixed",
   });
 
   const draftDateTime = useMemo(() => {
@@ -109,15 +186,67 @@ export default function CreateLeague() {
     return `${days} days`;
   }, [draftDateTime]);
 
+  const settingsErrors = useMemo(() => {
+    const errors: Partial<Record<"playoff_teams" | "ppr" | "pass_td" | "int", string>> = {};
+    if (Number.isNaN(scoring.ppr) || scoring.ppr < 0 || scoring.ppr > 2) {
+      errors.ppr = "PPR must be between 0 and 2.";
+    }
+    if (Number.isNaN(scoring.pass_td) || scoring.pass_td < 4 || scoring.pass_td > 6) {
+      errors.pass_td = "Pass TD must be between 4 and 6.";
+    }
+    if (Number.isNaN(scoring.int) || scoring.int < -6 || scoring.int > 0) {
+      errors.int = "INT must be between -6 and 0.";
+    }
+    if (settings.playoff_teams > basics.max_teams) {
+      errors.playoff_teams = `Playoff teams cannot exceed league size (${basics.max_teams}).`;
+    }
+    return errors;
+  }, [basics.max_teams, scoring.int, scoring.pass_td, scoring.ppr, settings.playoff_teams]);
+
+  const settingsValid = Object.keys(settingsErrors).length === 0;
+
+  const settingsSummary = useMemo(() => {
+    const pprLabel =
+      scoring.ppr === 1
+        ? "Full PPR"
+        : scoring.ppr === 0.5
+          ? "Half PPR"
+          : scoring.ppr === 0
+            ? "Standard"
+            : `${scoring.ppr} PPR`;
+    const waiverLabel = waiverOptions.find((option) => option.value === settings.waiver_type)?.label ?? "Waivers";
+    return `Superflex Off • Kicker On • Defense Off • ${pprLabel} • ${waiverLabel}`;
+  }, [scoring.ppr, settings.waiver_type]);
+
   const canContinue = useMemo(() => {
     if (step === 0) {
       return basics.name.trim().length > 2 && basics.max_teams > 0;
+    }
+    if (step === 1) {
+      return settingsValid;
     }
     if (step === 2) {
       return !!draft.draft_date && !!draft.draft_time;
     }
     return true;
-  }, [basics.name, basics.max_teams, draft.draft_date, draft.draft_time, step]);
+  }, [basics.name, basics.max_teams, draft.draft_date, draft.draft_time, settingsValid, step]);
+
+  const applySettingsPreset = (preset: SettingsPreset) => {
+    setSettingsPreset(preset);
+    if (preset === "custom") return;
+    const selected = SETTINGS_PRESETS[preset];
+    setScoring((prev) => ({
+      ...prev,
+      ppr: selected.scoring.ppr,
+      pass_td: selected.scoring.pass_td,
+      int: selected.scoring.int,
+    }));
+    setSettings((prev) => ({
+      ...prev,
+      waiver_type: selected.waiver_type,
+      trade_review_type: selected.trade_review_type,
+    }));
+  };
 
   const handleNext = () => {
     if (!canContinue) return;
@@ -155,6 +284,7 @@ export default function CreateLeague() {
           timezone: draft.timezone,
           draft_type: draft.draft_type,
           pick_timer_seconds: draft.pick_timer_seconds,
+          order_strategy: draft.order_strategy,
         },
       };
       const response = await apiPost<LeagueCreateResponse>("/leagues", payload);
@@ -252,7 +382,7 @@ export default function CreateLeague() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-12 space-y-8" data-create-step={step}>
+    <div className="max-w-5xl mx-auto py-12 pb-28 md:pb-12 space-y-8" data-create-step={step}>
       <div className="space-y-4">
         <h1 className="text-6xl font-black italic uppercase text-foreground">Create League</h1>
         <p className="text-sm font-medium text-muted-foreground uppercase tracking-[0.2em]">
@@ -361,53 +491,110 @@ export default function CreateLeague() {
           </CardHeader>
           <CardContent className="px-10 pb-10 space-y-8">
             <div className="space-y-3">
-              <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
-                Fixed Roster Format
-              </Label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(rosterSlots).map(([slot, value]) => (
-                <div key={slot} className="h-11 rounded-xl bg-white/5 border border-border px-4 flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/70">{slot}</span>
-                  <span className="text-sm font-black text-primary">{value}</span>
-                </div>
-              ))}
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground/80">
+                Presets
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {SETTINGS_PRESET_KEYS.map((presetKey) => {
+                  const selected = settingsPreset === presetKey;
+                  const label =
+                    presetKey === "custom"
+                      ? "Custom"
+                      : SETTINGS_PRESETS[presetKey as Exclude<SettingsPreset, "custom">].label;
+                  return (
+                    <button
+                      key={presetKey}
+                      type="button"
+                      onClick={() => applySettingsPreset(presetKey)}
+                      className={cn(
+                        "h-10 rounded-xl border px-4 text-[10px] font-black uppercase tracking-[0.18em] transition-colors",
+                        selected
+                          ? "border-primary/50 bg-primary/15 text-primary"
+                          : "border-white/10 bg-white/[0.03] text-muted-foreground hover:border-white/20 hover:text-foreground"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground/55">
-                Locked for all leagues: QB, RB, RB, WR, WR, TE, K + 4 Bench + 1 IR. No defensive players.
+            </div>
+
+            <div className="rounded-2xl border border-white/15 bg-white/[0.03] p-5 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/35 bg-amber-400/10 px-3 py-1">
+                  <Lock className="h-3.5 w-3.5 text-amber-200" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100">
+                    Locked Format
+                  </span>
+                </div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/80">
+                  Fixed Roster Format
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
+                {Object.entries(rosterSlots).map(([slot, value]) => (
+                  <div
+                    key={slot}
+                    className="h-12 rounded-xl border border-white/10 bg-black/20 px-3 flex items-center justify-between"
+                  >
+                    <span className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/80">
+                      {slot}
+                    </span>
+                    <span className="text-sm font-black text-primary">{value}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground/75">
+                Roster format is locked for competitive balance.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Playoff Teams</Label>
+                <SettingLabel
+                  label="Playoff Teams"
+                  description="Number of teams that qualify for playoffs. Keep this proportional to league size."
+                />
                 <Select
                   value={String(settings.playoff_teams)}
-                  onValueChange={(value) => setSettings((prev) => ({ ...prev, playoff_teams: Number(value) }))}
+                  onValueChange={(value) =>
+                    setSettings((prev) => ({ ...prev, playoff_teams: Number(value) }))
+                  }
                 >
-                  <SelectTrigger className="h-11 rounded-xl bg-white/5 border-border text-sm font-bold">
+                  <SelectTrigger className="h-11 cfb-control text-sm font-semibold">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-[#0A0C10] border-border rounded-xl">
                     {playoffOptions.map((option) => (
-                      <SelectItem key={option} value={String(option)} className="text-sm font-bold">
+                      <SelectItem key={option} value={String(option)} className="text-sm font-semibold">
                         {option} Teams
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {settingsErrors.playoff_teams && (
+                  <p className="text-[11px] font-semibold text-red-300">{settingsErrors.playoff_teams}</p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Waiver Type</Label>
+                <SettingLabel
+                  label="Waiver Type"
+                  description="FAAB uses bidding dollars, rolling keeps waiver order, reverse standings gives priority to lower-ranked teams."
+                />
                 <Select
                   value={settings.waiver_type}
-                  onValueChange={(value) => setSettings((prev) => ({ ...prev, waiver_type: value }))}
+                  onValueChange={(value) => {
+                    setSettingsPreset("custom");
+                    setSettings((prev) => ({ ...prev, waiver_type: value }));
+                  }}
                 >
-                  <SelectTrigger className="h-11 rounded-xl bg-white/5 border-border text-sm font-bold">
+                  <SelectTrigger className="h-11 cfb-control text-sm font-semibold">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-[#0A0C10] border-border rounded-xl">
                     {waiverOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value} className="text-sm font-bold">
+                      <SelectItem key={option.value} value={option.value} className="text-sm font-semibold">
                         {option.label}
                       </SelectItem>
                     ))}
@@ -415,63 +602,138 @@ export default function CreateLeague() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Trade Review</Label>
+                <SettingLabel
+                  label="Trade Review"
+                  description="Choose whether trades require commissioner approval, league votes, or process instantly."
+                />
                 <Select
                   value={settings.trade_review_type}
-                  onValueChange={(value) => setSettings((prev) => ({ ...prev, trade_review_type: value }))}
+                  onValueChange={(value) => {
+                    setSettingsPreset("custom");
+                    setSettings((prev) => ({ ...prev, trade_review_type: value }));
+                  }}
                 >
-                  <SelectTrigger className="h-11 rounded-xl bg-white/5 border-border text-sm font-bold">
+                  <SelectTrigger className="h-11 cfb-control text-sm font-semibold">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-[#0A0C10] border-border rounded-xl">
                     {tradeReviewOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value} className="text-sm font-bold">
+                      <SelectItem key={option.value} value={option.value} className="text-sm font-semibold">
                         {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">PPR</Label>
+                <SettingLabel
+                  label="PPR"
+                  description="Points per reception. 0 = standard, 0.5 = half-PPR, 1 = full PPR."
+                />
                 <Input
                   type="number"
                   step="0.5"
+                  min={0}
+                  max={2}
                   value={scoring.ppr}
-                  onChange={(e) => setScoring((prev) => ({ ...prev, ppr: Number(e.target.value) }))}
-                  className="h-11 rounded-xl bg-white/5 border-border text-sm font-bold"
+                  onChange={(e) => {
+                    setSettingsPreset("custom");
+                    setScoring((prev) => ({ ...prev, ppr: Number(e.target.value) }));
+                  }}
+                  className="h-11 cfb-control text-sm font-semibold"
                 />
+                {settingsErrors.ppr && (
+                  <p className="text-[11px] font-semibold text-red-300">{settingsErrors.ppr}</p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Pass TD</Label>
+                <SettingLabel
+                  label="Pass TD"
+                  description="Fantasy points awarded per passing touchdown."
+                />
                 <Input
                   type="number"
+                  min={4}
+                  max={6}
                   value={scoring.pass_td}
-                  onChange={(e) => setScoring((prev) => ({ ...prev, pass_td: Number(e.target.value) }))}
-                  className="h-11 rounded-xl bg-white/5 border-border text-sm font-bold"
+                  onChange={(e) => {
+                    setSettingsPreset("custom");
+                    setScoring((prev) => ({ ...prev, pass_td: Number(e.target.value) }));
+                  }}
+                  className="h-11 cfb-control text-sm font-semibold"
                 />
+                {settingsErrors.pass_td && (
+                  <p className="text-[11px] font-semibold text-red-300">{settingsErrors.pass_td}</p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">INT</Label>
+                <SettingLabel
+                  label="INT"
+                  description="Fantasy points lost when a QB throws an interception."
+                />
                 <Input
                   type="number"
+                  min={-6}
+                  max={0}
                   value={scoring.int}
-                  onChange={(e) => setScoring((prev) => ({ ...prev, int: Number(e.target.value) }))}
-                  className="h-11 rounded-xl bg-white/5 border-border text-sm font-bold"
+                  onChange={(e) => {
+                    setSettingsPreset("custom");
+                    setScoring((prev) => ({ ...prev, int: Number(e.target.value) }));
+                  }}
+                  className="h-11 cfb-control text-sm font-semibold"
                 />
+                {settingsErrors.int && (
+                  <p className="text-[11px] font-semibold text-red-300">{settingsErrors.int}</p>
+                )}
               </div>
             </div>
 
-            <div className="h-11 rounded-xl bg-white/5 border border-border px-4 flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/70">
-                Format Flags
-              </span>
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-                Superflex Off • Kicker On • Defense Off
-              </span>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 space-y-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground/80">
+                League Format Summary
+              </p>
+              <p className="text-sm font-semibold text-primary">{settingsSummary}</p>
+              <div className="grid grid-cols-1 gap-2 text-[11px] text-muted-foreground/75 md:grid-cols-2">
+                <p>Superflex: Off</p>
+                <p>Kicker: On</p>
+                <p>Defense: Off</p>
+                <p>Trade Review: {tradeReviewOptions.find((option) => option.value === settings.trade_review_type)?.label ?? settings.trade_review_type}</p>
+              </div>
+            </div>
+
+            {!settingsValid && (
+              <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-4">
+                <p className="text-[11px] font-semibold text-red-200">
+                  Fix settings errors before continuing.
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-[11px] text-muted-foreground/80 space-y-1">
+              <p className="font-semibold uppercase tracking-[0.14em]">Format Toggles</p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="space-y-1">
+                  <SettingLabel
+                    label="Superflex"
+                    description="When enabled, an extra starter slot can use a QB, RB, WR, or TE. Locked off in this format."
+                  />
+                  <p className="text-sm font-semibold text-foreground">Off (Locked)</p>
+                </div>
+                <div className="space-y-1">
+                  <SettingLabel
+                    label="Kicker"
+                    description="Includes kicker scoring in league totals. Locked on in this format."
+                  />
+                  <p className="text-sm font-semibold text-foreground">On (Locked)</p>
+                </div>
+                <div className="space-y-1">
+                  <SettingLabel
+                    label="Defense"
+                    description="Includes team-defense roster spots and defensive scoring. Locked off in this format."
+                  />
+                  <p className="text-sm font-semibold text-foreground">Off (Locked)</p>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -512,7 +774,7 @@ export default function CreateLeague() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Draft Type</Label>
                 <Select
@@ -524,6 +786,21 @@ export default function CreateLeague() {
                   </SelectTrigger>
                   <SelectContent className="bg-[#0A0C10] border-border rounded-xl">
                     <SelectItem value="snake" className="text-sm font-bold">Snake Draft</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Draft Order</Label>
+                <Select
+                  value={draft.order_strategy}
+                  onValueChange={(value) => setDraft((prev) => ({ ...prev, order_strategy: value }))}
+                >
+                  <SelectTrigger className="h-11 rounded-xl bg-white/5 border-border text-sm font-bold">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0A0C10] border-border rounded-xl">
+                    <SelectItem value="fixed" className="text-sm font-bold">Set Order</SelectItem>
+                    <SelectItem value="random" className="text-sm font-bold">Random Order</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -568,6 +845,10 @@ export default function CreateLeague() {
                 <p className="text-primary">{draftDateTime?.toLocaleString() || "--"}</p>
               </div>
               <div>
+                <p className="text-[10px] text-muted-foreground/60">Draft Order</p>
+                <p className="text-primary">{draft.order_strategy === "random" ? "Random" : "Set Order"}</p>
+              </div>
+              <div>
                 <p className="text-[10px] text-muted-foreground/60">Commissioner</p>
                 <p className="text-primary">You</p>
               </div>
@@ -576,37 +857,39 @@ export default function CreateLeague() {
         </Card>
       )}
 
-      <div className="flex items-center justify-between">
-        <Button
-          type="button"
-          variant="outline"
-          className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
-          onClick={step === 0 ? () => navigate("/leagues") : handleBack}
-        >
-          <ChevronLeft className="w-4 h-4 mr-2" />
-          Back
-        </Button>
-        {step < steps.length - 1 ? (
+      <div className="fixed bottom-3 left-3 right-3 z-30 rounded-2xl border border-white/10 bg-[#071024]/95 p-3 backdrop-blur-md md:static md:rounded-none md:border-0 md:bg-transparent md:p-0">
+        <div className="flex items-center justify-between gap-3">
           <Button
             type="button"
-            className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em]"
-            disabled={!canContinue}
-            onClick={handleNext}
+            variant="outline"
+            className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
+            onClick={step === 0 ? () => navigate("/leagues") : handleBack}
           >
-            Continue
-            <ChevronRight className="w-4 h-4 ml-2" />
+            <ChevronLeft className="w-4 h-4 mr-2" />
+            Back
           </Button>
-        ) : (
-          <Button
-            type="button"
-            className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em]"
-            onClick={handleCreate}
-            disabled={loading}
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
-            Create League
-          </Button>
-        )}
+          {step < steps.length - 1 ? (
+            <Button
+              type="button"
+              className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em] disabled:opacity-45 disabled:cursor-not-allowed"
+              disabled={!canContinue}
+              onClick={handleNext}
+            >
+              Continue
+              <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em]"
+              onClick={handleCreate}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
+              Create League
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

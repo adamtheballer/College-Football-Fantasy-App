@@ -110,7 +110,7 @@ const LeagueCard = ({
             className="w-full border-primary/30 bg-primary/10 text-primary font-black tracking-[0.2em] text-[10px] uppercase h-12 px-8 rounded-2xl hover:bg-primary/15 transition-all duration-300"
             onClick={() => onOpenDraft(id, draftStatus)}
           >
-            {draftStatus === "draft_live" ? "Enter Draft Room" : "Open Draft Lobby"}
+            {draftStatus === "draft_live" ? "Enter Draft Room" : "Open Draft Room"}
             <ChevronRight className="w-3 h-3 ml-2" />
           </Button>
         )}
@@ -193,10 +193,6 @@ export default function Leagues() {
               }}
               onOpenDraft={(leagueId, draftStatus) => {
                 setActiveLeagueId(leagueId);
-                if (draftStatus === "draft_live") {
-                  navigate(`/league/${leagueId}/draft`);
-                  return;
-                }
                 navigate(`/league/${leagueId}/lobby`);
               }}
             />

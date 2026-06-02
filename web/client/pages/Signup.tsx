@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,26 +9,12 @@ import { Trophy, Mail, Lock, User, ArrowRight } from "lucide-react";
 
 export default function Signup() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { signup, isLoggedIn } = useAuth();
-  const redirectTarget =
-    typeof location.state === "object" &&
-    location.state &&
-    "from" in location.state &&
-    typeof location.state.from === "string"
-      ? location.state.from
-      : "/";
+  const { signup } = useAuth();
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isLoggedIn) {
-      navigate(redirectTarget, { replace: true });
-    }
-  }, [isLoggedIn, navigate, redirectTarget]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +25,7 @@ export default function Signup() {
       if (nextUser) {
         setPendingGuide(nextUser.id);
       }
-      navigate(redirectTarget, { replace: true });
+      navigate("/", { replace: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
       if (message.includes("409")) {
@@ -77,7 +63,7 @@ export default function Signup() {
           </div>
         </div>
 
-        <Card className="bg-card/40 backdrop-blur-xl border-border/60 rounded-[2.5rem] overflow-hidden shadow-2xl">
+        <Card className="bg-card/40 backdrop-blur-xl border-transparent !border-0 rounded-[2.5rem] overflow-hidden shadow-2xl">
           <CardContent className="p-10 space-y-8">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-4">
@@ -88,7 +74,7 @@ export default function Signup() {
                     <Input
                       type="text"
                       placeholder="Enter your first name"
-                      className="bg-white/5 border-border/40 h-14 pl-12 rounded-2xl focus:ring-primary focus:border-primary transition-all text-sm font-medium"
+                      className="bg-white/5 border-transparent !border-0 h-14 pl-12 rounded-2xl focus:ring-primary/40 focus:border-primary/40 transition-all text-sm font-medium"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       required
@@ -102,7 +88,7 @@ export default function Signup() {
                     <Input
                       type="email"
                       placeholder="coach@saturday.com"
-                      className="bg-white/5 border-border/40 h-14 pl-12 rounded-2xl focus:ring-primary focus:border-primary transition-all text-sm font-medium"
+                      className="bg-white/5 border-transparent !border-0 h-14 pl-12 rounded-2xl focus:ring-primary/40 focus:border-primary/40 transition-all text-sm font-medium"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -116,7 +102,7 @@ export default function Signup() {
                     <Input 
                       type="password" 
                       placeholder="••••••••" 
-                      className="bg-white/5 border-border/40 h-14 pl-12 rounded-2xl focus:ring-primary focus:border-primary transition-all text-sm font-medium"
+                      className="bg-white/5 border-transparent !border-0 h-14 pl-12 rounded-2xl focus:ring-primary/40 focus:border-primary/40 transition-all text-sm font-medium"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -146,7 +132,7 @@ export default function Signup() {
               </Button>
             </form>
           </CardContent>
-          <div className="bg-white/5 px-10 py-6 border-t border-border/40 text-center">
+          <div className="bg-white/5 px-10 py-6 text-center">
              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                Already have an account? <Link to="/login" className="text-primary hover:underline font-black ml-1">Sign In</Link>
              </p>

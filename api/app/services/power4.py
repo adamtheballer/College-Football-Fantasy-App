@@ -149,6 +149,18 @@ for alias, canonical in SCHOOL_ALIASES.items():
     NORMALIZED_TO_CONFERENCE[normalized] = NORMALIZED_TO_CONFERENCE[canonical_normalized]
     NORMALIZED_TO_CANONICAL[normalized] = canonical
 
+_CANONICAL_NORMALIZED_SCHOOLS: tuple[tuple[str, str], ...] = tuple(
+    sorted(
+        (
+            (normalize_school(school), school)
+            for teams in CANONICAL_POWER4_TEAMS.values()
+            for school in teams
+        ),
+        key=lambda item: len(item[0]),
+        reverse=True,
+    )
+)
+
 
 def resolve_power4_school(name: str) -> str | None:
     normalized = normalize_school(name)
@@ -164,7 +176,12 @@ def resolve_power4_school(name: str) -> str | None:
         .strip()
     )
     if collapsed:
-        return NORMALIZED_TO_CANONICAL.get(collapsed)
+        resolved = NORMALIZED_TO_CANONICAL.get(collapsed)
+        if resolved:
+            return resolved
+        for canonical_normalized, canonical_name in _CANONICAL_NORMALIZED_SCHOOLS:
+            if collapsed.startswith(canonical_normalized):
+                return canonical_name
     return None
 
 

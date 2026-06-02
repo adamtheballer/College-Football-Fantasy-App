@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { X, Trophy, Activity, Target, Shield, ArrowLeft, Bookmark, ChevronDown, Quote, TrendingUp, Check } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Player } from "@/types/player";
+import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { apiGet } from "@/lib/api";
 
 interface PlayerDetailModalProps {
   player: Player | null;
   isOpen: boolean;
   onClose: () => void;
+  tradeLeagueId?: number | null;
 }
 
 type MatchupSnapshot = {
@@ -45,7 +48,9 @@ const posStyles: Record<string, { bg: string, border: string, text: string, shad
   CB: { bg: "bg-violet-500/20", border: "border-violet-500/30", text: "text-violet-400", shadow: "shadow-[0_0_15px_rgba(139,92,246,0.3)]", accent: "violet" },
 };
 
-export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModalProps) {
+export function PlayerDetailModal({ player, isOpen, onClose, tradeLeagueId = null }: PlayerDetailModalProps) {
+  const navigate = useNavigate();
+  const { activeLeagueId } = useActiveLeagueId();
   const [activeTab, setActiveTab] = useState<"overview" | "stats" | "history">("overview");
   const [historyYear, setHistoryYear] = useState<number>(2025);
   const [matchup, setMatchup] = useState<MatchupSnapshot | null>(null);
@@ -542,11 +547,18 @@ export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModal
 
            <div className="flex gap-6 relative">
               <Button
-                disabled
-                title="Trade flow is not part of the supported React surface yet."
+                onClick={() => {
+                  const targetLeagueId = tradeLeagueId ?? activeLeagueId;
+                  if (targetLeagueId) {
+                    navigate(`/trade/${targetLeagueId}/${player.id}`);
+                  } else {
+                    navigate("/trade");
+                  }
+                  onClose();
+                }}
                 className="h-16 px-12 bg-primary text-primary-foreground rounded-2xl text-[11px] font-black uppercase tracking-[0.3em] shadow-[0_20px_40px_rgba(var(--primary),0.3)] hover:scale-105 transition-all duration-500 border border-white/10"
               >
-                Trade Flow Coming Soon
+                Trade for Player
               </Button>
            </div>
         </div>

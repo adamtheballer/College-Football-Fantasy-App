@@ -54,14 +54,25 @@ class SportsDataClient:
 
     def get_standings(self, season: int) -> list[dict[str, Any]]:
         path = settings.sportsdata_standings_path.format(season=season)
-        data = self._request(path)
+        try:
+            data = self._request(path)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 404:
+                raise
+            fallback_path = settings.sportsdata_team_season_stats_path.format(season=season)
+            data = self._request(fallback_path)
         if isinstance(data, list):
             return data
         return [data]
 
     def get_injuries(self, season: int) -> list[dict[str, Any]]:
         path = settings.sportsdata_injuries_season_path.format(season=season)
-        data = self._request(path)
+        try:
+            data = self._request(path)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 404:
+                raise
+            data = self._request(settings.sportsdata_injured_players_path)
         if isinstance(data, list):
             return data
         return [data]

@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Bell, Zap, Activity, TrendingUp, ShieldAlert } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Bell, Zap, Activity, TrendingUp, ShieldAlert, ArrowRightLeft } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiGet } from "@/lib/api";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
@@ -14,6 +15,8 @@ const iconMap: Record<string, any> = {
   USAGE: Activity,
   WAIVER: TrendingUp,
   PROJECTION: Bell,
+  TRADE: ArrowRightLeft,
+  TRADE_SENT: ArrowRightLeft,
 };
 
 const typeColors: Record<string, string> = {
@@ -22,6 +25,8 @@ const typeColors: Record<string, string> = {
   USAGE: "text-blue-400",
   WAIVER: "text-amber-400",
   PROJECTION: "text-purple-400",
+  TRADE: "text-sky-300",
+  TRADE_SENT: "text-sky-300",
 };
 
 export default function Alerts() {
@@ -122,6 +127,30 @@ export default function Alerts() {
         </p>
       </div>
 
+      <Card className="rounded-[2rem] border border-white/10 bg-card/40">
+        <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+              Feed Health
+            </p>
+            <p className="text-sm font-black uppercase tracking-[0.14em] text-foreground">
+              {loaded ? `${alerts.length} alerts loaded` : "Loading alerts..."}
+            </p>
+            <p className="text-[10px] font-medium text-muted-foreground/70">
+              Alerts stay available regardless of draft status and update as your roster activity changes.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]">
+              <Link to="/watchlists">Open Watchlist</Link>
+            </Button>
+            <Button asChild className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]">
+              <Link to="/settings">Alert Settings</Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="bg-card/40 backdrop-blur-md border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
         <CardHeader className="px-10 py-8 border-b border-white/5 bg-white/5">
           <CardTitle className="text-[10px] font-black tracking-[0.5em] text-primary uppercase">
@@ -162,7 +191,7 @@ export default function Alerts() {
           {loaded && alerts.length === 0 && (
             <div className="px-10 py-12 text-center">
               <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/60 uppercase">
-                No league player alerts right now
+                No alerts yet. As you set rosters and watchlists, this feed will populate.
               </p>
             </div>
           )}

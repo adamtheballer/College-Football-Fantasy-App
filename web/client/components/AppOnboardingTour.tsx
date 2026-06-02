@@ -13,7 +13,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     title: "Welcome to College Football Fantasy",
     description:
-      "This app helps you manage leagues, review roster access, track alerts, study stats, and configure your settings from one supported React app.",
+      "This app helps you manage leagues, run drafts, track your roster activity, study stats, and configure settings in one place.",
   },
   {
     target: "#nav-home",
@@ -28,16 +28,46 @@ const TOUR_STEPS: TourStep[] = [
       "Use Leagues to create, join, and manage your fantasy leagues, view league settings, and prepare for your draft.",
   },
   {
+    target: "#nav-draft",
+    title: "Draft",
+    description:
+      "Draft is your live draft hub where your room, pick order, and queue tools are available before and during the draft.",
+  },
+  {
     target: "#nav-roster",
     title: "Roster",
     description:
       "Roster now takes you into supported league entry points instead of demo lineup screens and mock matchup pages.",
   },
   {
-    target: "#nav-alerts",
-    title: "Alerts",
+    target: "#nav-chats",
+    title: "Chats",
     description:
-      "Alerts keeps league and player notifications in one supported workflow so you can review important changes quickly.",
+      "Chats keeps league conversation and trade discussion in one place so managers can coordinate quickly.",
+  },
+  {
+    target: "#nav-watchlist",
+    title: "Watchlist",
+    description:
+      "Watchlist lets you track players you care about most, then jump into waiver or trade decisions faster.",
+  },
+  {
+    target: "#nav-waiver-wire",
+    title: "Waiver Wire",
+    description:
+      "Waiver Wire is where you review available players and place claims based on your league waiver rules.",
+  },
+  {
+    target: "#nav-trades",
+    title: "Trades",
+    description:
+      "Trades is where you build and send trade offers across your league once both rosters are available.",
+  },
+  {
+    target: "#nav-injury-center",
+    title: "Injury Center",
+    description:
+      "Injury Center helps you monitor player health changes that can impact lineup and waiver decisions.",
   },
   {
     target: "#nav-stats",

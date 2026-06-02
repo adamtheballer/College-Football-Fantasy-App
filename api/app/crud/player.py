@@ -1,4 +1,6 @@
-from sqlalchemy import Select, func, select
+import re
+
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.models.player import Player
@@ -33,8 +35,21 @@ def list_players(
     if school:
         stmt = stmt.where(Player.school == school)
     if search:
-        pattern = f"%{search}%"
-        stmt = stmt.where(Player.name.ilike(pattern) | Player.school.ilike(pattern))
+        # Tokenized search supports names with middle names/hyphens
+        # (e.g. "Ryan Williams" matches "Ryan Coleman-Williams").
+        tokens = [token for token in re.split(r"[\s,./-]+", search.strip()) if token]
+        if tokens:
+            term_clauses = []
+            for token in tokens:
+                pattern = f"%{token}%"
+                term_clauses.append(
+                    or_(
+                        Player.name.ilike(pattern),
+                        Player.school.ilike(pattern),
+                        Player.position.ilike(pattern),
+                    )
+                )
+            stmt = stmt.where(and_(*term_clauses))
     if league_id is not None and available_only:
         unavailable_players = (
             select(RosterEntry.player_id)

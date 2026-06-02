@@ -1,9 +1,13 @@
+import json
 from datetime import datetime, timedelta, timezone
 
+import httpx
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
+from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.notification import (
     NotificationDeliveryAttempt,
     NotificationLeaguePreference,
@@ -11,6 +15,8 @@ from collegefootballfantasy_api.app.models.notification import (
     NotificationPreference,
     PushToken,
 )
+from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.team import Team
@@ -27,6 +33,12 @@ from collegefootballfantasy_api.app.schemas.notification import (
 
 DEFAULT_DELIVERY_CHANNELS = ("push", "email")
 TERMINAL_ATTEMPT_STATUSES = {"delivered", "failed", "canceled", "skipped"}
+EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
+
+try:
+    from pywebpush import webpush as webpush_send
+except Exception:  # pragma: no cover - optional dependency for browser push delivery
+    webpush_send = None
 
 
 def legacy_user_key(user_id: int) -> str:
@@ -453,3 +465,244 @@ def refresh_scheduled_notification_state(db: Session, scheduled_notification_id:
         scheduled.sent_at = max(ts for ts in delivered_times if ts is not None)
     db.add(scheduled)
 
+
+def _touchdown_count_from_stats(stats: dict | None) -> int:
+    if not isinstance(stats, dict):
+        return 0
+    total = 0
+    for key in ("PassingTouchdowns", "RushingTouchdowns", "ReceivingTouchdowns"):
+        try:
+            total += int(float(stats.get(key) or 0))
+        except (TypeError, ValueError):
+            continue
+    return max(0, total)
+
+
+def _send_push_notifications(tokens: list[str], *, title: str, body: str, payload: dict | None = None) -> int:
+    def _send_web_push(subscription_token: str) -> bool:
+        if webpush_send is None:
+            return False
+        if not settings.web_push_vapid_private_key:
+            return False
+        normalized = (subscription_token or "").strip()
+        if not normalized.startswith("{"):
+            return False
+        try:
+            subscription = json.loads(normalized)
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(subscription, dict) or not subscription.get("endpoint"):
+            return False
+        claims_subject = settings.web_push_vapid_subject or "mailto:support@cfbfantasy.app"
+        try:
+            webpush_send(
+                subscription_info=subscription,
+                data=json.dumps({"title": title, "body": body, "data": payload or {}}),
+                vapid_private_key=settings.web_push_vapid_private_key,
+                vapid_claims={"sub": claims_subject},
+            )
+            return True
+        except Exception:
+            return False
+
+    sent = 0
+    for token in tokens:
+        normalized = (token or "").strip()
+        if normalized.startswith("ExponentPushToken["):
+            try:
+                httpx.post(
+                    EXPO_PUSH_URL,
+                    json={"to": normalized, "title": title, "body": body, "data": payload or {}},
+                    timeout=8.0,
+                )
+                sent += 1
+            except Exception:
+                continue
+            continue
+        if _send_web_push(normalized):
+            sent += 1
+    return sent
+
+
+def emit_live_player_alerts(
+    db: Session,
+    *,
+    season: int,
+    week: int,
+    max_logs_scan: int = 5000,
+) -> dict[str, int]:
+    roster_rows = (
+        db.query(RosterEntry, Team, Player)
+        .join(Team, Team.id == RosterEntry.team_id)
+        .join(Player, Player.id == RosterEntry.player_id)
+        .filter(Team.owner_user_id.isnot(None))
+        .all()
+    )
+    if not roster_rows:
+        return {"created": 0, "push_sent": 0, "injury_alerts": 0, "big_play_alerts": 0}
+
+    player_ids = {int(player.id) for _entry, _team, player in roster_rows}
+    user_ids = {int(team.owner_user_id) for _entry, team, _player in roster_rows if team.owner_user_id is not None}
+
+    stat_rows = (
+        db.query(PlayerStat)
+        .filter(
+            PlayerStat.player_id.in_(player_ids),
+            PlayerStat.season == season,
+            PlayerStat.week == week,
+        )
+        .all()
+    )
+    stat_by_player = {int(row.player_id): row for row in stat_rows}
+
+    injury_rows = (
+        db.query(Injury)
+        .filter(
+            Injury.player_id.in_(player_ids),
+            Injury.season == season,
+            Injury.week == week,
+        )
+        .order_by(Injury.updated_at.desc(), Injury.id.desc())
+        .all()
+    )
+    injury_by_player: dict[int, Injury] = {}
+    for injury in injury_rows:
+        injury_by_player.setdefault(int(injury.player_id), injury)
+
+    pref_by_user = {
+        int(pref.user_id): pref
+        for pref in db.query(NotificationPreference)
+        .filter(NotificationPreference.user_id.in_(user_ids))
+        .all()
+        if pref.user_id is not None
+    }
+    league_pref_by_user_league = {
+        (int(pref.user_id), int(pref.league_id)): pref
+        for pref in db.query(NotificationLeaguePreference)
+        .filter(NotificationLeaguePreference.user_id.in_(user_ids))
+        .all()
+        if pref.user_id is not None
+    }
+    push_tokens_by_user: dict[int, list[str]] = {}
+    for token in (
+        db.query(PushToken)
+        .filter(PushToken.user_id.in_(user_ids), PushToken.enabled.is_(True))
+        .all()
+    ):
+        if token.user_id is None:
+            continue
+        push_tokens_by_user.setdefault(int(token.user_id), []).append(token.device_token)
+
+    recent_logs = (
+        db.query(NotificationLog)
+        .filter(
+            NotificationLog.user_id.in_(user_ids),
+            NotificationLog.alert_type.in_(("INJURY", "TOUCHDOWN", "BIG_PLAY")),
+        )
+        .order_by(NotificationLog.sent_at.desc())
+        .limit(max(100, max_logs_scan))
+        .all()
+    )
+    existing_alert_keys = {
+        str((row.payload or {}).get("alert_key"))
+        for row in recent_logs
+        if isinstance(row.payload, dict) and (row.payload or {}).get("alert_key")
+    }
+
+    created = 0
+    push_sent = 0
+    injury_alerts = 0
+    big_play_alerts = 0
+
+    for _entry, team, player in roster_rows:
+        if team.owner_user_id is None:
+            continue
+        user_id = int(team.owner_user_id)
+        global_pref = pref_by_user.get(user_id)
+        league_pref = league_pref_by_user_league.get((user_id, int(team.league_id)))
+
+        injury = injury_by_player.get(int(player.id))
+        injury_status = (injury.status or "").strip().upper() if injury else ""
+        injury_active = injury_status and injury_status not in {"FULL", "ACTIVE", "HEALTHY", "PROBABLE"}
+        if injury_active and _global_pref_allows("INJURY", global_pref) and _league_pref_allows("INJURY", league_pref):
+            alert_key = f"injury:{user_id}:{team.league_id}:{player.id}:{injury_status}"
+            if alert_key not in existing_alert_keys:
+                title = f"⚠️ {player.name} injury update"
+                detail = injury.injury or "Status changed"
+                body = f"{player.name} is now {injury_status}. {detail}"
+                payload = {
+                    "alert_key": alert_key,
+                    "league_id": int(team.league_id),
+                    "team_id": int(team.id),
+                    "player_id": int(player.id),
+                    "status": injury_status,
+                    "season": season,
+                    "week": week,
+                }
+                db.add(
+                    NotificationLog(
+                        user_id=user_id,
+                        user_key=legacy_user_key(user_id),
+                        alert_type="INJURY",
+                        title=title,
+                        body=body,
+                        payload=payload,
+                        sent_at=datetime.utcnow(),
+                    )
+                )
+                existing_alert_keys.add(alert_key)
+                created += 1
+                injury_alerts += 1
+                if not global_pref or global_pref.push_enabled:
+                    push_sent += _send_push_notifications(
+                        push_tokens_by_user.get(user_id, []),
+                        title=title,
+                        body=body,
+                        payload=payload,
+                    )
+
+        stat_row = stat_by_player.get(int(player.id))
+        touchdown_total = _touchdown_count_from_stats(stat_row.stats if stat_row else None)
+        if touchdown_total > 0 and _global_pref_allows("TOUCHDOWN", global_pref) and _league_pref_allows("TOUCHDOWN", league_pref):
+            alert_key = f"td:{user_id}:{team.league_id}:{player.id}:{touchdown_total}"
+            if alert_key not in existing_alert_keys:
+                title = f"🏈 Big play: {player.name}"
+                body = f"{player.name} now has {touchdown_total} TDs this week. Check your matchup swing."
+                payload = {
+                    "alert_key": alert_key,
+                    "league_id": int(team.league_id),
+                    "team_id": int(team.id),
+                    "player_id": int(player.id),
+                    "touchdown_total": touchdown_total,
+                    "season": season,
+                    "week": week,
+                }
+                db.add(
+                    NotificationLog(
+                        user_id=user_id,
+                        user_key=legacy_user_key(user_id),
+                        alert_type="TOUCHDOWN",
+                        title=title,
+                        body=body,
+                        payload=payload,
+                        sent_at=datetime.utcnow(),
+                    )
+                )
+                existing_alert_keys.add(alert_key)
+                created += 1
+                big_play_alerts += 1
+                if not global_pref or global_pref.push_enabled:
+                    push_sent += _send_push_notifications(
+                        push_tokens_by_user.get(user_id, []),
+                        title=title,
+                        body=body,
+                        payload=payload,
+                    )
+
+    db.flush()
+    return {
+        "created": created,
+        "push_sent": push_sent,
+        "injury_alerts": injury_alerts,
+        "big_play_alerts": big_play_alerts,
+    }

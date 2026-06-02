@@ -167,6 +167,7 @@ type RequestOptions = {
   path: string;
   params?: Record<string, string | number | boolean | undefined>;
   body?: unknown;
+  headers?: Record<string, string>;
   signal?: AbortSignal;
   retryOn401?: boolean;
 };
@@ -176,11 +177,13 @@ const apiRequest = async <T>({
   path,
   params,
   body,
+  headers: customHeaders,
   signal,
   retryOn401 = true,
 }: RequestOptions): Promise<T> => {
   const headers: Record<string, string> = {
     ...buildAuthHeaders(),
+    ...(customHeaders || {}),
   };
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";
@@ -222,9 +225,10 @@ export const apiGet = async <T>(
 export const apiPost = async <T>(
   path: string,
   body: unknown,
-  params?: Record<string, string | number | boolean | undefined>
+  params?: Record<string, string | number | boolean | undefined>,
+  headers?: Record<string, string>
 ): Promise<T> => {
-  return apiRequest<T>({ method: "POST", path, body, params });
+  return apiRequest<T>({ method: "POST", path, body, params, headers });
 };
 
 export const apiPatch = async <T>(

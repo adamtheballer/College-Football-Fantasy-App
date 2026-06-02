@@ -18,6 +18,18 @@ class WatchlistPlayerCreate(BaseModel):
     player_id: int
 
 
+class WatchlistBulkSyncRequest(BaseModel):
+    player_ids: list[int]
+    replace: bool = True
+
+
+class WatchlistBulkSyncResponse(BaseModel):
+    watchlist_id: int
+    added: int
+    removed: int
+    total: int
+
+
 class WatchlistRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

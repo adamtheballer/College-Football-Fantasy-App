@@ -11,8 +11,10 @@ if ROOT_DIR not in sys.path:
 
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.integrations.cfbd import CFBDClient
+from collegefootballfantasy_api.app.models import load_model_registry
 from collegefootballfantasy_api.app.models.defense_rating import DefenseRating
 from collegefootballfantasy_api.app.services.projections.defense import compute_defense_ratings
+from collegefootballfantasy_api.app.services.power4 import list_power4_teams
 
 
 def main() -> None:
@@ -22,9 +24,30 @@ def main() -> None:
     parser.add_argument("--conference", type=str)
     args = parser.parse_args()
 
+    load_model_registry()
     client = CFBDClient()
     games_rows = client.get_games_teams(args.season, args.week, conference=args.conference)
     ratings = compute_defense_ratings(games_rows, season=args.season, week=args.week)
+    if not ratings:
+        ratings = [
+            DefenseRating(
+                team_name=team,
+                season=args.season,
+                week=args.week,
+                pass_def_score=0.0,
+                rush_def_score=0.0,
+                pass_def_tier="Average",
+                rush_def_tier="Average",
+                pass_yards_multiplier=1.0,
+                pass_catch_multiplier=1.0,
+                pass_td_multiplier=1.0,
+                pass_turnover_multiplier=1.0,
+                rush_yards_multiplier=1.0,
+                rush_success_multiplier=1.0,
+                rush_td_multiplier=1.0,
+            )
+            for team in list_power4_teams()
+        ]
 
     session = SessionLocal()
     try:

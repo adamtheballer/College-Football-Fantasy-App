@@ -98,6 +98,71 @@ def get_scoring_rules() -> dict[str, dict[str, float] | list[tuple[int, int | No
     }
 
 
+def build_rules_bundle_from_league_scoring_json(
+    scoring_json: dict[str, Any] | None,
+) -> dict[str, dict[str, float] | list[tuple[int, int | None, float]]]:
+    bundle = get_scoring_rules()
+    payload = dict(scoring_json or {})
+    offense = dict(bundle.get("offense", OFFENSIVE_SCORING_RULES))
+    kicker = dict(bundle.get("kicker", KICKING_SCORING_RULES))
+
+    def _coerce_number(*keys: str) -> float | None:
+        for key in keys:
+            raw = payload.get(key)
+            if raw is None:
+                continue
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    ppr = _coerce_number("ppr", "receptions")
+    if ppr is not None:
+        offense["Receptions"] = ppr
+
+    pass_td = _coerce_number("pass_td", "passing_td", "passing_tds")
+    if pass_td is not None:
+        offense["PassingTouchdowns"] = pass_td
+
+    interception = _coerce_number("int", "ints", "passing_int")
+    if interception is not None:
+        offense["PassingInterceptions"] = interception
+
+    pass_yd = _coerce_number("pass_yd", "passing_yd")
+    if pass_yd is not None:
+        offense["PassingYards"] = pass_yd
+
+    rush_yd = _coerce_number("rush_yd", "rushing_yd")
+    if rush_yd is not None:
+        offense["RushingYards"] = rush_yd
+
+    rush_td = _coerce_number("rush_td", "rushing_td", "rushing_tds")
+    if rush_td is not None:
+        offense["RushingTouchdowns"] = rush_td
+
+    rec_yd = _coerce_number("rec_yd", "receiving_yd")
+    if rec_yd is not None:
+        offense["ReceivingYards"] = rec_yd
+
+    rec_td = _coerce_number("rec_td", "receiving_td", "receiving_tds")
+    if rec_td is not None:
+        offense["ReceivingTouchdowns"] = rec_td
+
+    fg = _coerce_number("fg", "field_goal")
+    if fg is not None:
+        kicker["FieldGoalsMade0To49"] = fg
+        kicker["FieldGoalsMade50Plus"] = max(fg, kicker.get("FieldGoalsMade50Plus", fg))
+
+    xp = _coerce_number("xp", "extra_point")
+    if xp is not None:
+        kicker["ExtraPointsMade"] = xp
+
+    bundle["offense"] = offense
+    bundle["kicker"] = kicker
+    return bundle
+
+
 def _get_stat_value(stats: dict[str, Any], keys: list[str]) -> float | None:
     for key in keys:
         if key in stats and stats[key] is not None:

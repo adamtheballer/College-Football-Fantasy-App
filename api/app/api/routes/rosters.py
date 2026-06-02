@@ -8,6 +8,7 @@ from collegefootballfantasy_api.app.api.deps import (
     require_team_owner,
 )
 from collegefootballfantasy_api.app.db.session import get_db
+from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
@@ -24,6 +25,7 @@ from collegefootballfantasy_api.app.schemas.roster import (
     RosterEntryRead,
 )
 from collegefootballfantasy_api.app.schemas.transaction import TransactionList, TransactionRead
+from collegefootballfantasy_api.app.services.league_week_state import enforce_lineup_window_open
 
 router = APIRouter()
 
@@ -57,6 +59,13 @@ def _league_settings(db: Session, league_id: int) -> LeagueSettings:
     if not settings_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league settings not found")
     return settings_row
+
+
+def _enforce_lineup_window(db: Session, league_id: int) -> None:
+    league = db.get(League, league_id)
+    if not league:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
+    enforce_lineup_window_open(db, league=league)
 
 
 def _slot_limits(settings_row: LeagueSettings) -> dict[str, int]:
@@ -242,6 +251,7 @@ def update_lineup_endpoint(
     current_user: User = Depends(get_current_user),
 ) -> LineupUpdateResponse:
     team = require_team_owner(db, team_id, current_user)
+    _enforce_lineup_window(db, team.league_id)
     settings_row = _league_settings(db, team.league_id)
     slot_limits = _slot_limits(settings_row)
     roster_entries = _load_roster_entry_rows(db, team.id)

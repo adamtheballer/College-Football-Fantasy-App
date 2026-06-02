@@ -222,6 +222,7 @@ export default function WaiverWire() {
         player={selectedPlayer}
         isOpen={isPlayerModalOpen}
         onClose={() => setIsPlayerModalOpen(false)}
+        tradeLeagueId={selectedLeagueId}
       />
 
       <Dialog open={Boolean(pendingAddPlayer)} onOpenChange={(open) => !open && setPendingAddPlayer(null)}>

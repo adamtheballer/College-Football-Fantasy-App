@@ -87,7 +87,7 @@ export default function Login() {
           </div>
         </div>
 
-        <Card className="bg-card/40 backdrop-blur-xl border-border/60 rounded-[2.5rem] overflow-hidden shadow-2xl relative border-t-primary/20">
+        <Card className="bg-card/40 backdrop-blur-xl border-transparent rounded-[2.5rem] overflow-hidden shadow-2xl relative">
           <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
           <CardContent className="p-10 space-y-8">
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -99,7 +99,7 @@ export default function Login() {
                     <Input
                       type="email"
                       placeholder="coach@saturday.com"
-                      className="bg-white/5 border-border/40 h-14 pl-12 rounded-2xl focus:ring-primary focus:border-primary transition-all text-sm font-medium"
+                      className="bg-white/5 border-transparent h-14 pl-12 rounded-2xl focus:ring-primary/40 focus:border-primary/40 transition-all text-sm font-medium"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -116,7 +116,7 @@ export default function Login() {
                     <Input 
                       type="password" 
                       placeholder="••••••••" 
-                      className="bg-white/5 border-border/40 h-14 pl-12 rounded-2xl focus:ring-primary focus:border-primary transition-all text-sm font-medium"
+                      className="bg-white/5 border-transparent h-14 pl-12 rounded-2xl focus:ring-primary/40 focus:border-primary/40 transition-all text-sm font-medium"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -147,27 +147,24 @@ export default function Login() {
             </form>
 
             <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border/40" />
-              </div>
               <div className="relative flex justify-center text-[9px] font-black uppercase tracking-widest">
                 <span className="bg-[#05080a] px-4 text-muted-foreground/40">Or continue with</span>
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
-              <Button variant="outline" className="h-14 rounded-2xl border-border/40 bg-white/5 hover:bg-white/10 transition-all">
+              <Button variant="outline" className="h-14 rounded-2xl border-transparent bg-white/5 hover:bg-white/10 transition-all">
                 <Chrome className="w-5 h-5" />
               </Button>
-              <Button variant="outline" className="h-14 rounded-2xl border-border/40 bg-white/5 hover:bg-white/10 transition-all">
+              <Button variant="outline" className="h-14 rounded-2xl border-transparent bg-white/5 hover:bg-white/10 transition-all">
                 <Apple className="w-5 h-5" />
               </Button>
-              <Button variant="outline" className="h-14 rounded-2xl border-border/40 bg-white/5 hover:bg-white/10 transition-all">
+              <Button variant="outline" className="h-14 rounded-2xl border-transparent bg-white/5 hover:bg-white/10 transition-all">
                 <Github className="w-5 h-5" />
               </Button>
             </div>
           </CardContent>
-          <div className="bg-white/5 px-10 py-6 border-t border-border/40 text-center">
+          <div className="bg-white/5 px-10 py-6 text-center">
              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                Don't have an account? <Link to="/signup" className="text-primary hover:underline font-black ml-1">Create One</Link>
              </p>

@@ -34,6 +34,7 @@ const posStyles: Record<string, { bg: string; border: string; text: string }> = 
 };
 
 const OFFENSIVE_POSITIONS = new Set(["QB", "RB", "WR", "TE", "K"]);
+const ALL_LEAGUES_VALUE = "all";
 
 export default function Watchlist() {
   const [view, setView] = useState<"browse" | "watchlists">("browse");
@@ -45,6 +46,7 @@ export default function Watchlist() {
   const [pendingPlayerId, setPendingPlayerId] = useState<number | null>(null);
   const [activeListId, setActiveListId] = useState<number | null>(null);
   const [selectedLeagueId, setSelectedLeagueId] = useState<number | null>(null);
+  const [leagueFilterTouched, setLeagueFilterTouched] = useState(false);
 
   const { data: leagueRows = [] } = useLeagues();
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
@@ -56,7 +58,8 @@ export default function Watchlist() {
   const { data, isLoading, isError } = usePlayers({
     search: searchQuery || undefined,
     league_id: selectedLeagueId ?? undefined,
-    limit: 100,
+    limit: 5000,
+    sort: "position",
   });
 
   const watchlists = watchlistsPayload?.data ?? [];
@@ -67,6 +70,15 @@ export default function Watchlist() {
       setSelectedLeagueId(null);
       return;
     }
+    if (leagueFilterTouched) {
+      setSelectedLeagueId((current) => {
+        if (current && leagueRows.some((league) => league.id === current)) {
+          return current;
+        }
+        return null;
+      });
+      return;
+    }
     setSelectedLeagueId((current) => {
       if (current && leagueRows.some((league) => league.id === current)) {
         return current;
@@ -74,9 +86,9 @@ export default function Watchlist() {
       if (activeLeagueId && leagueRows.some((league) => league.id === activeLeagueId)) {
         return activeLeagueId;
       }
-      return leagueRows[0].id;
+      return null;
     });
-  }, [activeLeagueId, leagueRows]);
+  }, [activeLeagueId, leagueFilterTouched, leagueRows]);
 
   useEffect(() => {
     if (!selectedLeagueId) return;
@@ -177,6 +189,20 @@ export default function Watchlist() {
     if (watchlists.length === 0) return "Create your first watchlist.";
     return "Add players from browse mode to build this list.";
   }, [watchlists.length, watchlistsLoading]);
+  const selectedLeagueLabel =
+    leagueRows.find((league) => league.id === selectedLeagueId)?.name ?? "All Leagues";
+  const trackedPlayersCount = useMemo(
+    () =>
+      watchlists.reduce(
+        (sum, list) =>
+          sum +
+          list.players.filter((player) =>
+            OFFENSIVE_POSITIONS.has((player.pos ?? "").toUpperCase())
+          ).length,
+        0
+      ),
+    [watchlists]
+  );
 
   return (
     <div className="mx-auto max-w-7xl space-y-12 pb-12 pt-8">
@@ -184,6 +210,7 @@ export default function Watchlist() {
         player={selectedPlayer}
         isOpen={isPlayerModalOpen}
         onClose={() => setIsPlayerModalOpen(false)}
+        tradeLeagueId={selectedLeagueId}
       />
 
       {showNamingModal && (
@@ -232,27 +259,32 @@ export default function Watchlist() {
         </div>
       )}
 
-      <div className="flex items-start justify-between gap-6">
+      <div className="space-y-5">
+        <div className="flex items-start justify-between gap-6">
         <div className="space-y-2">
-          <h1 className="text-6xl font-black italic uppercase tracking-tighter text-foreground">
+          <h1 className="text-5xl font-black italic uppercase tracking-tighter text-foreground">
             {view === "browse" ? "Browse Players" : activeWatchlist?.name || "Watchlists"}
           </h1>
           <p className="text-[10px] font-black uppercase tracking-[0.35em] text-muted-foreground/60">
             {view === "browse"
-              ? "Search real backend player records"
+              ? "Global watchlists stay available before and after drafts"
               : "Persisted watchlists for your signed-in account"}
           </p>
         </div>
 
         <div className="grid w-full max-w-md gap-3">
           <Select
-            value={selectedLeagueId ? String(selectedLeagueId) : ""}
-            onValueChange={(value) => setSelectedLeagueId(Number(value))}
+            value={selectedLeagueId ? String(selectedLeagueId) : ALL_LEAGUES_VALUE}
+            onValueChange={(value) => {
+              setLeagueFilterTouched(true);
+              setSelectedLeagueId(value === ALL_LEAGUES_VALUE ? null : Number(value));
+            }}
           >
             <SelectTrigger className="h-14 rounded-[1.5rem] border-white/10 bg-white/5 text-[10px] font-black uppercase tracking-widest">
               <SelectValue placeholder="Select League" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value={ALL_LEAGUES_VALUE}>All Leagues (Global)</SelectItem>
               {leagueRows.map((league) => (
                 <SelectItem key={league.id} value={String(league.id)}>
                   {league.name}
@@ -261,16 +293,27 @@ export default function Watchlist() {
             </SelectContent>
           </Select>
 
-          {view === "browse" ? (
+          <div className="grid grid-cols-2 gap-2">
             <Button
               type="button"
-              onClick={() => setView("watchlists")}
-              className="h-14 rounded-2xl border border-white/10 bg-white/5 px-8 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground hover:bg-primary/10 hover:text-primary"
+              variant={view === "browse" ? "default" : "outline"}
+              onClick={() => setView("browse")}
+              className="h-14 rounded-2xl px-6 text-[10px] font-black uppercase tracking-[0.2em]"
             >
-              <Bookmark className="mr-3 h-4 w-4" />
-              My Watchlists
+              Browse
             </Button>
-          ) : (
+            <Button
+              type="button"
+              variant={view === "watchlists" ? "default" : "outline"}
+              onClick={() => setView("watchlists")}
+              className="h-14 rounded-2xl px-6 text-[10px] font-black uppercase tracking-[0.2em]"
+            >
+              <Bookmark className="mr-2 h-4 w-4" />
+              Watchlists
+            </Button>
+          </div>
+
+          {view === "watchlists" && (
             <Button
               type="button"
               onClick={() => setShowNamingModal(true)}
@@ -280,6 +323,40 @@ export default function Watchlist() {
               New Watchlist
             </Button>
           )}
+        </div>
+      </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Card className="rounded-2xl border border-white/10 bg-card/40">
+            <CardContent className="p-4">
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                League Filter
+              </p>
+              <p className="mt-1 text-sm font-black uppercase tracking-[0.14em] text-foreground">
+                {selectedLeagueLabel}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border border-white/10 bg-card/40">
+            <CardContent className="p-4">
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                Watchlists
+              </p>
+              <p className="mt-1 text-sm font-black uppercase tracking-[0.14em] text-foreground">
+                {watchlists.length}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border border-white/10 bg-card/40">
+            <CardContent className="p-4">
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                Tracked Players
+              </p>
+              <p className="mt-1 text-sm font-black uppercase tracking-[0.14em] text-foreground">
+                {trackedPlayersCount}
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </div>
 

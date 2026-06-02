@@ -809,14 +809,62 @@ export default function Stats() {
     if (matchup <= 40) return "Tough script expected: lower efficiency against stronger defense.";
     return "Neutral script expected: projection driven by baseline role.";
   }, [projectionB, compareResult]);
+  const selectedTeamLabel = selectedTeam || "Not selected";
+  const modeLabel = mode === "teams" ? "Team Research" : "Player Comparison";
+  const playerPoolCount = playerOptions.length;
 
   return (
     <div className="max-w-[1500px] mx-auto space-y-8 animate-in fade-in duration-700">
       <div className="space-y-2">
-        <h1 className="text-5xl font-black italic uppercase tracking-tight text-foreground">Stats</h1>
+        <h1 className="text-4xl font-black italic uppercase tracking-tight text-foreground">Stats</h1>
         <p className="text-[11px] font-black tracking-[0.3em] text-primary uppercase">
-          Power 4 Team Research Center
+          Cohesive Team And Player Research
         </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="rounded-2xl border border-white/10 bg-card/40">
+          <CardContent className="p-4">
+            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+              Active View
+            </p>
+            <p className="mt-1 text-sm font-black uppercase tracking-[0.14em] text-foreground">
+              {modeLabel}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border border-white/10 bg-card/40">
+          <CardContent className="p-4">
+            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+              Season
+            </p>
+            <p className="mt-1 text-sm font-black uppercase tracking-[0.14em] text-foreground">
+              {season}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border border-white/10 bg-card/40">
+          <CardContent className="p-4">
+            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+              Conference
+            </p>
+            <p className="mt-1 text-sm font-black uppercase tracking-[0.14em] text-foreground">
+              {conference}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border border-white/10 bg-card/40">
+          <CardContent className="p-4">
+            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+              Coverage
+            </p>
+            <p className="mt-1 text-sm font-black uppercase tracking-[0.14em] text-foreground">
+              {mode === "teams"
+                ? `${filteredTeams.length} teams • ${selectedTeamLabel}`
+                : `${playerPoolCount} players ready`}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="bg-card/40 backdrop-blur-md border border-white/10 rounded-[2.5rem] p-6">
@@ -890,7 +938,7 @@ export default function Stats() {
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search team..."
+              placeholder="Search team name..."
               className="h-10 bg-white/5 border-white/10 rounded-xl text-[11px] font-bold"
             />
           </div>

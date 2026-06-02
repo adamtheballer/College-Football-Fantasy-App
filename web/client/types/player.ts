@@ -29,6 +29,12 @@ export interface Player {
   school: string;
   pos: string;
   imageUrl?: string;
+  playerClass?: string;
+  sheetAdp?: number;
+  sheetProjectedSeasonPoints?: number;
+  sheetProjectionStats?: Record<string, number | null | undefined>;
+  sheetSourceSheetId?: string;
+  sheetSyncedAt?: string;
   conf: string;
   rank: number;
   adp: number;

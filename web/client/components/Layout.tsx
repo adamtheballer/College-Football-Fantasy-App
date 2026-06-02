@@ -8,12 +8,13 @@ import {
   LogIn,
   LogOut,
   ClipboardList,
-  Bell,
   BarChart3,
   MessageSquare,
   Bookmark,
   UserPlus,
   ShieldAlert,
+  ArrowRightLeft,
+  Clock3,
 } from "lucide-react";
 
 import { BackgroundEffects } from "./BackgroundEffects";
@@ -39,17 +40,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout, isLoggedIn } = useAuth();
   const [isGuideActive, setIsGuideActive] = useState(false);
   const mainScrollRef = useRef<HTMLElement | null>(null);
+  const isAuthScreen = location.pathname === "/login" || location.pathname === "/signup";
 
   const sidebarItems: SidebarItem[] = isLoggedIn
     ? [
         { name: "HOME", path: "/", icon: Home },
         { name: "LEAGUES", path: "/leagues", icon: Trophy },
+        { name: "DRAFT", path: "/draft", icon: Clock3 },
         { name: "ROSTER", path: "/rosters", icon: ClipboardList },
         { name: "CHATS", path: "/chats", icon: MessageSquare },
         { name: "WATCHLIST", path: "/watchlists", icon: Bookmark },
         { name: "WAIVER WIRE", path: "/waivers", icon: UserPlus },
+        { name: "TRADES", path: "/trade", icon: ArrowRightLeft },
         { name: "INJURY CENTER", path: "/injury-center", icon: ShieldAlert },
-        { name: "ALERTS", path: "/alerts", icon: Bell },
         { name: "STATS", path: "/stats", icon: BarChart3 },
         { name: "SETTINGS", path: "/settings", icon: Settings },
         {
@@ -66,7 +69,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: "SIGN IN", path: "/login", icon: LogIn },
       ];
 
-  const isDraftPage = location.pathname.startsWith("/draft");
+  const isFullScreenDraftRoom = /^\/league\/\d+\/draft\/?$/.test(location.pathname);
 
   useEffect(() => {
     if (!user) {
@@ -109,9 +112,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <BackgroundEffects />
       <FloatingQuickActions />
 
-      {/* Sidebar - Conditionally Hidden on Draft Page */}
-      {!isDraftPage && (
-        <aside className="w-72 h-screen sticky top-0 border-r border-border bg-sidebar-background/40 backdrop-blur-xl flex flex-col shrink-0 relative z-10 overflow-hidden">
+      {/* Sidebar - Conditionally Hidden in full-screen draft room */}
+      {!isFullScreenDraftRoom && (
+        <aside className="w-72 h-screen sticky top-0 bg-sidebar-background/40 backdrop-blur-xl flex flex-col shrink-0 relative z-10 overflow-hidden">
           {/* Subtle Sidebar Left-side Shine */}
           <div className="absolute top-0 left-0 w-full h-[100%] bg-sky-500/5 rounded-full blur-[100px] -ml-24 pointer-events-none" />
 
@@ -170,12 +173,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Main Content */}
       <main ref={mainScrollRef} data-app-scroll="true" className="flex-1 h-screen flex flex-col min-w-0 overflow-y-auto relative">
-        {/* Top Header - Also Conditionally Hidden or Adjusted on Draft Page */}
-        {!isDraftPage && (
-          <header id="app-header" className="border-b border-border bg-background/60 backdrop-blur-2xl sticky top-0 z-[120] flex flex-col px-12 py-6">
+        {/* Top Header - Conditionally hidden in full-screen draft room */}
+        {!isFullScreenDraftRoom && (
+          <header id="app-header" className="bg-background/60 backdrop-blur-2xl sticky top-0 z-[120] flex flex-col px-12 py-6">
             <div className="flex items-center justify-between">
               <h2 className="text-[10px] font-black tracking-[0.3em] text-primary/80 uppercase">College Football Fantasy</h2>
-              <div className="h-[1px] flex-1 mx-8 bg-gradient-to-r from-border/50 via-primary/20 to-border/50" />
+              <div className="h-[1px] flex-1 mx-8 opacity-0" />
               <div className="flex items-center gap-6">
                  {isLoggedIn ? (
                    <div className="flex items-center gap-3">
@@ -195,7 +198,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </header>
         )}
 
-        <div className={cn("flex-1", isDraftPage ? "p-0" : "p-8")}>
+        <div className={cn("flex-1", isFullScreenDraftRoom ? "p-0" : "p-8")}>
           {children}
         </div>
       </main>

@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, String, UniqueConstraint, Index
+from sqlalchemy import ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -17,6 +17,8 @@ class Team(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(200))
     owner_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     owner_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    waiver_priority: Mapped[int] = mapped_column(Integer, default=0)
+    faab_balance: Mapped[int] = mapped_column(Integer, default=100)
 
     league = relationship("League", back_populates="teams")
     roster_entries = relationship("RosterEntry", back_populates="team", cascade="all, delete-orphan")
