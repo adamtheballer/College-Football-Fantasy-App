@@ -47,7 +47,7 @@ const HomeStatCard = ({
   value: string;
   icon: typeof Trophy;
 }) => (
-  <Card className="bg-card/40 backdrop-blur-md border border-white/5 rounded-[2.5rem] overflow-hidden transition-all duration-300 hover:border-primary/30">
+  <Card className="cfb-color-wash bg-card/55 backdrop-blur-md border border-cyan-200/10 rounded-[2.5rem] overflow-hidden transition-all duration-300 hover:border-primary/35 hover:-translate-y-0.5">
     <CardContent className="p-8">
       <div className="flex items-center justify-between">
         <div className="space-y-2">
@@ -58,7 +58,7 @@ const HomeStatCard = ({
             {value}
           </p>
         </div>
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-300/30 to-blue-500/28 text-primary shadow-[0_0_30px_rgba(34,211,238,0.18)]">
           <Icon className="h-6 w-6" />
         </div>
       </div>
@@ -139,15 +139,22 @@ export default function Index() {
         .slice(0, 4),
     [leagues]
   );
+  const dashboardHeroTitle = `Welcome ${user?.firstName?.toUpperCase() ?? "Manager"}`;
 
   if (!isLoggedIn) {
     return (
-      <div className="max-w-6xl mx-auto space-y-12 pb-20 pt-12">
-        <div className="space-y-6">
+      <div className="relative max-w-6xl mx-auto space-y-12 overflow-hidden pb-20 pt-12">
+        <div className="pointer-events-none absolute -left-16 top-12 h-48 w-48 rounded-full bg-primary/14 blur-[90px]" />
+        <div className="pointer-events-none absolute right-4 top-28 h-36 w-36 rounded-full bg-cyan-300/10 blur-[70px]" />
+        <div className="pointer-events-none absolute right-28 top-10 h-24 w-24 rounded-full bg-amber-300/08 blur-[56px]" />
+        <div className="relative space-y-6">
           <p className="text-[10px] font-black uppercase tracking-[0.5em] text-primary">
             College Football Fantasy
           </p>
-          <h1 className="text-7xl font-black italic uppercase tracking-tight text-foreground">
+          <h1
+            className="cfb-home-hero-title text-7xl font-black italic uppercase tracking-tight"
+            data-text="College Football Fantasy"
+          >
             College Football Fantasy
           </h1>
           <p className="max-w-2xl text-lg text-muted-foreground">
@@ -172,13 +179,19 @@ export default function Index() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-10 pb-20 pt-12">
-      <div className="space-y-4">
+    <div className="relative max-w-7xl mx-auto space-y-10 overflow-hidden pb-20 pt-12">
+      <div className="pointer-events-none absolute -left-20 top-4 h-56 w-56 rounded-full bg-primary/12 blur-[100px]" />
+      <div className="pointer-events-none absolute right-8 top-24 h-44 w-44 rounded-full bg-cyan-300/09 blur-[80px]" />
+      <div className="pointer-events-none absolute right-40 top-12 h-32 w-32 rounded-full bg-amber-300/07 blur-[70px]" />
+      <div className="relative space-y-4">
         <p className="text-[10px] font-black uppercase tracking-[0.5em] text-primary">
           Dashboard Overview
         </p>
-        <h1 className="text-6xl font-black italic uppercase tracking-tight text-foreground">
-          Welcome {user?.firstName?.toUpperCase() ?? "Manager"}
+        <h1
+          className="cfb-home-hero-title text-6xl font-black italic uppercase tracking-tight"
+          data-text={dashboardHeroTitle}
+        >
+          {dashboardHeroTitle}
         </h1>
         <p className="text-lg text-muted-foreground">
           Jump into your current league, draft workflow, and weekly decisions from one dashboard.
@@ -186,7 +199,7 @@ export default function Index() {
       </div>
 
       {selectedLeague && (
-        <Card className="bg-card/40 backdrop-blur-md border border-primary/20 rounded-[2.5rem] overflow-hidden">
+        <Card className="cfb-color-wash bg-card/55 backdrop-blur-md border border-primary/20 rounded-[2.5rem] overflow-hidden shadow-[0_24px_70px_rgba(10,15,35,0.32)]">
           <CardContent className="p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="space-y-2">
               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">
@@ -241,8 +254,8 @@ export default function Index() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.3fr_0.9fr]">
-        <Card className="bg-card/40 border-white/5 rounded-[2.5rem] overflow-hidden">
-          <CardHeader className="border-b border-white/10 bg-white/[0.03]">
+        <Card className="cfb-color-wash bg-card/55 border-cyan-200/10 rounded-[2.5rem] overflow-hidden">
+          <CardHeader className="border-b border-white/10 bg-white/[0.04]">
             <CardTitle className="text-[10px] font-black uppercase tracking-[0.32em] text-primary">
               Your Leagues
             </CardTitle>
@@ -276,7 +289,7 @@ export default function Index() {
                       navigate(`/league/${league.id}`);
                     }}
                     className={`flex w-full items-center justify-between border-b border-white/10 px-8 py-5 text-left last:border-b-0 hover:bg-white/[0.04] ${
-                      isActive ? "bg-primary/10" : ""
+                      isActive ? "bg-primary/12" : ""
                     }`}
                   >
                     <div className="space-y-1">
@@ -296,8 +309,8 @@ export default function Index() {
         </Card>
 
         <div className="space-y-6">
-          <Card className="bg-card/40 border-white/5 rounded-[2.5rem] overflow-hidden">
-            <CardHeader className="border-b border-white/10 bg-white/[0.03]">
+          <Card className="cfb-color-wash bg-card/55 border-cyan-200/10 rounded-[2.5rem] overflow-hidden">
+            <CardHeader className="border-b border-white/10 bg-white/[0.04]">
               <CardTitle className="text-[10px] font-black uppercase tracking-[0.32em] text-primary">
                 Upcoming Drafts
               </CardTitle>
@@ -322,8 +335,8 @@ export default function Index() {
             </CardContent>
           </Card>
 
-          <Card className="bg-card/40 border-white/5 rounded-[2.5rem] overflow-hidden">
-            <CardHeader className="border-b border-white/10 bg-white/[0.03]">
+          <Card className="cfb-color-wash bg-card/55 border-cyan-200/10 rounded-[2.5rem] overflow-hidden">
+            <CardHeader className="border-b border-white/10 bg-white/[0.04]">
               <CardTitle className="text-[10px] font-black uppercase tracking-[0.32em] text-primary">
                 League Alerts
               </CardTitle>

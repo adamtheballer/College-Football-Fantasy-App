@@ -14,6 +14,7 @@ from collegefootballfantasy_api.app.api.routes import (
     injuries,
     leagues,
     matchups,
+    mock_drafts,
     notifications,
     ops,
     players,
@@ -98,6 +99,7 @@ app.include_router(health.router)
 app.include_router(ops.router)
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(leagues.router, prefix="/leagues", tags=["leagues"])
+app.include_router(mock_drafts.router, prefix="/mock-drafts", tags=["mock-drafts"])
 app.include_router(teams.router, tags=["teams"])
 app.include_router(players.router, prefix="/players", tags=["players"])
 app.include_router(rosters.router, tags=["rosters"])

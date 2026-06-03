@@ -5,13 +5,16 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.api.routes import leagues as league_routes
+from collegefootballfantasy_api.app.api.routes import mock_drafts as mock_draft_routes
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.models.mock_draft_session import MockDraftSession
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +81,18 @@ class DraftTimeoutRunner:
                 .all()
             )
             league_ids = [int(row[0]) for row in rows]
-            result.scanned = len(league_ids)
+            try:
+                mock_rows = (
+                    session.query(MockDraftSession.id)
+                    .filter(MockDraftSession.status.in_(["scheduled", "countdown", "live"]))
+                    .limit(max(1, int(settings.draft_timeout_batch_limit)))
+                    .all()
+                )
+                mock_ids = [int(row[0]) for row in mock_rows]
+            except ProgrammingError:
+                session.rollback()
+                mock_ids = []
+            result.scanned = len(league_ids) + len(mock_ids)
 
             for league_id in league_ids:
                 try:
@@ -97,6 +111,22 @@ class DraftTimeoutRunner:
                     session.rollback()
                     result.failures += 1
                     logger.exception("draft_timeout_runner_autopick_failed league_id=%s", league_id)
+            for session_id in mock_ids:
+                try:
+                    session_row = session.get(MockDraftSession, session_id)
+                    if session_row is None:
+                        continue
+                    changed = mock_draft_routes._autopick_timed_out_current_seat(  # noqa: SLF001
+                        session,
+                        session_row=session_row,
+                    )
+                    if changed:
+                        session.commit()
+                        result.autopicks += 1
+                except Exception:
+                    session.rollback()
+                    result.failures += 1
+                    logger.exception("draft_timeout_runner_autopick_failed mock_draft_id=%s", session_id)
         finally:
             session.close()
         return result

@@ -18,8 +18,11 @@ import Signup from "./pages/Signup";
 import CreateLeague from "./pages/CreateLeague";
 import JoinLeague from "./pages/JoinLeague";
 import Draft from "./pages/Draft";
-import DraftHub from "./pages/DraftHub";
 import DraftLobby from "./pages/DraftLobby";
+import MockDraftHub from "./pages/MockDraftHub";
+import MockDraftLobby from "./pages/MockDraftLobby";
+import MockDraftRoom from "./pages/MockDraftRoom";
+import MockDraftBoard from "./pages/MockDraftBoard";
 import Rosters from "./pages/Rosters";
 import Stats from "./pages/Stats";
 import WaiverWire from "./pages/WaiverWire";
@@ -69,7 +72,31 @@ const App = () => (
                 path="/draft"
                 element={
                   <ProtectedRoute>
-                    <DraftHub />
+                    <MockDraftHub />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/mock-drafts/:mockDraftId/lobby"
+                element={
+                  <ProtectedRoute>
+                    <MockDraftLobby />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/mock-drafts/:mockDraftId/room"
+                element={
+                  <ProtectedRoute>
+                    <MockDraftRoom />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/mock-drafts/:mockDraftId/board"
+                element={
+                  <ProtectedRoute>
+                    <MockDraftBoard />
                   </ProtectedRoute>
                 }
               />

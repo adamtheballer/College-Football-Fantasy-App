@@ -69,7 +69,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: "SIGN IN", path: "/login", icon: LogIn },
       ];
 
-  const isFullScreenDraftRoom = /^\/league\/\d+\/draft\/?$/.test(location.pathname);
+  const isFullScreenDraftRoom =
+    /^\/league\/\d+\/draft\/?$/.test(location.pathname) ||
+    /^\/mock-drafts\/\d+\/room\/?$/.test(location.pathname) ||
+    /^\/mock-drafts\/\d+\/board\/?$/.test(location.pathname);
 
   useEffect(() => {
     if (!user) {
@@ -110,13 +113,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Reusable Dramatic Background Effects */}
       <BackgroundEffects />
-      <FloatingQuickActions />
+      {!isFullScreenDraftRoom ? <FloatingQuickActions /> : null}
 
       {/* Sidebar - Conditionally Hidden in full-screen draft room */}
       {!isFullScreenDraftRoom && (
-        <aside className="w-72 h-screen sticky top-0 bg-sidebar-background/40 backdrop-blur-xl flex flex-col shrink-0 relative z-10 overflow-hidden">
+        <aside className="w-72 h-screen sticky top-0 bg-sidebar-background/55 backdrop-blur-xl flex flex-col shrink-0 relative z-10 overflow-hidden border-r border-cyan-200/10">
           {/* Subtle Sidebar Left-side Shine */}
-          <div className="absolute top-0 left-0 w-full h-[100%] bg-sky-500/5 rounded-full blur-[100px] -ml-24 pointer-events-none" />
+          <div className="absolute top-0 left-0 w-full h-[100%] bg-sky-400/10 rounded-full blur-[100px] -ml-24 pointer-events-none" />
+          <div className="absolute bottom-0 right-0 h-56 w-56 rounded-full bg-amber-300/10 blur-[90px] pointer-events-none" />
 
           <div className="p-8 relative z-10">
             <h1 className="text-xl font-black tracking-tighter text-foreground uppercase italic bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
@@ -175,7 +179,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <main ref={mainScrollRef} data-app-scroll="true" className="flex-1 h-screen flex flex-col min-w-0 overflow-y-auto relative">
         {/* Top Header - Conditionally hidden in full-screen draft room */}
         {!isFullScreenDraftRoom && (
-          <header id="app-header" className="bg-background/60 backdrop-blur-2xl sticky top-0 z-[120] flex flex-col px-12 py-6">
+          <header id="app-header" className="bg-background/65 backdrop-blur-2xl sticky top-0 z-[120] flex flex-col px-12 py-6 border-b border-cyan-200/10">
             <div className="flex items-center justify-between">
               <h2 className="text-[10px] font-black tracking-[0.3em] text-primary/80 uppercase">College Football Fantasy</h2>
               <div className="h-[1px] flex-1 mx-8 opacity-0" />
@@ -199,6 +203,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         )}
 
         <div className={cn("flex-1", isFullScreenDraftRoom ? "p-0" : "p-8")}>
+          {!isFullScreenDraftRoom ? (
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.08),transparent_55%)]" />
+          ) : null}
           {children}
         </div>
       </main>

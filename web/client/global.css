@@ -12,82 +12,82 @@
    * A different format will require also updating the theme in tailwind.config.ts.
   */
   :root {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
+    --background: 224 56% 9%;
+    --foreground: 210 40% 96%;
 
-    --card: 224 71% 7%;
-    --card-foreground: 213 31% 91%;
+    --card: 226 55% 12%;
+    --card-foreground: 210 40% 96%;
 
-    --popover: 224 71% 4%;
-    --popover-foreground: 213 31% 91%;
+    --popover: 226 55% 10%;
+    --popover-foreground: 210 40% 96%;
 
-    --primary: 210 100% 66%;
+    --primary: 194 95% 68%;
     --primary-foreground: 222 47% 11%;
 
-    --secondary: 222 47% 11%;
-    --secondary-foreground: 213 31% 91%;
+    --secondary: 224 42% 18%;
+    --secondary-foreground: 210 40% 96%;
 
-    --muted: 223 47% 11%;
-    --muted-foreground: 215.4 16.3% 56.9%;
+    --muted: 224 38% 18%;
+    --muted-foreground: 215 28% 73%;
 
-    --accent: 216 34% 17%;
-    --accent-foreground: 210 100% 66%;
+    --accent: 219 48% 20%;
+    --accent-foreground: 194 95% 68%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
-    --ring: 210 100% 66%;
+    --border: 214 46% 24%;
+    --input: 214 46% 24%;
+    --ring: 194 95% 68%;
 
     --radius: 1rem;
 
-    --sidebar-background: 224 71% 3%;
-    --sidebar-foreground: 213 31% 91%;
-    --sidebar-primary: 210 100% 66%;
+    --sidebar-background: 226 56% 8%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 194 95% 68%;
     --sidebar-primary-foreground: 222 47% 11%;
-    --sidebar-accent: 216 34% 17%;
-    --sidebar-accent-foreground: 210 100% 66%;
-    --sidebar-border: 216 34% 12%;
+    --sidebar-accent: 219 43% 19%;
+    --sidebar-accent-foreground: 194 95% 68%;
+    --sidebar-border: 218 42% 16%;
     --sidebar-ring: 217 91% 60%;
   }
 
   .dark {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
+    --background: 224 56% 9%;
+    --foreground: 210 40% 96%;
 
-    --card: 224 71% 7%;
-    --card-foreground: 213 31% 91%;
+    --card: 226 55% 12%;
+    --card-foreground: 210 40% 96%;
 
-    --popover: 224 71% 4%;
-    --popover-foreground: 213 31% 91%;
+    --popover: 226 55% 10%;
+    --popover-foreground: 210 40% 96%;
 
-    --primary: 210 100% 66%;
+    --primary: 194 95% 68%;
     --primary-foreground: 222 47% 11%;
 
-    --secondary: 222 47% 11%;
-    --secondary-foreground: 213 31% 91%;
+    --secondary: 224 42% 18%;
+    --secondary-foreground: 210 40% 96%;
 
-    --muted: 223 47% 11%;
-    --muted-foreground: 215.4 16.3% 56.9%;
+    --muted: 224 38% 18%;
+    --muted-foreground: 215 28% 73%;
 
-    --accent: 216 34% 17%;
-    --accent-foreground: 210 100% 66%;
+    --accent: 219 48% 20%;
+    --accent-foreground: 194 95% 68%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
+    --border: 214 46% 24%;
+    --input: 214 46% 24%;
     --ring: 212.7 26.8% 83.9%;
 
-    --sidebar-background: 224 71% 3%;
-    --sidebar-foreground: 213 31% 91%;
-    --sidebar-primary: 210 100% 66%;
+    --sidebar-background: 226 56% 8%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 194 95% 68%;
     --sidebar-primary-foreground: 222 47% 11%;
-    --sidebar-accent: 216 34% 17%;
-    --sidebar-accent-foreground: 210 100% 66%;
-    --sidebar-border: 216 34% 12%;
+    --sidebar-accent: 219 43% 19%;
+    --sidebar-accent-foreground: 194 95% 68%;
+    --sidebar-border: 218 42% 16%;
     --sidebar-ring: 217 91% 60%;
   }
 }
@@ -99,6 +99,11 @@
 
   body {
     @apply bg-background text-foreground;
+    background-image:
+      radial-gradient(circle at 12% 14%, rgba(34, 211, 238, 0.08), transparent 20%),
+      radial-gradient(circle at 82% 18%, rgba(251, 191, 36, 0.05), transparent 14%),
+      radial-gradient(circle at 74% 80%, rgba(59, 130, 246, 0.07), transparent 20%),
+      linear-gradient(180deg, rgba(8, 13, 28, 0.98) 0%, rgba(7, 10, 23, 1) 100%);
   }
 
   :where(p, span, li, h1, h2, h3, h4, h5, h6, a, button, label, td, th) {
@@ -115,20 +120,28 @@
 
 @layer components {
   .cfb-panel {
-    @apply rounded-[2rem] border border-white/10 bg-card/40 text-card-foreground backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.28)];
+    @apply rounded-[2rem] border border-cyan-200/10 bg-card/55 text-card-foreground backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.28)];
+    box-shadow:
+      0 20px 50px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 0 0 1px rgba(56, 189, 248, 0.04);
   }
 
   .cfb-panel-strong {
-    @apply rounded-[2.5rem] border border-white/10 bg-card/40 text-card-foreground backdrop-blur-xl shadow-[0_28px_70px_rgba(0,0,0,0.35)];
+    @apply rounded-[2.5rem] border border-cyan-200/10 bg-card/60 text-card-foreground backdrop-blur-xl shadow-[0_28px_70px_rgba(0,0,0,0.35)];
+    box-shadow:
+      0 28px 70px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 80px rgba(56, 189, 248, 0.05);
   }
 
   .cfb-control {
-    @apply rounded-2xl border border-white/10 bg-white/[0.04] text-foreground backdrop-blur-md transition-all duration-300;
+    @apply rounded-2xl border border-cyan-100/10 bg-white/[0.06] text-foreground backdrop-blur-md transition-all duration-300;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .cfb-control:hover {
-    @apply border-white/15 bg-white/[0.06];
+    @apply border-cyan-200/20 bg-white/[0.09];
   }
 
   .cfb-control:focus-visible,
@@ -142,6 +155,22 @@
 
   .cfb-section-title {
     @apply text-foreground font-black uppercase italic tracking-tight;
+  }
+
+  .cfb-color-wash {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cfb-color-wash::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at top left, rgba(34, 211, 238, 0.07), transparent 28%),
+      radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.06), transparent 30%),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent 45%);
   }
 
   .cfb-tour-active-target {
@@ -170,6 +199,51 @@
   .cfb-tour-open [data-nav-item="true"][data-nav-active="true"]:not(.cfb-tour-active-target) svg {
     color: hsl(var(--primary)) !important;
   }
+
+  .cfb-home-hero-title {
+    position: relative;
+    display: inline-block;
+    color: transparent;
+    background:
+      linear-gradient(135deg, #ffffff 0%, #ffffff 46%, rgba(147, 197, 253, 0.86) 76%, rgba(34, 211, 238, 0.68) 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    text-shadow:
+      0 0 26px rgba(59, 130, 246, 0.22),
+      0 0 54px rgba(34, 211, 238, 0.12);
+  }
+
+  .cfb-home-hero-title::before,
+  .cfb-home-hero-title::after {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .cfb-home-hero-title::before {
+    color: transparent;
+    background:
+      repeating-linear-gradient(
+        112deg,
+        transparent 0 0.62em,
+        rgba(255, 255, 255, 0.62) 0.64em 0.69em,
+        transparent 0.71em 1.05em
+      );
+    background-clip: text;
+    -webkit-background-clip: text;
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.18));
+    opacity: 0;
+    animation: cfb-home-title-laces 6.8s ease-in-out infinite;
+  }
+
+  .cfb-home-hero-title::after {
+    color: rgba(125, 211, 252, 0.18);
+    mix-blend-mode: screen;
+    opacity: 0;
+    text-shadow: -1px 0 rgba(59, 130, 246, 0.45), 1px 0 rgba(34, 211, 238, 0.35);
+    animation: cfb-home-title-glitch 7.4s steps(1, end) infinite;
+  }
 }
 
 @layer utilities {
@@ -182,5 +256,58 @@
     width: 0;
     height: 0;
     display: none;
+  }
+}
+
+@keyframes cfb-home-title-laces {
+  0%,
+  62%,
+  100% {
+    opacity: 0;
+    transform: translateX(-0.2em);
+  }
+  68% {
+    opacity: 0.2;
+  }
+  73% {
+    opacity: 0.44;
+    transform: translateX(0.1em);
+  }
+  79% {
+    opacity: 0;
+    transform: translateX(0.26em);
+  }
+}
+
+@keyframes cfb-home-title-glitch {
+  0%,
+  71%,
+  75%,
+  100% {
+    opacity: 0;
+    transform: none;
+    clip-path: inset(0 0 0 0);
+  }
+  72% {
+    opacity: 0.28;
+    transform: translate(1px, -1px);
+    clip-path: inset(0 0 70% 0);
+  }
+  73% {
+    opacity: 0.2;
+    transform: translate(-1px, 1px);
+    clip-path: inset(58% 0 18% 0);
+  }
+  74% {
+    opacity: 0.24;
+    transform: translate(1px, 0);
+    clip-path: inset(18% 0 56% 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cfb-home-hero-title::before,
+  .cfb-home-hero-title::after {
+    animation: none;
   }
 }

@@ -18,6 +18,15 @@ export default function DraftHub() {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [bootError, setBootError] = useState<string | null>(null);
 
+  const isMockSandboxLeague = (league: LeagueDetail): boolean => {
+    const name = String(league.name || "").trim().toLowerCase();
+    const description = String(league.description || "").trim().toLowerCase();
+    return (
+      name.startsWith("draft sandbox") ||
+      description.includes("temporary draft sandbox")
+    );
+  };
+
   const createDraftSandboxLeague = async (): Promise<LeagueDetail> => {
     const now = new Date();
     const draftStart = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
@@ -118,6 +127,15 @@ export default function DraftHub() {
 
       let targetLeague: LeagueDetail | null = null;
       for (const league of candidates) {
+        // Real league drafts should persist roster outcomes.
+        // Only run destructive practice reset for sandbox/mock leagues.
+        if (!isMockSandboxLeague(league)) {
+          if (activeLeagueId === league.id) {
+            targetLeague = league;
+            break;
+          }
+          continue;
+        }
         const canEnter = await setupDeterministicDraftRoom(league);
         if (!canEnter) continue;
         targetLeague = league;

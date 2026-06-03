@@ -28,6 +28,8 @@ const DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1NMP3EJSMbdRd7
 const DEFAULT_SHEET_ID = "1NMP3EJSMbdRd7HDA0t7TwxzJ9DM_bUynLoRCgE6Ml74";
 const DEFAULT_SHEET_TABS = ["BIG10", "ACC", "SEC", "BIG12"];
 const MIN_EXPECTED_SHEET_PLAYERS = 700;
+const POSITION_FULL_PICK_ERROR = "You cannot draft this position because your roster has no available slot for it.";
+const POSITION_FULL_BOARD_LABEL = "Roster full for this position";
 const ROSTER_SLOT_LAYOUT = ["QB", "RB1", "RB2", "WR1", "WR2", "TE", "FLEX", "K", "BENCH1", "BENCH2", "BENCH3", "BENCH4", "BENCH5", "IR"] as const;
 const REQUIRED_PROJECTION_STAT_KEYS = [
   "comp",
@@ -63,7 +65,8 @@ type DraftBoardPlayer = Player & {
   projectedStandardPoints: number;
 };
 
-type DraftSortMode = "projection_desc" | "adp_asc" | "position_asc";
+type DraftSortMode = "projection_desc" | "adp_asc";
+type DraftPositionFilter = "ALL" | "QB" | "RB" | "WR" | "TE" | "K";
 type DraftStatRow = { key: string; label: string; value: number };
 
 const positionPillClass: Record<string, string> = {
@@ -244,7 +247,9 @@ export default function Draft() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"draft" | "queue" | "roster">("draft");
   const [sortMode, setSortMode] = useState<DraftSortMode>("adp_asc");
+  const [positionFilter, setPositionFilter] = useState<DraftPositionFilter>("ALL");
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
+  const [draftPickErrorMessage, setDraftPickErrorMessage] = useState<string | null>(null);
   const [displaySecondsRemaining, setDisplaySecondsRemaining] = useState<number>(90);
   const [selectedRosterTeamId, setSelectedRosterTeamId] = useState<number | null>(null);
   const [pickSlotTransition, setPickSlotTransition] = useState<{ fromPick: number | null; toPick: number | null } | null>(null);
@@ -254,6 +259,7 @@ export default function Draft() {
     playerName: string;
   } | null>(null);
   const [draftStartFxVisible, setDraftStartFxVisible] = useState(false);
+  const [draftCompleteFxVisible, setDraftCompleteFxVisible] = useState(false);
   const timelineScrollRef = useRef<HTMLDivElement | null>(null);
   const timelineCardRefs = useRef(new Map<number, HTMLDivElement>());
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
@@ -264,6 +270,8 @@ export default function Draft() {
   const previousLatestPickIdRef = useRef<number | null>(null);
   const draftStartFxShownRef = useRef(false);
   const draftStartFxTimeoutRef = useRef<number | null>(null);
+  const draftCompleteFxShownRef = useRef(false);
+  const draftCompleteFxTimeoutRef = useRef<number | null>(null);
 
   const parsedLeagueId = leagueId && !Number.isNaN(Number(leagueId)) ? Number(leagueId) : undefined;
 
@@ -310,11 +318,17 @@ export default function Draft() {
   useEffect(() => {
     setAutoOpenedDraft(false);
     draftStartFxShownRef.current = false;
+    draftCompleteFxShownRef.current = false;
     if (draftStartFxTimeoutRef.current !== null) {
       window.clearTimeout(draftStartFxTimeoutRef.current);
       draftStartFxTimeoutRef.current = null;
     }
+    if (draftCompleteFxTimeoutRef.current !== null) {
+      window.clearTimeout(draftCompleteFxTimeoutRef.current);
+      draftCompleteFxTimeoutRef.current = null;
+    }
     setDraftStartFxVisible(false);
+    setDraftCompleteFxVisible(false);
     previousCenteredPickRef.current = null;
     setAccessRecoveryAttempted(false);
   }, [parsedLeagueId]);
@@ -357,13 +371,17 @@ export default function Draft() {
   const draftTeamById = useMemo(() => new Map(draftTeams.map((team) => [team.id, team])), [draftTeams]);
   const draftPicksByOverall = useMemo(() => new Map(draftPicks.map((pick) => [pick.overall_pick, pick])), [draftPicks]);
   const totalDraftRounds = useMemo(() => {
+    const serverRounds = Number(draftRoom?.total_rounds);
+    if (Number.isFinite(serverRounds) && serverRounds > 0) {
+      return Math.max(1, Math.round(serverRounds));
+    }
     const rosterSlots = draftRoom?.roster_slots && typeof draftRoom.roster_slots === "object" ? draftRoom.roster_slots : {};
     const rawRounds = Object.values(rosterSlots).reduce((sum, value) => {
       const n = Number(value);
       return sum + (Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0);
     }, 0);
     return Math.max(1, rawRounds);
-  }, [draftRoom?.roster_slots]);
+  }, [draftRoom?.roster_slots, draftRoom?.total_rounds]);
   const draftPickTimeline = useMemo(() => {
     if (draftTeams.length === 0) return [] as Array<{ overallPick: number; round: number; roundPick: number; teamId: number }>;
     const fallbackOrder = draftTeams.map((team) => team.id);
@@ -654,20 +672,12 @@ export default function Draft() {
     [boardPlayers]
   );
 
+  const effectiveSortMode: DraftSortMode = positionFilter === "ALL" ? sortMode : "adp_asc";
+
   const sortedBoardPlayers = useMemo(() => {
     const sorted = [...boardPlayers].sort((left, right) => {
-      if (sortMode === "adp_asc") {
+      if (effectiveSortMode === "adp_asc") {
         if (left.adpRank !== right.adpRank) return left.adpRank - right.adpRank;
-        if (right.projectedStandardPoints !== left.projectedStandardPoints) {
-          return right.projectedStandardPoints - left.projectedStandardPoints;
-        }
-        return left.name.localeCompare(right.name);
-      }
-      if (sortMode === "position_asc") {
-        const positionOrder = ["QB", "RB", "WR", "TE", "K"];
-        const leftPos = positionOrder.indexOf(normalizePlayerPosition(left.pos));
-        const rightPos = positionOrder.indexOf(normalizePlayerPosition(right.pos));
-        if (leftPos !== rightPos) return leftPos - rightPos;
         if (right.projectedStandardPoints !== left.projectedStandardPoints) {
           return right.projectedStandardPoints - left.projectedStandardPoints;
         }
@@ -684,12 +694,17 @@ export default function Draft() {
       ...player,
       draftRank: index + 1,
     }));
-  }, [boardPlayers, sortMode]);
+  }, [boardPlayers, effectiveSortMode]);
+
+  const positionFilteredBoardPlayers = useMemo(() => {
+    if (positionFilter === "ALL") return sortedBoardPlayers;
+    return sortedBoardPlayers.filter((player) => normalizePlayerPosition(player.pos) === positionFilter);
+  }, [positionFilter, sortedBoardPlayers]);
 
   const rankedPlayers = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
-    if (!normalizedSearch) return sortedBoardPlayers;
-    return sortedBoardPlayers.filter((player) => {
+    if (!normalizedSearch) return positionFilteredBoardPlayers;
+    return positionFilteredBoardPlayers.filter((player) => {
       const playerName = String(player.name ?? "").toLowerCase();
       const schoolName = String(player.school ?? "").toLowerCase();
       const position = normalizePlayerPosition(player.pos).toLowerCase();
@@ -699,7 +714,7 @@ export default function Draft() {
         position.includes(normalizedSearch)
       );
     });
-  }, [searchQuery, sortedBoardPlayers]);
+  }, [positionFilteredBoardPlayers, searchQuery]);
 
   const availablePlayers = useMemo(
     () => rankedPlayers.filter((player) => !draftedIds.has(player.id)),
@@ -708,6 +723,35 @@ export default function Draft() {
   const selectedPlayer = useMemo(
     () => rankedPlayers.find((player) => player.id === selectedPlayerId) ?? null,
     [rankedPlayers, selectedPlayerId]
+  );
+  const activePositionEligibility = useMemo(
+    () =>
+      draftRoom?.position_eligibility && typeof draftRoom.position_eligibility === "object"
+        ? draftRoom.position_eligibility
+        : {},
+    [draftRoom?.position_eligibility]
+  );
+  const getPlayerEligibility = useCallback(
+    (player: { pos?: unknown } | null | undefined) => {
+      const position = normalizePlayerPosition(player?.pos);
+      return position ? activePositionEligibility[position] : undefined;
+    },
+    [activePositionEligibility]
+  );
+  const canPlayerFitActiveRoster = useCallback(
+    (player: { pos?: unknown } | null | undefined) => {
+      const eligibility = getPlayerEligibility(player);
+      return eligibility ? eligibility.can_draft : true;
+    },
+    [getPlayerEligibility]
+  );
+  const getPlayerRosterLockReason = useCallback(
+    (player: { pos?: unknown } | null | undefined) => {
+      const eligibility = getPlayerEligibility(player);
+      if (!eligibility || eligibility.can_draft) return null;
+      return eligibility.reason || POSITION_FULL_BOARD_LABEL;
+    },
+    [getPlayerEligibility]
   );
 
   useEffect(() => {
@@ -720,7 +764,7 @@ export default function Draft() {
       pendingBoardScrollTopRef.current = null;
     });
     return () => window.cancelAnimationFrame(rafId);
-  }, [availablePlayers.length, draftRoom?.server_state_seq, sortMode, searchQuery]);
+  }, [availablePlayers.length, draftRoom?.server_state_seq, sortMode, searchQuery, positionFilter]);
 
   const queuePlayerIds = useMemo(
     () => (queuePayload?.data ?? []).map((row) => row.player_id),
@@ -734,6 +778,10 @@ export default function Draft() {
         .filter((player): player is DraftBoardPlayer => Boolean(player) && !draftedIds.has(player.id)),
     [draftedIds, prospectById, queuePlayerIds]
   );
+  const draftableQueuedPlayers = useMemo(
+    () => queuedPlayers.filter((player) => canPlayerFitActiveRoster(player)),
+    [canPlayerFitActiveRoster, queuedPlayers]
+  );
 
   useEffect(() => {
     if (selectedPlayerId === null) return;
@@ -744,6 +792,13 @@ export default function Draft() {
 
   const makePick = async (playerId: number) => {
     try {
+      setDraftPickErrorMessage(null);
+      pickMutation.reset();
+      const player = prospectById.get(playerId) ?? selectedPlayer;
+      if (player && !canPlayerFitActiveRoster(player)) {
+        setDraftPickErrorMessage(POSITION_FULL_PICK_ERROR);
+        return;
+      }
       pendingBoardScrollTopRef.current = boardScrollRef.current?.scrollTop ?? null;
       await pickMutation.mutateAsync(playerId);
     } catch {
@@ -768,7 +823,7 @@ export default function Draft() {
   };
 
   const draftNextQueued = async () => {
-    const next = queuedPlayers[0];
+    const next = draftableQueuedPlayers[0];
     if (!next) return;
     await makePick(next.id);
   };
@@ -779,6 +834,8 @@ export default function Draft() {
       : {};
   const selectedProjectionStatsMap = selectedProjectionStats as Record<string, unknown>;
   const selectedPlayerDrafted = selectedPlayer ? draftedIds.has(selectedPlayer.id) : false;
+  const selectedPlayerCanFitRoster = canPlayerFitActiveRoster(selectedPlayer);
+  const selectedPlayerRosterLockReason = getPlayerRosterLockReason(selectedPlayer);
   const selectedPlayerPosition = normalizePlayerPosition(selectedPlayer?.pos);
   const selectedPlayerHealthStatus =
     typeof selectedProjectionStatsMap["health_status"] === "string" && String(selectedProjectionStatsMap["health_status"]).trim()
@@ -908,6 +965,8 @@ export default function Draft() {
     phaseType === "pick_clock" &&
     liveTimerSeconds > 0 &&
     liveTimerSeconds <= 10;
+  const isCountdownPhase = draftRoom?.status === "countdown";
+  const isLivePickClock = draftRoom?.status === "live" && phaseType === "pick_clock" && !isPrepWindow;
   const urgencyScaleClass = isUrgencyTimer ? (liveTimerSeconds % 2 === 0 ? "scale-110" : "scale-95") : "scale-100";
   const timerLabel =
     draftRoom?.status === "countdown"
@@ -915,6 +974,51 @@ export default function Draft() {
       : isPrepWindow
         ? "Pick Transition"
         : "Draft Timer";
+  const timerCardToneClass = isUrgencyTimer
+    ? "border-red-300/80 bg-red-500/15 shadow-[0_0_30px_rgba(248,113,113,0.5)]"
+    : isPrepWindow
+      ? "border-primary/70 bg-primary/18 shadow-[0_0_28px_rgba(59,130,246,0.45)]"
+      : isCountdownPhase
+        ? "border-amber-300/70 bg-amber-500/10 shadow-[0_0_24px_rgba(245,158,11,0.35)]"
+        : isLivePickClock
+          ? "border-cyan-300/65 bg-cyan-500/10 shadow-[0_0_26px_rgba(34,211,238,0.32)]"
+          : "border-white/12 bg-white/[0.06]";
+  const timerLabelToneClass = isUrgencyTimer
+    ? "text-red-100/90"
+    : isPrepWindow
+      ? "text-primary/95"
+      : isCountdownPhase
+        ? "text-amber-100/90"
+        : isLivePickClock
+          ? "text-cyan-100/90"
+          : "text-muted-foreground/70";
+  const timerValueToneClass = isUrgencyTimer
+    ? `animate-pulse text-red-200 ${urgencyScaleClass}`
+    : isPrepWindow
+      ? "text-primary"
+      : isCountdownPhase
+        ? "text-amber-100"
+        : isLivePickClock
+          ? "text-cyan-100"
+          : "text-foreground";
+  const timerGlowClass = isUrgencyTimer
+    ? "from-red-400/20 via-red-300/5 to-transparent"
+    : isPrepWindow
+      ? "from-primary/25 via-primary/8 to-transparent"
+      : isCountdownPhase
+        ? "from-amber-300/20 via-amber-200/6 to-transparent"
+        : isLivePickClock
+          ? "from-cyan-300/20 via-cyan-200/6 to-transparent"
+          : "from-white/10 via-transparent to-transparent";
+  const timerIconToneClass = isUrgencyTimer
+    ? "text-red-200"
+    : isPrepWindow
+      ? "text-primary"
+      : isCountdownPhase
+        ? "text-amber-200"
+        : isLivePickClock
+          ? "text-cyan-200"
+          : "text-muted-foreground/70";
   const selectedRosterTeam = useMemo(
     () => draftRosters.find((teamRoster) => teamRoster.team_id === selectedRosterTeamId) ?? null,
     [draftRosters, selectedRosterTeamId]
@@ -939,8 +1043,9 @@ export default function Draft() {
 
     return ROSTER_SLOT_LAYOUT.map((label) => {
       const key = label.replace(/[0-9]+$/, "");
+      const displayLabel = label.replace(/^BENCH([0-9]+)$/i, "BENCH $1");
       const player = pullPlayer(key);
-      return { label, key, player };
+      return { label: displayLabel, key, player };
     });
   }, [selectedRosterTeam]);
 
@@ -960,11 +1065,25 @@ export default function Draft() {
     }, 2100);
   }, [draftRoom, pickPrepSeconds]);
 
+  useEffect(() => {
+    if (draftRoom?.status !== "completed" || draftCompleteFxShownRef.current) return;
+    draftCompleteFxShownRef.current = true;
+    setDraftCompleteFxVisible(true);
+    draftCompleteFxTimeoutRef.current = window.setTimeout(() => {
+      setDraftCompleteFxVisible(false);
+      draftCompleteFxTimeoutRef.current = null;
+    }, 3000);
+  }, [draftRoom?.status]);
+
   useEffect(
     () => () => {
       if (draftStartFxTimeoutRef.current !== null) {
         window.clearTimeout(draftStartFxTimeoutRef.current);
         draftStartFxTimeoutRef.current = null;
+      }
+      if (draftCompleteFxTimeoutRef.current !== null) {
+        window.clearTimeout(draftCompleteFxTimeoutRef.current);
+        draftCompleteFxTimeoutRef.current = null;
       }
     },
     []
@@ -1033,6 +1152,14 @@ export default function Draft() {
           </div>
         </div>
       )}
+      {draftCompleteFxVisible && (
+        <div className="pointer-events-none fixed left-1/2 top-8 z-[190] -translate-x-1/2">
+          <div className="rounded-2xl border border-emerald-300/45 bg-emerald-500/14 px-7 py-4 text-center shadow-[0_0_28px_rgba(16,185,129,0.45)] animate-[pulse_900ms_ease-in-out_2]">
+            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-emerald-100">Draft Complete</p>
+            <p className="mt-1 text-2xl font-black italic text-foreground">Great draft, everyone.</p>
+          </div>
+        </div>
+      )}
       <Card className="bg-card/40 border-white/10 rounded-[2.5rem] shadow-[0_0_60px_rgba(59,130,246,0.18)]">
         <CardHeader className="border-b border-white/10">
           <div className="space-y-4">
@@ -1072,17 +1199,15 @@ export default function Draft() {
 
             <div className="flex justify-center">
               <div
-                className={`min-w-[180px] rounded-2xl border px-5 py-3 text-center transition-all duration-300 ${
-                  isUrgencyTimer
-                    ? "border-red-400/70 bg-red-500/10 shadow-[0_0_24px_rgba(248,113,113,0.45)]"
-                    : "border-white/10 bg-white/5"
-                }`}
+                className={`relative min-w-[220px] overflow-hidden rounded-2xl border px-5 py-3 text-center transition-all duration-300 ${timerCardToneClass}`}
               >
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/70">{timerLabel}</p>
+                <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${timerGlowClass}`} />
+                <div className="relative flex items-center justify-center gap-2">
+                  <Clock3 className={`h-3.5 w-3.5 ${timerIconToneClass} ${isUrgencyTimer ? "animate-pulse" : ""}`} />
+                  <p className={`text-[9px] font-black uppercase tracking-[0.2em] ${timerLabelToneClass}`}>{timerLabel}</p>
+                </div>
                 <p
-                  className={`mt-1 text-3xl font-black italic transition-all duration-300 ${
-                    isUrgencyTimer ? `animate-pulse text-red-300 ${urgencyScaleClass}` : "text-foreground"
-                  }`}
+                  className={`relative mt-1 text-4xl font-black italic transition-all duration-300 ${timerValueToneClass}`}
                 >
                   {isPrepWindow ? `Prep ${pickPrepSeconds}s` : `${liveTimerSeconds}s`}
                 </p>
@@ -1199,28 +1324,40 @@ export default function Draft() {
         <CardContent className="p-5">
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "draft" | "queue" | "roster")}>
             <TabsContent value="draft" className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-3">
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_220px_220px] gap-3">
                 <Input
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="Search players, schools, or positions..."
                   className="h-12 rounded-2xl bg-white/5 border-white/10"
                 />
-                <Select value={sortMode} onValueChange={(value) => setSortMode(value as DraftSortMode)}>
+                <Select value={sortMode} onValueChange={(value) => setSortMode(value as DraftSortMode)} disabled={positionFilter !== "ALL"}>
                   <SelectTrigger className="h-12 rounded-2xl border-white/10 bg-white/5 text-[10px] font-black uppercase tracking-[0.16em]">
                     <SelectValue placeholder="Sort board" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="adp_asc">Draft Value / ADP</SelectItem>
                     <SelectItem value="projection_desc">Projection</SelectItem>
-                    <SelectItem value="position_asc">Position</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={positionFilter} onValueChange={(value) => setPositionFilter(value as DraftPositionFilter)}>
+                  <SelectTrigger className="h-12 rounded-2xl border-white/10 bg-white/5 text-[10px] font-black uppercase tracking-[0.16em]">
+                    <SelectValue placeholder="Position Filter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Positions</SelectItem>
+                    <SelectItem value="QB">QB (ADP)</SelectItem>
+                    <SelectItem value="RB">RB (ADP)</SelectItem>
+                    <SelectItem value="WR">WR (ADP)</SelectItem>
+                    <SelectItem value="TE">TE (ADP)</SelectItem>
+                    <SelectItem value="K">K (ADP)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {pickMutation.error && (
+              {(draftPickErrorMessage || pickMutation.error) && (
                 <div className="rounded-2xl border border-red-400/20 bg-red-500/5 p-4 text-[10px] font-black uppercase tracking-[0.18em] text-red-300">
-                  {formatApiError(pickMutation.error, "Unable to save draft pick.")}
+                  {draftPickErrorMessage || formatApiError(pickMutation.error, "Unable to save draft pick.")}
                 </div>
               )}
 
@@ -1228,11 +1365,11 @@ export default function Draft() {
                 <div className="grid grid-cols-[68px_minmax(0,1fr)_90px_170px_110px_90px_170px_210px] gap-4 border-b border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-[0.28em] text-muted-foreground/70 sticky top-0 bg-[#071327]/95 backdrop-blur">
                   <span>#</span>
                   <span>Player</span>
-                  <span className={sortMode === "position_asc" ? "text-primary" : ""}>Pos</span>
+                  <span className={positionFilter !== "ALL" ? "text-primary" : ""}>Pos</span>
                   <span>School</span>
                   <span>Class</span>
-                  <span className={sortMode === "adp_asc" ? "text-primary" : ""}>ADP</span>
-                  <span className={sortMode === "projection_desc" ? "text-primary" : ""}>Proj Pts</span>
+                  <span className={effectiveSortMode === "adp_asc" ? "text-primary" : ""}>ADP</span>
+                  <span className={effectiveSortMode === "projection_desc" ? "text-primary" : ""}>Proj Pts</span>
                   <span className="text-right">Action</span>
                 </div>
 
@@ -1251,72 +1388,85 @@ export default function Draft() {
                       const playerSchool = String(player.school ?? "-");
                       const playerClass = String(player.playerClass ?? "-").toUpperCase();
                       const boardRankDisplay = player.draftRank;
+                      const playerCanFitRoster = canPlayerFitActiveRoster(player);
+                      const rosterLockReason = getPlayerRosterLockReason(player);
                       return (
-                      <div
-                        key={player.id}
-                        className="grid grid-cols-[68px_minmax(0,1fr)_90px_170px_110px_90px_170px_210px] items-center gap-4 border-b border-white/5 px-5 py-3 last:border-b-0 hover:bg-primary/[0.08] transition-colors"
-                      >
-                        <span className="inline-flex h-8 min-w-[46px] items-center justify-center rounded-full border border-primary/35 bg-primary/15 px-3 text-[11px] font-black uppercase tracking-[0.16em] text-primary shadow-[0_0_14px_rgba(59,130,246,0.35)]">
-                          #{boardRankDisplay}
-                        </span>
-                        <div className="min-w-0">
-                          <button
-                            type="button"
-                            className="truncate text-left text-sm font-black uppercase tracking-tight text-foreground hover:text-primary"
-                            onClick={() => setSelectedPlayerId(player.id)}
-                          >
-                            {player.name}
-                          </button>
-                        </div>
-                        <span
-                          className={`inline-flex h-8 min-w-[58px] items-center justify-center gap-1 rounded-full border px-2 text-[10px] font-black uppercase tracking-[0.14em] ${
-                            positionPillClass[playerPos] ?? "border-white/20 bg-white/10 text-foreground"
+                        <div
+                          key={player.id}
+                          className={`grid grid-cols-[68px_minmax(0,1fr)_90px_170px_110px_90px_170px_210px] items-center gap-4 border-b border-white/5 px-5 py-3 last:border-b-0 hover:bg-primary/[0.08] transition-colors ${
+                            playerCanFitRoster ? "" : "bg-white/[0.02] opacity-70"
                           }`}
                         >
+                          <span className="inline-flex h-8 min-w-[46px] items-center justify-center rounded-full border border-primary/35 bg-primary/15 px-3 text-[11px] font-black uppercase tracking-[0.16em] text-primary shadow-[0_0_14px_rgba(59,130,246,0.35)]">
+                            #{boardRankDisplay}
+                          </span>
+                          <div className="min-w-0">
+                            <button
+                              type="button"
+                              className="truncate text-left text-sm font-black uppercase tracking-tight text-foreground hover:text-primary"
+                              onClick={() => setSelectedPlayerId(player.id)}
+                            >
+                              {player.name}
+                            </button>
+                          </div>
                           <span
-                            className={`h-2 w-2 rounded-full ${positionDotClass[playerPos] ?? "bg-white/60"}`}
-                          />
-                          {playerPos}
-                        </span>
-                        <span className="truncate text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{playerSchool}</span>
-                        <span className="truncate text-[10px] font-black uppercase tracking-[0.2em] text-foreground/80">{playerClass}</span>
-                        <span className="inline-flex h-8 min-w-[62px] items-center justify-center rounded-full border border-white/20 bg-white/5 px-2 text-[10px] font-black uppercase tracking-[0.14em] text-foreground tabular-nums">
-                          {formatProjection(player.adpRank)}
-                        </span>
-                        <span className="inline-flex h-8 min-w-[84px] items-center justify-center rounded-full border border-primary/30 bg-primary/10 px-2 text-[10px] font-black uppercase tracking-[0.14em] text-primary tabular-nums shadow-[0_0_16px_rgba(59,130,246,0.28)]">
-                          {formatProjection(player.projectedStandardPoints)}
-                        </span>
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-9 rounded-xl text-[9px] font-black uppercase tracking-[0.18em]"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void addToQueue(player.id);
-                            }}
-                            disabled={
-                              queuePlayerIds.includes(player.id) ||
-                              draftedIds.has(player.id) ||
-                              queueAddMutation.isPending
-                            }
+                            className={`inline-flex h-8 min-w-[58px] items-center justify-center gap-1 rounded-full border px-2 text-[10px] font-black uppercase tracking-[0.14em] ${
+                              positionPillClass[playerPos] ?? "border-white/20 bg-white/10 text-foreground"
+                            }`}
                           >
-                            Queue
-                          </Button>
-                          <Button
-                            type="button"
-                            className="h-9 rounded-xl text-[9px] font-black uppercase tracking-[0.18em]"
-                            disabled={!draftRoom.can_make_pick || pickMutation.isPending || draftedIds.has(player.id)}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void makePick(player.id);
-                            }}
-                          >
-                            {pickMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : draftedIds.has(player.id) ? "Drafted" : "Draft"}
-                          </Button>
+                            <span
+                              className={`h-2 w-2 rounded-full ${positionDotClass[playerPos] ?? "bg-white/60"}`}
+                            />
+                            {playerPos}
+                          </span>
+                          <span className="truncate text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{playerSchool}</span>
+                          <span className="truncate text-[10px] font-black uppercase tracking-[0.2em] text-foreground/80">{playerClass}</span>
+                          <span className="inline-flex h-8 min-w-[62px] items-center justify-center rounded-full border border-white/20 bg-white/5 px-2 text-[10px] font-black uppercase tracking-[0.14em] text-foreground tabular-nums">
+                            {formatProjection(player.adpRank)}
+                          </span>
+                          <span className="inline-flex h-8 min-w-[84px] items-center justify-center rounded-full border border-primary/30 bg-primary/10 px-2 text-[10px] font-black uppercase tracking-[0.14em] text-primary tabular-nums shadow-[0_0_16px_rgba(59,130,246,0.28)]">
+                            {formatProjection(player.projectedStandardPoints)}
+                          </span>
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="h-9 rounded-xl text-[9px] font-black uppercase tracking-[0.18em]"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void addToQueue(player.id);
+                                }}
+                                disabled={
+                                  queuePlayerIds.includes(player.id) ||
+                                  draftedIds.has(player.id) ||
+                                  queueAddMutation.isPending
+                                }
+                              >
+                                Queue
+                              </Button>
+                              <Button
+                                type="button"
+                                className="h-9 rounded-xl text-[9px] font-black uppercase tracking-[0.18em]"
+                                disabled={!draftRoom.can_make_pick || pickMutation.isPending || draftedIds.has(player.id) || !playerCanFitRoster}
+                                title={rosterLockReason || undefined}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void makePick(player.id);
+                                }}
+                              >
+                                {pickMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : draftedIds.has(player.id) ? "Drafted" : "Draft"}
+                              </Button>
+                            </div>
+                            {rosterLockReason && (
+                              <p className="text-right text-[8px] font-black uppercase tracking-[0.12em] text-amber-200/80">
+                                {rosterLockReason}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )})
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -1360,7 +1510,7 @@ export default function Draft() {
                 <div className="flex gap-2">
                   <Button
                     className="h-10 rounded-xl text-[9px] font-black uppercase tracking-[0.18em]"
-                    disabled={!draftRoom.can_make_pick || queuedPlayers.length === 0 || pickMutation.isPending}
+                    disabled={!draftRoom.can_make_pick || draftableQueuedPlayers.length === 0 || pickMutation.isPending}
                     onClick={() => void draftNextQueued()}
                   >
                     Draft Next
@@ -1413,7 +1563,7 @@ export default function Draft() {
                   value={selectedRosterTeamId ? String(selectedRosterTeamId) : ""}
                   onValueChange={(value) => setSelectedRosterTeamId(Number(value))}
                 >
-                  <SelectTrigger className="h-10 min-w-[220px] rounded-xl border-white/20 bg-white/5 text-[10px] font-black uppercase tracking-[0.16em]">
+                  <SelectTrigger className="h-10 min-w-[220px] rounded-xl border-primary/25 bg-white/5 text-[10px] font-black uppercase tracking-[0.16em] shadow-[0_0_14px_rgba(59,130,246,0.18)] transition-all duration-300 hover:border-primary/45 hover:shadow-[0_0_22px_rgba(59,130,246,0.26)]">
                     <SelectValue placeholder="Select team" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1433,7 +1583,8 @@ export default function Draft() {
                   </p>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.03] p-5 space-y-4">
+                <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-b from-white/[0.06] to-white/[0.03] p-5 shadow-[0_0_24px_rgba(59,130,246,0.2)] space-y-4">
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_0%,rgba(59,130,246,0.16),transparent_52%)]" />
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div>
                       <p className="text-sm font-black uppercase tracking-tight text-foreground">{selectedRosterTeam.team_name}</p>
@@ -1446,22 +1597,23 @@ export default function Draft() {
                     {selectedRosterSlots.map((slotRow) => {
                       const positionAccent =
                         slotRow.key === "QB"
-                          ? "border-blue-400/25 bg-blue-500/[0.08]"
+                          ? "border-blue-400/25 bg-blue-500/[0.08] shadow-[0_0_14px_rgba(96,165,250,0.2)]"
                           : slotRow.key === "RB"
-                            ? "border-emerald-400/25 bg-emerald-500/[0.08]"
+                            ? "border-emerald-400/25 bg-emerald-500/[0.08] shadow-[0_0_14px_rgba(52,211,153,0.2)]"
                             : slotRow.key === "WR"
-                              ? "border-violet-400/25 bg-violet-500/[0.08]"
+                              ? "border-violet-400/25 bg-violet-500/[0.08] shadow-[0_0_14px_rgba(167,139,250,0.2)]"
                               : slotRow.key === "TE"
-                                ? "border-amber-400/25 bg-amber-500/[0.08]"
+                                ? "border-amber-400/25 bg-amber-500/[0.08] shadow-[0_0_14px_rgba(251,191,36,0.18)]"
                                 : slotRow.key === "FLEX"
-                                  ? "border-cyan-400/25 bg-cyan-500/[0.08]"
+                                  ? "border-cyan-400/25 bg-cyan-500/[0.08] shadow-[0_0_14px_rgba(34,211,238,0.2)]"
                                   : slotRow.key === "K"
-                                    ? "border-slate-400/25 bg-slate-500/[0.08]"
+                                    ? "border-slate-400/25 bg-slate-500/[0.08] shadow-[0_0_12px_rgba(148,163,184,0.16)]"
                                     : slotRow.key === "IR"
-                                      ? "border-rose-400/25 bg-rose-500/[0.08]"
-                                      : "border-white/12 bg-white/[0.03]";
+                                      ? "border-rose-400/25 bg-rose-500/[0.08] shadow-[0_0_14px_rgba(251,113,133,0.18)]"
+                                      : "border-white/12 bg-white/[0.03] shadow-[0_0_10px_rgba(148,163,184,0.12)]";
                       return (
-                        <div key={slotRow.label} className={`rounded-xl border px-3 py-3 ${positionAccent}`}>
+                        <div key={slotRow.label} className={`relative overflow-hidden rounded-xl border px-3 py-3 transition-all duration-300 hover:-translate-y-[1px] hover:brightness-110 ${positionAccent}`}>
+                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/[0.04] via-transparent to-transparent" />
                           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">{slotRow.label}</p>
                           {slotRow.player ? (
                             <>
@@ -1646,13 +1798,23 @@ export default function Draft() {
             </div>
 
             <div className="flex items-center justify-between gap-3 border-t border-white/10 bg-[#0B1A35] px-6 py-4">
+              {selectedPlayerRosterLockReason && (
+                <p className="max-w-[260px] text-[9px] font-black uppercase tracking-[0.14em] text-amber-200/85">
+                  {selectedPlayerRosterLockReason}
+                </p>
+              )}
               <Button
                 type="button"
                 variant="outline"
                 className="h-10 rounded-lg text-[10px] font-black uppercase tracking-[0.14em]"
-                disabled={!draftRoom.can_make_pick || pickMutation.isPending || selectedPlayerDrafted}
+                disabled={!draftRoom.can_make_pick || pickMutation.isPending || selectedPlayerDrafted || !selectedPlayerCanFitRoster}
+                title={selectedPlayerRosterLockReason || undefined}
                 onClick={async () => {
                   if (!selectedPlayer) return;
+                  if (!canPlayerFitActiveRoster(selectedPlayer)) {
+                    await makePick(selectedPlayer.id);
+                    return;
+                  }
                   await makePick(selectedPlayer.id);
                   setSelectedPlayerId(null);
                 }}

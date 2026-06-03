@@ -4,28 +4,31 @@ import asyncio
 from collections import defaultdict
 from collections.abc import Iterable
 from datetime import datetime, timezone
+from typing import TypeAlias
 
 from fastapi import WebSocket
+
+RoomKey: TypeAlias = str | int
 
 
 class DraftRealtimeManager:
     def __init__(self) -> None:
-        self._connections: dict[int, set[WebSocket]] = defaultdict(set)
+        self._connections: dict[RoomKey, set[WebSocket]] = defaultdict(set)
         self._lock = asyncio.Lock()
 
-    async def connect(self, league_id: int, websocket: WebSocket) -> None:
+    async def connect(self, room_key: RoomKey, websocket: WebSocket) -> None:
         await websocket.accept()
         async with self._lock:
-            self._connections[league_id].add(websocket)
+            self._connections[room_key].add(websocket)
 
-    async def disconnect(self, league_id: int, websocket: WebSocket) -> None:
+    async def disconnect(self, room_key: RoomKey, websocket: WebSocket) -> None:
         async with self._lock:
-            room = self._connections.get(league_id)
+            room = self._connections.get(room_key)
             if not room:
                 return
             room.discard(websocket)
             if not room:
-                self._connections.pop(league_id, None)
+                self._connections.pop(room_key, None)
 
     async def connection_stats(self) -> dict[str, int]:
         async with self._lock:
@@ -35,7 +38,7 @@ class DraftRealtimeManager:
 
     async def broadcast(
         self,
-        league_id: int,
+        room_key: RoomKey,
         event: str,
         *,
         payload: dict | None = None,
@@ -49,7 +52,7 @@ class DraftRealtimeManager:
         occurred_at: datetime | None = None,
     ) -> None:
         async with self._lock:
-            sockets = list(self._connections.get(league_id, set()))
+            sockets = list(self._connections.get(room_key, set()))
         if not sockets:
             return
 
@@ -63,7 +66,7 @@ class DraftRealtimeManager:
             "entity_id": entity_id,
             "seq": seq,
             "schema_version": schema_version,
-            "league_id": league_id,
+            "room_key": str(room_key),
             "at": resolved_at.isoformat(),
             "payload": payload or {},
         }
@@ -78,7 +81,7 @@ class DraftRealtimeManager:
                 stale.append(socket)
 
         for socket in stale:
-            await self.disconnect(league_id, socket)
+            await self.disconnect(room_key, socket)
 
 
 draft_realtime_manager = DraftRealtimeManager()

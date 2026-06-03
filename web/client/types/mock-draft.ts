@@ -1,55 +1,55 @@
-export interface DraftRoomTeam {
+import type { DraftEventEnvelope, DraftPositionEligibility, DraftQueueItem, DraftRoomPick, DraftRoomTeam, DraftRosterTeam } from "./draft";
+
+export interface MockDraftSeat {
   id: number;
+  seat_number: number;
   name: string;
-  owner_user_id: number | null;
   owner_name: string | null;
+  owner_user_id: number | null;
+  is_cpu: boolean;
   lobby_joined: boolean;
   lobby_connected: boolean;
   lobby_ready: boolean;
 }
 
-export interface DraftRoomPick {
+export interface MockDraftSession {
   id: number;
-  overall_pick: number;
-  round_number: number;
-  round_pick: number;
-  team_id: number;
-  team_name: string;
-  player_id: number;
-  player_name: string;
-  player_position: string;
-  player_school: string;
-  made_by_user_id: number | null;
+  name: string;
+  invite_code: string;
+  mode: "public_multiplayer" | "single_player";
+  status: string;
+  manager_count: number;
+  pick_timer_seconds: number;
+  draft_type: string;
+  commissioner_user_id: number;
+  roster_slots: Record<string, number>;
+  scoring_json: Record<string, unknown>;
+  seats: MockDraftSeat[];
+  joined_count: number;
+  connected_count: number;
+  ready_count: number;
+  user_seat_id: number | null;
+  seconds_remaining: number | null;
+  can_enter_room: boolean;
   created_at: string;
+  updated_at: string;
 }
 
-export interface DraftRosterPlayer {
-  player_id: number;
-  player_name: string;
-  position: string;
-  school: string;
-  slot: string;
-  projected_fantasy_points: number | null;
+export interface MockDraftPreview {
+  id: number;
+  name: string;
+  invite_code: string;
+  mode: "public_multiplayer" | "single_player";
+  status: string;
+  manager_count: number;
+  joined_count: number;
+  pick_timer_seconds: number;
 }
 
-export interface DraftRosterTeam {
-  team_id: number;
-  team_name: string;
-  total_projected_points: number;
-  position_counts: Record<string, number>;
-  slots: Record<string, DraftRosterPlayer[]>;
-}
-
-export interface DraftPositionEligibility {
-  can_draft: boolean;
-  reason: string | null;
-  destination_slot: string | null;
-}
-
-export interface DraftRoom {
+export interface MockDraftRoom {
   draft_room_id: number;
-  league_id: number;
-  draft_id: number;
+  mock_draft_id: number;
+  mode: "public_multiplayer" | "single_player";
   status: string;
   draft_status: "waiting" | "active" | "paused" | "complete";
   pick_timer_seconds: number;
@@ -88,41 +88,15 @@ export interface DraftRoom {
   updated_at: string;
 }
 
-export interface DraftEventEnvelope {
-  event_id: string;
-  event: string;
-  event_type: string;
-  league_id: number;
-  entity_type: string;
-  entity_id: number | null;
-  seq: number;
-  schema_version: number;
-  at: string;
-  payload: Record<string, unknown>;
-}
-
-export interface DraftRoomSnapshot {
-  draft_room: DraftRoom;
+export interface MockDraftRoomSnapshot {
+  draft_room: MockDraftRoom;
   events: DraftEventEnvelope[];
   latest_seq: number;
 }
 
-export interface DraftQueueItem {
-  id: number;
-  priority: number;
-  player_id: number;
-  player_name: string;
-  player_position: string;
-  player_school: string;
-  player_class: string | null;
-  projected_fantasy_points: number | null;
-  adp: number | null;
-}
-
-export interface DraftQueue {
-  draft_id: number;
-  league_id: number;
-  team_id: number;
+export interface MockDraftQueue {
+  session_id: number;
+  seat_id: number;
   count: number;
   data: DraftQueueItem[];
 }

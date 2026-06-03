@@ -46,6 +46,12 @@ class DraftRosterTeamRead(BaseModel):
     slots: dict[str, list[DraftRosterPlayerRead]]
 
 
+class DraftPositionEligibilityRead(BaseModel):
+    can_draft: bool
+    reason: str | None = None
+    destination_slot: str | None = None
+
+
 class DraftRoomRead(BaseModel):
     draft_room_id: int
     league_id: int
@@ -53,7 +59,10 @@ class DraftRoomRead(BaseModel):
     status: str
     draft_status: Literal["waiting", "active", "paused", "complete"]
     pick_timer_seconds: int
+    total_rounds: int
+    total_picks: int
     roster_slots: dict[str, int]
+    position_eligibility: dict[str, DraftPositionEligibilityRead] = Field(default_factory=dict)
     draft_order: list[int] = Field(default_factory=list)
     drafted_player_ids: list[int] = Field(default_factory=list)
     available_player_count: int = 0

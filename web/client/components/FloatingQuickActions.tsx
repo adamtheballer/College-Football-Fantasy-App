@@ -46,7 +46,10 @@ export function FloatingQuickActions() {
   const isDraftRoute =
     location.pathname === "/draft" ||
     /^\/league\/\d+\/draft\/?$/.test(location.pathname) ||
-    /^\/league\/\d+\/lobby\/?$/.test(location.pathname);
+    /^\/league\/\d+\/lobby\/?$/.test(location.pathname) ||
+    /^\/mock-drafts\/\d+\/lobby\/?$/.test(location.pathname) ||
+    /^\/mock-drafts\/\d+\/room\/?$/.test(location.pathname) ||
+    /^\/mock-drafts\/\d+\/board\/?$/.test(location.pathname);
   if (!isLoggedIn || hiddenRoutes.includes(location.pathname) || isDraftRoute) {
     return null;
   }

@@ -7,6 +7,7 @@ import re
 import asyncio
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, WebSocket, WebSocketDisconnect, status
@@ -132,6 +133,11 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 OFFENSE_DRAFT_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
+DRAFT_POSITION_FULL_REASON = "You cannot draft this position because your roster has no available slot for it."
+DRAFT_POSITION_LOCK_REASON = "Roster full for this position"
+FLEX_ELIGIBLE_POSITIONS = {"RB", "WR", "TE"}
+SUPERFLEX_ELIGIBLE_POSITIONS = {"QB", "RB", "WR", "TE"}
+DRAFTABLE_SLOT_KEYS = {"QB", "RB", "WR", "TE", "K", "DEF", "FLEX", "SUPERFLEX", "BENCH"}
 MATCHMAKING_TEAM_COUNTS = {4, 6, 8, 10, 12, 14, 16}
 PUBLIC_JOINABLE_STATUSES = {"pre_draft", "matchmaking", "draft_scheduled"}
 SHEET_HEADER_ALIASES = {
@@ -802,6 +808,30 @@ def _apply_adp_formula(valid_rows: list[dict[str, object]]) -> None:
         )
 
 
+def _apply_projection_name_overrides(valid_rows: list[dict[str, object]]) -> None:
+    hollywood_smothers_aliases = {
+        _normalize_player_name("Hollywood Smothers"),
+        _normalize_player_name("Hollylwood Smothers"),
+        _normalize_player_name("Daylan Smothers"),
+        _normalize_player_name("Daylan Hollywood Smothers"),
+    }
+    projection_bonus_points = 4.0
+    for row in valid_rows:
+        normalized_name = _normalize_player_name(str(row.get("name") or ""))
+        if normalized_name not in hollywood_smothers_aliases:
+            continue
+        current_projection = float(row.get("projected_fantasy_points") or 0.0)
+        boosted_projection = round(max(0.0, current_projection + projection_bonus_points), 2)
+        row["projected_fantasy_points"] = boosted_projection
+        logger.info(
+            "sheet_sync_projection_override player=%s base=%.2f boosted=%.2f bonus=%.2f",
+            row.get("name"),
+            current_projection,
+            boosted_projection,
+            projection_bonus_points,
+        )
+
+
 def _get_or_create_global_watchlist(
     db: Session,
     *,
@@ -1076,95 +1106,163 @@ def _draft_pick_prep_remaining_seconds(
     return max(0, int(math.ceil(delta_seconds)))
 
 
+@dataclass(frozen=True)
+class DraftPositionFit:
+    can_draft: bool
+    reason: str | None = None
+    destination_slot: str | None = None
+
+
+def _canonical_roster_slot_key(value: str) -> str:
+    normalized = (value or "").strip().upper()
+    if not normalized:
+        return ""
+    if normalized.startswith("SUPERFLEX"):
+        return "SUPERFLEX"
+    if normalized.startswith("FLEX"):
+        return "FLEX"
+    if normalized in {"BE", "BN"} or normalized.startswith("BENCH"):
+        return "BENCH"
+    if normalized.startswith("IR"):
+        return "IR"
+    if normalized in {"DST", "D/ST"} or normalized.startswith("DEF"):
+        return "DEF"
+    for base in ("QB", "RB", "WR", "TE", "K"):
+        if normalized.startswith(base):
+            return base
+    return normalized
+
+
+def _build_canonical_slot_limits(raw_limits: dict | None) -> dict[str, int]:
+    canonical: dict[str, int] = {
+        "QB": 0,
+        "RB": 0,
+        "WR": 0,
+        "TE": 0,
+        "FLEX": 0,
+        "SUPERFLEX": 0,
+        "K": 0,
+        "DEF": 0,
+        "BENCH": 0,
+        "IR": 0,
+    }
+    for raw_key, raw_value in (raw_limits or {}).items():
+        slot_key = _canonical_roster_slot_key(str(raw_key))
+        if slot_key not in canonical:
+            continue
+        try:
+            limit = int(raw_value)
+        except (TypeError, ValueError):
+            continue
+        if limit <= 0:
+            continue
+        canonical[slot_key] += limit
+    return canonical
+
+
+def _roster_slot_counts(roster: object) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    if isinstance(roster, dict):
+        for raw_slot, raw_value in roster.items():
+            slot_key = _canonical_roster_slot_key(str(raw_slot))
+            if not slot_key:
+                continue
+            if isinstance(raw_value, (list, tuple, set)):
+                count = len(raw_value)
+            else:
+                try:
+                    count = int(raw_value)
+                except (TypeError, ValueError):
+                    count = 0
+            counts[slot_key] = counts.get(slot_key, 0) + max(0, count)
+        return counts
+
+    for entry in roster or []:
+        raw_slot = getattr(entry, "slot", None)
+        if raw_slot is None and isinstance(entry, dict):
+            raw_slot = entry.get("slot")
+        slot_key = _canonical_roster_slot_key(str(raw_slot or ""))
+        if slot_key:
+            counts[slot_key] = counts.get(slot_key, 0) + 1
+    return counts
+
+
+def _draftable_roster_rounds_from_slots(roster_slots: dict | None) -> int:
+    slot_limits = _build_canonical_slot_limits(roster_slots)
+    return sum(int(slot_limits.get(slot, 0)) for slot in DRAFTABLE_SLOT_KEYS)
+
+
+def can_draft_position(
+    player_position: str,
+    roster: object,
+    roster_settings: LeagueSettings | dict,
+) -> DraftPositionFit:
+    normalized_position = _normalize_position(player_position)
+    if not normalized_position:
+        return DraftPositionFit(
+            can_draft=False,
+            reason="invalid player position",
+            destination_slot=None,
+        )
+
+    if isinstance(roster_settings, LeagueSettings):
+        roster_slots = roster_settings.roster_slots_json or FIXED_ROSTER_SLOTS
+        superflex_enabled = bool(roster_settings.superflex_enabled)
+    else:
+        roster_slots = roster_settings or FIXED_ROSTER_SLOTS
+        superflex_enabled = bool(roster_slots.get("superflex_enabled", False)) if isinstance(roster_slots, dict) else False
+
+    slot_limits = _build_canonical_slot_limits(roster_slots)
+    current_counts = _roster_slot_counts(roster)
+
+    primary_limit = int(slot_limits.get(normalized_position, 0))
+    if primary_limit and current_counts.get(normalized_position, 0) < primary_limit:
+        return DraftPositionFit(can_draft=True, destination_slot=normalized_position)
+
+    flex_limit = int(slot_limits.get("FLEX", 0))
+    if (
+        normalized_position in FLEX_ELIGIBLE_POSITIONS
+        and flex_limit
+        and current_counts.get("FLEX", 0) < flex_limit
+    ):
+        return DraftPositionFit(can_draft=True, destination_slot="FLEX")
+
+    superflex_limit = int(slot_limits.get("SUPERFLEX", 0))
+    if (
+        superflex_enabled
+        and normalized_position in SUPERFLEX_ELIGIBLE_POSITIONS
+        and superflex_limit
+        and current_counts.get("SUPERFLEX", 0) < superflex_limit
+    ):
+        return DraftPositionFit(can_draft=True, destination_slot="SUPERFLEX")
+
+    bench_limit = int(slot_limits.get("BENCH", 0))
+    if current_counts.get("BENCH", 0) < bench_limit:
+        return DraftPositionFit(can_draft=True, destination_slot="BENCH")
+
+    return DraftPositionFit(
+        can_draft=False,
+        reason=DRAFT_POSITION_FULL_REASON,
+        destination_slot=None,
+    )
+
+
+def _team_roster_entries(db: Session, team_id: int) -> list[RosterEntry]:
+    return db.query(RosterEntry).filter(RosterEntry.team_id == team_id).all()
+
+
 def _assign_roster_slot(
     db: Session,
     settings_row: LeagueSettings,
     team_id: int,
     player_position: str,
 ) -> str:
-    roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
-    normalized_position = _normalize_position(player_position)
-    if not normalized_position:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid player position")
-
-    def _canonical_roster_slot_key(value: str) -> str:
-        normalized = (value or "").strip().upper()
-        if not normalized:
-            return ""
-        if normalized.startswith("SUPERFLEX"):
-            return "SUPERFLEX"
-        if normalized.startswith("FLEX"):
-            return "FLEX"
-        if normalized in {"BE", "BN"} or normalized.startswith("BENCH"):
-            return "BENCH"
-        if normalized.startswith("IR"):
-            return "IR"
-        for base in ("QB", "RB", "WR", "TE", "K"):
-            if normalized.startswith(base):
-                return base
-        return normalized
-
-    def _build_canonical_slot_limits(raw_limits: dict) -> dict[str, int]:
-        canonical: dict[str, int] = {
-            "QB": 0,
-            "RB": 0,
-            "WR": 0,
-            "TE": 0,
-            "FLEX": 0,
-            "SUPERFLEX": 0,
-            "K": 0,
-            "BENCH": 0,
-            "IR": 0,
-        }
-        for raw_key, raw_value in (raw_limits or {}).items():
-            slot_key = _canonical_roster_slot_key(str(raw_key))
-            if slot_key not in canonical:
-                continue
-            try:
-                limit = int(raw_value)
-            except (TypeError, ValueError):
-                continue
-            if limit <= 0:
-                continue
-            canonical[slot_key] += limit
-        return canonical
-
-    slot_limits = _build_canonical_slot_limits(roster_slots)
-    raw_counts = (
-        db.query(RosterEntry.slot, func.count(RosterEntry.id))
-        .filter(RosterEntry.team_id == team_id)
-        .group_by(RosterEntry.slot)
-        .all()
-    )
-    current_counts: dict[str, int] = {}
-    for raw_slot, raw_count in raw_counts:
-        slot_key = _canonical_roster_slot_key(str(raw_slot))
-        if not slot_key:
-            continue
-        current_counts[slot_key] = current_counts.get(slot_key, 0) + int(raw_count or 0)
-
-    primary_limit = int(slot_limits.get(normalized_position, 0))
-    if primary_limit and current_counts.get(normalized_position, 0) < primary_limit:
-        return normalized_position
-
-    flex_limit = int(slot_limits.get("FLEX", 0))
-    if normalized_position in {"RB", "WR", "TE"} and flex_limit and current_counts.get("FLEX", 0) < flex_limit:
-        return "FLEX"
-
-    if settings_row.superflex_enabled:
-        superflex_limit = int(slot_limits.get("SUPERFLEX", 0))
-        if normalized_position == "QB" and current_counts.get("SUPERFLEX", 0) < superflex_limit:
-            return "SUPERFLEX"
-
-    bench_limit = int(slot_limits.get("BENCH", 0))
-    if current_counts.get("BENCH", 0) < bench_limit:
-        return "BENCH"
-
-    ir_limit = int(slot_limits.get("IR", 0))
-    if current_counts.get("IR", 0) < ir_limit:
-        return "IR"
-
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="team roster is full")
+    roster_entries = _team_roster_entries(db, team_id)
+    fit = can_draft_position(player_position, roster_entries, settings_row)
+    if not fit.can_draft or not fit.destination_slot:
+        detail = "invalid player position" if fit.reason == "invalid player position" else DRAFT_POSITION_FULL_REASON
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+    return fit.destination_slot
 
 
 def _ordered_autopick_candidates(
@@ -1374,8 +1472,12 @@ def _draft_queue_state(
 
 
 def _total_draft_picks_for_league(*, settings_row: LeagueSettings, team_count: int) -> int:
+    return _total_roster_slot_rounds(settings_row=settings_row) * team_count
+
+
+def _total_roster_slot_rounds(*, settings_row: LeagueSettings) -> int:
     roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
-    return sum(int(value) for value in roster_slots.values()) * team_count
+    return max(1, _draftable_roster_rounds_from_slots(roster_slots))
 
 
 def _seconds_remaining_for_current_pick(
@@ -1572,34 +1674,24 @@ def _autopick_timed_out_current_team(
         if existing_timeout_pick:
             return False
 
-        selected_player = _queued_autopick_candidate(
+        # Timeout autopicks must mirror the draft board directly:
+        # pick the top available ADP player, and only fall through when
+        # that player's position cannot fit any valid slot for this roster.
+        selected_player: Player | None = None
+        selected_slot: str | None = None
+        current_team_roster = _team_roster_entries(db, current_team.id)
+        candidates = _ordered_autopick_candidates(
             db,
             draft_id=draft_row.id,
             league_id=league.id,
-            team_id=current_team.id,
         )
-        selected_slot: str | None = None
-        if selected_player is not None:
-            try:
-                selected_slot = _assign_roster_slot(db, settings_row, current_team.id, selected_player.position)
-            except HTTPException:
-                selected_player = None
-                selected_slot = None
-
-        if selected_player is None:
-            candidates = _ordered_autopick_candidates(
-                db,
-                draft_id=draft_row.id,
-                league_id=league.id,
-            )
-            for candidate in candidates:
-                try:
-                    slot = _assign_roster_slot(db, settings_row, current_team.id, candidate.position)
-                except HTTPException:
-                    continue
-                selected_player = candidate
-                selected_slot = slot
-                break
+        for candidate in candidates:
+            fit = can_draft_position(candidate.position, current_team_roster, settings_row)
+            if not fit.can_draft or not fit.destination_slot:
+                continue
+            selected_player = candidate
+            selected_slot = fit.destination_slot
+            break
         if selected_player is None or selected_slot is None:
             return False
 
@@ -1789,11 +1881,36 @@ def _draft_room_state(db: Session, league: League, current_user: User) -> DraftR
             }
         )
 
+    total_rounds = _total_roster_slot_rounds(settings_row=settings_row)
     total_picks = _total_draft_picks_for_league(settings_row=settings_row, team_count=len(teams))
     current_pick = len(picks_rows) + 1
     current_round, current_round_pick, current_team = _draft_pick_team_for_number(teams, current_pick)
     if total_picks and len(picks_rows) >= total_picks:
         current_team = None
+
+    current_team_roster_entries = (
+        [
+            roster_entry
+            for roster_entry, _team, _player in roster_rows_by_team.get(current_team.id, [])
+        ]
+        if current_team
+        else []
+    )
+    position_eligibility: dict[str, dict[str, str | bool | None]] = {}
+    for position in ("QB", "RB", "WR", "TE", "K"):
+        fit = (
+            can_draft_position(position, current_team_roster_entries, settings_row)
+            if current_team
+            else DraftPositionFit(can_draft=False, reason="Draft is complete.", destination_slot=None)
+        )
+        reason = fit.reason
+        if reason == DRAFT_POSITION_FULL_REASON:
+            reason = DRAFT_POSITION_LOCK_REASON
+        position_eligibility[position] = {
+            "can_draft": fit.can_draft,
+            "reason": reason,
+            "destination_slot": fit.destination_slot,
+        }
 
     timer_state = db.query(DraftTimerState).filter(DraftTimerState.draft_id == draft_row.id).first()
     timer_started_at = timer_state.timer_started_at if timer_state else None
@@ -1878,7 +1995,10 @@ def _draft_room_state(db: Session, league: League, current_user: User) -> DraftR
         status=draft_row.status,
         draft_status=_draft_status_value(draft_row.status),
         pick_timer_seconds=draft_row.pick_timer_seconds,
+        total_rounds=total_rounds,
+        total_picks=total_picks,
         roster_slots=roster_slots,
+        position_eligibility=position_eligibility,
         draft_order=[team.id for team in teams],
         drafted_player_ids=drafted_player_ids,
         available_player_count=int(available_player_count),
@@ -1944,6 +2064,9 @@ def _normalize_position(value: str) -> str:
         return ""
 
     # Accept depth-chart labels like QB1 / RB2 / WR3 and keep base position.
+    if normalized in {"DST", "D/ST"} or normalized.startswith("DEF"):
+        return "DEF"
+
     for base in ("QB", "RB", "WR", "TE", "K"):
         if normalized.startswith(base):
             return base
@@ -1958,6 +2081,8 @@ def _normalize_position(value: str) -> str:
         "WR": "WR",
         "TE": "TE",
         "K": "K",
+        "DST": "DEF",
+        "DEF": "DEF",
     }
     for key, mapped in position_map.items():
         if compact.startswith(key):
@@ -2554,6 +2679,7 @@ def _sync_sheet_to_draft_and_watchlist(
                 }
             )
 
+    _apply_projection_name_overrides(valid_rows)
     _apply_adp_formula(valid_rows)
 
     wr_rows = sorted(
@@ -4162,8 +4288,7 @@ def create_draft_pick_endpoint(
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="no teams available for draft")
 
             existing_picks = db.query(DraftPick).filter(DraftPick.draft_id == draft_row.id).count()
-            roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
-            total_picks = sum(int(value) for value in roster_slots.values()) * len(teams)
+            total_picks = _total_draft_picks_for_league(settings_row=settings_row, team_count=len(teams))
             if total_picks and existing_picks >= total_picks:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="draft is complete")
 

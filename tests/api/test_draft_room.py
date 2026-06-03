@@ -2,8 +2,10 @@ from datetime import datetime, timedelta, timezone
 
 from collegefootballfantasy_api.app.api.routes import leagues as league_routes
 from collegefootballfantasy_api.app.models.draft import Draft
+from collegefootballfantasy_api.app.models.draft_team_queue_item import DraftTeamQueueItem
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
+from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 
@@ -245,6 +247,27 @@ def test_practice_setup_normalizes_to_manager_one_plus_unique_auto_managers(clie
         assert f"Auto Manager {index}" in team_names
 
 
+def test_draft_room_total_rounds_equals_roster_slot_count(client):
+    token = create_user_and_token(client, "round-count")
+    league = create_league(client, token)
+
+    setup_response = client.post(
+        f"/leagues/{league['id']}/draft-room/practice-setup",
+        json={
+            "team_count": 4,
+            "reset_existing": True,
+            "start_now": False,
+            "mock_team_prefix": "Auto Manager",
+        },
+        headers=auth_headers(token),
+    )
+    assert setup_response.status_code == 200
+    room = setup_response.json()
+    expected_rounds = sum(int(value) for key, value in room["roster_slots"].items() if key != "IR")
+    assert room["total_rounds"] == expected_rounds
+    assert room["total_picks"] == expected_rounds * len(room["teams"])
+
+
 def test_draft_room_timeout_autopicks_current_team_using_top_available_player(client, db_session):
     token = create_user_and_token(client, "solo-auto")
     league = create_league(client, token)
@@ -298,6 +321,88 @@ def test_draft_room_timeout_autopicks_current_team_using_top_available_player(cl
     assert auto_pick["player_id"] == player_ids[0]
     assert auto_pick["made_by_user_id"] is None
     assert updated_room["current_pick"] == 2
+
+
+def test_sheet_sync_projection_override_boosts_hollywood_smothers_only():
+    rows = [
+        {"name": "Hollywood Smothers", "projected_fantasy_points": 212.0, "position": "RB"},
+        {"name": "Another Player", "projected_fantasy_points": 212.0, "position": "RB"},
+    ]
+    league_routes._apply_projection_name_overrides(rows)
+    assert rows[0]["projected_fantasy_points"] == 216.0
+    assert rows[1]["projected_fantasy_points"] == 212.0
+
+
+def test_timeout_autopick_ignores_queue_and_uses_top_board_player_for_expired_user_turn(client, db_session):
+    token = create_user_and_token(client, "timeout-board-over-queue")
+    league = create_league(client, token)
+    player_ids = create_players(client, 24)
+
+    setup_response = client.post(
+        f"/leagues/{league['id']}/draft-room/practice-setup",
+        json={
+            "team_count": 4,
+            "reset_existing": True,
+            "start_now": False,
+            "mock_team_prefix": "CPU Team",
+        },
+        headers=auth_headers(token),
+    )
+    assert setup_response.status_code == 200
+    room = setup_response.json()
+    user_team_id = int(room["user_team_id"])
+    ordered_ids = [user_team_id] + [int(team_id) for team_id in room["draft_order"] if int(team_id) != user_team_id]
+    league_routes._persist_draft_order(
+        db_session,
+        league_id=league["id"],
+        ordered_team_ids=ordered_ids,
+        strategy="random",
+    )
+    db_session.commit()
+
+    draft_row = db_session.query(Draft).filter(Draft.league_id == league["id"]).first()
+    assert draft_row is not None
+    draft_row.status = "live"
+    db_session.add(draft_row)
+    db_session.flush()
+
+    # Queue the second player; timeout must still take player_ids[0] from top ADP board order.
+    db_session.add(
+        DraftTeamQueueItem(
+            draft_id=draft_row.id,
+            team_id=user_team_id,
+            player_id=player_ids[1],
+            priority=1,
+        )
+    )
+    timer_row = league_routes._get_or_create_draft_timer_state(db_session, draft_row.id)
+    assert timer_row is not None
+    timer_row.timer_started_at = datetime.now(timezone.utc) - timedelta(seconds=95)
+    timer_row.paused_at = None
+    timer_row.paused_total_seconds = 0
+    db_session.add(timer_row)
+    db_session.commit()
+
+    league_row = db_session.query(League).filter(League.id == league["id"]).first()
+    assert league_row is not None
+    changed = league_routes._autopick_timed_out_current_team(
+        db_session,
+        league=league_row,
+        current_user=None,
+    )
+    assert changed is True
+    db_session.commit()
+
+    room_response = client.get(
+        f"/leagues/{league['id']}/draft-room",
+        headers=auth_headers(token),
+    )
+    assert room_response.status_code == 200
+    updated_room = room_response.json()
+    assert len(updated_room["picks"]) == 1
+    assert updated_room["picks"][0]["team_id"] == user_team_id
+    assert updated_room["picks"][0]["player_id"] == player_ids[0]
+    assert updated_room["picks"][0]["player_id"] != player_ids[1]
 
 
 def test_manual_pick_is_blocked_when_pick_clock_is_expired(client, db_session):
@@ -970,6 +1075,190 @@ def test_assign_roster_slot_prefers_flex_before_bench_for_te_overflow(client, db
 
     bench_slot = league_routes._assign_roster_slot(db_session, settings_row, team_row.id, "TE3")
     assert bench_slot == "BENCH"
+
+
+def test_can_draft_position_blocks_position_when_only_ir_is_open(client, db_session):
+    token = create_user_and_token(client, "rb-full-ir-open")
+    league = create_league(client, token)
+
+    settings_row = db_session.query(LeagueSettings).filter(LeagueSettings.league_id == league["id"]).first()
+    assert settings_row is not None
+    settings_row.roster_slots_json = {
+        "QB": 1,
+        "RB": 1,
+        "WR": 0,
+        "TE": 0,
+        "FLEX": 1,
+        "K": 0,
+        "BENCH": 1,
+        "IR": 1,
+    }
+    db_session.add(settings_row)
+    db_session.commit()
+
+    team_row = db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id.isnot(None)).first()
+    assert team_row is not None
+
+    rb_one = create_player_with_position(client, name="Full RB One", position="RB")
+    rb_flex = create_player_with_position(client, name="Full RB Flex", position="RB")
+    rb_bench = create_player_with_position(client, name="Full RB Bench", position="RB")
+    db_session.add_all(
+        [
+            RosterEntry(league_id=league["id"], team_id=team_row.id, player_id=rb_one, slot="RB", status="active"),
+            RosterEntry(league_id=league["id"], team_id=team_row.id, player_id=rb_flex, slot="FLEX", status="active"),
+            RosterEntry(league_id=league["id"], team_id=team_row.id, player_id=rb_bench, slot="BENCH", status="active"),
+        ]
+    )
+    db_session.commit()
+
+    roster_entries = db_session.query(RosterEntry).filter(RosterEntry.team_id == team_row.id).all()
+    fit = league_routes.can_draft_position("RB", roster_entries, settings_row)
+
+    assert fit.can_draft is False
+    assert fit.destination_slot is None
+    assert fit.reason == league_routes.DRAFT_POSITION_FULL_REASON
+
+
+def test_manual_pick_blocks_position_when_active_manager_has_no_valid_slot(client, db_session):
+    token = create_user_and_token(client, "manual-rb-full")
+    league = create_league(client, token)
+
+    settings_row = db_session.query(LeagueSettings).filter(LeagueSettings.league_id == league["id"]).first()
+    assert settings_row is not None
+    settings_row.roster_slots_json = {
+        "QB": 1,
+        "RB": 1,
+        "WR": 0,
+        "TE": 0,
+        "FLEX": 1,
+        "K": 0,
+        "BENCH": 1,
+        "IR": 1,
+    }
+    db_session.add(settings_row)
+    db_session.commit()
+
+    team_row = db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id.isnot(None)).first()
+    assert team_row is not None
+
+    rb_one = create_player_with_position(client, name="Manual Full RB One", position="RB")
+    rb_flex = create_player_with_position(client, name="Manual Full RB Flex", position="RB")
+    rb_bench = create_player_with_position(client, name="Manual Full RB Bench", position="RB")
+    blocked_rb = create_player_with_position(client, name="Manual Blocked RB", position="RB")
+    db_session.add_all(
+        [
+            RosterEntry(league_id=league["id"], team_id=team_row.id, player_id=rb_one, slot="RB", status="active"),
+            RosterEntry(league_id=league["id"], team_id=team_row.id, player_id=rb_flex, slot="FLEX", status="active"),
+            RosterEntry(league_id=league["id"], team_id=team_row.id, player_id=rb_bench, slot="BENCH", status="active"),
+        ]
+    )
+    db_session.commit()
+    force_draft_live(db_session, league_id=league["id"])
+
+    room_response = client.get(
+        f"/leagues/{league['id']}/draft-room",
+        headers=auth_headers(token),
+    )
+    assert room_response.status_code == 200
+    room = room_response.json()
+    assert room["position_eligibility"]["RB"]["can_draft"] is False
+    assert room["position_eligibility"]["RB"]["reason"] == "Roster full for this position"
+    assert room["position_eligibility"]["QB"]["can_draft"] is True
+
+    pick_response = client.post(
+        f"/leagues/{league['id']}/draft-picks",
+        json={"player_id": blocked_rb},
+        headers=auth_headers(token),
+    )
+
+    assert pick_response.status_code == 400
+    assert pick_response.json()["detail"] == league_routes.DRAFT_POSITION_FULL_REASON
+
+
+def test_timeout_autopick_skips_players_that_do_not_fit_active_roster(client, db_session):
+    token = create_user_and_token(client, "auto-skip-rb-full")
+    league = create_league(client, token)
+
+    settings_row = db_session.query(LeagueSettings).filter(LeagueSettings.league_id == league["id"]).first()
+    assert settings_row is not None
+    settings_row.roster_slots_json = {
+        "QB": 1,
+        "RB": 1,
+        "WR": 0,
+        "TE": 0,
+        "FLEX": 1,
+        "K": 0,
+        "BENCH": 1,
+        "IR": 1,
+    }
+    db_session.add(settings_row)
+    db_session.commit()
+
+    team_row = db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id.isnot(None)).first()
+    assert team_row is not None
+
+    rb_one = create_player_with_position(client, name="Auto Full RB One", position="RB")
+    rb_flex = create_player_with_position(client, name="Auto Full RB Flex", position="RB")
+    rb_bench = create_player_with_position(client, name="Auto Full RB Bench", position="RB")
+    skipped_rb = create_player_with_position(client, name="Auto Skipped RB", position="RB")
+    selected_qb = create_player_with_position(client, name="Auto Selected QB", position="QB")
+    db_session.add_all(
+        [
+            RosterEntry(league_id=league["id"], team_id=team_row.id, player_id=rb_one, slot="RB", status="active"),
+            RosterEntry(league_id=league["id"], team_id=team_row.id, player_id=rb_flex, slot="FLEX", status="active"),
+            RosterEntry(league_id=league["id"], team_id=team_row.id, player_id=rb_bench, slot="BENCH", status="active"),
+        ]
+    )
+    db_session.query(Player).filter(Player.id == skipped_rb).update(
+        {"sheet_adp": 1.0, "sheet_projected_season_points": 99.0}
+    )
+    db_session.query(Player).filter(Player.id == selected_qb).update(
+        {"sheet_adp": 2.0, "sheet_projected_season_points": 98.0}
+    )
+    db_session.commit()
+
+    draft_row = db_session.query(Draft).filter(Draft.league_id == league["id"]).first()
+    assert draft_row is not None
+    draft_row.status = "live"
+    db_session.add(draft_row)
+    timer_row = league_routes._get_or_create_draft_timer_state(db_session, draft_row.id)
+    assert timer_row is not None
+    timer_row.timer_started_at = datetime.now(timezone.utc) - timedelta(seconds=95)
+    timer_row.paused_at = None
+    timer_row.paused_total_seconds = 0
+    db_session.add(timer_row)
+    db_session.commit()
+
+    league_row = db_session.query(League).filter(League.id == league["id"]).first()
+    assert league_row is not None
+    changed = league_routes._autopick_timed_out_current_team(
+        db_session,
+        league=league_row,
+        current_user=None,
+    )
+    assert changed is True
+    db_session.commit()
+
+    room_response = client.get(
+        f"/leagues/{league['id']}/draft-room",
+        headers=auth_headers(token),
+    )
+    assert room_response.status_code == 200
+    room = room_response.json()
+    assert len(room["picks"]) == 1
+    assert room["picks"][0]["player_id"] == selected_qb
+
+    selected_entry = (
+        db_session.query(RosterEntry)
+        .filter(
+            RosterEntry.league_id == league["id"],
+            RosterEntry.team_id == team_row.id,
+            RosterEntry.player_id == selected_qb,
+        )
+        .first()
+    )
+    assert selected_entry is not None
+    assert selected_entry.slot == "QB"
 
 
 def test_manual_pick_uses_flex_before_bench_when_wr_slots_full(client, db_session):
