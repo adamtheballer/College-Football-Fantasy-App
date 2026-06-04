@@ -176,6 +176,62 @@ def test_news_feed_sorting_transfers_and_hidden_filter(client, db_session):
     assert transfer_rows[0]["category"] == "transfer"
 
 
+def test_news_feed_recent_sort_and_team_news_group(client, db_session):
+    now = datetime.now(timezone.utc)
+    rows = []
+    for index, category in enumerate(["depth_chart", "coaching", "eligibility", "team_news", "general", "injury"]):
+        rows.append(
+            NewsItem(
+                source_name="Manual",
+                source_url=f"https://example.com/recent-{index}",
+                source_type="manual",
+                title=f"Recent {category} item {index}",
+                summary="Recent item.",
+                content_hash=f"hash-recent-{index}",
+                category=category,
+                status="new",
+                published_at=now - timedelta(minutes=index),
+                discovered_at=now - timedelta(minutes=index),
+                fantasy_relevance_score=50 + index,
+                confidence_score=0,
+                fantasy_impact="Monitor.",
+                tags_json=[category],
+                raw_payload_json={},
+            )
+        )
+    hidden = NewsItem(
+        source_name="Manual",
+        source_url="https://example.com/recent-hidden",
+        source_type="manual",
+        title="Hidden recent team item",
+        summary="Hidden.",
+        content_hash="hash-recent-hidden",
+        category="team_news",
+        status="hidden",
+        published_at=now + timedelta(minutes=1),
+        discovered_at=now + timedelta(minutes=1),
+        fantasy_relevance_score=100,
+        confidence_score=0,
+        fantasy_impact="Hidden.",
+        tags_json=["team_news"],
+        raw_payload_json={},
+    )
+    db_session.add_all([*rows, hidden])
+    db_session.commit()
+
+    recent = client.get("/news/feed?sort=recent&limit=5")
+    assert recent.status_code == 200
+    recent_rows = recent.json()["data"]
+    assert len(recent_rows) == 5
+    assert recent_rows[0]["title"] == "Recent depth_chart item 0"
+    assert all(row["title"] != "Hidden recent team item" for row in recent_rows)
+
+    team_news = client.get("/news/feed?categories=team_news,depth_chart,coaching,eligibility&sort=recent&limit=5")
+    assert team_news.status_code == 200
+    team_categories = [row["category"] for row in team_news.json()["data"]]
+    assert team_categories == ["depth_chart", "coaching", "eligibility", "team_news"]
+
+
 def test_news_ingestion_does_not_crash_if_cfn_unavailable(client, db_session, monkeypatch):
     token = create_user_and_token(client, "ingest")
     source = NewsSource(

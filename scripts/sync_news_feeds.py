@@ -1,7 +1,11 @@
 import argparse
 
 from api.app.db.session import SessionLocal
+from api.app.models import load_model_registry
 from api.app.services.news_ingestion import run_news_ingestion
+
+
+load_model_registry()
 
 
 def parse_args() -> argparse.Namespace:

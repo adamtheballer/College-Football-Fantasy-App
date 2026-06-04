@@ -16,6 +16,8 @@ from api.app.services.news_ingestion import create_manual_news_item, run_news_in
 
 
 router = APIRouter()
+TEAM_NEWS_CATEGORY_GROUP = ("team_news", "depth_chart", "coaching", "eligibility")
+NEWS_SORT_VALUES = {"impact", "recent"}
 
 
 def _news_item_read(row: NewsItem) -> NewsItemRead:
@@ -44,6 +46,7 @@ def _feed_query(
     db: Session,
     *,
     category: str | None,
+    categories: str | None,
     team: str | None,
     player_id: int | None,
     position: str | None,
@@ -51,8 +54,16 @@ def _feed_query(
     breaking_only: bool,
 ):
     query = db.query(NewsItem).filter(NewsItem.status.in_(["new", "reviewed"]))
+    category_values: list[str] = []
+    if categories:
+        category_values.extend([value.strip() for value in categories.split(",") if value.strip()])
     if category:
-        query = query.filter(NewsItem.category == category)
+        if category == "team_news":
+            category_values.extend(TEAM_NEWS_CATEGORY_GROUP)
+        else:
+            category_values.append(category)
+    if category_values:
+        query = query.filter(NewsItem.category.in_(sorted(set(category_values))))
     if team:
         query = query.filter(func.lower(NewsItem.canonical_team) == team.lower())
     if player_id:
@@ -71,6 +82,7 @@ def _list_news(
     db: Session,
     *,
     category: str | None = None,
+    categories: str | None = None,
     team: str | None = None,
     player_id: int | None = None,
     position: str | None = None,
@@ -78,10 +90,12 @@ def _list_news(
     offset: int = 0,
     min_relevance: float = 0,
     breaking_only: bool = False,
+    sort: str = "impact",
 ) -> NewsListResponse:
     query = _feed_query(
         db,
         category=category,
+        categories=categories,
         team=team,
         player_id=player_id,
         position=position,
@@ -89,8 +103,16 @@ def _list_news(
         breaking_only=breaking_only,
     )
     total = query.count()
+    recency_order = (func.coalesce(NewsItem.published_at, NewsItem.discovered_at).desc(), NewsItem.id.desc())
+    if sort not in NEWS_SORT_VALUES:
+        sort = "impact"
+    order_by = (
+        recency_order
+        if sort == "recent"
+        else (NewsItem.fantasy_relevance_score.desc(), func.coalesce(NewsItem.published_at, NewsItem.discovered_at).desc(), NewsItem.id.desc())
+    )
     rows = (
-        query.order_by(NewsItem.fantasy_relevance_score.desc(), NewsItem.published_at.desc().nullslast(), NewsItem.discovered_at.desc())
+        query.order_by(*order_by)
         .offset(offset)
         .limit(limit)
         .all()
@@ -101,6 +123,7 @@ def _list_news(
 @router.get("/feed", response_model=NewsListResponse)
 def get_news_feed(
     category: str | None = Query(default=None),
+    categories: str | None = Query(default=None),
     team: str | None = Query(default=None),
     player_id: int | None = Query(default=None),
     position: str | None = Query(default=None),
@@ -108,11 +131,13 @@ def get_news_feed(
     offset: int = Query(default=0, ge=0),
     min_relevance: float = Query(default=0, ge=0, le=100),
     breaking_only: bool = Query(default=False),
+    sort: str = Query(default="impact", pattern="^(impact|recent)$"),
     db: Session = Depends(get_db),
 ) -> NewsListResponse:
     return _list_news(
         db,
         category=category,
+        categories=categories,
         team=team,
         player_id=player_id,
         position=position,
@@ -120,6 +145,7 @@ def get_news_feed(
         offset=offset,
         min_relevance=min_relevance,
         breaking_only=breaking_only,
+        sort=sort,
     )
 
 
@@ -129,7 +155,7 @@ def get_breaking_news(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> NewsListResponse:
-    return _list_news(db, limit=limit, offset=offset, min_relevance=35, breaking_only=True)
+    return _list_news(db, limit=limit, offset=offset, min_relevance=35, sort="recent")
 
 
 @router.get("/transfers", response_model=NewsListResponse)
@@ -138,7 +164,7 @@ def get_transfer_news(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> NewsListResponse:
-    return _list_news(db, category="transfer", limit=limit, offset=offset)
+    return _list_news(db, category="transfer", limit=limit, offset=offset, sort="recent")
 
 
 @router.get("/source-preview")
