@@ -1,0 +1,20 @@
+meta {
+  name: Add Roster Entry
+  type: http
+  seq: 1
+}
+post {
+  url: {{base_url}}/teams/{{team_id}}/roster
+  body: json
+}
+body:json {
+  {
+    "player_id": {{player_id}},
+    "slot": "QB",
+    "status": "active"
+  }
+}
+script:post-response {
+  const data = res.getBody();
+  bru.setVar("roster_entry_id", data.id);
+}

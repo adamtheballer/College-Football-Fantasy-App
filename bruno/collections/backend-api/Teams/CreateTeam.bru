@@ -1,0 +1,19 @@
+meta {
+  name: Create Team
+  type: http
+  seq: 1
+}
+post {
+  url: {{base_url}}/leagues/{{league_id}}/teams
+  body: json
+}
+body:json {
+  {
+    "name": "Workflow Team",
+    "owner_name": "Coach"
+  }
+}
+script:post-response {
+  const data = res.getBody();
+  bru.setVar("team_id", data.id);
+}

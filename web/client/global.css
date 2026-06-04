@@ -1,0 +1,482 @@
+/** @import must precede all other statements */
+@import url("https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..900&family=Manrope:wght@500..800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /**
+   * Tailwind CSS theme
+   * tailwind.config.ts expects the following color variables to be expressed as HSL values.
+   * A different format will require also updating the theme in tailwind.config.ts.
+  */
+  :root {
+    --font-sans:
+      "Inter", "Manrope", "Aptos", "SF Pro Display", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system,
+      BlinkMacSystemFont, sans-serif;
+    --font-display:
+      "Manrope", "Inter", "SF Pro Display", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system,
+      BlinkMacSystemFont, sans-serif;
+    --font-mono: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+
+    --background: 224 56% 9%;
+    --foreground: 210 40% 96%;
+
+    --card: 226 55% 12%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 226 55% 10%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 194 95% 68%;
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 224 42% 18%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 224 38% 18%;
+    --muted-foreground: 215 28% 73%;
+
+    --accent: 219 48% 20%;
+    --accent-foreground: 194 95% 68%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214 46% 24%;
+    --input: 214 46% 24%;
+    --ring: 194 95% 68%;
+
+    --radius: 1rem;
+
+    --sidebar-background: 226 56% 8%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 194 95% 68%;
+    --sidebar-primary-foreground: 222 47% 11%;
+    --sidebar-accent: 219 43% 19%;
+    --sidebar-accent-foreground: 194 95% 68%;
+    --sidebar-border: 218 42% 16%;
+    --sidebar-ring: 217 91% 60%;
+  }
+
+  .dark {
+    --background: 224 56% 9%;
+    --foreground: 210 40% 96%;
+
+    --card: 226 55% 12%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 226 55% 10%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 194 95% 68%;
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 224 42% 18%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 224 38% 18%;
+    --muted-foreground: 215 28% 73%;
+
+    --accent: 219 48% 20%;
+    --accent-foreground: 194 95% 68%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214 46% 24%;
+    --input: 214 46% 24%;
+    --ring: 212.7 26.8% 83.9%;
+
+    --sidebar-background: 226 56% 8%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 194 95% 68%;
+    --sidebar-primary-foreground: 222 47% 11%;
+    --sidebar-accent: 219 43% 19%;
+    --sidebar-accent-foreground: 194 95% 68%;
+    --sidebar-border: 218 42% 16%;
+    --sidebar-ring: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    font-feature-settings:
+      "cv02" 1,
+      "cv03" 1,
+      "cv04" 1,
+      "cv11" 1;
+    background-image:
+      radial-gradient(circle at 12% 14%, rgba(34, 211, 238, 0.08), transparent 20%),
+      radial-gradient(circle at 82% 18%, rgba(251, 191, 36, 0.05), transparent 14%),
+      radial-gradient(circle at 74% 80%, rgba(59, 130, 246, 0.07), transparent 20%),
+      linear-gradient(180deg, rgba(8, 13, 28, 0.98) 0%, rgba(7, 10, 23, 1) 100%);
+  }
+
+  :where(p, span, li, h1, h2, h3, h4, h5, h6, a, button, label, td, th) {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  pre,
+  code {
+    overflow-x: auto;
+    white-space: pre;
+  }
+}
+
+@layer components {
+  .cfb-panel {
+    @apply rounded-[2rem] border border-cyan-200/10 bg-card/55 text-card-foreground backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.28)];
+    box-shadow:
+      0 20px 50px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 0 0 1px rgba(56, 189, 248, 0.04);
+  }
+
+  .cfb-panel-strong {
+    @apply rounded-[2.5rem] border border-cyan-200/10 bg-card/60 text-card-foreground backdrop-blur-xl shadow-[0_28px_70px_rgba(0,0,0,0.35)];
+    box-shadow:
+      0 28px 70px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 80px rgba(56, 189, 248, 0.05);
+  }
+
+  .cfb-display-font {
+    font-family: var(--font-display);
+    font-weight: 900;
+    letter-spacing: -0.055em;
+    line-height: 0.92;
+  }
+
+  .cfb-ui-font {
+    font-family: var(--font-sans);
+    letter-spacing: -0.018em;
+  }
+
+  .cfb-label-font {
+    font-family: var(--font-sans);
+    font-weight: 760;
+    letter-spacing: -0.025em;
+    color: rgba(226, 232, 240, 0.95);
+  }
+
+  .cfb-control-font {
+    font-family: var(--font-sans);
+    font-weight: 720;
+    letter-spacing: -0.02em;
+  }
+
+  .cfb-note-font {
+    font-family: var(--font-sans);
+    font-weight: 820;
+    letter-spacing: 0.18em;
+  }
+
+  .cfb-control {
+    @apply rounded-2xl border border-cyan-100/10 bg-white/[0.06] text-foreground backdrop-blur-md transition-all duration-300;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .cfb-control:hover {
+    @apply border-cyan-200/20 bg-white/[0.09];
+  }
+
+  .cfb-control:focus-visible,
+  .cfb-control[data-state="open"] {
+    @apply border-primary/40 ring-2 ring-primary/20;
+  }
+
+  .cfb-micro-label {
+    @apply text-[10px] font-black uppercase tracking-[0.32em] text-muted-foreground/60;
+  }
+
+  .cfb-section-title {
+    @apply text-foreground font-black uppercase italic tracking-tight;
+  }
+
+  .cfb-color-wash {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cfb-color-wash::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at top left, rgba(34, 211, 238, 0.07), transparent 28%),
+      radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.06), transparent 30%),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent 45%);
+  }
+
+  .cfb-position-name-aura {
+    text-shadow: var(--cfb-name-aura, 0 0 14px rgba(34, 211, 238, 0.16));
+  }
+
+  .cfb-player-card-name {
+    color: rgba(226, 232, 240, 0.95);
+    text-shadow:
+      var(--cfb-name-aura, 0 0 16px rgba(34, 211, 238, 0.2)),
+      0 1px 10px rgba(2, 6, 23, 0.44);
+  }
+
+  .cfb-name-aura-sky {
+    --cfb-name-aura: 0 0 20px rgba(56, 189, 248, 0.46), 0 0 2px rgba(186, 230, 253, 0.72);
+  }
+
+  .cfb-name-aura-emerald {
+    --cfb-name-aura: 0 0 20px rgba(52, 211, 153, 0.4), 0 0 2px rgba(187, 247, 208, 0.68);
+  }
+
+  .cfb-name-aura-violet {
+    --cfb-name-aura: 0 0 20px rgba(167, 139, 250, 0.44), 0 0 2px rgba(221, 214, 254, 0.68);
+  }
+
+  .cfb-name-aura-amber {
+    --cfb-name-aura: 0 0 19px rgba(251, 191, 36, 0.38), 0 0 2px rgba(254, 240, 138, 0.64);
+  }
+
+  .cfb-name-aura-rose {
+    --cfb-name-aura: 0 0 19px rgba(251, 113, 133, 0.37), 0 0 2px rgba(254, 205, 211, 0.64);
+  }
+
+  .cfb-name-aura-cyan {
+    --cfb-name-aura: 0 0 19px rgba(34, 211, 238, 0.38), 0 0 2px rgba(207, 250, 254, 0.64);
+  }
+
+  .cfb-draft-timer-urgent {
+    animation: cfb-draft-timer-urgent 0.9s ease-in-out infinite;
+  }
+
+  .cfb-draft-search-input {
+    background-color: #0b1830 !important;
+    border-color: rgba(103, 232, 249, 0.26) !important;
+    color: rgb(236, 254, 255) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 0 0 1px rgba(34, 211, 238, 0.06),
+      0 12px 30px rgba(8, 47, 73, 0.22) !important;
+  }
+
+  .cfb-draft-search-input::placeholder {
+    color: rgba(207, 250, 254, 0.46) !important;
+  }
+
+  .cfb-draft-search-input:hover {
+    background-color: #0d1d38 !important;
+    border-color: rgba(103, 232, 249, 0.38) !important;
+  }
+
+  .cfb-draft-search-input:focus,
+  .cfb-draft-search-input:focus-visible {
+    background-color: #0d1d38 !important;
+    border-color: rgba(125, 211, 252, 0.6) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 0 3px rgba(34, 211, 238, 0.14),
+      0 14px 34px rgba(8, 47, 73, 0.28) !important;
+  }
+
+  .cfb-draft-search-input:-webkit-autofill,
+  .cfb-draft-search-input:-webkit-autofill:hover,
+  .cfb-draft-search-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: rgb(236, 254, 255) !important;
+    box-shadow:
+      0 0 0 1000px #0b1830 inset,
+      0 0 0 1px rgba(34, 211, 238, 0.22) !important;
+    caret-color: rgb(236, 254, 255);
+  }
+
+  .cfb-sidebar-nav {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(103, 232, 249, 0.38) transparent;
+  }
+
+  .cfb-sidebar-nav::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .cfb-sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .cfb-sidebar-nav::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(103, 232, 249, 0.48), rgba(59, 130, 246, 0.36));
+  }
+
+  .cfb-sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(103, 232, 249, 0.68), rgba(59, 130, 246, 0.52));
+  }
+
+  .cfb-tour-active-target {
+    background: linear-gradient(to right, hsl(var(--primary)), rgb(59 130 246)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.35) !important;
+    border-color: transparent !important;
+  }
+
+  .cfb-tour-active-target svg,
+  .cfb-tour-active-target span {
+    color: hsl(var(--primary-foreground)) !important;
+  }
+
+  .cfb-tour-open [data-nav-item="true"][data-nav-active="true"]:not(.cfb-tour-active-target) {
+    background: transparent !important;
+    color: hsl(var(--muted-foreground)) !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
+  }
+
+  .cfb-tour-open [data-nav-item="true"][data-nav-active="true"]:not(.cfb-tour-active-target) .nav-active-overlay {
+    display: none !important;
+  }
+
+  .cfb-tour-open [data-nav-item="true"][data-nav-active="true"]:not(.cfb-tour-active-target) svg {
+    color: hsl(var(--primary)) !important;
+  }
+
+  .cfb-home-hero-title {
+    position: relative;
+    display: inline-block;
+    color: transparent;
+    background:
+      linear-gradient(135deg, #ffffff 0%, #ffffff 46%, rgba(147, 197, 253, 0.86) 76%, rgba(34, 211, 238, 0.68) 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    text-shadow:
+      0 0 26px rgba(59, 130, 246, 0.22),
+      0 0 54px rgba(34, 211, 238, 0.12);
+  }
+
+  .cfb-home-hero-title::before,
+  .cfb-home-hero-title::after {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .cfb-home-hero-title::before {
+    color: transparent;
+    background:
+      repeating-linear-gradient(
+        112deg,
+        transparent 0 0.62em,
+        rgba(255, 255, 255, 0.62) 0.64em 0.69em,
+        transparent 0.71em 1.05em
+      );
+    background-clip: text;
+    -webkit-background-clip: text;
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.18));
+    opacity: 0;
+    animation: cfb-home-title-laces 6.8s ease-in-out infinite;
+  }
+
+  .cfb-home-hero-title::after {
+    color: rgba(125, 211, 252, 0.18);
+    mix-blend-mode: screen;
+    opacity: 0;
+    text-shadow: -1px 0 rgba(59, 130, 246, 0.45), 1px 0 rgba(34, 211, 238, 0.35);
+    animation: cfb-home-title-glitch 7.4s steps(1, end) infinite;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+}
+
+@keyframes cfb-home-title-laces {
+  0%,
+  62%,
+  100% {
+    opacity: 0;
+    transform: translateX(-0.2em);
+  }
+  68% {
+    opacity: 0.2;
+  }
+  73% {
+    opacity: 0.44;
+    transform: translateX(0.1em);
+  }
+  79% {
+    opacity: 0;
+    transform: translateX(0.26em);
+  }
+}
+
+@keyframes cfb-home-title-glitch {
+  0%,
+  71%,
+  75%,
+  100% {
+    opacity: 0;
+    transform: none;
+    clip-path: inset(0 0 0 0);
+  }
+  72% {
+    opacity: 0.28;
+    transform: translate(1px, -1px);
+    clip-path: inset(0 0 70% 0);
+  }
+  73% {
+    opacity: 0.2;
+    transform: translate(-1px, 1px);
+    clip-path: inset(58% 0 18% 0);
+  }
+  74% {
+    opacity: 0.24;
+    transform: translate(1px, 0);
+    clip-path: inset(18% 0 56% 0);
+  }
+}
+
+@keyframes cfb-draft-timer-urgent {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 0 rgba(248, 113, 113, 0);
+  }
+  50% {
+    transform: scale(1.045);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 0 26px rgba(248, 113, 113, 0.28);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cfb-home-hero-title::before,
+  .cfb-home-hero-title::after,
+  .cfb-draft-timer-urgent {
+    animation: none;
+  }
+}

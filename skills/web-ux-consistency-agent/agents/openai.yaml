@@ -1,0 +1,4 @@
+interface:
+  display_name: "Web UX Consistency"
+  short_description: "Preserve the current web app design language"
+  default_prompt: "Use $web-ux-consistency-agent to design or review React UI work while preserving the current site’s visual paradigm."

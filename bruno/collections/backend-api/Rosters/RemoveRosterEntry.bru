@@ -1,0 +1,8 @@
+meta {
+  name: Remove Roster Entry
+  type: http
+  seq: 3
+}
+delete {
+  url: {{base_url}}/teams/{{team_id}}/roster/{{roster_entry_id}}
+}

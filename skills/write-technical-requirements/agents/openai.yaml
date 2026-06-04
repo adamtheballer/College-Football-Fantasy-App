@@ -1,0 +1,4 @@
+interface:
+  display_name: "Technical Requirements Writer"
+  short_description: "Feature and epic requirements authoring"
+  default_prompt: "Use $write-technical-requirements to draft or refine a repo-style feature or epic requirements document."

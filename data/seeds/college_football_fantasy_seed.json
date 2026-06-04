@@ -1,0 +1,3289 @@
+{
+  "players": [
+    {
+      "external_id": null,
+      "name": "Arch Manning",
+      "position": "QB",
+      "school": "Texas"
+    },
+    {
+      "external_id": null,
+      "name": "Marcel Reed",
+      "position": "QB",
+      "school": "Texas A&M"
+    },
+    {
+      "external_id": null,
+      "name": "DJ Lagway",
+      "position": "QB",
+      "school": "Florida"
+    },
+    {
+      "external_id": null,
+      "name": "LaNorris Sellers",
+      "position": "QB",
+      "school": "South Carolina"
+    },
+    {
+      "external_id": null,
+      "name": "Kevin Jennings",
+      "position": "QB",
+      "school": "SMU"
+    },
+    {
+      "external_id": null,
+      "name": "Gunner Stockton",
+      "position": "QB",
+      "school": "Georgia"
+    },
+    {
+      "external_id": null,
+      "name": "Sam Leavitt",
+      "position": "QB",
+      "school": "Arizona State"
+    },
+    {
+      "external_id": null,
+      "name": "Trinidad Chambliss",
+      "position": "QB",
+      "school": "Ole Miss"
+    },
+    {
+      "external_id": null,
+      "name": "Miller Moss",
+      "position": "QB",
+      "school": "Louisville"
+    },
+    {
+      "external_id": null,
+      "name": "Ethan Grunkemeyer",
+      "position": "QB",
+      "school": "Penn State"
+    },
+    {
+      "external_id": null,
+      "name": "Kaytron Allen",
+      "position": "RB",
+      "school": "Penn State"
+    },
+    {
+      "external_id": null,
+      "name": "Jadan Baugh",
+      "position": "RB",
+      "school": "Florida"
+    },
+    {
+      "external_id": null,
+      "name": "Kewan Lacy",
+      "position": "RB",
+      "school": "Ole Miss"
+    },
+    {
+      "external_id": null,
+      "name": "Nate Frazier",
+      "position": "RB",
+      "school": "Georgia"
+    },
+    {
+      "external_id": null,
+      "name": "Isaac Brown",
+      "position": "RB",
+      "school": "Louisville"
+    },
+    {
+      "external_id": null,
+      "name": "Raleek Brown",
+      "position": "RB",
+      "school": "Arizona State"
+    },
+    {
+      "external_id": null,
+      "name": "T.J. Harden",
+      "position": "RB",
+      "school": "SMU"
+    },
+    {
+      "external_id": null,
+      "name": "Quintrevion Wisner",
+      "position": "RB",
+      "school": "Texas"
+    },
+    {
+      "external_id": null,
+      "name": "Rueben Owens II",
+      "position": "RB",
+      "school": "Texas A&M"
+    },
+    {
+      "external_id": null,
+      "name": "Rahsul Faison",
+      "position": "RB",
+      "school": "South Carolina"
+    },
+    {
+      "external_id": null,
+      "name": "Ryan Wingo",
+      "position": "WR",
+      "school": "Texas"
+    },
+    {
+      "external_id": null,
+      "name": "KC Concepcion",
+      "position": "WR",
+      "school": "Texas A&M"
+    },
+    {
+      "external_id": null,
+      "name": "Romello Brinson",
+      "position": "WR",
+      "school": "SMU"
+    },
+    {
+      "external_id": null,
+      "name": "Jordyn Tyson",
+      "position": "WR",
+      "school": "Arizona State"
+    },
+    {
+      "external_id": null,
+      "name": "Jordan Hudson",
+      "position": "WR",
+      "school": "SMU"
+    },
+    {
+      "external_id": null,
+      "name": "Harrison Wallace III",
+      "position": "WR",
+      "school": "Ole Miss"
+    },
+    {
+      "external_id": null,
+      "name": "Trebor Pena",
+      "position": "WR",
+      "school": "Penn State"
+    },
+    {
+      "external_id": null,
+      "name": "Chris Bell",
+      "position": "WR",
+      "school": "Louisville"
+    },
+    {
+      "external_id": null,
+      "name": "Nyck Harbor",
+      "position": "WR",
+      "school": "South Carolina"
+    },
+    {
+      "external_id": null,
+      "name": "Vernell Brown III",
+      "position": "WR",
+      "school": "Florida"
+    },
+    {
+      "external_id": null,
+      "name": "Eugene Wilson III",
+      "position": "WR",
+      "school": "Florida"
+    },
+    {
+      "external_id": null,
+      "name": "DeAndre Moore Jr.",
+      "position": "WR",
+      "school": "Texas"
+    },
+    {
+      "external_id": null,
+      "name": "Terry Bussey",
+      "position": "WR",
+      "school": "Texas A&M"
+    },
+    {
+      "external_id": null,
+      "name": "Cayden Lee",
+      "position": "WR",
+      "school": "Ole Miss"
+    },
+    {
+      "external_id": null,
+      "name": "Dillon Bell",
+      "position": "WR",
+      "school": "Georgia"
+    },
+    {
+      "external_id": null,
+      "name": "Caullin Lacy",
+      "position": "WR",
+      "school": "Louisville"
+    },
+    {
+      "external_id": null,
+      "name": "Mazeo Bennett Jr.",
+      "position": "WR",
+      "school": "South Carolina"
+    },
+    {
+      "external_id": null,
+      "name": "Jack Endries",
+      "position": "TE",
+      "school": "Texas"
+    },
+    {
+      "external_id": null,
+      "name": "Luke Reynolds",
+      "position": "TE",
+      "school": "Penn State"
+    },
+    {
+      "external_id": null,
+      "name": "Amir Jackson",
+      "position": "TE",
+      "school": "Florida"
+    },
+    {
+      "external_id": null,
+      "name": "Chamon Metayer",
+      "position": "TE",
+      "school": "Arizona State"
+    },
+    {
+      "external_id": null,
+      "name": "Theo Melin \u00d6hrstr\u00f6m",
+      "position": "TE",
+      "school": "Texas A&M"
+    },
+    {
+      "external_id": null,
+      "name": "Dae'Quan Wright",
+      "position": "TE",
+      "school": "Ole Miss"
+    },
+    {
+      "external_id": null,
+      "name": "Lawson Luckie",
+      "position": "TE",
+      "school": "Georgia"
+    },
+    {
+      "external_id": null,
+      "name": "RJ Maryland",
+      "position": "TE",
+      "school": "SMU"
+    },
+    {
+      "external_id": null,
+      "name": "Jaleel Skinner",
+      "position": "TE",
+      "school": "Louisville"
+    }
+  ],
+  "player_stats": [
+    {
+      "player_lookup": {
+        "name": "Arch Manning",
+        "school": "Texas",
+        "position": "QB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "passingYards": 3163,
+        "passingTds": 26,
+        "interceptions": 7,
+        "rushingYards": 399,
+        "rushingTds": 10
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Marcel Reed",
+        "school": "Texas A&M",
+        "position": "QB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "passingYards": 3169,
+        "passingTds": 25,
+        "interceptions": 12,
+        "rushingYards": 493,
+        "rushingTds": 6
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "DJ Lagway",
+        "school": "Florida",
+        "position": "QB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "passingYards": 2264,
+        "passingTds": 16,
+        "interceptions": 14,
+        "rushingYards": 136,
+        "rushingTds": 1
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "LaNorris Sellers",
+        "school": "South Carolina",
+        "position": "QB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "passingYards": 2437,
+        "passingTds": 13,
+        "interceptions": 8,
+        "rushingYards": 270,
+        "rushingTds": 5
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Kevin Jennings",
+        "school": "SMU",
+        "position": "QB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "passingYards": 3641,
+        "passingTds": 26,
+        "interceptions": 13,
+        "rushingYards": 54,
+        "rushingTds": 4
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Gunner Stockton",
+        "school": "Georgia",
+        "position": "QB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "passingYards": 2894,
+        "passingTds": 24,
+        "interceptions": 5,
+        "rushingYards": 526,
+        "rushingTds": 6
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Sam Leavitt",
+        "school": "Arizona State",
+        "position": "QB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "passingYards": 1628,
+        "passingTds": 10,
+        "interceptions": 3,
+        "rushingYards": 306,
+        "rushingTds": 5
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Trinidad Chambliss",
+        "school": "Ole Miss",
+        "position": "QB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "passingYards": 3937,
+        "passingTds": 22,
+        "interceptions": 3,
+        "rushingYards": 527,
+        "rushingTds": 8
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Miller Moss",
+        "school": "Louisville",
+        "position": "QB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "passingYards": 2679,
+        "passingTds": 16,
+        "interceptions": 7,
+        "rushingYards": 3,
+        "rushingTds": 0
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Ethan Grunkemeyer",
+        "school": "Penn State",
+        "position": "QB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "passingYards": 1339,
+        "passingTds": 8,
+        "interceptions": 4,
+        "rushingYards": 3,
+        "rushingTds": 0
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Kaytron Allen",
+        "school": "Penn State",
+        "position": "RB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 1303,
+        "rushingTds": 15,
+        "receptions": 18,
+        "receivingYards": 68,
+        "receivingTds": 0
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Jadan Baugh",
+        "school": "Florida",
+        "position": "RB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 1170,
+        "rushingTds": 8,
+        "receptions": 33,
+        "receivingYards": 210,
+        "receivingTds": 2
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Kewan Lacy",
+        "school": "Ole Miss",
+        "position": "RB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 1567,
+        "rushingTds": 24,
+        "receptions": 29,
+        "receivingYards": 177,
+        "receivingTds": 0
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Nate Frazier",
+        "school": "Georgia",
+        "position": "RB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 947,
+        "rushingTds": 6,
+        "receptions": 16,
+        "receivingYards": 116,
+        "receivingTds": 1
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Isaac Brown",
+        "school": "Louisville",
+        "position": "RB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 884,
+        "rushingTds": 7,
+        "receptions": 13,
+        "receivingYards": 48,
+        "receivingTds": 0
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Raleek Brown",
+        "school": "Arizona State",
+        "position": "RB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 1141,
+        "rushingTds": 4,
+        "receptions": 34,
+        "receivingYards": 239,
+        "receivingTds": 2
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "T.J. Harden",
+        "school": "SMU",
+        "position": "RB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 787,
+        "rushingTds": 9,
+        "receptions": 19,
+        "receivingYards": 99,
+        "receivingTds": 1
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Quintrevion Wisner",
+        "school": "Texas",
+        "position": "RB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 597,
+        "rushingTds": 3,
+        "receptions": 22,
+        "receivingYards": 146,
+        "receivingTds": 1
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Rueben Owens II",
+        "school": "Texas A&M",
+        "position": "RB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 639,
+        "rushingTds": 5,
+        "receptions": 13,
+        "receivingYards": 130,
+        "receivingTds": 0
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Rahsul Faison",
+        "school": "South Carolina",
+        "position": "RB"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 470,
+        "rushingTds": 3,
+        "receptions": 19,
+        "receivingYards": 118,
+        "receivingTds": 0
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Ryan Wingo",
+        "school": "Texas",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 42,
+        "rushingTds": 0,
+        "receptions": 54,
+        "receivingYards": 834,
+        "receivingTds": 7
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "KC Concepcion",
+        "school": "Texas A&M",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 61,
+        "receivingYards": 919,
+        "receivingTds": 9
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Romello Brinson",
+        "school": "SMU",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 43,
+        "receivingYards": 638,
+        "receivingTds": 3
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Jordyn Tyson",
+        "school": "Arizona State",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 4,
+        "rushingTds": 1,
+        "receptions": 61,
+        "receivingYards": 711,
+        "receivingTds": 8
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Jordan Hudson",
+        "school": "SMU",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 61,
+        "receivingYards": 766,
+        "receivingTds": 6
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Harrison Wallace III",
+        "school": "Ole Miss",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 1,
+        "rushingTds": 0,
+        "receptions": 61,
+        "receivingYards": 934,
+        "receivingTds": 4
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Trebor Pena",
+        "school": "Penn State",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 73,
+        "rushingTds": 0,
+        "receptions": 49,
+        "receivingYards": 552,
+        "receivingTds": 2
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Chris Bell",
+        "school": "Louisville",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 72,
+        "receivingYards": 917,
+        "receivingTds": 6
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Nyck Harbor",
+        "school": "South Carolina",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 30,
+        "receivingYards": 618,
+        "receivingTds": 6
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Vernell Brown III",
+        "school": "Florida",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 14,
+        "rushingTds": 0,
+        "receptions": 40,
+        "receivingYards": 512,
+        "receivingTds": 0
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Eugene Wilson III",
+        "school": "Florida",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 12,
+        "rushingTds": 0,
+        "receptions": 27,
+        "receivingYards": 239,
+        "receivingTds": 3
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "DeAndre Moore Jr.",
+        "school": "Texas",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 38,
+        "receivingYards": 532,
+        "receivingTds": 4
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Terry Bussey",
+        "school": "Texas A&M",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 81,
+        "rushingTds": 1,
+        "receptions": 18,
+        "receivingYards": 195,
+        "receivingTds": 1
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Cayden Lee",
+        "school": "Ole Miss",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 44,
+        "receivingYards": 635,
+        "receivingTds": 3
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Dillon Bell",
+        "school": "Georgia",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 27,
+        "receivingYards": 268,
+        "receivingTds": 2
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Caullin Lacy",
+        "school": "Louisville",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "passingYards": 2,
+        "passingTds": 1,
+        "interceptions": 0,
+        "rushingYards": 53,
+        "rushingTds": 0,
+        "receptions": 60,
+        "receivingYards": 635,
+        "receivingTds": 2
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Mazeo Bennett Jr.",
+        "school": "South Carolina",
+        "position": "WR"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 10,
+        "receivingYards": 62,
+        "receivingTds": 0
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Jack Endries",
+        "school": "Texas",
+        "position": "TE"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 33,
+        "receivingYards": 346,
+        "receivingTds": 3
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Luke Reynolds",
+        "school": "Penn State",
+        "position": "TE"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 26,
+        "rushingTds": 0,
+        "receptions": 26,
+        "receivingYards": 257,
+        "receivingTds": 0
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Amir Jackson",
+        "school": "Florida",
+        "position": "TE"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 3,
+        "receivingYards": 29,
+        "receivingTds": 1
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Chamon Metayer",
+        "school": "Arizona State",
+        "position": "TE"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 1,
+        "rushingTds": 0,
+        "receptions": 38,
+        "receivingYards": 375,
+        "receivingTds": 4
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Theo Melin \u00d6hrstr\u00f6m",
+        "school": "Texas A&M",
+        "position": "TE"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 19,
+        "receivingYards": 168,
+        "receivingTds": 1
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Dae'Quan Wright",
+        "school": "Ole Miss",
+        "position": "TE"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 2,
+        "rushingTds": 0,
+        "receptions": 39,
+        "receivingYards": 635,
+        "receivingTds": 5
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Lawson Luckie",
+        "school": "Georgia",
+        "position": "TE"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 15,
+        "receivingYards": 158,
+        "receivingTds": 4
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "RJ Maryland",
+        "school": "SMU",
+        "position": "TE"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 27,
+        "receivingYards": 322,
+        "receivingTds": 2
+      }
+    },
+    {
+      "player_lookup": {
+        "name": "Jaleel Skinner",
+        "school": "Louisville",
+        "position": "TE"
+      },
+      "season": 2025,
+      "week": 0,
+      "source": "espn",
+      "stats": {
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 21,
+        "receivingYards": 204,
+        "receivingTds": 2
+      }
+    }
+  ],
+  "frontend_players": [
+    {
+      "name": "Arch Manning",
+      "school": "Texas",
+      "pos": "QB",
+      "conf": "SEC",
+      "rank": 1,
+      "adp": null,
+      "posRank": 1,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": 3600,
+        "passingTds": 30,
+        "ints": 8,
+        "rushingYards": 450,
+        "rushingTds": 9,
+        "receptions": null,
+        "receivingYards": null,
+        "receivingTds": null,
+        "fpts": 374.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": 3163,
+            "passingTds": 26,
+            "ints": 7,
+            "rushingYards": 399,
+            "rushingTds": 10,
+            "receptions": null,
+            "receivingYards": null,
+            "receivingTds": null,
+            "fpts": 341.4
+          }
+        }
+      ],
+      "analysis": "Projected to remain one of the highest-upside fantasy QBs in this pool because the 2025 passing base was already strong and the rushing TD profile adds a second scoring lane. Texas also returns premium receiving talent around him."
+    },
+    {
+      "name": "Marcel Reed",
+      "school": "Texas A&M",
+      "pos": "QB",
+      "conf": "SEC",
+      "rank": 2,
+      "adp": null,
+      "posRank": 2,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": 3300,
+        "passingTds": 26,
+        "ints": 10,
+        "rushingYards": 500,
+        "rushingTds": 7,
+        "receptions": null,
+        "receivingYards": null,
+        "receivingTds": null,
+        "fpts": 346.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": 3169,
+            "passingTds": 25,
+            "ints": 12,
+            "rushingYards": 493,
+            "rushingTds": 6,
+            "receptions": null,
+            "receivingYards": null,
+            "receivingTds": null,
+            "fpts": 342.1
+          }
+        }
+      ],
+      "analysis": "Reed brings a balanced fantasy profile with real passing volume and useful designed-run equity. A repeat of his 2025 workload would keep him near the top tier among Power 4 dual-threat QBs in this set."
+    },
+    {
+      "name": "DJ Lagway",
+      "school": "Florida",
+      "pos": "QB",
+      "conf": "SEC",
+      "rank": 3,
+      "adp": null,
+      "posRank": 3,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": 2800,
+        "passingTds": 22,
+        "ints": 11,
+        "rushingYards": 220,
+        "rushingTds": 3,
+        "receptions": null,
+        "receivingYards": null,
+        "receivingTds": null,
+        "fpts": 250.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": 2264,
+            "passingTds": 16,
+            "ints": 14,
+            "rushingYards": 136,
+            "rushingTds": 1,
+            "receptions": null,
+            "receivingYards": null,
+            "receivingTds": null,
+            "fpts": 188.2
+          }
+        }
+      ],
+      "analysis": "Lagway's 2025 yardage base was solid, but the interception rate kept the profile volatile. The projection assumes efficiency growth rather than a huge volume spike."
+    },
+    {
+      "name": "LaNorris Sellers",
+      "school": "South Carolina",
+      "pos": "QB",
+      "conf": "SEC",
+      "rank": 4,
+      "adp": null,
+      "posRank": 4,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": 2850,
+        "passingTds": 18,
+        "ints": 8,
+        "rushingYards": 520,
+        "rushingTds": 8,
+        "receptions": null,
+        "receivingYards": null,
+        "receivingTds": null,
+        "fpts": 316.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": 2437,
+            "passingTds": 13,
+            "ints": 8,
+            "rushingYards": 270,
+            "rushingTds": 5,
+            "receptions": null,
+            "receivingYards": null,
+            "receivingTds": null,
+            "fpts": 240.2
+          }
+        }
+      ],
+      "analysis": "Sellers is attractive in fantasy because his rushing output can stabilize weekly scoring even when passing efficiency swings. South Carolina's offense still runs through him."
+    },
+    {
+      "name": "Kevin Jennings",
+      "school": "SMU",
+      "pos": "QB",
+      "conf": "ACC",
+      "rank": 5,
+      "adp": null,
+      "posRank": 5,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": 3800,
+        "passingTds": 28,
+        "ints": 11,
+        "rushingYards": 150,
+        "rushingTds": 4,
+        "receptions": null,
+        "receivingYards": null,
+        "receivingTds": null,
+        "fpts": 306.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": 3641,
+            "passingTds": 26,
+            "ints": 13,
+            "rushingYards": 54,
+            "rushingTds": 4,
+            "receptions": null,
+            "receivingYards": null,
+            "receivingTds": null,
+            "fpts": 275.0
+          }
+        }
+      ],
+      "analysis": "Jennings posted one of the better pure passing seasons in this group and adds enough rushing to stay fantasy relevant even without elite QB carry volume. SMU's offense supported multiple productive pass catchers in 2025."
+    },
+    {
+      "name": "Gunner Stockton",
+      "school": "Georgia",
+      "pos": "QB",
+      "conf": "SEC",
+      "rank": 6,
+      "adp": null,
+      "posRank": 6,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": 3200,
+        "passingTds": 26,
+        "ints": 7,
+        "rushingYards": 420,
+        "rushingTds": 5,
+        "receptions": null,
+        "receivingYards": null,
+        "receivingTds": null,
+        "fpts": 332.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": 2894,
+            "passingTds": 24,
+            "ints": 5,
+            "rushingYards": 526,
+            "rushingTds": 6,
+            "receptions": null,
+            "receivingYards": null,
+            "receivingTds": null,
+            "fpts": 329.4
+          }
+        }
+      ],
+      "analysis": "Stockton's combination of efficient passing and real rushing production makes him a strong all-around fantasy option. Georgia's target depth should help preserve his floor."
+    },
+    {
+      "name": "Sam Leavitt",
+      "school": "Arizona State",
+      "pos": "QB",
+      "conf": "BIG12",
+      "rank": 7,
+      "adp": null,
+      "posRank": 7,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": 2600,
+        "passingTds": 20,
+        "ints": 8,
+        "rushingYards": 380,
+        "rushingTds": 6,
+        "receptions": null,
+        "receivingYards": null,
+        "receivingTds": null,
+        "fpts": 286.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": 1628,
+            "passingTds": 10,
+            "ints": 3,
+            "rushingYards": 306,
+            "rushingTds": 5,
+            "receptions": null,
+            "receivingYards": null,
+            "receivingTds": null,
+            "fpts": 219.7
+          }
+        }
+      ],
+      "analysis": "Leavitt's 2025 totals were modest as a passer but useful as a runner, which matters in fantasy formats. A normal second-year growth curve would materially lift his ceiling."
+    },
+    {
+      "name": "Trinidad Chambliss",
+      "school": "Ole Miss",
+      "pos": "QB",
+      "conf": "SEC",
+      "rank": 8,
+      "adp": null,
+      "posRank": 8,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": 3950,
+        "passingTds": 25,
+        "ints": 7,
+        "rushingYards": 480,
+        "rushingTds": 7,
+        "receptions": null,
+        "receivingYards": null,
+        "receivingTds": null,
+        "fpts": 378.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": 3937,
+            "passingTds": 22,
+            "ints": 3,
+            "rushingYards": 527,
+            "rushingTds": 8,
+            "receptions": null,
+            "receivingYards": null,
+            "receivingTds": null,
+            "fpts": 393.2
+          }
+        }
+      ],
+      "analysis": "Chambliss had one of the best statistical baselines in this file, pairing high passing volume with meaningful rushing scores. That profile translates cleanly to fantasy."
+    },
+    {
+      "name": "Miller Moss",
+      "school": "Louisville",
+      "pos": "QB",
+      "conf": "ACC",
+      "rank": 9,
+      "adp": null,
+      "posRank": 9,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": 3000,
+        "passingTds": 22,
+        "ints": 9,
+        "rushingYards": 25,
+        "rushingTds": 0,
+        "receptions": null,
+        "receivingYards": null,
+        "receivingTds": null,
+        "fpts": 192.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": 2679,
+            "passingTds": 16,
+            "ints": 7,
+            "rushingYards": 3,
+            "rushingTds": 0,
+            "receptions": null,
+            "receivingYards": null,
+            "receivingTds": null,
+            "fpts": 149.4
+          }
+        }
+      ],
+      "analysis": "Moss projects as a pass-first fantasy QB whose value depends on maintaining volume and improving touchdown efficiency. The lack of rushing keeps him below the dual-threat tier."
+    },
+    {
+      "name": "Ethan Grunkemeyer",
+      "school": "Penn State",
+      "pos": "QB",
+      "conf": "BIG10",
+      "rank": 10,
+      "adp": null,
+      "posRank": 10,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": 2500,
+        "passingTds": 18,
+        "ints": 7,
+        "rushingYards": 100,
+        "rushingTds": 2,
+        "receptions": null,
+        "receivingYards": null,
+        "receivingTds": null,
+        "fpts": 198.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": 1339,
+            "passingTds": 8,
+            "ints": 4,
+            "rushingYards": 3,
+            "rushingTds": 0,
+            "receptions": null,
+            "receivingYards": null,
+            "receivingTds": null,
+            "fpts": 66.9
+          }
+        }
+      ],
+      "analysis": "Grunkemeyer's sample was smaller than the elite names here, but his 2025 efficiency was good enough to justify a starter-level projection. The estimate assumes Penn State expands his role."
+    },
+    {
+      "name": "Kaytron Allen",
+      "school": "Penn State",
+      "pos": "RB",
+      "conf": "BIG10",
+      "rank": 11,
+      "adp": null,
+      "posRank": 1,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 1250,
+        "rushingTds": 13,
+        "receptions": 20,
+        "receivingYards": 110,
+        "receivingTds": 1,
+        "fpts": 230.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 1303,
+            "rushingTds": 15,
+            "receptions": 18,
+            "receivingYards": 68,
+            "receivingTds": 0,
+            "fpts": 221.1
+          }
+        }
+      ],
+      "analysis": "Allen already produced a feature-back season in 2025 and remains one of the safer RB projections in the set. His receiving ceiling is limited, but the rushing floor is strong."
+    },
+    {
+      "name": "Jadan Baugh",
+      "school": "Florida",
+      "pos": "RB",
+      "conf": "SEC",
+      "rank": 12,
+      "adp": null,
+      "posRank": 2,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 1200,
+        "rushingTds": 10,
+        "receptions": 28,
+        "receivingYards": 220,
+        "receivingTds": 2,
+        "fpts": 224.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 1170,
+            "rushingTds": 8,
+            "receptions": 33,
+            "receivingYards": 210,
+            "receivingTds": 2,
+            "fpts": 219.0
+          }
+        }
+      ],
+      "analysis": "Baugh has one of the cleaner three-down fantasy profiles because he already handled heavy rushing work and added receiving production. That makes him valuable in PPR-style settings."
+    },
+    {
+      "name": "Kewan Lacy",
+      "school": "Ole Miss",
+      "pos": "RB",
+      "conf": "SEC",
+      "rank": 13,
+      "adp": null,
+      "posRank": 3,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 1450,
+        "rushingTds": 18,
+        "receptions": 25,
+        "receivingYards": 180,
+        "receivingTds": 1,
+        "fpts": 294.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 1567,
+            "rushingTds": 24,
+            "receptions": 29,
+            "receivingYards": 177,
+            "receivingTds": 0,
+            "fpts": 348.4
+          }
+        }
+      ],
+      "analysis": "Lacy's 2025 production was elite volume plus elite touchdown output. Even with some touchdown regression, he projects as a top-end fantasy back."
+    },
+    {
+      "name": "Nate Frazier",
+      "school": "Georgia",
+      "pos": "RB",
+      "conf": "SEC",
+      "rank": 14,
+      "adp": null,
+      "posRank": 4,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 1050,
+        "rushingTds": 9,
+        "receptions": 22,
+        "receivingYards": 160,
+        "receivingTds": 1,
+        "fpts": 197.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 947,
+            "rushingTds": 6,
+            "receptions": 16,
+            "receivingYards": 116,
+            "receivingTds": 1,
+            "fpts": 163.3
+          }
+        }
+      ],
+      "analysis": "Frazier looks like a solid anchor RB because Georgia used him heavily on the ground and also involved him enough as a receiver to avoid being game-script dependent."
+    },
+    {
+      "name": "Isaac Brown",
+      "school": "Louisville",
+      "pos": "RB",
+      "conf": "ACC",
+      "rank": 15,
+      "adp": null,
+      "posRank": 5,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 1000,
+        "rushingTds": 9,
+        "receptions": 18,
+        "receivingYards": 120,
+        "receivingTds": 1,
+        "fpts": 196.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 884,
+            "rushingTds": 7,
+            "receptions": 13,
+            "receivingYards": 48,
+            "receivingTds": 0,
+            "fpts": 147.2
+          }
+        }
+      ],
+      "analysis": "Brown's 2025 rushing efficiency was excellent, so even a modest increase in receiving usage would keep him in the RB1/2 mix for this pool. Louisville clearly trusted him."
+    },
+    {
+      "name": "Raleek Brown",
+      "school": "Arizona State",
+      "pos": "RB",
+      "conf": "BIG12",
+      "rank": 16,
+      "adp": null,
+      "posRank": 6,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 1100,
+        "rushingTds": 7,
+        "receptions": 36,
+        "receivingYards": 280,
+        "receivingTds": 2,
+        "fpts": 228.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 1141,
+            "rushingTds": 4,
+            "receptions": 34,
+            "receivingYards": 239,
+            "receivingTds": 2,
+            "fpts": 205.0
+          }
+        }
+      ],
+      "analysis": "Brown offers a strong hybrid profile because he was productive both as a runner and receiver. That receiving role meaningfully raises the week-to-week floor."
+    },
+    {
+      "name": "T.J. Harden",
+      "school": "SMU",
+      "pos": "RB",
+      "conf": "ACC",
+      "rank": 17,
+      "adp": null,
+      "posRank": 7,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 900,
+        "rushingTds": 9,
+        "receptions": 20,
+        "receivingYards": 150,
+        "receivingTds": 1,
+        "fpts": 194.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 787,
+            "rushingTds": 9,
+            "receptions": 19,
+            "receivingYards": 99,
+            "receivingTds": 1,
+            "fpts": 169.6
+          }
+        }
+      ],
+      "analysis": "Harden's projection leans on stable rushing usage in an offense that also generated receiving production for backs. He is less explosive than the top backs here but still usable."
+    },
+    {
+      "name": "Quintrevion Wisner",
+      "school": "Texas",
+      "pos": "RB",
+      "conf": "SEC",
+      "rank": 18,
+      "adp": null,
+      "posRank": 8,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 850,
+        "rushingTds": 6,
+        "receptions": 24,
+        "receivingYards": 190,
+        "receivingTds": 1,
+        "fpts": 164.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 597,
+            "rushingTds": 3,
+            "receptions": 22,
+            "receivingYards": 146,
+            "receivingTds": 1,
+            "fpts": 114.3
+          }
+        }
+      ],
+      "analysis": "Wisner's 2025 totals were more good than dominant, but Texas creates scoring chances and he contributed as a receiver. That keeps him viable even if the backfield stays shared."
+    },
+    {
+      "name": "Rueben Owens II",
+      "school": "Texas A&M",
+      "pos": "RB",
+      "conf": "SEC",
+      "rank": 19,
+      "adp": null,
+      "posRank": 9,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 850,
+        "rushingTds": 7,
+        "receptions": 18,
+        "receivingYards": 160,
+        "receivingTds": 1,
+        "fpts": 177.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 639,
+            "rushingTds": 5,
+            "receptions": 13,
+            "receivingYards": 130,
+            "receivingTds": 0,
+            "fpts": 106.9
+          }
+        }
+      ],
+      "analysis": "Owens was productive in a committee context and projects as a good fit for balanced fantasy scoring. His profile improves if Texas A&M consolidates touches."
+    },
+    {
+      "name": "Rahsul Faison",
+      "school": "South Carolina",
+      "pos": "RB",
+      "conf": "SEC",
+      "rank": 20,
+      "adp": null,
+      "posRank": 10,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 700,
+        "rushingTds": 5,
+        "receptions": 20,
+        "receivingYards": 140,
+        "receivingTds": 0,
+        "fpts": 148.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 470,
+            "rushingTds": 3,
+            "receptions": 19,
+            "receivingYards": 118,
+            "receivingTds": 0,
+            "fpts": 96.8
+          }
+        }
+      ],
+      "analysis": "Faison's 2025 baseline was lighter than the top RBs in this file, so the projection stays conservative. He still merits inclusion because he contributed both as a runner and pass catcher."
+    },
+    {
+      "name": "Ryan Wingo",
+      "school": "Texas",
+      "pos": "WR",
+      "conf": "SEC",
+      "rank": 21,
+      "adp": null,
+      "posRank": 1,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 50,
+        "rushingTds": 0,
+        "receptions": 62,
+        "receivingYards": 980,
+        "receivingTds": 9,
+        "fpts": 219.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 42,
+            "rushingTds": 0,
+            "receptions": 54,
+            "receivingYards": 834,
+            "receivingTds": 7,
+            "fpts": 183.6
+          }
+        }
+      ],
+      "analysis": "Wingo already flashed high-value downfield production in 2025 and plays in one of the better offenses in the set. He is a strong breakout candidate if target share climbs."
+    },
+    {
+      "name": "KC Concepcion",
+      "school": "Texas A&M",
+      "pos": "WR",
+      "conf": "SEC",
+      "rank": 22,
+      "adp": null,
+      "posRank": 2,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 40,
+        "rushingTds": 1,
+        "receptions": 70,
+        "receivingYards": 1000,
+        "receivingTds": 9,
+        "fpts": 228.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 0,
+            "rushingTds": 0,
+            "receptions": 61,
+            "receivingYards": 919,
+            "receivingTds": 9,
+            "fpts": 207.9
+          }
+        }
+      ],
+      "analysis": "Concepcion combined volume and touchdowns in 2025 and has one of the strongest WR fantasy baselines in the file. The projection assumes similar featured usage."
+    },
+    {
+      "name": "Romello Brinson",
+      "school": "SMU",
+      "pos": "WR",
+      "conf": "ACC",
+      "rank": 23,
+      "adp": null,
+      "posRank": 3,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 50,
+        "receivingYards": 725,
+        "receivingTds": 5,
+        "fpts": 152.5,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 0,
+            "rushingTds": 0,
+            "receptions": 43,
+            "receivingYards": 638,
+            "receivingTds": 3,
+            "fpts": 124.8
+          }
+        }
+      ],
+      "analysis": "Brinson already showed efficient secondary-receiver production in 2025 and remains attached to a productive SMU passing game. He is a useful depth WR with room for more target share."
+    },
+    {
+      "name": "Jordyn Tyson",
+      "school": "Arizona State",
+      "pos": "WR",
+      "conf": "BIG12",
+      "rank": 24,
+      "adp": null,
+      "posRank": 4,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 25,
+        "rushingTds": 1,
+        "receptions": 70,
+        "receivingYards": 900,
+        "receivingTds": 9,
+        "fpts": 218.5,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 4,
+            "rushingTds": 1,
+            "receptions": 61,
+            "receivingYards": 711,
+            "receivingTds": 8,
+            "fpts": 179.5
+          }
+        }
+      ],
+      "analysis": "Tyson produced like a true lead receiver in 2025 and also chipped in a little on the ground. The projection assumes he remains Arizona State's primary explosive option."
+    },
+    {
+      "name": "Jordan Hudson",
+      "school": "SMU",
+      "pos": "WR",
+      "conf": "ACC",
+      "rank": 25,
+      "adp": null,
+      "posRank": 5,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 68,
+        "receivingYards": 900,
+        "receivingTds": 7,
+        "fpts": 200.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 0,
+            "rushingTds": 0,
+            "receptions": 61,
+            "receivingYards": 766,
+            "receivingTds": 6,
+            "fpts": 173.6
+          }
+        }
+      ],
+      "analysis": "Hudson's 2025 profile points to a stable WR2-type fantasy starter with upside if SMU keeps its passing volume elevated. He benefits from playing with an established QB."
+    },
+    {
+      "name": "Harrison Wallace III",
+      "school": "Ole Miss",
+      "pos": "WR",
+      "conf": "SEC",
+      "rank": 26,
+      "adp": null,
+      "posRank": 6,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 10,
+        "rushingTds": 0,
+        "receptions": 65,
+        "receivingYards": 950,
+        "receivingTds": 6,
+        "fpts": 197.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 1,
+            "rushingTds": 0,
+            "receptions": 61,
+            "receivingYards": 934,
+            "receivingTds": 4,
+            "fpts": 178.5
+          }
+        }
+      ],
+      "analysis": "Wallace posted one of the cleaner pure receiving seasons in this pool. The estimate assumes he remains a high-share target in Ole Miss's offense."
+    },
+    {
+      "name": "Trebor Pena",
+      "school": "Penn State",
+      "pos": "WR",
+      "conf": "BIG10",
+      "rank": 27,
+      "adp": null,
+      "posRank": 7,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 50,
+        "rushingTds": 0,
+        "receptions": 58,
+        "receivingYards": 700,
+        "receivingTds": 4,
+        "fpts": 155.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 73,
+            "rushingTds": 0,
+            "receptions": 49,
+            "receivingYards": 552,
+            "receivingTds": 2,
+            "fpts": 141.5
+          }
+        }
+      ],
+      "analysis": "Pena's value comes from steady receptions more than huge touchdown output. That makes him more appealing in reception-weighted formats than in TD-heavy formats."
+    },
+    {
+      "name": "Chris Bell",
+      "school": "Louisville",
+      "pos": "WR",
+      "conf": "ACC",
+      "rank": 28,
+      "adp": null,
+      "posRank": 8,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 75,
+        "receivingYards": 975,
+        "receivingTds": 7,
+        "fpts": 214.5,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 0,
+            "rushingTds": 0,
+            "receptions": 72,
+            "receivingYards": 917,
+            "receivingTds": 6,
+            "fpts": 199.7
+          }
+        }
+      ],
+      "analysis": "Bell's target and yardage base were strong enough in 2025 to support another productive season-level projection. Louisville clearly treated him as a primary receiver."
+    },
+    {
+      "name": "Nyck Harbor",
+      "school": "South Carolina",
+      "pos": "WR",
+      "conf": "SEC",
+      "rank": 29,
+      "adp": null,
+      "posRank": 9,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 45,
+        "receivingYards": 800,
+        "receivingTds": 7,
+        "fpts": 167.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 0,
+            "rushingTds": 0,
+            "receptions": 30,
+            "receivingYards": 618,
+            "receivingTds": 6,
+            "fpts": 127.8
+          }
+        }
+      ],
+      "analysis": "Harbor's 2025 line was built on chunk plays and touchdowns, so the projection keeps strong upside but acknowledges some volatility. His athletic profile gives him ceiling."
+    },
+    {
+      "name": "Vernell Brown III",
+      "school": "Florida",
+      "pos": "WR",
+      "conf": "SEC",
+      "rank": 30,
+      "adp": null,
+      "posRank": 10,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 25,
+        "rushingTds": 0,
+        "receptions": 55,
+        "receivingYards": 700,
+        "receivingTds": 3,
+        "fpts": 145.5,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 14,
+            "rushingTds": 0,
+            "receptions": 40,
+            "receivingYards": 512,
+            "receivingTds": 0,
+            "fpts": 92.6
+          }
+        }
+      ],
+      "analysis": "Brown's 2025 production came through steady involvement rather than huge scoring numbers. He profiles as a useful volume receiver if Florida keeps him near the top of the pecking order."
+    },
+    {
+      "name": "Eugene Wilson III",
+      "school": "Florida",
+      "pos": "WR",
+      "conf": "SEC",
+      "rank": 31,
+      "adp": null,
+      "posRank": 11,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 30,
+        "rushingTds": 0,
+        "receptions": 50,
+        "receivingYards": 600,
+        "receivingTds": 5,
+        "fpts": 143.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 12,
+            "rushingTds": 0,
+            "receptions": 27,
+            "receivingYards": 239,
+            "receivingTds": 3,
+            "fpts": 70.1
+          }
+        }
+      ],
+      "analysis": "Wilson's 2025 counting stats were lighter, but he still projects as a meaningful part of Florida's target tree. The estimate assumes healthier and more stable usage."
+    },
+    {
+      "name": "DeAndre Moore Jr.",
+      "school": "Texas",
+      "pos": "WR",
+      "conf": "SEC",
+      "rank": 32,
+      "adp": null,
+      "posRank": 12,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 48,
+        "receivingYards": 700,
+        "receivingTds": 5,
+        "fpts": 148.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 0,
+            "rushingTds": 0,
+            "receptions": 38,
+            "receivingYards": 532,
+            "receivingTds": 4,
+            "fpts": 115.2
+          }
+        }
+      ],
+      "analysis": "Moore was efficient on moderate volume in 2025 and fits as a complementary fantasy receiver with spike-week potential in Texas's passing game."
+    },
+    {
+      "name": "Terry Bussey",
+      "school": "Texas A&M",
+      "pos": "WR",
+      "conf": "SEC",
+      "rank": 33,
+      "adp": null,
+      "posRank": 13,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 160,
+        "rushingTds": 2,
+        "receptions": 35,
+        "receivingYards": 450,
+        "receivingTds": 4,
+        "fpts": 110.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 81,
+            "rushingTds": 1,
+            "receptions": 18,
+            "receivingYards": 195,
+            "receivingTds": 1,
+            "fpts": 58.6
+          }
+        }
+      ],
+      "analysis": "Bussey is interesting because he can score in more than one way. The projection keeps him below the pure-volume WRs but credits the hybrid usage."
+    },
+    {
+      "name": "Cayden Lee",
+      "school": "Ole Miss",
+      "pos": "WR",
+      "conf": "SEC",
+      "rank": 34,
+      "adp": null,
+      "posRank": 14,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 55,
+        "receivingYards": 800,
+        "receivingTds": 5,
+        "fpts": 165.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 0,
+            "rushingTds": 0,
+            "receptions": 44,
+            "receivingYards": 635,
+            "receivingTds": 3,
+            "fpts": 125.5
+          }
+        }
+      ],
+      "analysis": "Lee posted strong secondary-receiver production in 2025 and would be fantasy relevant again if Ole Miss remains pass efficient. He is a sound depth option."
+    },
+    {
+      "name": "Dillon Bell",
+      "school": "Georgia",
+      "pos": "WR",
+      "conf": "SEC",
+      "rank": 35,
+      "adp": null,
+      "posRank": 15,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 40,
+        "rushingTds": 1,
+        "receptions": 40,
+        "receivingYards": 450,
+        "receivingTds": 4,
+        "fpts": 97.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 0,
+            "rushingTds": 0,
+            "receptions": 27,
+            "receivingYards": 268,
+            "receivingTds": 2,
+            "fpts": 65.8
+          }
+        }
+      ],
+      "analysis": "Bell's profile is more role-player than target hog, but Georgia used him in enough ways to keep him fantasy-viable in deeper pools. The projection is intentionally conservative."
+    },
+    {
+      "name": "Caullin Lacy",
+      "school": "Louisville",
+      "pos": "WR",
+      "conf": "ACC",
+      "rank": 36,
+      "adp": null,
+      "posRank": 16,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": 0,
+        "passingTds": 0,
+        "ints": 0,
+        "rushingYards": 40,
+        "rushingTds": 0,
+        "receptions": 65,
+        "receivingYards": 760,
+        "receivingTds": 5,
+        "fpts": 175.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": 2,
+            "passingTds": 1,
+            "ints": 0,
+            "rushingYards": 53,
+            "rushingTds": 0,
+            "receptions": 60,
+            "receivingYards": 635,
+            "receivingTds": 2,
+            "fpts": 138.5
+          }
+        }
+      ],
+      "analysis": "Lacy's value comes from broad usage: he caught a lot of passes, handled occasional rushing, and even logged a passing attempt. That versatility helps in fantasy."
+    },
+    {
+      "name": "Mazeo Bennett Jr.",
+      "school": "South Carolina",
+      "pos": "WR",
+      "conf": "SEC",
+      "rank": 37,
+      "adp": null,
+      "posRank": 17,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 28,
+        "receivingYards": 340,
+        "receivingTds": 2,
+        "fpts": 74.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 0,
+            "rushingTds": 0,
+            "receptions": 10,
+            "receivingYards": 62,
+            "receivingTds": 0,
+            "fpts": 16.2
+          }
+        }
+      ],
+      "analysis": "Bennett's 2025 line was modest, so this is more of a developmental stash projection than a finished-product one. South Carolina's receiver room still leaves room for growth."
+    },
+    {
+      "name": "Jack Endries",
+      "school": "Texas",
+      "pos": "TE",
+      "conf": "SEC",
+      "rank": 38,
+      "adp": null,
+      "posRank": 1,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 42,
+        "receivingYards": 500,
+        "receivingTds": 4,
+        "fpts": 116.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 0,
+            "rushingTds": 0,
+            "receptions": 33,
+            "receivingYards": 346,
+            "receivingTds": 3,
+            "fpts": 85.6
+          }
+        }
+      ],
+      "analysis": "Endries had useful mid-tier TE production in 2025 and plays in an offense that can support touchdown chances. He profiles as a stable TE option."
+    },
+    {
+      "name": "Luke Reynolds",
+      "school": "Penn State",
+      "pos": "TE",
+      "conf": "BIG10",
+      "rank": 39,
+      "adp": null,
+      "posRank": 2,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 10,
+        "rushingTds": 0,
+        "receptions": 35,
+        "receivingYards": 420,
+        "receivingTds": 3,
+        "fpts": 96.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 26,
+            "rushingTds": 0,
+            "receptions": 26,
+            "receivingYards": 257,
+            "receivingTds": 0,
+            "fpts": 53.3
+          }
+        }
+      ],
+      "analysis": "Reynolds was involved enough in 2025 to matter in deeper formats, and Penn State's TE usage keeps a path open to growth. The projection is moderate rather than aggressive."
+    },
+    {
+      "name": "Amir Jackson",
+      "school": "Florida",
+      "pos": "TE",
+      "conf": "SEC",
+      "rank": 40,
+      "adp": null,
+      "posRank": 3,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 18,
+        "receivingYards": 220,
+        "receivingTds": 2,
+        "fpts": 52.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 0,
+            "rushingTds": 0,
+            "receptions": 3,
+            "receivingYards": 29,
+            "receivingTds": 1,
+            "fpts": 11.9
+          }
+        }
+      ],
+      "analysis": "Jackson's 2025 receiving line was small, so the projection treats him as a developmental TE seed entry rather than a locked-in fantasy starter."
+    },
+    {
+      "name": "Chamon Metayer",
+      "school": "Arizona State",
+      "pos": "TE",
+      "conf": "BIG12",
+      "rank": 41,
+      "adp": null,
+      "posRank": 4,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 42,
+        "receivingYards": 450,
+        "receivingTds": 4,
+        "fpts": 111.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 1,
+            "rushingTds": 0,
+            "receptions": 38,
+            "receivingYards": 375,
+            "receivingTds": 4,
+            "fpts": 99.6
+          }
+        }
+      ],
+      "analysis": "Metayer already posted one of the better TE receiving seasons in this file. That makes him one of the cleaner fantasy TE bets."
+    },
+    {
+      "name": "Theo Melin \u00d6hrstr\u00f6m",
+      "school": "Texas A&M",
+      "pos": "TE",
+      "conf": "SEC",
+      "rank": 42,
+      "adp": null,
+      "posRank": 5,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 28,
+        "receivingYards": 280,
+        "receivingTds": 3,
+        "fpts": 74.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 0,
+            "rushingTds": 0,
+            "receptions": 19,
+            "receivingYards": 168,
+            "receivingTds": 1,
+            "fpts": 41.8
+          }
+        }
+      ],
+      "analysis": "\u00d6hrstr\u00f6m's 2025 baseline was modest but usable for a TE, especially given his touchdown capability. He profiles as a depth TE with red-zone utility."
+    },
+    {
+      "name": "Dae'Quan Wright",
+      "school": "Ole Miss",
+      "pos": "TE",
+      "conf": "SEC",
+      "rank": 43,
+      "adp": null,
+      "posRank": 6,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 42,
+        "receivingYards": 600,
+        "receivingTds": 5,
+        "fpts": 132.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 2,
+            "rushingTds": 0,
+            "receptions": 39,
+            "receivingYards": 635,
+            "receivingTds": 5,
+            "fpts": 134.7
+          }
+        }
+      ],
+      "analysis": "Wright's 2025 production was strong for a TE and comparable to some mid-tier WR lines in this pool. He carries legitimate positional advantage upside."
+    },
+    {
+      "name": "Lawson Luckie",
+      "school": "Georgia",
+      "pos": "TE",
+      "conf": "SEC",
+      "rank": 44,
+      "adp": null,
+      "posRank": 7,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 22,
+        "receivingYards": 240,
+        "receivingTds": 4,
+        "fpts": 70.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 0,
+            "rushingTds": 0,
+            "receptions": 15,
+            "receivingYards": 158,
+            "receivingTds": 4,
+            "fpts": 54.8
+          }
+        }
+      ],
+      "analysis": "Luckie was efficient on limited volume and found the end zone enough to stay relevant. He is a reasonable upside TE dart in this dataset."
+    },
+    {
+      "name": "RJ Maryland",
+      "school": "SMU",
+      "pos": "TE",
+      "conf": "ACC",
+      "rank": 45,
+      "adp": null,
+      "posRank": 8,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 35,
+        "receivingYards": 430,
+        "receivingTds": 4,
+        "fpts": 102.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 0,
+            "rushingTds": 0,
+            "receptions": 27,
+            "receivingYards": 322,
+            "receivingTds": 2,
+            "fpts": 71.2
+          }
+        }
+      ],
+      "analysis": "Maryland's 2025 line was solidly fantasy-usable for the position, particularly if SMU stays pass leaning. He belongs in the TE1/TE2 conversation within this pool."
+    },
+    {
+      "name": "Jaleel Skinner",
+      "school": "Louisville",
+      "pos": "TE",
+      "conf": "ACC",
+      "rank": 46,
+      "adp": null,
+      "posRank": 9,
+      "rostered": null,
+      "status": "HEALTHY",
+      "number": null,
+      "projection": {
+        "passingYards": null,
+        "passingTds": null,
+        "ints": null,
+        "rushingYards": 0,
+        "rushingTds": 0,
+        "receptions": 26,
+        "receivingYards": 290,
+        "receivingTds": 3,
+        "fpts": 73.0,
+        "qbr": null,
+        "expectedPlays": null,
+        "expectedRushPerPlay": null,
+        "expectedTdPerPlay": null,
+        "floor": null,
+        "ceiling": null,
+        "boomProb": null,
+        "bustProb": null
+      },
+      "history": [
+        {
+          "year": 2025,
+          "stats": {
+            "passingYards": null,
+            "passingTds": null,
+            "ints": null,
+            "rushingYards": 0,
+            "rushingTds": 0,
+            "receptions": 21,
+            "receivingYards": 204,
+            "receivingTds": 2,
+            "fpts": 53.4
+          }
+        }
+      ],
+      "analysis": "Skinner offers a workable middle-tier TE profile built on steady red-zone and chain-moving usage. The projection assumes similar role continuity."
+    }
+  ],
+  "roster_source_urls": [
+    "https://www.espn.com/college-football/team/roster/_/id/251",
+    "https://www.espn.com/college-football/team/roster/_/id/213",
+    "https://www.espn.com/college-football/team/roster/_/id/57",
+    "https://www.espn.com/college-football/team/roster/_/id/2579",
+    "https://www.espn.com/college-football/team/roster/_/id/9",
+    "https://www.espn.com/college-football/team/roster/_/id/245",
+    "https://www.espn.com/college-football/team/roster/_/id/145",
+    "https://www.espn.com/college-football/team/roster/_/id/61",
+    "https://www.espn.com/college-football/team/roster/_/id/2567",
+    "https://www.espn.com/college-football/team/roster/_/id/97"
+  ]
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Senior Software Engineer"
+  short_description: "Full-stack architecture and review expert"
+  default_prompt: "Use $senior-software-engineer-agent to architect, review, or refine UI, API, and integration work for this repo."

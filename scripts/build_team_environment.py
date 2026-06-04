@@ -1,0 +1,101 @@
+import argparse
+import os
+import sys
+from datetime import datetime
+
+from sqlalchemy import delete, select
+
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if ROOT_DIR not in sys.path:
+    sys.path.append(ROOT_DIR)
+
+from api.app.db.session import SessionLocal
+from api.app.integrations.cfbd import CFBDClient
+from api.app.models import load_model_registry
+from api.app.models.game import Game
+from api.app.models.game_odds import GameOdds
+from api.app.models.team_environment import TeamEnvironment
+from api.app.services.projections.team_environment import compute_team_environment
+from api.app.services.power4 import list_power4_teams
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Build weekly team environment baselines from CFBD.")
+    parser.add_argument("--season", type=int, default=datetime.now().year)
+    parser.add_argument("--week", type=int, required=True)
+    parser.add_argument("--conference", type=str)
+    args = parser.parse_args()
+
+    load_model_registry()
+    client = CFBDClient()
+    games_rows = client.get_games_teams(args.season, args.week, conference=args.conference)
+    implied_totals: dict[str, float] = {}
+    spreads: dict[str, float] = {}
+    session = SessionLocal()
+    try:
+        games = session.scalars(
+            select(Game).where(Game.season == args.season, Game.week == args.week)
+        ).all()
+        game_ids = [g.id for g in games]
+        odds_rows = session.scalars(select(GameOdds).where(GameOdds.game_id.in_(game_ids))).all()
+        odds_by_game = {row.game_id: row for row in odds_rows}
+        for game in games:
+            odds = odds_by_game.get(game.id)
+            if not odds:
+                continue
+            if odds.home_implied is not None:
+                implied_totals[game.home_team] = odds.home_implied
+            if odds.away_implied is not None:
+                implied_totals[game.away_team] = odds.away_implied
+            if odds.spread is not None:
+                spreads[game.home_team] = odds.spread
+                spreads[game.away_team] = -odds.spread
+    finally:
+        session.close()
+
+    environments = compute_team_environment(
+        games_rows,
+        season=args.season,
+        week=args.week,
+        implied_totals=implied_totals,
+        spreads=spreads,
+    )
+    default_expected_plays = 68.0
+    default_expected_points = 27.0
+    default_pass_rate = 0.52
+    existing_teams = {row.team_name for row in environments}
+    for team_name in list_power4_teams():
+        if team_name in existing_teams:
+            continue
+        implied_total = implied_totals.get(team_name)
+        environments.append(
+            TeamEnvironment(
+                team_name=team_name,
+                season=args.season,
+                week=args.week,
+                expected_plays=default_expected_plays,
+                expected_points=implied_total if implied_total is not None else default_expected_points,
+                pass_rate=default_pass_rate,
+                rush_rate=1.0 - default_pass_rate,
+                red_zone_trips=3.0,
+                red_zone_td_rate=0.58,
+                pace_seconds_per_play=27.0,
+                implied_team_total=implied_total,
+                spread=spreads.get(team_name),
+            )
+        )
+
+    session = SessionLocal()
+    try:
+        session.execute(
+            delete(TeamEnvironment).where(TeamEnvironment.season == args.season, TeamEnvironment.week == args.week)
+        )
+        session.add_all(environments)
+        session.commit()
+        print(f"Stored {len(environments)} team environment rows.")
+    finally:
+        session.close()
+
+
+if __name__ == "__main__":
+    main()

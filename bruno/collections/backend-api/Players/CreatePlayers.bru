@@ -1,0 +1,25 @@
+meta {
+  name: Create Players
+  type: http
+  seq: 1
+}
+post {
+  url: {{base_url}}/players
+  body: json
+}
+body:json {
+  [
+    {
+      "name": "Sam QB",
+      "position": "QB",
+      "school": "State University",
+      "external_id": "cfbd_123"
+    }
+  ]
+}
+script:post-response {
+  const data = res.getBody();
+  if (Array.isArray(data) && data.length > 0) {
+    bru.setVar("player_id", data[0].id);
+  }
+}
