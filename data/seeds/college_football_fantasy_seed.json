@@ -1070,22 +1070,22 @@
       "school": "Texas",
       "pos": "QB",
       "conf": "SEC",
-      "rank": 1,
+      "rank": 14,
       "adp": null,
-      "posRank": 1,
+      "posRank": 9,
       "rostered": null,
       "status": "HEALTHY",
       "number": null,
       "projection": {
-        "passingYards": 3600,
-        "passingTds": 30,
-        "ints": 8,
-        "rushingYards": 450,
-        "rushingTds": 9,
+        "passingYards": 3300,
+        "passingTds": 27,
+        "ints": 9,
+        "rushingYards": 300,
+        "rushingTds": 5,
         "receptions": null,
         "receivingYards": null,
         "receivingTds": null,
-        "fpts": 374.0,
+        "fpts": 340.0,
         "qbr": null,
         "expectedPlays": null,
         "expectedRushPerPlay": null,
@@ -1111,7 +1111,7 @@
           }
         }
       ],
-      "analysis": "Projected to remain one of the highest-upside fantasy QBs in this pool because the 2025 passing base was already strong and the rushing TD profile adds a second scoring lane. Texas also returns premium receiving talent around him."
+      "analysis": "Manning remains a high-upside QB target, but the projection now treats him as an early-second-round fantasy option instead of a top-six overall player."
     },
     {
       "name": "Marcel Reed",
@@ -1406,22 +1406,22 @@
       "school": "Ole Miss",
       "pos": "QB",
       "conf": "SEC",
-      "rank": 8,
+      "rank": 15,
       "adp": null,
-      "posRank": 8,
+      "posRank": 10,
       "rostered": null,
       "status": "HEALTHY",
       "number": null,
       "projection": {
-        "passingYards": 3950,
-        "passingTds": 25,
-        "ints": 7,
-        "rushingYards": 480,
-        "rushingTds": 7,
+        "passingYards": 3250,
+        "passingTds": 22,
+        "ints": 8,
+        "rushingYards": 320,
+        "rushingTds": 4,
         "receptions": null,
         "receivingYards": null,
         "receivingTds": null,
-        "fpts": 378.0,
+        "fpts": 338.0,
         "qbr": null,
         "expectedPlays": null,
         "expectedRushPerPlay": null,
@@ -1447,7 +1447,7 @@
           }
         }
       ],
-      "analysis": "Chambliss had one of the best statistical baselines in this file, pairing high passing volume with meaningful rushing scores. That profile translates cleanly to fantasy."
+      "analysis": "Chambliss still carries starter-level fantasy appeal in Ole Miss' offense, but the projection now prices in less rushing touchdown certainty and a more realistic early-second-round draft cost."
     },
     {
       "name": "Miller Moss",

@@ -37,8 +37,9 @@ export interface Player {
   sheetSyncedAt?: string;
   conf: string;
   rank: number;
+  boardRank?: number | null;
   adp: number;
-  posRank: number;
+  posRank: number | null;
   rostered: number;
   status: "HEALTHY" | "OUT" | "QUESTIONABLE" | "DOUBTFUL" | "IR";
   projection: PlayerStats;

@@ -15,6 +15,7 @@ type BackendPlayerRead = {
   sheet_projection_stats?: Record<string, number | null> | null;
   sheet_source_sheet_id?: string | null;
   sheet_synced_at?: string | null;
+  board_rank?: number | null;
 };
 
 type BackendPlayerListResponse = {
@@ -136,7 +137,7 @@ export const normalizePlayer = (
     conference?: string;
     rank?: number;
     adp?: number;
-    posRank?: number;
+    posRank?: number | null;
     status?: string;
     projection?: BackendProjectionRead;
   }
@@ -148,8 +149,9 @@ export const normalizePlayer = (
   imageUrl: player.image_url ?? undefined,
   conf: context?.conference ?? "N/A",
   rank: context?.rank ?? 0,
+  boardRank: player.board_rank ?? context?.rank ?? null,
   adp: context?.adp ?? 0,
-  posRank: context?.posRank ?? 0,
+  posRank: context?.posRank ?? null,
   rostered: 0,
   status: normalizeStatus(context?.status),
   projection: mapProjection(context?.projection, player.sheet_projected_season_points ?? 0),
@@ -176,6 +178,7 @@ export function usePlayers(
     week?: number;
     limit?: number;
     offset?: number;
+    enrich?: boolean;
   } = {}
 ) {
   const {
@@ -190,6 +193,7 @@ export function usePlayers(
     week = 1,
     limit = 100,
     offset = 0,
+    enrich = true,
   } = params;
 
   return useQuery({
@@ -207,10 +211,36 @@ export function usePlayers(
         week,
         limit,
         offset,
+        enrich,
       },
     ],
     staleTime: 30_000,
     queryFn: async () => {
+      if (!enrich) {
+        const payload = await apiGet<BackendPlayerListResponse>("/players", {
+          search: search || undefined,
+          position: position || undefined,
+          school: school || undefined,
+          league_id,
+          available_in_league_id,
+          available_only,
+          sort,
+          limit,
+          offset,
+        });
+
+        return {
+          ...payload,
+          data: payload.data.map((player, index) =>
+            normalizePlayer(player, {
+              rank: player.sheet_adp ?? offset + index + 1,
+              adp: player.sheet_adp ?? 0,
+              posRank: null,
+            })
+          ),
+        };
+      }
+
       const [payload, projections, teams, injuries] = await Promise.all([
         apiGet<BackendPlayerListResponse>("/players", {
           search: search || undefined,
@@ -295,6 +325,18 @@ export function usePlayers(
         ),
       };
     },
+  });
+}
+
+export function useDraftPlayerPool(
+  params: Omit<Parameters<typeof usePlayers>[0], "enrich"> = {}
+) {
+  return usePlayers({
+    ...params,
+    available_only: params.available_only ?? true,
+    sort: params.sort ?? "draft_rank",
+    limit: params.limit ?? 100,
+    enrich: false,
   });
 }
 

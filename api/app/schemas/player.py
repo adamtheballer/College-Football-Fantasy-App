@@ -25,6 +25,7 @@ class PlayerRead(PlayerBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    board_rank: int | None = None
     created_at: datetime
     updated_at: datetime
 

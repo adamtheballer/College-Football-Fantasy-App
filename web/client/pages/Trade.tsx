@@ -619,7 +619,7 @@ export default function Trade() {
               </div>
               <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                  Verdict
+                  Basic Estimate
                 </p>
                 <p className="mt-2 text-xl font-black text-primary">{analysis.verdict}</p>
               </div>
@@ -627,7 +627,7 @@ export default function Trade() {
           ) : (
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                Select players from both sides, then run analysis to see value differential.
+                Select players from both sides, then run a basic estimate to see value differential.
               </p>
             </div>
           )}
@@ -637,7 +637,7 @@ export default function Trade() {
       <Card className="rounded-[2rem] border border-emerald-400/20 bg-emerald-500/10">
         <CardContent className="flex items-center gap-3 p-5 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-100">
           <Users className="h-4 w-4" />
-          Trade value is calculated from your league rosters and weekly projections.
+          Basic trade value uses local roster and projection data only; schedule context is neutral unless backend analysis is added.
         </CardContent>
       </Card>
     </div>

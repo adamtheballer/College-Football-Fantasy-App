@@ -24,7 +24,7 @@ import {
 import { useDraftTimer } from "@/hooks/use-draft-timer";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useLeagueDetail } from "@/hooks/use-leagues";
-import { usePlayerSeasonSummary, usePlayers } from "@/hooks/use-players";
+import { useDraftPlayerPool, usePlayerSeasonSummary } from "@/hooks/use-players";
 import { ApiError } from "@/lib/api";
 import type { Player } from "@/types/player";
 import { getCompletedDraftExitPath, isDraftAutoPickDue, shouldShowDraftCompletionModal } from "./draft-flow";
@@ -321,14 +321,14 @@ export default function Draft() {
     });
   }, []);
 
-  const { data: playersPayload, isLoading: playersLoading, error: playersError } = usePlayers({
+  const { data: playersPayload, isLoading: playersLoading, error: playersError } = useDraftPlayerPool({
     search: searchQuery.trim() || undefined,
     position: positionFilter === "ALL" ? undefined : positionFilter,
     league_id: parsedLeagueId,
     available_in_league_id: parsedLeagueId,
     available_only: true,
     sort: sortMode,
-    limit: 500,
+    limit: 100,
     season: projectionSeason,
     week: 1,
   });
@@ -1284,6 +1284,23 @@ export default function Draft() {
       <Card className="bg-card/40 border-white/10 rounded-[2.5rem] shadow-[0_0_60px_rgba(59,130,246,0.18)]">
         <CardHeader className="border-b border-white/10">
           <div className="space-y-4">
+            <div className="flex justify-center">
+              <div
+                className={`relative min-w-[220px] overflow-hidden rounded-2xl border px-5 py-3 text-center transition-all duration-300 ${timerCardToneClass}`}
+              >
+                <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${timerGlowClass}`} />
+                <div className="relative flex items-center justify-center gap-2">
+                  <Clock3 className={`h-3.5 w-3.5 ${timerIconToneClass} ${isUrgencyTimer ? "animate-pulse" : ""}`} />
+                  <p className={`text-[9px] font-black uppercase tracking-[0.2em] ${timerLabelToneClass}`}>{timerLabel}</p>
+                </div>
+                <p
+                  className={`relative mt-1 text-4xl font-black italic transition-all duration-300 ${timerValueToneClass}`}
+                >
+                  {isPrepWindow ? `Prep ${pickPrepSeconds}s` : draftTimer.formattedTime}
+                </p>
+              </div>
+            </div>
+
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-2">
                 <Button
@@ -1315,23 +1332,6 @@ export default function Draft() {
                 >
                   Draft History
                 </Button>
-              </div>
-            </div>
-
-            <div className="flex justify-center">
-              <div
-                className={`relative min-w-[220px] overflow-hidden rounded-2xl border px-5 py-3 text-center transition-all duration-300 ${timerCardToneClass}`}
-              >
-                <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${timerGlowClass}`} />
-                <div className="relative flex items-center justify-center gap-2">
-                  <Clock3 className={`h-3.5 w-3.5 ${timerIconToneClass} ${isUrgencyTimer ? "animate-pulse" : ""}`} />
-                  <p className={`text-[9px] font-black uppercase tracking-[0.2em] ${timerLabelToneClass}`}>{timerLabel}</p>
-                </div>
-                <p
-                  className={`relative mt-1 text-4xl font-black italic transition-all duration-300 ${timerValueToneClass}`}
-                >
-                  {isPrepWindow ? `Prep ${pickPrepSeconds}s` : draftTimer.formattedTime}
-                </p>
               </div>
             </div>
           </div>
@@ -1439,47 +1439,50 @@ export default function Draft() {
       )}
 
       <Card className="bg-card/40 border-white/10 rounded-[2.5rem] shadow-[0_0_70px_rgba(59,130,246,0.14)]">
-        <CardHeader className="border-b border-white/10 items-center">
-          <CardTitle className="text-center text-[11px] font-black uppercase tracking-[0.28em] text-primary">Draft Board</CardTitle>
-        </CardHeader>
-        <CardContent className="p-5">
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as DraftActiveTab)}>
-            <TabsContent value="draft" className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_220px_220px] gap-3">
-                <Input
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search players, schools, or positions..."
-                  className="h-12 rounded-2xl bg-white/5 border-white/10"
-                />
-                <Select value={sortMode} onValueChange={(value) => setSortMode(value as DraftSortMode)}>
-                  <SelectTrigger className="h-12 rounded-2xl border-white/10 bg-white/5 text-[10px] font-black uppercase tracking-[0.16em]">
-                    <SelectValue placeholder="Sort board" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft_rank">Draft Rank</SelectItem>
-                    <SelectItem value="projection">Fantasy Points</SelectItem>
-                    <SelectItem value="adp">ADP</SelectItem>
-                    <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="position">Position</SelectItem>
-                    <SelectItem value="school">School</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={positionFilter} onValueChange={(value) => setPositionFilter(value as DraftPositionFilter)}>
-                  <SelectTrigger className="h-12 rounded-2xl border-white/10 bg-white/5 text-[10px] font-black uppercase tracking-[0.16em]">
-                    <SelectValue placeholder="Position Filter" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">All Positions</SelectItem>
-                    <SelectItem value="QB">QB (ADP)</SelectItem>
-                    <SelectItem value="RB">RB (ADP)</SelectItem>
-                    <SelectItem value="WR">WR (ADP)</SelectItem>
-                    <SelectItem value="TE">TE (ADP)</SelectItem>
-                    <SelectItem value="K">K (ADP)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        <CardContent className="space-y-5 p-5">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px]">
+            <Input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search players, schools, or positions..."
+              className="h-12 rounded-2xl border-cyan-200/15 bg-white/5 font-bold shadow-[0_0_22px_rgba(34,211,238,0.06)]"
+            />
+            <Select value={sortMode} onValueChange={(value) => setSortMode(value as DraftSortMode)}>
+              <SelectTrigger className="h-12 rounded-2xl border-white/10 bg-white/5 text-[10px] font-black uppercase tracking-[0.16em]">
+                <SelectValue placeholder="Sort board" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="draft_rank">Draft Rank</SelectItem>
+                <SelectItem value="projection">Fantasy Points</SelectItem>
+                <SelectItem value="adp">ADP</SelectItem>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="position">Position</SelectItem>
+                <SelectItem value="school">School</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={positionFilter} onValueChange={(value) => setPositionFilter(value as DraftPositionFilter)}>
+              <SelectTrigger className="h-12 rounded-2xl border-white/10 bg-white/5 text-[10px] font-black uppercase tracking-[0.16em]">
+                <SelectValue placeholder="Position Filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Positions</SelectItem>
+                <SelectItem value="QB">QB (ADP)</SelectItem>
+                <SelectItem value="RB">RB (ADP)</SelectItem>
+                <SelectItem value="WR">WR (ADP)</SelectItem>
+                <SelectItem value="TE">TE (ADP)</SelectItem>
+                <SelectItem value="K">K (ADP)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as DraftActiveTab)}>
+            <TabsList className="mb-5 grid w-full grid-cols-4 rounded-2xl border border-white/10 bg-white/[0.04] p-1">
+              <TabsTrigger value="draft">Draft</TabsTrigger>
+              <TabsTrigger value="queue">Queue</TabsTrigger>
+              <TabsTrigger value="roster">Roster</TabsTrigger>
+              <TabsTrigger value="history">History</TabsTrigger>
+            </TabsList>
+            <TabsContent value="draft" className="space-y-4">
               {(draftPickErrorMessage || pickMutation.error) && (
                 <div className="rounded-2xl border border-red-400/20 bg-red-500/5 p-4 text-[10px] font-black uppercase tracking-[0.18em] text-red-300">
                   {draftPickErrorMessage || formatApiError(pickMutation.error, "Unable to save draft pick.")}
@@ -1522,11 +1525,11 @@ export default function Draft() {
                             : "No available players remain."}
                     </div>
                   ) : (
-                    availablePlayers.map((player) => {
+                    availablePlayers.map((player, index) => {
                       const playerPos = normalizePlayerPosition(player.pos) || "N/A";
                       const playerSchool = String(player.school ?? "-");
                       const playerClass = String(player.playerClass ?? "-").toUpperCase();
-                      const boardRankDisplay = player.draftRank;
+                      const boardRankDisplay = index + 1;
                       const playerCanFitRoster = canPlayerFitActiveRoster(player);
                       const rosterLockReason = getPlayerRosterLockReason(player);
                       return (
@@ -1639,10 +1642,10 @@ export default function Draft() {
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[52vh] overflow-y-auto pr-1">
-                  {queuedPlayers.map((player) => (
+                  {queuedPlayers.map((player, index) => (
                     <div key={player.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-black uppercase tracking-tight text-foreground">#{player.draftRank} • {player.name}</p>
+                        <p className="text-sm font-black uppercase tracking-tight text-foreground">#{index + 1} • {player.name}</p>
                         <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/70">
                           {normalizePlayerPosition(player.pos) || "N/A"} • {player.school} • {(player.playerClass || "-").toUpperCase()} • ADP {formatProjection(player.adpRank)} • {formatProjection(player.projectedStandardPoints)} proj
                         </p>
@@ -1777,14 +1780,6 @@ export default function Draft() {
               </div>
             </TabsContent>
 
-            <div className="mt-5 border-t border-white/10 pt-4">
-              <TabsList className="w-full grid grid-cols-4">
-                <TabsTrigger value="draft">Draft</TabsTrigger>
-                <TabsTrigger value="queue">Queue</TabsTrigger>
-                <TabsTrigger value="roster">Roster</TabsTrigger>
-                <TabsTrigger value="history">History</TabsTrigger>
-              </TabsList>
-            </div>
           </Tabs>
         </CardContent>
       </Card>

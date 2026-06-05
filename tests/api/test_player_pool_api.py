@@ -152,7 +152,7 @@ def test_list_players_available_only_excludes_rostered_and_drafted_players(clien
 
     response = client.get(
         "/players",
-        params={"league_id": league["id"], "available_only": True, "limit": 500},
+        params={"league_id": league["id"], "available_only": True, "limit": 100},
         headers=auth_headers(token),
     )
     assert response.status_code == 200
@@ -196,7 +196,7 @@ def test_list_players_available_only_excludes_canonical_drafted_duplicate(client
 
     response = client.get(
         "/players",
-        params={"available_in_league_id": league["id"], "limit": 500},
+        params={"available_in_league_id": league["id"], "limit": 100},
         headers=auth_headers(token),
     )
 
@@ -231,7 +231,7 @@ def test_draft_pick_creates_roster_entry_and_removes_player_from_available_pool(
 
     available = client.get(
         "/players",
-        params={"available_in_league_id": league["id"], "limit": 500},
+        params={"available_in_league_id": league["id"], "limit": 100},
         headers=auth_headers(token),
     )
     assert player.id not in {row["id"] for row in available.json()["data"]}

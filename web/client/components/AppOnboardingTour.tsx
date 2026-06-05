@@ -319,14 +319,16 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-            <Button
-              variant="ghost"
-              className="h-10 rounded-xl px-4 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground"
-              onClick={finishGuide}
-            >
-              End Guide
-            </Button>
+          <div className={`flex flex-wrap items-center gap-3 pt-2 ${isFinalStep ? "justify-end" : "justify-between"}`}>
+            {!isFinalStep && (
+              <Button
+                variant="ghost"
+                className="h-10 rounded-xl px-4 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground"
+                onClick={finishGuide}
+              >
+                End Guide
+              </Button>
+            )}
             <div className="flex items-center gap-2">
               {currentStep > 0 && (
                 <Button

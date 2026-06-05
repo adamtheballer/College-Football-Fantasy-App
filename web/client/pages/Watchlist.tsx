@@ -58,7 +58,7 @@ export default function Watchlist() {
   const { data, isLoading, isError } = usePlayers({
     search: searchQuery || undefined,
     league_id: selectedLeagueId ?? undefined,
-    limit: 5000,
+    limit: 100,
     sort: "position",
   });
 

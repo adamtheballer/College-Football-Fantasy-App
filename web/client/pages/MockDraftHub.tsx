@@ -123,9 +123,9 @@ export default function MockDraftHub() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4">
-                <p className="text-sm font-black text-foreground">Draft against auto managers immediately</p>
+                <p className="text-sm font-black text-foreground">Draft against auto managers after a short countdown</p>
                 <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/80">
-                  The rest of the room fills with CPU managers right away. You skip the public seat-claim lobby and go straight into the mock draft preview room.
+                  The room fills with CPU managers, randomizes the draft order, then sends you into a 90-second draft-room countdown.
                 </p>
               </div>
               <Button

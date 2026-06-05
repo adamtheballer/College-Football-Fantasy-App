@@ -26,6 +26,7 @@ import CreateMockDraft from "./pages/CreateMockDraft";
 import JoinMockDraft from "./pages/JoinMockDraft";
 import MockDraftLobby from "./pages/MockDraftLobby";
 import MockDraftRoom from "./pages/MockDraftRoom";
+import SinglePlayerMockDraftRoom from "./pages/SinglePlayerMockDraftRoom";
 import MockDraftResults from "./pages/MockDraftResults";
 import Rosters from "./pages/Rosters";
 import Stats from "./pages/Stats";
@@ -34,8 +35,30 @@ import Watchlist from "./pages/Watchlist";
 import Chats from "./pages/Chats";
 import InjuryCenter from "./pages/InjuryCenter";
 import Trade from "./pages/Trade";
+import { ApiError } from "@/lib/api";
 
-const queryClient = new QueryClient();
+const shouldRetryQuery = (failureCount: number, error: unknown) => {
+  if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
+    return false;
+  }
+  if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+    return false;
+  }
+  return failureCount < 2;
+};
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: shouldRetryQuery,
+      staleTime: 15_000,
+      refetchOnWindowFocus: true,
+    },
+    mutations: {
+      retry: (failureCount, error) => shouldRetryQuery(failureCount, error),
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -117,6 +140,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <MockDraftRoom />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/draft/mock/single/:mockDraftId"
+                element={
+                  <ProtectedRoute>
+                    <SinglePlayerMockDraftRoom />
                   </ProtectedRoute>
                 }
               />

@@ -253,6 +253,9 @@ API runs on `http://localhost:8000`, UI runs on `http://localhost:8080`.
 ## Draft System Notes
 
 - Real league drafts write both `draft_picks` and `roster_entries`; this is intentional because completed live picks fill league rosters.
+- Real draft pick creation locks the `drafts` row, recalculates the current pick under that lock, writes the `draft_picks` row and matching `roster_entries` row in one transaction, and converts expected uniqueness races into HTTP 409 conflicts.
+- Real drafts currently transition from `scheduled` to `live` on the first successful pick as an intentional MVP behavior.
+- When the final real draft pick is made, `drafts.status` becomes `completed` and `leagues.status` becomes `post_draft`.
 - Draft rooms read the player pool from the backend `players` table. Import the Google Sheet before drafting:
   `uv run python scripts/import_players_from_google_sheet.py --url "https://docs.google.com/spreadsheets/d/1NMP3EJSMbdRd7HDA0t7TwxzJ9DM_bUynLoRCgE6Ml74/export?format=csv&gid=0"`.
 - If Google Sheets is unavailable, export CSV manually and run:
@@ -260,11 +263,15 @@ API runs on `http://localhost:8000`, UI runs on `http://localhost:8080`.
 - See `docs/draft-room.md` for column aliases, dry-run usage, and verification steps.
 - Mock drafts use separate mock draft tables and must not write real league `draft_picks`, `roster_entries`, `leagues.status`, or `drafts.status`.
 - Standalone multiplayer mock drafts use `mock_draft_sessions`, `mock_draft_participants`, `mock_draft_picks`, and `mock_draft_events`; rosters/results are derived from mock picks.
-- Real draft order currently uses deterministic join order: teams ordered by `created_at`, then `id`. There is no explicit real-draft order table yet.
+- Real draft order uses persisted `draft_order_team_ids` metadata when configured; otherwise it falls back to deterministic join order: teams ordered by `created_at`, then `id`.
 - Mock draft order is randomized once by the backend at the scheduled start time and persisted on participants.
 - Draft room multiplayer freshness uses websocket updates plus React Query polling. The polling fallback is faster for active drafts and slower for idle rooms.
-- Pick timer state is backend-backed. Automatic pick enforcement depends on the draft timeout runner being enabled and running.
-- Current MVP limitation: real drafts do not yet have a dedicated explicit `draft_order` table or a full commissioner start/pause/resume endpoint set beyond the existing draft-room status transitions.
+- Pick timer state is backend-backed through `current_pick_started_at`, `current_pick_expires_at`, and draft timer state rows. Auto-pick endpoints enforce expired clocks; automatic background enforcement depends on the draft timeout runner being enabled and running.
+- Backend player availability is the source of truth for draft boards. `/players?available_only=true&league_id=<id>` excludes both players already on league rosters and players already selected in the active league draft.
+- Draft player search is server-filtered by name, school, and position; frontend filtering is display-only safety, not availability authority.
+- The Streamlit `ui/` league page is legacy/dev-only and intentionally disabled for league creation/settings. Use the React `web/` app so nested league basics, settings, and draft payloads persist correctly.
+- Trade analysis shown in the app is a basic local estimate based on roster/projection inputs. Schedule context is neutral unless a backend comparison endpoint supplies deeper matchup context.
+- Current MVP limitation: real drafts do not yet have a dedicated explicit `draft_order` table beyond persisted draft-order metadata and fallback join order.
 
 Mock draft retention cleanup:
 

@@ -1,22 +1,48 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Bot, Clipboard, Loader2, Mail, Search, Timer, Trophy, User } from "lucide-react";
+import { Loader2, RadioTower } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { DraftRoomBoard } from "@/components/draft/DraftRoomBoard";
+import { SinglePlayerDraftOrderReveal } from "@/components/draft/SinglePlayerDraftOrderReveal";
+import { PlayerDetailModal } from "@/components/PlayerDetailModal";
 import { useDraftTimer } from "@/hooks/use-draft-timer";
 import {
   useEmailMockDraftHistory,
   useExitMockDraft,
+  useMockDraftAvailablePlayers,
   useMockDraftAutoPick,
   useMockDraftHistory,
   useMockDraftPick,
   useMockDraftRoom,
+  useResetSinglePlayerMockDraft,
 } from "@/hooks/use-mock-drafts";
-import { usePlayers } from "@/hooks/use-players";
 import { ApiError } from "@/lib/api";
-import { MOCK_DRAFT_EXIT_PATH, shouldShowMockCompletionModal, shouldTriggerMockAutoPick } from "./mock-draft-flow";
+import { adaptMockToDraftBoardState, mapPlayersToDraftBoardPlayers } from "@/lib/draft-board-adapters";
+import type { Player } from "@/types/player";
+import {
+  MOCK_DRAFT_EXIT_PATH,
+  getMockTurnKey,
+  getMockAutoPickDelayMs,
+  shouldShowMockCompletionModal,
+  shouldShowSinglePlayerDraftOrderReveal,
+  shouldScheduleBotAutoPick,
+  shouldTriggerTimerExpiredAutoPick,
+} from "./mock-draft-flow";
+
+const singlePlayerContinueStorageKey = (mockDraftId: number) => `single-player-mock-draft-continued:${mockDraftId}`;
+const MOCK_AUTO_PICK_RETRY_MS = 1_000;
+const SEARCH_DEBOUNCE_MS = 180;
+
+function useDebouncedValue<T>(value: T, delayMs: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedValue(value), delayMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMs, value]);
+
+  return debouncedValue;
+}
 
 export default function MockDraftRoom() {
   const { mockDraftId } = useParams();
@@ -27,44 +53,245 @@ export default function MockDraftRoom() {
   const autoPickMutation = useMockDraftAutoPick(parsedMockDraftId);
   const emailMutation = useEmailMockDraftHistory(parsedMockDraftId);
   const exitMutation = useExitMockDraft(parsedMockDraftId);
+  const resetMutation = useResetSinglePlayerMockDraft(parsedMockDraftId);
   const { data: history } = useMockDraftHistory(parsedMockDraftId, Boolean(room?.is_complete));
   const [search, setSearch] = useState("");
   const [completionChoiceMade, setCompletionChoiceMade] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
-  const { data: playersPayload, isLoading: playersLoading } = usePlayers({ search: search.trim() || undefined, sort: "adp", limit: 500 });
+  const [hasContinuedToDraft, setHasContinuedToDraft] = useState(false);
+  const [showDraftUnderway, setShowDraftUnderway] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [autoPickRetryMessage, setAutoPickRetryMessage] = useState<string | null>(null);
+  const previousStatusRef = useRef<string | null>(null);
+  const autoPickTimeoutRef = useRef<number | null>(null);
+  const timerFallbackTimeoutRef = useRef<number | null>(null);
+  const currentAutoPickTurnKeyRef = useRef<string | null>(null);
+  const lastBotAutoPickAttemptKeyRef = useRef<string | null>(null);
+  const lastTimerFallbackAttemptKeyRef = useRef<string | null>(null);
+  const debouncedSearch = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
+  const { data: playersPayload } = useMockDraftAvailablePlayers(parsedMockDraftId, { search: debouncedSearch || undefined, limit: 100 });
 
+  useEffect(() => {
+    if (!parsedMockDraftId) return;
+    setHasContinuedToDraft(window.sessionStorage.getItem(singlePlayerContinueStorageKey(parsedMockDraftId)) === "1");
+  }, [parsedMockDraftId]);
+
+  const timerTargetExpiresAt = room?.current_pick_expires_at ?? (room?.status === "intermission" ? room.session.intermission_ends_at : null);
   const timer = useDraftTimer({
     serverTime: room?.server_time,
-    currentPickExpiresAt: room?.current_pick_expires_at,
+    currentPickExpiresAt: timerTargetExpiresAt,
     currentPick: room?.current_overall_pick,
   });
 
   const draftedPlayerIds = useMemo(() => new Set((room?.picks ?? []).map((pick) => pick.player_id)), [room?.picks]);
   const availablePlayers = useMemo(
-    () => (playersPayload?.data ?? []).filter((player) => !draftedPlayerIds.has(player.id)).slice(0, 150),
+    () => mapPlayersToDraftBoardPlayers(playersPayload?.data ?? [], draftedPlayerIds),
     [draftedPlayerIds, playersPayload?.data]
   );
-  const currentParticipant = room?.participants.find((participant) => participant.id === room.current_participant_id) ?? null;
+  const boardState = useMemo(
+    () => (room ? adaptMockToDraftBoardState(room, availablePlayers, timer.formattedTime, timer.secondsRemaining) : null),
+    [availablePlayers, room, timer.formattedTime, timer.secondsRemaining]
+  );
   const showCompletionModal = shouldShowMockCompletionModal(Boolean(room?.is_complete), completionChoiceMade);
+  const showOrderReveal = shouldShowSinglePlayerDraftOrderReveal(room, hasContinuedToDraft);
 
   useEffect(() => {
-    if (!shouldTriggerMockAutoPick(room, { isExpired: timer.isExpired, autoPickPending: autoPickMutation.isPending })) return;
-    if (room.current_participant_type === "bot") {
-      const timeout = window.setTimeout(() => {
-        void autoPickMutation.mutateAsync({ force: false }).catch(() => undefined);
-      }, 1_200);
-      return () => window.clearTimeout(timeout);
+    currentAutoPickTurnKeyRef.current = getMockTurnKey(room);
+  }, [room?.mock_draft_id, room?.current_overall_pick, room?.current_participant_id, room?.current_participant_type, room?.status]);
+
+  useEffect(() => {
+    if (!room) return;
+    const turnKey = getMockTurnKey(room);
+    if (!turnKey) return;
+    if (!shouldScheduleBotAutoPick(room, { autoPickPending: autoPickMutation.isPending })) return;
+    if (lastBotAutoPickAttemptKeyRef.current === turnKey) return;
+
+    lastBotAutoPickAttemptKeyRef.current = turnKey;
+    const delayMs = getMockAutoPickDelayMs(room);
+    if (import.meta.env.DEV) {
+      console.debug("[SingleMockDraft] bot auto-pick scheduled", {
+        mockDraftId: room.mock_draft_id,
+        overallPick: room.current_overall_pick,
+        participantId: room.current_participant_id,
+        participantType: room.current_participant_type,
+        delayMs,
+      });
     }
-    if (timer.isExpired) {
-      void autoPickMutation.mutateAsync({ force: false }).catch(() => undefined);
+    autoPickTimeoutRef.current = window.setTimeout(() => {
+      autoPickTimeoutRef.current = null;
+      if (currentAutoPickTurnKeyRef.current !== turnKey) return;
+      if (import.meta.env.DEV) {
+        console.debug("[SingleMockDraft] bot auto-pick firing", {
+          mockDraftId: room.mock_draft_id,
+          overallPick: room.current_overall_pick,
+          participantType: room.current_participant_type,
+        });
+      }
+      void autoPickMutation
+        .mutateAsync({ force: true, expectedOverallPick: room.current_overall_pick })
+        .then((payload) => {
+          setAutoPickRetryMessage(null);
+          lastTimerFallbackAttemptKeyRef.current = null;
+          if (import.meta.env.DEV) {
+            console.debug("[SingleMockDraft] auto-pick success", {
+              mockDraftId: payload.mock_draft_id,
+              status: payload.status,
+              currentOverallPick: payload.current_overall_pick,
+              picks: payload.picks.length,
+            });
+          }
+        })
+        .catch((err) => {
+          lastBotAutoPickAttemptKeyRef.current = null;
+          setAutoPickRetryMessage("Auto-pick failed. Retrying...");
+          if (import.meta.env.DEV) {
+            console.error("[SingleMockDraft] auto-pick failed", err);
+          }
+          timerFallbackTimeoutRef.current = window.setTimeout(() => {
+            if (currentAutoPickTurnKeyRef.current === turnKey) {
+              void autoPickMutation
+                .mutateAsync({ force: true, expectedOverallPick: room.current_overall_pick })
+                .then((payload) => {
+                  setAutoPickRetryMessage(null);
+                  lastTimerFallbackAttemptKeyRef.current = null;
+                  if (import.meta.env.DEV) {
+                    console.debug("[SingleMockDraft] auto-pick retry success", {
+                      mockDraftId: payload.mock_draft_id,
+                      status: payload.status,
+                      currentOverallPick: payload.current_overall_pick,
+                      picks: payload.picks.length,
+                    });
+                  }
+                })
+                .catch((retryErr) => {
+                  lastTimerFallbackAttemptKeyRef.current = null;
+                  if (import.meta.env.DEV) {
+                    console.error("[SingleMockDraft] auto-pick retry failed", retryErr);
+                  }
+                });
+            }
+          }, MOCK_AUTO_PICK_RETRY_MS);
+        });
+    }, delayMs);
+    return () => {
+      if (autoPickTimeoutRef.current !== null) {
+        window.clearTimeout(autoPickTimeoutRef.current);
+        autoPickTimeoutRef.current = null;
+        if (currentAutoPickTurnKeyRef.current === turnKey) {
+          lastBotAutoPickAttemptKeyRef.current = null;
+        }
+      }
+    };
+  }, [
+    autoPickMutation.isPending,
+    autoPickMutation.mutateAsync,
+    room?.mock_draft_id,
+    room?.current_overall_pick,
+    room?.current_participant_id,
+    room?.current_participant_type,
+    room?.is_complete,
+    room?.status,
+  ]);
+
+  useEffect(() => {
+    if (!room) return;
+    const turnKey = getMockTurnKey(room);
+    if (!turnKey) return;
+    if (!shouldTriggerTimerExpiredAutoPick(room, { isExpired: timer.isExpired, autoPickPending: autoPickMutation.isPending })) return;
+    if (lastTimerFallbackAttemptKeyRef.current === turnKey) return;
+
+    lastTimerFallbackAttemptKeyRef.current = turnKey;
+    if (import.meta.env.DEV) {
+      console.debug("[SingleMockDraft] timer expired fallback", {
+        mockDraftId: room.mock_draft_id,
+        overallPick: room.current_overall_pick,
+        participantId: room.current_participant_id,
+        participantType: room.current_participant_type,
+      });
     }
-  }, [autoPickMutation, room?.current_overall_pick, room?.current_participant_type, room?.is_complete, room?.status, timer.isExpired]);
+    void autoPickMutation
+      .mutateAsync({ force: true, expectedOverallPick: room.current_overall_pick })
+      .then((payload) => {
+        setAutoPickRetryMessage(null);
+        lastBotAutoPickAttemptKeyRef.current = null;
+        if (import.meta.env.DEV) {
+          console.debug("[SingleMockDraft] auto-pick success", {
+            mockDraftId: payload.mock_draft_id,
+            status: payload.status,
+            currentOverallPick: payload.current_overall_pick,
+            picks: payload.picks.length,
+          });
+        }
+      })
+      .catch((err) => {
+        lastTimerFallbackAttemptKeyRef.current = null;
+        setAutoPickRetryMessage("Auto-pick failed. Retrying...");
+        if (import.meta.env.DEV) {
+          console.error("[SingleMockDraft] auto-pick failed", err);
+        }
+      });
+  }, [
+    autoPickMutation.isPending,
+    autoPickMutation.mutateAsync,
+    room?.mock_draft_id,
+    room?.current_overall_pick,
+    room?.current_participant_id,
+    room?.current_participant_type,
+    room?.is_complete,
+    room?.status,
+    timer.isExpired,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (autoPickTimeoutRef.current !== null) {
+        window.clearTimeout(autoPickTimeoutRef.current);
+      }
+      if (timerFallbackTimeoutRef.current !== null) {
+        window.clearTimeout(timerFallbackTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!room) return;
+    const previousStatus = previousStatusRef.current;
+    if (room.session.mode === "single_player" && previousStatus === "intermission" && room.status === "live") {
+      setShowDraftUnderway(true);
+      if (import.meta.env.DEV) {
+        console.debug("[SingleMockDraft] intermission ended -> live", {
+          mockDraftId: room.mock_draft_id,
+          currentOverallPick: room.current_overall_pick,
+          currentParticipantId: room.current_participant_id,
+          currentParticipantType: room.current_participant_type,
+        });
+      }
+    }
+    if (previousStatus !== room.status && import.meta.env.DEV) {
+      console.debug("[SingleMockDraft] status changed", {
+        mockDraftId: room.mock_draft_id,
+        from: previousStatus,
+        to: room.status,
+      });
+    }
+    previousStatusRef.current = room.status;
+  }, [room, room?.status, room?.session.mode]);
+
+  useEffect(() => {
+    if (!showDraftUnderway) return;
+    const timeout = window.setTimeout(() => setShowDraftUnderway(false), 1_500);
+    return () => window.clearTimeout(timeout);
+  }, [showDraftUnderway]);
 
   if (!parsedMockDraftId) return <div className="py-16 text-center text-red-300">Invalid mock draft id.</div>;
   if (isLoading) {
-    return <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading mock room...</div>;
+    return (
+      <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading mock draft board...
+      </div>
+    );
   }
-  if (!room) {
+  if (!room || !boardState) {
     return <div className="py-16 text-center text-red-300">{error instanceof Error ? error.message : "Mock room unavailable."}</div>;
   }
 
@@ -88,147 +315,72 @@ export default function MockDraftRoom() {
     navigate(response.navigate_to || MOCK_DRAFT_EXIT_PATH);
   };
 
+  const continueToDraft = () => {
+    if (parsedMockDraftId) {
+      window.sessionStorage.setItem(singlePlayerContinueStorageKey(parsedMockDraftId), "1");
+    }
+    setHasContinuedToDraft(true);
+  };
+
+  const resetDraft = async () => {
+    if (!parsedMockDraftId) return;
+    window.sessionStorage.removeItem(singlePlayerContinueStorageKey(parsedMockDraftId));
+    setCompletionChoiceMade(false);
+    setEmailError(null);
+    setShowDraftUnderway(false);
+    previousStatusRef.current = null;
+    await resetMutation.mutateAsync();
+    setHasContinuedToDraft(false);
+  };
+
+  if (showOrderReveal) {
+    return (
+      <SinglePlayerDraftOrderReveal
+        participants={boardState.participants}
+        formattedTime={timer.formattedTime}
+        onContinue={continueToDraft}
+        onExit={() => void exitDraft()}
+      />
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-7xl space-y-6 py-6">
-      {showCompletionModal ? (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-xl">
-          <Card className="w-full max-w-xl rounded-[2rem] border-cyan-200/20 bg-[#07111f] text-center">
-            <CardContent className="space-y-5 p-6">
-              <Trophy className="mx-auto h-10 w-10 text-cyan-200" />
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200">Mock Draft Complete</p>
-                <h2 className="mt-2 text-2xl font-black text-white">Want to send the draft history to your email?</h2>
-                <p className="mt-2 text-sm font-semibold text-slate-400">{history ? `${history.pick_count} picks are ready.` : "History is being prepared."}</p>
-              </div>
-              {emailError ? <p className="text-sm font-semibold text-amber-200">{emailError}</p> : null}
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Button variant="outline" onClick={() => setCompletionChoiceMade(true)}>No thanks</Button>
-                <Button className="bg-cyan-300 text-slate-950" disabled={emailMutation.isPending} onClick={() => void sendEmail()}>
-                  {emailMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-                  Send to my email
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+    <>
+      {showDraftUnderway ? (
+        <div className="pointer-events-none fixed inset-0 z-[1300] flex items-center justify-center bg-slate-950/30 backdrop-blur-sm">
+          <div className="rounded-[2rem] border border-cyan-300/25 bg-slate-950/90 px-10 py-8 text-center shadow-[0_0_80px_rgba(34,211,238,0.18)]">
+            <RadioTower className="mx-auto h-8 w-8 text-cyan-200" />
+            <p className="mt-4 text-3xl font-black italic uppercase tracking-tight text-white">Draft Is Underway</p>
+            <p className="mt-2 text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100/80">The pick clock is live</p>
+          </div>
         </div>
       ) : null}
-
-      {room.is_complete && completionChoiceMade ? (
-        <Card className="rounded-[2rem] border-emerald-300/20 bg-emerald-400/10">
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
-            <div>
-              <p className="text-lg font-black text-foreground">Mock Draft Complete</p>
-              <p className="text-sm font-semibold text-muted-foreground">You can copy results or exit back to the Draft tab.</p>
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" disabled={!history?.plain_text} onClick={() => history?.plain_text && navigator.clipboard?.writeText(history.plain_text)}>
-                <Clipboard className="mr-2 h-4 w-4" />
-                Copy History
-              </Button>
-              <Button className="bg-cyan-300 text-slate-950" onClick={() => void exitDraft()}>Exit Mock Draft</Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <Card className="rounded-[2rem] border-white/10 bg-card/45">
-        <CardHeader className="border-b border-white/10">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <CardTitle className="text-3xl font-black uppercase text-foreground">{room.session.name}</CardTitle>
-              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-                Round {room.current_round} • Pick {room.current_round_pick} • Overall {room.current_overall_pick}/{room.total_picks}
-              </p>
-              <p className="mt-2 text-sm font-bold text-cyan-100">
-                On clock: {room.current_team_name ?? "Complete"} {currentParticipant?.participant_type === "bot" ? "(Bot)" : ""}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Timer</p>
-              <p className="text-5xl font-black tabular-nums text-foreground">{room.status === "live" ? timer.formattedTime : "--:--"}</p>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-200">{room.phase_type ?? room.status}</p>
-            </div>
-          </div>
-        </CardHeader>
-        {room.status === "intermission" ? (
-          <CardContent className="p-8 text-center">
-            <Timer className="mx-auto h-10 w-10 text-cyan-200" />
-            <p className="mt-3 text-2xl font-black text-foreground">Pre-draft intermission</p>
-            <p className="mt-2 text-sm font-semibold text-muted-foreground">Draft order is locked. Picks open when the backend intermission timer ends.</p>
-          </CardContent>
-        ) : null}
-      </Card>
-
-      <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <Card className="rounded-[2rem] border-white/10 bg-card/40">
-          <CardHeader><CardTitle className="text-[11px] font-black uppercase tracking-[0.22em] text-primary">Draft Order</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {room.participants
-              .filter((participant) => participant.draft_position !== null)
-              .sort((a, b) => Number(a.draft_position) - Number(b.draft_position))
-              .map((participant) => (
-                <div key={participant.id} className={`rounded-xl border p-3 ${participant.id === room.current_participant_id ? "border-cyan-300/50 bg-cyan-400/10" : "border-white/10 bg-white/[0.03]"}`}>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Pick {participant.draft_position}</p>
-                  <p className="mt-1 font-black text-foreground">{participant.team_name}</p>
-                  <p className="mt-1 flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
-                    {participant.participant_type === "bot" ? <Bot className="h-3 w-3" /> : <User className="h-3 w-3" />}
-                    {participant.display_name}
-                  </p>
-                </div>
-              ))}
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-[2rem] border-white/10 bg-card/40">
-          <CardHeader className="border-b border-white/10">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <CardTitle className="text-[11px] font-black uppercase tracking-[0.22em] text-primary">Available Players</CardTitle>
-              <div className="relative w-full max-w-sm">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-10" placeholder="Search players..." />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {playersLoading ? (
-              <div className="p-6 text-sm text-muted-foreground">Loading players...</div>
-            ) : (
-              <div className="max-h-[680px] overflow-y-auto">
-                {availablePlayers.map((player, index) => (
-                  <div key={player.id} className="grid grid-cols-[64px_minmax(0,1fr)_80px_120px] items-center gap-3 border-b border-white/10 px-4 py-3">
-                    <p className="font-black tabular-nums text-muted-foreground">{index + 1}</p>
-                    <div className="min-w-0">
-                      <p className="truncate font-black text-foreground">{player.name}</p>
-                      <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{player.school}</p>
-                    </div>
-                    <p className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1 text-center text-xs font-black text-cyan-100">{player.pos}</p>
-                    <Button
-                      className="bg-gradient-to-r from-cyan-300 to-blue-500 text-slate-950"
-                      disabled={!room.can_make_pick || pickMutation.isPending || autoPickMutation.isPending || room.is_complete}
-                      onClick={() => pickMutation.mutate(player.id)}
-                    >
-                      {pickMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Draft"}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="rounded-[2rem] border-white/10 bg-card/40">
-        <CardHeader><CardTitle className="text-[11px] font-black uppercase tracking-[0.22em] text-primary">Pick History</CardTitle></CardHeader>
-        <CardContent className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {room.picks.slice().reverse().slice(0, 24).map((pick) => (
-            <div key={pick.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{pick.round_number}.{pick.round_pick} • {pick.pick_source}</p>
-              <p className="mt-1 font-black text-foreground">{pick.player_name}</p>
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">{pick.team_name}</p>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    </div>
+      <DraftRoomBoard
+        state={boardState}
+        searchQuery={search}
+        onSearchChange={setSearch}
+        onDraftPlayer={(playerId) => pickMutation.mutate(playerId)}
+        onSelectPlayer={(player) => setSelectedPlayer(player.sourcePlayer ?? null)}
+        draftPending={pickMutation.isPending}
+        autoPickPending={autoPickMutation.isPending}
+        error={autoPickRetryMessage ?? (pickMutation.error instanceof Error ? pickMutation.error.message : autoPickMutation.error instanceof Error ? autoPickMutation.error.message : resetMutation.error instanceof Error ? resetMutation.error.message : null)}
+        onExit={() => void exitDraft()}
+        onEmailHistory={() => void sendEmail()}
+        onSkipEmail={() => setCompletionChoiceMade(true)}
+        onCopyHistory={() => history?.plain_text && navigator.clipboard?.writeText(history.plain_text)}
+        onReset={room.session.mode === "single_player" ? () => void resetDraft() : undefined}
+        showCompletionModal={showCompletionModal}
+        completionChoiceMade={Boolean(room.is_complete && completionChoiceMade)}
+        emailPending={emailMutation.isPending}
+        exitPending={exitMutation.isPending}
+        emailError={emailError}
+        historyTextAvailable={Boolean(history?.plain_text)}
+      />
+      <PlayerDetailModal
+        player={selectedPlayer}
+        isOpen={Boolean(selectedPlayer)}
+        onClose={() => setSelectedPlayer(null)}
+      />
+    </>
   );
 }

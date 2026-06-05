@@ -31,6 +31,14 @@ def test_list_endpoint_rejects_huge_limit(client):
     assert response.status_code == 422
 
 
+def test_players_endpoint_rejects_negative_offset_and_oversized_limit(client):
+    negative_offset = client.get("/players?offset=-1")
+    oversized_limit = client.get("/players?limit=101")
+
+    assert negative_offset.status_code == 422
+    assert oversized_limit.status_code == 422
+
+
 def test_list_endpoint_accepts_normal_request(client):
     token = create_user_and_token(client)
 

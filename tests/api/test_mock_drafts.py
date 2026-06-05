@@ -166,7 +166,7 @@ def test_create_returns_unique_invite_code(client):
     assert first["invite_link"].endswith(f"/draft/mock/invite/{first['invite_code']}")
 
 
-def test_create_single_player_returns_no_invite_and_starts_live_with_bots(client, db_session):
+def test_create_single_player_returns_no_invite_and_enters_pre_draft_countdown_with_bots(client, db_session):
     token = create_user_and_token(client, "single")
     created = create_mock_draft(client, token, team_count=4, round_count=1, mode="single_player")
 
@@ -174,19 +174,24 @@ def test_create_single_player_returns_no_invite_and_starts_live_with_bots(client
     assert created["invite_code"] is None
     assert created["invite_link"] is None
     assert created["join_url"] is None
-    assert created["status"] == "live"
+    assert created["status"] == "intermission"
 
     session_row = db_session.get(MockDraftSession, created["mock_draft_id"])
     assert session_row is not None
     assert session_row.mode == "single_player"
     assert session_row.invite_code is None
-    assert session_row.current_pick_started_at is not None
-    assert session_row.current_pick_expires_at is not None
+    assert session_row.intermission_started_at is not None
+    assert session_row.intermission_ends_at is not None
+    assert 85 <= (session_row.intermission_ends_at - session_row.intermission_started_at).total_seconds() <= 95
+    assert session_row.current_pick_started_at is None
+    assert session_row.current_pick_expires_at is None
 
     room = client.get(f"/mock-drafts/{created['mock_draft_id']}/room", headers=auth_headers(token))
     assert room.status_code == 200, room.text
     payload = room.json()
-    assert payload["status"] == "live"
+    assert payload["status"] == "intermission"
+    assert payload["phase_type"] == "prestart_countdown"
+    assert 0 < payload["seconds_remaining"] <= 90
     assert payload["session"]["mode"] == "single_player"
     assert len(payload["participants"]) == 4
     assert len(payload["draft_order"]) == 4
@@ -195,6 +200,304 @@ def test_create_single_player_returns_no_invite_and_starts_live_with_bots(client
     assert db_session.query(DraftPick).count() == 0
     assert db_session.query(MockDraftRosterEntry).count() == 0
     assert db_session.query(MockDraftSeat).count() == 0
+
+
+def test_single_player_pre_draft_countdown_transitions_to_live_and_starts_pick_timer(client, db_session):
+    token = create_user_and_token(client, "single-start")
+    created = create_mock_draft(client, token, team_count=4, round_count=1, mode="single_player")
+    session_row = db_session.get(MockDraftSession, created["mock_draft_id"])
+    assert session_row is not None
+    session_row.intermission_ends_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    db_session.add(session_row)
+    db_session.commit()
+
+    room = client.get(f"/mock-drafts/{created['mock_draft_id']}/room", headers=auth_headers(token))
+    assert room.status_code == 200, room.text
+    payload = room.json()
+
+    assert payload["status"] == "live"
+    assert payload["phase_type"] == "pick_clock"
+    assert payload["current_pick_started_at"] is not None
+    assert payload["current_pick_expires_at"] is not None
+
+
+def test_available_mock_players_dedupes_canonical_player_rows(client):
+    token = create_user_and_token(client, "dedupe-pool")
+    created = create_mock_draft(client, token, team_count=4, round_count=1, mode="single_player")
+    response = client.post(
+        "/players",
+        json=[
+            {
+                "external_id": None,
+                "name": "Arch Manning",
+                "position": "QB",
+                "school": "Texas",
+                "image_url": None,
+                "sheet_adp": None,
+                "sheet_projected_season_points": None,
+            },
+            {
+                "external_id": None,
+                "name": "Arch Manning",
+                "position": "QB",
+                "school": "TEXAS",
+                "image_url": None,
+                "sheet_adp": 14,
+                "sheet_projected_season_points": 340.0,
+            },
+        ],
+    )
+    assert response.status_code == 201, response.text
+
+    available = client.get(
+        f"/mock-drafts/{created['mock_draft_id']}/available-players",
+        params={"search": "arch m", "limit": 10},
+        headers=auth_headers(token),
+    )
+    assert available.status_code == 200, available.text
+    rows = available.json()["data"]
+
+    assert len(rows) == 1
+    assert rows[0]["name"] == "Arch Manning"
+    assert rows[0]["school"] == "TEXAS"
+    assert rows[0]["sheet_adp"] == 14
+    assert rows[0]["sheet_projected_season_points"] == 340.0
+    assert rows[0]["board_rank"] == 1
+
+
+def test_available_mock_position_search_uses_master_board_ranks(client):
+    token = create_user_and_token(client, "board-rank-search")
+    created = create_mock_draft(client, token, team_count=4, round_count=1, mode="single_player")
+    response = client.post(
+        "/players",
+        json=[
+            {
+                "external_id": None,
+                "name": "Top RB",
+                "position": "RB",
+                "school": "School A",
+                "image_url": None,
+                "sheet_adp": 1,
+                "sheet_projected_season_points": 350.0,
+            },
+            {
+                "external_id": None,
+                "name": "First QB",
+                "position": "QB",
+                "school": "School B",
+                "image_url": None,
+                "sheet_adp": 2,
+                "sheet_projected_season_points": 340.0,
+            },
+            {
+                "external_id": None,
+                "name": "Second QB",
+                "position": "QB",
+                "school": "School C",
+                "image_url": None,
+                "sheet_adp": 2,
+                "sheet_projected_season_points": 330.0,
+            },
+            {
+                "external_id": None,
+                "name": "Top WR",
+                "position": "WR",
+                "school": "School D",
+                "image_url": None,
+                "sheet_adp": 3,
+                "sheet_projected_season_points": 320.0,
+            },
+        ],
+    )
+    assert response.status_code == 201, response.text
+
+    master = client.get(
+        f"/mock-drafts/{created['mock_draft_id']}/available-players",
+        params={"limit": 10},
+        headers=auth_headers(token),
+    )
+    assert master.status_code == 200, master.text
+    master_rank_by_name = {row["name"]: row["board_rank"] for row in master.json()["data"]}
+
+    qb_search = client.get(
+        f"/mock-drafts/{created['mock_draft_id']}/available-players",
+        params={"search": "QB", "limit": 10},
+        headers=auth_headers(token),
+    )
+    assert qb_search.status_code == 200, qb_search.text
+    qbs = qb_search.json()["data"]
+    assert [row["name"] for row in qbs] == ["First QB", "Second QB"]
+    assert [row["board_rank"] for row in qbs] == [master_rank_by_name["First QB"], master_rank_by_name["Second QB"]]
+    assert len({row["board_rank"] for row in qbs}) == len(qbs)
+
+
+def test_single_player_bot_at_pick_one_auto_picks_after_intermission(client, db_session):
+    token = create_user_and_token(client, "single-bot-one")
+    created = create_mock_draft(client, token, team_count=4, round_count=1, mode="single_player")
+    player_ids = create_players(client, 12)
+
+    participants = (
+        db_session.query(MockDraftParticipant)
+        .filter(MockDraftParticipant.mock_draft_id == created["mock_draft_id"])
+        .order_by(MockDraftParticipant.participant_type.asc(), MockDraftParticipant.id.asc())
+        .all()
+    )
+    bots = [participant for participant in participants if participant.participant_type == "bot"]
+    humans = [participant for participant in participants if participant.participant_type == "human"]
+    assert bots and humans
+    for participant in participants:
+        participant.draft_position = None
+    db_session.commit()
+
+    bots[0].draft_position = 1
+    humans[0].draft_position = 2
+    for index, bot in enumerate(bots[1:], start=3):
+        bot.draft_position = index
+    session_row = db_session.get(MockDraftSession, created["mock_draft_id"])
+    assert session_row is not None
+    session_row.draft_order_locked = True
+    session_row.is_locked = True
+    session_row.intermission_ends_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    db_session.add(session_row)
+    db_session.commit()
+
+    live_room = client.get(f"/mock-drafts/{created['mock_draft_id']}/room", headers=auth_headers(token))
+    assert live_room.status_code == 200, live_room.text
+    live_payload = live_room.json()
+    assert live_payload["status"] == "live"
+    assert live_payload["current_overall_pick"] == 1
+    assert live_payload["current_participant_type"] == "bot"
+    assert live_payload["current_pick_started_at"] is not None
+
+    session_row = db_session.get(MockDraftSession, created["mock_draft_id"])
+    assert session_row is not None
+    session_row.current_pick_started_at = datetime.now(timezone.utc) - timedelta(seconds=3)
+    session_row.current_pick_expires_at = datetime.now(timezone.utc) + timedelta(seconds=27)
+    db_session.add(session_row)
+    db_session.commit()
+
+    auto = client.post(
+        f"/mock-drafts/{created['mock_draft_id']}/auto-pick",
+        json={"force": False, "expected_overall_pick": 1},
+        headers=auth_headers(token),
+    )
+    assert auto.status_code == 200, auto.text
+    payload = auto.json()
+    assert payload["current_overall_pick"] == 2
+    assert len(payload["picks"]) == 1
+    assert payload["picks"][0]["overall_pick"] == 1
+    assert payload["picks"][0]["participant_id"] == bots[0].id
+    assert payload["picks"][0]["player_id"] == player_ids[0]
+    assert payload["current_pick_started_at"] is not None
+    assert payload["current_pick_expires_at"] is not None
+
+    stale = client.post(
+        f"/mock-drafts/{created['mock_draft_id']}/auto-pick",
+        json={"force": True, "expected_overall_pick": 1},
+        headers=auth_headers(token),
+    )
+    assert stale.status_code == 409
+    picks = db_session.query(MockDraftPick).filter(MockDraftPick.mock_draft_id == created["mock_draft_id"]).all()
+    assert len(picks) == 1
+
+
+def test_single_player_bot_first_pick_force_auto_picks_immediately(client, db_session):
+    token = create_user_and_token(client, "single-bot-force")
+    created = create_mock_draft(client, token, team_count=4, round_count=1, mode="single_player")
+    create_players(client, 12)
+
+    participants = (
+        db_session.query(MockDraftParticipant)
+        .filter(MockDraftParticipant.mock_draft_id == created["mock_draft_id"])
+        .order_by(MockDraftParticipant.participant_type.asc(), MockDraftParticipant.id.asc())
+        .all()
+    )
+    bots = [participant for participant in participants if participant.participant_type == "bot"]
+    humans = [participant for participant in participants if participant.participant_type == "human"]
+    assert bots and humans
+    for participant in participants:
+        participant.draft_position = None
+    db_session.commit()
+
+    bots[0].draft_position = 1
+    humans[0].draft_position = 2
+    for index, bot in enumerate(bots[1:], start=3):
+        bot.draft_position = index
+
+    session_row = db_session.get(MockDraftSession, created["mock_draft_id"])
+    assert session_row is not None
+    session_row.draft_order_locked = True
+    session_row.is_locked = True
+    session_row.intermission_ends_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    db_session.add(session_row)
+    db_session.commit()
+
+    live_room = client.get(f"/mock-drafts/{created['mock_draft_id']}/room", headers=auth_headers(token))
+    assert live_room.status_code == 200, live_room.text
+    assert live_room.json()["current_participant_type"] == "bot"
+
+    auto = client.post(
+        f"/mock-drafts/{created['mock_draft_id']}/auto-pick",
+        json={"force": True, "expected_overall_pick": 1},
+        headers=auth_headers(token),
+    )
+    assert auto.status_code == 200, auto.text
+    payload = auto.json()
+    assert payload["current_overall_pick"] == 2
+    assert len(payload["picks"]) == 1
+    assert payload["picks"][0]["overall_pick"] == 1
+    assert payload["picks"][0]["participant_id"] == bots[0].id
+
+
+def test_single_player_user_pick_and_available_players_are_mock_scoped(client, db_session):
+    token = create_user_and_token(client, "single-user-pick")
+    league = create_league(client, token)
+    league_before = db_session.get(League, league["id"]).status
+    created = create_mock_draft(client, token, team_count=4, round_count=1, mode="single_player")
+    player_ids = create_players(client, 8)
+    move_to_live(client, db_session, token, created["mock_draft_id"])
+
+    participants = (
+        db_session.query(MockDraftParticipant)
+        .filter(MockDraftParticipant.mock_draft_id == created["mock_draft_id"])
+        .order_by(MockDraftParticipant.is_host.desc(), MockDraftParticipant.id.asc())
+        .all()
+    )
+    for participant in participants:
+        participant.draft_position = None
+        db_session.add(participant)
+    db_session.flush()
+    for index, participant in enumerate(participants, start=1):
+        participant.draft_position = index
+        db_session.add(participant)
+    session_row = db_session.get(MockDraftSession, created["mock_draft_id"])
+    session_row.current_overall_pick = 1
+    session_row.current_pick_started_at = datetime.now(timezone.utc)
+    session_row.current_pick_expires_at = datetime.now(timezone.utc) + timedelta(seconds=30)
+    db_session.add(session_row)
+    db_session.commit()
+
+    pick = client.post(
+        f"/mock-drafts/{created['mock_draft_id']}/picks",
+        json={"player_id": player_ids[0]},
+        headers=auth_headers(token),
+    )
+    assert pick.status_code == 200, pick.text
+    assert pick.json()["picks"][0]["player_id"] == player_ids[0]
+
+    available = client.get(
+        f"/mock-drafts/{created['mock_draft_id']}/available-players",
+        params={"search": "QB", "limit": 100},
+        headers=auth_headers(token),
+    )
+    assert available.status_code == 200, available.text
+    available_ids = {row["id"] for row in available.json()["data"]}
+    assert player_ids[0] not in available_ids
+    assert set(player_ids[1:]).issubset(available_ids)
+    assert db_session.query(RosterEntry).count() == 0
+    assert db_session.query(DraftPick).count() == 0
+    assert db_session.query(MockDraftRosterEntry).count() == 0
+    assert db_session.get(League, league["id"]).status == league_before
 
 
 def test_single_player_cannot_be_joined_by_invite(client):
@@ -426,22 +729,75 @@ def test_full_156_pick_mock_draft_simulation_completes_without_real_writes(clien
     assert history.json()["pick_count"] == 156
 
 
+def test_single_player_completes_and_reset_restarts_without_real_writes(client, db_session):
+    host_token = create_user_and_token(client, "single-reset")
+    league = create_league(client, host_token)
+    league_before = db_session.get(League, league["id"]).status
+    created = create_mock_draft(client, host_token, team_count=4, round_count=1, mode="single_player")
+    create_players(client, 60)
+    room = move_to_live(client, db_session, host_token, created["mock_draft_id"])
+    assert room["status"] == "live"
+
+    total_picks = room["total_picks"]
+    assert total_picks == 52
+    for _index in range(total_picks):
+        response = client.post(
+            f"/mock-drafts/{created['mock_draft_id']}/auto-pick",
+            json={"force": True},
+            headers=auth_headers(host_token),
+        )
+        assert response.status_code == 200, response.text
+        room = response.json()
+        if room["is_complete"]:
+            break
+
+    assert room["is_complete"] is True
+    assert room["status"] == "completed"
+    assert room["should_show_email_prompt"] is True
+    assert db_session.query(MockDraftPick).filter(MockDraftPick.mock_draft_id == created["mock_draft_id"]).count() == total_picks
+    assert db_session.query(RosterEntry).count() == 0
+    assert db_session.query(DraftPick).count() == 0
+    assert db_session.query(MockDraftRosterEntry).count() == 0
+    assert db_session.get(League, league["id"]).status == league_before
+
+    reset = client.post(f"/mock-drafts/{created['mock_draft_id']}/reset", headers=auth_headers(host_token))
+    assert reset.status_code == 200, reset.text
+    payload = reset.json()
+    assert payload["status"] == "intermission"
+    assert payload["phase_type"] == "prestart_countdown"
+    assert payload["current_overall_pick"] == 1
+    assert payload["picks"] == []
+    assert len(payload["draft_order"]) == 4
+    session_row = db_session.get(MockDraftSession, created["mock_draft_id"])
+    assert session_row.completed_at is None
+    assert session_row.history_email_sent_at is None
+    assert 85 <= (session_row.intermission_ends_at - session_row.intermission_started_at).total_seconds() <= 95
+    assert db_session.query(MockDraftPick).filter(MockDraftPick.mock_draft_id == created["mock_draft_id"]).count() == 0
+    assert db_session.query(RosterEntry).count() == 0
+    assert db_session.query(DraftPick).count() == 0
+    assert db_session.query(MockDraftRosterEntry).count() == 0
+    assert db_session.get(League, league["id"]).status == league_before
+
+
 def test_email_history_fallback_success_and_cleanup(client, db_session):
     host_token = create_user_and_token(client, "email-host")
     created = create_mock_draft(client, host_token, team_count=4, round_count=1)
-    create_players(client, 10)
-    move_to_live(client, db_session, host_token, created["mock_draft_id"])
-    for _index in range(4):
+    create_players(client, 60)
+    room = move_to_live(client, db_session, host_token, created["mock_draft_id"])
+    for _index in range(room["total_picks"]):
         response = client.post(
             f"/mock-drafts/{created['mock_draft_id']}/auto-pick",
             json={"force": True},
             headers=auth_headers(host_token),
         )
         assert response.status_code == 200
+        room = response.json()
+        if room["is_complete"]:
+            break
 
     missing = client.post(f"/mock-drafts/{created['mock_draft_id']}/history/email", headers=auth_headers(host_token))
     assert missing.status_code == 503
-    assert missing.json()["detail"]["history"]["pick_count"] == 4
+    assert missing.json()["detail"]["history"]["pick_count"] == 52
 
     prior_key = settings.resend_api_key
     settings.resend_api_key = "test-key"

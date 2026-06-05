@@ -7,10 +7,16 @@ import {
   getMockDraftCreateSuccessRoomPath,
   getMockDraftResultsPath,
   getMockDraftRoomPath,
+  getMockAutoPickDelayMs,
+  getMockTurnKey,
   MOCK_DRAFT_EXIT_PATH,
+  MOCK_BOT_AUTO_PICK_DELAY_MS,
   shouldShowMockInvitePanel,
   shouldShowMockInviteSuccess,
   shouldShowMockCompletionModal,
+  shouldShowSinglePlayerDraftOrderReveal,
+  shouldScheduleBotAutoPick,
+  shouldTriggerTimerExpiredAutoPick,
   shouldTriggerMockAutoPick,
 } from "./mock-draft-flow";
 
@@ -51,6 +57,65 @@ describe("mock draft flow helpers", () => {
     ).toBe(true);
   });
 
+  it("schedules bot auto-pick only for a live bot participant", () => {
+    expect(
+      shouldScheduleBotAutoPick(
+        { status: "live", is_complete: false, current_participant_id: 12, current_participant_type: "bot" },
+        { autoPickPending: false }
+      )
+    ).toBe(true);
+    expect(
+      shouldScheduleBotAutoPick(
+        { status: "live", is_complete: false, current_participant_id: 12, current_participant_type: "human" },
+        { autoPickPending: false }
+      )
+    ).toBe(false);
+    expect(
+      shouldScheduleBotAutoPick(
+        { status: "intermission", is_complete: false, current_participant_id: 12, current_participant_type: "bot" },
+        { autoPickPending: false }
+      )
+    ).toBe(false);
+  });
+
+  it("uses timer-expired fallback for any live current participant", () => {
+    expect(
+      shouldTriggerTimerExpiredAutoPick(
+        { status: "live", is_complete: false, current_participant_id: 12 },
+        { isExpired: true, autoPickPending: false }
+      )
+    ).toBe(true);
+    expect(
+      shouldTriggerTimerExpiredAutoPick(
+        { status: "live", is_complete: false, current_participant_id: 12 },
+        { isExpired: false, autoPickPending: false }
+      )
+    ).toBe(false);
+    expect(
+      shouldTriggerTimerExpiredAutoPick(
+        { status: "completed", is_complete: true, current_participant_id: 12 },
+        { isExpired: true, autoPickPending: false }
+      )
+    ).toBe(false);
+  });
+
+  it("builds a stable turn key from pick and current participant", () => {
+    expect(
+      getMockTurnKey({
+        mock_draft_id: 7,
+        current_overall_pick: 1,
+        current_participant_id: 44,
+        current_participant_type: "bot",
+        status: "live",
+      } as any)
+    ).toBe("7:1:44:bot:live");
+  });
+
+  it("uses a short bot delay and immediate human timeout auto-pick", () => {
+    expect(getMockAutoPickDelayMs({ current_participant_type: "bot" } as any)).toBe(MOCK_BOT_AUTO_PICK_DELAY_MS);
+    expect(getMockAutoPickDelayMs({ current_participant_type: "human" } as any)).toBe(0);
+  });
+
   it("triggers auto-pick for expired human turns only", () => {
     expect(
       shouldTriggerMockAutoPick(
@@ -85,5 +150,32 @@ describe("mock draft flow helpers", () => {
     expect(shouldShowMockCompletionModal(true, false)).toBe(true);
     expect(shouldShowMockCompletionModal(true, true)).toBe(false);
     expect(shouldShowMockCompletionModal(false, false)).toBe(false);
+  });
+
+  it("shows the single-player draft order reveal only during pre-draft countdown", () => {
+    expect(
+      shouldShowSinglePlayerDraftOrderReveal(
+        { status: "intermission", session: { mode: "single_player" } } as any,
+        false
+      )
+    ).toBe(true);
+    expect(
+      shouldShowSinglePlayerDraftOrderReveal(
+        { status: "live", session: { mode: "single_player" } } as any,
+        false
+      )
+    ).toBe(false);
+    expect(
+      shouldShowSinglePlayerDraftOrderReveal(
+        { status: "intermission", session: { mode: "public_multiplayer" } } as any,
+        false
+      )
+    ).toBe(false);
+    expect(
+      shouldShowSinglePlayerDraftOrderReveal(
+        { status: "intermission", session: { mode: "single_player" } } as any,
+        true
+      )
+    ).toBe(false);
   });
 });

@@ -228,7 +228,7 @@ export default function Index() {
         .slice(0, 4),
     [leagues]
   );
-  const dashboardHeroTitle = `Welcome ${user?.firstName?.toUpperCase() ?? "Manager"}`;
+  const dashboardHeroTitle = "Dashboard Command Center";
   const rosterSignal = workspace?.roster?.length ? `${workspace.roster.length} rostered` : "Build your first roster";
   const nextDraftSignal = upcomingDrafts[0]?.draft?.draft_datetime_utc
     ? formatDraftTime(upcomingDrafts[0].draft.draft_datetime_utc)

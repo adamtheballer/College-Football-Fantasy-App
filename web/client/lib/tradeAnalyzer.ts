@@ -29,26 +29,29 @@ const injuryPenalty = (status?: string) => {
   return 0.98;
 };
 
-export const computeTradeValue = (player: TradePlayer) => {
+export const computeBasicTradeValue = (player: TradePlayer) => {
   const scarcity = positionScarcity[player.pos] ?? 1;
   const schedule = scheduleModifier();
   const injury = injuryPenalty(player.status);
-  const rankBoost = 1 + Math.max(0, (12 - player.posRank)) * 0.01;
+  const positionRank = Number.isFinite(player.posRank) ? player.posRank : 12;
+  const rankBoost = 1 + Math.max(0, (12 - positionRank)) * 0.01;
   const value = player.fpts * scarcity * schedule * injury * rankBoost;
   return Number(value.toFixed(1));
 };
 
-export const evaluateTrade = (receive: TradePlayer[], give: TradePlayer[]) => {
-  const receiveValue = receive.reduce((sum, p) => sum + computeTradeValue(p), 0);
-  const giveValue = give.reduce((sum, p) => sum + computeTradeValue(p), 0);
+export const computeTradeValue = computeBasicTradeValue;
+
+export const evaluateBasicTrade = (receive: TradePlayer[], give: TradePlayer[]) => {
+  const receiveValue = receive.reduce((sum, p) => sum + computeBasicTradeValue(p), 0);
+  const giveValue = give.reduce((sum, p) => sum + computeBasicTradeValue(p), 0);
   const delta = receiveValue - giveValue;
   const deltaPct = giveValue === 0 ? 0 : delta / giveValue;
 
-  let verdict = "Even";
-  if (deltaPct >= 0.08) verdict = "Strong Win";
-  else if (deltaPct >= 0.03) verdict = "Slight Win";
-  else if (deltaPct <= -0.08) verdict = "Strong Loss";
-  else if (deltaPct <= -0.03) verdict = "Slight Loss";
+  let verdict = "Basic Even";
+  if (deltaPct >= 0.08) verdict = "Basic Lean Receive";
+  else if (deltaPct >= 0.03) verdict = "Basic Slight Edge";
+  else if (deltaPct <= -0.08) verdict = "Basic Lean Give";
+  else if (deltaPct <= -0.03) verdict = "Basic Slight Loss";
 
   return {
     receiveValue: Number(receiveValue.toFixed(1)),
@@ -57,3 +60,5 @@ export const evaluateTrade = (receive: TradePlayer[], give: TradePlayer[]) => {
     verdict,
   };
 };
+
+export const evaluateTrade = evaluateBasicTrade;
