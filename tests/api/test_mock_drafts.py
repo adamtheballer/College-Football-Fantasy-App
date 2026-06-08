@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy.exc import IntegrityError
+
 from api.app.core.config import settings
 from api.app.models.draft_pick import DraftPick
 from api.app.models.league import League
@@ -12,6 +14,7 @@ from api.app.models.mock_draft_session import MockDraftSession
 from api.app.models.player import Player
 from api.app.models.roster import RosterEntry
 from api.app.services.mock_draft_service import cleanup_expired_mock_drafts
+from api.app.services import mock_draft_service
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -60,11 +63,12 @@ def create_mock_draft(
 
 
 def create_players(client, total: int) -> list[int]:
+    position_cycle = ["QB", "RB", "RB", "WR", "WR", "TE", "K", "RB", "WR", "TE"]
     payload = [
         {
             "external_id": None,
             "name": f"Mock Player {index + 1}",
-            "position": "QB",
+            "position": position_cycle[index % len(position_cycle)],
             "school": f"School {index + 1}",
             "image_url": None,
             "sheet_adp": index + 1,
@@ -331,6 +335,24 @@ def test_available_mock_position_search_uses_master_board_ranks(client):
     assert len({row["board_rank"] for row in qbs}) == len(qbs)
 
 
+def test_available_mock_players_can_return_more_than_top_100(client):
+    token = create_user_and_token(client, "mock-more-than-100")
+    created = create_mock_draft(client, token, team_count=4, round_count=1, mode="single_player")
+    create_players(client, 150)
+
+    response = client.get(
+        f"/mock-drafts/{created['mock_draft_id']}/available-players",
+        params={"limit": 150},
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["limit"] == 150
+    assert len(payload["data"]) == 150
+    assert payload["data"][-1]["board_rank"] == 150
+
+
 def test_single_player_bot_at_pick_one_auto_picks_after_intermission(client, db_session):
     token = create_user_and_token(client, "single-bot-one")
     created = create_mock_draft(client, token, team_count=4, round_count=1, mode="single_player")
@@ -449,6 +471,49 @@ def test_single_player_bot_first_pick_force_auto_picks_immediately(client, db_se
     assert payload["picks"][0]["participant_id"] == bots[0].id
 
 
+def test_auto_pick_works_without_player_adp_or_projection(client, db_session):
+    token = create_user_and_token(client, "auto-no-rank")
+    created = create_mock_draft(client, token, team_count=4, round_count=1, mode="single_player")
+    response = client.post(
+        "/players",
+        json=[
+            {
+                "external_id": None,
+                "name": "Zeta Fallback",
+                "position": "RB",
+                "school": "Fallback State",
+                "image_url": None,
+                "sheet_adp": None,
+                "sheet_projected_season_points": None,
+            },
+            {
+                "external_id": None,
+                "name": "Alpha Fallback",
+                "position": "WR",
+                "school": "Fallback Tech",
+                "image_url": None,
+                "sheet_adp": None,
+                "sheet_projected_season_points": None,
+            },
+        ],
+    )
+    assert response.status_code == 201, response.text
+    room = move_to_live(client, db_session, token, created["mock_draft_id"])
+    assert room["status"] == "live"
+
+    auto = client.post(
+        f"/mock-drafts/{created['mock_draft_id']}/auto-pick",
+        json={"force": True, "expected_overall_pick": 1},
+        headers=auth_headers(token),
+    )
+
+    assert auto.status_code == 200, auto.text
+    payload = auto.json()
+    assert len(payload["picks"]) == 1
+    assert payload["picks"][0]["player_name"] == "Alpha Fallback"
+    assert payload["current_overall_pick"] == 2
+
+
 def test_single_player_user_pick_and_available_players_are_mock_scoped(client, db_session):
     token = create_user_and_token(client, "single-user-pick")
     league = create_league(client, token)
@@ -487,7 +552,7 @@ def test_single_player_user_pick_and_available_players_are_mock_scoped(client, d
 
     available = client.get(
         f"/mock-drafts/{created['mock_draft_id']}/available-players",
-        params={"search": "QB", "limit": 100},
+        params={"limit": 100},
         headers=auth_headers(token),
     )
     assert available.status_code == 200, available.text
@@ -498,6 +563,101 @@ def test_single_player_user_pick_and_available_players_are_mock_scoped(client, d
     assert db_session.query(DraftPick).count() == 0
     assert db_session.query(MockDraftRosterEntry).count() == 0
     assert db_session.get(League, league["id"]).status == league_before
+
+
+def test_single_player_user_pick_must_fit_remaining_roster_position(client, db_session):
+    token = create_user_and_token(client, "single-position-fit")
+    created = create_mock_draft(client, token, team_count=4, round_count=1, mode="single_player")
+    player_payload = [
+        {"name": "Filled QB", "position": "QB"},
+        {"name": "Filled RB One", "position": "RB"},
+        {"name": "Filled RB Two", "position": "RB"},
+        {"name": "Filled WR One", "position": "WR"},
+        {"name": "Filled WR Two", "position": "WR"},
+        {"name": "Filled TE", "position": "TE"},
+        {"name": "Filled Flex", "position": "RB"},
+        {"name": "Filled Bench QB", "position": "QB"},
+        {"name": "Filled Bench WR", "position": "WR"},
+        {"name": "Filled Bench TE", "position": "TE"},
+        {"name": "Filled Bench RB", "position": "RB"},
+        {"name": "Filled Bench WR Two", "position": "WR"},
+        {"name": "Wrong Position Candidate", "position": "RB"},
+        {"name": "Kicker Candidate", "position": "K"},
+    ]
+    response = client.post(
+        "/players",
+        json=[
+            {
+                "external_id": None,
+                "name": row["name"],
+                "position": row["position"],
+                "school": "Roster Fit State",
+                "image_url": None,
+                "sheet_adp": index + 1,
+                "sheet_projected_season_points": float(300 - index),
+            }
+            for index, row in enumerate(player_payload)
+        ],
+    )
+    assert response.status_code == 201, response.text
+    players = response.json()
+    move_to_live(client, db_session, token, created["mock_draft_id"])
+
+    participants = (
+        db_session.query(MockDraftParticipant)
+        .filter(MockDraftParticipant.mock_draft_id == created["mock_draft_id"])
+        .order_by(MockDraftParticipant.is_host.desc(), MockDraftParticipant.id.asc())
+        .all()
+    )
+    host = next(participant for participant in participants if participant.participant_type == "human")
+    bots = [participant for participant in participants if participant.id != host.id]
+    for participant in participants:
+        participant.draft_position = None
+        db_session.add(participant)
+    db_session.flush()
+    for index, bot in enumerate(bots, start=1):
+        bot.draft_position = index
+        db_session.add(bot)
+    host.draft_position = 4
+    db_session.add(host)
+    for index, player in enumerate(players[:12], start=1):
+        db_session.add(
+            MockDraftPick(
+                session_id=created["mock_draft_id"],
+                mock_draft_id=created["mock_draft_id"],
+                participant_id=host.id,
+                seat_id=None,
+                player_id=player["id"],
+                round_number=1,
+                round_pick=index,
+                overall_pick=index,
+                pick_source="human",
+            )
+        )
+    session_row = db_session.get(MockDraftSession, created["mock_draft_id"])
+    assert session_row is not None
+    session_row.current_overall_pick = 13
+    session_row.current_pick_started_at = datetime.now(timezone.utc)
+    session_row.current_pick_expires_at = datetime.now(timezone.utc) + timedelta(seconds=30)
+    db_session.add(session_row)
+    db_session.commit()
+
+    wrong_position = client.post(
+        f"/mock-drafts/{created['mock_draft_id']}/picks",
+        json={"player_id": players[12]["id"]},
+        headers=auth_headers(token),
+    )
+    assert wrong_position.status_code == 409
+    assert "cannot fit" in wrong_position.text
+    assert db_session.query(MockDraftPick).filter(MockDraftPick.mock_draft_id == created["mock_draft_id"]).count() == 12
+
+    kicker = client.post(
+        f"/mock-drafts/{created['mock_draft_id']}/picks",
+        json={"player_id": players[13]["id"]},
+        headers=auth_headers(token),
+    )
+    assert kicker.status_code == 200, kicker.text
+    assert kicker.json()["picks"][-1]["player_name"] == "Kicker Candidate"
 
 
 def test_single_player_cannot_be_joined_by_invite(client):
@@ -685,6 +845,158 @@ def test_bot_and_human_timer_auto_pick(client, db_session):
     picks = db_session.query(MockDraftPick).filter(MockDraftPick.mock_draft_id == created["mock_draft_id"]).all()
     assert len({pick.overall_pick for pick in picks}) == len(picks)
     assert len({pick.player_id for pick in picks}) == len(picks)
+
+
+def test_human_timer_auto_pick_uses_first_valid_queued_player(client, db_session):
+    host_token = create_user_and_token(client, "auto-queue")
+    created = create_mock_draft(client, host_token, team_count=4, round_count=1, mode="single_player")
+    player_ids = create_players(client, 20)
+
+    participants = db_session.query(MockDraftParticipant).filter(MockDraftParticipant.mock_draft_id == created["mock_draft_id"]).all()
+    human = next(participant for participant in participants if participant.participant_type == "human")
+    bots = [participant for participant in participants if participant.participant_type == "bot"]
+    for participant in participants:
+        participant.draft_position = None
+    db_session.commit()
+
+    human.draft_position = 1
+    for index, bot in enumerate(bots, start=2):
+        bot.draft_position = index
+
+    now = datetime.now(timezone.utc)
+    session_row = db_session.get(MockDraftSession, created["mock_draft_id"])
+    assert session_row is not None
+    session_row.status = "live"
+    session_row.draft_order_locked = True
+    session_row.is_locked = True
+    session_row.current_overall_pick = 1
+    session_row.current_pick_started_at = now - timedelta(seconds=31)
+    session_row.current_pick_expires_at = now - timedelta(seconds=1)
+    db_session.add(session_row)
+    db_session.commit()
+
+    queued_player_id = player_ids[5]
+    invalid_player_id = max(player_ids) + 100_000
+    response = client.post(
+        f"/mock-drafts/{created['mock_draft_id']}/auto-pick",
+        json={
+            "expected_overall_pick": 1,
+            "preferred_player_ids": [invalid_player_id, queued_player_id],
+        },
+        headers=auth_headers(host_token),
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert len(payload["picks"]) == 1
+    assert payload["picks"][0]["participant_id"] == human.id
+    assert payload["picks"][0]["player_id"] == queued_player_id
+    assert payload["picks"][0]["pick_source"] == "auto_timer"
+    assert payload["current_overall_pick"] == 2
+
+
+def test_auto_pick_integrity_error_returns_409_without_partial_pick(client, db_session, monkeypatch):
+    host_token = create_user_and_token(client, "auto-conflict")
+    created = create_mock_draft(client, host_token, team_count=4, round_count=2, mode="single_player")
+    create_players(client, 20)
+    room = move_to_live(client, db_session, host_token, created["mock_draft_id"])
+    assert room["status"] == "live"
+
+    def raise_integrity_error(*args, **kwargs):
+        raise IntegrityError("insert mock draft pick", {}, Exception("forced conflict"))
+
+    monkeypatch.setattr(mock_draft_service, "_create_pick", raise_integrity_error)
+
+    response = client.post(
+        f"/mock-drafts/{created['mock_draft_id']}/auto-pick",
+        json={"force": True, "expected_overall_pick": room["current_overall_pick"]},
+        headers=auth_headers(host_token),
+    )
+
+    assert response.status_code == 409
+    assert "Duplicate auto-pick request" in response.text
+    assert db_session.query(MockDraftPick).filter(MockDraftPick.mock_draft_id == created["mock_draft_id"]).count() == 0
+
+
+def test_mock_draft_pick_seat_id_is_nullable_for_standalone_picks():
+    assert MockDraftPick.__table__.c.seat_id.nullable is True
+
+
+def test_available_player_board_ranks_do_not_compress_after_picks(client, db_session):
+    host_token = create_user_and_token(client, "stable-ranks")
+    created = create_mock_draft(client, host_token, team_count=4, round_count=2, mode="single_player")
+    create_players(client, 20)
+    room = move_to_live(client, db_session, host_token, created["mock_draft_id"])
+    assert room["status"] == "live"
+
+    first_pick = client.post(
+        f"/mock-drafts/{created['mock_draft_id']}/auto-pick",
+        json={"force": True, "expected_overall_pick": room["current_overall_pick"]},
+        headers=auth_headers(host_token),
+    )
+    assert first_pick.status_code == 200, first_pick.text
+    assert first_pick.json()["picks"][0]["player_name"] == "Mock Player 1"
+
+    available = client.get(
+        f"/mock-drafts/{created['mock_draft_id']}/available-players",
+        params={"limit": 3},
+        headers=auth_headers(host_token),
+    )
+
+    assert available.status_code == 200, available.text
+    players = available.json()["data"]
+    assert players[0]["name"] == "Mock Player 2"
+    assert players[0]["board_rank"] == 2
+    assert players[1]["name"] == "Mock Player 3"
+    assert players[1]["board_rank"] == 3
+
+
+def test_available_players_positions_filter_finds_late_kicker_need(client):
+    host_token = create_user_and_token(client, "kicker-filter")
+    created = create_mock_draft(client, host_token, team_count=4, round_count=1, mode="single_player")
+    payload = [
+        {
+            "external_id": None,
+            "name": f"Ranked RB {index + 1}",
+            "position": "RB",
+            "school": f"School {index + 1}",
+            "image_url": None,
+            "sheet_adp": index + 1,
+            "sheet_projected_season_points": float(400 - index),
+        }
+        for index in range(510)
+    ]
+    payload.append(
+        {
+            "external_id": None,
+            "name": "Late Board Kicker",
+            "position": "K",
+            "school": "Special Teams",
+            "image_url": None,
+            "sheet_adp": 999,
+            "sheet_projected_season_points": 90.0,
+        }
+    )
+    players_response = client.post("/players", json=payload)
+    assert players_response.status_code == 201, players_response.text
+
+    generic_response = client.get(
+        f"/mock-drafts/{created['mock_draft_id']}/available-players",
+        params={"limit": 100},
+        headers=auth_headers(host_token),
+    )
+    assert generic_response.status_code == 200, generic_response.text
+    assert all(player["position"] != "K" for player in generic_response.json()["data"])
+
+    kicker_response = client.get(
+        f"/mock-drafts/{created['mock_draft_id']}/available-players",
+        params={"limit": 100, "positions": "K"},
+        headers=auth_headers(host_token),
+    )
+    assert kicker_response.status_code == 200, kicker_response.text
+    kicker_players = kicker_response.json()["data"]
+    assert [player["name"] for player in kicker_players] == ["Late Board Kicker"]
+    assert kicker_players[0]["position"] == "K"
 
 
 def test_full_156_pick_mock_draft_simulation_completes_without_real_writes(client, db_session):

@@ -70,12 +70,24 @@ const assignRosterSlots = (picks: DraftBoardPick[]) => {
   return assignments;
 };
 
+export const getDraftablePositionsForRosterPicks = (picks: DraftBoardPick[]) => {
+  const assignments = assignRosterSlots(picks);
+  const positions = new Set<string>();
+  for (const slot of rosterSlotDefinitions) {
+    if (slot.area === "ir" || assignments.has(slot.key)) continue;
+    slot.accepts.forEach((position) => positions.add(position));
+  }
+  return positions;
+};
+
 export function DraftRoomBoard({
   state,
   searchQuery,
   onSearchChange,
   onDraftPlayer,
   onQueuePlayer,
+  queuedPlayerIds: controlledQueuedPlayerIds,
+  onQueuedPlayerIdsChange,
   onSelectPlayer,
   draftPending,
   autoPickPending,
@@ -97,6 +109,8 @@ export function DraftRoomBoard({
   onSearchChange: (value: string) => void;
   onDraftPlayer: (playerId: number) => void;
   onQueuePlayer?: (playerId: number) => void;
+  queuedPlayerIds?: number[];
+  onQueuedPlayerIdsChange?: (playerIds: number[]) => void;
   onSelectPlayer?: (player: DraftBoardPlayer) => void;
   draftPending: boolean;
   autoPickPending: boolean;
@@ -114,8 +128,16 @@ export function DraftRoomBoard({
   historyTextAvailable?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<DraftBoardActiveTab>("draft");
-  const [queuedPlayerIds, setQueuedPlayerIds] = useState<number[]>([]);
+  const [internalQueuedPlayerIds, setInternalQueuedPlayerIds] = useState<number[]>([]);
   const [selectedRosterParticipantId, setSelectedRosterParticipantId] = useState<string | null>(null);
+  const queuedPlayerIds = controlledQueuedPlayerIds ?? internalQueuedPlayerIds;
+  const setQueuedPlayerIds = (updater: (current: number[]) => number[]) => {
+    const next = updater(queuedPlayerIds);
+    if (controlledQueuedPlayerIds === undefined) {
+      setInternalQueuedPlayerIds(next);
+    }
+    onQueuedPlayerIdsChange?.(next);
+  };
   const queuedPlayerIdSet = useMemo(() => new Set(queuedPlayerIds), [queuedPlayerIds]);
   const playerById = useMemo(() => new Map(state.availablePlayers.map((player) => [player.id, player])), [state.availablePlayers]);
   const queuedPlayers = useMemo(
@@ -145,6 +167,13 @@ export function DraftRoomBoard({
   const selectedRosterValue = selectedRoster ? String(selectedRoster.participantId) : "";
   const selectedRosterAssignments = useMemo(() => assignRosterSlots(selectedRoster?.picks ?? []), [selectedRoster?.picks]);
   const selectedRosterPicksMade = selectedRoster?.picks.length ?? 0;
+  const userRosterPicks = state.userRoster ?? [];
+  const userDraftablePositions = useMemo(() => getDraftablePositionsForRosterPicks(userRosterPicks), [userRosterPicks]);
+  const draftableAvailablePlayers = useMemo(
+    () => state.availablePlayers.filter((player) => userDraftablePositions.has(normalizeRosterPosition(player.position))),
+    [state.availablePlayers, userDraftablePositions]
+  );
+  const isPlayerDraftableForUserRoster = (player: DraftBoardPlayer) => userDraftablePositions.has(normalizeRosterPosition(player.position));
 
   const queuePlayer = (playerId: number) => {
     setQueuedPlayerIds((current) => (current.includes(playerId) ? current : [...current, playerId]));
@@ -214,7 +243,7 @@ export function DraftRoomBoard({
 
       {activeTab === "draft" ? (
         <AvailablePlayersTable
-          players={state.availablePlayers}
+          players={draftableAvailablePlayers}
           searchQuery={searchQuery}
           onSearchChange={onSearchChange}
           onDraftPlayer={onDraftPlayer}
@@ -256,7 +285,7 @@ export function DraftRoomBoard({
                     </Button>
                     <Button
                       className="h-10 rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 px-5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-950"
-                      disabled={!state.isUserOnClock || state.isComplete || draftPending || autoPickPending || player.disabled}
+                      disabled={!state.isUserOnClock || state.isComplete || draftPending || autoPickPending || player.disabled || !isPlayerDraftableForUserRoster(player)}
                       onClick={() => onDraftPlayer(player.id)}
                     >
                       {draftPending ? "Drafting..." : "Draft"}

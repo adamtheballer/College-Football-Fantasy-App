@@ -207,19 +207,33 @@ SHEET_PROJECTION_STAT_KEYS = (
 GOOGLE_SHEET_ID_RE = re.compile(r"/spreadsheets/d/([a-zA-Z0-9-_]+)")
 SHEET_TAB_META_RE = re.compile(r'\[(\d+),0,\\"(\d+)\\",\[\{\\"1\\":\[\[0,0,\\"([^\\"]+)\\"')
 POSITION_DEMAND_BONUS: dict[str, int] = {
-    "QB": -24,
+    "QB": -28,
     "RB": 28,
-    "WR": 28,
-    "TE": 14,
+    "WR": 34,
+    "TE": 20,
     "K": -55,
 }
 FLEX_BONUS: dict[str, int] = {
     "QB": 0,
     "RB": 10,
-    "WR": 10,
-    "TE": 5,
+    "WR": 12,
+    "TE": 4,
     "K": 0,
 }
+PREFERRED_DRAFT_BOARD_ORDER = (
+    "Ahmad Hardy",
+    "Jeremiah Smith",
+    "Kewan Lacy",
+    "Cam Cook",
+    "LJ Martin",
+    "Malachi Toney",
+    "Trinidad Chambliss",
+    "Mark Fletcher Jr.",
+    "Devon Dampier",
+    "Cam Coleman",
+    "Arch Manning",
+)
+TE_MID_TIER_SCORE_BOOST = 1.10
 REPLACEMENT_RANK_BY_POSITION: dict[str, int] = {
     "QB": 12,
     "RB": 30,
@@ -701,7 +715,7 @@ def _apply_adp_formula(valid_rows: list[dict[str, object]]) -> None:
             if position_rank <= 8:
                 return 6.0
             return 0.0
-        if position in {"RB", "WR"}:
+        if position == "RB":
             if position_rank <= 5:
                 return 38.0
             if position_rank <= 12:
@@ -709,17 +723,29 @@ def _apply_adp_formula(valid_rows: list[dict[str, object]]) -> None:
             if position_rank <= 24:
                 return 10.0
             return 0.0
+        if position == "WR":
+            if position_rank <= 5:
+                return 46.0
+            if position_rank <= 12:
+                return 29.0
+            if position_rank <= 24:
+                return 12.0
+            return 0.0
         if position == "TE":
-            if position_rank <= 3:
-                return 30.0
-            if position_rank <= 8:
-                return 14.0
+            if position_rank <= 5:
+                return 48.0
+            if position_rank <= 10:
+                return 24.0
+            if position_rank <= 15:
+                return 8.0
             return 0.0
         if position == "K":
             return -40.0
         return 0.0
 
-    def _elite_gap_bonus(gap_to_next: float) -> float:
+    def _elite_gap_bonus(position: str, gap_to_next: float) -> float:
+        if position == "TE":
+            return 0.0
         if gap_to_next >= 70:
             return 40.0
         if gap_to_next >= 40:
@@ -768,9 +794,11 @@ def _apply_adp_formula(valid_rows: list[dict[str, object]]) -> None:
                 + (value_above_replacement * VALUE_ABOVE_REPLACEMENT_WEIGHT)
                 + float(POSITION_DEMAND_BONUS.get(position, 0))
                 + scarcity_bonus
-                + _elite_gap_bonus(gap_to_next)
+                + _elite_gap_bonus(position, gap_to_next)
                 + float(FLEX_BONUS.get(position, 0))
             )
+            if position == "TE" and 6 <= index <= 30:
+                score *= TE_MID_TIER_SCORE_BOOST
             adp_score_by_row_id[row_id] = score
             position_rank_by_row_id[row_id] = index
             replacement_level_by_row_id[row_id] = replacement_level_projection
@@ -778,32 +806,27 @@ def _apply_adp_formula(valid_rows: list[dict[str, object]]) -> None:
             elite_gap_by_row_id[row_id] = gap_to_next
             scarcity_bonus_by_row_id[row_id] = scarcity_bonus
 
+    preferred_rank_by_name = {
+        _normalize_player_name(name): index for index, name in enumerate(PREFERRED_DRAFT_BOARD_ORDER, start=1)
+    }
+
+    def _draft_board_sort_key(entry: dict[str, object]) -> tuple[object, ...]:
+        preferred_rank = preferred_rank_by_name.get(_normalize_player_name(str(entry.get("name") or "")))
+        if preferred_rank is not None:
+            return (0, preferred_rank)
+        return (
+            1,
+            -float(adp_score_by_row_id.get(id(entry), 0)),
+            -float(entry.get("projected_fantasy_points") or 0),
+            str(entry.get("name") or "").lower(),
+        )
+
     provisional_sorted = sorted(
         valid_rows,
-        key=lambda entry: (
-            -float(adp_score_by_row_id.get(id(entry), 0)),
-            -float(entry.get("projected_fantasy_points") or 0),
-            str(entry.get("name") or "").lower(),
-        ),
+        key=_draft_board_sort_key,
     )
 
-    # Guardrail: preserve QB slotting from draft-value order, but ensure non-QB players
-    # never invert by raw projection (higher projected non-QB always ahead of lower projected non-QB).
-    non_qb_projection_sorted = sorted(
-        (entry for entry in provisional_sorted if str(entry.get("position") or "").upper() != "QB"),
-        key=lambda entry: (
-            -float(entry.get("projected_fantasy_points") or 0),
-            -float(adp_score_by_row_id.get(id(entry), 0)),
-            str(entry.get("name") or "").lower(),
-        ),
-    )
-    non_qb_iter = iter(non_qb_projection_sorted)
-    all_rows_sorted: list[dict[str, object]] = []
-    for entry in provisional_sorted:
-        if str(entry.get("position") or "").upper() == "QB":
-            all_rows_sorted.append(entry)
-        else:
-            all_rows_sorted.append(next(non_qb_iter))
+    all_rows_sorted = provisional_sorted
     for rank, row in enumerate(all_rows_sorted, start=1):
         row["adp"] = float(rank)
 
@@ -829,20 +852,36 @@ def _apply_projection_name_overrides(valid_rows: list[dict[str, object]]) -> Non
         _normalize_player_name("Daylan Smothers"),
         _normalize_player_name("Daylan Hollywood Smothers"),
     }
+    projection_floor_by_name = {
+        _normalize_player_name("Trey'Dez Green"): 252.0,
+        _normalize_player_name("Terrance Carter Jr."): 238.0,
+        _normalize_player_name("Jamari Johnson"): 228.0,
+        _normalize_player_name("DJ Vonnahme"): 222.0,
+        _normalize_player_name("Luke Hasz"): 216.0,
+        _normalize_player_name("Mario Craver"): 258.0,
+    }
+    projection_ceiling_by_name = {
+        _normalize_player_name("Calvin Russell III"): 190.0,
+    }
     projection_bonus_points = 4.0
     for row in valid_rows:
         normalized_name = _normalize_player_name(str(row.get("name") or ""))
-        if normalized_name not in hollywood_smothers_aliases:
-            continue
         current_projection = float(row.get("projected_fantasy_points") or 0.0)
-        boosted_projection = round(max(0.0, current_projection + projection_bonus_points), 2)
-        row["projected_fantasy_points"] = boosted_projection
+        boosted_projection = current_projection
+        if normalized_name in hollywood_smothers_aliases:
+            boosted_projection = max(boosted_projection, current_projection + projection_bonus_points)
+        if normalized_name in projection_floor_by_name:
+            boosted_projection = max(boosted_projection, projection_floor_by_name[normalized_name])
+        if normalized_name in projection_ceiling_by_name:
+            boosted_projection = min(boosted_projection, projection_ceiling_by_name[normalized_name])
+        if boosted_projection == current_projection:
+            continue
+        row["projected_fantasy_points"] = round(max(0.0, boosted_projection), 2)
         logger.info(
-            "sheet_sync_projection_override player=%s base=%.2f boosted=%.2f bonus=%.2f",
+            "sheet_sync_projection_override player=%s base=%.2f boosted=%.2f",
             row.get("name"),
             current_projection,
-            boosted_projection,
-            projection_bonus_points,
+            float(row["projected_fantasy_points"]),
         )
 
 

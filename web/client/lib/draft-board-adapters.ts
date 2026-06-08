@@ -42,20 +42,23 @@ const mapRoster = (roster: StandaloneMockDraftRoom["rosters"][number]): DraftBoa
 export const mapPlayersToDraftBoardPlayers = (players: Player[], draftedPlayerIds: Set<number>): DraftBoardPlayer[] =>
   players
     .filter((player) => !draftedPlayerIds.has(player.id))
-    .map((player, index) => ({
-      id: player.id,
-      rank: index + 1,
-      boardRank: player.boardRank ?? player.rank ?? null,
-      name: player.name,
-      school: player.school,
-      position: player.pos,
-      projection: player.sheetProjectedSeasonPoints ?? player.projection?.fpts ?? null,
-      adp: player.sheetAdp ?? player.adp ?? null,
-      rosteredPercent: player.rostered ?? null,
-      team: player.school,
-      disabled: false,
-      sourcePlayer: player,
-    }));
+    .map((player, index) => {
+      const stableRank = player.boardRank ?? player.rank ?? index + 1;
+      return {
+        id: player.id,
+        rank: stableRank,
+        boardRank: stableRank,
+        name: player.name,
+        school: player.school,
+        position: player.pos,
+        projection: player.sheetProjectedSeasonPoints ?? player.projection?.fpts ?? null,
+        adp: player.sheetAdp ?? player.adp ?? null,
+        rosteredPercent: player.rostered ?? null,
+        team: player.school,
+        disabled: false,
+        sourcePlayer: player,
+      };
+    });
 
 export const adaptMockToDraftBoardState = (
   room: StandaloneMockDraftRoom,

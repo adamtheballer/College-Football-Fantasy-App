@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Bot, Check, User } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +26,8 @@ export function DraftOrderPanel({
   currentOverallPick: number;
   totalPicks: number;
 }) {
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const currentPickRef = useRef<HTMLDivElement | null>(null);
   const ordered = [...participants].sort((a, b) => Number(a.draftPosition ?? 999) - Number(b.draftPosition ?? 999));
   const picksByOverallPick = new Map(picks.map((pick) => [pick.overallPick, pick]));
   const picksMade = Math.max(0, Math.min(totalPicks, picks.length));
@@ -43,6 +46,23 @@ export function DraftOrderPanel({
       isCurrent: overallPick === currentOverallPick,
     };
   });
+
+  useEffect(() => {
+    const currentPickElement = currentPickRef.current;
+    const scrollContainer = scrollContainerRef.current;
+    if (!currentPickElement || !scrollContainer) return;
+
+    const targetLeft =
+      currentPickElement.offsetLeft -
+      (scrollContainer.clientWidth - currentPickElement.clientWidth) / 2;
+    const maxScrollLeft = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+    const nextScrollLeft = Math.max(0, Math.min(targetLeft, maxScrollLeft));
+
+    scrollContainer.scrollTo({
+      left: nextScrollLeft,
+      behavior: "smooth",
+    });
+  }, [currentOverallPick]);
 
   return (
     <Card data-testid="draft-order-panel" className="relative overflow-hidden rounded-[2rem] border-cyan-200/10 bg-card/55 shadow-[0_24px_80px_rgba(8,13,30,0.45)]">
@@ -75,7 +95,7 @@ export function DraftOrderPanel({
       <CardContent className="relative overflow-hidden p-0">
         <div className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 w-16 bg-gradient-to-r from-card/95 to-transparent" />
         <div className="pointer-events-none absolute bottom-0 right-0 top-0 z-10 w-16 bg-gradient-to-l from-card/95 to-transparent" />
-        <div className="overflow-x-auto p-4" style={{ scrollbarWidth: "thin" }}>
+        <div ref={scrollContainerRef} className="overflow-x-auto p-4" style={{ scrollbarWidth: "thin" }}>
         <div className="flex min-w-max gap-3 pb-1">
         {pickSlots.map((slot) => {
           const participant = slot.participant;
@@ -85,6 +105,7 @@ export function DraftOrderPanel({
           return (
           <div
             key={slot.overallPick}
+            ref={slot.isCurrent ? currentPickRef : undefined}
             className={`relative flex h-36 w-36 shrink-0 flex-col justify-between overflow-hidden rounded-[1.4rem] border p-4 transition-all ${
               slot.isCurrent
                 ? "scale-[1.02] border-cyan-300/75 bg-cyan-400/18 shadow-[0_0_30px_rgba(34,211,238,0.28)]"

@@ -42,8 +42,8 @@ export default function Signup() {
       const message = err instanceof Error ? err.message : "";
       if (message.includes("409")) {
         setError("That email is already registered. Try signing in instead.");
-      } else if (message.includes("Failed to fetch")) {
-        setError("Cannot reach the server. Make sure backend is running on port 8000.");
+      } else if (message) {
+        setError(message);
       } else {
         setError("Create account failed. Please try again.");
       }

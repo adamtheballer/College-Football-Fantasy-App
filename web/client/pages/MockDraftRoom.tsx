@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Loader2, RadioTower } from "lucide-react";
 
-import { DraftRoomBoard } from "@/components/draft/DraftRoomBoard";
+import { DraftRoomBoard, getDraftablePositionsForRosterPicks } from "@/components/draft/DraftRoomBoard";
 import { SinglePlayerDraftOrderReveal } from "@/components/draft/SinglePlayerDraftOrderReveal";
 import { PlayerDetailModal } from "@/components/PlayerDetailModal";
 import { useDraftTimer } from "@/hooks/use-draft-timer";
@@ -18,7 +18,9 @@ import {
 } from "@/hooks/use-mock-drafts";
 import { ApiError } from "@/lib/api";
 import { adaptMockToDraftBoardState, mapPlayersToDraftBoardPlayers } from "@/lib/draft-board-adapters";
+import type { DraftBoardPick } from "@/types/draft-board";
 import type { Player } from "@/types/player";
+import type { StandaloneMockDraftPick } from "@/types/mock-draft";
 import {
   MOCK_DRAFT_EXIT_PATH,
   getMockTurnKey,
@@ -32,6 +34,23 @@ import {
 const singlePlayerContinueStorageKey = (mockDraftId: number) => `single-player-mock-draft-continued:${mockDraftId}`;
 const MOCK_AUTO_PICK_RETRY_MS = 1_000;
 const SEARCH_DEBOUNCE_MS = 180;
+const MOCK_DRAFT_BOARD_LIMIT = 500;
+
+const mapMockPickToDraftBoardPick = (pick: StandaloneMockDraftPick): DraftBoardPick => ({
+  id: pick.id,
+  overallPick: pick.overall_pick,
+  roundNumber: pick.round_number,
+  roundPick: pick.round_pick,
+  participantId: pick.participant_id,
+  participantName: pick.participant_name,
+  teamName: pick.team_name,
+  playerId: pick.player_id,
+  playerName: pick.player_name,
+  playerPosition: pick.player_position,
+  playerSchool: pick.player_school,
+  pickSource: pick.pick_source,
+  createdAt: pick.created_at,
+});
 
 function useDebouncedValue<T>(value: T, delayMs: number) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -61,15 +80,33 @@ export default function MockDraftRoom() {
   const [hasContinuedToDraft, setHasContinuedToDraft] = useState(false);
   const [showDraftUnderway, setShowDraftUnderway] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  const [autoPickRetryMessage, setAutoPickRetryMessage] = useState<string | null>(null);
+  const [queuedPlayerIds, setQueuedPlayerIds] = useState<number[]>([]);
   const previousStatusRef = useRef<string | null>(null);
   const autoPickTimeoutRef = useRef<number | null>(null);
   const timerFallbackTimeoutRef = useRef<number | null>(null);
   const currentAutoPickTurnKeyRef = useRef<string | null>(null);
   const lastBotAutoPickAttemptKeyRef = useRef<string | null>(null);
   const lastTimerFallbackAttemptKeyRef = useRef<string | null>(null);
+  const autoPickRetryCountByTurnKeyRef = useRef<Map<string, number>>(new Map());
+  const latestAutoPickContextRef = useRef<{
+    room: typeof room;
+    availablePlayers: typeof availablePlayers;
+    draftedPlayerIds: Set<number>;
+    autoPickPending: boolean;
+  }>({ room: null, availablePlayers: [], draftedPlayerIds: new Set(), autoPickPending: false });
   const debouncedSearch = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
-  const { data: playersPayload } = useMockDraftAvailablePlayers(parsedMockDraftId, { search: debouncedSearch || undefined, limit: 100 });
+  const userDraftablePositions = useMemo(() => {
+    if (!room?.user_team_id) return undefined;
+    const userRoster = room.rosters.find((roster) => roster.participant_id === room.user_team_id);
+    if (!userRoster) return undefined;
+    const positions = [...getDraftablePositionsForRosterPicks(userRoster.picks.map(mapMockPickToDraftBoardPick))].sort();
+    return positions.length ? positions : undefined;
+  }, [room?.rosters, room?.user_team_id]);
+  const { data: playersPayload } = useMockDraftAvailablePlayers(parsedMockDraftId, {
+    search: debouncedSearch || undefined,
+    positions: userDraftablePositions,
+    limit: MOCK_DRAFT_BOARD_LIMIT,
+  });
 
   useEffect(() => {
     if (!parsedMockDraftId) return;
@@ -92,8 +129,52 @@ export default function MockDraftRoom() {
     () => (room ? adaptMockToDraftBoardState(room, availablePlayers, timer.formattedTime, timer.secondsRemaining) : null),
     [availablePlayers, room, timer.formattedTime, timer.secondsRemaining]
   );
+  const queuedAutoPickPlayerIds = useMemo(
+    () => (room?.current_participant_type === "human" ? queuedPlayerIds : []),
+    [queuedPlayerIds, room?.current_participant_type]
+  );
   const showCompletionModal = shouldShowMockCompletionModal(Boolean(room?.is_complete), completionChoiceMade);
   const showOrderReveal = shouldShowSinglePlayerDraftOrderReveal(room, hasContinuedToDraft);
+
+  useEffect(() => {
+    latestAutoPickContextRef.current = {
+      room,
+      availablePlayers,
+      draftedPlayerIds,
+      autoPickPending: autoPickMutation.isPending,
+    };
+  }, [autoPickMutation.isPending, availablePlayers, draftedPlayerIds, room]);
+
+  const logAutoPickFailure = (err: unknown, context: { reason: string; turnKey: string; retryCount: number }) => {
+    if (!import.meta.env.DEV) return;
+    const latest = latestAutoPickContextRef.current;
+    const latestRoom = latest.room;
+    const currentParticipant = latestRoom?.participants.find((participant) => participant.id === latestRoom.current_participant_id);
+    console.error("[SingleMockDraft] auto-pick failed", {
+      error: err,
+      errorName: err instanceof Error ? err.name : undefined,
+      errorMessage: err instanceof Error ? err.message : String(err),
+      errorStack: err instanceof Error ? err.stack : undefined,
+      apiStatus: err instanceof ApiError ? err.status : undefined,
+      apiMessage: err instanceof ApiError ? err.message : undefined,
+      apiDetail: err instanceof ApiError ? err.detail : undefined,
+      reason: context.reason,
+      turnKey: context.turnKey,
+      retryCount: context.retryCount,
+      mockDraftId: latestRoom?.mock_draft_id,
+      currentOverallPick: latestRoom?.current_overall_pick,
+      currentRound: latestRoom?.current_round,
+      currentRoundPick: latestRoom?.current_round_pick,
+      currentParticipant,
+      currentParticipantType: latestRoom?.current_participant_type,
+      status: latestRoom?.status,
+      picksCount: latestRoom?.picks.length ?? 0,
+      availablePlayersCount: latest.availablePlayers.length,
+      firstAvailablePlayer: latest.availablePlayers[0],
+      draftedPlayerIds: Array.from(latest.draftedPlayerIds),
+      autoPickPending: latest.autoPickPending,
+    });
+  };
 
   useEffect(() => {
     currentAutoPickTurnKeyRef.current = getMockTurnKey(room);
@@ -130,7 +211,7 @@ export default function MockDraftRoom() {
       void autoPickMutation
         .mutateAsync({ force: true, expectedOverallPick: room.current_overall_pick })
         .then((payload) => {
-          setAutoPickRetryMessage(null);
+          autoPickRetryCountByTurnKeyRef.current.delete(turnKey);
           lastTimerFallbackAttemptKeyRef.current = null;
           if (import.meta.env.DEV) {
             console.debug("[SingleMockDraft] auto-pick success", {
@@ -143,16 +224,18 @@ export default function MockDraftRoom() {
         })
         .catch((err) => {
           lastBotAutoPickAttemptKeyRef.current = null;
-          setAutoPickRetryMessage("Auto-pick failed. Retrying...");
-          if (import.meta.env.DEV) {
-            console.error("[SingleMockDraft] auto-pick failed", err);
+          const retryCount = (autoPickRetryCountByTurnKeyRef.current.get(turnKey) ?? 0) + 1;
+          autoPickRetryCountByTurnKeyRef.current.set(turnKey, retryCount);
+          logAutoPickFailure(err, { reason: "bot_turn", turnKey, retryCount });
+          if (retryCount > 2) {
+            return;
           }
           timerFallbackTimeoutRef.current = window.setTimeout(() => {
             if (currentAutoPickTurnKeyRef.current === turnKey) {
               void autoPickMutation
                 .mutateAsync({ force: true, expectedOverallPick: room.current_overall_pick })
                 .then((payload) => {
-                  setAutoPickRetryMessage(null);
+                  autoPickRetryCountByTurnKeyRef.current.delete(turnKey);
                   lastTimerFallbackAttemptKeyRef.current = null;
                   if (import.meta.env.DEV) {
                     console.debug("[SingleMockDraft] auto-pick retry success", {
@@ -165,9 +248,9 @@ export default function MockDraftRoom() {
                 })
                 .catch((retryErr) => {
                   lastTimerFallbackAttemptKeyRef.current = null;
-                  if (import.meta.env.DEV) {
-                    console.error("[SingleMockDraft] auto-pick retry failed", retryErr);
-                  }
+                  const nextRetryCount = (autoPickRetryCountByTurnKeyRef.current.get(turnKey) ?? retryCount) + 1;
+                  autoPickRetryCountByTurnKeyRef.current.set(turnKey, nextRetryCount);
+                  logAutoPickFailure(retryErr, { reason: "bot_turn_retry", turnKey, retryCount: nextRetryCount });
                 });
             }
           }, MOCK_AUTO_PICK_RETRY_MS);
@@ -210,9 +293,13 @@ export default function MockDraftRoom() {
       });
     }
     void autoPickMutation
-      .mutateAsync({ force: true, expectedOverallPick: room.current_overall_pick })
+      .mutateAsync({
+        force: true,
+        expectedOverallPick: room.current_overall_pick,
+        preferredPlayerIds: queuedAutoPickPlayerIds,
+      })
       .then((payload) => {
-        setAutoPickRetryMessage(null);
+        autoPickRetryCountByTurnKeyRef.current.delete(turnKey);
         lastBotAutoPickAttemptKeyRef.current = null;
         if (import.meta.env.DEV) {
           console.debug("[SingleMockDraft] auto-pick success", {
@@ -225,10 +312,13 @@ export default function MockDraftRoom() {
       })
       .catch((err) => {
         lastTimerFallbackAttemptKeyRef.current = null;
-        setAutoPickRetryMessage("Auto-pick failed. Retrying...");
-        if (import.meta.env.DEV) {
-          console.error("[SingleMockDraft] auto-pick failed", err);
-        }
+        const retryCount = (autoPickRetryCountByTurnKeyRef.current.get(turnKey) ?? 0) + 1;
+        autoPickRetryCountByTurnKeyRef.current.set(turnKey, retryCount);
+        logAutoPickFailure(err, {
+          reason: room.current_participant_type === "bot" ? "bot_timer_fallback" : "timer_expired",
+          turnKey,
+          retryCount,
+        });
       });
   }, [
     autoPickMutation.isPending,
@@ -239,6 +329,7 @@ export default function MockDraftRoom() {
     room?.current_participant_type,
     room?.is_complete,
     room?.status,
+    queuedAutoPickPlayerIds,
     timer.isExpired,
   ]);
 
@@ -328,10 +419,20 @@ export default function MockDraftRoom() {
     setCompletionChoiceMade(false);
     setEmailError(null);
     setShowDraftUnderway(false);
+    setQueuedPlayerIds([]);
     previousStatusRef.current = null;
     await resetMutation.mutateAsync();
     setHasContinuedToDraft(false);
   };
+
+  const visibleDraftError =
+    room.is_complete || room.status === "completed"
+      ? null
+      : pickMutation.error instanceof Error
+        ? pickMutation.error.message
+        : resetMutation.error instanceof Error
+          ? resetMutation.error.message
+          : null;
 
   if (showOrderReveal) {
     return (
@@ -360,10 +461,12 @@ export default function MockDraftRoom() {
         searchQuery={search}
         onSearchChange={setSearch}
         onDraftPlayer={(playerId) => pickMutation.mutate(playerId)}
+        queuedPlayerIds={queuedPlayerIds}
+        onQueuedPlayerIdsChange={setQueuedPlayerIds}
         onSelectPlayer={(player) => setSelectedPlayer(player.sourcePlayer ?? null)}
         draftPending={pickMutation.isPending}
         autoPickPending={autoPickMutation.isPending}
-        error={autoPickRetryMessage ?? (pickMutation.error instanceof Error ? pickMutation.error.message : autoPickMutation.error instanceof Error ? autoPickMutation.error.message : resetMutation.error instanceof Error ? resetMutation.error.message : null)}
+        error={visibleDraftError}
         onExit={() => void exitDraft()}
         onEmailHistory={() => void sendEmail()}
         onSkipEmail={() => setCompletionChoiceMade(true)}

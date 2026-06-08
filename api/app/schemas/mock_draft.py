@@ -143,6 +143,8 @@ class MockDraftPickCreate(BaseModel):
 class MockDraftAutoPickRequest(BaseModel):
     force: bool = False
     expected_overall_pick: int | None = Field(default=None, ge=1)
+    preferred_player_id: int | None = Field(default=None, ge=1)
+    preferred_player_ids: list[int] | None = None
 
 
 class MockDraftPickRead(BaseModel):

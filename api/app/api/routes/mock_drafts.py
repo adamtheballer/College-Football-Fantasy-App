@@ -210,7 +210,8 @@ def get_mock_draft_available_players(
     mock_draft_id: int,
     search: str | None = None,
     position: str | None = None,
-    limit: int = Query(50, ge=1, le=100),
+    positions: str | None = None,
+    limit: int = Query(500, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -221,6 +222,7 @@ def get_mock_draft_available_players(
         current_user=current_user,
         search=search,
         position=position,
+        positions=positions,
         limit=limit,
         offset=offset,
     )
@@ -268,6 +270,8 @@ def make_mock_draft_auto_pick(
         current_user=current_user,
         force=bool(force or (payload.force if payload else False)),
         expected_overall_pick=payload.expected_overall_pick if payload else None,
+        preferred_player_id=payload.preferred_player_id if payload else None,
+        preferred_player_ids=payload.preferred_player_ids if payload else None,
     )
 
 

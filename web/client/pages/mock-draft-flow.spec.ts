@@ -111,8 +111,9 @@ describe("mock draft flow helpers", () => {
     ).toBe("7:1:44:bot:live");
   });
 
-  it("uses a short bot delay and immediate human timeout auto-pick", () => {
+  it("uses a measured bot delay and immediate human timeout auto-pick", () => {
     expect(getMockAutoPickDelayMs({ current_participant_type: "bot" } as any)).toBe(MOCK_BOT_AUTO_PICK_DELAY_MS);
+    expect(MOCK_BOT_AUTO_PICK_DELAY_MS).toBe(3000);
     expect(getMockAutoPickDelayMs({ current_participant_type: "human" } as any)).toBe(0);
   });
 

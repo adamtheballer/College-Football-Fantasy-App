@@ -133,10 +133,12 @@ export function useMockDraftPick(mockDraftId?: number) {
 export function useMockDraftAutoPick(mockDraftId?: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { force?: boolean; expectedOverallPick?: number } = {}) =>
+    mutationFn: (payload: { force?: boolean; expectedOverallPick?: number; preferredPlayerId?: number | null; preferredPlayerIds?: number[] } = {}) =>
       apiPost<StandaloneMockDraftRoom>(`/mock-drafts/${mockDraftId}/auto-pick`, {
         force: Boolean(payload.force),
         expected_overall_pick: payload.expectedOverallPick,
+        preferred_player_id: payload.preferredPlayerId ?? undefined,
+        preferred_player_ids: payload.preferredPlayerIds?.length ? payload.preferredPlayerIds : undefined,
       }),
     onSuccess: (payload) => {
       queryClient.setQueryData(["mock-draft", mockDraftId, "room"], payload);
@@ -148,11 +150,12 @@ export function useMockDraftAutoPick(mockDraftId?: number) {
 
 export function useMockDraftAvailablePlayers(
   mockDraftId?: number,
-  params: { search?: string; position?: string; limit?: number; offset?: number } = {}
+  params: { search?: string; position?: string; positions?: string[]; limit?: number; offset?: number } = {}
 ) {
-  const { search, position, limit = 100, offset = 0 } = params;
+  const { search, position, positions, limit = 500, offset = 0 } = params;
+  const positionsParam = positions?.length ? positions.join(",") : undefined;
   return useQuery({
-    queryKey: ["mock-draft", mockDraftId, "available-players", { search: search || "", position: position || "", limit, offset }],
+    queryKey: ["mock-draft", mockDraftId, "available-players", { search: search || "", position: position || "", positions: positionsParam || "", limit, offset }],
     enabled: typeof mockDraftId === "number" && !Number.isNaN(mockDraftId),
     staleTime: 5_000,
     placeholderData: (previousData) => previousData,
@@ -160,6 +163,7 @@ export function useMockDraftAvailablePlayers(
       const payload = await apiGet<BackendPlayerListResponse>(`/mock-drafts/${mockDraftId}/available-players`, {
         search: search || undefined,
         position: position || undefined,
+        positions: positionsParam,
         limit,
         offset,
       });

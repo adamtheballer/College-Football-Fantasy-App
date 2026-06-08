@@ -2,8 +2,8 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { DraftRoomBoard } from "./DraftRoomBoard";
-import type { DraftBoardState } from "@/types/draft-board";
+import { DraftRoomBoard, getDraftablePositionsForRosterPicks } from "./DraftRoomBoard";
+import type { DraftBoardPick, DraftBoardState } from "@/types/draft-board";
 
 const baseState: DraftBoardState = {
   mode: "single_mock",
@@ -133,5 +133,25 @@ describe("DraftRoomBoard shared layout", () => {
 
     expect(html).toContain('data-testid="draft-complete-modal"');
     expect(html).toContain("Restart Mock");
+  });
+
+  it("only exposes K as draftable when the user roster has every other slot filled", () => {
+    const filledRoster: DraftBoardPick[] = ["QB", "RB", "RB", "WR", "WR", "TE", "RB", "QB", "WR", "TE", "RB", "WR"].map((position, index) => ({
+      id: index + 1,
+      overallPick: index + 1,
+      roundNumber: 1,
+      roundPick: index + 1,
+      participantId: 1,
+      participantName: "Adam",
+      teamName: "Adam's Team",
+      playerId: index + 100,
+      playerName: `Filled ${position} ${index}`,
+      playerPosition: position,
+      playerSchool: "Test",
+      pickSource: "human",
+      createdAt: new Date().toISOString(),
+    }));
+
+    expect([...getDraftablePositionsForRosterPicks(filledRoster)]).toEqual(["K"]);
   });
 });

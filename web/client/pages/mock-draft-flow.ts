@@ -1,6 +1,6 @@
 import type { StandaloneMockDraftCreateResponse, StandaloneMockDraftMode, StandaloneMockDraftRoom } from "@/types/mock-draft";
 
-export const MOCK_BOT_AUTO_PICK_DELAY_MS = 2_000;
+export const MOCK_BOT_AUTO_PICK_DELAY_MS = 3_000;
 
 export const getMockDraftLobbyPath = (mockDraftId: number) => `/draft/mock/${mockDraftId}/lobby`;
 export const getMockDraftRoomPath = (mockDraftId: number) => `/draft/mock/${mockDraftId}/room`;
