@@ -35,10 +35,11 @@ const toLocalDateTimeInput = (date: Date) => {
 const formatCreateMockDraftError = (error: unknown) => {
   if (error instanceof ApiError) {
     if (error.status === 401) return "Please sign in to create a mock draft.";
+    if (error.status === 0) return "Backend server is offline. Start FastAPI and try again.";
     return error.message;
   }
   if (error instanceof TypeError && error.message.toLowerCase().includes("fetch")) {
-    return "Unable to reach the backend API. Check that FastAPI is running and VITE_API_BASE_URL points to the correct public or local backend URL.";
+    return "Backend server is offline. Start FastAPI and try again.";
   }
   if (error instanceof Error && error.message) return error.message;
   return "Unable to create mock draft. Please try again.";

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { setPendingGuide } from "@/lib/onboarding";
+import { ApiError } from "@/lib/api";
 import {
   Trophy,
   Mail,
@@ -43,11 +44,18 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recoveryNotice, setRecoveryNotice] = useState<string | null>(null);
+
+  const handleForgotPassword = () => {
+    setError(null);
+    setRecoveryNotice("Password reset emails are not configured yet. For now, contact support or try signing in again.");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setRecoveryNotice(null);
     try {
       const signedInUser = await login(email, password);
       if (signedInUser) {
@@ -56,7 +64,9 @@ export default function Login() {
       navigate(redirectTarget, { replace: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
-      if (message.includes("invalid credentials")) {
+      if (err instanceof ApiError && err.status === 0) {
+        setError("Backend server is offline. Start FastAPI and try again.");
+      } else if (message.includes("invalid credentials")) {
         setError("Sign in failed. Check email/password and try again.");
       } else if (message.includes("Failed to fetch")) {
         setError("Cannot reach the server. Make sure backend is running on port 8000.");
@@ -176,7 +186,13 @@ export default function Login() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between px-3">
                       <label className="text-[10px] font-black uppercase tracking-widest text-cyan-100/70">Password</label>
-                      <button type="button" className="text-[9px] font-black uppercase tracking-widest text-amber-200/75 transition-colors hover:text-amber-100">Forgot?</button>
+                      <button
+                        type="button"
+                        onClick={handleForgotPassword}
+                        className="text-[9px] font-black uppercase tracking-widest text-amber-200/80 transition-colors hover:text-amber-100"
+                      >
+                        Forgot Password?
+                      </button>
                     </div>
                     <div className="group relative">
                       <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-100/45 transition-colors group-focus-within:text-cyan-200" />
@@ -191,6 +207,12 @@ export default function Login() {
                     </div>
                   </div>
                 </div>
+
+                {recoveryNotice && (
+                  <div className="rounded-2xl border border-amber-200/35 bg-amber-300/12 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-100">
+                    {recoveryNotice}
+                  </div>
+                )}
 
                 {error && (
                   <div className="rounded-2xl border border-red-300/35 bg-red-500/15 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-red-100">

@@ -15,7 +15,7 @@ def test_projection_overrides_raise_top_tight_ends_and_mario_craver_and_cap_calv
     _apply_projection_name_overrides(rows)
 
     projection_by_name = {row["name"]: row["projected_fantasy_points"] for row in rows}
-    assert projection_by_name["Trey'Dez Green"] == 252.0
+    assert projection_by_name["Trey'Dez Green"] == 240.0
     assert projection_by_name["Terrance Carter Jr."] == 238.0
     assert projection_by_name["Jamari Johnson"] == 228.0
     assert projection_by_name["DJ Vonnahme"] == 222.0
@@ -91,7 +91,7 @@ def test_draft_value_formula_places_top_tight_ends_after_early_rounds():
     )
     assert len(top_te_adps) == 5
     assert min(top_te_adps) >= 25
-    assert min(top_te_adps) <= 45
+    assert min(top_te_adps) <= 55
     assert max(top_te_adps) <= 65
 
 

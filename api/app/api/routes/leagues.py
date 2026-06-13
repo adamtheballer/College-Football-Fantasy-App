@@ -853,7 +853,7 @@ def _apply_projection_name_overrides(valid_rows: list[dict[str, object]]) -> Non
         _normalize_player_name("Daylan Hollywood Smothers"),
     }
     projection_floor_by_name = {
-        _normalize_player_name("Trey'Dez Green"): 252.0,
+        _normalize_player_name("Trey'Dez Green"): 240.0,
         _normalize_player_name("Terrance Carter Jr."): 238.0,
         _normalize_player_name("Jamari Johnson"): 228.0,
         _normalize_player_name("DJ Vonnahme"): 222.0,

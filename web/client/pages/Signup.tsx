@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { setPendingGuide } from "@/lib/onboarding";
+import { ApiError } from "@/lib/api";
 import {
   Trophy,
   Mail,
@@ -40,7 +41,9 @@ export default function Signup() {
       navigate("/", { replace: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
-      if (message.includes("409")) {
+      if (err instanceof ApiError && err.status === 0) {
+        setError("Backend server is offline. Start FastAPI and try again.");
+      } else if (message.includes("409")) {
         setError("That email is already registered. Try signing in instead.");
       } else if (message) {
         setError(message);
@@ -172,7 +175,15 @@ export default function Signup() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="ml-3 text-[10px] font-black uppercase tracking-widest text-cyan-100/70">Password</label>
+                    <div className="flex items-center justify-between px-3">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-cyan-100/70">Password</label>
+                      <Link
+                        to="/login"
+                        className="text-[9px] font-black uppercase tracking-widest text-amber-200/80 transition-colors hover:text-amber-100"
+                      >
+                        Forgot Password?
+                      </Link>
+                    </div>
                     <div className="group relative">
                       <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-100/45 transition-colors group-focus-within:text-cyan-200" />
                       <Input

@@ -96,6 +96,19 @@ def test_list_players_search_school_position_and_sort(client, db_session):
     assert [row["name"] for row in sort_response.json()["data"]][:2] == ["Beta Passer", "Alpha Runner"]
 
 
+def test_list_players_excludes_generated_smoke_rows(client, db_session):
+    add_player(db_session, "Smoke Player 1780924455-1", "RB", "Smoke School 1", adp=1)
+    add_player(db_session, "Smoke Raw Player 1780924535-1", "RB", "Smoke Raw School 1", adp=2)
+    real = add_player(db_session, "Ahmad Hardy", "RB", "Missouri", adp=3)
+
+    response = client.get("/players", params={"limit": 100, "sort": "draft_rank"})
+
+    assert response.status_code == 200
+    rows = response.json()["data"]
+    assert [row["id"] for row in rows] == [real.id]
+    assert all(not row["name"].lower().startswith("smoke") for row in rows)
+
+
 def test_list_players_dedupes_canonical_players_and_prefers_sheet_board_row(client, db_session):
     sportsdata_row = Player(
         external_id="sportsdata-aaron",

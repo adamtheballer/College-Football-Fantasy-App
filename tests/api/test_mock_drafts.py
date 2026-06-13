@@ -269,6 +269,55 @@ def test_available_mock_players_dedupes_canonical_player_rows(client):
     assert rows[0]["board_rank"] == 1
 
 
+def test_available_mock_players_excludes_generated_smoke_rows(client):
+    token = create_user_and_token(client, "smoke-pool")
+    created = create_mock_draft(client, token, team_count=4, round_count=1, mode="single_player")
+    response = client.post(
+        "/players",
+        json=[
+            {
+                "external_id": None,
+                "name": "Smoke Player 1780924455-1",
+                "position": "RB",
+                "school": "Smoke School 1",
+                "image_url": None,
+                "sheet_adp": 1,
+                "sheet_projected_season_points": 299.0,
+            },
+            {
+                "external_id": None,
+                "name": "Smoke Raw Player 1780924535-1",
+                "position": "RB",
+                "school": "Smoke Raw School 1",
+                "image_url": None,
+                "sheet_adp": 2,
+                "sheet_projected_season_points": 298.0,
+            },
+            {
+                "external_id": None,
+                "name": "Ahmad Hardy",
+                "position": "RB",
+                "school": "Missouri",
+                "image_url": None,
+                "sheet_adp": 3,
+                "sheet_projected_season_points": 347.4,
+            },
+        ],
+    )
+    assert response.status_code == 201, response.text
+
+    available = client.get(
+        f"/mock-drafts/{created['mock_draft_id']}/available-players",
+        params={"limit": 10},
+        headers=auth_headers(token),
+    )
+
+    assert available.status_code == 200, available.text
+    rows = available.json()["data"]
+    assert [row["name"] for row in rows] == ["Ahmad Hardy"]
+    assert rows[0]["board_rank"] == 1
+
+
 def test_available_mock_position_search_uses_master_board_ranks(client):
     token = create_user_and_token(client, "board-rank-search")
     created = create_mock_draft(client, token, team_count=4, round_count=1, mode="single_player")

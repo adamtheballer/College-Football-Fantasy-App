@@ -10,6 +10,7 @@ from api.app.models.roster import RosterEntry
 from api.app.models.team import Team
 from api.app.schemas.player import PlayerCreate
 from api.app.services.player_identity import player_board_sort_tuple, player_canonical_key, prefer_canonical_player
+from api.app.services.player_pool_filters import generated_test_player_filter
 
 
 def create_players(db: Session, players_in: list[PlayerCreate]) -> list[Player]:
@@ -88,7 +89,7 @@ def list_players(
     available_only: bool = False,
     sort: str | None = None,
 ) -> tuple[list[Player], int]:
-    stmt: Select = select(Player)
+    stmt: Select = select(Player).where(generated_test_player_filter())
     if position:
         stmt = stmt.where(func.upper(Player.position) == position.upper())
     if school:

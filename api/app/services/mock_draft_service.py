@@ -45,6 +45,7 @@ from api.app.services.draft_timer import clear_timer_on_completion, is_timer_exp
 from api.app.services.invite_links import build_mock_draft_invite_link, generate_invite_token
 from api.app.services.league_flow import FIXED_ROSTER_SLOTS
 from api.app.services.mock_draft_history import build_mock_draft_history
+from api.app.services.player_pool_filters import generated_test_player_filter
 
 
 INVITE_CODE_LENGTH = 128
@@ -585,6 +586,7 @@ def _draft_board_players_query(db: Session):
             )
             .label("dedupe_rank"),
         )
+        .filter(generated_test_player_filter())
         .filter(player_position_key.in_(OFFENSE_POSITIONS))
         .subquery()
     )
