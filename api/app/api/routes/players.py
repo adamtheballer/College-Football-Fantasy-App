@@ -48,7 +48,7 @@ def create_players_endpoint(
 
 @router.get("", response_model=PlayerList)
 def list_players_endpoint(
-    limit: int = Query(50, ge=1, le=2000),
+    limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     position: str | None = None,
     school: str | None = None,

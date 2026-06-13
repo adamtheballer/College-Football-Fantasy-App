@@ -84,7 +84,7 @@ class DraftTimeoutRunner:
             try:
                 mock_rows = (
                     session.query(MockDraftSession.id)
-                    .filter(MockDraftSession.status.in_(["scheduled", "countdown", "live"]))
+                    .filter(MockDraftSession.status.in_(["scheduled", "lobby", "intermission", "live"]))
                     .limit(max(1, int(settings.draft_timeout_batch_limit)))
                     .all()
                 )

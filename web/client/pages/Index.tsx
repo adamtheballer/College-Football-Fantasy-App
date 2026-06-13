@@ -228,7 +228,7 @@ export default function Index() {
         .slice(0, 4),
     [leagues]
   );
-  const dashboardHeroTitle = `Welcome ${user?.firstName?.toUpperCase() ?? "Manager"}`;
+  const dashboardHeroTitle = "Dashboard Command Center";
   const rosterSignal = workspace?.roster?.length ? `${workspace.roster.length} rostered` : "Build your first roster";
   const nextDraftSignal = upcomingDrafts[0]?.draft?.draft_datetime_utc
     ? formatDraftTime(upcomingDrafts[0].draft.draft_datetime_utc)
@@ -245,7 +245,7 @@ export default function Index() {
             College Football Fantasy
           </p>
           <h1
-            className="cfb-home-hero-title text-7xl font-black italic uppercase tracking-tight"
+            className="cfb-home-hero-title block max-w-full text-[clamp(3rem,4.8vw,5rem)] font-black italic uppercase leading-[0.94] tracking-[-0.055em]"
             data-text="College Football Fantasy"
           >
             College Football Fantasy

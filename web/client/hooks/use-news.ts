@@ -40,6 +40,8 @@ export type NewsFeedFilters = {
   offset?: number;
   min_relevance?: number;
   breaking_only?: boolean;
+  categories?: string;
+  sort?: "impact" | "recent";
 };
 
 export function useNewsFeed(filters: NewsFeedFilters = {}, enabled = true) {
@@ -53,9 +55,9 @@ export function useNewsFeed(filters: NewsFeedFilters = {}, enabled = true) {
 }
 
 export function useBreakingNews() {
-  return useNewsFeed({ limit: 8, min_relevance: 35, breaking_only: true });
+  return useNewsFeed({ limit: 5, min_relevance: 20, sort: "recent" });
 }
 
 export function useTransferNews() {
-  return useNewsFeed({ category: "transfer", limit: 8 });
+  return useNewsFeed({ category: "transfer", limit: 5, sort: "recent" });
 }

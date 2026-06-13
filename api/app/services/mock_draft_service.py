@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, unquote, urlparse
 
 from fastapi import HTTPException, status
-from sqlalchemy import case, func
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -13,6 +13,7 @@ from api.app.core.config import settings
 from api.app.models.mock_draft_event import MockDraftEvent
 from api.app.models.mock_draft_participant import MockDraftParticipant
 from api.app.models.mock_draft_pick import MockDraftPick
+from api.app.models.mock_draft_seat import MockDraftSeat
 from api.app.models.mock_draft_session import MockDraftSession
 from api.app.models.player import Player
 from api.app.models.user import User
@@ -31,24 +32,53 @@ from api.app.schemas.mock_draft import (
     MockDraftSessionSummary,
     MockDraftSettingsUpdate,
 )
+from api.app.schemas.player import PlayerList
 from api.app.services.draft_engine import (
     calculate_total_picks,
     get_participant_for_pick,
     get_round_number,
     get_round_pick,
+    get_total_picks,
     is_final_pick,
 )
 from api.app.services.draft_timer import clear_timer_on_completion, is_timer_expired, reset_pick_timer_after_pick, seconds_remaining, start_pick_timer
 from api.app.services.invite_links import build_mock_draft_invite_link, generate_invite_token
+from api.app.services.league_flow import FIXED_ROSTER_SLOTS
 from api.app.services.mock_draft_history import build_mock_draft_history
+from api.app.services.player_pool_filters import generated_test_player_filter
 
 
 INVITE_CODE_LENGTH = 128
 INTERMISSION_SECONDS = 30
-BOT_PICK_DELAY_SECONDS = 1
+SINGLE_PLAYER_PRE_DRAFT_SECONDS = 90
+BOT_PICK_DELAY_SECONDS = 3
 OFFENSE_POSITIONS = ("QB", "RB", "WR", "TE", "K")
+FLEX_POSITIONS = ("RB", "WR", "TE")
 JOINABLE_STATUSES = {"scheduled", "lobby"}
 LOCKED_STATUSES = {"intermission", "live", "paused", "completed", "cancelled", "expired", "pending_deletion"}
+MOCK_DRAFT_METADATA_MODELS = (MockDraftSeat,)
+
+
+def _fixed_mock_round_count() -> int:
+    return max(1, get_total_picks(1, FIXED_ROSTER_SLOTS))
+
+
+def _roster_slot_definitions(session_row: MockDraftSession) -> list[tuple[str, tuple[str, ...]]]:
+    slots = session_row.roster_slots_json or FIXED_ROSTER_SLOTS
+    definitions: list[tuple[str, tuple[str, ...]]] = []
+    for position in ("QB", "RB", "WR", "TE", "K"):
+        count = max(0, int(slots.get(position, 0) or 0))
+        for index in range(count):
+            label = position if count == 1 else f"{position}{index + 1}"
+            definitions.append((label, (position,)))
+    flex_count = max(0, int(slots.get("FLEX", 0) or 0))
+    for index in range(flex_count):
+        label = "FLEX" if flex_count == 1 else f"FLEX{index + 1}"
+        definitions.append((label, FLEX_POSITIONS))
+    bench_count = max(0, int(slots.get("BENCH", slots.get("BE", 0)) or 0))
+    for index in range(bench_count):
+        definitions.append((f"BENCH{index + 1}", OFFENSE_POSITIONS))
+    return definitions
 
 
 def _now() -> datetime:
@@ -223,6 +253,7 @@ def _session_summary(session_row: MockDraftSession) -> MockDraftSessionSummary:
 def create_mock_draft(db: Session, *, payload: MockDraftCreateRequest, current_user: User) -> MockDraftCreateResponse:
     now = _now()
     mode = payload.mode
+    round_count = _fixed_mock_round_count()
     invite_code = generate_unique_invite_code(db) if mode == "public_multiplayer" else None
     scheduled_start_at = (_as_utc(payload.scheduled_start_at) or payload.scheduled_start_at).astimezone(timezone.utc)
     effective_start_at = now if mode == "single_player" else scheduled_start_at
@@ -235,10 +266,10 @@ def create_mock_draft(db: Session, *, payload: MockDraftCreateRequest, current_u
         status="lobby",
         manager_count=payload.team_count,
         team_count=payload.team_count,
-        round_count=payload.round_count,
+        round_count=round_count,
         draft_type="snake",
         pick_timer_seconds=payload.pick_timer_seconds,
-        roster_slots_json={},
+        roster_slots_json=FIXED_ROSTER_SLOTS.copy(),
         scoring_json={"mock": True, "scoring_type": payload.scoring_type},
         is_locked=False,
         draft_datetime_utc=effective_start_at,
@@ -277,15 +308,15 @@ def create_mock_draft(db: Session, *, payload: MockDraftCreateRequest, current_u
     if mode == "single_player":
         fill_empty_seats_with_bots(db, session_row=session_row, now=now)
         randomize_draft_order_once(db, session_row=session_row)
-        session_row.status = "live"
-        session_row.started_at = now
+        session_row.status = "intermission"
         session_row.current_overall_pick = 1
-        session_row.intermission_started_at = None
-        session_row.intermission_ends_at = None
-        start_pick_timer(session_row, now)
+        session_row.intermission_started_at = now
+        session_row.intermission_ends_at = now + timedelta(seconds=SINGLE_PLAYER_PRE_DRAFT_SECONDS)
+        session_row.current_pick_started_at = None
+        session_row.current_pick_expires_at = None
         db.add(session_row)
         log_mock_draft_event(db, mock_draft_id=session_row.id, event_type="order_randomized", created_by_user_id=current_user.id)
-        log_mock_draft_event(db, mock_draft_id=session_row.id, event_type="draft_started", created_by_user_id=current_user.id)
+        log_mock_draft_event(db, mock_draft_id=session_row.id, event_type="intermission_started", created_by_user_id=current_user.id)
     db.commit()
     db.refresh(session_row)
     invite_link = _join_url(invite_code) if mode == "public_multiplayer" else None
@@ -395,6 +426,9 @@ def update_settings_before_lock(
     for field_name, value in updates.items():
         if value is None:
             continue
+        if field_name == "round_count":
+            session_row.round_count = _fixed_mock_round_count()
+            continue
         if field_name == "team_count":
             joined_count = _participants_query(db, session_row.id).count()
             if int(value) < joined_count:
@@ -406,6 +440,8 @@ def update_settings_before_lock(
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="scheduled_start_at must be in the future")
             session_row.draft_datetime_utc = value
         setattr(session_row, field_name, value)
+    session_row.round_count = _fixed_mock_round_count()
+    session_row.roster_slots_json = FIXED_ROSTER_SLOTS.copy()
     db.add(session_row)
     log_mock_draft_event(db, mock_draft_id=session_row.id, event_type="settings_updated", created_by_user_id=current_user.id)
     db.commit()
@@ -526,17 +562,38 @@ def _current_participant(db: Session, session_row: MockDraftSession) -> MockDraf
     return get_participant_for_pick(participants, int(session_row.current_overall_pick or 1))
 
 
-def _available_players_query(db: Session, mock_draft_id: int):
-    picked_subquery = db.query(MockDraftPick.player_id).filter(
-        (MockDraftPick.mock_draft_id == mock_draft_id) | (MockDraftPick.session_id == mock_draft_id)
-    )
+def _draft_board_players_query(db: Session):
     adp_missing = case((Player.sheet_adp.is_(None), 1), else_=0)
     adp_non_positive = case((Player.sheet_adp <= 0, 1), else_=0)
     projection_points = func.coalesce(Player.sheet_projected_season_points, -1.0)
+    player_name_key = func.lower(Player.name)
+    player_school_key = func.lower(Player.school)
+    player_position_key = func.upper(Player.position)
+    ranked_players = (
+        db.query(
+            Player.id.label("player_id"),
+            func.row_number()
+            .over(
+                partition_by=(player_name_key, player_school_key, player_position_key),
+                order_by=(
+                    adp_missing.asc(),
+                    adp_non_positive.asc(),
+                    projection_points.desc(),
+                    Player.sheet_adp.asc(),
+                    Player.name.asc(),
+                    Player.id.asc(),
+                ),
+            )
+            .label("dedupe_rank"),
+        )
+        .filter(generated_test_player_filter())
+        .filter(player_position_key.in_(OFFENSE_POSITIONS))
+        .subquery()
+    )
     return (
         db.query(Player)
-        .filter(Player.position.in_(OFFENSE_POSITIONS))
-        .filter(~Player.id.in_(picked_subquery))
+        .join(ranked_players, ranked_players.c.player_id == Player.id)
+        .filter(ranked_players.c.dedupe_rank == 1)
         .order_by(
             adp_missing.asc(),
             adp_non_positive.asc(),
@@ -548,11 +605,215 @@ def _available_players_query(db: Session, mock_draft_id: int):
     )
 
 
-def _select_best_available_player(db: Session, mock_draft_id: int) -> Player:
-    player = _available_players_query(db, mock_draft_id).with_for_update().first()
+def _available_players_query(db: Session, mock_draft_id: int):
+    player_name_key = func.lower(Player.name)
+    player_school_key = func.lower(Player.school)
+    player_position_key = func.upper(Player.position)
+    picked_player_keys = (
+        db.query(
+            func.lower(Player.name).label("picked_name_key"),
+            func.lower(Player.school).label("picked_school_key"),
+            func.upper(Player.position).label("picked_position_key"),
+        )
+        .join(MockDraftPick, MockDraftPick.player_id == Player.id)
+        .filter((MockDraftPick.mock_draft_id == mock_draft_id) | (MockDraftPick.session_id == mock_draft_id))
+        .subquery()
+    )
+    return (
+        _draft_board_players_query(db)
+        .outerjoin(
+            picked_player_keys,
+            and_(
+                player_name_key == picked_player_keys.c.picked_name_key,
+                player_school_key == picked_player_keys.c.picked_school_key,
+                player_position_key == picked_player_keys.c.picked_position_key,
+            ),
+        )
+        .filter(picked_player_keys.c.picked_name_key.is_(None))
+    )
+
+
+def _participant_pick_player_rows(
+    db: Session,
+    *,
+    session_id: int,
+    participant_id: int,
+) -> list[tuple[MockDraftPick, Player]]:
+    return (
+        db.query(MockDraftPick, Player)
+        .join(Player, Player.id == MockDraftPick.player_id)
+        .filter(
+            ((MockDraftPick.mock_draft_id == session_id) | (MockDraftPick.session_id == session_id)),
+            MockDraftPick.participant_id == participant_id,
+        )
+        .order_by(MockDraftPick.overall_pick.asc())
+        .all()
+    )
+
+
+def _assigned_mock_roster_slots(
+    session_row: MockDraftSession,
+    pick_player_rows: list[tuple[MockDraftPick, Player]],
+) -> dict[str, tuple[MockDraftPick, Player]]:
+    assignments: dict[str, tuple[MockDraftPick, Player]] = {}
+    slot_definitions = _roster_slot_definitions(session_row)
+    for pick, player in pick_player_rows:
+        position = (player.position or "").strip().upper()
+        slot = next(
+            (
+                slot_key
+                for slot_key, accepted_positions in slot_definitions
+                if slot_key not in assignments and not slot_key.startswith("BENCH") and position in accepted_positions
+            ),
+            None,
+        )
+        if slot is None:
+            slot = next(
+                (
+                    slot_key
+                    for slot_key, accepted_positions in slot_definitions
+                    if slot_key not in assignments and slot_key.startswith("BENCH") and position in accepted_positions
+                ),
+                None,
+            )
+        if slot is not None:
+            assignments[slot] = (pick, player)
+    return assignments
+
+
+def _eligible_mock_roster_positions(
+    db: Session,
+    *,
+    session_row: MockDraftSession,
+    participant: MockDraftParticipant,
+) -> set[str]:
+    pick_player_rows = _participant_pick_player_rows(db, session_id=session_row.id, participant_id=participant.id)
+    assignments = _assigned_mock_roster_slots(session_row, pick_player_rows)
+    eligible_positions: set[str] = set()
+    for slot_key, accepted_positions in _roster_slot_definitions(session_row):
+        if slot_key not in assignments:
+            eligible_positions.update(accepted_positions)
+    return eligible_positions
+
+
+def _validate_player_fits_mock_roster(
+    db: Session,
+    *,
+    session_row: MockDraftSession,
+    participant: MockDraftParticipant,
+    player: Player,
+) -> None:
+    position = (player.position or "").strip().upper()
+    if position not in _eligible_mock_roster_positions(db, session_row=session_row, participant=participant):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This position cannot fit the current roster.")
+
+
+def get_available_mock_players(
+    db: Session,
+    *,
+    mock_draft_id: int,
+    current_user: User,
+    search: str | None = None,
+    position: str | None = None,
+    positions: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> PlayerList:
+    session_row = _get_session_or_404(db, mock_draft_id)
+    _require_participant(db, session_row, current_user)
+    board_rank_by_player_id = {
+        player_id: index + 1
+        for index, (player_id,) in enumerate(_draft_board_players_query(db).with_entities(Player.id).all())
+    }
+    query = _available_players_query(db, session_row.id)
+    position_filters: list[str] = []
+    if positions:
+        position_filters = [value.strip().upper() for value in positions.split(",") if value.strip()]
+    elif position:
+        position_filters = [position.upper()]
+    if position_filters:
+        query = query.filter(func.upper(Player.position).in_(position_filters))
+    if search:
+        search_value = search.strip()
+        if search_value:
+            pattern = f"%{search_value}%"
+            query = query.filter(
+                or_(
+                    Player.name.ilike(pattern),
+                    Player.school.ilike(pattern),
+                    Player.position.ilike(pattern),
+                )
+            )
+    total = query.count()
+    players = query.offset(offset).limit(limit).all()
+    for player in players:
+        setattr(player, "board_rank", board_rank_by_player_id.get(player.id))
+    return PlayerList(data=players, total=total, limit=limit, offset=offset)
+
+
+def _select_best_available_player(db: Session, session_row: MockDraftSession, participant: MockDraftParticipant) -> Player:
+    # The mock draft session row is already locked by make_auto_pick before this
+    # selector runs. Do not add FOR UPDATE to this query: it uses window functions
+    # and an outer join for deduping/excluding drafted players, which can fail on
+    # PostgreSQL even though SQLite accepts it in tests.
+    eligible_positions = _eligible_mock_roster_positions(db, session_row=session_row, participant=participant)
+    if not eligible_positions:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Team roster is full.")
+    player = _available_players_query(db, session_row.id).filter(func.upper(Player.position).in_(eligible_positions)).first()
     if player is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No available players remain for auto-pick.")
     return player
+
+
+def _select_preferred_auto_pick_player(
+    db: Session,
+    *,
+    session_row: MockDraftSession,
+    participant: MockDraftParticipant,
+    preferred_player_id: int | None,
+    preferred_player_ids: list[int] | None,
+) -> Player | None:
+    if participant.participant_type != "human":
+        return None
+
+    ordered_player_ids: list[int] = []
+    if preferred_player_ids:
+        ordered_player_ids.extend(player_id for player_id in preferred_player_ids if player_id not in ordered_player_ids)
+    if preferred_player_id is not None and preferred_player_id not in ordered_player_ids:
+        ordered_player_ids.insert(0, preferred_player_id)
+    if not ordered_player_ids:
+        return None
+
+    eligible_positions = _eligible_mock_roster_positions(db, session_row=session_row, participant=participant)
+    if not eligible_positions:
+        return None
+
+    for candidate_player_id in ordered_player_ids:
+        player = db.query(Player).filter(Player.id == candidate_player_id).first()
+        if player is None:
+            continue
+
+        already_picked = (
+            db.query(MockDraftPick)
+            .join(Player, Player.id == MockDraftPick.player_id)
+            .filter(
+                ((MockDraftPick.mock_draft_id == session_row.id) | (MockDraftPick.session_id == session_row.id)),
+                func.lower(Player.name) == player.name.lower(),
+                func.lower(Player.school) == player.school.lower(),
+                func.upper(Player.position) == player.position.upper(),
+            )
+            .first()
+        )
+        if already_picked:
+            continue
+
+        position = (player.position or "").strip().upper()
+        if position not in eligible_positions:
+            continue
+
+        return player
+
+    return None
 
 
 def _pick_rows(db: Session, mock_draft_id: int) -> list[tuple[MockDraftPick, MockDraftParticipant, Player]]:
@@ -743,9 +1004,12 @@ def _create_pick(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This pick has already been made.")
     existing_player = (
         db.query(MockDraftPick)
+        .join(Player, Player.id == MockDraftPick.player_id)
         .filter(
             ((MockDraftPick.mock_draft_id == session_row.id) | (MockDraftPick.session_id == session_row.id)),
-            MockDraftPick.player_id == player.id,
+            func.lower(Player.name) == player.name.lower(),
+            func.lower(Player.school) == player.school.lower(),
+            func.upper(Player.position) == player.position.upper(),
         )
         .first()
     )
@@ -815,6 +1079,7 @@ def make_human_pick(
             player = db.query(Player).filter(Player.id == player_id).with_for_update().first()
             if player is None:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Player not found.")
+            _validate_player_fits_mock_roster(db, session_row=session_row, participant=current, player=player)
             _create_pick(
                 db,
                 session_row=session_row,
@@ -833,7 +1098,16 @@ def make_human_pick(
     return get_room_state(db, mock_draft_id=mock_draft_id, current_user=current_user)
 
 
-def make_auto_pick(db: Session, *, mock_draft_id: int, current_user: User | None = None, force: bool = False) -> MockDraftRoomRead:
+def make_auto_pick(
+    db: Session,
+    *,
+    mock_draft_id: int,
+    current_user: User | None = None,
+    force: bool = False,
+    expected_overall_pick: int | None = None,
+    preferred_player_id: int | None = None,
+    preferred_player_ids: list[int] | None = None,
+) -> MockDraftRoomRead:
     user_for_response = current_user
     try:
         with db.begin_nested():
@@ -842,6 +1116,8 @@ def make_auto_pick(db: Session, *, mock_draft_id: int, current_user: User | None
             if session_row.status != "live":
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Mock draft is not live.")
             now = _now()
+            if expected_overall_pick is not None and int(session_row.current_overall_pick or 1) != expected_overall_pick:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Mock draft pick changed; refresh and retry.")
             current = _current_participant(db, session_row)
             if current is None:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No participant is on the clock.")
@@ -851,7 +1127,13 @@ def make_auto_pick(db: Session, *, mock_draft_id: int, current_user: User | None
                 started_at = _as_utc(session_row.current_pick_started_at) or now
                 if (now - started_at).total_seconds() < BOT_PICK_DELAY_SECONDS:
                     raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Bot pick delay has not elapsed.")
-            player = _select_best_available_player(db, session_row.id)
+            player = _select_preferred_auto_pick_player(
+                db,
+                session_row=session_row,
+                participant=current,
+                preferred_player_id=preferred_player_id,
+                preferred_player_ids=preferred_player_ids,
+            ) or _select_best_available_player(db, session_row, current)
             current.auto_pick_count = int(current.auto_pick_count or 0) + 1
             db.add(current)
             source = "bot" if current.participant_type == "bot" else "auto_timer"
@@ -870,8 +1152,7 @@ def make_auto_pick(db: Session, *, mock_draft_id: int, current_user: User | None
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        if user_for_response is None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Duplicate auto-pick request.") from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Duplicate auto-pick request.") from exc
     if user_for_response is None:
         session_row = _get_session_or_404(db, mock_draft_id)
         host_user = db.get(User, session_row.host_user_id or session_row.commissioner_user_id)
@@ -910,6 +1191,58 @@ def email_history(db: Session, *, mock_draft_id: int, current_user: User) -> Moc
     log_mock_draft_event(db, mock_draft_id=session_row.id, event_type="email_sent", created_by_user_id=current_user.id)
     db.commit()
     return MockDraftEmailHistoryResponse(sent=True, emails=[email], message="Draft history email queued.", history=history)
+
+
+def reset_single_player_mock_draft(db: Session, *, mock_draft_id: int, current_user: User) -> MockDraftRoomRead:
+    now = _now()
+    try:
+        with db.begin_nested():
+            session_row = _get_session_or_404(db, mock_draft_id, lock=True)
+            participant = _require_participant(db, session_row, current_user)
+            if _mock_draft_mode(session_row) != "single_player":
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only single-player mock drafts can be reset here.")
+            if not participant.is_host and session_row.host_user_id != current_user.id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Host access required.")
+
+            (
+                db.query(MockDraftPick)
+                .filter((MockDraftPick.mock_draft_id == session_row.id) | (MockDraftPick.session_id == session_row.id))
+                .delete(synchronize_session=False)
+            )
+            participant_rows = _participants_query(db, session_row.id).with_for_update().all()
+            for row in participant_rows:
+                row.auto_pick_count = 0
+                row.left_at = None
+                row.connection_status = "connected"
+                row.last_seen_at = now
+                row.draft_position = None
+                db.add(row)
+            db.flush()
+
+            fill_empty_seats_with_bots(db, session_row=session_row, now=now)
+            session_row.draft_order_locked = False
+            session_row.is_locked = False
+            randomize_draft_order_once(db, session_row=session_row)
+            session_row.status = "intermission"
+            session_row.round_count = _fixed_mock_round_count()
+            session_row.roster_slots_json = FIXED_ROSTER_SLOTS.copy()
+            session_row.current_overall_pick = 1
+            session_row.intermission_started_at = now
+            session_row.intermission_ends_at = now + timedelta(seconds=SINGLE_PLAYER_PRE_DRAFT_SECONDS)
+            session_row.started_at = None
+            session_row.completed_at = None
+            session_row.history_email_sent_at = None
+            session_row.should_preserve_history = False
+            session_row.expires_at = None
+            session_row.current_pick_started_at = None
+            session_row.current_pick_expires_at = None
+            db.add(session_row)
+            log_mock_draft_event(db, mock_draft_id=session_row.id, event_type="reset", created_by_user_id=current_user.id)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Mock draft state changed; refresh and try again.") from exc
+    return get_room_state(db, mock_draft_id=mock_draft_id, current_user=current_user)
 
 
 def exit_mock_draft(db: Session, *, mock_draft_id: int, current_user: User) -> MockDraftExitResponse:

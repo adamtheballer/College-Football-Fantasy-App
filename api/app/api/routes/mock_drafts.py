@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from api.app.api.deps import get_current_user
@@ -27,6 +27,7 @@ from api.app.schemas.mock_draft import (
     MockDraftRoomRead,
     MockDraftSettingsUpdate,
 )
+from api.app.schemas.player import PlayerList
 from api.app.services import mock_draft_service
 
 
@@ -204,6 +205,29 @@ def get_mock_draft_room(
     return mock_draft_service.get_room_state(db, mock_draft_id=mock_draft_id, current_user=current_user)
 
 
+@router.get("/{mock_draft_id}/available-players", response_model=PlayerList)
+def get_mock_draft_available_players(
+    mock_draft_id: int,
+    search: str | None = None,
+    position: str | None = None,
+    positions: str | None = None,
+    limit: int = Query(500, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> PlayerList:
+    return mock_draft_service.get_available_mock_players(
+        db,
+        mock_draft_id=mock_draft_id,
+        current_user=current_user,
+        search=search,
+        position=position,
+        positions=positions,
+        limit=limit,
+        offset=offset,
+    )
+
+
 @router.post("/{mock_draft_id}/picks", response_model=MockDraftRoomRead)
 def make_mock_draft_pick(
     mock_draft_id: int,
@@ -245,6 +269,22 @@ def make_mock_draft_auto_pick(
         mock_draft_id=mock_draft_id,
         current_user=current_user,
         force=bool(force or (payload.force if payload else False)),
+        expected_overall_pick=payload.expected_overall_pick if payload else None,
+        preferred_player_id=payload.preferred_player_id if payload else None,
+        preferred_player_ids=payload.preferred_player_ids if payload else None,
+    )
+
+
+@router.post("/{mock_draft_id}/reset", response_model=MockDraftRoomRead)
+def reset_single_player_mock_draft(
+    mock_draft_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> MockDraftRoomRead:
+    return mock_draft_service.reset_single_player_mock_draft(
+        db,
+        mock_draft_id=mock_draft_id,
+        current_user=current_user,
     )
 
 

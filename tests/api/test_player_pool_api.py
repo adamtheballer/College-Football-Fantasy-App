@@ -96,6 +96,19 @@ def test_list_players_search_school_position_and_sort(client, db_session):
     assert [row["name"] for row in sort_response.json()["data"]][:2] == ["Beta Passer", "Alpha Runner"]
 
 
+def test_list_players_excludes_generated_smoke_rows(client, db_session):
+    add_player(db_session, "Smoke Player 1780924455-1", "RB", "Smoke School 1", adp=1)
+    add_player(db_session, "Smoke Raw Player 1780924535-1", "RB", "Smoke Raw School 1", adp=2)
+    real = add_player(db_session, "Ahmad Hardy", "RB", "Missouri", adp=3)
+
+    response = client.get("/players", params={"limit": 100, "sort": "draft_rank"})
+
+    assert response.status_code == 200
+    rows = response.json()["data"]
+    assert [row["id"] for row in rows] == [real.id]
+    assert all(not row["name"].lower().startswith("smoke") for row in rows)
+
+
 def test_list_players_dedupes_canonical_players_and_prefers_sheet_board_row(client, db_session):
     sportsdata_row = Player(
         external_id="sportsdata-aaron",
@@ -152,7 +165,7 @@ def test_list_players_available_only_excludes_rostered_and_drafted_players(clien
 
     response = client.get(
         "/players",
-        params={"league_id": league["id"], "available_only": True, "limit": 500},
+        params={"league_id": league["id"], "available_only": True, "limit": 100},
         headers=auth_headers(token),
     )
     assert response.status_code == 200
@@ -196,7 +209,7 @@ def test_list_players_available_only_excludes_canonical_drafted_duplicate(client
 
     response = client.get(
         "/players",
-        params={"available_in_league_id": league["id"], "limit": 500},
+        params={"available_in_league_id": league["id"], "limit": 100},
         headers=auth_headers(token),
     )
 
@@ -231,7 +244,7 @@ def test_draft_pick_creates_roster_entry_and_removes_player_from_available_pool(
 
     available = client.get(
         "/players",
-        params={"available_in_league_id": league["id"], "limit": 500},
+        params={"available_in_league_id": league["id"], "limit": 100},
         headers=auth_headers(token),
     )
     assert player.id not in {row["id"] for row in available.json()["data"]}

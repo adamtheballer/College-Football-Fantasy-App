@@ -1,13 +1,12 @@
-import React, { useEffect, useState } from "react";
-import { X, Trophy, Activity, Target, Shield, ArrowLeft, Bookmark, ChevronDown, Quote, TrendingUp, Check } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Activity, Bookmark, CalendarDays, Target, TrendingUp, Trophy, X, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent } from "@/components/ui/card";
+
 import { Button } from "@/components/ui/button";
-import { Player } from "@/types/player";
-import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { apiGet } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import type { Player } from "@/types/player";
+import { useActiveLeagueId } from "@/hooks/use-active-league";
 
 interface PlayerDetailModalProps {
   player: Player | null;
@@ -24,35 +23,71 @@ type MatchupSnapshot = {
   pressureRate: number | null;
 };
 
-const matchupGradeColor = (grade?: string) => {
-  if (grade === "A+" || grade === "A") return "text-emerald-400";
-  if (grade === "B") return "text-lime-300";
-  if (grade === "C") return "text-amber-300";
-  if (grade === "D") return "text-orange-400";
-  if (grade === "F") return "text-red-400";
-  return "text-muted-foreground";
+const posStyles: Record<string, { text: string; border: string; bg: string; glow: string; gradient: string }> = {
+  QB: {
+    text: "text-blue-100",
+    border: "border-blue-300/35",
+    bg: "bg-blue-500/15",
+    glow: "shadow-[0_0_34px_rgba(96,165,250,0.26)]",
+    gradient: "from-blue-500/24 via-cyan-400/10 to-transparent",
+  },
+  RB: {
+    text: "text-emerald-100",
+    border: "border-emerald-300/35",
+    bg: "bg-emerald-500/15",
+    glow: "shadow-[0_0_34px_rgba(74,222,128,0.24)]",
+    gradient: "from-emerald-500/24 via-cyan-400/10 to-transparent",
+  },
+  WR: {
+    text: "text-violet-100",
+    border: "border-violet-300/35",
+    bg: "bg-violet-500/15",
+    glow: "shadow-[0_0_34px_rgba(196,181,253,0.24)]",
+    gradient: "from-violet-500/24 via-cyan-400/10 to-transparent",
+  },
+  TE: {
+    text: "text-amber-100",
+    border: "border-amber-300/35",
+    bg: "bg-amber-500/15",
+    glow: "shadow-[0_0_34px_rgba(251,191,36,0.22)]",
+    gradient: "from-amber-500/24 via-cyan-400/10 to-transparent",
+  },
+  K: {
+    text: "text-slate-100",
+    border: "border-slate-300/35",
+    bg: "bg-slate-400/15",
+    glow: "shadow-[0_0_28px_rgba(203,213,225,0.18)]",
+    gradient: "from-slate-400/20 via-cyan-400/8 to-transparent",
+  },
 };
 
-const posStyles: Record<string, { bg: string, border: string, text: string, shadow: string, accent: string }> = {
-  QB: { bg: "bg-blue-500/20", border: "border-blue-500/30", text: "text-blue-400", shadow: "shadow-[0_0_15px_rgba(59,130,246,0.3)]", accent: "blue" },
-  RB: { bg: "bg-emerald-500/20", border: "border-emerald-500/30", text: "text-emerald-400", shadow: "shadow-[0_0_15px_rgba(16,185,129,0.3)]", accent: "emerald" },
-  WR: { bg: "bg-purple-500/20", border: "border-purple-500/30", text: "text-purple-400", shadow: "shadow-[0_0_15px_rgba(168,85,247,0.3)]", accent: "purple" },
-  TE: { bg: "bg-orange-500/20", border: "border-orange-500/30", text: "text-orange-400", shadow: "shadow-[0_0_15px_rgba(249,115,22,0.3)]", accent: "orange" },
-  K: { bg: "bg-cyan-500/20", border: "border-cyan-500/30", text: "text-cyan-400", shadow: "shadow-[0_0_15px_rgba(6,182,212,0.3)]", accent: "cyan" },
-  DL: { bg: "bg-red-500/20", border: "border-red-500/30", text: "text-red-400", shadow: "shadow-[0_0_15px_rgba(239,68,68,0.3)]", accent: "red" },
-  DB: { bg: "bg-pink-500/20", border: "border-pink-500/30", text: "text-pink-400", shadow: "shadow-[0_0_15px_rgba(236,72,153,0.3)]", accent: "pink" },
-  LB: { bg: "bg-amber-500/20", border: "border-amber-500/30", text: "text-amber-400", shadow: "shadow-[0_0_15px_rgba(245,158,11,0.3)]", accent: "amber" },
-  DE: { bg: "bg-rose-500/20", border: "border-rose-500/30", text: "text-rose-400", shadow: "shadow-[0_0_15px_rgba(244,63,94,0.3)]", accent: "rose" },
-  S: { bg: "bg-indigo-500/20", border: "border-indigo-500/30", text: "text-indigo-400", shadow: "shadow-[0_0_15px_rgba(99,102,241,0.3)]", accent: "indigo" },
-  OL: { bg: "bg-slate-500/20", border: "border-slate-500/30", text: "text-slate-400", shadow: "shadow-[0_0_15px_rgba(100,116,139,0.3)]", accent: "slate" },
-  CB: { bg: "bg-violet-500/20", border: "border-violet-500/30", text: "text-violet-400", shadow: "shadow-[0_0_15px_rgba(139,92,246,0.3)]", accent: "violet" },
+const matchupGradeClass = (grade?: string) => {
+  if (grade === "A+" || grade === "A") return "text-emerald-300";
+  if (grade === "B") return "text-lime-300";
+  if (grade === "C") return "text-amber-300";
+  if (grade === "D") return "text-orange-300";
+  if (grade === "F") return "text-red-300";
+  return "text-slate-400";
 };
+
+const formatNumber = (value: unknown, fallback = "—") => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  const rounded = Math.round(parsed * 10) / 10;
+  return Number.isInteger(rounded) ? rounded.toLocaleString() : rounded.toFixed(1);
+};
+
+const getInitials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 
 export function PlayerDetailModal({ player, isOpen, onClose, tradeLeagueId = null }: PlayerDetailModalProps) {
   const navigate = useNavigate();
   const { activeLeagueId } = useActiveLeagueId();
-  const [activeTab, setActiveTab] = useState<"overview" | "stats" | "history">("overview");
-  const [historyYear, setHistoryYear] = useState<number>(2025);
   const [matchup, setMatchup] = useState<MatchupSnapshot | null>(null);
   const [reasons, setReasons] = useState<string[]>([]);
   const [schedule, setSchedule] = useState<
@@ -71,484 +106,261 @@ export function PlayerDetailModal({ player, isOpen, onClose, tradeLeagueId = nul
 
     apiGet<{ data: any[] }>(`/schedule/player/${player.id}`, { season, week, weeks: 4 }, controller.signal)
       .then((payload) => {
-        if (!payload?.data?.length) return;
-        const mapped = payload.data.map((game) => ({
-          week: game.week,
-          opponent: game.opponent,
-          homeAway: game.home_away,
-          grade: game.grade,
-          colorClass:
-            game.grade === "A+" || game.grade === "A"
-              ? "text-emerald-400"
-              : game.grade === "B"
-              ? "text-lime-300"
-              : game.grade === "C"
-              ? "text-amber-300"
-              : game.grade === "D"
-              ? "text-orange-400"
-              : "text-red-400",
-        }));
-        setSchedule(mapped);
-        const nextOpponent = payload.data[0]?.opponent;
-        const nextWeek = payload.data[0]?.week ?? week;
-        if (nextOpponent) {
-          apiGet<{ data: any[] }>(
-            "/matchups",
-            { season, week: nextWeek, team: nextOpponent, position: player.pos },
-            controller.signal
-          )
-            .then((matchupPayload) => {
-              const row = matchupPayload?.data?.[0];
-              if (!row) return;
-              setMatchup({
-                grade: row.grade,
-                rank: row.rank,
-                yardsPerTarget: row.yards_per_target,
-                yardsPerRush: row.yards_per_rush,
-                pressureRate: row.pressure_rate,
-              });
-            })
-            .catch(() => {});
-        }
+        const rows = payload?.data ?? [];
+        setSchedule(
+          rows.slice(0, 4).map((game) => ({
+            week: game.week,
+            opponent: game.opponent,
+            homeAway: game.home_away,
+            grade: game.grade,
+            colorClass: matchupGradeClass(game.grade),
+          }))
+        );
+
+        const nextOpponent = rows[0]?.opponent;
+        const nextWeek = rows[0]?.week ?? week;
+        if (!nextOpponent) return;
+
+        apiGet<{ data: any[] }>(
+          "/matchups",
+          { season, week: nextWeek, team: nextOpponent, position: player.pos },
+          controller.signal
+        )
+          .then((matchupPayload) => {
+            const row = matchupPayload?.data?.[0];
+            if (!row) return;
+            setMatchup({
+              grade: row.grade,
+              rank: row.rank,
+              yardsPerTarget: row.yards_per_target,
+              yardsPerRush: row.yards_per_rush,
+              pressureRate: row.pressure_rate,
+            });
+          })
+          .catch(() => {});
       })
       .catch(() => {});
 
     apiGet<{ reasons: { detail: string }[] }>(`/projections/${player.id}/explanations`, { season, week }, controller.signal)
-      .then((payload) => {
-        if (!payload?.reasons?.length) return;
-        setReasons(payload.reasons.map((r) => r.detail));
-      })
+      .then((payload) => setReasons((payload?.reasons ?? []).slice(0, 4).map((reason) => reason.detail)))
       .catch(() => {});
 
     return () => controller.abort();
   }, [player, isOpen]);
 
+  const productionStats = useMemo(() => {
+    if (!player) return [];
+    if (player.pos === "QB") {
+      return [
+        { label: "Pass Yds", value: formatNumber(player.projection.passingYards) },
+        { label: "Pass TD", value: formatNumber(player.projection.passingTds) },
+        { label: "INT", value: formatNumber(player.projection.ints) },
+        { label: "Rush Yds", value: formatNumber(player.projection.rushingYards) },
+      ];
+    }
+    if (player.pos === "K") {
+      const kickerStats = player.projection as Player["projection"] & { fg?: number; xp?: number };
+      return [
+        { label: "FG", value: formatNumber(kickerStats.fg) },
+        { label: "XP", value: formatNumber(kickerStats.xp) },
+        { label: "Floor", value: formatNumber(player.projection.floor) },
+        { label: "Ceiling", value: formatNumber(player.projection.ceiling) },
+      ];
+    }
+    return [
+      { label: "Rush Yds", value: formatNumber(player.projection.rushingYards) },
+      { label: "Rec Yds", value: formatNumber(player.projection.receivingYards) },
+      { label: "Receptions", value: formatNumber(player.projection.receptions) },
+      { label: "TDs", value: formatNumber((player.projection.rushingTds ?? 0) + (player.projection.receivingTds ?? 0)) },
+    ];
+  }, [player]);
+
   if (!player || !isOpen) return null;
 
-  const style = posStyles[player.pos] || posStyles.QB;
-  const currentHistory =
-    player.history.find((h) => h.year === historyYear) ||
-    player.history[0] ||
-    { year: historyYear, stats: { fpts: 0 } };
+  const position = String(player.pos || "").toUpperCase();
+  const style = posStyles[position] ?? posStyles.QB;
+  const targetLeagueId = tradeLeagueId ?? activeLeagueId;
+  const nextGame = schedule[0];
+  const weeklyProjection =
+    Number(player.projection.fpts) > 80 ? Number(player.projection.fpts) / 12 : Number(player.projection.fpts);
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300 backdrop-blur-2xl bg-black/80">
-      <div className="relative w-full max-w-6xl h-full max-h-[90vh] bg-card/60 border border-white/10 rounded-[4rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-500">
-        
-        {/* Background Glow Overlay */}
-        <div className={cn("absolute inset-0 opacity-20 pointer-events-none bg-gradient-to-br from-transparent via-transparent to-primary/20")} />
-        <div className={cn("absolute -top-40 -right-40 w-96 h-96 blur-[120px] rounded-full pointer-events-none opacity-20", style.bg.replace("bg-", "bg-"))} />
+    <div className="fixed inset-0 z-[1600] bg-slate-950/45 backdrop-blur-2xl" onClick={onClose}>
+      <div
+        className="absolute right-0 top-0 h-screen w-full overflow-hidden border-l border-cyan-200/15 bg-[#071120]/96 shadow-[-40px_0_120px_rgba(0,0,0,0.55)] animate-in slide-in-from-right-10 duration-300 md:w-[75vw]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br opacity-90", style.gradient)} />
+        <div className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-cyan-300/12 blur-[110px]" />
+        <div className="pointer-events-none absolute bottom-0 left-1/4 h-80 w-96 rounded-full bg-blue-500/10 blur-[120px]" />
 
-        {/* Header Navigation */}
-        <div className="relative z-10 px-12 pt-12 flex items-center justify-between">
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            className="h-14 w-14 rounded-2xl bg-white/5 border border-white/10 text-muted-foreground hover:text-primary transition-all hover:scale-110 shadow-xl"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </Button>
+        <div className="relative flex h-full flex-col p-6 lg:p-8">
+          <div className="flex items-start justify-between gap-6">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan-100/70">Player Card</p>
+              <h2 className="mt-2 truncate text-4xl font-black italic uppercase leading-none tracking-tight text-white drop-shadow-[0_0_24px_rgba(34,211,238,0.14)] lg:text-6xl">
+                {player.name}
+              </h2>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <span className="rounded-full border border-white/12 bg-white/[0.055] px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-slate-200">
+                  {player.school}
+                </span>
+                <span className={cn("rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em]", style.border, style.bg, style.text, style.glow)}>
+                  {position || "N/A"}
+                </span>
+                <span className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-100">
+                  {player.status}
+                </span>
+              </div>
+            </div>
 
-          <div className="flex flex-col items-center">
-             <h2 className="text-5xl md:text-6xl font-black italic uppercase tracking-tighter text-foreground leading-none bg-gradient-to-b from-white to-white/60 bg-clip-text text-transparent drop-shadow-2xl">
-               {player.name}
-             </h2>
-             <div className="mt-3 flex items-center gap-4">
-               <div className="px-3 py-1 rounded-lg bg-white/5 border border-white/10">
-                 <span className="text-[10px] font-black tracking-[0.4em] text-muted-foreground uppercase italic">{player.school}</span>
-               </div>
-               <div className="w-1.5 h-1.5 rounded-full bg-primary/40 shadow-[0_0_10px_rgba(var(--primary),0.5)]" />
-               <div className={cn("px-3 py-1 rounded-lg border", style.bg, style.border)}>
-                 <span className={cn("text-[10px] font-black tracking-[0.4em] uppercase", style.text)}>{player.pos}</span>
-               </div>
-             </div>
+            <div className="flex shrink-0 gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 rounded-2xl border-white/10 bg-white/5 text-cyan-100"
+              >
+                <Bookmark className="h-5 w-5" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 rounded-2xl border-white/10 bg-white/5 text-white hover:bg-red-400/10 hover:text-red-100"
+                onClick={onClose}
+                aria-label="Close player card"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
 
-          <Button
-            variant="ghost"
-            className="h-14 w-14 rounded-2xl bg-white/5 border border-white/10 text-primary hover:bg-primary/10 transition-all hover:scale-110 shadow-xl"
-          >
-            <Bookmark className="w-6 h-6" />
-          </Button>
-        </div>
-
-        {/* Tabs */}
-        <div className="relative z-10 px-10 mt-8 border-b border-white/5 flex gap-10">
-          {[
-            { id: "overview", label: "Overview" },
-            { id: "stats", label: "Projections" },
-            { id: "history", label: "History" }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={cn(
-                "pb-6 text-[11px] font-black uppercase tracking-[0.3em] transition-all relative",
-                activeTab === tab.id ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {tab.label}
-              {activeTab === tab.id && (
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary rounded-full shadow-[0_-4px_12px_rgba(var(--primary),0.4)]" />
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Content Area */}
-        <div className="relative z-10 flex-1 overflow-y-auto no-scrollbar p-10">
-          {activeTab === "overview" && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 animate-in slide-in-from-bottom-8 duration-500">
-              {/* Left Column: Stats Cards */}
-              <div className="lg:col-span-8 space-y-10">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                  {[
-                    { label: "ADP", value: player.adp, icon: TrendingUp },
-                    { label: "CONF", value: player.conf, icon: Trophy },
-                    { label: "RANK", value: `#${player.rank}`, icon: Target },
-                    { label: "STATUS", value: player.status, icon: Activity, color: "text-emerald-400" },
-                  ].map((stat, i) => (
-                    <Card key={i} className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 space-y-6 hover:bg-white/[0.08] transition-all duration-500 group relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-16 h-16 bg-primary/5 blur-xl rounded-full -mr-8 -mt-8 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/5 group-hover:border-primary/20 transition-colors">
-                        <stat.icon className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/40 uppercase mb-2">{stat.label}</p>
-                        <p className={cn("text-2xl font-black italic uppercase tracking-tight", stat.color || "text-foreground")}>{stat.value}</p>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-
-                <div className="space-y-8">
-                  <div className="flex items-center gap-4">
-                    <h3 className="text-[11px] font-black tracking-[0.5em] text-primary uppercase italic">Season Projections</h3>
-                    <div className="h-[1px] flex-1 bg-gradient-to-r from-primary/20 to-transparent" />
+          <div className="mt-7 grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="grid min-h-0 gap-5">
+              <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+                {[
+                  { label: "ADP", value: formatNumber(player.sheetAdp ?? player.adp), icon: TrendingUp },
+                  { label: "Rank", value: `#${formatNumber(player.rank, "—")}`, icon: Target },
+                  { label: "Projection", value: formatNumber(player.sheetProjectedSeasonPoints ?? player.projection.fpts), icon: Zap },
+                  { label: "Rostered", value: `${formatNumber(player.rostered, "0")}%`, icon: Trophy },
+                ].map((stat) => (
+                  <div key={stat.label} className="rounded-[1.5rem] border border-white/10 bg-white/[0.055] p-5">
+                    <stat.icon className="h-5 w-5 text-cyan-200" />
+                    <p className="mt-5 text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">{stat.label}</p>
+                    <p className="mt-2 truncate text-3xl font-black italic text-white">{stat.value}</p>
                   </div>
-                  <Card className="bg-[#0A0C10]/40 backdrop-blur-xl border border-white/10 rounded-[3.5rem] p-12 overflow-hidden relative shadow-inner">
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.02] to-transparent" />
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-12 relative z-10">
-                      {player.pos === "QB" ? (
-                        <>
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-black tracking-widest text-muted-foreground/40 uppercase">Passing Yards</p>
-                            <p className="text-4xl font-black italic tracking-tighter text-foreground leading-none">{player.projection.passingYards?.toLocaleString()}</p>
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-black tracking-widest text-muted-foreground/40 uppercase">Touchdowns</p>
-                            <p className="text-4xl font-black italic tracking-tighter text-emerald-400 leading-none">{player.projection.passingTds}</p>
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-black tracking-widest text-muted-foreground/40 uppercase">Interceptions</p>
-                            <p className="text-4xl font-black italic tracking-tighter text-red-400 leading-none">{player.projection.ints}</p>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-black tracking-widest text-muted-foreground/40 uppercase">Rushing Yards</p>
-                            <p className="text-4xl font-black italic tracking-tighter text-foreground leading-none">{player.projection.rushingYards?.toLocaleString() || player.projection.receivingYards?.toLocaleString()}</p>
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-black tracking-widest text-muted-foreground/40 uppercase">Touchdowns</p>
-                            <p className="text-4xl font-black italic tracking-tighter text-emerald-400 leading-none">{player.projection.rushingTds || player.projection.receivingTds}</p>
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-black tracking-widest text-muted-foreground/40 uppercase">Receptions</p>
-                            <p className="text-4xl font-black italic tracking-tighter text-blue-400 leading-none">{player.projection.receptions || 0}</p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    <div className="mt-12 pt-12 border-t border-white/5 relative z-10">
-                      <Quote className="absolute top-10 left-0 w-10 h-10 text-primary/10" />
-                      <p className="text-base font-medium italic text-muted-foreground/80 leading-relaxed pl-14">
-                        "{player.analysis}"
-                      </p>
-                    </div>
-                  </Card>
-                </div>
+                ))}
               </div>
 
-              {/* Right Column: Profile Image Placeholder & Big Stat */}
-              <div className="lg:col-span-4 space-y-8">
-                 <div className="aspect-[4/5] rounded-[4rem] bg-gradient-to-b from-white/10 via-white/5 to-transparent border border-white/10 flex items-center justify-center relative group overflow-hidden shadow-2xl">
-                    <div className="absolute inset-0 bg-primary/5 group-hover:bg-primary/10 transition-all duration-700" />
-
-                    {player.imageUrl ? (
-                      <img
-                        src={player.imageUrl}
-                        alt={player.name}
-                        className="relative z-10 h-full w-full object-cover"
-                      />
-                    ) : (
-                      <Avatar className="relative z-10 h-40 w-40 rounded-[2.5rem] border border-white/10 bg-white/5">
-                        <AvatarFallback className="rounded-[2.5rem] bg-white/5 text-5xl font-black italic uppercase text-primary">
-                          {player.name
-                            .split(" ")
-                            .slice(0, 2)
-                            .map((part) => part[0])
-                            .join("")}
-                        </AvatarFallback>
-                        <AvatarImage src="" alt={player.name} />
-                      </Avatar>
-                    )}
-
-                    <div className="text-white/10 scale-[5] relative z-10 transition-transform duration-700 group-hover:scale-[5.5]">
-                      <Activity className="w-12 h-12 stroke-[0.5] animate-pulse" />
+              <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
+                <div className="rounded-[1.75rem] border border-white/10 bg-slate-950/35 p-5">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100/70">Projected Production</p>
+                      <p className="mt-1 text-sm font-bold text-slate-400">Season profile and fantasy output</p>
                     </div>
-
-                    <div className="absolute bottom-12 left-12 right-12 space-y-3 z-20">
-                       <p className="text-[11px] font-black uppercase tracking-[0.5em] text-primary italic drop-shadow-[0_0_10px_rgba(var(--primary),0.5)]">Projected</p>
-                       <p className="text-5xl font-black italic tracking-tighter text-white drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-                         {player.projection.fpts} <span className="text-xl align-top mt-2 inline-block">PTS</span>
-                       </p>
-                    </div>
-                 </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === "history" && (
-            <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-500">
-               <div className="flex items-center justify-between">
-                  <h3 className="text-2xl font-black italic uppercase text-foreground">Season History</h3>
-                  <div className="relative group">
-                    <Button variant="outline" className="h-12 bg-white/5 border-white/10 rounded-xl px-6 gap-3 min-w-[140px] justify-between text-[11px] font-black uppercase tracking-widest">
-                      Year: {historyYear}
-                      <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                    </Button>
-                    <div className="absolute top-full right-0 mt-2 w-full bg-card/95 border border-white/10 rounded-xl overflow-hidden backdrop-blur-xl hidden group-hover:block z-[400] shadow-2xl">
-                       {player.history.map(h => (
-                         <button 
-                           key={h.year}
-                           onClick={() => setHistoryYear(h.year)}
-                           className="w-full px-6 py-4 text-left text-[11px] font-black uppercase tracking-widest hover:bg-primary/10 hover:text-primary transition-colors border-b border-white/5 last:border-0"
-                         >
-                           {h.year}
-                         </button>
-                       ))}
-                    </div>
-                  </div>
-               </div>
-
-               <Card className="bg-white/5 border border-white/10 rounded-[3rem] overflow-hidden">
-                 <table className="w-full text-left">
-                   <thead>
-                     <tr className="border-b border-white/5 bg-white/5">
-                        <th className="px-10 py-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Category</th>
-                        <th className="px-10 py-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Season Stats</th>
-                        <th className="px-10 py-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Fantasy Points</th>
-                     </tr>
-                   </thead>
-                   <tbody className="divide-y divide-white/[0.02]">
-                      {Object.entries(currentHistory.stats).filter(([k]) => k !== 'fpts').map(([key, value]) => {
-                        const labelMap: Record<string, string> = {
-                          passingYards: "Passing Yards",
-                          passingTds: "Passing Touchdowns",
-                          ints: "Interceptions",
-                          rushingYards: "Rushing Yards",
-                          rushingTds: "Rushing Touchdowns",
-                          receptions: "Receptions",
-                          receivingYards: "Receiving Yards",
-                          receivingTds: "Receiving Touchdowns",
-                          qbr: "QBR / Efficiency"
-                        };
-                        return (
-                          <tr key={key} className="hover:bg-white/[0.02] transition-colors">
-                             <td className="px-10 py-6 text-[11px] font-black uppercase tracking-widest text-muted-foreground">{labelMap[key] || key.replace(/([A-Z])/g, ' $1')}</td>
-                             <td className="px-10 py-6 text-lg font-black italic text-foreground tracking-tight">{value}</td>
-                             <td className="px-10 py-6 text-right">
-                                <span className="text-[10px] font-black bg-primary/10 text-primary px-3 py-1.5 rounded-lg">VERIFIED</span>
-                             </td>
-                          </tr>
-                        );
-                      })}
-                      <tr className="bg-primary/5">
-                         <td className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.3em] text-primary">Season Total</td>
-                         <td className="px-10 py-8"></td>
-                         <td className="px-10 py-8 text-right text-3xl font-black italic tracking-tighter text-primary">{currentHistory.stats.fpts} PTS</td>
-                      </tr>
-                   </tbody>
-                 </table>
-               </Card>
-            </div>
-          )}
-
-          {activeTab === "stats" && (
-            <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-500">
-              <div className="flex items-center gap-4">
-                <h3 className="text-[11px] font-black tracking-[0.5em] text-primary uppercase italic">Next Week Projection</h3>
-                <div className="h-[1px] flex-1 bg-gradient-to-r from-primary/20 to-transparent" />
-              </div>
-
-              <Card className="bg-white/5 border border-white/10 rounded-[2rem] p-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/40 uppercase">
-                      Matchup Grade
+                    <p className={cn("text-5xl font-black italic", style.text)}>
+                      {formatNumber(player.projection.fpts)}
                     </p>
-                    <div className="flex items-center gap-4">
-                      <span className={cn("text-4xl font-black italic", matchupGradeColor(matchup?.grade))}>
-                        {matchup?.grade ?? "-"}
-                      </span>
-                      <span className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                        {matchup?.rank ? `Defense Rank ${matchup.rank}` : "No matchup data"}
-                      </span>
-                    </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                      Yards/Target
-                      <div className="text-lg font-black text-foreground">{matchup?.yardsPerTarget ?? "-"}</div>
-                    </div>
-                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                      Yards/Rush
-                      <div className="text-lg font-black text-foreground">{matchup?.yardsPerRush ?? "-"}</div>
-                    </div>
-                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                      Pressure Rate
-                      <div className="text-lg font-black text-foreground">{matchup?.pressureRate ?? "-"}</div>
-                    </div>
+                  <div className="mt-5 grid grid-cols-2 gap-3">
+                    {productionStats.map((stat) => (
+                      <div key={stat.label} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">{stat.label}</p>
+                        <p className="mt-1 text-2xl font-black text-white">{stat.value}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </Card>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-2">
-                  <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/40 uppercase">FPTS</p>
-                  <p className="text-3xl font-black italic text-foreground">
-                    {(player.projection.fpts > 80 ? player.projection.fpts / 12 : player.projection.fpts).toFixed(1)}
+                <div className="rounded-[1.75rem] border border-white/10 bg-slate-950/35 p-5">
+                  <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100/70">
+                    <Activity className="h-4 w-4" />
+                    Weekly Outlook
                   </p>
-                  <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">
-                    Floor {player.projection.floor?.toFixed(1) ?? "-"} • Ceiling {player.projection.ceiling?.toFixed(1) ?? "-"}
-                  </p>
-                </Card>
-
-                <Card className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-2">
-                  <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/40 uppercase">Next Week Boom/Bust</p>
-                  <p className="text-3xl font-black italic text-foreground">
-                    {player.projection.boomProb !== undefined ? `${Math.round(player.projection.boomProb * 100)}%` : "-"}
-                  </p>
-                  <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">
-                    Bust {player.projection.bustProb !== undefined ? `${Math.round(player.projection.bustProb * 100)}%` : "-"}
-                  </p>
-                </Card>
-
-                <Card className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-2">
-                  <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/40 uppercase">Expected Plays</p>
-                  <p className="text-3xl font-black italic text-foreground">
-                    {player.projection.expectedPlays?.toFixed(1) ?? "-"}
-                  </p>
-                  <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">
-                    Rush/Play {player.projection.expectedRushPerPlay?.toFixed(2) ?? "-"} • TD/Play {player.projection.expectedTdPerPlay?.toFixed(3) ?? "-"}
-                  </p>
-                </Card>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {player.pos === "QB" ? (
-                  <>
-                    <Card className="bg-white/5 border border-white/10 rounded-[2rem] p-6">
-                      <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/40 uppercase">Pass Yards</p>
-                      <p className="text-2xl font-black italic text-foreground">{player.projection.passingYards?.toFixed(0) ?? "-"}</p>
-                    </Card>
-                    <Card className="bg-white/5 border border-white/10 rounded-[2rem] p-6">
-                      <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/40 uppercase">Pass TD</p>
-                      <p className="text-2xl font-black italic text-emerald-400">{player.projection.passingTds?.toFixed(1) ?? "-"}</p>
-                    </Card>
-                    <Card className="bg-white/5 border border-white/10 rounded-[2rem] p-6">
-                      <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/40 uppercase">INT</p>
-                      <p className="text-2xl font-black italic text-red-400">{player.projection.ints?.toFixed(1) ?? "-"}</p>
-                    </Card>
-                    <Card className="bg-white/5 border border-white/10 rounded-[2rem] p-6">
-                      <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/40 uppercase">QBR</p>
-                      <p className="text-2xl font-black italic text-primary">{player.projection.qbr?.toFixed(1) ?? "-"}</p>
-                    </Card>
-                  </>
-                ) : (
-                  <>
-                    <Card className="bg-white/5 border border-white/10 rounded-[2rem] p-6">
-                      <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/40 uppercase">Rush Yards</p>
-                      <p className="text-2xl font-black italic text-foreground">{player.projection.rushingYards?.toFixed(0) ?? "-"}</p>
-                    </Card>
-                    <Card className="bg-white/5 border border-white/10 rounded-[2rem] p-6">
-                      <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/40 uppercase">Rec Yards</p>
-                      <p className="text-2xl font-black italic text-foreground">{player.projection.receivingYards?.toFixed(0) ?? "-"}</p>
-                    </Card>
-                    <Card className="bg-white/5 border border-white/10 rounded-[2rem] p-6">
-                      <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/40 uppercase">Receptions</p>
-                      <p className="text-2xl font-black italic text-blue-400">{player.projection.receptions?.toFixed(1) ?? "-"}</p>
-                    </Card>
-                    <Card className="bg-white/5 border border-white/10 rounded-[2rem] p-6">
-                      <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/40 uppercase">TDs</p>
-                      <p className="text-2xl font-black italic text-emerald-400">
-                        {((player.projection.rushingTds ?? 0) + (player.projection.receivingTds ?? 0)).toFixed(1)}
+                  <div className="mt-5 grid grid-cols-3 gap-3">
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Week</p>
+                      <p className="mt-1 text-xl font-black text-white">{nextGame?.week ?? "—"}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Grade</p>
+                      <p className={cn("mt-1 text-xl font-black", matchupGradeClass(matchup?.grade ?? nextGame?.grade))}>
+                        {matchup?.grade ?? nextGame?.grade ?? "—"}
                       </p>
-                    </Card>
-                  </>
-                )}
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">FPTS</p>
+                      <p className="mt-1 text-xl font-black text-white">{formatNumber(weeklyProjection)}</p>
+                    </div>
+                  </div>
+                  <p className="mt-4 text-sm font-semibold leading-6 text-slate-300">
+                    {nextGame ? `${nextGame.homeAway ?? "vs"} ${nextGame.opponent}` : "No upcoming schedule data available."}
+                    {matchup?.rank ? ` Defense rank ${matchup.rank}.` : ""}
+                  </p>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-4">
-                  <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/40 uppercase">
-                    Projection Reasons
+              <div className="grid min-h-0 gap-5 xl:grid-cols-2">
+                <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-5">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100/70">Fantasy Read</p>
+                  <p className="mt-4 line-clamp-4 text-sm font-semibold leading-6 text-slate-300">
+                    {player.analysis || "No player analysis has been added yet."}
                   </p>
-                  <ul className="space-y-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/70">
-                    {reasons.length ? reasons.map((reason) => (
-                      <li key={reason} className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                </div>
+                <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-5">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100/70">Projection Drivers</p>
+                  <div className="mt-4 grid gap-2">
+                    {(reasons.length ? reasons : ["Usage, depth chart role, and scoring format drive this ranking."]).map((reason) => (
+                      <p key={reason} className="line-clamp-1 rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-300">
                         {reason}
-                      </li>
-                    )) : (
-                      <li className="text-muted-foreground/50 normal-case tracking-normal">
-                        No projection explanation data yet.
-                      </li>
-                    )}
-                  </ul>
-                </Card>
-
-                <Card className="bg-white/5 border border-white/10 rounded-[2rem] p-6 space-y-4">
-                  <p className="text-[10px] font-black tracking-[0.3em] text-muted-foreground/40 uppercase">
-                    Next 4 Games
-                  </p>
-                  <div className="space-y-2">
-                    {schedule.length ? schedule.map((game) => (
-                      <div key={`${game.week}-${game.opponent}-${game.grade}`} className="flex items-center justify-between text-[11px] font-black uppercase tracking-widest">
-                        <span className="text-muted-foreground/70">vs {game.opponent}</span>
-                        <span className={cn("font-black", game.colorClass)}>{game.grade}</span>
-                      </div>
-                    )) : (
-                      <div className="text-[11px] text-muted-foreground/50 normal-case tracking-normal">
-                        No upcoming schedule data available.
-                      </div>
-                    )}
+                      </p>
+                    ))}
                   </div>
-                </Card>
+                </div>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Action Bar */}
-        <div className="relative z-10 p-12 bg-white/5 border-t border-white/5 flex items-center justify-between">
-           <div className="flex items-center gap-12">
-              <div className="flex flex-col gap-1">
-                 <span className="text-[10px] font-black tracking-[0.2em] text-muted-foreground/40 uppercase">% Rostered</span>
-                 <span className="text-3xl font-black italic text-foreground tracking-tighter leading-none">{player.rostered}%</span>
+            <aside className="grid min-h-0 gap-5">
+              <div className={cn("relative overflow-hidden rounded-[2rem] border p-6", style.border, style.bg, style.glow)}>
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent" />
+                <div className="relative flex aspect-square items-center justify-center rounded-[1.5rem] border border-white/10 bg-slate-950/35">
+                  {player.imageUrl ? (
+                    <img src={player.imageUrl} alt={player.name} className="h-full w-full rounded-[1.5rem] object-cover" />
+                  ) : (
+                    <div className="flex h-36 w-36 items-center justify-center rounded-[2rem] border border-white/10 bg-white/[0.06] text-5xl font-black italic text-cyan-200">
+                      {getInitials(player.name)}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex flex-col gap-1">
-                 <span className="text-[10px] font-black tracking-[0.2em] text-muted-foreground/40 uppercase">POS Rank</span>
-                 <span className="text-3xl font-black italic text-primary tracking-tighter leading-none">#{player.posRank}</span>
-              </div>
-           </div>
 
-           <div className="flex gap-6 relative">
+              <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5">
+                <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100/70">
+                  <CalendarDays className="h-4 w-4" />
+                  Next Games
+                </p>
+                <div className="mt-4 grid gap-2">
+                  {schedule.length ? schedule.map((game) => (
+                    <div key={`${game.week}-${game.opponent}`} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2">
+                      <p className="truncate text-[11px] font-black uppercase tracking-[0.12em] text-slate-300">
+                        W{game.week} • {game.opponent}
+                      </p>
+                      <p className={cn("text-sm font-black", game.colorClass)}>{game.grade}</p>
+                    </div>
+                  )) : (
+                    <p className="rounded-xl border border-dashed border-white/10 p-3 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                      No schedule data
+                    </p>
+                  )}
+                </div>
+              </div>
+
               <Button
+                type="button"
+                className="h-14 rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-[0_0_28px_rgba(34,211,238,0.22)]"
                 onClick={() => {
-                  const targetLeagueId = tradeLeagueId ?? activeLeagueId;
                   if (targetLeagueId) {
                     navigate(`/trade/${targetLeagueId}/${player.id}`);
                   } else {
@@ -556,11 +368,11 @@ export function PlayerDetailModal({ player, isOpen, onClose, tradeLeagueId = nul
                   }
                   onClose();
                 }}
-                className="h-16 px-12 bg-primary text-primary-foreground rounded-2xl text-[11px] font-black uppercase tracking-[0.3em] shadow-[0_20px_40px_rgba(var(--primary),0.3)] hover:scale-105 transition-all duration-500 border border-white/10"
               >
-                Trade for Player
+                Trade For Player
               </Button>
-           </div>
+            </aside>
+          </div>
         </div>
       </div>
     </div>

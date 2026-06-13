@@ -207,19 +207,33 @@ SHEET_PROJECTION_STAT_KEYS = (
 GOOGLE_SHEET_ID_RE = re.compile(r"/spreadsheets/d/([a-zA-Z0-9-_]+)")
 SHEET_TAB_META_RE = re.compile(r'\[(\d+),0,\\"(\d+)\\",\[\{\\"1\\":\[\[0,0,\\"([^\\"]+)\\"')
 POSITION_DEMAND_BONUS: dict[str, int] = {
-    "QB": -24,
+    "QB": -28,
     "RB": 28,
-    "WR": 28,
-    "TE": 14,
+    "WR": 34,
+    "TE": 20,
     "K": -55,
 }
 FLEX_BONUS: dict[str, int] = {
     "QB": 0,
     "RB": 10,
-    "WR": 10,
-    "TE": 5,
+    "WR": 12,
+    "TE": 4,
     "K": 0,
 }
+PREFERRED_DRAFT_BOARD_ORDER = (
+    "Ahmad Hardy",
+    "Jeremiah Smith",
+    "Kewan Lacy",
+    "Cam Cook",
+    "LJ Martin",
+    "Malachi Toney",
+    "Trinidad Chambliss",
+    "Mark Fletcher Jr.",
+    "Devon Dampier",
+    "Cam Coleman",
+    "Arch Manning",
+)
+TE_MID_TIER_SCORE_BOOST = 1.10
 REPLACEMENT_RANK_BY_POSITION: dict[str, int] = {
     "QB": 12,
     "RB": 30,
@@ -701,7 +715,7 @@ def _apply_adp_formula(valid_rows: list[dict[str, object]]) -> None:
             if position_rank <= 8:
                 return 6.0
             return 0.0
-        if position in {"RB", "WR"}:
+        if position == "RB":
             if position_rank <= 5:
                 return 38.0
             if position_rank <= 12:
@@ -709,17 +723,29 @@ def _apply_adp_formula(valid_rows: list[dict[str, object]]) -> None:
             if position_rank <= 24:
                 return 10.0
             return 0.0
+        if position == "WR":
+            if position_rank <= 5:
+                return 46.0
+            if position_rank <= 12:
+                return 29.0
+            if position_rank <= 24:
+                return 12.0
+            return 0.0
         if position == "TE":
-            if position_rank <= 3:
-                return 30.0
-            if position_rank <= 8:
-                return 14.0
+            if position_rank <= 5:
+                return 48.0
+            if position_rank <= 10:
+                return 24.0
+            if position_rank <= 15:
+                return 8.0
             return 0.0
         if position == "K":
             return -40.0
         return 0.0
 
-    def _elite_gap_bonus(gap_to_next: float) -> float:
+    def _elite_gap_bonus(position: str, gap_to_next: float) -> float:
+        if position == "TE":
+            return 0.0
         if gap_to_next >= 70:
             return 40.0
         if gap_to_next >= 40:
@@ -768,9 +794,11 @@ def _apply_adp_formula(valid_rows: list[dict[str, object]]) -> None:
                 + (value_above_replacement * VALUE_ABOVE_REPLACEMENT_WEIGHT)
                 + float(POSITION_DEMAND_BONUS.get(position, 0))
                 + scarcity_bonus
-                + _elite_gap_bonus(gap_to_next)
+                + _elite_gap_bonus(position, gap_to_next)
                 + float(FLEX_BONUS.get(position, 0))
             )
+            if position == "TE" and 6 <= index <= 30:
+                score *= TE_MID_TIER_SCORE_BOOST
             adp_score_by_row_id[row_id] = score
             position_rank_by_row_id[row_id] = index
             replacement_level_by_row_id[row_id] = replacement_level_projection
@@ -778,32 +806,27 @@ def _apply_adp_formula(valid_rows: list[dict[str, object]]) -> None:
             elite_gap_by_row_id[row_id] = gap_to_next
             scarcity_bonus_by_row_id[row_id] = scarcity_bonus
 
+    preferred_rank_by_name = {
+        _normalize_player_name(name): index for index, name in enumerate(PREFERRED_DRAFT_BOARD_ORDER, start=1)
+    }
+
+    def _draft_board_sort_key(entry: dict[str, object]) -> tuple[object, ...]:
+        preferred_rank = preferred_rank_by_name.get(_normalize_player_name(str(entry.get("name") or "")))
+        if preferred_rank is not None:
+            return (0, preferred_rank)
+        return (
+            1,
+            -float(adp_score_by_row_id.get(id(entry), 0)),
+            -float(entry.get("projected_fantasy_points") or 0),
+            str(entry.get("name") or "").lower(),
+        )
+
     provisional_sorted = sorted(
         valid_rows,
-        key=lambda entry: (
-            -float(adp_score_by_row_id.get(id(entry), 0)),
-            -float(entry.get("projected_fantasy_points") or 0),
-            str(entry.get("name") or "").lower(),
-        ),
+        key=_draft_board_sort_key,
     )
 
-    # Guardrail: preserve QB slotting from draft-value order, but ensure non-QB players
-    # never invert by raw projection (higher projected non-QB always ahead of lower projected non-QB).
-    non_qb_projection_sorted = sorted(
-        (entry for entry in provisional_sorted if str(entry.get("position") or "").upper() != "QB"),
-        key=lambda entry: (
-            -float(entry.get("projected_fantasy_points") or 0),
-            -float(adp_score_by_row_id.get(id(entry), 0)),
-            str(entry.get("name") or "").lower(),
-        ),
-    )
-    non_qb_iter = iter(non_qb_projection_sorted)
-    all_rows_sorted: list[dict[str, object]] = []
-    for entry in provisional_sorted:
-        if str(entry.get("position") or "").upper() == "QB":
-            all_rows_sorted.append(entry)
-        else:
-            all_rows_sorted.append(next(non_qb_iter))
+    all_rows_sorted = provisional_sorted
     for rank, row in enumerate(all_rows_sorted, start=1):
         row["adp"] = float(rank)
 
@@ -829,20 +852,36 @@ def _apply_projection_name_overrides(valid_rows: list[dict[str, object]]) -> Non
         _normalize_player_name("Daylan Smothers"),
         _normalize_player_name("Daylan Hollywood Smothers"),
     }
+    projection_floor_by_name = {
+        _normalize_player_name("Trey'Dez Green"): 240.0,
+        _normalize_player_name("Terrance Carter Jr."): 238.0,
+        _normalize_player_name("Jamari Johnson"): 228.0,
+        _normalize_player_name("DJ Vonnahme"): 222.0,
+        _normalize_player_name("Luke Hasz"): 216.0,
+        _normalize_player_name("Mario Craver"): 258.0,
+    }
+    projection_ceiling_by_name = {
+        _normalize_player_name("Calvin Russell III"): 190.0,
+    }
     projection_bonus_points = 4.0
     for row in valid_rows:
         normalized_name = _normalize_player_name(str(row.get("name") or ""))
-        if normalized_name not in hollywood_smothers_aliases:
-            continue
         current_projection = float(row.get("projected_fantasy_points") or 0.0)
-        boosted_projection = round(max(0.0, current_projection + projection_bonus_points), 2)
-        row["projected_fantasy_points"] = boosted_projection
+        boosted_projection = current_projection
+        if normalized_name in hollywood_smothers_aliases:
+            boosted_projection = max(boosted_projection, current_projection + projection_bonus_points)
+        if normalized_name in projection_floor_by_name:
+            boosted_projection = max(boosted_projection, projection_floor_by_name[normalized_name])
+        if normalized_name in projection_ceiling_by_name:
+            boosted_projection = min(boosted_projection, projection_ceiling_by_name[normalized_name])
+        if boosted_projection == current_projection:
+            continue
+        row["projected_fantasy_points"] = round(max(0.0, boosted_projection), 2)
         logger.info(
-            "sheet_sync_projection_override player=%s base=%.2f boosted=%.2f bonus=%.2f",
+            "sheet_sync_projection_override player=%s base=%.2f boosted=%.2f",
             row.get("name"),
             current_projection,
-            boosted_projection,
-            projection_bonus_points,
+            float(row["projected_fantasy_points"]),
         )
 
 
@@ -903,31 +942,7 @@ def _replace_watchlist_players(
 
 
 def _ordered_draft_teams(db: Session, league_id: int) -> list[Team]:
-    teams = db.query(Team).filter(Team.league_id == league_id).all()
-    if not teams:
-        return []
-
-    settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league_id).first()
-    scoring_json = settings_row.scoring_json if settings_row and isinstance(settings_row.scoring_json, dict) else {}
-    meta = scoring_json.get("__meta__", {}) if isinstance(scoring_json.get("__meta__", {}), dict) else {}
-    order_ids = meta.get("draft_order_team_ids")
-
-    if isinstance(order_ids, list) and order_ids:
-        index_by_team_id = {
-            int(team_id): index
-            for index, team_id in enumerate(order_ids)
-            if isinstance(team_id, int)
-        }
-        if index_by_team_id:
-            return sorted(
-                teams,
-                key=lambda team: (
-                    index_by_team_id.get(team.id, len(index_by_team_id) + team.id),
-                    team.id,
-                ),
-            )
-
-    return sorted(teams, key=lambda team: (team.created_at, team.id))
+    return draft_service.get_ordered_draft_teams(db, league_id)
 
 
 def _league_settings_meta(settings_row: LeagueSettings | None) -> dict:
@@ -1033,31 +1048,11 @@ def _ensure_draft_order_when_full(db: Session, league: League) -> None:
 
 
 def _draft_pick_team_for_number(teams: list[Team], pick_number: int) -> tuple[int, int, Team | None]:
-    team_count = len(teams)
-    return (
-        get_round_number(pick_number, team_count) or 1,
-        get_round_pick(pick_number, team_count) or 1,
-        get_snake_team_for_pick(teams, pick_number),
-    )
+    return draft_service.get_draft_pick_team_for_number(teams, pick_number)
 
 
 def _get_or_create_draft_timer_state(db: Session, draft_id: int) -> DraftTimerState:
-    timer_state = db.query(DraftTimerState).filter(DraftTimerState.draft_id == draft_id).first()
-    if timer_state:
-        return timer_state
-    timer_state = DraftTimerState(
-        draft_id=draft_id,
-        timer_started_at=None,
-        paused_at=None,
-        paused_total_seconds=0,
-        last_tick_at=None,
-        auto_picking_started_at=None,
-        auto_picking_pick_number=None,
-        state_version=1,
-    )
-    db.add(timer_state)
-    db.flush()
-    return timer_state
+    return draft_service._get_or_create_draft_timer_state(db, draft_id)
 
 
 def _start_or_resume_draft_timer(
@@ -1095,18 +1090,12 @@ def _reset_draft_timer_for_next_pick(
     transition_seconds: int = 0,
     draft_row: Draft | None = None,
 ) -> None:
-    delay = max(0, int(transition_seconds))
-    started_at = now_utc + timedelta(seconds=delay)
-    timer_state.timer_started_at = started_at
-    timer_state.paused_at = None
-    timer_state.paused_total_seconds = 0
-    timer_state.last_tick_at = now_utc
-    timer_state.auto_picking_started_at = None
-    timer_state.auto_picking_pick_number = None
-    timer_state.state_version += 1
-    if draft_row is not None and draft_row.status != "completed":
-        draft_row.current_pick_started_at = started_at
-        draft_row.current_pick_expires_at = started_at + timedelta(seconds=max(0, int(draft_row.pick_timer_seconds)))
+    draft_service._reset_draft_timer_for_next_pick(
+        timer_state=timer_state,
+        now_utc=now_utc,
+        transition_seconds=transition_seconds,
+        draft_row=draft_row,
+    )
 
 
 def _complete_draft(
@@ -1116,14 +1105,12 @@ def _complete_draft(
     timer_state: DraftTimerState | None,
     now_utc: datetime,
 ) -> None:
-    draft_row.status = "completed"
-    draft_row.completed_at = draft_row.completed_at or now_utc
-    draft_row.current_pick_expires_at = None
-    league.status = "post_draft"
-    if timer_state is not None:
-        timer_state.paused_at = now_utc
-        timer_state.last_tick_at = now_utc
-        timer_state.state_version += 1
+    draft_service._complete_draft(
+        draft_row=draft_row,
+        league=league,
+        timer_state=timer_state,
+        now_utc=now_utc,
+    )
 
 
 def _normalize_summary_email(value: str | None) -> str | None:
@@ -1141,13 +1128,11 @@ def _draft_pick_prep_remaining_seconds(
     timer_state: DraftTimerState | None,
     now_utc: datetime,
 ) -> int:
-    if draft_row.status not in {"scheduled", "countdown", "live"}:
-        return 0
-    timer_started_at = _as_utc(timer_state.timer_started_at) if timer_state else None
-    if timer_started_at is None:
-        return 0
-    delta_seconds = (timer_started_at - now_utc).total_seconds()
-    return max(0, int(math.ceil(delta_seconds)))
+    return draft_service._draft_pick_prep_remaining_seconds(
+        draft_row=draft_row,
+        timer_state=timer_state,
+        now_utc=now_utc,
+    )
 
 
 @dataclass(frozen=True)
@@ -1301,12 +1286,7 @@ def _assign_roster_slot(
     team_id: int,
     player_position: str,
 ) -> str:
-    roster_entries = _team_roster_entries(db, team_id)
-    fit = can_draft_position(player_position, roster_entries, settings_row)
-    if not fit.can_draft or not fit.destination_slot:
-        detail = "invalid player position" if fit.reason == "invalid player position" else DRAFT_POSITION_FULL_REASON
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
-    return fit.destination_slot
+    return draft_service.assign_draft_roster_slot(db, settings_row, team_id, player_position)
 
 
 def _ordered_autopick_candidates(
@@ -1405,20 +1385,7 @@ def _remove_player_from_draft_queues(
     draft_id: int,
     player_id: int,
 ) -> None:
-    try:
-        with db.begin_nested():
-            (
-                db.query(DraftTeamQueueItem)
-                .filter(
-                    DraftTeamQueueItem.draft_id == draft_id,
-                    DraftTeamQueueItem.player_id == player_id,
-                )
-                .delete(synchronize_session=False)
-            )
-            db.flush()
-    except ProgrammingError:
-        # Draft queue table is introduced by newer migrations; tolerate older envs.
-        db.expire_all()
+    draft_service._remove_player_from_draft_queues(db, draft_id=draft_id, player_id=player_id)
 
 
 def _queued_autopick_candidate(
@@ -1516,12 +1483,11 @@ def _draft_queue_state(
 
 
 def _total_draft_picks_for_league(*, settings_row: LeagueSettings, team_count: int) -> int:
-    return get_total_picks(team_count, settings_row.roster_slots_json or FIXED_ROSTER_SLOTS)
+    return draft_service._total_draft_picks_for_league(settings_row=settings_row, team_count=team_count)
 
 
 def _total_roster_slot_rounds(*, settings_row: LeagueSettings) -> int:
-    roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
-    return max(1, _draftable_roster_rounds_from_slots(roster_slots))
+    return draft_service._total_roster_slot_rounds(settings_row=settings_row)
 
 
 def _seconds_remaining_for_current_pick(
@@ -1532,50 +1498,11 @@ def _seconds_remaining_for_current_pick(
     current_team: Team | None = None,
     current_pick_number: int | None = None,
 ) -> int | None:
-    if draft_row.status not in {"scheduled", "countdown", "live", "paused"}:
-        return None
-    if draft_row.status == "scheduled":
-        start_at = _as_utc(draft_row.draft_datetime_utc)
-        if start_at is None:
-            return None
-        return max(0, int(math.ceil((start_at - now_utc).total_seconds())))
-
-    if draft_row.status == "countdown":
-        timer_started_at = _as_utc(timer_state.timer_started_at) if timer_state else None
-        anchor_started_at = timer_started_at or _as_utc(draft_row.updated_at) or _as_utc(draft_row.created_at)
-        if not anchor_started_at:
-            return DRAFT_LOBBY_COUNTDOWN_SECONDS
-        elapsed_seconds = max(0, int((now_utc - anchor_started_at).total_seconds()))
-        return max(0, int(DRAFT_LOBBY_COUNTDOWN_SECONDS) - elapsed_seconds)
-
-    prep_remaining = _draft_pick_prep_remaining_seconds(
+    return draft_service._seconds_remaining_for_current_pick(
         draft_row=draft_row,
         timer_state=timer_state,
         now_utc=now_utc,
     )
-    pick_window_seconds = int(draft_row.pick_timer_seconds)
-    if prep_remaining > 0:
-        return pick_window_seconds + prep_remaining
-    current_pick_expires_at = _as_utc(draft_row.current_pick_expires_at)
-    if current_pick_expires_at is not None:
-        if draft_row.status == "paused" and timer_state and timer_state.paused_at is not None:
-            paused_at = _as_utc(timer_state.paused_at) or now_utc
-            return max(0, int(math.ceil((current_pick_expires_at - paused_at).total_seconds())))
-        return max(0, int(math.ceil((current_pick_expires_at - now_utc).total_seconds())))
-    timer_started_at = timer_state.timer_started_at if timer_state else None
-    timer_paused_at = timer_state.paused_at if timer_state else None
-    timer_paused_total_seconds = int(timer_state.paused_total_seconds if timer_state else 0)
-    anchor_started_at = _as_utc(timer_started_at) or _as_utc(draft_row.updated_at) or _as_utc(draft_row.created_at)
-    if not anchor_started_at:
-        return None
-    elapsed_until = now_utc
-    if draft_row.status == "paused" and timer_paused_at is not None:
-        elapsed_until = _as_utc(timer_paused_at) or now_utc
-    elapsed_seconds = max(
-        0,
-        int((elapsed_until - anchor_started_at).total_seconds()) - timer_paused_total_seconds,
-    )
-    return max(0, pick_window_seconds - elapsed_seconds)
 
 
 def _advance_countdown_if_ready(
@@ -1848,276 +1775,8 @@ def _autopick_timed_out_current_team(
 
 
 def _draft_room_state(db: Session, league: League, current_user: User) -> DraftRoomRead:
-    membership = require_league_member(db, league.id, current_user)
-    draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
-    if not draft_row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
+    return draft_service.get_draft_room_state(db, league, current_user)
 
-    settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
-    if not settings_row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league settings not found")
-
-    teams = _ordered_draft_teams(db, league.id)
-    picks_rows = (
-        db.query(DraftPick, Team, Player)
-        .join(Team, Team.id == DraftPick.team_id)
-        .join(Player, Player.id == DraftPick.player_id)
-        .filter(DraftPick.draft_id == draft_row.id)
-        .order_by(DraftPick.overall_pick.asc())
-        .all()
-    )
-    drafted_player_ids = [player.id for _pick, _team, player in picks_rows]
-
-    roster_rows = (
-        db.query(RosterEntry, Team, Player)
-        .join(Team, Team.id == RosterEntry.team_id)
-        .join(Player, Player.id == RosterEntry.player_id)
-        .filter(RosterEntry.league_id == league.id)
-        .order_by(Team.id.asc(), RosterEntry.created_at.asc())
-        .all()
-    )
-
-    roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
-    slot_order = [slot for slot in roster_slots.keys()]
-    if "BENCH" not in slot_order:
-        slot_order.append("BENCH")
-    if "IR" not in slot_order:
-        slot_order.append("IR")
-    if "FLEX" not in slot_order and "SUPERFLEX" not in slot_order:
-        slot_order.append("FLEX")
-
-    roster_rows_by_team: dict[int, list[tuple[RosterEntry, Team, Player]]] = {}
-    for row in roster_rows:
-        roster_rows_by_team.setdefault(row[1].id, []).append(row)
-
-    rosters_by_team = []
-    for team in teams:
-        team_rows = roster_rows_by_team.get(team.id, [])
-        position_counts: dict[str, int] = {}
-        slots: dict[str, list] = {slot: [] for slot in slot_order}
-        total_projected_points = 0.0
-
-        for roster_entry, _team, player in team_rows:
-            position_counts[player.position] = position_counts.get(player.position, 0) + 1
-            slot_name = roster_entry.slot
-            if slot_name == "SUPERFLEX":
-                slot_name = "FLEX"
-            if slot_name not in slots:
-                slots[slot_name] = []
-            projected = (
-                float(player.sheet_projected_season_points)
-                if player.sheet_projected_season_points is not None
-                else None
-            )
-            if projected is not None:
-                total_projected_points += projected
-            slots[slot_name].append(
-                {
-                    "player_id": player.id,
-                    "player_name": player.name,
-                    "position": player.position,
-                    "school": player.school,
-                    "slot": slot_name,
-                    "projected_fantasy_points": projected,
-                }
-            )
-
-        rosters_by_team.append(
-            {
-                "team_id": team.id,
-                "team_name": team.name,
-                "total_projected_points": round(total_projected_points, 1),
-                "position_counts": position_counts,
-                "slots": slots,
-            }
-        )
-
-    total_rounds = _total_roster_slot_rounds(settings_row=settings_row)
-    total_picks = _total_draft_picks_for_league(settings_row=settings_row, team_count=len(teams))
-    draft_complete = is_draft_complete(len(picks_rows), total_picks) or draft_row.status == "completed"
-    current_pick = min(len(picks_rows) + 1, total_picks) if total_picks else len(picks_rows) + 1
-    current_round, current_round_pick, current_team = _draft_pick_team_for_number(teams, current_pick)
-    if draft_complete:
-        current_team = None
-
-    current_team_roster_entries = (
-        [
-            roster_entry
-            for roster_entry, _team, _player in roster_rows_by_team.get(current_team.id, [])
-        ]
-        if current_team
-        else []
-    )
-    position_eligibility: dict[str, dict[str, str | bool | None]] = {}
-    for position in ("QB", "RB", "WR", "TE", "K"):
-        fit = (
-            can_draft_position(position, current_team_roster_entries, settings_row)
-            if current_team
-            else DraftPositionFit(can_draft=False, reason="Draft is complete.", destination_slot=None)
-        )
-        reason = fit.reason
-        if reason == DRAFT_POSITION_FULL_REASON:
-            reason = DRAFT_POSITION_LOCK_REASON
-        position_eligibility[position] = {
-            "can_draft": fit.can_draft,
-            "reason": reason,
-            "destination_slot": fit.destination_slot,
-        }
-
-    timer_state = db.query(DraftTimerState).filter(DraftTimerState.draft_id == draft_row.id).first()
-    timer_started_at = timer_state.timer_started_at if timer_state else None
-    timer_paused_at = timer_state.paused_at if timer_state else None
-    timer_paused_total_seconds = int(timer_state.paused_total_seconds if timer_state else 0)
-    now_utc = datetime.now(timezone.utc)
-    prep_remaining = _draft_pick_prep_remaining_seconds(
-        draft_row=draft_row,
-        timer_state=timer_state,
-        now_utc=now_utc,
-    )
-    auto_pick_seconds_remaining: int | None = None
-
-    user_team = next((team for team in teams if team.owner_user_id == current_user.id), None)
-    can_make_pick = False
-    lobby_presence_by_team, lobby_joined_count, lobby_connected_count, lobby_ready_count = _lobby_presence_summary(
-        db,
-        draft_id=draft_row.id,
-        teams=teams,
-        now_utc=now_utc,
-    )
-
-    seconds_remaining: int | None = None
-    current_pick_expires_at: datetime | None = _as_utc(draft_row.current_pick_expires_at)
-    if draft_row.status in {"scheduled", "countdown", "live", "paused"}:
-        seconds_remaining = _seconds_remaining_for_current_pick(
-            draft_row=draft_row,
-            timer_state=timer_state,
-            now_utc=now_utc,
-            current_team=current_team,
-            current_pick_number=current_pick,
-        )
-        if (
-            current_pick_expires_at is None
-            and seconds_remaining is not None
-            and draft_row.status != "paused"
-            and current_team is not None
-        ):
-            current_pick_expires_at = now_utc + timedelta(seconds=seconds_remaining)
-    has_time_remaining = seconds_remaining is None or seconds_remaining > 0
-    can_make_pick = bool(
-        draft_row.status in {"live"}
-        and current_team
-        and prep_remaining <= 0
-        and has_time_remaining
-        and (
-            current_user.id == league.commissioner_user_id
-            or current_user.id == current_team.owner_user_id
-        )
-    )
-
-    phase_type: str | None = None
-    phase_seconds_remaining: int | None = None
-    current_pick_timer_seconds = int(draft_row.pick_timer_seconds)
-    if draft_row.status == "scheduled":
-        phase_type = "lobby_countdown"
-        phase_seconds_remaining = seconds_remaining
-    elif draft_row.status == "countdown":
-        phase_type = "prestart_countdown"
-        phase_seconds_remaining = seconds_remaining
-    elif draft_row.status in {"live", "paused"}:
-        if prep_remaining > 0:
-            phase_type = "pick_transition"
-            phase_seconds_remaining = prep_remaining
-        else:
-            phase_type = "pick_clock"
-            phase_seconds_remaining = seconds_remaining
-
-    pick_state = "WAITING_FOR_PICK"
-    if phase_type == "pick_transition":
-        pick_state = "PICK_SUBMITTED"
-
-    drafted_player_ids_subquery = db.query(DraftPick.player_id).filter(DraftPick.draft_id == draft_row.id)
-    available_player_count = (
-        db.query(func.count(Player.id))
-        .filter(Player.position.in_(tuple(OFFENSE_DRAFT_POSITIONS)))
-        .filter(~Player.id.in_(drafted_player_ids_subquery))
-        .scalar()
-        or 0
-    )
-    server_state_seq = latest_league_event_seq(db, league_id=league.id)
-
-    return DraftRoomRead(
-        draft_room_id=draft_row.id,
-        league_id=league.id,
-        draft_id=draft_row.id,
-        status=draft_row.status,
-        draft_status=_draft_status_value(draft_row.status),
-        server_time=now_utc,
-        pick_timer_seconds=draft_row.pick_timer_seconds,
-        total_rounds=total_rounds,
-        total_picks=total_picks,
-        is_complete=draft_complete,
-        can_exit=draft_complete,
-        email_history_available=draft_complete,
-        roster_slots=roster_slots,
-        position_eligibility=position_eligibility,
-        draft_order=[team.id for team in teams],
-        drafted_player_ids=drafted_player_ids,
-        available_player_count=int(available_player_count),
-        rosters_by_team=rosters_by_team,
-        lobby_ready_count=lobby_ready_count,
-        lobby_joined_count=lobby_joined_count,
-        lobby_connected_count=lobby_connected_count,
-        teams=[
-            DraftRoomTeamRead(
-                id=team.id,
-                name=team.name,
-                owner_user_id=team.owner_user_id,
-                owner_name=team.owner_name,
-                lobby_joined=bool(lobby_presence_by_team.get(team.id, {}).get("joined")),
-                lobby_connected=bool(lobby_presence_by_team.get(team.id, {}).get("connected")),
-                lobby_ready=bool(lobby_presence_by_team.get(team.id, {}).get("ready")),
-            )
-            for team in teams
-        ],
-        picks=[
-            DraftRoomPickRead(
-                id=pick.id,
-                overall_pick=pick.overall_pick,
-                round_number=pick.round_number,
-                round_pick=pick.round_pick,
-                team_id=team.id,
-                team_name=team.name,
-                player_id=player.id,
-                player_name=player.name,
-                player_position=player.position,
-                player_school=player.school,
-                made_by_user_id=pick.made_by_user_id,
-                created_at=pick.created_at,
-            )
-            for pick, team, player in picks_rows
-        ],
-        current_pick=current_pick,
-        current_round=current_round,
-        current_round_pick=current_round_pick,
-        current_team_id=current_team.id if current_team else None,
-        current_team_name=current_team.name if current_team else None,
-        current_pick_started_at=_as_utc(draft_row.current_pick_started_at),
-        current_pick_expires_at=current_pick_expires_at,
-        seconds_remaining=seconds_remaining,
-        phase_seconds_remaining=phase_seconds_remaining,
-        phase_type=phase_type,
-        pick_state=pick_state,
-        auto_pick_seconds_remaining=auto_pick_seconds_remaining,
-        current_pick_timer_seconds=current_pick_timer_seconds,
-        timer_started_at=timer_started_at,
-        timer_paused_at=timer_paused_at,
-        timer_paused_total_seconds=timer_paused_total_seconds,
-        server_state_seq=server_state_seq,
-        user_team_id=user_team.id if user_team else None,
-        can_make_pick=can_make_pick,
-        created_at=draft_row.created_at,
-        updated_at=draft_row.updated_at,
-    )
 
 
 def _normalize_position(value: str) -> str:

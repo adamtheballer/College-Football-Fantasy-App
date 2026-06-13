@@ -209,8 +209,13 @@ const apiRequest = async <T>({
     if (error instanceof TypeError && error.message.toLowerCase().includes("fetch")) {
       throw new ApiError(
         0,
-        `Unable to reach the backend API. Check that FastAPI is running and VITE_API_BASE_URL points to the correct public or local backend URL. Current VITE_API_BASE_URL: ${API_BASE}.`,
-        { apiBase: API_BASE, path }
+        "Backend server is offline. Start FastAPI and try again.",
+        {
+          apiBase: API_BASE,
+          path,
+          troubleshooting:
+            "Check that FastAPI is running and VITE_API_BASE_URL points to the correct public or local backend URL.",
+        }
       );
     }
     throw error;

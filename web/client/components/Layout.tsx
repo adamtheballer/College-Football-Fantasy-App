@@ -70,9 +70,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       ];
 
   const isFullScreenDraftRoom =
-    /^\/league\/\d+\/draft\/?$/.test(location.pathname) ||
-    /^\/mock-drafts\/\d+\/room\/?$/.test(location.pathname) ||
-    /^\/mock-drafts\/\d+\/board\/?$/.test(location.pathname);
+    /^\/leagues?\/[^/]+\/(lobby|draft)\/?$/.test(location.pathname) ||
+    /^\/draft\/mock\/[^/]+\/(lobby|room)\/?$/.test(location.pathname) ||
+    /^\/draft\/mock\/single\/[^/]+\/?$/.test(location.pathname) ||
+    /^\/mock-drafts\/[^/]+\/(lobby|room|board)\/?$/.test(location.pathname);
 
   useEffect(() => {
     if (!user) {
@@ -183,13 +184,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex items-center justify-between">
               <h2 className="text-[10px] font-black tracking-[0.3em] text-primary/80 uppercase">College Football Fantasy</h2>
               <div className="h-[1px] flex-1 mx-8 opacity-0" />
-              <div className="flex items-center gap-6">
+              <div className="flex min-w-fit items-center gap-6 overflow-visible">
                  {isLoggedIn ? (
-                   <div className="flex items-center gap-3">
-                      <span className="text-[10px] font-black tracking-[0.2em] text-muted-foreground uppercase opacity-40 italic">Dashboard</span>
+                   <div className="flex min-w-fit items-center gap-3 overflow-visible">
+                      <span className="whitespace-nowrap text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-40 italic">Dashboard</span>
                       <div className="w-1 h-1 rounded-full bg-border" />
-                      <span className="text-[10px] font-black tracking-[0.2em] text-foreground uppercase animate-in fade-in slide-in-from-right-2 duration-700">
-                        Welcome <span className="text-primary italic">{user?.firstName}</span>
+                      <span className="whitespace-nowrap py-1 pr-2 text-[10px] font-black uppercase leading-none tracking-[0.2em] text-foreground animate-in fade-in slide-in-from-right-2 duration-700">
+                        Welcome <span className="inline-block pr-1 text-primary italic">{user?.firstName}</span>
                       </span>
                    </div>
                  ) : (

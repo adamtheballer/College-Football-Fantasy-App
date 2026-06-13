@@ -18,7 +18,7 @@ describe("api client errors", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     await expect(apiGet("/health")).rejects.toThrow(
-      "Unable to reach the backend API. Check that FastAPI is running and VITE_API_BASE_URL points to the correct public or local backend URL."
+      "Backend server is offline. Start FastAPI and try again."
     );
   });
 

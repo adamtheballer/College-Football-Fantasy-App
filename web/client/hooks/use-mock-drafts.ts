@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
+import { normalizePlayer } from "@/hooks/use-players";
+import type { Player } from "@/types/player";
 import type {
   StandaloneMockDraftCreateRequest,
   StandaloneMockDraftCreateResponse,
@@ -9,6 +11,32 @@ import type {
   StandaloneMockDraftLobby,
   StandaloneMockDraftRoom,
 } from "@/types/mock-draft";
+
+type BackendPlayerRead = {
+  id: number;
+  name: string;
+  position: string;
+  school: string;
+  image_url?: string | null;
+  player_class?: string | null;
+  sheet_adp?: number | null;
+  sheet_projected_season_points?: number | null;
+  sheet_projection_stats?: Record<string, number | null> | null;
+  sheet_source_sheet_id?: string | null;
+  sheet_synced_at?: string | null;
+  board_rank?: number | null;
+};
+
+type BackendPlayerListResponse = {
+  data: BackendPlayerRead[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+type MockAvailablePlayerListResponse = Omit<BackendPlayerListResponse, "data"> & {
+  data: Player[];
+};
 
 export function useCreateMockDraft() {
   const queryClient = useQueryClient();
@@ -97,6 +125,7 @@ export function useMockDraftPick(mockDraftId?: number) {
     onSuccess: (payload) => {
       queryClient.setQueryData(["mock-draft", mockDraftId, "room"], payload);
       queryClient.invalidateQueries({ queryKey: ["players"] });
+      queryClient.invalidateQueries({ queryKey: ["mock-draft", mockDraftId, "available-players"] });
     },
   });
 }
@@ -104,11 +133,50 @@ export function useMockDraftPick(mockDraftId?: number) {
 export function useMockDraftAutoPick(mockDraftId?: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { force?: boolean } = {}) =>
-      apiPost<StandaloneMockDraftRoom>(`/mock-drafts/${mockDraftId}/auto-pick`, { force: Boolean(payload.force) }),
+    mutationFn: (payload: { force?: boolean; expectedOverallPick?: number; preferredPlayerId?: number | null; preferredPlayerIds?: number[] } = {}) =>
+      apiPost<StandaloneMockDraftRoom>(`/mock-drafts/${mockDraftId}/auto-pick`, {
+        force: Boolean(payload.force),
+        expected_overall_pick: payload.expectedOverallPick,
+        preferred_player_id: payload.preferredPlayerId ?? undefined,
+        preferred_player_ids: payload.preferredPlayerIds?.length ? payload.preferredPlayerIds : undefined,
+      }),
     onSuccess: (payload) => {
       queryClient.setQueryData(["mock-draft", mockDraftId, "room"], payload);
       queryClient.invalidateQueries({ queryKey: ["players"] });
+      queryClient.invalidateQueries({ queryKey: ["mock-draft", mockDraftId, "available-players"] });
+    },
+  });
+}
+
+export function useMockDraftAvailablePlayers(
+  mockDraftId?: number,
+  params: { search?: string; position?: string; positions?: string[]; limit?: number; offset?: number } = {}
+) {
+  const { search, position, positions, limit = 500, offset = 0 } = params;
+  const positionsParam = positions?.length ? positions.join(",") : undefined;
+  return useQuery({
+    queryKey: ["mock-draft", mockDraftId, "available-players", { search: search || "", position: position || "", positions: positionsParam || "", limit, offset }],
+    enabled: typeof mockDraftId === "number" && !Number.isNaN(mockDraftId),
+    staleTime: 5_000,
+    placeholderData: (previousData) => previousData,
+    queryFn: async (): Promise<MockAvailablePlayerListResponse> => {
+      const payload = await apiGet<BackendPlayerListResponse>(`/mock-drafts/${mockDraftId}/available-players`, {
+        search: search || undefined,
+        position: position || undefined,
+        positions: positionsParam,
+        limit,
+        offset,
+      });
+      return {
+        ...payload,
+        data: payload.data.map((player, index) =>
+          normalizePlayer(player, {
+            rank: player.board_rank ?? offset + index + 1,
+            adp: player.sheet_adp ?? 0,
+            posRank: null,
+          })
+        ),
+      };
     },
   });
 }
@@ -130,6 +198,18 @@ export function useEmailMockDraftHistory(mockDraftId?: number) {
 export function useExitMockDraft(mockDraftId?: number) {
   return useMutation({
     mutationFn: () => apiPost<{ ok: boolean; navigate_to: string }>(`/mock-drafts/${mockDraftId}/exit`, {}),
+  });
+}
+
+export function useResetSinglePlayerMockDraft(mockDraftId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<StandaloneMockDraftRoom>(`/mock-drafts/${mockDraftId}/reset`, {}),
+    onSuccess: (payload) => {
+      queryClient.setQueryData(["mock-draft", mockDraftId, "room"], payload);
+      queryClient.invalidateQueries({ queryKey: ["mock-draft", mockDraftId, "available-players"] });
+      queryClient.invalidateQueries({ queryKey: ["mock-draft", mockDraftId, "history"] });
+    },
   });
 }
 

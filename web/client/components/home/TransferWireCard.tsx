@@ -14,10 +14,10 @@ export const TRANSFER_WIRE_EMPTY_MESSAGE = "No fantasy-relevant news yet. Run ne
 export const TRANSFER_WIRE_ERROR_MESSAGE = "Unable to load Transfer Wire.";
 
 const tabFilters: Record<NewsTab, NewsFeedFilters> = {
-  breaking: { limit: 8, min_relevance: 35, breaking_only: true },
-  transfer: { limit: 8, category: "transfer" },
-  injury: { limit: 8, category: "injury" },
-  team_news: { limit: 8, category: "team_news" },
+  breaking: { limit: 5, min_relevance: 20, sort: "recent" },
+  transfer: { limit: 5, category: "transfer", sort: "recent" },
+  injury: { limit: 5, category: "injury", sort: "recent" },
+  team_news: { limit: 5, categories: "team_news,depth_chart,coaching,eligibility", sort: "recent" },
 };
 
 export const formatNewsCategory = (category: string) => category.replace(/_/g, " ").toUpperCase();
@@ -149,7 +149,7 @@ export function TransferWireCard() {
           </div>
         ) : (
           <div className="grid gap-3">
-            {items.slice(0, 8).map((item) => (
+            {items.slice(0, 5).map((item) => (
               <NewsItemRow key={item.id} item={item} />
             ))}
           </div>
