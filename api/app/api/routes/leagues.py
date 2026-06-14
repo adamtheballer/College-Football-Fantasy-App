@@ -2739,7 +2739,7 @@ def join_matchmaking(
             current_user=current_user,
         )
 
-    join_league_flow(db, league, current_user)
+    join_league_flow(db, league, current_user, allow_existing=True)
     db.refresh(league)
     _update_matchmaking_draft_window_if_full(db, league)
     db.commit()
@@ -4073,7 +4073,11 @@ def list_league_members(
 
 
 @router.post("/join-by-code", response_model=LeaguePreview)
-def join_by_code(payload: JoinByCodeRequest, db: Session = Depends(get_db)) -> LeaguePreview:
+def join_by_code(
+    payload: JoinByCodeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeaguePreview:
     invite = (
         db.query(LeagueInvite)
         .filter(LeagueInvite.code == payload.invite_code.upper(), LeagueInvite.active.is_(True))

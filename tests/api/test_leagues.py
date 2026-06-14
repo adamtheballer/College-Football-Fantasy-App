@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+from api.app.models.draft import Draft
 from api.app.models.league_settings import LeagueSettings
 from api.app.models.injury import Injury
 from api.app.models.matchup import Matchup
@@ -182,6 +183,7 @@ def test_private_league_requires_invite_code_join_flow(client):
     preview = client.post(
         "/leagues/join-by-code",
         json={"invite_code": league["invite_code"]},
+        headers=auth_headers(member_token),
     )
     assert preview.status_code == 200
     assert preview.json()["id"] == league["id"]
@@ -193,6 +195,60 @@ def test_private_league_requires_invite_code_join_flow(client):
     )
     assert invite_join.status_code == 200
     assert len(invite_join.json()["members"]) == 2
+
+
+def test_join_by_code_requires_authentication(client):
+    owner_token = create_user_and_token(client, "invite-owner")
+    league = create_league(client, owner_token, is_private=True)
+
+    preview = client.post(
+        "/leagues/join-by-code",
+        json={"invite_code": league["invite_code"]},
+    )
+
+    assert preview.status_code in {401, 403}
+
+
+def test_join_with_code_rejects_duplicate_member(client):
+    owner_token = create_user_and_token(client, "dup-owner")
+    member_token = create_user_and_token(client, "dup-member")
+    league = create_league(client, owner_token, is_private=True)
+
+    first_join = client.post(
+        "/leagues/join-with-code",
+        json={"invite_code": league["invite_code"]},
+        headers=auth_headers(member_token),
+    )
+    assert first_join.status_code == 200
+
+    duplicate_join = client.post(
+        "/leagues/join-with-code",
+        json={"invite_code": league["invite_code"]},
+        headers=auth_headers(member_token),
+    )
+
+    assert duplicate_join.status_code == 409
+    assert duplicate_join.json()["detail"] == "already joined this league"
+
+
+def test_join_with_code_rejects_completed_draft(client, db_session):
+    owner_token = create_user_and_token(client, "done-owner")
+    member_token = create_user_and_token(client, "done-member")
+    league = create_league(client, owner_token, is_private=True)
+    league_id = league["id"]
+
+    draft_row = db_session.query(Draft).filter(Draft.league_id == league_id).one()
+    draft_row.status = "completed"
+    db_session.commit()
+
+    join_response = client.post(
+        "/leagues/join-with-code",
+        json={"invite_code": league["invite_code"]},
+        headers=auth_headers(member_token),
+    )
+
+    assert join_response.status_code == 409
+    assert join_response.json()["detail"] == "league draft is already complete"
 
 
 def test_league_workspace_returns_real_matchup_and_standings(client, db_session):

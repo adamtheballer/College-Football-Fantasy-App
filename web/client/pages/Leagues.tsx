@@ -104,13 +104,13 @@ const LeagueCard = ({
           League Hub
           <ChevronRight className="w-3 h-3 ml-2" />
         </Button>
-        {(draftStatus === "draft_live" || draftStatus === "draft_scheduled") && (
+        {["scheduled", "live", "paused"].includes(draftStatus) && (
           <Button
             variant="outline"
             className="w-full border-primary/30 bg-primary/10 text-primary font-black tracking-[0.2em] text-[10px] uppercase h-12 px-8 rounded-2xl hover:bg-primary/15 transition-all duration-300"
             onClick={() => onOpenDraft(id, draftStatus)}
           >
-            {draftStatus === "draft_live" ? "Enter Draft Room" : "Open Draft Room"}
+            {draftStatus === "live" ? "Enter Draft Room" : "Open Draft Room"}
             <ChevronRight className="w-3 h-3 ml-2" />
           </Button>
         )}
@@ -193,7 +193,7 @@ export default function Leagues() {
               }}
               onOpenDraft={(leagueId, draftStatus) => {
                 setActiveLeagueId(leagueId);
-                navigate(`/league/${leagueId}/lobby`);
+                navigate(draftStatus === "live" ? `/league/${leagueId}/draft` : `/league/${leagueId}/lobby`);
               }}
             />
           ))}

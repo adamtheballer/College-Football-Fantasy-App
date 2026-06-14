@@ -126,6 +126,7 @@ export default function LeagueDetail() {
   const draftDate = league.draft?.draft_datetime_utc
     ? new Date(league.draft.draft_datetime_utc).toLocaleString()
     : "Draft not scheduled";
+  const canOpenRealDraft = ["scheduled", "live", "paused"].includes(league.draft?.status ?? "");
   const workspaceActions = Array.isArray(workspace?.allowed_actions)
     ? workspace.allowed_actions
     : workspace?.allowed_actions
@@ -172,14 +173,16 @@ export default function LeagueDetail() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Button
-              variant="outline"
-              className="rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
-              onClick={() => navigate(`/league/${league.id}/lobby`)}
-            >
-              Draft Lobby
-              <ChevronRight className="ml-2 h-3 w-3" />
-            </Button>
+            {canOpenRealDraft && (
+              <Button
+                variant="outline"
+                className="rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
+                onClick={() => navigate(league.draft?.status === "live" ? `/league/${league.id}/draft` : `/league/${league.id}/lobby`)}
+              >
+                {league.draft?.status === "live" ? "Draft Room" : "Draft Lobby"}
+                <ChevronRight className="ml-2 h-3 w-3" />
+              </Button>
+            )}
             <Button
               variant="outline"
               className="rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"

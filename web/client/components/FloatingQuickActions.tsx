@@ -21,9 +21,9 @@ export function FloatingQuickActions() {
   const actions = useMemo<QuickAction[]>(
     () => [
       {
-        label: "Mock Drafts",
+        label: "Start Mock Draft",
         icon: ClipboardList,
-        onClick: () => navigate("/draft"),
+        onClick: () => navigate("/draft/mock/create?single=1"),
         styleClass: "from-primary/90 to-blue-500/90",
       },
       {

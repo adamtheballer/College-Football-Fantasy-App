@@ -159,14 +159,26 @@ def create_league(
     return LeagueCreateResponse(league=detail, invite_code=code, invite_link=invite_link)
 
 
-def join_league(db: Session, league: League, current_user: User) -> LeagueDetailRead:
+def join_league(
+    db: Session,
+    league: League,
+    current_user: User,
+    *,
+    allow_existing: bool = False,
+) -> LeagueDetailRead:
     existing = (
         db.query(LeagueMember)
         .filter(LeagueMember.league_id == league.id, LeagueMember.user_id == current_user.id)
         .first()
     )
     if existing:
+        if not allow_existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="already joined this league")
         return get_league_detail(db, league)
+
+    draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
+    if league.status == "post_draft" or (draft_row and draft_row.status == "completed"):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="league draft is already complete")
 
     member_count = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).count()
     if member_count >= league.max_teams:
@@ -181,7 +193,6 @@ def join_league(db: Session, league: League, current_user: User) -> LeagueDetail
             owner_user_id=current_user.id,
         )
     )
-    draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
     if draft_row:
         schedule_draft_notifications(db, league.id, current_user.id, draft_row.draft_datetime_utc)
     db.commit()

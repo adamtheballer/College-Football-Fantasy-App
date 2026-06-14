@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from api.app.models import Base, TimestampMixin
@@ -9,6 +9,7 @@ from api.app.models import Base, TimestampMixin
 class Draft(TimestampMixin, Base):
     __tablename__ = "drafts"
     __table_args__ = (
+        UniqueConstraint("league_id", name="uq_drafts_league_id"),
         Index("ix_drafts_league_id", "league_id"),
         Index("ix_drafts_datetime", "draft_datetime_utc"),
     )

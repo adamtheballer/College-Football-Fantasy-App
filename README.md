@@ -253,9 +253,11 @@ API runs on `http://localhost:8000`, UI runs on `http://localhost:8080`.
 ## Draft System Notes
 
 - Real league drafts write both `draft_picks` and `roster_entries`; this is intentional because completed live picks fill league rosters.
+- Each real league is constrained to one `drafts` row. A completed real draft cannot be restarted or replaced by creating a second real draft for that league.
 - Real draft pick creation locks the `drafts` row, recalculates the current pick under that lock, writes the `draft_picks` row and matching `roster_entries` row in one transaction, and converts expected uniqueness races into HTTP 409 conflicts.
 - Real drafts currently transition from `scheduled` to `live` on the first successful pick as an intentional MVP behavior.
 - When the final real draft pick is made, `drafts.status` becomes `completed` and `leagues.status` becomes `post_draft`.
+- League creation and join flows require an authenticated user. The creator becomes commissioner, joins as the first member, receives a team, and gets a generated invite code/link. Invite-code joins reject duplicate members, full leagues, and completed drafts.
 - Draft rooms read the player pool from the backend `players` table. Import the Google Sheet before drafting:
   `uv run python scripts/import_players_from_google_sheet.py --url "https://docs.google.com/spreadsheets/d/1NMP3EJSMbdRd7HDA0t7TwxzJ9DM_bUynLoRCgE6Ml74/export?format=csv&gid=0"`.
 - If Google Sheets is unavailable, export CSV manually and run:
@@ -272,6 +274,20 @@ API runs on `http://localhost:8000`, UI runs on `http://localhost:8080`.
 - The Streamlit `ui/` league page is legacy/dev-only and intentionally disabled for league creation/settings. Use the React `web/` app so nested league basics, settings, and draft payloads persist correctly.
 - Trade analysis shown in the app is a basic local estimate based on roster/projection inputs. Schedule context is neutral unless a backend comparison endpoint supplies deeper matchup context.
 - Current MVP limitation: real drafts do not yet have a dedicated explicit `draft_order` table beyond persisted draft-order metadata and fallback join order.
+
+## Local Multiplayer League Testing
+
+Use one normal Chrome window and one Chrome Incognito window as two different users:
+
+1. Start FastAPI and React against the same local database.
+2. Create a league while signed in as user A.
+3. Copy the invite code/link from the league creation screen.
+4. Sign in as user B in Incognito and join the league by code.
+5. Refresh both browsers and confirm both users see the same league, member count, draft status, and draft room state.
+6. For a scheduled/live real draft, use the temporary Draft navigation entry or the league card draft action; after completion, rosters should be visible from the Roster tab and the Draft entry should no longer appear.
+7. Use the bottom plus action for mock drafts. Mock drafts remain standalone and must not create real league draft picks or roster entries.
+
+For another device or tunnel, configure the existing public URL environment variables and keep both browser sessions pointed at the same backend/database. Do not expose secrets in frontend env files.
 
 Mock draft retention cleanup:
 

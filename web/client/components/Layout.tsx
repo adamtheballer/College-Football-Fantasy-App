@@ -22,6 +22,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { AppOnboardingTour } from "./AppOnboardingTour";
 import { clearPendingGuide, hasPendingGuide } from "@/lib/onboarding";
 import { FloatingQuickActions } from "./FloatingQuickActions";
+import { useActiveLeagueId } from "@/hooks/use-active-league";
+import { useLeagueDetail } from "@/hooks/use-leagues";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -38,15 +40,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isLoggedIn } = useAuth();
+  const { activeLeagueId } = useActiveLeagueId();
+  const { data: activeLeague } = useLeagueDetail(
+    activeLeagueId ?? undefined,
+    isLoggedIn && typeof activeLeagueId === "number"
+  );
   const [isGuideActive, setIsGuideActive] = useState(false);
   const mainScrollRef = useRef<HTMLElement | null>(null);
   const isAuthScreen = location.pathname === "/login" || location.pathname === "/signup";
 
-  const sidebarItems: SidebarItem[] = isLoggedIn
-    ? [
+  const activeDraftStatus = activeLeague?.draft?.status ?? null;
+  const shouldShowRealDraftTab = Boolean(
+    activeLeagueId && activeDraftStatus && ["scheduled", "live", "paused"].includes(activeDraftStatus)
+  );
+  const realDraftPath =
+    activeLeagueId && activeDraftStatus === "live"
+      ? `/league/${activeLeagueId}/draft`
+      : activeLeagueId
+        ? `/league/${activeLeagueId}/lobby`
+        : "/leagues";
+
+  const loggedInSidebarItems: SidebarItem[] = [
         { name: "HOME", path: "/", icon: Home },
         { name: "LEAGUES", path: "/leagues", icon: Trophy },
-        { name: "DRAFT", path: "/draft", icon: Clock3 },
+        ...(shouldShowRealDraftTab ? [{ name: "DRAFT", path: realDraftPath, icon: Clock3 }] : []),
         { name: "ROSTER", path: "/rosters", icon: ClipboardList },
         { name: "CHATS", path: "/chats", icon: MessageSquare },
         { name: "WATCHLIST", path: "/watchlists", icon: Bookmark },
@@ -61,7 +78,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           icon: LogOut,
           onClick: logout,
         },
-      ]
+      ];
+
+  const sidebarItems: SidebarItem[] = isLoggedIn
+    ? loggedInSidebarItems
     : [
         { name: "HOME", path: "/", icon: Home },
         { name: "LEAGUES", path: "/leagues", icon: Trophy },

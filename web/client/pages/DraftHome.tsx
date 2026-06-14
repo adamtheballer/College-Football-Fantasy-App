@@ -10,6 +10,9 @@ export default function DraftHome() {
   const navigate = useNavigate();
   const { data: leagues = [], isLoading: leaguesLoading } = useLeagues(12);
   const { data: recentMocks, isLoading: mocksLoading } = useRecentMockDrafts();
+  const realDraftLeagues = leagues.filter((league) =>
+    ["scheduled", "live", "paused"].includes(league.draft?.status ?? "")
+  );
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 py-8">
@@ -64,15 +67,15 @@ export default function DraftHome() {
           <CardContent className="space-y-3">
             {leaguesLoading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading leagues...</div>
-            ) : leagues.length === 0 ? (
-              <p className="text-sm font-semibold text-muted-foreground">No leagues yet.</p>
+            ) : realDraftLeagues.length === 0 ? (
+              <p className="text-sm font-semibold text-muted-foreground">No scheduled or live real drafts.</p>
             ) : (
-              leagues.map((league) => (
+              realDraftLeagues.map((league) => (
                 <button
                   key={league.id}
                   type="button"
                   className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left hover:bg-white/[0.06]"
-                  onClick={() => navigate(`/league/${league.id}/draft`)}
+                  onClick={() => navigate(league.draft?.status === "live" ? `/league/${league.id}/draft` : `/league/${league.id}/lobby`)}
                 >
                   <div>
                     <p className="font-black text-foreground">{league.name}</p>
