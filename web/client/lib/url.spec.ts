@@ -14,13 +14,13 @@ describe("public invite URL helpers", () => {
   });
 
   it("detects localhost invite links", () => {
-    expect(isLocalhostUrl("http://localhost:5173/draft/mock/invite/token")).toBe(true);
-    expect(isLocalhostUrl("http://127.0.0.1:5173/draft/mock/invite/token")).toBe(true);
-    expect(isLocalhostUrl("http://0.0.0.0:5173/draft/mock/invite/token")).toBe(true);
+    expect(isLocalhostUrl("http://localhost:8080/draft/mock/invite/token")).toBe(true);
+    expect(isLocalhostUrl("http://127.0.0.1:8080/draft/mock/invite/token")).toBe(true);
+    expect(isLocalhostUrl("http://0.0.0.0:8080/draft/mock/invite/token")).toBe(true);
   });
 
   it("shows local-only warning for localhost invite links", () => {
-    const status = getInviteLinkStatus("http://localhost:5173/draft/mock/invite/token");
+    const status = getInviteLinkStatus("http://localhost:8080/draft/mock/invite/token");
 
     expect(status.label).toBe("Local-only link");
     expect(status.isLocalOnly).toBe(true);
@@ -46,7 +46,7 @@ describe("public invite URL helpers", () => {
 
   it("extracts mock invite tokens from pasted links and legacy query links", () => {
     expect(extractMockInviteToken("https://frontend-tunnel.example/draft/mock/invite/secure-token")).toBe("secure-token");
-    expect(extractMockInviteToken("http://localhost:5173/draft/mock/join?code=legacy-token")).toBe("legacy-token");
+    expect(extractMockInviteToken("http://localhost:8080/draft/mock/join?code=legacy-token")).toBe("legacy-token");
     expect(extractMockInviteToken("plain-token")).toBe("plain-token");
   });
 });

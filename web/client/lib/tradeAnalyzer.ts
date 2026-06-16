@@ -4,7 +4,7 @@ export type TradePlayer = {
   pos: string;
   school: string;
   fpts: number;
-  posRank: number;
+  posRank?: number | null;
   status?: string;
 };
 

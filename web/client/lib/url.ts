@@ -23,7 +23,7 @@ export const isLocalhostUrl = (url: string): boolean => {
 
 export const getPublicWebUrl = (): string => {
   const browserOrigin = typeof window !== "undefined" ? window.location.origin : "";
-  const configured = import.meta.env.VITE_PUBLIC_WEB_URL || browserOrigin || "http://localhost:5173";
+  const configured = import.meta.env.VITE_PUBLIC_WEB_URL || browserOrigin || "http://localhost:8080";
   return configured.replace(/\/+$/, "");
 };
 

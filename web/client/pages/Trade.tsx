@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -202,6 +203,7 @@ const TradeList = ({
 export default function Trade() {
   const { leagueId: leagueIdParam, playerId: playerIdParam } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: leagues = [], isLoading: leaguesLoading } = useLeagues(50, true);
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
 
@@ -355,6 +357,11 @@ export default function Trade() {
     setProposalMessage(null);
     try {
       const response = await apiPost<TradeProposalResponse>("/trades/propose", payload);
+      queryClient.invalidateQueries({ queryKey: ["league", league.id, "workspace"] });
+      queryClient.invalidateQueries({ queryKey: ["league", league.id, "teams"] });
+      queryClient.invalidateQueries({ queryKey: ["team", ownedTeamId, "roster"] });
+      queryClient.invalidateQueries({ queryKey: ["team", opponentTeamId, "roster"] });
+      queryClient.invalidateQueries({ queryKey: ["trades", league.id] });
       setProposalMessage(response.message);
       toast({
         title: "Trade offer sent",
@@ -407,13 +414,13 @@ export default function Trade() {
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="space-y-2">
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">
-            Trade Analyzer
+            Basic Trade Estimate
           </p>
           <h1 className="text-6xl font-black italic uppercase tracking-tight text-foreground">
             Trade Builder
           </h1>
           <p className="text-sm text-muted-foreground">
-            Select players from both rosters and compare trade value.
+            Select players from both rosters and compare a projection-only trade estimate.
           </p>
         </div>
         <Button

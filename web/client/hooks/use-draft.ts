@@ -11,13 +11,6 @@ import type {
   DraftRoomSnapshot,
 } from "@/types/draft";
 
-type DraftPracticeSetupRequest = {
-  team_count?: number;
-  reset_existing?: boolean;
-  start_now?: boolean;
-  mock_team_prefix?: string;
-};
-
 type DraftRoomStatusUpdateRequest = {
   status: "active" | "paused" | "filling" | "lobby_open" | "countdown" | "abandoned";
 };
@@ -137,7 +130,7 @@ export function useDraftRoomRealtime(leagueId?: number, enabled = true) {
       try {
         const snapshot = await apiGet<DraftRoomSnapshot>(`/leagues/${leagueId}/draft-room/snapshot`, {
           since_seq: sinceSeq,
-          limit: 250,
+          limit: 100,
         });
         if (!isActive) return;
         applySnapshot(snapshot);
@@ -301,25 +294,6 @@ export function useDraftHistoryEmail(leagueId?: number) {
         throw new Error("Draft history email is missing a valid league id.");
       }
       return apiPost<DraftHistoryEmailResponse>(`/leagues/${leagueId}/draft-history/email`, payload);
-    },
-  });
-}
-
-export function useDraftPracticeSetup(leagueId?: number) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (payload: DraftPracticeSetupRequest) => {
-      if (typeof leagueId !== "number" || Number.isNaN(leagueId)) {
-        throw new Error("Draft setup is missing a valid league id.");
-      }
-      return apiPost<DraftRoom>(`/leagues/${leagueId}/draft-room/practice-setup`, payload);
-    },
-    onSuccess: (payload) => {
-      queryClient.setQueryData(["league", leagueId, "draft-room"], payload);
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "teams"] });
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
     },
   });
 }

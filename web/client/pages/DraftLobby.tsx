@@ -71,7 +71,7 @@ export default function DraftLobby() {
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNow(Date.now());
-    }, 30_000);
+    }, 1_000);
     return () => window.clearInterval(timer);
   }, []);
 

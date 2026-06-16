@@ -284,22 +284,11 @@ export function usePlayers(
 
       const projectionByPlayerId = new Map<number, BackendProjectionRead>();
       const overallRankByPlayer = new Map<number, number>();
-      const posRankByPlayer = new Map<number, number>();
-      const playerById = new Map<number, BackendPlayerRead>(
-        payload.data.map((player): [number, BackendPlayerRead] => [player.id, player])
-      );
 
       const sortedProjections = [...projections.data].sort((a, b) => b.fantasy_points - a.fantasy_points);
-      const positionCounters = new Map<string, number>();
       sortedProjections.forEach((row, index) => {
         projectionByPlayerId.set(row.player_id, row);
         overallRankByPlayer.set(row.player_id, index + 1);
-        const player = playerById.get(row.player_id);
-        if (!player) return;
-        const currentRank = positionCounters.get(player.position) ?? 0;
-        const nextRank = currentRank + 1;
-        positionCounters.set(player.position, nextRank);
-        posRankByPlayer.set(player.id, nextRank);
       });
 
       const conferenceEntries: Array<[string, string]> = teams.data.map(
@@ -318,7 +307,7 @@ export function usePlayers(
             conference: conferenceBySchool.get(player.school.toUpperCase()) ?? "N/A",
             rank: player.sheet_adp ?? overallRankByPlayer.get(player.id) ?? 0,
             adp: player.sheet_adp ?? overallRankByPlayer.get(player.id) ?? 0,
-            posRank: posRankByPlayer.get(player.id) ?? 0,
+            posRank: null,
             status: injuryByPlayerId.get(player.id),
             projection: projectionByPlayerId.get(player.id),
           })
@@ -383,7 +372,7 @@ export function usePlayerDetail(playerId?: number | null, enabled = true) {
         conference: conferenceBySchool.get(payload.school.toUpperCase()) ?? "N/A",
         rank: payload.sheet_adp ?? 0,
         adp: payload.sheet_adp ?? 0,
-        posRank: 0,
+        posRank: null,
         status: injuryByPlayerId.get(payload.id),
         projection,
       });

@@ -317,6 +317,9 @@ export default function LeagueDetail() {
                 <p className="mt-2 text-sm font-bold text-foreground">
                   {league.settings.playoff_teams}
                 </p>
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/55">
+                  Future setting; playoff brackets are not enabled in alpha.
+                </p>
               </div>
             </CardContent>
           </Card>

@@ -554,7 +554,7 @@ export default function CreateLeague() {
               <div className="space-y-2">
                 <SettingLabel
                   label="Playoff Teams"
-                  description="Number of teams that qualify for playoffs. Keep this proportional to league size."
+                  description="Saved for standings and future playoff seeding. Automated playoff brackets are not enabled yet."
                 />
                 <Select
                   value={String(settings.playoff_teams)}

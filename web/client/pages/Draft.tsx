@@ -16,7 +16,6 @@ import {
   useDraftQueueClear,
   useDraftQueueRemove,
   useDraftPick,
-  useDraftPracticeSetup,
   useDraftRoom,
   useDraftRoomRealtime,
   useDraftSheetSync,
@@ -287,7 +286,6 @@ export default function Draft() {
     error: draftRoomError,
   } = useDraftRoom(parsedLeagueId);
   useDraftRoomRealtime(parsedLeagueId, true);
-  const draftPracticeSetup = useDraftPracticeSetup(parsedLeagueId);
   const pickMutation = useDraftPick(parsedLeagueId);
   const autoPickMutation = useDraftAutoPick(parsedLeagueId);
   const historyEmailMutation = useDraftHistoryEmail(parsedLeagueId);
@@ -298,7 +296,6 @@ export default function Draft() {
   const queueAddMutation = useDraftQueueAdd(parsedLeagueId, userTeamId);
   const queueRemoveMutation = useDraftQueueRemove(parsedLeagueId, userTeamId);
   const queueClearMutation = useDraftQueueClear(parsedLeagueId, userTeamId);
-  const [autoOpenedDraft, setAutoOpenedDraft] = useState(false);
   const [autoSheetSyncTriggered, setAutoSheetSyncTriggered] = useState(false);
   const [accessRecoveryAttempted, setAccessRecoveryAttempted] = useState(false);
   const [completionModalDismissed, setCompletionModalDismissed] = useState(false);
@@ -338,7 +335,6 @@ export default function Draft() {
   } = usePlayerSeasonSummary(selectedPlayerId, 2025, selectedPlayerId !== null);
 
   useEffect(() => {
-    setAutoOpenedDraft(false);
     draftStartFxShownRef.current = false;
     draftCompleteFxShownRef.current = false;
     if (draftStartFxTimeoutRef.current !== null) {
@@ -365,27 +361,6 @@ export default function Draft() {
     setActiveLeagueId(null);
     navigate("/draft", { replace: true });
   }, [accessRecoveryAttempted, draftRoomError, navigate, setActiveLeagueId]);
-
-  useEffect(() => {
-    if (!parsedLeagueId || autoOpenedDraft || draftPracticeSetup.isPending) return;
-
-    const draftMissing = draftRoomError instanceof ApiError && draftRoomError.status === 404;
-    if (!draftMissing) return;
-
-    setAutoOpenedDraft(true);
-    draftPracticeSetup.mutate({
-      team_count: 12,
-      reset_existing: true,
-      start_now: false,
-      mock_team_prefix: "Auto Manager",
-    });
-  }, [
-    autoOpenedDraft,
-    draftPracticeSetup,
-    draftRoom,
-    draftRoomError,
-    parsedLeagueId,
-  ]);
 
   const draftTeams = useMemo(() => (Array.isArray(draftRoom?.teams) ? draftRoom.teams : []), [draftRoom?.teams]);
   const draftPicks = useMemo(() => (Array.isArray(draftRoom?.picks) ? draftRoom.picks : []), [draftRoom?.picks]);
@@ -1169,18 +1144,14 @@ export default function Draft() {
     );
   }
 
-  if (draftRoomLoading || draftPracticeSetup.isPending) {
+  if (draftRoomLoading) {
     return (
       <div className="max-w-5xl mx-auto py-16">
         <Card className="bg-card/40 border-white/10 rounded-[2.5rem]">
           <CardContent className="p-12 flex items-center justify-center gap-3">
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/70">
-              {draftRoomLoading
-                ? "Loading live draft room..."
-                : draftPracticeSetup.isPending
-                  ? "Opening pre-draft lobby..."
-                  : "Building ADP board..."}
+              Loading live draft room...
             </p>
           </CardContent>
         </Card>

@@ -290,8 +290,7 @@ export default function Index() {
               </p>
             </div>
             <h1
-              className="cfb-home-hero-title text-6xl font-black italic uppercase tracking-tight md:text-7xl"
-              data-text={dashboardHeroTitle}
+              className="bg-gradient-to-r from-white via-cyan-100 to-blue-200 bg-clip-text text-6xl font-black italic uppercase tracking-tight text-transparent md:text-7xl"
             >
               {dashboardHeroTitle}
             </h1>
