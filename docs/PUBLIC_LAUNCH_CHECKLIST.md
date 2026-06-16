@@ -38,6 +38,11 @@ The project is not public-launch-ready until every P0 and P1 item is complete.
 - [ ] Provider data import and refresh runbooks are tested.
 - [ ] API collections are updated for supported flows.
 
+## In-Progress Evidence
+
+- Local dev boot reliability: API and UI now consistently use `http://localhost:8000` and `http://localhost:8080`; `make dev-local` starts both without Docker when an existing database is available.
+- Auth/session abuse hardening: failed-login throttling is implemented for `/auth/login`. This is not complete enough to check the P1 auth gate; remaining work includes distributed rate limiting, signup throttling, refresh abuse controls, and production proxy/IP trust policy.
+
 ## Feature Readiness Targets
 
 - Auth/session: 9/10 before public launch.

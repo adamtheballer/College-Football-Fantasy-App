@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     refresh_cookie_secure: bool = False
     refresh_cookie_samesite: str = "lax"
     refresh_cookie_domain: str | None = None
+    auth_failed_login_limit: int = 5
+    auth_failed_login_window_seconds: int = 60
     allow_legacy_api_token_auth: bool = False
     realtime_relay_enabled: bool = True
     realtime_relay_poll_interval_ms: int = 350

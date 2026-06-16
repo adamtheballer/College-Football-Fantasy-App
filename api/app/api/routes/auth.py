@@ -24,6 +24,11 @@ from api.app.schemas.auth import (
     UserLogin,
     UserRead,
 )
+from api.app.services.auth_rate_limit import (
+    assert_login_not_rate_limited,
+    clear_failed_logins,
+    record_failed_login,
+)
 
 router = APIRouter()
 
@@ -119,9 +124,12 @@ def signup(payload: UserCreate, response: Response, request: Request, db: Sessio
 
 @router.post("/login", response_model=AuthResponse)
 def login(payload: UserLogin, response: Response, request: Request, db: Session = Depends(get_db)) -> AuthResponse:
+    assert_login_not_rate_limited(request, payload.email)
     user = db.query(User).filter(User.email == payload.email.lower()).first()
     if not user or not verify_password(payload.password, user.password_hash):
+        record_failed_login(request, payload.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
+    clear_failed_logins(request, payload.email)
     now = _now_utc()
     user.last_login = now
     refresh_token = _create_refresh_session(db, user_id=user.id, request=request)

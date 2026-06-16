@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from api.app.core.config import settings
 from api.app.core.security import create_access_token
 from api.app.models.refresh_session import RefreshSession
+from api.app.services.auth_rate_limit import reset_auth_rate_limits
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -20,6 +21,38 @@ def signup_user(client, suffix: str = "one") -> dict:
     )
     assert response.status_code == 201
     return response.json()
+
+
+def test_login_rate_limits_repeated_failed_attempts(client):
+    reset_auth_rate_limits()
+    original_limit = settings.auth_failed_login_limit
+    original_window = settings.auth_failed_login_window_seconds
+    try:
+        settings.auth_failed_login_limit = 2
+        settings.auth_failed_login_window_seconds = 60
+        signup_user(client, "rate-limit")
+
+        first = client.post(
+            "/auth/login",
+            json={"email": "coach-rate-limit@example.com", "password": "wrong"},
+        )
+        second = client.post(
+            "/auth/login",
+            json={"email": "coach-rate-limit@example.com", "password": "wrong"},
+        )
+        blocked = client.post(
+            "/auth/login",
+            json={"email": "coach-rate-limit@example.com", "password": "wrong"},
+        )
+
+        assert first.status_code == 401
+        assert second.status_code == 401
+        assert blocked.status_code == 429
+        assert blocked.headers["retry-after"] == "60"
+    finally:
+        settings.auth_failed_login_limit = original_limit
+        settings.auth_failed_login_window_seconds = original_window
+        reset_auth_rate_limits()
 
 
 def test_signup_returns_access_token_and_refresh_cookie(client):

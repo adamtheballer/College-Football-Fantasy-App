@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help db-up db-down migrate api web dev bootstrap test-backend test-web test-e2e
+.PHONY: help db-up db-down migrate api web dev dev-local bootstrap test-backend test-web test-e2e
 
 help:
 	@echo "CollegeFootballFantasy local commands"
@@ -9,6 +9,7 @@ help:
 	@echo "  make api            # start API only (localhost:8000)"
 	@echo "  make web            # start web only (localhost:8080)"
 	@echo "  make migrate        # run alembic migrations"
+	@echo "  make dev-local      # start API + UI without Docker, using existing DB"
 	@echo "  make test-backend   # run backend tests"
 	@echo "  make test-web       # run web typecheck + unit tests"
 	@echo "  make test-e2e       # run Playwright critical browser tests"
@@ -30,6 +31,9 @@ web:
 
 dev:
 	./scripts/dev.sh
+
+dev-local:
+	./scripts/dev-local.sh
 
 bootstrap: db-up
 	uv sync

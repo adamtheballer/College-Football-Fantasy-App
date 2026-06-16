@@ -1,30 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-  COMPOSE_BIN=(docker compose)
-elif command -v docker-compose >/dev/null 2>&1; then
-  COMPOSE_BIN=(docker-compose)
-else
-  echo "docker compose not found. Install Docker Desktop or docker-compose." >&2
-  exit 1
-fi
-
-DB_PORT="${DB_PORT:-5433}"
-export DB_PORT
+export DB_PORT="${DB_PORT:-5433}"
 export DATABASE_URL="${DATABASE_URL:-postgresql+psycopg://postgres:postgres@localhost:${DB_PORT}/collegefootballfantasy}"
 export UI_BASE_URL="${UI_BASE_URL:-http://localhost:8080}"
-
-echo "Starting postgres..."
-"${COMPOSE_BIN[@]}" up -d db --remove-orphans
+export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}"
 
 if ! command -v uv >/dev/null 2>&1; then
   echo "uv not found. Install with: curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
   exit 1
 fi
-
-echo "Syncing dependencies..."
-uv sync
 
 if ! command -v npm >/dev/null 2>&1; then
   echo "npm not found. Install Node.js to run the React UI." >&2
@@ -36,14 +21,14 @@ if [ ! -d web/node_modules ]; then
   npm --prefix web install
 fi
 
-echo "Running migrations..."
-PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head
+echo "Starting API and UI without Docker."
+echo "This requires an existing database reachable at: ${DATABASE_URL}"
+echo "If the API fails readiness, start Postgres or run: make dev"
 
-echo "Starting API and UI..."
-PYTHONPATH=. uv run uvicorn api.app.main:app --host 0.0.0.0 --port 8000 &
+PYTHONPATH=. uv run uvicorn api.app.main:app --host 0.0.0.0 --port 8000 --reload &
 API_PID=$!
 
-npm --prefix web run dev -- --host 0.0.0.0 &
+npm --prefix web run dev -- --host 0.0.0.0 --port 8080 &
 UI_PID=$!
 
 echo "API -> http://localhost:8000"

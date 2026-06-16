@@ -57,6 +57,12 @@ make bootstrap
 make dev
 ```
 
+If Docker is unavailable but a local Postgres database is already running, use:
+
+```bash
+make dev-local
+```
+
 Common verification commands:
 
 ```bash
