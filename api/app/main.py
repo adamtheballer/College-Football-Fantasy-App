@@ -66,17 +66,7 @@ def _extract_origin(url: str) -> str | None:
 
 
 def build_cors_origins() -> list[str]:
-    origins = [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-        "http://localhost:5175",
-        "http://127.0.0.1:5175",
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
-    ]
-    origins.extend(settings.cors_origin_list)
+    origins = list(settings.cors_origin_list)
     for configured_url in (settings.ui_base_url, settings.public_web_url):
         origin = _extract_origin(configured_url)
         if origin:

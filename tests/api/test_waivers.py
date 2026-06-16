@@ -1,3 +1,6 @@
+import pytest
+
+from api.app.api.routes import waivers as waiver_routes
 from api.app.models.roster import RosterEntry
 from api.app.models.team import Team
 from api.app.models.transaction import Transaction
@@ -274,3 +277,95 @@ def test_create_waiver_claim_idempotency_key_replays_without_duplicate(client, d
 
     claims = db_session.query(WaiverClaim).filter(WaiverClaim.league_id == league["id"]).all()
     assert len(claims) == 1
+
+
+def test_failed_waiver_claim_create_rolls_back_claim(client, db_session, monkeypatch):
+    owner_user_id, owner_token = create_user_and_token(client, "owner-create-rollback")
+    league = create_league(client, owner_token, waiver_type="faab")
+    owner_team = _team_for_user(db_session, league["id"], owner_user_id)
+
+    drop_player_id, _unused_player_id, target_player_id = create_players(client)
+    add_response = client.post(
+        f"/teams/{owner_team.id}/roster",
+        json={"player_id": drop_player_id, "slot": "RB", "status": "active"},
+        headers=auth_headers(owner_token),
+    )
+    assert add_response.status_code == 201
+
+    def fail_emit(*_args, **_kwargs):
+        raise RuntimeError("forced claim create failure")
+
+    monkeypatch.setattr(waiver_routes, "_emit_waiver_event", fail_emit)
+
+    with pytest.raises(RuntimeError):
+        client.post(
+            f"/leagues/{league['id']}/waivers/claims",
+            json={
+                "team_id": owner_team.id,
+                "add_player_id": target_player_id,
+                "drop_player_id": drop_player_id,
+                "bid_amount": 7,
+            },
+            headers=auth_headers(owner_token) | {"Idempotency-Key": "waiver-create-fail"},
+        )
+
+    db_session.expire_all()
+    claims = db_session.query(WaiverClaim).filter(WaiverClaim.league_id == league["id"]).all()
+    assert claims == []
+
+
+def test_failed_waiver_process_rolls_back_claim_and_roster_mutations(client, db_session, monkeypatch):
+    owner_user_id, owner_token = create_user_and_token(client, "owner-process-rollback")
+    league = create_league(client, owner_token, waiver_type="faab")
+    owner_team = _team_for_user(db_session, league["id"], owner_user_id)
+
+    drop_player_id, _unused_player_id, target_player_id = create_players(client)
+    add_response = client.post(
+        f"/teams/{owner_team.id}/roster",
+        json={"player_id": drop_player_id, "slot": "RB", "status": "active"},
+        headers=auth_headers(owner_token),
+    )
+    assert add_response.status_code == 201
+    claim_response = client.post(
+        f"/leagues/{league['id']}/waivers/claims",
+        json={
+            "team_id": owner_team.id,
+            "add_player_id": target_player_id,
+            "drop_player_id": drop_player_id,
+            "bid_amount": 7,
+        },
+        headers=auth_headers(owner_token),
+    )
+    assert claim_response.status_code == 201
+
+    def fail_process(db, *, league_id: int, acted_by_user_id: int | None, batch_key: str):
+        claim = db.query(WaiverClaim).filter(WaiverClaim.league_id == league_id).one()
+        claim.status = "won"
+        db.add(
+            RosterEntry(
+                league_id=league_id,
+                team_id=owner_team.id,
+                player_id=target_player_id,
+                slot="RB",
+                status="active",
+            )
+        )
+        db.flush()
+        raise RuntimeError("forced waiver process failure")
+
+    monkeypatch.setattr(waiver_routes, "process_pending_waiver_claims", fail_process)
+
+    with pytest.raises(RuntimeError):
+        client.post(
+            f"/leagues/{league['id']}/waivers/process",
+            json={"batch_key": "rollback-batch"},
+            headers=auth_headers(owner_token) | {"Idempotency-Key": "waiver-process-fail"},
+        )
+
+    db_session.expire_all()
+    claim = db_session.query(WaiverClaim).filter(WaiverClaim.league_id == league["id"]).one()
+    rostered_player_ids = {
+        row.player_id for row in db_session.query(RosterEntry).filter(RosterEntry.team_id == owner_team.id).all()
+    }
+    assert claim.status == "pending"
+    assert target_player_id not in rostered_player_ids

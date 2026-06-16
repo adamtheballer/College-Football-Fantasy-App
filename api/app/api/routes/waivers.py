@@ -333,50 +333,51 @@ def create_waiver_claim_endpoint(
     if idem.replay and idem.response_payload is not None and idem.response_status_code is not None:
         return JSONResponse(status_code=idem.response_status_code, content=idem.response_payload)
 
-    claim = WaiverClaim(
-        league_id=league.id,
-        team_id=team.id,
-        created_by_user_id=current_user.id,
-        add_player_id=add_player.id,
-        drop_player_id=drop_player_id,
-        bid_amount=bid_amount,
-        note=payload.note,
-        priority_snapshot=current_team.waiver_priority,
-        status="pending",
-    )
-    db.add(claim)
-    db.flush()
-
-    _emit_waiver_event(
-        db,
-        league_id=league.id,
-        event_type="waiver.claim.created",
-        payload={
-            "claim_id": claim.id,
-            "team_id": claim.team_id,
-            "add_player_id": claim.add_player_id,
-            "bid_amount": claim.bid_amount,
-            "mode": waiver_mode,
-        },
-    )
-
     try:
-        team_name_by_id = _team_name_map(db, league.id)
-        player_ids = {claim.add_player_id}
-        if claim.drop_player_id is not None:
-            player_ids.add(claim.drop_player_id)
-        player_by_id = _player_map(db, player_ids)
-        response_payload = _serialize_claim(
-            claim,
-            team_name_by_id=team_name_by_id,
-            player_by_id=player_by_id,
-        ).model_dump(mode="json")
-        complete_idempotent_request(
-            db,
-            start=idem,
-            response_status_code=status.HTTP_201_CREATED,
-            response_payload=response_payload,
-        )
+        with db.begin_nested():
+            claim = WaiverClaim(
+                league_id=league.id,
+                team_id=team.id,
+                created_by_user_id=current_user.id,
+                add_player_id=add_player.id,
+                drop_player_id=drop_player_id,
+                bid_amount=bid_amount,
+                note=payload.note,
+                priority_snapshot=current_team.waiver_priority,
+                status="pending",
+            )
+            db.add(claim)
+            db.flush()
+
+            _emit_waiver_event(
+                db,
+                league_id=league.id,
+                event_type="waiver.claim.created",
+                payload={
+                    "claim_id": claim.id,
+                    "team_id": claim.team_id,
+                    "add_player_id": claim.add_player_id,
+                    "bid_amount": claim.bid_amount,
+                    "mode": waiver_mode,
+                },
+            )
+
+            team_name_by_id = _team_name_map(db, league.id)
+            player_ids = {claim.add_player_id}
+            if claim.drop_player_id is not None:
+                player_ids.add(claim.drop_player_id)
+            player_by_id = _player_map(db, player_ids)
+            response_payload = _serialize_claim(
+                claim,
+                team_name_by_id=team_name_by_id,
+                player_by_id=player_by_id,
+            ).model_dump(mode="json")
+            complete_idempotent_request(
+                db,
+                start=idem,
+                response_status_code=status.HTTP_201_CREATED,
+                response_payload=response_payload,
+            )
         db.commit()
         return response_payload
     except Exception:
@@ -408,7 +409,7 @@ def list_waiver_claims_endpoint(
     rows = (
         query.order_by(WaiverClaim.created_at.desc(), WaiverClaim.id.desc())
         .offset(max(0, offset))
-        .limit(max(1, min(limit, 200)))
+        .limit(max(1, min(limit, 100)))
         .all()
     )
 
@@ -423,7 +424,7 @@ def list_waiver_claims_endpoint(
     return WaiverClaimList(
         data=[_serialize_claim(row, team_name_by_id=team_name_by_id, player_by_id=player_by_id) for row in rows],
         total=total,
-        limit=max(1, min(limit, 200)),
+        limit=max(1, min(limit, 100)),
         offset=max(0, offset),
     )
 
@@ -491,34 +492,35 @@ def process_waiver_claims_endpoint(
         return JSONResponse(status_code=idem.response_status_code, content=idem.response_payload)
     batch_key = payload.batch_key.strip() if payload.batch_key else f"{league.season_year}-w1-{int(_utc_now().timestamp())}"
     try:
-        execution = process_pending_waiver_claims(
-            db,
-            league_id=league.id,
-            acted_by_user_id=current_user.id,
-            batch_key=batch_key,
-        )
-        append_admin_action(
-            db,
-            league_id=league.id,
-            actor_user_id=current_user.id,
-            action_type="waivers.processed",
-            target_type="league",
-            target_id=league.id,
-            metadata={
-                "batch_key": batch_key,
-                "processed_count": execution.response.processed_count,
-                "won_count": execution.response.won_count,
-                "lost_count": execution.response.lost_count,
-                "invalid_count": execution.response.invalid_count,
-            },
-        )
-        response_payload = execution.response.model_dump(mode="json")
-        complete_idempotent_request(
-            db,
-            start=idem,
-            response_status_code=status.HTTP_200_OK,
-            response_payload=response_payload,
-        )
+        with db.begin_nested():
+            execution = process_pending_waiver_claims(
+                db,
+                league_id=league.id,
+                acted_by_user_id=current_user.id,
+                batch_key=batch_key,
+            )
+            append_admin_action(
+                db,
+                league_id=league.id,
+                actor_user_id=current_user.id,
+                action_type="waivers.processed",
+                target_type="league",
+                target_id=league.id,
+                metadata={
+                    "batch_key": batch_key,
+                    "processed_count": execution.response.processed_count,
+                    "won_count": execution.response.won_count,
+                    "lost_count": execution.response.lost_count,
+                    "invalid_count": execution.response.invalid_count,
+                },
+            )
+            response_payload = execution.response.model_dump(mode="json")
+            complete_idempotent_request(
+                db,
+                start=idem,
+                response_status_code=status.HTTP_200_OK,
+                response_payload=response_payload,
+            )
         db.commit()
         return response_payload
     except Exception:

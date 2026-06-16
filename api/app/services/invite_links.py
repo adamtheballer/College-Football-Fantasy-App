@@ -8,12 +8,13 @@ from api.app.core.config import settings
 
 
 LOCALHOST_NAMES = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
+DEFAULT_LOCAL_WEB_URL = "http://localhost:8080"
 
 
 def _parse_url(value: str):
     candidate = value.strip()
     if not candidate:
-        candidate = "http://localhost:5173"
+        candidate = DEFAULT_LOCAL_WEB_URL
     if "://" not in candidate:
         candidate = f"https://{candidate}"
     return urlparse(candidate)
@@ -22,9 +23,9 @@ def _parse_url(value: str):
 def normalize_public_web_url() -> str:
     parsed = _parse_url(settings.public_web_url or settings.ui_base_url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return "http://localhost:5173"
+        return DEFAULT_LOCAL_WEB_URL
     base = f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip("/")
-    return base or "http://localhost:5173"
+    return base or DEFAULT_LOCAL_WEB_URL
 
 
 def is_localhost_url(url: str) -> bool:

@@ -73,6 +73,47 @@ def add_player(db_session, name: str, position: str = "QB", school: str = "Texas
     return player
 
 
+def test_create_players_requires_auth_in_production(client, monkeypatch):
+    monkeypatch.setattr("api.app.api.routes.players.settings.environment", "production")
+
+    response = client.post(
+        "/players",
+        json=[
+            {
+                "external_id": None,
+                "name": "Prod Locked QB",
+                "position": "QB",
+                "school": "Texas",
+                "image_url": None,
+            }
+        ],
+    )
+
+    assert response.status_code == 401
+
+
+def test_create_players_allows_authenticated_user_in_production(client, monkeypatch):
+    token = create_user_and_token(client, "prod-player-create")
+    monkeypatch.setattr("api.app.api.routes.players.settings.environment", "production")
+
+    response = client.post(
+        "/players",
+        json=[
+            {
+                "external_id": None,
+                "name": "Prod Auth QB",
+                "position": "QB",
+                "school": "Texas",
+                "image_url": None,
+            }
+        ],
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 201
+    assert response.json()[0]["name"] == "Prod Auth QB"
+
+
 def test_list_players_returns_imported_players_and_empty_pool(client, db_session):
     empty = client.get("/players")
     assert empty.status_code == 200

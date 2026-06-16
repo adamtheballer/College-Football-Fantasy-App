@@ -13,6 +13,7 @@ from api.app.models.player import Player
 from api.app.models.player_stat import PlayerStat
 from api.app.models.team import Team
 from api.app.models.team_weekly_score import TeamWeeklyScore
+from api.app.scoring import build_rules_bundle_from_league_scoring_json
 from api.app.schemas.scoring import MatchupScoreRead, TeamWeeklyScoreRead, WeekScoreResponse
 
 
@@ -60,27 +61,30 @@ def number_from_stats(stats: dict[str, Any], key: str) -> float:
 def _league_scoring(db: Session, league: League) -> dict[str, float]:
     settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
     raw = settings.scoring_json if settings and isinstance(settings.scoring_json, dict) else {}
-    scoring = dict(DEFAULT_SCORING)
-    aliases = {
-        "ppr": "receptions",
-        "passing_td": "passing_touchdowns",
-        "passing_tds": "passing_touchdowns",
-        "pass_td": "passing_touchdowns",
-        "int": "interceptions",
-        "rush_yd": "rushing_yards",
-        "rec_yd": "receiving_yards",
-        "fg": "field_goals_made",
-        "xp": "extra_points_made",
+    rules_bundle = build_rules_bundle_from_league_scoring_json(raw)
+    offense = rules_bundle.get("offense", {})
+    kicker = rules_bundle.get("kicker", {})
+    offense_rules = offense if isinstance(offense, dict) else {}
+    kicker_rules = kicker if isinstance(kicker, dict) else {}
+    return {
+        "passing_yards": float(offense_rules.get("PassingYards", DEFAULT_SCORING["passing_yards"])),
+        "passing_touchdowns": float(
+            offense_rules.get("PassingTouchdowns", DEFAULT_SCORING["passing_touchdowns"])
+        ),
+        "interceptions": float(offense_rules.get("PassingInterceptions", DEFAULT_SCORING["interceptions"])),
+        "rushing_yards": float(offense_rules.get("RushingYards", DEFAULT_SCORING["rushing_yards"])),
+        "rushing_touchdowns": float(
+            offense_rules.get("RushingTouchdowns", DEFAULT_SCORING["rushing_touchdowns"])
+        ),
+        "receiving_yards": float(offense_rules.get("ReceivingYards", DEFAULT_SCORING["receiving_yards"])),
+        "receiving_touchdowns": float(
+            offense_rules.get("ReceivingTouchdowns", DEFAULT_SCORING["receiving_touchdowns"])
+        ),
+        "receptions": float(offense_rules.get("Receptions", DEFAULT_SCORING["receptions"])),
+        "fumbles_lost": float(offense_rules.get("FumblesLost", DEFAULT_SCORING["fumbles_lost"])),
+        "field_goals_made": float(kicker_rules.get("FieldGoalsMade0To49", DEFAULT_SCORING["field_goals_made"])),
+        "extra_points_made": float(kicker_rules.get("ExtraPointsMade", DEFAULT_SCORING["extra_points_made"])),
     }
-    for key, value in raw.items():
-        target = aliases.get(str(key), str(key))
-        if target not in scoring:
-            continue
-        try:
-            scoring[target] = float(value)
-        except (TypeError, ValueError):
-            continue
-    return scoring
 
 
 def calculate_player_fantasy_points(stats: dict[str, Any], scoring_json: dict[str, float]) -> tuple[float, dict]:

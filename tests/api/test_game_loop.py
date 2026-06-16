@@ -8,6 +8,7 @@ from api.app.models.standing import Standing
 from api.app.models.team import Team
 from api.app.models.team_weekly_score import TeamWeeklyScore
 from api.app.models.user import User
+from api.app.scoring import calculate_fantasy_points
 from api.app.services.scoring_service import calculate_player_fantasy_points
 
 
@@ -237,6 +238,12 @@ def test_calculate_player_fantasy_points_defaults_and_missing_stats():
 
     missing_points, _missing_breakdown = calculate_player_fantasy_points({"passing_yards": "bad"}, {})
     assert missing_points == 0.0
+
+    central_points = calculate_fantasy_points(
+        {"passing_yards": 250, "passing_touchdowns": 2, "interceptions": 1},
+        position="QB",
+    )
+    assert central_points == 16.0
 
 
 def test_score_and_finalize_week_are_idempotent_and_use_lineup_snapshots(client, db_session):

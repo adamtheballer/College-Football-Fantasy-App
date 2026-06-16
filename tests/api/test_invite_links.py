@@ -15,11 +15,11 @@ def test_build_mock_draft_invite_link_uses_public_web_url(monkeypatch):
 
 
 def test_localhost_public_web_url_produces_local_invite_link(monkeypatch):
-    monkeypatch.setattr(settings, "public_web_url", "http://localhost:5173")
+    monkeypatch.setattr(settings, "public_web_url", "http://localhost:8080")
 
     link = build_mock_draft_invite_link("local-token")
 
-    assert link == "http://localhost:5173/draft/mock/invite/local-token"
+    assert link == "http://localhost:8080/draft/mock/invite/local-token"
     assert is_localhost_url(link) is True
 
 
@@ -33,13 +33,14 @@ def test_public_web_url_produces_public_invite_link(monkeypatch):
 
 
 def test_cors_origin_builder_includes_public_web_url_origin(monkeypatch):
+    monkeypatch.setattr(settings, "cors_origins", "http://localhost:8080,http://127.0.0.1:8080")
     monkeypatch.setattr(settings, "ui_base_url", "https://ui-base.example/path")
     monkeypatch.setattr(settings, "public_web_url", "https://frontend-tunnel.example/draft")
 
     origins = build_cors_origins()
 
-    assert "http://localhost:5173" in origins
-    assert "http://127.0.0.1:5175" in origins
+    assert "http://localhost:8080" in origins
+    assert "http://127.0.0.1:8080" in origins
     assert "https://ui-base.example" in origins
     assert "https://frontend-tunnel.example" in origins
     assert "*" not in origins

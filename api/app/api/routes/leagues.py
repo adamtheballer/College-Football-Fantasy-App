@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, WebSocket, WebSocketDisconnect, status
-from sqlalchemy import and_, case, func
+from sqlalchemy import func
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
@@ -43,7 +43,6 @@ from api.app.models.scoring_run import ScoringRun
 from api.app.models.team import Team
 from api.app.models.user import User
 from api.app.models.watchlist import Watchlist, WatchlistPlayer
-from api.app.models.weekly_projection import WeeklyProjection
 from api.app.schemas.audit import AdminActionListRead, AdminActionRead
 from api.app.schemas.draft_room import (
     DraftAutoPickRequest,
@@ -243,11 +242,9 @@ REPLACEMENT_RANK_BY_POSITION: dict[str, int] = {
 }
 PROJECTION_WEIGHT = 1.00
 VALUE_ABOVE_REPLACEMENT_WEIGHT = 0.15
-DRAFT_AUTOPICKS_ENABLED = True
 DRAFT_PICK_TRANSITION_SECONDS = 3
 DRAFT_LOBBY_COUNTDOWN_SECONDS = 60
 DRAFT_START_VISUAL_SECONDS = 2
-DRAFT_CPU_AUTOPICK_BUFFER_SECONDS = 2
 DRAFT_LOBBY_CONNECTED_TTL_SECONDS = 25
 DRAFT_STATUS_MAP = {
     "filling": "waiting",
@@ -1055,34 +1052,6 @@ def _get_or_create_draft_timer_state(db: Session, draft_id: int) -> DraftTimerSt
     return draft_service._get_or_create_draft_timer_state(db, draft_id)
 
 
-def _start_or_resume_draft_timer(
-    *,
-    timer_state: DraftTimerState,
-    now_utc: datetime,
-) -> None:
-    if timer_state.timer_started_at is None:
-        timer_state.timer_started_at = now_utc
-    if timer_state.paused_at:
-        pause_delta = max(0, int((now_utc - timer_state.paused_at).total_seconds()))
-        timer_state.paused_total_seconds += pause_delta
-        timer_state.paused_at = None
-    timer_state.last_tick_at = now_utc
-    timer_state.state_version += 1
-
-
-def _pause_draft_timer(
-    *,
-    timer_state: DraftTimerState,
-    now_utc: datetime,
-) -> None:
-    if timer_state.timer_started_at is None:
-        timer_state.timer_started_at = now_utc
-    if timer_state.paused_at is None:
-        timer_state.paused_at = now_utc
-    timer_state.last_tick_at = now_utc
-    timer_state.state_version += 1
-
-
 def _reset_draft_timer_for_next_pick(
     *,
     timer_state: DraftTimerState,
@@ -1095,21 +1064,6 @@ def _reset_draft_timer_for_next_pick(
         now_utc=now_utc,
         transition_seconds=transition_seconds,
         draft_row=draft_row,
-    )
-
-
-def _complete_draft(
-    *,
-    draft_row: Draft,
-    league: League,
-    timer_state: DraftTimerState | None,
-    now_utc: datetime,
-) -> None:
-    draft_service._complete_draft(
-        draft_row=draft_row,
-        league=league,
-        timer_state=timer_state,
-        now_utc=now_utc,
     )
 
 
@@ -1276,83 +1230,6 @@ def can_draft_position(
     )
 
 
-def _team_roster_entries(db: Session, team_id: int) -> list[RosterEntry]:
-    return db.query(RosterEntry).filter(RosterEntry.team_id == team_id).all()
-
-
-def _assign_roster_slot(
-    db: Session,
-    settings_row: LeagueSettings,
-    team_id: int,
-    player_position: str,
-) -> str:
-    return draft_service.assign_draft_roster_slot(db, settings_row, team_id, player_position)
-
-
-def _ordered_autopick_candidates(
-    db: Session,
-    *,
-    draft_id: int,
-    league_id: int,
-    limit: int = 300,
-) -> list[Player]:
-    drafted_player_ids_subquery = db.query(DraftPick.player_id).filter(DraftPick.draft_id == draft_id)
-    rostered_player_ids_subquery = db.query(RosterEntry.player_id).filter(RosterEntry.league_id == league_id)
-
-    # Autopicks should mirror the top of the draft board:
-    # 1) lowest ADP first (best available),
-    # 2) then highest projection for deterministic ties.
-    adp_missing = case((Player.sheet_adp.is_(None), 1), else_=0)
-    adp_non_positive = case((Player.sheet_adp <= 0, 1), else_=0)
-
-    latest_projection_window = (
-        db.query(WeeklyProjection.season, WeeklyProjection.week)
-        .order_by(WeeklyProjection.season.desc(), WeeklyProjection.week.desc())
-        .first()
-    )
-
-    query = (
-        db.query(Player)
-        .filter(Player.position.in_(tuple(OFFENSE_DRAFT_POSITIONS)))
-        .filter(~Player.id.in_(drafted_player_ids_subquery))
-        .filter(~Player.id.in_(rostered_player_ids_subquery))
-    )
-
-    if latest_projection_window:
-        sheet_projection_points = func.coalesce(Player.sheet_projected_season_points, -1.0)
-        projection_points = func.coalesce(WeeklyProjection.fantasy_points, 0.0)
-        query = (
-            query
-            .outerjoin(
-                WeeklyProjection,
-                and_(
-                    WeeklyProjection.player_id == Player.id,
-                    WeeklyProjection.season == int(latest_projection_window[0]),
-                    WeeklyProjection.week == int(latest_projection_window[1]),
-                ),
-            )
-            .order_by(
-                adp_missing.asc(),
-                adp_non_positive.asc(),
-                Player.sheet_adp.asc(),
-                sheet_projection_points.desc(),
-                projection_points.desc(),
-                Player.id.asc(),
-            )
-        )
-    else:
-        sheet_projection_points = func.coalesce(Player.sheet_projected_season_points, -1.0)
-        query = query.order_by(
-            adp_missing.asc(),
-            adp_non_positive.asc(),
-            Player.sheet_adp.asc(),
-            sheet_projection_points.desc(),
-            Player.id.asc(),
-        )
-
-    return query.limit(limit).all()
-
-
 def _normalize_queue_priorities(
     db: Session,
     *,
@@ -1386,29 +1263,6 @@ def _remove_player_from_draft_queues(
     player_id: int,
 ) -> None:
     draft_service._remove_player_from_draft_queues(db, draft_id=draft_id, player_id=player_id)
-
-
-def _queued_autopick_candidate(
-    db: Session,
-    *,
-    draft_id: int,
-    league_id: int,
-    team_id: int,
-) -> Player | None:
-    drafted_player_ids_subquery = db.query(DraftPick.player_id).filter(DraftPick.draft_id == draft_id)
-    rostered_player_ids_subquery = db.query(RosterEntry.player_id).filter(RosterEntry.league_id == league_id)
-    queue_rows = _normalize_queue_priorities(db, draft_id=draft_id, team_id=team_id)
-    for queue_row in queue_rows:
-        player = (
-            db.query(Player)
-            .filter(Player.id == queue_row.player_id)
-            .filter(~Player.id.in_(drafted_player_ids_subquery))
-            .filter(~Player.id.in_(rostered_player_ids_subquery))
-            .first()
-        )
-        if player:
-            return player
-    return None
 
 
 def _queue_item_to_read(
@@ -1505,41 +1359,6 @@ def _seconds_remaining_for_current_pick(
     )
 
 
-def _advance_countdown_if_ready(
-    db: Session,
-    *,
-    league: League,
-    draft_row: Draft,
-    timer_state: DraftTimerState,
-    now_utc: datetime,
-) -> bool:
-    if draft_row.status != "countdown":
-        return False
-
-    seconds_remaining = _seconds_remaining_for_current_pick(
-        draft_row=draft_row,
-        timer_state=timer_state,
-        now_utc=now_utc,
-        current_team=None,
-    )
-    if seconds_remaining is None or seconds_remaining > 0:
-        return False
-
-    draft_row.status = "live"
-    if league.status != "post_draft":
-        league.status = "draft_live"
-    _reset_draft_timer_for_next_pick(
-        timer_state=timer_state,
-        now_utc=now_utc,
-        transition_seconds=0,
-        draft_row=draft_row,
-    )
-    db.add(draft_row)
-    db.add(timer_state)
-    db.add(league)
-    return True
-
-
 def _autopick_timed_out_current_team(
     db: Session,
     *,
@@ -1547,231 +1366,12 @@ def _autopick_timed_out_current_team(
     current_user: User | None,
     force: bool = False,
 ) -> bool:
-    if not DRAFT_AUTOPICKS_ENABLED:
-        return False
-
-    now_utc = datetime.now(timezone.utc)
-    changed = False
-    transitioned_to_countdown = False
-    transitioned_to_live = False
-    autopick_committed = False
-
-    with db.begin_nested():
-        draft_row = (
-            db.query(Draft)
-            .filter(Draft.league_id == league.id)
-            .with_for_update()
-            .first()
-        )
-        if not draft_row:
-            return False
-
-        settings_row = (
-            db.query(LeagueSettings)
-            .filter(LeagueSettings.league_id == league.id)
-            .with_for_update()
-            .first()
-        )
-        if not settings_row:
-            return False
-
-        timer_state = (
-            db.query(DraftTimerState)
-            .filter(DraftTimerState.draft_id == draft_row.id)
-            .with_for_update()
-            .first()
-        )
-        if not timer_state:
-            timer_state = _get_or_create_draft_timer_state(db, draft_row.id)
-            db.flush()
-
-        teams = _ordered_draft_teams(db, league.id)
-        if not teams:
-            return False
-
-        if _advance_countdown_if_ready(
-            db,
-            league=league,
-            draft_row=draft_row,
-            timer_state=timer_state,
-            now_utc=now_utc,
-        ):
-            changed = True
-            if draft_row.status == "countdown":
-                transitioned_to_countdown = True
-            elif draft_row.status == "live":
-                transitioned_to_live = True
-            return changed
-
-        if draft_row.status != "live":
-            return False
-
-        total_picks = _total_draft_picks_for_league(settings_row=settings_row, team_count=len(teams))
-        existing_picks = db.query(DraftPick).filter(DraftPick.draft_id == draft_row.id).count()
-        if is_draft_complete(existing_picks, total_picks):
-            _complete_draft(draft_row=draft_row, league=league, timer_state=timer_state, now_utc=now_utc)
-            db.add(draft_row)
-            db.add(league)
-            db.add(timer_state)
-            changed = True
-            return changed
-
-        round_number, round_pick, current_team = _draft_pick_team_for_number(teams, existing_picks + 1)
-        if current_team is None:
-            return False
-
-        current_pick_number = existing_picks + 1
-        seconds_remaining = _seconds_remaining_for_current_pick(
-            draft_row=draft_row,
-            timer_state=timer_state,
-            now_utc=now_utc,
-            current_team=current_team,
-            current_pick_number=current_pick_number,
-        )
-        if seconds_remaining is None:
-            return False
-
-        autopick_trigger_seconds = 0
-        if current_team.owner_user_id is None:
-            autopick_trigger_seconds = max(
-                0,
-                int(draft_row.pick_timer_seconds) - int(DRAFT_CPU_AUTOPICK_BUFFER_SECONDS),
-            )
-
-        if not force and seconds_remaining > autopick_trigger_seconds:
-            return False
-
-        pick_idempotency = f"timeout:{draft_row.id}:{current_pick_number}"
-        existing_timeout_pick = (
-            db.query(DraftPick)
-            .filter(
-                DraftPick.draft_id == draft_row.id,
-                DraftPick.idempotency_key == pick_idempotency,
-            )
-            .first()
-        )
-        if existing_timeout_pick:
-            return False
-
-        # Timeout autopicks must mirror the draft board directly:
-        # pick the top available ADP player, and only fall through when
-        # that player's position cannot fit any valid slot for this roster.
-        selected_player: Player | None = None
-        selected_slot: str | None = None
-        current_team_roster = _team_roster_entries(db, current_team.id)
-        candidates = _ordered_autopick_candidates(
-            db,
-            draft_id=draft_row.id,
-            league_id=league.id,
-        )
-        for candidate in candidates:
-            fit = can_draft_position(candidate.position, current_team_roster, settings_row)
-            if not fit.can_draft or not fit.destination_slot:
-                continue
-            selected_player = candidate
-            selected_slot = fit.destination_slot
-            break
-        if selected_player is None or selected_slot is None:
-            return False
-
-        db.add(
-            DraftPick(
-                draft_id=draft_row.id,
-                team_id=current_team.id,
-                player_id=selected_player.id,
-                made_by_user_id=None,
-                round_number=round_number,
-                round_pick=round_pick,
-                overall_pick=current_pick_number,
-                idempotency_key=pick_idempotency,
-            )
-        )
-        db.flush()
-        db.add(
-            RosterEntry(
-                league_id=league.id,
-                team_id=current_team.id,
-                player_id=selected_player.id,
-                slot=selected_slot,
-                status="active",
-            )
-        )
-        db.flush()
-        _remove_player_from_draft_queues(
-            db,
-            draft_id=draft_row.id,
-            player_id=selected_player.id,
-        )
-
-        _reset_draft_timer_for_next_pick(
-            timer_state=timer_state,
-            now_utc=now_utc,
-            transition_seconds=0,
-            draft_row=draft_row,
-        )
-
-        if draft_row.status == "scheduled":
-            draft_row.status = "live"
-        league.status = "draft_live"
-        if is_draft_complete(current_pick_number, total_picks):
-            _complete_draft(draft_row=draft_row, league=league, timer_state=timer_state, now_utc=now_utc)
-
-        db.add(draft_row)
-        db.add(league)
-        db.add(timer_state)
-        autopick_committed = True
-        changed = True
-
-    if changed:
-        if transitioned_to_countdown:
-            _emit_draft_event(
-                db,
-                league_id=league.id,
-                event_type="draft.status.changed",
-                entity_type="draft_room",
-                payload={"status": "countdown", "reason": "scheduled_start_reached"},
-            )
-            _emit_draft_event(
-                db,
-                league_id=league.id,
-                event_type="draft.room.updated",
-                entity_type="draft_room",
-                payload={"reason": "countdown_started"},
-            )
-        if transitioned_to_live:
-            _emit_draft_event(
-                db,
-                league_id=league.id,
-                event_type="draft.status.changed",
-                entity_type="draft_room",
-                payload={"status": "live", "reason": "countdown_complete"},
-            )
-            _emit_draft_event(
-                db,
-                league_id=league.id,
-                event_type="draft.room.updated",
-                entity_type="draft_room",
-                payload={"reason": "draft_start_visual"},
-            )
-        if autopick_committed:
-            _emit_draft_event(
-                db,
-                league_id=league.id,
-                event_type="draft.pick.made",
-                entity_type="draft_pick",
-                payload={
-                    "reason": "timeout_autopick",
-                    "made_by_user_id": current_user.id if current_user else None,
-                },
-            )
-            _emit_draft_event(
-                db,
-                league_id=league.id,
-                event_type="draft.room.updated",
-                entity_type="draft_room",
-                payload={"reason": "timeout_autopick"},
-            )
-    return changed
+    return draft_service.autopick_timed_out_current_team(
+        db,
+        league=league,
+        current_user=current_user,
+        force=force,
+    )
 
 
 def _draft_room_state(db: Session, league: League, current_user: User) -> DraftRoomRead:
@@ -3167,7 +2767,7 @@ def get_draft_room_endpoint(
 def get_draft_room_snapshot_endpoint(
     league_id: int,
     since_seq: int = Query(0, ge=0),
-    limit: int = Query(250, ge=1, le=250),
+    limit: int = Query(100, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> DraftRoomSnapshotRead:
@@ -3192,7 +2792,7 @@ def get_draft_room_snapshot_endpoint(
 def list_league_events_endpoint(
     league_id: int,
     since_seq: int = Query(0, ge=0),
-    limit: int = Query(250, ge=1, le=250),
+    limit: int = Query(100, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeagueEventListRead:
@@ -3300,6 +2900,23 @@ def practice_setup_draft_room_endpoint(
     current_user: User = Depends(get_current_user),
 ) -> DraftRoomRead:
     league, _membership = require_commissioner(db, league_id, current_user)
+    if settings.environment.lower() == "production":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Practice setup is disabled in production. Use standalone mock drafts for practice.",
+        )
+    draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
+    existing_pick_count = (
+        db.query(DraftPick.id).filter(DraftPick.draft_id == draft_row.id).count()
+        if draft_row
+        else 0
+    )
+    existing_roster_count = db.query(RosterEntry.id).filter(RosterEntry.league_id == league.id).count()
+    if existing_pick_count > 0 or existing_roster_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Practice setup cannot reset a league with existing draft picks or roster entries. Use standalone mock drafts for practice.",
+        )
     _setup_draft_practice(db, league=league, payload=payload, current_user=current_user)
     append_admin_action(
         db,
@@ -3334,90 +2951,12 @@ def update_draft_room_status_endpoint(
     current_user: User = Depends(get_current_user),
 ) -> DraftRoomRead:
     league, _membership = require_commissioner(db, league_id, current_user)
-    draft_row = db.query(Draft).filter(Draft.league_id == league.id).with_for_update().first()
-    if not draft_row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
-    if draft_row.status == "completed":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="draft is complete")
-    timer_state = _get_or_create_draft_timer_state(db, draft_row.id)
-    now_utc = datetime.now(timezone.utc)
-
-    def _require_empty_draft_for_countdown() -> None:
-        existing_pick_count = db.query(DraftPick.id).filter(DraftPick.draft_id == draft_row.id).count()
-        if existing_pick_count > 0:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Cannot start countdown with existing picks. Run practice setup reset first.",
-            )
-
-    if payload.status == "paused":
-        draft_row.status = "paused"
-        _pause_draft_timer(timer_state=timer_state, now_utc=now_utc)
-    elif payload.status == "active":
-        if draft_row.status == "paused":
-            draft_row.status = "live"
-            draft_row.draft_datetime_utc = draft_row.draft_datetime_utc or now_utc
-            if league.status != "post_draft":
-                league.status = "draft_live"
-            _start_or_resume_draft_timer(timer_state=timer_state, now_utc=now_utc)
-        else:
-            _require_empty_draft_for_countdown()
-            draft_row.status = "countdown"
-            draft_row.draft_datetime_utc = now_utc
-            if league.status != "post_draft":
-                league.status = "draft_scheduled"
-            _reset_draft_timer_for_next_pick(
-                timer_state=timer_state,
-                now_utc=now_utc,
-                transition_seconds=0,
-                draft_row=draft_row,
-            )
-    elif payload.status in {"filling", "lobby_open", "countdown"}:
-        draft_row.status = payload.status
-        if league.status != "post_draft":
-            league.status = "draft_scheduled"
-        if payload.status == "countdown":
-            _require_empty_draft_for_countdown()
-            draft_row.draft_datetime_utc = now_utc
-            _reset_draft_timer_for_next_pick(
-                timer_state=timer_state,
-                now_utc=now_utc,
-                transition_seconds=0,
-                draft_row=draft_row,
-            )
-        else:
-            _pause_draft_timer(timer_state=timer_state, now_utc=now_utc)
-    elif payload.status == "abandoned":
-        draft_row.status = "abandoned"
-        league.status = "post_draft"
-        _pause_draft_timer(timer_state=timer_state, now_utc=now_utc)
-    else:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="unsupported draft status transition")
-
-    db.add(draft_row)
-    db.add(timer_state)
-    db.add(league)
-    append_admin_action(
+    return draft_service.update_draft_room_status(
         db,
-        league_id=league.id,
-        actor_user_id=current_user.id,
-        action_type="draft.status.changed",
-        target_type="draft_room",
-        target_id=draft_row.id,
-        metadata={"status": draft_row.status},
+        league=league,
+        payload=payload,
+        current_user=current_user,
     )
-    db.commit()
-    _emit_draft_event(
-        db,
-        league_id=league_id,
-        event_type="draft.status.changed",
-        entity_type="draft_room",
-        entity_id=draft_row.id,
-        payload={"status": draft_row.status},
-    )
-    db.commit()
-    room = _draft_room_state(db, league, current_user)
-    return room
 
 
 @router.post("/{league_id}/draft-room/lobby/join", response_model=DraftRoomRead)
@@ -4167,7 +3706,22 @@ def update_league_settings(
     current_user: User = Depends(get_current_user),
 ) -> LeagueDetailRead:
     league, _ = require_commissioner(db, league_id, current_user)
-    return update_league_settings_flow(db, league, payload)
+    detail = update_league_settings_flow(db, league, payload)
+    append_admin_action(
+        db,
+        league_id=league.id,
+        actor_user_id=current_user.id,
+        action_type="league.settings.updated",
+        target_type="league_settings",
+        target_id=league.id,
+        metadata={
+            "playoff_teams": payload.playoff_teams,
+            "waiver_type": payload.waiver_type,
+            "trade_review_type": payload.trade_review_type,
+        },
+    )
+    db.commit()
+    return detail
 
 
 @router.patch("/{league_id}/draft", response_model=DraftRead)

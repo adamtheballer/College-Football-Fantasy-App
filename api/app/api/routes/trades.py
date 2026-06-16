@@ -4,6 +4,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from api.app.api.deps import (
@@ -16,6 +17,7 @@ from api.app.db.session import get_db
 from api.app.models.defense_rating import DefenseRating
 from api.app.models.defense_vs_position import DefenseVsPosition
 from api.app.models.game import Game
+from api.app.models.league_member import LeagueMember
 from api.app.models.injury import Injury
 from api.app.models.league_settings import LeagueSettings
 from api.app.models.notification import NotificationLog
@@ -52,7 +54,7 @@ DEFAULT_ROSTER_SLOTS = {
     "WR": 2,
     "TE": 1,
     "K": 1,
-    "BE": 4,
+    "BENCH": 4,
     "IR": 1,
 }
 
@@ -72,14 +74,25 @@ GRADE_MULTIPLIER = {
     "D": 0.97,
     "F": 0.94,
 }
-TRADE_OPEN_STATUSES = {"open"}
-TRADE_PENDING_REVIEW_STATUSES = {"pending_review"}
-TRADE_RESOLVED_STATUSES = {"accepted", "rejected", "cancelled", "expired", "vetoed"}
+TRADE_OPEN_STATUSES = {"proposed", "open"}
+TRADE_PENDING_REVIEW_STATUSES = {"accepted", "pending_review"}
+TRADE_RESOLVED_STATUSES = {"completed", "accepted", "rejected", "cancelled", "expired", "vetoed"}
 DEFAULT_TRADE_EXPIRY_HOURS = 48
+FLEX_POSITIONS = {"RB", "WR", "TE"}
+SUPERFLEX_POSITIONS = {"QB", "RB", "WR", "TE"}
 
 
 def _unique_player_ids(player_ids: list[int]) -> list[int]:
     return list(dict.fromkeys(player_ids))
+
+
+def _raise_if_duplicate_trade_players(give_ids: list[int], receive_ids: list[int]) -> None:
+    if len(give_ids) != len(set(give_ids)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="duplicate give player in trade")
+    if len(receive_ids) != len(set(receive_ids)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="duplicate receive player in trade")
+    if set(give_ids) & set(receive_ids):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="same player cannot be on both trade sides")
 
 
 def _utc_now() -> datetime:
@@ -103,6 +116,10 @@ def _trade_offer_side_ids(db: Session, offer_id: int, side: str) -> list[int]:
         .all()
     )
     return [int(row[0]) for row in rows]
+
+
+def _trade_offer_side_ids_from_items(items: list[TradeOfferItem], side: str) -> list[int]:
+    return [int(row.player_id) for row in items if row.side == side]
 
 
 def _serialize_trade_offer(db: Session, offer: TradeOffer) -> TradeOfferSummary:
@@ -151,6 +168,114 @@ def _record_trade_transaction(
     db.add(row)
 
 
+def _normalize_slot_name(slot: str | None) -> str:
+    value = (slot or "BENCH").strip().upper()
+    if value in {"BE", "BN"}:
+        return "BENCH"
+    if value in {"D/ST", "DST"}:
+        return "DEF"
+    return value
+
+
+def _normalize_roster_slot_limits(settings_row: LeagueSettings | None) -> dict[str, int]:
+    raw = settings_row.roster_slots_json if settings_row and isinstance(settings_row.roster_slots_json, dict) else {}
+    limits = DEFAULT_ROSTER_SLOTS.copy()
+    for key, value in raw.items():
+        normalized = _normalize_slot_name(str(key))
+        try:
+            limits[normalized] = max(0, int(value))
+        except (TypeError, ValueError):
+            continue
+    if settings_row and not settings_row.kicker_enabled:
+        limits["K"] = 0
+    if settings_row and not settings_row.defense_enabled:
+        limits["DEF"] = 0
+    if settings_row and not settings_row.superflex_enabled:
+        limits["SUPERFLEX"] = 0
+    return limits
+
+
+def _slot_can_hold_position(slot: str, position: str) -> bool:
+    normalized_slot = _normalize_slot_name(slot)
+    normalized_position = (position or "").strip().upper()
+    if normalized_slot == "BENCH":
+        return True
+    if normalized_slot == "FLEX":
+        return normalized_position in FLEX_POSITIONS
+    if normalized_slot == "SUPERFLEX":
+        return normalized_position in SUPERFLEX_POSITIONS
+    if normalized_slot == "DEF":
+        return normalized_position in {"DEF", "DST", "D/ST"}
+    return normalized_slot == normalized_position
+
+
+def _assign_trade_destination_slot(
+    *,
+    player_position: str,
+    counts: dict[str, int],
+    limits: dict[str, int],
+) -> str:
+    candidate_slots = [
+        _normalize_slot_name(player_position),
+        "FLEX",
+        "SUPERFLEX",
+        "BENCH",
+    ]
+    for candidate in candidate_slots:
+        if not _slot_can_hold_position(candidate, player_position):
+            continue
+        if counts.get(candidate, 0) < limits.get(candidate, 0):
+            counts[candidate] = counts.get(candidate, 0) + 1
+            return candidate
+    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade would create an illegal roster")
+
+
+def _validate_trade_roster_counts(
+    *,
+    team_id: int,
+    assignments: dict[int, str],
+    player_position_by_entry_id: dict[int, str],
+    limits: dict[str, int],
+) -> None:
+    counts: dict[str, int] = {}
+    for entry_id, slot in assignments.items():
+        normalized_slot = _normalize_slot_name(slot)
+        player_position = player_position_by_entry_id.get(entry_id, "")
+        if normalized_slot not in limits:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade would create an invalid roster slot")
+        if not _slot_can_hold_position(normalized_slot, player_position):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade would create an invalid roster slot")
+        counts[normalized_slot] = counts.get(normalized_slot, 0) + 1
+    for slot, count in counts.items():
+        if count > limits.get(slot, 0):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"trade would exceed {slot} slots for team {team_id}",
+            )
+
+
+def _assert_trade_team_owner_memberships(db: Session, offer: TradeOffer, from_team: Team, to_team: Team) -> None:
+    if from_team.league_id != offer.league_id or to_team.league_id != offer.league_id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade teams must belong to the offer league")
+    if from_team.owner_user_id is None or to_team.owner_user_id is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade teams must both have owners")
+    if from_team.owner_user_id != offer.from_user_id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade invalid: sender team owner changed")
+    if to_team.owner_user_id != offer.to_user_id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade invalid: recipient team owner changed")
+    member_count = (
+        db.query(LeagueMember)
+        .filter(
+            LeagueMember.league_id == offer.league_id,
+            LeagueMember.user_id.in_([offer.from_user_id, offer.to_user_id]),
+        )
+        .count()
+    )
+    expected_count = 1 if offer.from_user_id == offer.to_user_id else 2
+    if member_count != expected_count:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade managers must be league members")
+
+
 def _load_trade_offer_for_member(
     db: Session,
     *,
@@ -175,35 +300,114 @@ def _execute_trade_accept(
     offer: TradeOffer,
     acted_by_user: User,
 ) -> None:
-    give_ids = _trade_offer_side_ids(db, offer.id, "give")
-    receive_ids = _trade_offer_side_ids(db, offer.id, "receive")
+    item_rows = (
+        db.query(TradeOfferItem)
+        .filter(TradeOfferItem.trade_offer_id == offer.id)
+        .with_for_update()
+        .all()
+    )
+    give_ids = _trade_offer_side_ids_from_items(item_rows, "give")
+    receive_ids = _trade_offer_side_ids_from_items(item_rows, "receive")
     if not give_ids or not receive_ids:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade offer has no player items")
     if len(give_ids) != len(receive_ids):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade offer side counts are invalid")
+    _raise_if_duplicate_trade_players(give_ids, receive_ids)
 
-    from_entries = (
-        db.query(RosterEntry)
-        .filter(RosterEntry.team_id == offer.from_team_id, RosterEntry.player_id.in_(give_ids))
+    teams = (
+        db.query(Team)
+        .filter(Team.id.in_([offer.from_team_id, offer.to_team_id]))
+        .with_for_update()
         .all()
     )
-    to_entries = (
+    team_by_id = {team.id: team for team in teams}
+    from_team = team_by_id.get(offer.from_team_id)
+    to_team = team_by_id.get(offer.to_team_id)
+    if not from_team or not to_team:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="trade team not found")
+    _assert_trade_team_owner_memberships(db, offer, from_team, to_team)
+
+    settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == offer.league_id).first()
+    limits = _normalize_roster_slot_limits(settings_row)
+
+    roster_rows = (
         db.query(RosterEntry)
-        .filter(RosterEntry.team_id == offer.to_team_id, RosterEntry.player_id.in_(receive_ids))
+        .filter(RosterEntry.league_id == offer.league_id, RosterEntry.team_id.in_([offer.from_team_id, offer.to_team_id]))
+        .with_for_update()
         .all()
     )
+    from_entries = [row for row in roster_rows if row.team_id == offer.from_team_id and row.player_id in set(give_ids)]
+    to_entries = [row for row in roster_rows if row.team_id == offer.to_team_id and row.player_id in set(receive_ids)]
     if len({row.player_id for row in from_entries}) != len(give_ids):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade invalid: sender roster changed")
     if len({row.player_id for row in to_entries}) != len(receive_ids):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade invalid: recipient roster changed")
 
+    player_ids = {row.player_id for row in roster_rows}
+    players = db.query(Player).filter(Player.id.in_(player_ids)).all() if player_ids else []
+    position_by_player_id = {player.id: player.position for player in players}
+    player_position_by_entry_id = {
+        row.id: position_by_player_id.get(row.player_id, "") for row in roster_rows
+    }
+    destination_team_by_entry_id: dict[int, int] = {}
+    destination_slot_by_entry_id: dict[int, str] = {}
+    give_entry_ids = {row.id for row in from_entries}
+    receive_entry_ids = {row.id for row in to_entries}
+
+    for row in roster_rows:
+        if row.id in give_entry_ids:
+            destination_team_by_entry_id[row.id] = offer.to_team_id
+        elif row.id in receive_entry_ids:
+            destination_team_by_entry_id[row.id] = offer.from_team_id
+        else:
+            destination_team_by_entry_id[row.id] = row.team_id
+            destination_slot_by_entry_id[row.id] = _normalize_slot_name(row.slot)
+
+    for team_id in (offer.from_team_id, offer.to_team_id):
+        team_entry_ids = [
+            row.id for row in roster_rows if destination_team_by_entry_id.get(row.id) == team_id
+        ]
+        if len(team_entry_ids) != len(set(team_entry_ids)):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade would create duplicate roster entries")
+        player_ids_for_team = [
+            next(row.player_id for row in roster_rows if row.id == entry_id) for entry_id in team_entry_ids
+        ]
+        if len(player_ids_for_team) != len(set(player_ids_for_team)):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade would duplicate a player on a team")
+
+        counts: dict[str, int] = {}
+        incoming_entry_ids: list[int] = []
+        for entry_id in team_entry_ids:
+            if entry_id in destination_slot_by_entry_id:
+                slot = destination_slot_by_entry_id[entry_id]
+                counts[slot] = counts.get(slot, 0) + 1
+            else:
+                incoming_entry_ids.append(entry_id)
+        for incoming_entry_id in incoming_entry_ids:
+            player_position = player_position_by_entry_id.get(incoming_entry_id, "")
+            destination_slot_by_entry_id[incoming_entry_id] = _assign_trade_destination_slot(
+                player_position=player_position,
+                counts=counts,
+                limits=limits,
+            )
+
+        _validate_trade_roster_counts(
+            team_id=team_id,
+            assignments={
+                entry_id: destination_slot_by_entry_id[entry_id]
+                for entry_id in team_entry_ids
+            },
+            player_position_by_entry_id=player_position_by_entry_id,
+            limits=limits,
+        )
+
     for row in from_entries:
         row.team_id = offer.to_team_id
-        row.slot = "BENCH"
+        row.slot = destination_slot_by_entry_id[row.id]
         db.add(row)
     for row in to_entries:
         row.team_id = offer.from_team_id
-        row.slot = "BENCH"
+        row.slot = destination_slot_by_entry_id[row.id]
         db.add(row)
 
     for player_id in give_ids:
@@ -438,6 +642,7 @@ def propose_trade(
     if payload.from_team_id == payload.to_team_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="trade teams must be different")
 
+    _raise_if_duplicate_trade_players(payload.give_ids, payload.receive_ids)
     give_ids = _unique_player_ids(payload.give_ids)
     receive_ids = _unique_player_ids(payload.receive_ids)
     if not give_ids or not receive_ids:
@@ -510,99 +715,103 @@ def propose_trade(
         return JSONResponse(status_code=idem.response_status_code, content=idem.response_payload)
 
     try:
-        proposal_ref = f"TR-{uuid4().hex[:8].upper()}"
-        trade_offer = TradeOffer(
-            proposal_ref=proposal_ref,
-            league_id=league.id,
-            from_team_id=from_team.id,
-            to_team_id=to_team.id,
-            from_user_id=current_user.id,
-            to_user_id=to_team.owner_user_id,
-            status="open",
-            review_status="pending",
-            review_mode=review_mode,
-            note=note or None,
-            expires_at=datetime.utcnow().replace(microsecond=0) + timedelta(hours=DEFAULT_TRADE_EXPIRY_HOURS),
-        )
-        db.add(trade_offer)
-        db.flush()
-        for player_id in give_ids:
-            db.add(TradeOfferItem(trade_offer_id=trade_offer.id, player_id=player_id, side="give"))
-        for player_id in receive_ids:
-            db.add(TradeOfferItem(trade_offer_id=trade_offer.id, player_id=player_id, side="receive"))
+        with db.begin_nested():
+            proposal_ref = f"TR-{uuid4().hex[:8].upper()}"
+            trade_offer = TradeOffer(
+                proposal_ref=proposal_ref,
+                league_id=league.id,
+                from_team_id=from_team.id,
+                to_team_id=to_team.id,
+                from_user_id=current_user.id,
+                to_user_id=to_team.owner_user_id,
+                status="proposed",
+                review_status="none",
+                review_mode=review_mode,
+                note=note or None,
+                expires_at=datetime.utcnow().replace(microsecond=0) + timedelta(hours=DEFAULT_TRADE_EXPIRY_HOURS),
+            )
+            db.add(trade_offer)
+            db.flush()
+            for player_id in give_ids:
+                db.add(TradeOfferItem(trade_offer_id=trade_offer.id, player_id=player_id, side="give"))
+            for player_id in receive_ids:
+                db.add(TradeOfferItem(trade_offer_id=trade_offer.id, player_id=player_id, side="receive"))
 
-        trade_summary = (
-            f"{from_team.name} sends {', '.join(give_names)} for {', '.join(receive_names)}."
-        )
-        if note:
-            trade_summary = f"{trade_summary} Note: {note}"
+            trade_summary = (
+                f"{from_team.name} sends {', '.join(give_names)} for {', '.join(receive_names)}."
+            )
+            if note:
+                trade_summary = f"{trade_summary} Note: {note}"
 
-        recipient_alert = NotificationLog(
-            user_id=to_team.owner_user_id,
-            user_key=str(to_team.owner_user_id),
-            alert_type="TRADE_SENT",
-            title=f"New trade offer from {from_team.name}",
-            body=trade_summary,
-            payload={
-                "proposal_ref": proposal_ref,
-                "league_id": league.id,
-                "from_team_id": from_team.id,
-                "to_team_id": to_team.id,
-                "give_ids": give_ids,
-                "receive_ids": receive_ids,
-                "player_id": receive_ids[0],
-                "path": f"/trade/{league.id}",
-            },
-            sent_at=datetime.utcnow(),
-        )
-        sender_alert = NotificationLog(
-            user_id=current_user.id,
-            user_key=str(current_user.id),
-            alert_type="TRADE",
-            title=f"Trade offer sent to {to_team.name}",
-            body=trade_summary,
-            payload={
-                "proposal_ref": proposal_ref,
-                "league_id": league.id,
-                "from_team_id": from_team.id,
-                "to_team_id": to_team.id,
-                "give_ids": give_ids,
-                "receive_ids": receive_ids,
-                "player_id": give_ids[0],
-                "path": f"/trade/{league.id}",
-            },
-            sent_at=datetime.utcnow(),
-        )
-        db.add(recipient_alert)
-        db.add(sender_alert)
-        append_admin_action(
-            db,
-            league_id=league.id,
-            actor_user_id=current_user.id,
-            action_type="trade.proposed",
-            target_type="trade_offer",
-            target_id=trade_offer.id,
-            metadata={
-                "proposal_ref": proposal_ref,
-                "from_team_id": from_team.id,
-                "to_team_id": to_team.id,
-                "give_ids": give_ids,
-                "receive_ids": receive_ids,
-                "review_mode": review_mode,
-            },
-        )
-        response_payload = TradeProposalResponse(
-            proposal_ref=proposal_ref,
-            message=f"Trade offer sent to {to_team.name}.",
-        ).model_dump(mode="json")
-        complete_idempotent_request(
-            db,
-            start=idem,
-            response_status_code=status.HTTP_201_CREATED,
-            response_payload=response_payload,
-        )
+            recipient_alert = NotificationLog(
+                user_id=to_team.owner_user_id,
+                user_key=str(to_team.owner_user_id),
+                alert_type="TRADE_SENT",
+                title=f"New trade offer from {from_team.name}",
+                body=trade_summary,
+                payload={
+                    "proposal_ref": proposal_ref,
+                    "league_id": league.id,
+                    "from_team_id": from_team.id,
+                    "to_team_id": to_team.id,
+                    "give_ids": give_ids,
+                    "receive_ids": receive_ids,
+                    "player_id": receive_ids[0],
+                    "path": f"/trade/{league.id}",
+                },
+                sent_at=datetime.utcnow(),
+            )
+            sender_alert = NotificationLog(
+                user_id=current_user.id,
+                user_key=str(current_user.id),
+                alert_type="TRADE",
+                title=f"Trade offer sent to {to_team.name}",
+                body=trade_summary,
+                payload={
+                    "proposal_ref": proposal_ref,
+                    "league_id": league.id,
+                    "from_team_id": from_team.id,
+                    "to_team_id": to_team.id,
+                    "give_ids": give_ids,
+                    "receive_ids": receive_ids,
+                    "player_id": give_ids[0],
+                    "path": f"/trade/{league.id}",
+                },
+                sent_at=datetime.utcnow(),
+            )
+            db.add(recipient_alert)
+            db.add(sender_alert)
+            append_admin_action(
+                db,
+                league_id=league.id,
+                actor_user_id=current_user.id,
+                action_type="trade.proposed",
+                target_type="trade_offer",
+                target_id=trade_offer.id,
+                metadata={
+                    "proposal_ref": proposal_ref,
+                    "from_team_id": from_team.id,
+                    "to_team_id": to_team.id,
+                    "give_ids": give_ids,
+                    "receive_ids": receive_ids,
+                    "review_mode": review_mode,
+                },
+            )
+            response_payload = TradeProposalResponse(
+                proposal_ref=proposal_ref,
+                message=f"Trade offer sent to {to_team.name}.",
+            ).model_dump(mode="json")
+            complete_idempotent_request(
+                db,
+                start=idem,
+                response_status_code=status.HTTP_201_CREATED,
+                response_payload=response_payload,
+            )
         db.commit()
         return response_payload
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade completion conflict; refresh and retry") from exc
     except Exception:
         fail_idempotent_request(db, start=idem)
         db.commit()
@@ -673,44 +882,47 @@ def accept_trade_offer(
             offer_locked.responded_at = _utc_now()
             if review_mode in {"none", "instant", "auto"}:
                 _execute_trade_accept(db, offer=offer_locked, acted_by_user=current_user)
-                offer_locked.status = "accepted"
-                offer_locked.review_status = "accepted"
+                offer_locked.status = "completed"
+                offer_locked.review_status = "completed"
             else:
-                offer_locked.status = "pending_review"
+                offer_locked.status = "accepted"
                 offer_locked.review_status = "pending_commissioner"
             db.add(offer_locked)
 
-        response = (
-            TradeOfferActionResponse(
-                proposal_ref=proposal_ref,
-                status="accepted",
-                message="Trade accepted and rosters updated.",
+            response = (
+                TradeOfferActionResponse(
+                    proposal_ref=proposal_ref,
+                    status="completed",
+                    message="Trade accepted and rosters updated.",
+                )
+                if review_mode in {"none", "instant", "auto"}
+                else TradeOfferActionResponse(
+                    proposal_ref=proposal_ref,
+                    status="accepted",
+                    message="Trade accepted and is pending commissioner review.",
+                )
             )
-            if offer.review_mode and offer.review_mode.strip().lower() in {"none", "instant", "auto"}
-            else TradeOfferActionResponse(
-                proposal_ref=proposal_ref,
-                status="pending_review",
-                message="Trade accepted and is pending commissioner review.",
+            append_admin_action(
+                db,
+                league_id=offer_locked.league_id,
+                actor_user_id=current_user.id,
+                action_type="trade.accepted",
+                target_type="trade_offer",
+                target_id=offer_locked.id,
+                metadata={"proposal_ref": proposal_ref, "result_status": response.status},
             )
-        )
-        append_admin_action(
-            db,
-            league_id=offer.league_id,
-            actor_user_id=current_user.id,
-            action_type="trade.accepted",
-            target_type="trade_offer",
-            target_id=offer.id,
-            metadata={"proposal_ref": proposal_ref, "result_status": response.status},
-        )
-        payload = response.model_dump(mode="json")
-        complete_idempotent_request(
-            db,
-            start=idem,
-            response_status_code=status.HTTP_200_OK,
-            response_payload=payload,
-        )
+            payload = response.model_dump(mode="json")
+            complete_idempotent_request(
+                db,
+                start=idem,
+                response_status_code=status.HTTP_200_OK,
+                response_payload=payload,
+            )
         db.commit()
         return payload
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade completion conflict; refresh and retry") from exc
     except Exception:
         fail_idempotent_request(db, start=idem)
         db.commit()
@@ -744,33 +956,36 @@ def approve_trade_offer(
             if offer_locked.status not in TRADE_PENDING_REVIEW_STATUSES:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"trade is already {offer_locked.status}")
             _execute_trade_accept(db, offer=offer_locked, acted_by_user=current_user)
-            offer_locked.status = "accepted"
+            offer_locked.status = "completed"
             offer_locked.review_status = "approved"
             offer_locked.responded_at = _utc_now()
             db.add(offer_locked)
-        response = TradeOfferActionResponse(
-            proposal_ref=proposal_ref,
-            status="accepted",
-            message="Trade approved and rosters updated.",
-        )
-        append_admin_action(
-            db,
-            league_id=offer.league_id,
-            actor_user_id=current_user.id,
-            action_type="trade.review.approved",
-            target_type="trade_offer",
-            target_id=offer.id,
-            metadata={"proposal_ref": proposal_ref},
-        )
-        payload = response.model_dump(mode="json")
-        complete_idempotent_request(
-            db,
-            start=idem,
-            response_status_code=status.HTTP_200_OK,
-            response_payload=payload,
-        )
+            response = TradeOfferActionResponse(
+                proposal_ref=proposal_ref,
+                status="completed",
+                message="Trade approved and rosters updated.",
+            )
+            append_admin_action(
+                db,
+                league_id=offer_locked.league_id,
+                actor_user_id=current_user.id,
+                action_type="trade.review.approved",
+                target_type="trade_offer",
+                target_id=offer_locked.id,
+                metadata={"proposal_ref": proposal_ref},
+            )
+            payload = response.model_dump(mode="json")
+            complete_idempotent_request(
+                db,
+                start=idem,
+                response_status_code=status.HTTP_200_OK,
+                response_payload=payload,
+            )
         db.commit()
         return payload
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade completion conflict; refresh and retry") from exc
     except Exception:
         fail_idempotent_request(db, start=idem)
         db.commit()
@@ -875,30 +1090,38 @@ def reject_trade_offer(
     if idem.replay and idem.response_payload is not None and idem.response_status_code is not None:
         return JSONResponse(status_code=idem.response_status_code, content=idem.response_payload)
     try:
-        offer.status = "rejected"
-        offer.review_status = "rejected"
-        offer.responded_at = _utc_now()
-        db.add(offer)
-        append_admin_action(
-            db,
-            league_id=offer.league_id,
-            actor_user_id=current_user.id,
-            action_type="trade.rejected",
-            target_type="trade_offer",
-            target_id=offer.id,
-            metadata={"proposal_ref": proposal_ref},
-        )
-        payload = TradeOfferActionResponse(
-            proposal_ref=proposal_ref,
-            status="rejected",
-            message="Trade rejected.",
-        ).model_dump(mode="json")
-        complete_idempotent_request(
-            db,
-            start=idem,
-            response_status_code=status.HTTP_200_OK,
-            response_payload=payload,
-        )
+        with db.begin_nested():
+            offer_locked = db.query(TradeOffer).filter(TradeOffer.id == offer.id).with_for_update().first()
+            if not offer_locked:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="trade offer not found")
+            if offer_locked.status not in TRADE_OPEN_STATUSES:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"trade is already {offer_locked.status}")
+            if current_user.id != offer_locked.to_user_id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="only the receiving manager can reject")
+            offer_locked.status = "rejected"
+            offer_locked.review_status = "rejected"
+            offer_locked.responded_at = _utc_now()
+            db.add(offer_locked)
+            append_admin_action(
+                db,
+                league_id=offer_locked.league_id,
+                actor_user_id=current_user.id,
+                action_type="trade.rejected",
+                target_type="trade_offer",
+                target_id=offer_locked.id,
+                metadata={"proposal_ref": proposal_ref},
+            )
+            payload = TradeOfferActionResponse(
+                proposal_ref=proposal_ref,
+                status="rejected",
+                message="Trade rejected.",
+            ).model_dump(mode="json")
+            complete_idempotent_request(
+                db,
+                start=idem,
+                response_status_code=status.HTTP_200_OK,
+                response_payload=payload,
+            )
         db.commit()
         return payload
     except Exception:
@@ -928,30 +1151,38 @@ def cancel_trade_offer(
     if idem.replay and idem.response_payload is not None and idem.response_status_code is not None:
         return JSONResponse(status_code=idem.response_status_code, content=idem.response_payload)
     try:
-        offer.status = "cancelled"
-        offer.review_status = "cancelled"
-        offer.responded_at = _utc_now()
-        db.add(offer)
-        append_admin_action(
-            db,
-            league_id=offer.league_id,
-            actor_user_id=current_user.id,
-            action_type="trade.cancelled",
-            target_type="trade_offer",
-            target_id=offer.id,
-            metadata={"proposal_ref": proposal_ref},
-        )
-        payload = TradeOfferActionResponse(
-            proposal_ref=proposal_ref,
-            status="cancelled",
-            message="Trade cancelled.",
-        ).model_dump(mode="json")
-        complete_idempotent_request(
-            db,
-            start=idem,
-            response_status_code=status.HTTP_200_OK,
-            response_payload=payload,
-        )
+        with db.begin_nested():
+            offer_locked = db.query(TradeOffer).filter(TradeOffer.id == offer.id).with_for_update().first()
+            if not offer_locked:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="trade offer not found")
+            if offer_locked.status not in TRADE_OPEN_STATUSES:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"trade is already {offer_locked.status}")
+            if current_user.id != offer_locked.from_user_id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="only the sending manager can cancel")
+            offer_locked.status = "cancelled"
+            offer_locked.review_status = "cancelled"
+            offer_locked.responded_at = _utc_now()
+            db.add(offer_locked)
+            append_admin_action(
+                db,
+                league_id=offer_locked.league_id,
+                actor_user_id=current_user.id,
+                action_type="trade.cancelled",
+                target_type="trade_offer",
+                target_id=offer_locked.id,
+                metadata={"proposal_ref": proposal_ref},
+            )
+            payload = TradeOfferActionResponse(
+                proposal_ref=proposal_ref,
+                status="cancelled",
+                message="Trade cancelled.",
+            ).model_dump(mode="json")
+            complete_idempotent_request(
+                db,
+                start=idem,
+                response_status_code=status.HTTP_200_OK,
+                response_payload=payload,
+            )
         db.commit()
         return payload
     except Exception:

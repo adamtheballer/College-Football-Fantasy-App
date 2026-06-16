@@ -75,7 +75,7 @@ async def ops_overview(
     ) or 0
     open_trades = (
         db.query(func.count(TradeOffer.id))
-        .filter(TradeOffer.status.in_(("open", "pending_review")))
+        .filter(TradeOffer.status.in_(("proposed", "open", "accepted", "pending_review")))
         .scalar()
     ) or 0
     live_drafts = (

@@ -24,7 +24,7 @@ class TradeOffer(TimestampMixin, Base):
     to_team_id: Mapped[int] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"))
     from_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     to_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    status: Mapped[str] = mapped_column(String(30), default="open")
+    status: Mapped[str] = mapped_column(String(30), default="proposed")
     review_status: Mapped[str] = mapped_column(String(30), default="none")
     review_mode: Mapped[str] = mapped_column(String(30), default="commissioner")
     note: Mapped[str | None] = mapped_column(String(300), nullable=True)

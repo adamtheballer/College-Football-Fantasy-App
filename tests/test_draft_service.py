@@ -5,6 +5,8 @@ from api.app.services import draft_service
 def test_draft_service_imports():
     assert draft_service.create_real_draft_pick is not None
     assert draft_service.get_draft_room_state is not None
+    assert draft_service.autopick_timed_out_current_team is not None
+    assert draft_service.update_draft_room_status is not None
 
 
 def test_draft_service_snake_pick_helper_handles_forward_and_reverse_rounds():

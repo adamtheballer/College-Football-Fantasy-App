@@ -19,7 +19,8 @@ from api.app.schemas.roster import (
     RosterEntryRead,
 )
 from api.app.schemas.transaction import TransactionList, TransactionRead
-from api.app.services.league_week_state import enforce_lineup_window_open
+from api.app.services.admin_actions import append_admin_action
+from api.app.services.roster_lock_service import enforce_players_unlocked_for_week, enforce_roster_window_open
 
 DEFAULT_ROSTER_SLOTS = {
     "QB": 1,
@@ -53,11 +54,12 @@ def league_settings(db: Session, league_id: int) -> LeagueSettings:
     return settings_row
 
 
-def enforce_lineup_window(db: Session, league_id: int) -> None:
+def enforce_lineup_window(db: Session, league_id: int) -> League:
     league = db.get(League, league_id)
     if not league:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
-    enforce_lineup_window_open(db, league=league)
+    enforce_roster_window_open(db, league)
+    return league
 
 
 def slot_limits(settings_row: LeagueSettings) -> dict[str, int]:
@@ -121,6 +123,27 @@ def record_transaction(
     return row
 
 
+def record_roster_audit(
+    db: Session,
+    *,
+    league_id: int,
+    actor_user_id: int,
+    action_type: str,
+    target_id: int | None,
+    metadata: dict,
+    target_type: str = "roster_entry",
+) -> None:
+    append_admin_action(
+        db,
+        league_id=league_id,
+        actor_user_id=actor_user_id,
+        action_type=action_type,
+        target_type=target_type,
+        target_id=target_id,
+        metadata=metadata,
+    )
+
+
 def best_available_slot(
     db: Session,
     team: Team,
@@ -152,7 +175,14 @@ def _raise_roster_conflict(exc: IntegrityError) -> None:
 
 
 def add_roster_entry(db: Session, team: Team, entry_in: RosterEntryCreate, current_user: User) -> RosterEntryRead:
+    league = enforce_lineup_window(db, team.league_id)
     ensure_player_exists(db, entry_in.player_id)
+    enforce_players_unlocked_for_week(
+        db,
+        league=league,
+        player_ids={entry_in.player_id},
+        action_label="roster add",
+    )
     ensure_player_available(db, team.league_id, entry_in.player_id)
 
     settings_row = league_settings(db, team.league_id)
@@ -177,6 +207,14 @@ def add_roster_entry(db: Session, team: Team, entry_in: RosterEntryCreate, curre
             created_by_user_id=current_user.id,
             player_id=entry.player_id,
         )
+        record_roster_audit(
+            db,
+            league_id=team.league_id,
+            actor_user_id=current_user.id,
+            action_type="roster.added",
+            target_id=entry.id,
+            metadata={"team_id": team.id, "player_id": entry.player_id, "slot": entry.slot},
+        )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -198,11 +236,18 @@ def list_roster_entries(db: Session, team: Team, limit: int, offset: int) -> Ros
 
 
 def delete_roster_entry(db: Session, team: Team, roster_entry_id: int, current_user: User) -> None:
+    league = enforce_lineup_window(db, team.league_id)
     entry = db.get(RosterEntry, roster_entry_id)
     if not entry or entry.team_id != team.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="roster entry not found")
 
     dropped_player_id = entry.player_id
+    enforce_players_unlocked_for_week(
+        db,
+        league=league,
+        player_ids={dropped_player_id},
+        action_label="roster drop",
+    )
     db.delete(entry)
     try:
         record_transaction(
@@ -213,6 +258,14 @@ def delete_roster_entry(db: Session, team: Team, roster_entry_id: int, current_u
             created_by_user_id=current_user.id,
             player_id=dropped_player_id,
         )
+        record_roster_audit(
+            db,
+            league_id=team.league_id,
+            actor_user_id=current_user.id,
+            action_type="roster.dropped",
+            target_id=roster_entry_id,
+            metadata={"team_id": team.id, "player_id": dropped_player_id},
+        )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -220,7 +273,7 @@ def delete_roster_entry(db: Session, team: Team, roster_entry_id: int, current_u
 
 
 def update_lineup(db: Session, team: Team, payload: LineupUpdateRequest, current_user: User) -> LineupUpdateResponse:
-    enforce_lineup_window(db, team.league_id)
+    league = enforce_lineup_window(db, team.league_id)
     settings_row = league_settings(db, team.league_id)
     limits = slot_limits(settings_row)
     roster_entries = load_roster_entry_rows(db, team.id)
@@ -243,6 +296,12 @@ def update_lineup(db: Session, team: Team, payload: LineupUpdateRequest, current
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="roster entry not found")
 
     validate_slot_counts(limits, desired_slots)
+    enforce_players_unlocked_for_week(
+        db,
+        league=league,
+        player_ids={entry.player_id for entry, _previous_slot in changed_entries},
+        action_label="lineup change",
+    )
 
     for assignment in payload.assignments:
         roster_by_id[assignment.roster_entry_id].slot = assignment.slot
@@ -257,6 +316,22 @@ def update_lineup(db: Session, team: Team, payload: LineupUpdateRequest, current
             player_id=entry.player_id,
             reason=f"{previous_slot} -> {entry.slot}",
         )
+    if changed_entries:
+        record_roster_audit(
+            db,
+            league_id=team.league_id,
+            actor_user_id=current_user.id,
+            action_type="roster.lineup_changed",
+            target_type="team",
+            target_id=team.id,
+            metadata={
+                "team_id": team.id,
+                "changes": [
+                    {"roster_entry_id": entry.id, "player_id": entry.player_id, "from": previous_slot, "to": entry.slot}
+                    for entry, previous_slot in changed_entries
+                ],
+            },
+        )
 
     try:
         db.commit()
@@ -267,12 +342,20 @@ def update_lineup(db: Session, team: Team, payload: LineupUpdateRequest, current
 
 
 def add_drop(db: Session, team: Team, payload: AddDropRequest, current_user: User) -> AddDropResponse:
+    league = enforce_lineup_window(db, team.league_id)
     add_player = ensure_player_exists(db, payload.add_player_id)
     ensure_player_available(db, team.league_id, add_player.id)
 
     drop_entry = db.get(RosterEntry, payload.drop_roster_entry_id)
     if not drop_entry or drop_entry.team_id != team.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="roster entry not found")
+
+    enforce_players_unlocked_for_week(
+        db,
+        league=league,
+        player_ids={add_player.id, drop_entry.player_id},
+        action_label="add/drop",
+    )
 
     new_slot = best_available_slot(db, team, add_player.position, exclude_entry_id=drop_entry.id)
     dropped_player_id = drop_entry.player_id
@@ -298,6 +381,20 @@ def add_drop(db: Session, team: Team, payload: AddDropRequest, current_user: Use
             player_id=add_player.id,
             related_player_id=dropped_player_id,
             reason=payload.reason,
+        )
+        record_roster_audit(
+            db,
+            league_id=team.league_id,
+            actor_user_id=current_user.id,
+            action_type="roster.add_drop",
+            target_type="team",
+            target_id=team.id,
+            metadata={
+                "team_id": team.id,
+                "added_player_id": add_player.id,
+                "dropped_player_id": dropped_player_id,
+                "slot": new_slot,
+            },
         )
         db.commit()
     except IntegrityError as exc:

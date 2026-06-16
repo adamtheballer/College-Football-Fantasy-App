@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from api.app.api.deps import get_current_user
 from api.app.core.config import settings
 from api.app.crud.player import create_players, get_player, list_players
 from api.app.crud.player_stat import get_player_stat, upsert_player_stat
@@ -41,8 +42,12 @@ def _stat_value(stats: dict, keys: list[str]) -> float:
 
 @router.post("", response_model=list[PlayerRead], status_code=status.HTTP_201_CREATED)
 def create_players_endpoint(
-    players_in: list[PlayerCreate], db: Session = Depends(get_db)
+    players_in: list[PlayerCreate],
+    db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
 ) -> list[PlayerRead]:
+    if settings.environment.lower() == "production":
+        get_current_user(db=db, authorization=authorization)
     return create_players(db, players_in)
 
 

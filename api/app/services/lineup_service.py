@@ -13,6 +13,7 @@ from api.app.models.roster import RosterEntry
 from api.app.models.team import Team
 from api.app.models.user import User
 from api.app.schemas.lineup import LineupAssignment, LineupEntryRead, LineupRead
+from api.app.services.roster_lock_service import enforce_players_unlocked_for_week
 
 
 BENCH_SLOTS = {"BENCH", "BE", "IR"}
@@ -172,6 +173,35 @@ def update_lineup(
     lineup = get_or_create_lineup(db, league, team, season, week)
     if is_lineup_locked(lineup):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="lineup locked")
+
+    existing_entries = (
+        db.query(LineupEntry)
+        .filter(LineupEntry.lineup_id == lineup.id)
+        .all()
+    )
+    existing_by_player_id = {entry.player_id: entry for entry in existing_entries}
+    assignment_by_player_id = {assignment.player_id: assignment for assignment in assignments}
+    changed_player_ids: set[int] = set()
+    for existing in existing_entries:
+        assignment = assignment_by_player_id.get(existing.player_id)
+        if assignment is None:
+            changed_player_ids.add(existing.player_id)
+            continue
+        if existing.slot != assignment.slot or bool(existing.is_starter) != bool(assignment.is_starter):
+            changed_player_ids.add(existing.player_id)
+    for assignment in assignments:
+        if assignment.player_id not in existing_by_player_id:
+            changed_player_ids.add(assignment.player_id)
+
+    enforce_players_unlocked_for_week(
+        db,
+        league=league,
+        player_ids=changed_player_ids,
+        action_label="lineup change",
+        season=season,
+        week=week,
+    )
+
     roster_by_player = validate_lineup_assignments(db, league, team, assignments)
     db.query(LineupEntry).filter(LineupEntry.lineup_id == lineup.id).delete(synchronize_session=False)
     db.flush()

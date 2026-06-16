@@ -1,6 +1,9 @@
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from api.app.models.game import Game
 from api.app.models.roster import RosterEntry
 from api.app.models.team import Team
 
@@ -229,3 +232,88 @@ def test_lineup_updates_block_when_week_is_locked(client, db_session):
     )
     assert lineup_response.status_code == 409
     assert "lineups are locked for week 1" in lineup_response.json()["detail"]
+
+    add_drop_response = client.post(
+        f"/teams/{team.id}/add-drop",
+        json={"add_player_id": create_players(client)[1], "drop_roster_entry_id": added_entry["id"]},
+        headers=auth_headers(token),
+    )
+    assert add_drop_response.status_code == 409
+    assert "lineups are locked for week 1" in add_drop_response.json()["detail"]
+
+    delete_response = client.delete(
+        f"/teams/{team.id}/roster/{added_entry['id']}",
+        headers=auth_headers(token),
+    )
+    assert delete_response.status_code == 409
+    assert "lineups are locked for week 1" in delete_response.json()["detail"]
+
+
+def test_started_player_game_blocks_roster_and_lineup_mutations(client, db_session):
+    token = create_user_and_token(client, "owner-started")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    player_id, _swap_player_id = create_players(client)
+
+    add_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": player_id, "slot": "RB", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert add_response.status_code == 201
+    roster_entry = add_response.json()
+
+    db_session.add(
+        Game(
+            season=2026,
+            week=1,
+            season_type="regular",
+            start_date=datetime.now(timezone.utc) - timedelta(minutes=5),
+            home_team="Texas",
+            away_team="USC",
+            home_points=None,
+            away_points=None,
+            neutral_site=False,
+        )
+    )
+    db_session.commit()
+
+    lineup_response = client.patch(
+        f"/teams/{team.id}/lineup",
+        json={"assignments": [{"roster_entry_id": roster_entry["id"], "slot": "BENCH"}]},
+        headers=auth_headers(token),
+    )
+    assert lineup_response.status_code == 409
+    assert "player games have started" in lineup_response.json()["detail"]
+
+    full_lineup_response = client.get(
+        f"/leagues/{league['id']}/teams/{team.id}/lineup",
+        params={"season": 2026, "week": 1},
+        headers=auth_headers(token),
+    )
+    assert full_lineup_response.status_code == 200
+
+    new_lineup_response = client.patch(
+        f"/leagues/{league['id']}/teams/{team.id}/lineup",
+        params={"season": 2026, "week": 1},
+        json={
+            "assignments": [
+                {
+                    "roster_entry_id": roster_entry["id"],
+                    "player_id": player_id,
+                    "slot": "BENCH",
+                    "is_starter": False,
+                }
+            ]
+        },
+        headers=auth_headers(token),
+    )
+    assert new_lineup_response.status_code == 409
+    assert "player games have started" in new_lineup_response.json()["detail"]
+
+    delete_response = client.delete(
+        f"/teams/{team.id}/roster/{roster_entry['id']}",
+        headers=auth_headers(token),
+    )
+    assert delete_response.status_code == 409
+    assert "player games have started" in delete_response.json()["detail"]

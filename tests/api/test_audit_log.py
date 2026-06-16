@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+from api.app.models.team import Team
+
 
 def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
@@ -51,9 +53,10 @@ def create_league(client, token: str) -> dict:
     return response.json()["league"]
 
 
-def test_audit_log_tracks_commissioner_actions(client):
+def test_audit_log_tracks_commissioner_actions(client, db_session):
     _owner_user_id, owner_token = create_user_and_token(client, "owner-actions")
     league = create_league(client, owner_token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id == _owner_user_id).one()
 
     pause_response = client.post(
         f"/leagues/{league['id']}/draft-room/status",
@@ -80,6 +83,34 @@ def test_audit_log_tracks_commissioner_actions(client):
     )
     assert run_due.status_code == 200
 
+    settings_response = client.patch(
+        f"/leagues/{league['id']}/settings",
+        json={
+            "scoring_json": {"ppr": 1, "pass_td": 4, "int": -2},
+            "roster_slots_json": {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 1, "BENCH": 4, "IR": 1},
+            "playoff_teams": 4,
+            "waiver_type": "faab",
+            "trade_review_type": "commissioner",
+            "superflex_enabled": False,
+            "kicker_enabled": True,
+            "defense_enabled": False,
+        },
+        headers=auth_headers(owner_token),
+    )
+    assert settings_response.status_code == 200
+
+    player_response = client.post(
+        "/players",
+        json=[{"external_id": None, "name": "Audit RB", "position": "RB", "school": "Texas", "image_url": None}],
+    )
+    assert player_response.status_code == 201
+    roster_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": player_response.json()[0]["id"], "slot": "RB", "status": "active"},
+        headers=auth_headers(owner_token),
+    )
+    assert roster_response.status_code == 201
+
     audit_response = client.get(
         f"/leagues/{league['id']}/audit-log",
         headers=auth_headers(owner_token),
@@ -90,6 +121,8 @@ def test_audit_log_tracks_commissioner_actions(client):
     assert "draft.status.changed" in action_types
     assert "automation.job.scheduled" in action_types
     assert "automation.jobs.run_due" in action_types
+    assert "league.settings.updated" in action_types
+    assert "roster.added" in action_types
 
 
 def test_audit_log_requires_membership(client):

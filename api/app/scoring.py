@@ -50,6 +50,22 @@ KICKING_SCORING_RULES: dict[str, float] = {
     "FieldGoalsMade50Plus": 5.0,
 }
 
+STAT_ALIASES: dict[str, tuple[str, ...]] = {
+    "PassingYards": ("passing_yards", "pass_yds", "PassYards"),
+    "PassingTouchdowns": ("passing_touchdowns", "passing_tds", "pass_tds"),
+    "PassingInterceptions": ("interceptions", "passing_interceptions"),
+    "RushingYards": ("rushing_yards", "rush_yds"),
+    "RushingTouchdowns": ("rushing_touchdowns", "rushing_tds", "rush_tds"),
+    "Receptions": ("receptions",),
+    "ReceivingYards": ("receiving_yards", "rec_yards", "rec_yds"),
+    "ReceivingTouchdowns": ("receiving_touchdowns", "receiving_tds", "rec_tds"),
+    "FumblesLost": ("fumbles_lost",),
+    "ExtraPointsMade": ("extra_points_made", "xp_made"),
+    "FieldGoalsMade": ("field_goals_made", "FieldGoals"),
+    "FieldGoalsMade0To49": ("field_goals_made_0_49", "FieldGoalsMade0to49", "FieldGoalsMade0_49"),
+    "FieldGoalsMade50Plus": ("field_goals_made_50_plus", "FieldGoalsMade50PlusYds"),
+}
+
 POINTS_ALLOWED_BUCKETS: list[tuple[int, int | None, float]] = [
     (0, 0, 10.0),
     (1, 6, 7.0),
@@ -173,6 +189,11 @@ def _get_stat_value(stats: dict[str, Any], keys: list[str]) -> float | None:
     return None
 
 
+def _stat_lookup_keys(stat_key: str) -> list[str]:
+    aliases = STAT_ALIASES.get(stat_key, ())
+    return [stat_key, *aliases]
+
+
 def _points_allowed_score(points_allowed: float | None, buckets: list[tuple[int, int | None, float]]) -> float:
     if points_allowed is None:
         return 0.0
@@ -186,9 +207,9 @@ def _points_allowed_score(points_allowed: float | None, buckets: list[tuple[int,
 
 
 def _field_goal_points(stats: dict[str, Any], rules: dict[str, float]) -> float:
-    made_50_plus = _get_stat_value(stats, ["FieldGoalsMade50Plus", "FieldGoalsMade50PlusYds"])
-    made_total = _get_stat_value(stats, ["FieldGoalsMade", "FieldGoals"])
-    made_0_49 = _get_stat_value(stats, ["FieldGoalsMade0To49", "FieldGoalsMade0to49", "FieldGoalsMade0_49"])
+    made_50_plus = _get_stat_value(stats, _stat_lookup_keys("FieldGoalsMade50Plus"))
+    made_total = _get_stat_value(stats, _stat_lookup_keys("FieldGoalsMade"))
+    made_0_49 = _get_stat_value(stats, _stat_lookup_keys("FieldGoalsMade0To49"))
     if made_0_49 is None and made_total is not None and made_50_plus is not None:
         made_0_49 = max(made_total - made_50_plus, 0)
     points = 0.0
@@ -227,12 +248,8 @@ def calculate_fantasy_points(
         for stat_key, multiplier in rule_map.items():
             if rule_key == "kicker" and stat_key in {"FieldGoalsMade0To49", "FieldGoalsMade50Plus"}:
                 continue
-            raw_value = stats.get(stat_key)
-            if raw_value is None:
-                continue
-            try:
-                value = float(raw_value)
-            except (TypeError, ValueError):
+            value = _get_stat_value(stats, _stat_lookup_keys(stat_key))
+            if value is None:
                 continue
             total += value * float(multiplier)
     if rule_key == "kicker" and isinstance(rule_map, dict):

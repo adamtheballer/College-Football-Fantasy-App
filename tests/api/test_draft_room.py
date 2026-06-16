@@ -3,12 +3,14 @@ from datetime import datetime, timedelta, timezone
 from api.app.api.routes import leagues as league_routes
 from api.app.core.config import settings
 from api.app.models.draft import Draft
+from api.app.models.draft_pick import DraftPick
 from api.app.models.draft_team_queue_item import DraftTeamQueueItem
 from api.app.models.league import League
 from api.app.models.league_settings import LeagueSettings
 from api.app.models.player import Player
 from api.app.models.roster import RosterEntry
 from api.app.models.team import Team
+from api.app.services import draft_service
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -302,7 +304,7 @@ def test_draft_room_requires_membership(client):
     assert response.json()["detail"] == "league membership required"
 
 
-def test_practice_setup_resets_draft_and_builds_mock_teams(client, db_session):
+def test_practice_setup_rejects_existing_real_draft_state(client, db_session):
     token = create_user_and_token(client, "practice")
     league = create_league(client, token)
     player_id = create_player(client, "Practice QB")
@@ -326,20 +328,18 @@ def test_practice_setup_resets_draft_and_builds_mock_teams(client, db_session):
         },
         headers=auth_headers(token),
     )
-    assert setup_response.status_code == 200
-    room = setup_response.json()
-    assert room["status"] == "countdown"
-    assert room["current_pick"] == 1
-    assert len(room["picks"]) == 0
-    assert len(room["teams"]) == 4
-    assert any(team["owner_user_id"] is None for team in room["teams"])
+    assert setup_response.status_code == 409
+    assert "existing draft picks or roster entries" in setup_response.json()["detail"]
 
     roster_response = client.get(
-        f"/teams/{room['user_team_id']}/roster",
+        f"/teams/{pick_response.json()['user_team_id']}/roster",
         headers=auth_headers(token),
     )
     assert roster_response.status_code == 200
-    assert roster_response.json()["total"] == 0
+    assert roster_response.json()["total"] == 1
+    draft_row = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    assert db_session.query(DraftPick).filter(DraftPick.draft_id == draft_row.id).count() == 1
+    assert db_session.query(RosterEntry).filter(RosterEntry.league_id == league["id"]).count() == 1
 
 
 def test_practice_setup_normalizes_to_manager_one_plus_unique_auto_managers(client):
@@ -369,6 +369,29 @@ def test_practice_setup_normalizes_to_manager_one_plus_unique_auto_managers(clie
     assert "Manager 1" in team_names
     for index in range(2, 13):
         assert f"Auto Manager {index}" in team_names
+
+
+def test_practice_setup_is_disabled_in_production(client):
+    token = create_user_and_token(client, "practice-production")
+    league = create_league(client, token)
+    prior_environment = settings.environment
+    settings.environment = "production"
+    try:
+        response = client.post(
+            f"/leagues/{league['id']}/draft-room/practice-setup",
+            json={
+                "team_count": 4,
+                "reset_existing": True,
+                "start_now": False,
+                "mock_team_prefix": "Auto Manager",
+            },
+            headers=auth_headers(token),
+        )
+    finally:
+        settings.environment = prior_environment
+
+    assert response.status_code == 403
+    assert "disabled in production" in response.json()["detail"]
 
 
 def test_draft_room_total_rounds_equals_roster_slot_count(client):
@@ -1100,7 +1123,7 @@ def test_assign_roster_slot_prefers_flex_before_bench_for_wr_overflow(client, db
     db_session.commit()
 
     # Incoming depth-label positions like WR3 should normalize and fill FLEX first.
-    slot = league_routes._assign_roster_slot(db_session, settings_row, team_row.id, "WR3")
+    slot = draft_service.assign_draft_roster_slot(db_session, settings_row, team_row.id, "WR3")
     assert slot == "FLEX"
 
     db_session.add(
@@ -1109,7 +1132,7 @@ def test_assign_roster_slot_prefers_flex_before_bench_for_wr_overflow(client, db
     db_session.commit()
 
     # Once FLEX is full, overflow should go to BENCH.
-    bench_slot = league_routes._assign_roster_slot(db_session, settings_row, team_row.id, "WR4")
+    bench_slot = draft_service.assign_draft_roster_slot(db_session, settings_row, team_row.id, "WR4")
     assert bench_slot == "BENCH"
 
 
@@ -1147,7 +1170,7 @@ def test_assign_roster_slot_prefers_flex_before_bench_for_rb_overflow(client, db
     )
     db_session.commit()
 
-    slot = league_routes._assign_roster_slot(db_session, settings_row, team_row.id, "RB3")
+    slot = draft_service.assign_draft_roster_slot(db_session, settings_row, team_row.id, "RB3")
     assert slot == "FLEX"
 
     db_session.add(
@@ -1155,7 +1178,7 @@ def test_assign_roster_slot_prefers_flex_before_bench_for_rb_overflow(client, db
     )
     db_session.commit()
 
-    bench_slot = league_routes._assign_roster_slot(db_session, settings_row, team_row.id, "RB4")
+    bench_slot = draft_service.assign_draft_roster_slot(db_session, settings_row, team_row.id, "RB4")
     assert bench_slot == "BENCH"
 
 
@@ -1189,7 +1212,7 @@ def test_assign_roster_slot_prefers_flex_before_bench_for_te_overflow(client, db
     )
     db_session.commit()
 
-    slot = league_routes._assign_roster_slot(db_session, settings_row, team_row.id, "TE2")
+    slot = draft_service.assign_draft_roster_slot(db_session, settings_row, team_row.id, "TE2")
     assert slot == "FLEX"
 
     db_session.add(
@@ -1197,7 +1220,7 @@ def test_assign_roster_slot_prefers_flex_before_bench_for_te_overflow(client, db
     )
     db_session.commit()
 
-    bench_slot = league_routes._assign_roster_slot(db_session, settings_row, team_row.id, "TE3")
+    bench_slot = draft_service.assign_draft_roster_slot(db_session, settings_row, team_row.id, "TE3")
     assert bench_slot == "BENCH"
 
 
@@ -1649,7 +1672,7 @@ def test_draft_room_snapshot_returns_event_stream_delta(client, db_session):
 
     snapshot_response = client.get(
         f"/leagues/{league['id']}/draft-room/snapshot",
-        params={"since_seq": 0, "limit": 250},
+        params={"since_seq": 0, "limit": 100},
         headers=auth_headers(token),
     )
     assert snapshot_response.status_code == 200
@@ -1661,7 +1684,7 @@ def test_draft_room_snapshot_returns_event_stream_delta(client, db_session):
 
     delta_response = client.get(
         f"/leagues/{league['id']}/draft-room/snapshot",
-        params={"since_seq": snapshot["latest_seq"], "limit": 250},
+        params={"since_seq": snapshot["latest_seq"], "limit": 100},
         headers=auth_headers(token),
     )
     assert delta_response.status_code == 200
@@ -1684,7 +1707,7 @@ def test_league_events_endpoint_returns_cursorable_event_log(client, db_session)
 
     events_response = client.get(
         f"/leagues/{league['id']}/events",
-        params={"since_seq": 0, "limit": 250},
+        params={"since_seq": 0, "limit": 100},
         headers=auth_headers(token),
     )
     assert events_response.status_code == 200
@@ -1695,7 +1718,7 @@ def test_league_events_endpoint_returns_cursorable_event_log(client, db_session)
     latest_seq = payload["latest_seq"]
     delta_response = client.get(
         f"/leagues/{league['id']}/events",
-        params={"since_seq": latest_seq, "limit": 250},
+        params={"since_seq": latest_seq, "limit": 100},
         headers=auth_headers(token),
     )
     assert delta_response.status_code == 200
