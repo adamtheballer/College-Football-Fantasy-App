@@ -255,8 +255,8 @@ Short-term compatibility is acceptable, but the behavior should move toward this
 - The league workspace contract should be treated as the source of truth for role-aware league actions
 - Existing routes can be preserved initially while changing the behavior and defaults
 - This story should be coordinated with:
-  - [10_feature_frontend_architecture_consolidation.md](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/requirements/10_feature_frontend_architecture_consolidation.md)
-  - [12_epic_react_frontend_delivery.md](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/requirements/12_epic_react_frontend_delivery.md)
+  - [10_feature_frontend_architecture_consolidation.md](requirements/10_feature_frontend_architecture_consolidation.md)
+  - [12_epic_react_frontend_delivery.md](requirements/12_epic_react_frontend_delivery.md)
 
 ## Success Metrics
 

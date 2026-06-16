@@ -7,7 +7,7 @@ help:
 	@echo "  make bootstrap      # sync deps, install web deps, run db + migrations"
 	@echo "  make dev            # start DB + API + UI together"
 	@echo "  make api            # start API only (localhost:8000)"
-	@echo "  make web            # start web only (localhost:5173)"
+	@echo "  make web            # start web only (localhost:8080)"
 	@echo "  make migrate        # run alembic migrations"
 	@echo "  make test-backend   # run backend tests"
 	@echo "  make test-web       # run web typecheck + unit tests"

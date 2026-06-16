@@ -67,12 +67,23 @@ docker compose up --build
 
 Local dev URLs:
 
-- UI: `http://localhost:5173`
+- UI: `http://localhost:8080`
 - API: `http://localhost:8000`
+
+## Current Platform Readiness
+
+- See `docs/RELEASE_READINESS.md` before inviting external testers. The current default recommendation is internal alpha only until Docker Compose is verified, `docs/MANUAL_SMOKE_TEST.md` passes, and the friends-beta gate passes.
+- For public launch planning, use `docs/PUBLIC_LAUNCH_CHECKLIST.md`, `docs/DEPLOYMENT_RUNBOOK.md`, and `docs/OPERATIONS_RUNBOOK.md`.
+- Real drafts, mock drafts, league creation/joining, rosters, waivers, trades, schedules, weekly scoring, standings snapshots, and audit logs have backend coverage.
+- Regular-season schedule/matchup/standings support is an MVP. Playoff bracket generation, playoff seeding locks, and playoff matchup advancement are not implemented yet.
+- Two scoring APIs currently exist for compatibility: legacy weekly score endpoints and the newer auditable recompute endpoint. Use the auditable recompute endpoint for commissioner-run scoring jobs until the legacy path is retired.
+- Roster and lineup mutations enforce week/player lock rules; player kickoff locks depend on `games.start_date` data being present for the current league week.
 
 ## Testing Multiplayer Mock Drafts With Friends
 
-`localhost` is not shareable. A link like `http://localhost:5173` only works on the developer machine running Vite. To test multiplayer mock drafts with friends while still editing locally with hot reload, expose the local frontend and backend with public tunnel URLs or deploy public dev URLs.
+Use this flow only after the release readiness gate in `docs/RELEASE_READINESS.md` is satisfied for your target test group.
+
+`localhost` is not shareable. A link like `http://localhost:8080` only works on the developer machine running Vite. To test multiplayer mock drafts with friends while still editing locally with hot reload, expose the local frontend and backend with public tunnel URLs or deploy public dev URLs.
 
 Keep the normal local dev workflow running:
 
@@ -83,7 +94,7 @@ cd web && npm run dev
 
 Then point public tunnels at those local servers:
 
-- Frontend public URL forwards to `http://localhost:5173`
+- Frontend public URL forwards to `http://localhost:8080`
 - Backend public URL forwards to `http://localhost:8000`
 
 Backend `.env` for public tunnel testing:
@@ -113,11 +124,11 @@ Auth cookie settings matter because multiplayer requires accounts:
 Development checklist:
 
 - Local-only:
-  - Frontend: `http://localhost:5173`
+  - Frontend: `http://localhost:8080`
   - Backend: `http://localhost:8000`
   - Invite links are local-only
 - Public tunnel:
-  - Frontend public tunnel points to `localhost:5173`
+  - Frontend public tunnel points to `localhost:8080`
   - Backend public tunnel points to `localhost:8000`
   - `PUBLIC_WEB_URL` uses the frontend tunnel
   - `VITE_API_BASE_URL` uses the backend tunnel
@@ -145,7 +156,7 @@ See `.env.example` for the full list.
 - `CORS_ORIGINS`
 - `JWT_SECRET_KEY`
 
-`UI_BASE_URL` should match your local web origin (`http://localhost:5173` for Vite dev).
+`UI_BASE_URL` should match your local web origin (`http://localhost:8080` for Vite dev).
 `PUBLIC_WEB_URL` is the frontend URL used when the backend generates mock draft invite links.
 `PUBLIC_API_URL` documents the externally reachable backend URL for public tunnel or production mode.
 `CORS_ORIGINS` is a comma-separated allowlist for browser origins that can call the API.
