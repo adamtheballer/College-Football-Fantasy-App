@@ -232,6 +232,10 @@ class JoinLeagueRequest(BaseModel):
     league_id: int
 
 
+class JoinLeagueByIdRequest(BaseModel):
+    invite_code: str | None = None
+
+
 class MatchmakingJoinRequest(BaseModel):
     team_count: int
     skill_mode: Literal["beginner", "pro"] = "beginner"

@@ -377,8 +377,9 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.route("**/leagues/77/join", async (route) => {
+      expect(route.request().postDataJSON()).toEqual({ invite_code: "ABCDEFGHIJKLMNOPQRST" });
       await route.fulfill({
-        status: 201,
+        status: 200,
         contentType: "application/json",
         body: JSON.stringify(leagueDetail),
       });
@@ -408,7 +409,7 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/leagues/join");
-    await page.getByPlaceholder("ENTER INVITE CODE").fill("abcdefghijklmnopqrst");
+    await page.getByPlaceholder("ENTER INVITE CODE OR LINK").fill("https://example.com/join/abcdefghijklmnopqrst");
     await page.getByRole("button", { name: /Preview League/i }).click();
     await expect(page.getByRole("heading", { name: /League Preview/i })).toBeVisible();
     await expect(page.getByText("Invite League")).toBeVisible();

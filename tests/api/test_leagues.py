@@ -1,6 +1,9 @@
 from datetime import datetime, timedelta, timezone
 
 from api.app.models.draft import Draft
+from api.app.models.league import League
+from api.app.models.league_invite import LeagueInvite
+from api.app.models.league_member import LeagueMember
 from api.app.models.league_settings import LeagueSettings
 from api.app.models.injury import Injury
 from api.app.models.matchup import Matchup
@@ -37,12 +40,13 @@ def create_league(
     name: str = "Test League",
     draft_order_strategy: str = "fixed",
     is_private: bool = False,
+    max_teams: int = 12,
 ) -> dict:
     payload = {
         "basics": {
             "name": name,
             "season_year": 2026,
-            "max_teams": 12,
+            "max_teams": max_teams,
             "is_private": is_private,
             "description": "Workspace league",
             "icon_url": None,
@@ -72,6 +76,61 @@ def create_league(
     )
     assert response.status_code == 201
     return response.json()["league"]
+
+
+def test_create_league_requires_auth(client):
+    payload = {
+        "basics": {
+            "name": "No Auth League",
+            "season_year": 2026,
+            "max_teams": 12,
+            "is_private": True,
+            "description": None,
+            "icon_url": None,
+        },
+        "settings": {
+            "scoring_json": {"ppr": 1},
+            "roster_slots_json": {"QB": 1},
+            "playoff_teams": 4,
+            "waiver_type": "faab",
+            "trade_review_type": "commissioner",
+            "superflex_enabled": False,
+            "kicker_enabled": True,
+            "defense_enabled": False,
+        },
+        "draft": {
+            "draft_datetime_utc": "2026-08-19T18:00:00Z",
+            "timezone": "America/Los_Angeles",
+            "draft_type": "snake",
+            "pick_timer_seconds": 90,
+            "order_strategy": "fixed",
+        },
+    }
+
+    response = client.post("/leagues", json=payload)
+
+    assert response.status_code in {401, 403}
+
+
+def test_create_league_creates_invite_settings_draft_member_team_and_no_roster_entries(client, db_session):
+    token = create_user_and_token(client, "create-complete")
+    created = create_league(client, token, name="Complete League", is_private=True)
+
+    league_row = db_session.get(League, created["id"])
+    assert league_row is not None
+    assert league_row.commissioner_user_id == created["commissioner_user_id"]
+    assert league_row.invite_code == created["invite_code"]
+
+    assert db_session.query(LeagueSettings).filter(LeagueSettings.league_id == created["id"]).count() == 1
+    assert db_session.query(Draft).filter(Draft.league_id == created["id"]).count() == 1
+    assert db_session.query(LeagueInvite).filter(
+        LeagueInvite.league_id == created["id"],
+        LeagueInvite.code == created["invite_code"],
+        LeagueInvite.active.is_(True),
+    ).count() == 1
+    assert db_session.query(LeagueMember).filter(LeagueMember.league_id == created["id"]).count() == 1
+    assert db_session.query(Team).filter(Team.league_id == created["id"], Team.owner_user_id == created["commissioner_user_id"]).count() == 1
+    assert db_session.query(RosterEntry).filter(RosterEntry.league_id == created["id"]).count() == 0
 
 
 def test_create_and_list_leagues(client):
@@ -197,16 +256,29 @@ def test_private_league_requires_invite_code_join_flow(client):
     assert len(invite_join.json()["members"]) == 2
 
 
-def test_join_by_code_requires_authentication(client):
+def test_join_by_code_preview_is_public_and_does_not_join(client, db_session):
     owner_token = create_user_and_token(client, "invite-owner")
     league = create_league(client, owner_token, is_private=True)
 
     preview = client.post(
         "/leagues/join-by-code",
-        json={"invite_code": league["invite_code"]},
+        json={"invite_code": league["invite_code"].lower()},
     )
 
-    assert preview.status_code in {401, 403}
+    assert preview.status_code == 200
+    assert preview.json()["id"] == league["id"]
+    assert preview.json()["member_count"] == 1
+    assert db_session.query(LeagueMember).filter(LeagueMember.league_id == league["id"]).count() == 1
+
+
+def test_join_by_code_invalid_code_returns_clear_404(client):
+    response = client.post(
+        "/leagues/join-by-code",
+        json={"invite_code": "FAKECODE"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "invite code not found"
 
 
 def test_join_with_code_rejects_duplicate_member(client):
@@ -229,6 +301,134 @@ def test_join_with_code_rejects_duplicate_member(client):
 
     assert duplicate_join.status_code == 409
     assert duplicate_join.json()["detail"] == "already joined this league"
+
+
+def test_private_join_by_id_with_invite_creates_member_and_team_once(client, db_session):
+    owner_token = create_user_and_token(client, "private-id-owner")
+    member_token = create_user_and_token(client, "private-id-member")
+    league = create_league(client, owner_token, is_private=True)
+
+    response = client.post(
+        f"/leagues/{league['id']}/join",
+        json={"invite_code": league["invite_code"].lower()},
+        headers=auth_headers(member_token),
+    )
+
+    assert response.status_code == 200
+    assert len(response.json()["members"]) == 2
+    member_user_id = response.json()["members"][-1]["user_id"]
+    assert db_session.query(LeagueMember).filter(
+        LeagueMember.league_id == league["id"],
+        LeagueMember.user_id == member_user_id,
+    ).count() == 1
+    assert db_session.query(Team).filter(
+        Team.league_id == league["id"],
+        Team.owner_user_id == member_user_id,
+    ).count() == 1
+
+    duplicate = client.post(
+        f"/leagues/{league['id']}/join",
+        json={"invite_code": league["invite_code"]},
+        headers=auth_headers(member_token),
+    )
+
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"] == "already joined this league"
+    assert db_session.query(LeagueMember).filter(LeagueMember.league_id == league["id"]).count() == 2
+    assert db_session.query(Team).filter(Team.league_id == league["id"]).count() == 2
+
+
+def test_full_league_blocks_new_join(client, db_session):
+    owner_token = create_user_and_token(client, "full-owner")
+    member_token = create_user_and_token(client, "full-member")
+    blocked_token = create_user_and_token(client, "full-blocked")
+    league = create_league(client, owner_token, is_private=True, max_teams=2)
+
+    join_response = client.post(
+        f"/leagues/{league['id']}/join",
+        json={"invite_code": league["invite_code"]},
+        headers=auth_headers(member_token),
+    )
+    assert join_response.status_code == 200
+
+    blocked = client.post(
+        f"/leagues/{league['id']}/join",
+        json={"invite_code": league["invite_code"]},
+        headers=auth_headers(blocked_token),
+    )
+
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"] == "league is full"
+    assert db_session.query(LeagueMember).filter(LeagueMember.league_id == league["id"]).count() == 2
+    assert db_session.query(Team).filter(Team.league_id == league["id"]).count() == 2
+
+
+def test_regenerate_invite_disables_old_code_and_requires_commissioner(client):
+    owner_token = create_user_and_token(client, "regen-owner")
+    member_token = create_user_and_token(client, "regen-member")
+    outsider_token = create_user_and_token(client, "regen-outsider")
+    league = create_league(client, owner_token, is_private=True)
+
+    member_join = client.post(
+        f"/leagues/{league['id']}/join",
+        json={"invite_code": league["invite_code"]},
+        headers=auth_headers(member_token),
+    )
+    assert member_join.status_code == 200
+
+    forbidden = client.post(
+        f"/leagues/{league['id']}/regenerate-invite",
+        headers=auth_headers(member_token),
+    )
+    assert forbidden.status_code == 403
+
+    regenerated = client.post(
+        f"/leagues/{league['id']}/regenerate-invite",
+        headers=auth_headers(owner_token),
+    )
+    assert regenerated.status_code == 200
+    new_code = regenerated.json()["invite_code"]
+    assert new_code != league["invite_code"]
+
+    old_preview = client.post("/leagues/join-by-code", json={"invite_code": league["invite_code"]})
+    assert old_preview.status_code == 404
+
+    new_join = client.post(
+        f"/leagues/{league['id']}/join",
+        json={"invite_code": new_code},
+        headers=auth_headers(outsider_token),
+    )
+    assert new_join.status_code == 200
+
+
+def test_non_commissioner_cannot_update_league_settings(client):
+    owner_token = create_user_and_token(client, "settings-owner")
+    member_token = create_user_and_token(client, "settings-member")
+    league = create_league(client, owner_token, is_private=True)
+    join_response = client.post(
+        f"/leagues/{league['id']}/join",
+        json={"invite_code": league["invite_code"]},
+        headers=auth_headers(member_token),
+    )
+    assert join_response.status_code == 200
+
+    response = client.patch(
+        f"/leagues/{league['id']}/settings",
+        json={
+            "scoring_json": {"ppr": 1},
+            "roster_slots_json": {"QB": 1},
+            "playoff_teams": 4,
+            "waiver_type": "faab",
+            "trade_review_type": "commissioner",
+            "superflex_enabled": False,
+            "kicker_enabled": True,
+            "defense_enabled": False,
+        },
+        headers=auth_headers(member_token),
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "commissioner only"
 
 
 def test_join_with_code_rejects_completed_draft(client, db_session):

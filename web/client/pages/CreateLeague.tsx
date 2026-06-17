@@ -21,6 +21,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { apiPost } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
+import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { LeagueCreateResponse } from "@/types/league";
 
 const steps = ["Basics", "Settings", "Draft", "Review"] as const;
@@ -116,6 +117,7 @@ export default function CreateLeague() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isLoggedIn } = useAuth();
+  const { setActiveLeagueId } = useActiveLeagueId();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -151,9 +153,10 @@ export default function CreateLeague() {
     QB: 1,
     RB: 2,
     WR: 2,
+    FLEX: 1,
     TE: 1,
     K: 1,
-    BENCH: 4,
+    BENCH: 5,
     IR: 1,
   };
 
@@ -290,6 +293,7 @@ export default function CreateLeague() {
       const response = await apiPost<LeagueCreateResponse>("/leagues", payload);
       queryClient.invalidateQueries({ queryKey: ["leagues"] });
       queryClient.setQueryData(["league", response.league.id], response.league);
+      setActiveLeagueId(response.league.id);
       setSuccess(response);
     } catch (err: any) {
       setError(err.message || "Unable to create league.");

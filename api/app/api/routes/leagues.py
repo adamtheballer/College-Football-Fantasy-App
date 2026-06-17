@@ -97,6 +97,7 @@ from api.app.schemas.league_flow import (
     LeagueSettingsUpdate,
     LeagueWorkspaceRead,
     JoinByCodeRequest,
+    JoinLeagueByIdRequest,
 )
 from api.app.services.league_flow import (
     FIXED_ROSTER_SLOTS,
@@ -3615,11 +3616,11 @@ def list_league_members(
 def join_by_code(
     payload: JoinByCodeRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ) -> LeaguePreview:
+    normalized_code = payload.invite_code.strip().upper()
     invite = (
         db.query(LeagueInvite)
-        .filter(LeagueInvite.code == payload.invite_code.upper(), LeagueInvite.active.is_(True))
+        .filter(LeagueInvite.code == normalized_code, LeagueInvite.active.is_(True))
         .first()
     )
     if not invite:
@@ -3649,9 +3650,10 @@ def join_with_code(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeagueDetailRead:
+    normalized_code = payload.invite_code.strip().upper()
     invite = (
         db.query(LeagueInvite)
-        .filter(LeagueInvite.code == payload.invite_code.upper(), LeagueInvite.active.is_(True))
+        .filter(LeagueInvite.code == normalized_code, LeagueInvite.active.is_(True))
         .first()
     )
     if not invite:
@@ -3674,13 +3676,29 @@ def join_with_code(
 @router.post("/{league_id}/join", response_model=LeagueDetailRead)
 def join_league(
     league_id: int,
+    payload: JoinLeagueByIdRequest | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeagueDetailRead:
     league = db.get(League, league_id)
     if not league:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
-    _ensure_public_waiting_joinable(league)
+    if league.is_private:
+        normalized_code = (payload.invite_code if payload else None)
+        normalized_code = normalized_code.strip().upper() if normalized_code else ""
+        invite = (
+            db.query(LeagueInvite)
+            .filter(
+                LeagueInvite.league_id == league.id,
+                LeagueInvite.code == normalized_code,
+                LeagueInvite.active.is_(True),
+            )
+            .first()
+        )
+        if not invite:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="private leagues require an invite code")
+    else:
+        _ensure_public_waiting_joinable(league)
     join_league_flow(db, league, current_user)
     _finalize_join_state(db, league)
     db.commit()

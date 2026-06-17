@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from api.app.core.config import settings
@@ -70,6 +71,41 @@ def generate_unique_invite(db: Session) -> str:
         if not exists:
             return code
     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="unable to generate invite code")
+
+
+def _user_display_name(user: User) -> str:
+    first_name = (user.first_name or "").strip()
+    if first_name:
+        return first_name
+    email_prefix = (user.email or "").split("@", 1)[0].strip()
+    return email_prefix or f"User {user.id}"
+
+
+def _unique_team_name(db: Session, *, league_id: int, base_name: str) -> str:
+    clean_base = (base_name or "Team").strip()[:180] or "Team"
+    existing_names = {
+        row[0]
+        for row in db.query(Team.name)
+        .filter(Team.league_id == league_id, Team.name.like(f"{clean_base}%"))
+        .all()
+    }
+    if clean_base not in existing_names:
+        return clean_base
+    for suffix in range(2, 1000):
+        candidate = f"{clean_base} {suffix}"
+        if candidate not in existing_names:
+            return candidate
+    return f"{clean_base} {datetime.now(timezone.utc).timestamp():.0f}"
+
+
+def _create_owned_team(db: Session, *, league_id: int, current_user: User) -> Team:
+    owner_name = _user_display_name(current_user)
+    return Team(
+        league_id=league_id,
+        name=_unique_team_name(db, league_id=league_id, base_name=f"{owner_name}'s Team"),
+        owner_name=owner_name,
+        owner_user_id=current_user.id,
+    )
 def create_league(
     payload: LeagueCreateRequest,
     db: Session,
@@ -141,18 +177,18 @@ def create_league(
         )
     )
 
-    db.add(
-        Team(
-            league_id=league.id,
-            name=f"{current_user.first_name}'s Team",
-            owner_name=current_user.first_name,
-            owner_user_id=current_user.id,
-        )
-    )
+    db.add(_create_owned_team(db, league_id=league.id, current_user=current_user))
 
     schedule_draft_notifications(db, league.id, current_user.id, payload.draft.draft_datetime_utc)
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="league could not be created because of a duplicate invite or team",
+        ) from exc
     db.refresh(league)
     detail = get_league_detail(db, league)
     invite_link = f"{settings.ui_base_url.rstrip('/')}/join/{code}"
@@ -166,6 +202,11 @@ def join_league(
     *,
     allow_existing: bool = False,
 ) -> LeagueDetailRead:
+    locked_league = db.query(League).filter(League.id == league.id).with_for_update().first()
+    if not locked_league:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
+    league = locked_league
+
     existing = (
         db.query(LeagueMember)
         .filter(LeagueMember.league_id == league.id, LeagueMember.user_id == current_user.id)
@@ -185,17 +226,17 @@ def join_league(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="league is full")
 
     db.add(LeagueMember(league_id=league.id, user_id=current_user.id, role="member"))
-    db.add(
-        Team(
-            league_id=league.id,
-            name=f"{current_user.first_name}'s Team",
-            owner_name=current_user.first_name,
-            owner_user_id=current_user.id,
-        )
-    )
+    db.add(_create_owned_team(db, league_id=league.id, current_user=current_user))
     if draft_row:
         schedule_draft_notifications(db, league.id, current_user.id, draft_row.draft_datetime_utc)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="already joined this league",
+        ) from exc
     db.refresh(league)
     return get_league_detail(db, league)
 
