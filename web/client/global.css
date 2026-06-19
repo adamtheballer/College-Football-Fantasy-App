@@ -1,5 +1,5 @@
 /** @import must precede all other statements */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Rajdhani:wght@500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -119,10 +119,6 @@
 }
 
 @layer components {
-  .cfb-sidebar-type {
-    font-family: "Rajdhani", "Inter", ui-sans-serif, system-ui, sans-serif;
-  }
-
   .cfb-panel {
     @apply rounded-[2rem] border border-cyan-100/10 text-card-foreground backdrop-blur-md shadow-[0_22px_55px_rgba(2,6,23,0.38)];
     background:

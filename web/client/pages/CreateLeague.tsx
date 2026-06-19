@@ -38,15 +38,15 @@ const getDefaultDraftTime = () => "19:00";
 const fieldLabelClass =
   "text-xs font-semibold uppercase tracking-[0.04em] text-[#94A3B8]";
 const inputClass =
-  "h-12 rounded-[10px] border border-white/[0.08] bg-[#161E2E] px-4 text-[15px] font-medium text-[#F8FAFC] shadow-none backdrop-blur-none placeholder:text-[#64748B] focus-visible:border-[#22C55E] focus-visible:ring-2 focus-visible:ring-[#22C55E]/15 focus-visible:ring-offset-0";
+  "h-12 rounded-[10px] border border-white/[0.08] bg-[#161E2E] px-4 text-[15px] font-medium text-[#F8FAFC] shadow-none backdrop-blur-none placeholder:text-[#64748B] focus-visible:border-[#60A5FA] focus-visible:ring-2 focus-visible:ring-[#60A5FA]/15 focus-visible:ring-offset-0";
 const selectTriggerClass =
-  "h-12 rounded-[10px] border border-white/[0.08] bg-[#161E2E] px-4 text-[15px] font-medium text-[#F8FAFC] shadow-none backdrop-blur-none focus:ring-2 focus:ring-[#22C55E]/15 focus-visible:border-[#22C55E]";
+  "h-12 rounded-[10px] border border-white/[0.08] bg-[#161E2E] px-4 text-[15px] font-medium text-[#F8FAFC] shadow-none backdrop-blur-none focus:ring-2 focus:ring-[#60A5FA]/15 focus-visible:border-[#60A5FA]";
 const selectContentClass =
   "rounded-[10px] border border-white/[0.08] bg-[#111827] text-[#F8FAFC] shadow-xl backdrop-blur-none";
 const cardClass =
   "rounded-[20px] border border-white/[0.08] bg-[#111827] shadow-[0_12px_32px_rgba(0,0,0,0.18)]";
 const primaryButtonClass =
-  "h-12 rounded-[10px] bg-[#22C55E] bg-none px-6 text-sm font-bold text-[#04130A] shadow-none hover:bg-[#2FE36C] hover:shadow-none focus-visible:ring-[#22C55E]/30 disabled:bg-[#334155] disabled:text-[#94A3B8]";
+  "h-12 rounded-[10px] bg-[#60A5FA] bg-none px-6 text-sm font-bold text-[#06111F] shadow-none hover:bg-[#7DD3FC] hover:shadow-none focus-visible:ring-[#60A5FA]/30 disabled:bg-[#334155] disabled:text-[#94A3B8]";
 const secondaryButtonClass =
   "h-12 rounded-[10px] border border-white/[0.08] bg-[#161E2E] bg-none px-6 text-sm font-semibold text-[#F8FAFC] shadow-none hover:border-white/15 hover:bg-[#1E293B] hover:text-white";
 
@@ -80,9 +80,9 @@ function Stepper({ currentStep }: { currentStep: number }) {
             className={cn(
               "flex items-center gap-3 rounded-[12px] border px-4 py-3 transition-colors",
               isActive
-                ? "border-[#22C55E]/50 bg-[#22C55E]/10 text-[#F8FAFC]"
+                ? "border-[#60A5FA]/50 bg-[#60A5FA]/10 text-[#F8FAFC]"
                 : isComplete
-                  ? "border-[#22C55E]/25 bg-[#22C55E]/5 text-[#D1FAE5]"
+                  ? "border-[#60A5FA]/25 bg-[#60A5FA]/5 text-[#DBEAFE]"
                   : "border-white/[0.08] bg-[#0B1020] text-[#94A3B8]",
             )}
           >
@@ -90,7 +90,7 @@ function Stepper({ currentStep }: { currentStep: number }) {
               className={cn(
                 "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold",
                 isActive || isComplete
-                  ? "border-[#22C55E] bg-[#22C55E] text-[#04130A]"
+                  ? "border-[#60A5FA] bg-[#60A5FA] text-[#06111F]"
                   : "border-white/[0.12] text-[#94A3B8]",
               )}
             >
@@ -262,7 +262,7 @@ export default function CreateLeague() {
       <div className="min-h-full bg-[#070A12] px-6 py-10 text-[#F8FAFC] md:px-10">
         <div className="mx-auto max-w-2xl">
           <div className={cn(cardClass, "p-8 text-center md:p-10")}>
-            <p className="text-sm font-semibold text-[#22C55E]">College Football Fantasy</p>
+            <p className="text-sm font-semibold text-[#60A5FA]">College Football Fantasy</p>
             <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.03em]">Sign in required</h1>
             <p className="mt-3 text-sm text-[#94A3B8]">You need an account before creating a league.</p>
             <Button type="button" onClick={() => navigate("/login")} className={cn(primaryButtonClass, "mt-8")}>
@@ -280,7 +280,7 @@ export default function CreateLeague() {
         <div className="mx-auto max-w-[1180px]">
           <div className={cn(cardClass, "p-6 md:p-10")}>
             <div className="flex flex-col gap-3 border-b border-white/[0.08] pb-8">
-              <p className="text-sm font-semibold text-[#22C55E]">League created</p>
+              <p className="text-sm font-semibold text-[#60A5FA]">League created</p>
               <h1 className="text-4xl font-extrabold tracking-[-0.03em] md:text-5xl">Invite managers</h1>
               <p className="max-w-2xl text-sm leading-6 text-[#94A3B8]">
                 Share the invite code or link. Managers can preview the league before joining.
@@ -291,7 +291,7 @@ export default function CreateLeague() {
               <div className="rounded-[16px] border border-white/[0.08] bg-[#161E2E] p-5">
                 <p className={fieldLabelClass}>Invite code</p>
                 <div className="mt-3 flex items-center justify-between gap-4">
-                  <span className="text-2xl font-bold tracking-[0.08em] text-[#22C55E]">{success.invite_code}</span>
+                  <span className="text-2xl font-bold tracking-[0.08em] text-[#60A5FA]">{success.invite_code}</span>
                   <Button
                     type="button"
                     variant="outline"
@@ -349,7 +349,7 @@ export default function CreateLeague() {
     <div className="min-h-full bg-[#070A12] px-5 py-6 text-[#F8FAFC] sm:px-8 md:px-10" data-create-step={step}>
       <div className="mx-auto max-w-[1180px] space-y-7">
         <header className="space-y-3">
-          <p className="text-sm font-semibold text-[#22C55E]">College Football Fantasy</p>
+          <p className="text-sm font-semibold text-[#60A5FA]">College Football Fantasy</p>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h1 className="text-4xl font-extrabold tracking-[-0.03em] text-[#F8FAFC] md:text-5xl">
@@ -420,7 +420,7 @@ export default function CreateLeague() {
                       <Switch
                         checked={basics.is_private}
                         onCheckedChange={(value) => setBasics((prev) => ({ ...prev, is_private: value }))}
-                        className="data-[state=checked]:bg-[#22C55E] data-[state=unchecked]:bg-[#334155] focus-visible:ring-[#22C55E]/30"
+                        className="data-[state=checked]:bg-[#60A5FA] data-[state=unchecked]:bg-[#334155] focus-visible:ring-[#60A5FA]/30"
                       />
                       <span className="text-sm font-semibold text-[#F8FAFC]">
                         {basics.is_private ? "Invite only" : "Public"}
@@ -458,7 +458,7 @@ export default function CreateLeague() {
                     {Object.entries(rosterSlots).map(([slot, value]) => (
                       <div key={slot} className="rounded-[12px] border border-white/[0.08] bg-[#161E2E] p-4">
                         <span className="text-xs font-semibold text-[#94A3B8]">{slot}</span>
-                        <p className="mt-2 text-2xl font-bold text-[#22C55E]">{value}</p>
+                        <p className="mt-2 text-2xl font-bold text-[#60A5FA]">{value}</p>
                       </div>
                     ))}
                   </div>
@@ -551,7 +551,7 @@ export default function CreateLeague() {
 
                 <div className="flex flex-col gap-2 rounded-[14px] border border-white/[0.08] bg-[#161E2E] p-4 sm:flex-row sm:items-center sm:justify-between">
                   <span className={fieldLabelClass}>Format flags</span>
-                  <span className="text-sm font-semibold text-[#22C55E]">
+                  <span className="text-sm font-semibold text-[#60A5FA]">
                     Superflex Off · Kicker On · Defense Off
                   </span>
                 </div>
@@ -617,7 +617,7 @@ export default function CreateLeague() {
                   </Field>
                   <Field label="Preview">
                     <div className="flex h-12 items-center gap-3 rounded-[10px] border border-white/[0.08] bg-[#161E2E] px-4 text-sm font-semibold text-[#CBD5E1]">
-                      <Calendar className="h-4 w-4 text-[#22C55E]" />
+                      <Calendar className="h-4 w-4 text-[#60A5FA]" />
                       Draft starts in {draftCountdown || "--"}
                     </div>
                   </Field>

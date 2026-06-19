@@ -113,9 +113,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Sidebar - Conditionally Hidden on Draft Page */}
       {!isDraftPage && (
-        <aside className="cfb-sidebar-type w-72 h-screen sticky top-0 border-r border-white/[0.08] bg-[#080C14] flex flex-col shrink-0 relative z-10 overflow-hidden">
+        <aside className="w-72 h-screen sticky top-0 border-r border-white/[0.08] bg-[#080C14] flex flex-col shrink-0 relative z-10 overflow-hidden">
           <div className="p-8 relative z-10">
-            <h1 className="text-[1.65rem] font-bold tracking-[-0.055em] text-[#F8FAFC] uppercase italic">
+            <h1 className="font-sans text-[1.85rem] font-black tracking-[-0.075em] text-[#F8FAFC] uppercase italic">
               CFB Fantasy
             </h1>
           </div>
@@ -130,21 +130,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   data-nav-item="true"
                   data-nav-active={isActive ? "true" : "false"}
                   className={cn(
-                    "flex items-center gap-4 px-4 py-3.5 rounded-lg text-[17px] font-bold tracking-[0.035em] transition-colors duration-200 relative group w-full text-left",
+                    "flex items-center gap-4 px-4 py-3.5 rounded-lg font-sans text-[16px] font-black uppercase italic tracking-[-0.025em] transition-colors duration-200 relative group w-full text-left",
                     isActive
-                      ? "border-l-2 border-[#22C55E] bg-[#22C55E]/[0.12] text-white"
+                      ? "border-l-2 border-[#60A5FA] bg-[#60A5FA]/[0.14] text-white"
                       : "text-[#94A3B8] hover:bg-white/[0.05] hover:text-[#F8FAFC]"
                   )}
                 >
                   <item.icon className={cn(
                     "w-4 h-4 transition-colors duration-200",
                     isActive
-                      ? "text-[#22C55E]"
+                      ? "text-[#7DD3FC]"
                       : "text-[#64748B] group-hover:text-[#F8FAFC]"
                   )} />
                   {item.name}
                   {isActive && (
-                    <div className="nav-active-overlay absolute inset-y-2 left-0 w-0.5 rounded-full bg-[#22C55E] pointer-events-none" />
+                    <div className="nav-active-overlay absolute inset-y-2 left-0 w-0.5 rounded-full bg-[#60A5FA] pointer-events-none" />
                   )}
                 </div>
               );
@@ -181,7 +181,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       <span className="text-xs font-semibold tracking-[0.06em] text-[#64748B] uppercase">Dashboard</span>
                       <div className="w-1 h-1 rounded-full bg-white/20" />
                       <span className="text-xs font-semibold tracking-[0.06em] text-[#F8FAFC] uppercase animate-in fade-in slide-in-from-right-2 duration-700">
-                        Welcome <span className="text-[#22C55E]">{user?.firstName}</span>
+                        Welcome <span className="text-[#7DD3FC]">{user?.firstName}</span>
                       </span>
                    </div>
                  ) : (

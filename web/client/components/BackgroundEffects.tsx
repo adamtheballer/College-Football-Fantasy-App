@@ -17,7 +17,7 @@ export const BackgroundEffects = ({ className }: BackgroundEffectsProps) => {
       {/* Color fields */}
       <div className="absolute -left-24 top-4 h-[460px] w-[460px] rounded-full bg-cyan-400/17 blur-[120px]" />
       <div className="absolute right-[-90px] top-10 h-[430px] w-[430px] rounded-full bg-blue-500/15 blur-[130px]" />
-      <div className="absolute bottom-[-120px] left-[18%] h-[420px] w-[420px] rounded-full bg-emerald-400/8 blur-[140px]" />
+      <div className="absolute bottom-[-120px] left-[18%] h-[420px] w-[420px] rounded-full bg-sky-400/8 blur-[140px]" />
       <div className="absolute bottom-12 right-[18%] h-[370px] w-[370px] rounded-full bg-fuchsia-500/10 blur-[130px]" />
       <div className="absolute right-[8%] top-[42%] h-[300px] w-[300px] rounded-full bg-amber-300/8 blur-[110px]" />
 
