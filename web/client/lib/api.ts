@@ -185,13 +185,25 @@ const apiRequest = async <T>({
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
-  const res = await fetch(buildUrl(path, params), {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-    signal,
-    credentials: "include",
-  });
+  let res: Response;
+  try {
+    res = await fetch(buildUrl(path, params), {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal,
+      credentials: "include",
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
+    throw new ApiError(
+      0,
+      `Unable to reach the backend API at ${API_BASE}. Make sure FastAPI is running and CORS allows this web origin.`,
+      { cause: error instanceof Error ? error.message : String(error), apiBase: API_BASE }
+    );
+  }
   if (res.status === 401 && retryOn401 && !path.startsWith("/auth/")) {
     const refreshed = await refreshAccessToken();
     if (refreshed) {

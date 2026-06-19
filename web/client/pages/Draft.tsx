@@ -9,6 +9,7 @@ import { useDraftPick, useDraftRoom } from "@/hooks/use-draft";
 import { useLeagueDetail } from "@/hooks/use-leagues";
 import { usePlayers } from "@/hooks/use-players";
 import { ApiError } from "@/lib/api";
+import { filterDraftablePlayers, getLegalPositionsForRoster } from "@/lib/rosterLegality";
 
 const formatApiError = (error: unknown, fallback: string) => {
   if (error instanceof ApiError) {
@@ -50,8 +51,21 @@ export default function Draft() {
   const availablePlayers = useMemo(() => {
     const basePlayers = playersPayload?.data ?? [];
     const normalizedSearch = searchQuery.trim().toLowerCase();
-    return basePlayers
-      .filter((player) => !draftedIds.has(player.id))
+    const currentTeamRoster =
+      draftRoom?.current_team_id === null || draftRoom?.current_team_id === undefined
+        ? []
+        : draftRoom.picks
+            .filter((pick) => pick.team_id === draftRoom.current_team_id)
+            .map((pick) => ({
+              id: pick.player_id,
+              position: pick.player_position,
+            }));
+    return filterDraftablePlayers(
+      basePlayers,
+      currentTeamRoster,
+      draftRoom?.roster_slots ?? {},
+      draftedIds
+    )
       .filter((player) => {
         if (!normalizedSearch) return true;
         return (
@@ -66,7 +80,18 @@ export default function Draft() {
         }
         return left.name.localeCompare(right.name);
       });
-  }, [draftedIds, playersPayload?.data, searchQuery]);
+  }, [draftRoom?.current_team_id, draftRoom?.picks, draftRoom?.roster_slots, draftedIds, playersPayload?.data, searchQuery]);
+
+  const legalPositions = useMemo(() => {
+    if (!draftRoom?.current_team_id) return [];
+    const currentTeamRoster = draftRoom.picks
+      .filter((pick) => pick.team_id === draftRoom.current_team_id)
+      .map((pick) => ({
+        id: pick.player_id,
+        position: pick.player_position,
+      }));
+    return getLegalPositionsForRoster(currentTeamRoster, draftRoom.roster_slots);
+  }, [draftRoom]);
 
   const myPicks = useMemo(
     () =>
@@ -209,6 +234,12 @@ export default function Draft() {
               <CardTitle className="text-[11px] font-black uppercase tracking-[0.28em] text-primary">
                 Available Players
               </CardTitle>
+              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                Showing legal players for: {draftRoom.current_team_name || "Draft complete"}
+              </p>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/80">
+                Legal positions: {legalPositions.length ? legalPositions.join(", ") : "None"}
+              </p>
             </CardHeader>
             <CardContent className="p-8 space-y-6">
               <Input
@@ -237,7 +268,9 @@ export default function Draft() {
                   </div>
                 ) : availablePlayers.length === 0 ? (
                   <div className="px-6 py-10 text-center text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
-                    No available players match this search.
+                    {legalPositions.length
+                      ? `No legal players match this search. Remaining legal positions: ${legalPositions.join(", ")}.`
+                      : "Roster is full. No legal picks remain."}
                   </div>
                 ) : (
                   availablePlayers.slice(0, 80).map((player) => (

@@ -17,8 +17,10 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import CreateLeague from "./pages/CreateLeague";
 import JoinLeague from "./pages/JoinLeague";
+import DraftHome from "./pages/DraftHome";
 import DraftLobby from "./pages/DraftLobby";
 import Draft from "./pages/Draft";
+import SinglePlayerMockDraftRoom from "./pages/SinglePlayerMockDraftRoom";
 import Rosters from "./pages/Rosters";
 import Alerts from "./pages/Alerts";
 import Stats from "./pages/Stats";
@@ -65,7 +67,22 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
-              <Route path="/draft" element={<Navigate to="/leagues" replace />} />
+              <Route
+                path="/draft"
+                element={
+                  <ProtectedRoute>
+                    <DraftHome />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/draft/mock/single-player"
+                element={
+                  <ProtectedRoute>
+                    <SinglePlayerMockDraftRoom />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/league/:leagueId"
                 element={

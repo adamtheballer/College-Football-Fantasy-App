@@ -29,6 +29,32 @@ def test_signup_returns_access_token_and_refresh_cookie(client):
     assert settings.refresh_cookie_name in client.cookies
 
 
+def test_auth_me_returns_current_authenticated_user(client):
+    payload = signup_user(client, "me")
+    response = client.get("/auth/me", headers=auth_headers(payload["access_token"]))
+    assert response.status_code == 200
+    assert response.json()["id"] == payload["user"]["id"]
+    assert response.json()["email"] == "coach-me@example.com"
+
+
+def test_auth_me_requires_authentication(client):
+    response = client.get("/auth/me")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "missing auth token"
+
+
+def test_local_dev_cors_allows_dynamic_vite_port(client):
+    response = client.options(
+        "/auth/signup",
+        headers={
+            "Origin": "http://localhost:8083",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:8083"
+
+
 def test_protected_route_accepts_bearer_access_token(client):
     payload = signup_user(client, "bearer")
     response = client.get("/leagues", headers=auth_headers(payload["access_token"]))

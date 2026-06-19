@@ -33,6 +33,12 @@ type AuthPayload = {
   };
 };
 
+type UserReadPayload = {
+  id: number;
+  first_name: string;
+  email: string;
+};
+
 type AuthContextValue = {
   user: User | null;
   login: (email: string, password: string) => Promise<User>;
@@ -112,6 +118,12 @@ const mapAuthPayload = (payload: AuthPayload): User => ({
   email: payload.user.email,
 });
 
+const mapUserReadPayload = (payload: UserReadPayload): User => ({
+  id: payload.id,
+  firstName: payload.first_name,
+  email: payload.email,
+});
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
@@ -127,7 +139,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     let cancelled = false;
-    apiGet("/notifications/preferences")
+    apiGet<UserReadPayload>("/auth/me")
+      .then((payload) => {
+        if (cancelled) return;
+        const nextUser = mapUserReadPayload(payload);
+        safeStorageSet(USER_STORAGE_KEY, JSON.stringify(nextUser));
+        setUser(nextUser);
+      })
       .catch((error) => {
         if (cancelled) return;
         if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {

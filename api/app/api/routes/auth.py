@@ -12,6 +12,7 @@ from collegefootballfantasy_api.app.core.security import (
     hash_token,
     verify_password,
 )
+from collegefootballfantasy_api.app.api.deps import get_current_user
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
 from collegefootballfantasy_api.app.models.user import User
@@ -72,6 +73,11 @@ def _create_refresh_session(
         )
     )
     return refresh_token
+
+
+@router.get("/me", response_model=UserRead)
+def current_user_profile(current_user: User = Depends(get_current_user)) -> UserRead:
+    return UserRead.model_validate(current_user)
 
 
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)

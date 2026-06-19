@@ -1,7 +1,6 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.api.deps import (
@@ -60,6 +59,7 @@ from collegefootballfantasy_api.app.services.league_workspace import (
     build_league_workspace,
     get_league_detail,
 )
+from collegefootballfantasy_api.app.services.roster_legality import assign_best_roster_slot_for_team
 
 router = APIRouter()
 
@@ -77,36 +77,6 @@ def _draft_pick_team_for_number(teams: list[Team], pick_number: int) -> tuple[in
     round_pick = ((pick_number - 1) % total_teams) + 1
     ordered_teams = teams if round_number % 2 == 1 else list(reversed(teams))
     return round_number, round_pick, ordered_teams[round_pick - 1]
-
-
-def _assign_roster_slot(
-    db: Session,
-    settings_row: LeagueSettings,
-    team_id: int,
-    player_position: str,
-) -> str:
-    roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
-    current_counts = dict(
-        db.query(RosterEntry.slot, func.count(RosterEntry.id))
-        .filter(RosterEntry.team_id == team_id)
-        .group_by(RosterEntry.slot)
-        .all()
-    )
-
-    primary_limit = int(roster_slots.get(player_position, 0))
-    if primary_limit and current_counts.get(player_position, 0) < primary_limit:
-        return player_position
-
-    if settings_row.superflex_enabled:
-        superflex_limit = int(roster_slots.get("SUPERFLEX", 0))
-        if player_position == "QB" and current_counts.get("SUPERFLEX", 0) < superflex_limit:
-            return "SUPERFLEX"
-
-    bench_limit = int(roster_slots.get("BENCH", 0))
-    if current_counts.get("BENCH", 0) < bench_limit:
-        return "BENCH"
-
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="team roster is full")
 
 
 def _draft_room_state(db: Session, league: League, current_user: User) -> DraftRoomRead:
@@ -351,7 +321,18 @@ def create_draft_pick_endpoint(
     if existing_roster_entry:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player already on a league roster")
 
-    slot = _assign_roster_slot(db, settings_row, current_team.id, player.position)
+    slot = assign_best_roster_slot_for_team(
+        db,
+        current_team.id,
+        player.position,
+        settings_row.roster_slots_json or FIXED_ROSTER_SLOTS,
+        superflex_enabled=settings_row.superflex_enabled,
+    )
+    if not slot:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No open roster slot for this position.",
+        )
     pick = DraftPick(
         draft_id=draft_row.id,
         team_id=current_team.id,

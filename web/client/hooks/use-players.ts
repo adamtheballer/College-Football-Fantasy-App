@@ -9,6 +9,13 @@ type BackendPlayerRead = {
   position: string;
   school: string;
   image_url?: string | null;
+  player_class?: string | null;
+  sheet_adp?: number | null;
+  sheet_projected_season_points?: number | null;
+  sheet_projection_stats?: Record<string, number | null> | null;
+  sheet_source_sheet_id?: string | null;
+  sheet_synced_at?: string | null;
+  board_rank?: number | null;
 };
 
 type BackendPlayerListResponse = {
@@ -61,6 +68,16 @@ type BackendInjuryResponse = {
   data: BackendInjuryRow[];
 };
 
+export type PlayerSeasonStatsResponse = {
+  player_id: number;
+  season: number;
+  week: number;
+  source: string;
+  cached: boolean;
+  stats: Record<string, unknown> | null;
+  message?: string | null;
+};
+
 const VALID_STATUSES = new Set(["HEALTHY", "OUT", "QUESTIONABLE", "DOUBTFUL", "IR"]);
 
 const normalizeStatus = (value?: string | null): Player["status"] => {
@@ -71,8 +88,11 @@ const normalizeStatus = (value?: string | null): Player["status"] => {
   return "HEALTHY";
 };
 
-const mapProjection = (projection?: BackendProjectionRead): Player["projection"] => ({
-  fpts: projection?.fantasy_points ?? 0,
+const mapProjection = (
+  projection?: BackendProjectionRead,
+  fallbackFantasyPoints = 0
+): Player["projection"] => ({
+  fpts: projection?.fantasy_points ?? fallbackFantasyPoints,
   passingYards: projection?.pass_yards ?? 0,
   passingTds: projection?.pass_tds ?? 0,
   ints: projection?.interceptions ?? 0,
@@ -97,7 +117,7 @@ export const normalizePlayer = (
     conference?: string;
     rank?: number;
     adp?: number;
-    posRank?: number;
+    posRank?: number | null;
     status?: string;
     projection?: BackendProjectionRead;
   }
@@ -107,15 +127,22 @@ export const normalizePlayer = (
   school: player.school,
   pos: player.position,
   imageUrl: player.image_url ?? undefined,
+  playerClass: player.player_class ?? undefined,
   conf: context?.conference ?? "N/A",
-  rank: context?.rank ?? 0,
-  adp: context?.adp ?? 0,
-  posRank: context?.posRank ?? 0,
+  rank: context?.rank ?? player.board_rank ?? player.sheet_adp ?? 0,
+  boardRank: player.board_rank ?? player.sheet_adp ?? context?.rank ?? null,
+  adp: context?.adp ?? player.sheet_adp ?? 0,
+  posRank: context?.posRank ?? null,
   rostered: 0,
   status: normalizeStatus(context?.status),
-  projection: mapProjection(context?.projection),
+  projection: mapProjection(context?.projection, player.sheet_projected_season_points ?? 0),
   history: [],
   analysis: "",
+  sheetAdp: player.sheet_adp ?? undefined,
+  sheetProjectedSeasonPoints: player.sheet_projected_season_points ?? undefined,
+  sheetProjectionStats: player.sheet_projection_stats ?? undefined,
+  sheetSourceSheetId: player.sheet_source_sheet_id ?? undefined,
+  sheetSyncedAt: player.sheet_synced_at ?? undefined,
 });
 
 export function usePlayers(
@@ -214,9 +241,13 @@ export function usePlayers(
         overallRankByPlayer.set(row.player_id, index + 1);
       });
 
-      payload.data.forEach((player) => {
-        const projection = projectionByPlayerId.get(player.id);
-        if (!projection) return;
+      [...payload.data]
+        .sort((left, right) => {
+          const leftRank = left.board_rank ?? left.sheet_adp ?? overallRankByPlayer.get(left.id) ?? Number.POSITIVE_INFINITY;
+          const rightRank = right.board_rank ?? right.sheet_adp ?? overallRankByPlayer.get(right.id) ?? Number.POSITIVE_INFINITY;
+          return leftRank - rightRank;
+        })
+        .forEach((player) => {
         const current = positionCounters.get(player.position) ?? 0;
         const nextRank = current + 1;
         positionCounters.set(player.position, nextRank);
@@ -237,8 +268,8 @@ export function usePlayers(
         data: payload.data.map((player) =>
           normalizePlayer(player, {
             conference: conferenceBySchool.get(player.school.toUpperCase()) ?? "N/A",
-            rank: overallRankByPlayer.get(player.id) ?? 0,
-            adp: overallRankByPlayer.get(player.id) ?? 0,
+            rank: player.board_rank ?? player.sheet_adp ?? overallRankByPlayer.get(player.id) ?? 0,
+            adp: player.sheet_adp ?? player.board_rank ?? overallRankByPlayer.get(player.id) ?? 0,
             posRank: posRankByPlayer.get(player.id) ?? 0,
             status: injuryByPlayerId.get(player.id),
             projection: projectionByPlayerId.get(player.id),
@@ -297,5 +328,21 @@ export function usePlayerDetail(playerId?: number | null, enabled = true) {
         projection,
       });
     },
+  });
+}
+
+export function usePlayerSeasonStats(
+  playerId?: number | null,
+  season = 2025,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: ["player-season-stats", playerId, season],
+    enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
+    staleTime: 60_000,
+    queryFn: () =>
+      apiGet<PlayerSeasonStatsResponse>(`/players/${playerId}/season-stats`, {
+        season,
+      }),
   });
 }

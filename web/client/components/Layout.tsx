@@ -14,6 +14,7 @@ import {
   Bookmark,
   UserPlus,
   ShieldAlert,
+  Timer,
 } from "lucide-react";
 
 import { BackgroundEffects } from "./BackgroundEffects";
@@ -44,6 +45,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     ? [
         { name: "HOME", path: "/", icon: Home },
         { name: "LEAGUES", path: "/leagues", icon: Trophy },
+        { name: "DRAFT", path: "/draft", icon: Timer },
         { name: "ROSTER", path: "/rosters", icon: ClipboardList },
         { name: "CHATS", path: "/chats", icon: MessageSquare },
         { name: "WATCHLIST", path: "/watchlists", icon: Bookmark },
@@ -67,6 +69,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       ];
 
   const isDraftPage = location.pathname.startsWith("/draft");
+  const isCreateLeaguePage = location.pathname === "/leagues/create";
 
   useEffect(() => {
     if (!user) {
@@ -105,23 +108,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         />
       )}
 
-      {/* Reusable Dramatic Background Effects */}
-      <BackgroundEffects />
-      <FloatingQuickActions />
+      {!isCreateLeaguePage && <BackgroundEffects />}
+      {!isDraftPage && !isCreateLeaguePage && <FloatingQuickActions />}
 
       {/* Sidebar - Conditionally Hidden on Draft Page */}
       {!isDraftPage && (
-        <aside className="w-72 h-screen sticky top-0 border-r border-border bg-sidebar-background/40 backdrop-blur-xl flex flex-col shrink-0 relative z-10 overflow-hidden">
-          {/* Subtle Sidebar Left-side Shine */}
-          <div className="absolute top-0 left-0 w-full h-[100%] bg-sky-500/5 rounded-full blur-[100px] -ml-24 pointer-events-none" />
-
+        <aside className="cfb-sidebar-type w-72 h-screen sticky top-0 border-r border-white/[0.08] bg-[#080C14] flex flex-col shrink-0 relative z-10 overflow-hidden">
           <div className="p-8 relative z-10">
-            <h1 className="text-xl font-black tracking-tighter text-foreground uppercase italic bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
+            <h1 className="text-[1.65rem] font-bold tracking-[-0.055em] text-[#F8FAFC] uppercase italic">
               CFB Fantasy
             </h1>
           </div>
 
-          <nav className="flex-1 px-6 space-y-3 mt-4 pb-6 relative z-10 flex flex-col overflow-hidden">
+          <nav className="flex-1 px-5 space-y-2 mt-4 pb-6 relative z-10 flex flex-col overflow-hidden">
             {sidebarItems.map((item) => {
               const isActive = location.pathname === item.path;
               const navId = `nav-${item.name.toLowerCase().replace(/\s+/g, "-")}`;
@@ -131,21 +130,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   data-nav-item="true"
                   data-nav-active={isActive ? "true" : "false"}
                   className={cn(
-                    "flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black tracking-[0.1em] transition-all duration-300 uppercase relative overflow-hidden group w-full text-left",
+                    "flex items-center gap-4 px-4 py-3.5 rounded-lg text-[17px] font-bold tracking-[0.035em] transition-colors duration-200 relative group w-full text-left",
                     isActive
-                      ? "text-primary-foreground shadow-[0_0_26px_rgba(var(--primary),0.25)] border border-white/10 bg-gradient-to-r from-primary to-blue-500"
-                      : "text-muted-foreground hover:text-primary-foreground hover:shadow-[0_0_22px_rgba(var(--primary),0.20)] hover:border hover:border-white/10 hover:bg-gradient-to-r hover:from-primary hover:to-blue-500"
+                      ? "border-l-2 border-[#22C55E] bg-[#22C55E]/[0.12] text-white"
+                      : "text-[#94A3B8] hover:bg-white/[0.05] hover:text-[#F8FAFC]"
                   )}
                 >
                   <item.icon className={cn(
-                    "w-4 h-4 transition-all duration-300",
+                    "w-4 h-4 transition-colors duration-200",
                     isActive
-                      ? "text-primary-foreground"
-                      : "text-primary group-hover:text-primary-foreground group-hover:scale-110"
+                      ? "text-[#22C55E]"
+                      : "text-[#64748B] group-hover:text-[#F8FAFC]"
                   )} />
                   {item.name}
                   {isActive && (
-                    <div className="nav-active-overlay absolute inset-0 bg-gradient-to-r from-white/10 to-transparent pointer-events-none" />
+                    <div className="nav-active-overlay absolute inset-y-2 left-0 w-0.5 rounded-full bg-[#22C55E] pointer-events-none" />
                   )}
                 </div>
               );
@@ -172,22 +171,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <main ref={mainScrollRef} data-app-scroll="true" className="flex-1 h-screen flex flex-col min-w-0 overflow-y-auto relative">
         {/* Top Header - Also Conditionally Hidden or Adjusted on Draft Page */}
         {!isDraftPage && (
-          <header id="app-header" className="border-b border-border bg-background/60 backdrop-blur-2xl sticky top-0 z-[120] flex flex-col px-12 py-6">
+          <header id="app-header" className="border-b border-white/[0.08] bg-[#080C14]/95 backdrop-blur sticky top-0 z-[120] flex flex-col px-8 py-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-[10px] font-black tracking-[0.3em] text-primary/80 uppercase">College Football Fantasy</h2>
-              <div className="h-[1px] flex-1 mx-8 bg-gradient-to-r from-border/50 via-primary/20 to-border/50" />
+              <h2 className="text-xs font-semibold tracking-[0.08em] text-[#94A3B8] uppercase">College Football Fantasy</h2>
+              <div className="h-px flex-1 mx-8 bg-white/[0.08]" />
               <div className="flex items-center gap-6">
                  {isLoggedIn ? (
                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] font-black tracking-[0.2em] text-muted-foreground uppercase opacity-40 italic">Dashboard</span>
-                      <div className="w-1 h-1 rounded-full bg-border" />
-                      <span className="text-[10px] font-black tracking-[0.2em] text-foreground uppercase animate-in fade-in slide-in-from-right-2 duration-700">
-                        Welcome <span className="text-primary italic">{user?.firstName}</span>
+                      <span className="text-xs font-semibold tracking-[0.06em] text-[#64748B] uppercase">Dashboard</span>
+                      <div className="w-1 h-1 rounded-full bg-white/20" />
+                      <span className="text-xs font-semibold tracking-[0.06em] text-[#F8FAFC] uppercase animate-in fade-in slide-in-from-right-2 duration-700">
+                        Welcome <span className="text-[#22C55E]">{user?.firstName}</span>
                       </span>
                    </div>
                  ) : (
                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] font-black tracking-[0.2em] text-muted-foreground/40 uppercase tracking-widest">Guest Access</span>
+                      <span className="text-xs font-semibold tracking-[0.08em] text-[#64748B] uppercase">Guest Access</span>
                    </div>
                  )}
               </div>
@@ -195,7 +194,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </header>
         )}
 
-        <div className={cn("flex-1", isDraftPage ? "p-0" : "p-8")}>
+        <div className={cn("flex-1", isDraftPage || isCreateLeaguePage ? "p-0" : "p-8")}>
           {children}
         </div>
       </main>

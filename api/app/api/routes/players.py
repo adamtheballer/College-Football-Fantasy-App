@@ -65,6 +65,120 @@ def get_player_endpoint(player_id: int, db: Session = Depends(get_db)) -> Player
     return player
 
 
+@router.get("/{player_id}/season-stats", response_model=PlayerStatResponse)
+def get_player_season_stats_endpoint(
+    player_id: int,
+    season: int = 2025,
+    refresh: bool = False,
+    db: Session = Depends(get_db),
+) -> PlayerStatResponse:
+    player = get_player(db, player_id)
+    if not player:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
+
+    week_value = 0
+    existing = get_player_stat(db, player_id, season, week_value)
+    stale = _is_stale(existing.updated_at, settings.sportsdata_cache_ttl_days) if existing else True
+    should_refresh = refresh or not existing or stale
+
+    if existing and not should_refresh:
+        return PlayerStatResponse(
+            player_id=player_id,
+            season=season,
+            week=week_value,
+            source=existing.source,
+            cached=True,
+            stats=existing.stats,
+        )
+
+    if not settings.sportsdata_api_key and not existing:
+        return PlayerStatResponse(
+            player_id=player_id,
+            season=season,
+            week=week_value,
+            source="sportsdata",
+            cached=False,
+            stats=None,
+            message="SPORTSDATA_API_KEY is not configured.",
+        )
+
+    if not player.external_id and not existing:
+        return PlayerStatResponse(
+            player_id=player_id,
+            season=season,
+            week=week_value,
+            source="sportsdata",
+            cached=False,
+            stats=None,
+            message="Player external_id is not set for SportsData lookup.",
+        )
+
+    def _refresh_from_provider() -> None:
+        if not settings.sportsdata_api_key:
+            raise RuntimeError("SPORTSDATA_API_KEY is not configured.")
+        if not player.external_id:
+            raise RuntimeError("Player external_id is not set for SportsData lookup.")
+        client = SportsDataClient()
+        stats = client.get_player_stats(player.external_id)
+        if not stats:
+            raise RuntimeError("No season stats returned from SportsData.")
+        upsert_player_stat(db, player_id, season, week_value, stats=stats, source="sportsdata")
+
+    refreshed = False
+    stale_fallback_message: str | None = None
+    if should_refresh:
+        try:
+            refreshed, _state = ensure_feed_fresh(
+                db,
+                provider="sportsdata",
+                feed="player_season_stats",
+                scope={
+                    "player_id": player.id,
+                    "external_id": player.external_id,
+                    "season": season,
+                    "week": week_value,
+                },
+                refresh_fn=_refresh_from_provider,
+                ttl_days=settings.sportsdata_cache_ttl_days,
+                force_refresh=refresh or stale or not existing,
+            )
+            db.commit()
+        except Exception as exc:
+            if not existing:
+                return PlayerStatResponse(
+                    player_id=player_id,
+                    season=season,
+                    week=week_value,
+                    source="sportsdata",
+                    cached=False,
+                    stats=None,
+                    message=str(exc),
+                )
+            stale_fallback_message = f"Using stale cached season stats: {exc}"
+
+    stored = get_player_stat(db, player_id, season, week_value) or existing
+    if not stored:
+        return PlayerStatResponse(
+            player_id=player_id,
+            season=season,
+            week=week_value,
+            source="sportsdata",
+            cached=False,
+            stats=None,
+            message="No season stats available.",
+        )
+
+    return PlayerStatResponse(
+        player_id=player_id,
+        season=season,
+        week=week_value,
+        source=stored.source,
+        cached=not refreshed,
+        stats=stored.stats,
+        message=stale_fallback_message,
+    )
+
+
 @router.get("/{player_id}/stats", response_model=PlayerStatResponse)
 def get_player_stats_endpoint(
     player_id: int,
