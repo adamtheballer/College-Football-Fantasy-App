@@ -20,6 +20,7 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     league_invite,
     league_member,
     league_settings,
+    matchup,
     notification,
     player,
     player_stat,
@@ -30,8 +31,10 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     team_stats_snapshot,
     transaction,
     team,
+    standing,
     user,
     watchlist,
+    weekly_projection,
 )
 
 TEST_DATABASE_URL = "sqlite://"

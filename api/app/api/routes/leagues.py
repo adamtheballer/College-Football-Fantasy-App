@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -34,16 +34,21 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueCreateRequest,
     LeagueCreateResponse,
     LeagueDetailRead,
+    LeagueMatchupTabRead,
     LeagueNewsList,
     LeagueMemberRead,
     LeagueMembersList,
     LeaguePowerRankingList,
     LeaguePreview,
+    LeagueRosterTabRead,
     LeagueScoreboardList,
+    LeagueSettingsViewRead,
     LeagueSettingsUpdate,
+    LeagueWaiversRead,
     LeagueWorkspaceRead,
     JoinByCodeRequest,
 )
+from collegefootballfantasy_api.app.services.draft_completion import finalize_draft_rosters_and_matchups
 from collegefootballfantasy_api.app.services.league_flow import (
     FIXED_ROSTER_SLOTS,
     create_league,
@@ -59,7 +64,16 @@ from collegefootballfantasy_api.app.services.league_workspace import (
     build_league_workspace,
     get_league_detail,
 )
-from collegefootballfantasy_api.app.services.roster_legality import assign_best_roster_slot_for_team
+from collegefootballfantasy_api.app.services.roster_legality import (
+    assign_best_roster_slot_for_team,
+    normalize_roster_slot_limits,
+)
+from collegefootballfantasy_api.app.services.league_roster_matchup import (
+    build_matchup_tab_view,
+    build_roster_tab_view,
+    build_settings_view,
+    build_waivers_view,
+)
 
 router = APIRouter()
 
@@ -100,15 +114,19 @@ def _draft_room_state(db: Session, league: League, current_user: User) -> DraftR
     )
 
     roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
-    total_picks = sum(int(value) for value in roster_slots.values()) * len(teams)
+    draft_roster_slots = normalize_roster_slot_limits(roster_slots)
+    total_picks = sum(int(value) for value in draft_roster_slots.values()) * len(teams)
     current_pick = len(picks_rows) + 1
     current_round, current_round_pick, current_team = _draft_pick_team_for_number(teams, current_pick)
     if total_picks and len(picks_rows) >= total_picks:
         current_team = None
 
     user_team = next((team for team in teams if team.owner_user_id == current_user.id), None)
+    member_count = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).count()
+    league_is_full = member_count >= league.max_teams
     can_make_pick = bool(
-        current_team
+        league_is_full
+        and current_team
         and (
             current_user.id == league.commissioner_user_id
             or current_user.id == current_team.owner_user_id
@@ -218,6 +236,62 @@ def get_league_workspace_endpoint(
     return build_league_workspace(db, league, membership, current_user)
 
 
+@router.get("/{league_id}/roster", response_model=LeagueRosterTabRead)
+def get_league_roster_tab_endpoint(
+    league_id: int,
+    week: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeagueRosterTabRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return build_roster_tab_view(db, league, current_user, selected_week=week)
+
+
+@router.get("/{league_id}/matchup", response_model=LeagueMatchupTabRead)
+def get_league_matchup_tab_endpoint(
+    league_id: int,
+    week: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeagueMatchupTabRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return build_matchup_tab_view(db, league, current_user, selected_week=week)
+
+
+@router.get("/{league_id}/settings-view", response_model=LeagueSettingsViewRead)
+def get_league_settings_tab_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeagueSettingsViewRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return build_settings_view(db, league, current_user)
+
+
+@router.get("/{league_id}/waivers", response_model=LeagueWaiversRead)
+def get_league_waiver_tab_endpoint(
+    league_id: int,
+    limit: int = 50,
+    offset: int = 0,
+    week: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeagueWaiversRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return build_waivers_view(
+        db,
+        league,
+        current_user,
+        limit=max(1, min(limit, 100)),
+        offset=max(0, offset),
+        selected_week=week,
+    )
+
+
 @router.get("/{league_id}/matchups", response_model=LeagueScoreboardList)
 def get_league_matchups_endpoint(
     league_id: int,
@@ -278,6 +352,17 @@ def create_draft_pick_endpoint(
     draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
     if not draft_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
+    member_count = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).count()
+    if member_count < league.max_teams:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="draft cannot start until the league is full",
+        )
+    draft_start = draft_row.draft_datetime_utc
+    if draft_start.tzinfo is None:
+        draft_start = draft_start.replace(tzinfo=timezone.utc)
+    if draft_row.status == "scheduled" and draft_start > datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="draft has not started yet")
 
     settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
     if not settings_row:
@@ -289,7 +374,8 @@ def create_draft_pick_endpoint(
 
     existing_picks = db.query(DraftPick).filter(DraftPick.draft_id == draft_row.id).count()
     roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
-    total_picks = sum(int(value) for value in roster_slots.values()) * len(teams)
+    draft_roster_slots = normalize_roster_slot_limits(roster_slots)
+    total_picks = sum(int(value) for value in draft_roster_slots.values()) * len(teams)
     if total_picks and existing_picks >= total_picks:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="draft is complete")
 
@@ -354,6 +440,7 @@ def create_draft_pick_endpoint(
             status="active",
         )
     )
+    db.flush()
 
     if draft_row.status == "scheduled":
         draft_row.status = "live"
@@ -361,6 +448,7 @@ def create_draft_pick_endpoint(
     if total_picks and existing_picks + 1 >= total_picks:
         draft_row.status = "completed"
         league.status = "post_draft"
+        finalize_draft_rosters_and_matchups(db, league)
 
     db.add(draft_row)
     db.add(league)

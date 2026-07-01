@@ -12,11 +12,14 @@ import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
 import Leagues from "./pages/Leagues";
 import Settings from "./pages/Settings";
-import LeagueDetail from "./pages/LeagueDetail";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import CreateLeague from "./pages/CreateLeague";
 import JoinLeague from "./pages/JoinLeague";
+import LeagueMatchup from "./pages/LeagueMatchup";
+import LeagueRoster from "./pages/LeagueRoster";
+import LeagueSettings from "./pages/LeagueSettings";
+import LeagueWaivers from "./pages/LeagueWaivers";
 import DraftHome from "./pages/DraftHome";
 import DraftLobby from "./pages/DraftLobby";
 import Draft from "./pages/Draft";
@@ -24,8 +27,6 @@ import SinglePlayerMockDraftRoom from "./pages/SinglePlayerMockDraftRoom";
 import Rosters from "./pages/Rosters";
 import Alerts from "./pages/Alerts";
 import Stats from "./pages/Stats";
-import WaiverWire from "./pages/WaiverWire";
-import Watchlist from "./pages/Watchlist";
 import Chats from "./pages/Chats";
 import InjuryCenter from "./pages/InjuryCenter";
 import Trade from "./pages/Trade";
@@ -87,7 +88,39 @@ const App = () => (
                 path="/league/:leagueId"
                 element={
                   <ProtectedRoute>
-                    <LeagueDetail />
+                    <LeagueRoster />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/league/:leagueId/roster"
+                element={
+                  <ProtectedRoute>
+                    <LeagueRoster />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/league/:leagueId/matchup"
+                element={
+                  <ProtectedRoute>
+                    <LeagueMatchup />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/league/:leagueId/waivers"
+                element={
+                  <ProtectedRoute>
+                    <LeagueWaivers />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/league/:leagueId/settings"
+                element={
+                  <ProtectedRoute>
+                    <LeagueSettings />
                   </ProtectedRoute>
                 }
               />
@@ -110,8 +143,8 @@ const App = () => (
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/rosters" element={<ProtectedRoute><Rosters /></ProtectedRoute>} />
               <Route path="/chats" element={<ProtectedRoute><Chats /></ProtectedRoute>} />
-              <Route path="/waivers" element={<ProtectedRoute><WaiverWire /></ProtectedRoute>} />
-              <Route path="/watchlists" element={<ProtectedRoute><Watchlist /></ProtectedRoute>} />
+              <Route path="/waivers" element={<ProtectedRoute><Navigate to="/leagues" replace /></ProtectedRoute>} />
+              <Route path="/watchlists" element={<ProtectedRoute><Navigate to="/leagues" replace /></ProtectedRoute>} />
               <Route path="/injury-center" element={<ProtectedRoute><InjuryCenter /></ProtectedRoute>} />
               <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
               <Route path="/trade" element={<ProtectedRoute><Trade /></ProtectedRoute>} />

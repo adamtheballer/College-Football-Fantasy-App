@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRightLeft, ChevronRight, ShieldAlert, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -179,6 +179,7 @@ const TradeList = ({
 
 export default function Trade() {
   const { leagueId: leagueIdParam, playerId: playerIdParam } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { data: leagues = [] } = useLeagues(50, true);
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
@@ -205,6 +206,11 @@ export default function Trade() {
   const [analysis, setAnalysis] = useState<TradeAnalyzeResult | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const targetTeamIdParam = searchParams.get("teamId");
+  const targetTeamId =
+    targetTeamIdParam && /^\d+$/.test(targetTeamIdParam)
+      ? Number(targetTeamIdParam)
+      : null;
 
   useEffect(() => {
     if (!leagueId) return;
@@ -223,6 +229,12 @@ export default function Trade() {
       return opponentTeams[0].id;
     });
   }, [opponentTeams]);
+
+  useEffect(() => {
+    if (!targetTeamId || targetTeamId === ownedTeamId) return;
+    if (!opponentTeams.some((team) => team.id === targetTeamId)) return;
+    setOpponentTeamId(targetTeamId);
+  }, [opponentTeams, ownedTeamId, targetTeamId]);
 
   const {
     data: myRosterPayload,
@@ -244,13 +256,25 @@ export default function Trade() {
   useEffect(() => {
     const parsedPlayerId =
       playerIdParam && /^\d+$/.test(playerIdParam) ? Number(playerIdParam) : null;
-    if (!parsedPlayerId || !theirRows.length) return;
+    if (!parsedPlayerId) return;
+    if (targetTeamId && targetTeamId === ownedTeamId && myRows.some((row) => row.playerId === parsedPlayerId)) {
+      setGiveIds((current) =>
+        current.includes(parsedPlayerId) ? current : [...current, parsedPlayerId]
+      );
+      return;
+    }
     if (theirRows.some((row) => row.playerId === parsedPlayerId)) {
       setReceiveIds((current) =>
         current.includes(parsedPlayerId) ? current : [...current, parsedPlayerId]
       );
+      return;
     }
-  }, [playerIdParam, theirRows]);
+    if (myRows.some((row) => row.playerId === parsedPlayerId)) {
+      setGiveIds((current) =>
+        current.includes(parsedPlayerId) ? current : [...current, parsedPlayerId]
+      );
+    }
+  }, [myRows, ownedTeamId, playerIdParam, targetTeamId, theirRows]);
 
   useEffect(() => {
     setAnalysis(null);

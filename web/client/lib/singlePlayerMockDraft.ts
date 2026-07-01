@@ -16,6 +16,18 @@ export const MOCK_INTERMISSION_SECONDS = 5;
 export const MOCK_BOT_PICK_DELAY_SECONDS = 2;
 export const MOCK_PICK_TIMER_SECONDS = 30;
 
+export type MockDraftSettings = {
+  leagueSize: number;
+  rounds: number;
+  pickTimerSeconds: number;
+};
+
+export const DEFAULT_MOCK_DRAFT_SETTINGS: MockDraftSettings = {
+  leagueSize: MOCK_TEAM_COUNT,
+  rounds: MOCK_ROUNDS,
+  pickTimerSeconds: MOCK_PICK_TIMER_SECONDS,
+};
+
 export type MockDraftTeam = {
   id: number;
   name: string;
@@ -44,6 +56,7 @@ export type SinglePlayerMockDraftStatus = "intermission" | "live" | "complete";
 
 export type SinglePlayerMockDraftState = {
   id: string;
+  settings?: MockDraftSettings;
   status: SinglePlayerMockDraftStatus;
   createdAt: number;
   intermissionEndsAt: number;
@@ -97,26 +110,67 @@ export const MOCK_ROSTER_SLOT_LIMITS: RosterSlotLimits = {
   BENCH: BENCH_SLOTS,
 };
 
-export const createMockTeams = (): MockDraftTeam[] =>
-  Array.from({ length: MOCK_TEAM_COUNT }, (_, index) => {
+const clampNumber = (value: number, min: number, max: number, fallback: number) => {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(value)));
+};
+
+export const parseMockDraftSettings = (search = ""): MockDraftSettings => {
+  const params = new URLSearchParams(search.startsWith("?") ? search : `?${search}`);
+  return {
+    leagueSize: clampNumber(Number(params.get("teams")), 8, 12, DEFAULT_MOCK_DRAFT_SETTINGS.leagueSize),
+    rounds: clampNumber(Number(params.get("rounds")), 8, 15, DEFAULT_MOCK_DRAFT_SETTINGS.rounds),
+    pickTimerSeconds: clampNumber(Number(params.get("timer")), 15, 90, DEFAULT_MOCK_DRAFT_SETTINGS.pickTimerSeconds),
+  };
+};
+
+export const getMockDraftSettings = (state?: Pick<SinglePlayerMockDraftState, "settings"> | null): MockDraftSettings => ({
+  ...DEFAULT_MOCK_DRAFT_SETTINGS,
+  ...(state?.settings ?? {}),
+});
+
+export const getMockTeamCount = (state?: Pick<SinglePlayerMockDraftState, "settings"> | null) =>
+  getMockDraftSettings(state).leagueSize;
+
+export const getMockRounds = (state?: Pick<SinglePlayerMockDraftState, "settings"> | null) =>
+  getMockDraftSettings(state).rounds;
+
+export const getMockPickTimerSeconds = (state?: Pick<SinglePlayerMockDraftState, "settings"> | null) =>
+  getMockDraftSettings(state).pickTimerSeconds;
+
+export const getMockTotalPicks = (state?: Pick<SinglePlayerMockDraftState, "settings"> | null) =>
+  getMockTeamCount(state) * getMockRounds(state);
+
+export const getMockUserTeamId = (leagueSize = MOCK_TEAM_COUNT) =>
+  Math.min(Math.max(1, Math.ceil(leagueSize / 2)), leagueSize);
+
+export const createMockTeams = (
+  settings: MockDraftSettings = DEFAULT_MOCK_DRAFT_SETTINGS
+): MockDraftTeam[] =>
+  Array.from({ length: settings.leagueSize }, (_, index) => {
     const id = index + 1;
+    const userTeamId = getMockUserTeamId(settings.leagueSize);
     return {
       id,
-      name: id === MOCK_USER_TEAM_ID ? "Your Team" : `Bot Team ${id}`,
-      managerType: id === MOCK_USER_TEAM_ID ? "user" : "bot",
+      name: id === userTeamId ? "Your Team" : `Bot Team ${id}`,
+      managerType: id === userTeamId ? "user" : "bot",
     };
   });
 
-export const createSinglePlayerMockDraft = (now = Date.now()): SinglePlayerMockDraftState => ({
+export const createSinglePlayerMockDraft = (
+  now = Date.now(),
+  settings: MockDraftSettings = DEFAULT_MOCK_DRAFT_SETTINGS
+): SinglePlayerMockDraftState => ({
   id: `local-${now}`,
+  settings,
   status: "intermission",
   createdAt: now,
   intermissionEndsAt: now + MOCK_INTERMISSION_SECONDS * 1000,
   currentPick: 1,
   pickStartedAt: null,
   pickExpiresAt: null,
-  userTeamId: MOCK_USER_TEAM_ID,
-  teams: createMockTeams(),
+  userTeamId: getMockUserTeamId(settings.leagueSize),
+  teams: createMockTeams(settings),
   picks: [],
   queuedPlayerIds: [],
 });
@@ -137,7 +191,7 @@ export const resolveInitialSinglePlayerMockDraftState = ({
 }): MockDraftInitialStateResolution => {
   if (shouldStartNewSinglePlayerMockDraft(search)) {
     return {
-      state: createSinglePlayerMockDraft(now),
+      state: createSinglePlayerMockDraft(now, parseMockDraftSettings(search)),
       shouldClearStoredDraft: true,
       shouldReplaceUrl: true,
     };
@@ -150,23 +204,23 @@ export const resolveInitialSinglePlayerMockDraftState = ({
   };
 };
 
-export const getRoundNumber = (overallPick: number) =>
-  Math.floor((overallPick - 1) / MOCK_TEAM_COUNT) + 1;
+export const getRoundNumber = (overallPick: number, teamCount = MOCK_TEAM_COUNT) =>
+  Math.floor((overallPick - 1) / Math.max(1, teamCount)) + 1;
 
-export const getRoundPick = (overallPick: number) =>
-  ((overallPick - 1) % MOCK_TEAM_COUNT) + 1;
+export const getRoundPick = (overallPick: number, teamCount = MOCK_TEAM_COUNT) =>
+  ((overallPick - 1) % Math.max(1, teamCount)) + 1;
 
-export const getTeamIdForPick = (overallPick: number) => {
-  const round = getRoundNumber(overallPick);
-  const roundPick = getRoundPick(overallPick);
-  return round % 2 === 1 ? roundPick : MOCK_TEAM_COUNT - roundPick + 1;
+export const getTeamIdForPick = (overallPick: number, teamCount = MOCK_TEAM_COUNT) => {
+  const round = getRoundNumber(overallPick, teamCount);
+  const roundPick = getRoundPick(overallPick, teamCount);
+  return round % 2 === 1 ? roundPick : teamCount - roundPick + 1;
 };
 
 export const getCurrentTeam = (state: SinglePlayerMockDraftState) =>
-  state.teams.find((team) => team.id === getTeamIdForPick(state.currentPick));
+  state.teams.find((team) => team.id === getTeamIdForPick(state.currentPick, getMockTeamCount(state)));
 
 export const isUserOnClock = (state: SinglePlayerMockDraftState) =>
-  state.status === "live" && getTeamIdForPick(state.currentPick) === state.userTeamId;
+  state.status === "live" && getTeamIdForPick(state.currentPick, getMockTeamCount(state)) === state.userTeamId;
 
 export const isPickTimerDanger = (
   state: SinglePlayerMockDraftState,
@@ -214,7 +268,7 @@ export const getAvailablePlayers = (
 
 export const getMockRosterPlayers = (
   state: SinglePlayerMockDraftState,
-  teamId = getTeamIdForPick(state.currentPick)
+  teamId = getTeamIdForPick(state.currentPick, getMockTeamCount(state))
 ): RosterPlayer[] =>
   state.picks
     .filter((pick) => pick.teamId === teamId)
@@ -226,14 +280,14 @@ export const getMockRosterPlayers = (
 
 export const getLegalMockPositionsForTeam = (
   state: SinglePlayerMockDraftState,
-  teamId = getTeamIdForPick(state.currentPick)
+  teamId = getTeamIdForPick(state.currentPick, getMockTeamCount(state))
 ): PlayerPosition[] =>
   getLegalPositionsForRoster(getMockRosterPlayers(state, teamId), MOCK_ROSTER_SLOT_LIMITS);
 
 export const getDraftablePlayersForTeam = (
   board: DraftPlayer[],
   state: SinglePlayerMockDraftState,
-  teamId = getTeamIdForPick(state.currentPick)
+  teamId = getTeamIdForPick(state.currentPick, getMockTeamCount(state))
 ) =>
   filterDraftablePlayers(
     board,
@@ -263,12 +317,13 @@ const createPick = (
   pickedBy: MockDraftPick["pickedBy"],
   now: number
 ): MockDraftPick => {
-  const teamId = getTeamIdForPick(state.currentPick);
+  const teamCount = getMockTeamCount(state);
+  const teamId = getTeamIdForPick(state.currentPick, teamCount);
   const team = state.teams.find((row) => row.id === teamId);
   return {
     overallPick: state.currentPick,
-    round: getRoundNumber(state.currentPick),
-    roundPick: getRoundPick(state.currentPick),
+    round: getRoundNumber(state.currentPick, teamCount),
+    roundPick: getRoundPick(state.currentPick, teamCount),
     teamId,
     teamName: team?.name ?? `Team ${teamId}`,
     playerId: player.id,
@@ -290,7 +345,7 @@ const startCurrentPickTimer = (
 ): SinglePlayerMockDraftState => ({
   ...state,
   pickStartedAt: now,
-  pickExpiresAt: now + MOCK_PICK_TIMER_SECONDS * 1000,
+  pickExpiresAt: now + getMockPickTimerSeconds(state) * 1000,
 });
 
 const appendPick = (
@@ -299,11 +354,12 @@ const appendPick = (
   now: number
 ): SinglePlayerMockDraftState => {
   const nextPick = state.currentPick + 1;
-  if (nextPick > MOCK_TOTAL_PICKS) {
+  const totalPicks = getMockTotalPicks(state);
+  if (nextPick > totalPicks) {
     return {
       ...state,
       status: "complete",
-      currentPick: MOCK_TOTAL_PICKS,
+      currentPick: totalPicks,
       pickStartedAt: null,
       pickExpiresAt: null,
       picks: [...state.picks, pick],
@@ -382,7 +438,8 @@ export const advanceSinglePlayerMockDraft = (
   }
 
   let guard = 0;
-  while (nextState.status === "live" && guard < MOCK_TOTAL_PICKS) {
+  const totalPicks = getMockTotalPicks(nextState);
+  while (nextState.status === "live" && guard < totalPicks) {
     guard += 1;
     const currentTeam = getCurrentTeam(nextState);
     const isBotTurn = currentTeam?.managerType === "bot";
@@ -404,7 +461,7 @@ export const advanceSinglePlayerMockDraft = (
       return {
         ...nextState,
         status: "complete",
-        currentPick: MOCK_TOTAL_PICKS,
+        currentPick: totalPicks,
         pickStartedAt: null,
         pickExpiresAt: null,
       };

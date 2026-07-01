@@ -46,6 +46,9 @@ const player = (id: number, pos = "RB"): DraftPlayer => ({
   tier: 1,
   tprScore: 250 - id,
   marScore: 250 - id,
+  finalDraftScore: 250 - id,
+  cfb27Overall: null,
+  cfb27TalentScore: 0.5,
 });
 
 const board = Array.from({ length: 180 }, (_, index) =>

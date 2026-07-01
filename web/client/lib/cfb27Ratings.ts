@@ -1,0 +1,73 @@
+export type Cfb27Rating = {
+  rank: number;
+  name: string;
+  school: string;
+  pos: "QB" | "RB" | "WR" | "TE" | "K";
+  ovr: number;
+};
+
+const normalizeText = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/\b(jr|jr\.|iii|ii|iv)\b/g, "")
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+
+const ratingRows = [
+  [1, "Dante Moore", "Oregon", "QB", 95], [2, "Julian Sayin", "Ohio State", "QB", 94], [3, "Trinidad Chambliss", "Ole Miss", "QB", 93], [4, "CJ Carr", "Notre Dame", "QB", 92], [5, "Jayden Maiava", "USC", "QB", 92], [6, "Arch Manning", "Texas", "QB", 91], [7, "Darian Mensah", "Miami", "QB", 91], [8, "Noah Fifita", "Arizona", "QB", 90], [9, "Sam Leavitt", "LSU", "QB", 90], [10, "Byrum Brown", "Auburn", "QB", 89], [11, "Devon Dampier", "Utah", "QB", 89], [12, "Drew Mestemaker", "Oklahoma State", "QB", 89], [13, "John Mateer", "Oklahoma", "QB", 89], [14, "Kevin Jennings", "SMU", "QB", 89], [15, "Avery Johnson", "Kansas State", "QB", 88], [16, "Demond Williams Jr.", "Washington", "QB", 88], [17, "Josh Hoover", "Indiana", "QB", 88], [18, "Marcel Reed", "Texas A&M", "QB", 88], [19, "Rocco Becht", "Penn State", "QB", 88], [20, "Anthony Colandrea", "Nebraska", "QB", 87], [21, "Maddux Madsen", "Boise State", "QB", 87], [22, "Nico Iamaleava", "UCLA", "QB", 87], [23, "Alonza Barnett III", "UCF", "QB", 86], [24, "Brad Jackson", "Texas State", "QB", 86], [25, "Conner Weigman", "Houston", "QB", 86], [26, "LaNorris Sellers", "South Carolina", "QB", 86], [27, "Jaron-Keawe Sagapolutele", "Cal", "QB", 85], [28, "Bear Bachmeier", "BYU", "QB", 84], [29, "Cale Hellums", "Army", "QB", 84], [30, "CJ Bailey", "NC State", "QB", 84], [31, "Colton Joseph", "Wisconsin", "QB", 84], [32, "Bryce Underwood", "Michigan", "QB", 83], [33, "DJ Lagway", "Baylor", "QB", 83], [34, "KaMario Taylor", "Mississippi State", "QB", 83], [35, "Katin Houser", "Illinois", "QB", 83], [36, "Mason Heintschel", "Pittsburgh", "QB", 83], [37, "Owen McCown", "UTSA", "QB", 83], [38, "Austin Mack", "Alabama", "QB", 82], [39, "Dylan Raiola", "Oregon", "QB", 82], [40, "Keelon Russell", "Alabama", "QB", 82], [41, "Liam Szarka", "Air Force", "QB", 82], [42, "Malik Washington", "Maryland", "QB", 82], [43, "Micah Alejado", "Hawaii", "QB", 82], [44, "Nick Minicucci", "Delaware", "QB", 82], [45, "Tavien St. Clair", "Ohio State", "QB", 82], [46, "Austin Simmons", "Missouri", "QB", 81], [47, "Caden Veltkamp", "FAU", "QB", 81], [48, "Drake Lindsey", "Minnesota", "QB", 81], [49, "Keisean Henderson", "Houston", "QB", 81], [50, "Lincoln Kienholz", "Louisville", "QB", 81],
+  [1, "Jeremiah Smith", "Ohio State", "WR", 99], [2, "Malachi Toney", "Miami", "WR", 96], [3, "Cam Coleman", "Texas", "WR", 92], [4, "Duce Robinson", "Florida State", "WR", 92], [5, "KJ Duff", "Rutgers", "WR", 92], [6, "Danny Scudero", "Colorado", "WR", 91], [7, "Mario Craver", "Texas A&M", "WR", 91], [8, "Ryan Coleman-Williams", "Alabama", "WR", 91], [9, "Amare Thomas", "Houston", "WR", 90], [10, "Cooper Barkate", "Miami", "WR", 90], [11, "Easton Messer", "FAU", "WR", 90], [12, "Eric Singleton Jr.", "Florida", "WR", 90], [13, "Ian Strong", "Cal", "WR", 90], [14, "Isaiah Sategna III", "Oklahoma", "WR", 90], [15, "Wyatt Young", "Oklahoma State", "WR", 90], [16, "Beau Sparks", "Texas State", "WR", 89], [17, "Charlie Becker", "Indiana", "WR", 89], [18, "Jackson Harris", "LSU", "WR", 89], [19, "T.J. Moore", "Clemson", "WR", 89], [20, "Andrew Marsh", "Michigan", "WR", 88], [21, "Braylon Staley", "Tennessee", "WR", 88], [22, "Bryant Wesco Jr.", "Clemson", "WR", 88], [23, "Cayden Lee", "Missouri", "WR", 88], [24, "Dakorien Moore", "Oregon", "WR", 88], [25, "Iverson Hooks", "Oregon", "WR", 88], [26, "Jayce Brown", "LSU", "WR", 88], [27, "Jordan Faison", "Notre Dame", "WR", 88], [28, "Keshaun Singleton", "Auburn", "WR", 88], [29, "Nick Marsh", "Indiana", "WR", 88], [30, "Nik McMillan", "Kansas", "WR", 88], [31, "Victor Snow", "NC State", "WR", 88], [32, "Brandon Inniss", "Ohio State", "WR", 87], [33, "Chase Hendricks", "Cal", "WR", 87], [34, "Coy Eakin", "Texas Tech", "WR", 87], [35, "Dezmen Roebuck", "Washington", "WR", 87], [36, "Evan Stewart", "Oregon", "WR", 87], [37, "Isaiah Horton", "Texas A&M", "WR", 87], [38, "Jacory Barney Jr.", "Nebraska", "WR", 87], [39, "Junior Sherrill", "Vanderbilt", "WR", 87], [40, "Kenny Johnson", "Texas Tech", "WR", 87], [41, "Omarion Miller", "Arizona State", "WR", 87], [42, "Reed Harris", "Arizona State", "WR", 87], [43, "Ryan Wingo", "Texas", "WR", 87], [44, "Shazz Preston", "Indiana", "WR", 87], [45, "Trell Harris", "Oklahoma", "WR", 87], [46, "Trent Walker", "Houston", "WR", 87], [47, "Vernell Brown III", "Florida", "WR", 87], [48, "Cam Vaughn", "Miami", "WR", 86], [49, "Chris Dawn Jr.", "Texas State", "WR", 86], [50, "DeAndre Moore Jr.", "Colorado", "WR", 86],
+  [1, "Ahmad Hardy", "Missouri", "RB", 96], [2, "Kewan Lacy", "Ole Miss", "RB", 96], [3, "Mark Fletcher Jr.", "Miami", "RB", 93], [4, "Antwan Raymond", "Rutgers", "RB", 92], [5, "Isaac Brown", "Louisville", "RB", 92], [6, "LJ Martin", "BYU", "RB", 92], [7, "Caleb Hawkins", "Oklahoma State", "RB", 91], [8, "Cam Cook", "West Virginia", "RB", 91], [9, "Jadan Baugh", "Florida", "RB", 91], [10, "Bo Jackson", "Ohio State", "RB", 90], [11, "Cam Edwards", "Michigan State", "RB", 90], [12, "DeSean Bishop", "Tennessee", "RB", 90], [13, "Nate Sheppard", "Duke", "RB", 90], [14, "Nate Frazier", "Georgia", "RB", 90], [15, "Wayne Knight", "UCLA", "RB", 90], [16, "Hollywood Smothers", "Texas", "RB", 89], [17, "Jai'Den Thomas", "UNLV", "RB", 89], [18, "Quintrevion Wisner", "Florida State", "RB", 89], [19, "Cameron Dickey", "Texas Tech", "RB", 88], [20, "Dylan Riley", "Boise State", "RB", 88], [21, "Fluff Bothwell", "Mississippi State", "RB", 88], [22, "Jahiem White", "North Texas", "RB", 88], [23, "Jeremiah Cobb", "Auburn", "RB", 88], [24, "Kamari Moulton", "Iowa", "RB", 88], [25, "Raleek Brown", "Texas", "RB", 88], [26, "Waymond Jordan", "USC", "RB", 88], [27, "Will Henderson III", "UTSA", "RB", 88], [28, "Bryson Washington", "Auburn", "RB", 87], [29, "Carson Hansen", "Penn State", "RB", 87], [30, "Darius Taylor", "Minnesota", "RB", 87], [31, "Jamal Roberts", "Missouri", "RB", 87], [32, "Jordan Marshall", "Michigan", "RB", 87], [33, "Jordon Davison", "Oregon", "RB", 87], [34, "Kendrick Raphael", "SMU", "RB", 87], [35, "Keyjuan Brown", "Louisville", "RB", 87], [36, "King Miller", "USC", "RB", 87], [37, "Lucky Sutton", "San Diego State", "RB", 87], [38, "Rueben Owens II", "Texas A&M", "RB", 87], [39, "Turbo Richard", "Indiana", "RB", 87], [40, "Aneyas Williams", "Notre Dame", "RB", 86], [41, "Braylen Russell", "Arkansas", "RB", 86], [42, "Caden Durham", "LSU", "RB", 86], [43, "Caleb Komolafe", "Northwestern", "RB", 86], [44, "Dylan Edwards", "Kansas", "RB", 86], [45, "Evan Dickens", "Boston College", "RB", 86], [46, "Harlem Berry", "LSU", "RB", 86], [47, "J'koby Williams", "Texas Tech", "RB", 86], [48, "Ja'Kyrian Turner", "Pittsburgh", "RB", 86], [49, "Jalen Buckley", "Western Michigan", "RB", 86], [50, "Quinten Joyner", "Texas Tech", "RB", 86],
+  [1, "Terrance Carter Jr.", "Texas Tech", "TE", 92], [2, "Trey'Dez Green", "LSU", "TE", 92], [3, "Jamari Johnson", "Oregon", "TE", 90], [4, "Dorian Thomas", "Cal", "TE", 89], [5, "Benjamin Brahmer", "Penn State", "TE", 88], [6, "DJ Vonnahme", "Iowa", "TE", 88], [7, "Dylan Wade", "UCF", "TE", 88], [8, "Peter Clarke", "Temple", "TE", 88], [9, "Dorian Fleming", "Maryland", "TE", 87], [10, "Garrett Oakley", "Kansas State", "TE", 87], [11, "Jeremiah Hasley", "Duke", "TE", 87], [12, "Luke Hasz", "Ole Miss", "TE", 87], [13, "Brett Norfleet", "Missouri", "TE", 86], [14, "Kaelan Chudzinski", "Boston College", "TE", 86], [15, "Brody Foley", "Louisville", "TE", 85], [16, "Hayden Hansen", "Oklahoma", "TE", 85], [17, "Rocky Beers", "Oklahoma", "TE", 85], [18, "Benji Gosnell", "Virginia Tech", "TE", 84], [19, "Decker DeGraaf", "Washington", "TE", 84], [20, "Eli Finley", "Louisiana Tech", "TE", 84], [21, "Luke Reynolds", "Virginia Tech", "TE", 84], [22, "Toby Payne", "Marshall", "TE", 84], [23, "Elija Lofton", "Miami", "TE", 83], [24, "Ethan Davis", "Tennessee", "TE", 82], [25, "Jake Johnson", "Auburn", "TE", 82], [26, "Luke Lindenmeyer", "Nebraska", "TE", 82], [27, "Mark Bowman", "USC", "TE", 82], [28, "River Helms", "Georgia Southern", "TE", 82], [29, "Theo Melin Ohrstrom", "SMU", "TE", 82], [30, "Andrew Rappleyea", "Penn State", "TE", 81], [31, "Caleb Odom", "Ole Miss", "TE", 81], [32, "George Burhenn", "Purdue", "TE", 81], [33, "Hunter Tipton", "Memphis", "TE", 81], [34, "Hunter Welcing", "Ohio State", "TE", 81], [35, "Ian Premer", "Notre Dame", "TE", 81], [36, "Jaleel Skinner", "Louisville", "TE", 81], [37, "Jelani Thurman", "North Carolina", "TE", 81], [38, "Juice Vereen", "Colorado State", "TE", 81], [39, "Lawson Luckie", "Georgia", "TE", 81], [40, "Mason Mini", "Cal", "TE", 81], [41, "Randy Pittman Jr.", "SMU", "TE", 81], [42, "Walker Lyons", "BYU", "TE", 81], [43, "Cole Spence", "Vanderbilt", "TE", 80], [44, "Cooper Flanagan", "Notre Dame", "TE", 80], [45, "Desirrio Riles", "Florida State", "TE", 80], [46, "Donovan Green", "Oklahoma State", "TE", 80], [47, "Jaden Platt", "Arkansas", "TE", 80], [48, "Kaiden Prothro", "Georgia", "TE", 80], [49, "Max Reese", "North Texas", "TE", 80], [50, "Nate Kurisky", "Duke", "TE", 80],
+  [1, "Tate Sandell", "Oklahoma", "K", 87], [2, "Brock Taylor", "Vanderbilt", "K", 86], [3, "Lucas Carneiro", "Ole Miss", "K", 86], [4, "Peyton Woodring", "Georgia", "K", 86], [5, "Nico Gramatica", "USF", "K", 85], [6, "Alex McPherson", "Auburn", "K", 84], [7, "Ryan Barker", "Penn State", "K", 84], [8, "Aidan Birr", "Georgia Tech", "K", 83], [9, "John Love", "Virginia Tech", "K", 83], [10, "Towns McGough", "Cal", "K", 83], [11, "Aeron Burrell", "North Carolina", "K", 82], [12, "David Olano", "Texas A&M", "K", 82], [13, "Kyle Cunanan", "Nebraska", "K", 82], [14, "Kyle Konrardy", "Iowa State", "K", 82], [15, "Mateen Bhaghani", "UCLA", "K", 82], [16, "Nico Radicic", "Indiana", "K", 82], [17, "Spencer Porath", "Notre Dame", "K", 82], [18, "Stone Harrington", "Texas Tech", "K", 82], [19, "Collin Rogers", "FAU", "K", 81], [20, "Gavin Lahm", "Wisconsin", "K", 81], [21, "Nolan Hauser", "Clemson", "K", 81], [22, "Stephen Rusnak", "Cincinnati", "K", 81], [23, "Jacobo Lozano", "Purdue", "K", 80], [24, "Kyle Ferrie", "Mississippi State", "K", 80], [25, "Michael Salgado-Medina", "Arizona", "K", 80], [26, "Patrick Durkin", "Florida", "K", 80], [27, "Sean O'Haire", "Maryland", "K", 80], [28, "Blake Craig", "Missouri", "K", 79], [29, "Colton Boomer", "Boise State", "K", 79], [30, "Cosme Salas", "Duke", "K", 79], [31, "Gianni Spetic", "Texas", "K", 79], [32, "Jackson Kleather", "Northwestern", "K", 79], [33, "Luca Lombardo", "Boston College", "K", 79], [34, "Ryon Sayeri", "USC", "K", 79], [35, "Tyler Robles", "Washington", "K", 79], [36, "Chase Meyer", "Cal", "K", 78], [37, "Clune Van Andel", "Arkansas State", "K", 78], [38, "Connor Hawkins", "Ohio State", "K", 78], [39, "Connor Calvert", "Wake Forest", "K", 78], [40, "Cooper Ranvier", "Tennessee", "K", 78], [41, "Emmet Kenney", "Stanford", "K", 78], [42, "Gage Hurych", "Oregon", "K", 78], [43, "Jack Stevens", "Washington State", "K", 78], [44, "Jai Patel", "Rutgers", "K", 78], [45, "Kanoah Vinesett", "NC State", "K", 78], [46, "Kyle Lemmermann", "TCU", "K", 78], [47, "Luis Rodriguez", "Kansas State", "K", 78], [48, "Martin Connington", "Kansas", "K", 78], [49, "Rudy Kessinger", "Eastern Michigan", "K", 78], [50, "Scott Starzyk", "LSU", "K", 78],
+] as const;
+
+export const CFB27_RATINGS: Cfb27Rating[] = ratingRows.map(([rank, name, school, pos, ovr]) => ({
+  rank,
+  name,
+  school,
+  pos,
+  ovr,
+}));
+
+const ratingByExactKey = new Map(
+  CFB27_RATINGS.map((rating) => [
+    `${normalizeText(rating.name)}|${normalizeText(rating.school)}|${rating.pos}`,
+    rating,
+  ])
+);
+
+const ratingsByNamePosition = CFB27_RATINGS.reduce((map, rating) => {
+  const key = `${normalizeText(rating.name)}|${rating.pos}`;
+  map.set(key, [...(map.get(key) ?? []), rating]);
+  return map;
+}, new Map<string, Cfb27Rating[]>());
+
+export const findCfb27Rating = ({
+  name,
+  school,
+  pos,
+}: {
+  name: string;
+  school: string;
+  pos: string;
+}) => {
+  const normalizedPos = pos.toUpperCase();
+  const exact = ratingByExactKey.get(
+    `${normalizeText(name)}|${normalizeText(school)}|${normalizedPos}`
+  );
+  if (exact) return exact;
+
+  const nameMatches = ratingsByNamePosition.get(`${normalizeText(name)}|${normalizedPos}`);
+  return nameMatches?.length === 1 ? nameMatches[0] : null;
+};
+
+export const getCfb27PositionPercentile = (rating: Cfb27Rating | null) => {
+  if (!rating) return 0.5;
+  const samePosition = CFB27_RATINGS.filter((entry) => entry.pos === rating.pos);
+  const ovrs = samePosition.map((entry) => entry.ovr);
+  const min = Math.min(...ovrs);
+  const max = Math.max(...ovrs);
+  if (max === min) return 0.5;
+  return (rating.ovr - min) / (max - min);
+};

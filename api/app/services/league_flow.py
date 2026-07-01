@@ -30,18 +30,61 @@ FIXED_ROSTER_SLOTS = {
     "QB": 1,
     "RB": 2,
     "WR": 2,
+    "FLEX": 1,
     "TE": 1,
+    "SUPERFLEX": 0,
     "K": 1,
-    "BENCH": 4,
+    "BENCH": 5,
     "IR": 1,
 }
 
+ROSTER_SLOT_BOUNDS = {
+    "QB": (1, 3),
+    "RB": (1, 5),
+    "WR": (1, 5),
+    "TE": (1, 3),
+    "FLEX": (0, 3),
+    "SUPERFLEX": (0, 2),
+    "K": (0, 2),
+    "BENCH": (0, 10),
+    "IR": (0, 4),
+}
 
-def enforce_fixed_roster_settings(payload_settings):
-    payload_settings.roster_slots_json = FIXED_ROSTER_SLOTS.copy()
-    payload_settings.superflex_enabled = False
-    payload_settings.kicker_enabled = True
-    payload_settings.defense_enabled = False
+def _coerce_slot_count(value, minimum: int, maximum: int) -> int:
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        count = minimum
+    return max(minimum, min(maximum, count))
+
+
+def normalize_roster_settings(payload_settings):
+    raw_slots = payload_settings.roster_slots_json or FIXED_ROSTER_SLOTS
+    normalized_slots: dict[str, int] = {}
+
+    for raw_key, raw_value in raw_slots.items():
+        key = str(raw_key).strip().upper()
+        if key == "BE":
+            key = "BENCH"
+        if key not in ROSTER_SLOT_BOUNDS:
+            continue
+        minimum, maximum = ROSTER_SLOT_BOUNDS[key]
+        normalized_slots[key] = _coerce_slot_count(raw_value, minimum, maximum)
+
+    if not normalized_slots:
+        normalized_slots = FIXED_ROSTER_SLOTS.copy()
+
+    if payload_settings.superflex_enabled:
+        normalized_slots["SUPERFLEX"] = max(1, normalized_slots.get("SUPERFLEX", 0))
+    else:
+        normalized_slots["SUPERFLEX"] = 0
+
+    if payload_settings.kicker_enabled:
+        normalized_slots["K"] = max(1, normalized_slots.get("K", 0))
+    else:
+        normalized_slots["K"] = 0
+
+    payload_settings.roster_slots_json = normalized_slots
     return payload_settings
 
 
@@ -52,12 +95,14 @@ def generate_unique_invite(db: Session) -> str:
         if not exists:
             return code
     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="unable to generate invite code")
+
+
 def create_league(
     payload: LeagueCreateRequest,
     db: Session,
     current_user: User,
 ) -> LeagueCreateResponse:
-    payload.settings = enforce_fixed_roster_settings(payload.settings)
+    payload.settings = normalize_roster_settings(payload.settings)
     code = generate_unique_invite(db)
     league = League(
         name=payload.basics.name,
@@ -188,7 +233,7 @@ def update_league_settings(
     if not settings_row:
         settings_row = LeagueSettings(league_id=league.id)
 
-    payload = enforce_fixed_roster_settings(payload)
+    payload = normalize_roster_settings(payload)
     settings_row.scoring_json = payload.scoring_json
     settings_row.roster_slots_json = payload.roster_slots_json
     settings_row.playoff_teams = payload.playoff_teams

@@ -16,6 +16,7 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
+    "types": ["node", "react", "react-dom", "vite/client"],
 
     /* Linting */
     "strict": false,

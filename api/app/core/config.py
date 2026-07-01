@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     odds_base_url: str = "https://api.the-odds-api.com/v4"
     sportsdata_api_key: str | None = None
     sportsdata_base_url: str = "https://api.sportsdata.io/v3/cfb"
+    sportsdataio_api_key: str | None = None
+    projection_provider: str = "sportsdataio"
     sportsdata_enabled: bool = True
     sportsdata_player_stats_path: str = "stats/json/Player/{external_id}"
     sportsdata_player_stats_week_path: str = "stats/json/PlayerGameStatsByWeek/{season}/{week}"

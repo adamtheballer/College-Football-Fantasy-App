@@ -12,6 +12,9 @@ import {
   Lock,
   User,
   ArrowRight,
+  Github,
+  Chrome,
+  Apple,
   Zap,
   ShieldCheck,
   Sparkles,
@@ -76,24 +79,24 @@ export default function Signup() {
           <div className="max-w-3xl space-y-4">
             <div className="inline-flex items-center gap-2 rounded-full border border-amber-200/25 bg-amber-300/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] text-amber-100">
               <Sparkles className="h-3.5 w-3.5" />
-              Your league starts here
+              Saturday night is live
             </div>
             <h1 className="text-6xl font-black uppercase italic leading-[0.9] tracking-tight text-white xl:text-7xl">
-              Claim your
+              Build your
               <span className="block bg-gradient-to-r from-cyan-200 via-sky-300 to-amber-200 bg-clip-text text-transparent">
-                sideline
+                title team
               </span>
             </h1>
             <p className="max-w-xl text-sm font-bold uppercase tracking-[0.16em] text-slate-200/70">
-              Create your coach profile, build a league, and start chasing college football bragging rights.
+              Draft boards, live scoring, waiver runs, and league bragging rights in one electric college football command center.
             </p>
           </div>
 
           <div className="grid max-w-2xl grid-cols-3 gap-3">
             {[
-              { label: "Draft Room", value: "Live", icon: Radio, tone: "from-cyan-400/25 to-blue-500/15 text-cyan-100" },
-              { label: "League Size", value: "12", icon: Users, tone: "from-emerald-400/25 to-teal-500/15 text-emerald-100" },
-              { label: "Season Edge", value: "24/7", icon: Star, tone: "from-amber-300/25 to-orange-500/15 text-amber-100" },
+              { label: "Live Drafts", value: "90s", icon: Radio, tone: "from-cyan-400/25 to-blue-500/15 text-cyan-100" },
+              { label: "Managers", value: "12", icon: Users, tone: "from-emerald-400/25 to-teal-500/15 text-emerald-100" },
+              { label: "Power Plays", value: "24/7", icon: Star, tone: "from-amber-300/25 to-orange-500/15 text-amber-100" },
             ].map((item) => (
               <div key={item.label} className={`rounded-2xl border border-white/10 bg-gradient-to-br ${item.tone} p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]`}>
                 <item.icon className="mb-4 h-5 w-5" />
@@ -104,7 +107,7 @@ export default function Signup() {
           </div>
 
           <div className="flex max-w-xl flex-wrap gap-3">
-            {["Create leagues", "Invite managers", "Draft boards", "Live scoring"].map((label) => (
+            {["CFB rankings", "Rivalry week", "Waiver wire", "Draft room"].map((label) => (
               <span key={label} className="rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/75">
                 {label}
               </span>
@@ -181,7 +184,7 @@ export default function Signup() {
                         to="/login"
                         className="text-[9px] font-black uppercase tracking-widest text-amber-200/80 transition-colors hover:text-amber-100"
                       >
-                        Forgot Password?
+                        Already Registered?
                       </Link>
                     </div>
                     <div className="group relative">
@@ -218,6 +221,24 @@ export default function Signup() {
                   )}
                 </Button>
               </form>
+
+              <div className="relative flex items-center justify-center">
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/20 to-white/10" />
+                <span className="px-4 text-[9px] font-black uppercase tracking-widest text-slate-300/50">Or continue with</span>
+                <div className="h-px flex-1 bg-gradient-to-l from-transparent via-white/20 to-white/10" />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <Button variant="outline" className="h-14 rounded-2xl border-white/10 bg-white/10 text-white hover:border-cyan-200/35 hover:bg-cyan-300/15">
+                  <Chrome className="h-5 w-5" />
+                </Button>
+                <Button variant="outline" className="h-14 rounded-2xl border-white/10 bg-white/10 text-white hover:border-amber-200/35 hover:bg-amber-300/15">
+                  <Apple className="h-5 w-5" />
+                </Button>
+                <Button variant="outline" className="h-14 rounded-2xl border-white/10 bg-white/10 text-white hover:border-rose-200/35 hover:bg-rose-300/15">
+                  <Github className="h-5 w-5" />
+                </Button>
+              </div>
             </CardContent>
 
             <div className="relative border-t border-white/10 bg-white/[0.06] px-7 py-5 text-center">

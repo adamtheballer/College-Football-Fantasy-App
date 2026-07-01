@@ -14,6 +14,9 @@ import {
   getCurrentTeam,
   getDraftablePlayersForTeam,
   getLegalMockPositionsForTeam,
+  getMockDraftSettings,
+  getMockTeamCount,
+  getMockTotalPicks,
   getRoundNumber,
   getRoundPick,
   getSecondsRemaining,
@@ -21,8 +24,6 @@ import {
   isPickTimerDanger,
   isUserOnClock,
   makeUserMockPick,
-  MOCK_TEAM_COUNT,
-  MOCK_TOTAL_PICKS,
   resolveInitialSinglePlayerMockDraftState,
   toggleQueuedMockPlayer,
   type MockDraftPick,
@@ -194,11 +195,14 @@ export default function SinglePlayerMockDraftRoom() {
     limit: 1000,
     sort: "draft_rank",
   });
+  const mockSettings = getMockDraftSettings(draftState);
+  const teamCount = getMockTeamCount(draftState);
+  const totalPicks = getMockTotalPicks(draftState);
 
   const draftBoard = useMemo(
     () =>
       buildDraftBoard(playersPayload?.data ?? [], {
-        leagueSize: 12,
+        leagueSize: mockSettings.leagueSize,
         rosterSlots: {
           QB: 1,
           RB: 2,
@@ -209,7 +213,7 @@ export default function SinglePlayerMockDraftRoom() {
           IR: 0,
         },
       }),
-    [playersPayload?.data]
+    [mockSettings.leagueSize, playersPayload?.data]
   );
 
   const selectedBoardPlayer = useMemo(
@@ -322,25 +326,25 @@ export default function SinglePlayerMockDraftRoom() {
 
   const draftOrderPicks = useMemo(
     () =>
-      Array.from({ length: MOCK_TOTAL_PICKS }, (_, index) => {
+      Array.from({ length: totalPicks }, (_, index) => {
         const overallPick = index + 1;
-        const teamId = getTeamIdForPick(overallPick);
+        const teamId = getTeamIdForPick(overallPick, teamCount);
         const team = draftState.teams.find((row) => row.id === teamId);
         const pick = draftState.picks.find((row) => row.overallPick === overallPick);
         return {
           overallPick,
-          round: getRoundNumber(overallPick),
-          roundPick: getRoundPick(overallPick),
+          round: getRoundNumber(overallPick, teamCount),
+          roundPick: getRoundPick(overallPick, teamCount),
           teamId,
           team,
           pick,
         };
       }),
-    [draftState.picks, draftState.teams]
+    [draftState.picks, draftState.teams, teamCount, totalPicks]
   );
 
   const resetDraft = () => {
-    const freshDraft = createSinglePlayerMockDraft();
+    const freshDraft = createSinglePlayerMockDraft(Date.now(), mockSettings);
     setDraftState(freshDraft);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(freshDraft));
     setActiveTab("draft");
@@ -878,8 +882,8 @@ export default function SinglePlayerMockDraftRoom() {
               <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">Scroll every pick left to right</p>
             </div>
             <div className="text-right">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{MOCK_TOTAL_PICKS} Picks</p>
-              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">{MOCK_TOTAL_PICKS - draftedCount} Unlocked</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{totalPicks} Picks</p>
+              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">{totalPicks - draftedCount} Unlocked</p>
             </div>
           </div>
           <div ref={carouselRef} className="flex gap-4 overflow-x-auto px-5 py-5 scroll-smooth">
@@ -932,7 +936,7 @@ export default function SinglePlayerMockDraftRoom() {
           <section className="rounded-[2rem] border border-primary/30 bg-primary/10 p-6 text-center">
             <Trophy className="mx-auto mb-3 h-8 w-8 text-primary" />
             <p className="text-xl font-black uppercase tracking-tight text-foreground">Draft Complete</p>
-            <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">156 picks completed without real league mutations.</p>
+            <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">{totalPicks} picks completed without real league mutations.</p>
           </section>
         ) : null}
 

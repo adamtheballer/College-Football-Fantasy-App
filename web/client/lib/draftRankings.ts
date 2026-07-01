@@ -1,5 +1,6 @@
 import { Player } from "@/types/player";
 import { PlayerStats } from "@/types/player";
+import { findCfb27Rating, getCfb27PositionPercentile } from "@/lib/cfb27Ratings";
 
 export type DraftRosterSlots = {
   QB: number;
@@ -26,6 +27,9 @@ export type DraftPlayer = Player & {
   tier: number;
   tprScore: number;
   marScore: number;
+  finalDraftScore: number;
+  cfb27Overall: number | null;
+  cfb27TalentScore: number;
 };
 
 const POWER4_CONFS = new Set(["SEC", "Big Ten", "Big 12", "ACC"]);
@@ -73,6 +77,19 @@ const normalCdf = (x: number, meanValue: number, sd: number) => {
   if (sd <= 0) return 0.5;
   const z = (x - meanValue) / (sd * Math.SQRT2);
   return 0.5 * (1 + erf(z));
+};
+
+const percentileFromValue = (value: number, values: number[]) => {
+  if (!values.length) return 0.5;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  if (max === min) return 0.5;
+  return clamp((value - min) / (max - min), 0, 1);
+};
+
+const percentileFromRank = (rank: number | null | undefined, total: number) => {
+  if (!rank || !Number.isFinite(rank) || rank <= 0 || total <= 1) return 0.5;
+  return clamp(1 - (rank - 1) / (total - 1), 0, 1);
 };
 
 const varianceByPos: Record<string, number> = {
@@ -282,6 +299,12 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
 
     const injuryPenalty = player.status && player.status !== "HEALTHY" ? 0.05 : 0.0;
     const committeePenalty = ["RB", "WR", "TE"].includes(player.pos) ? (1 - roleCertainty) * 0.05 : 0.0;
+    const cfb27Rating = findCfb27Rating({
+      name: player.name,
+      school: player.school,
+      pos: player.pos,
+    });
+    const cfb27TalentScore = getCfb27PositionPercentile(cfb27Rating);
 
     return {
       player,
@@ -293,6 +316,8 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
       consistency,
       injuryPenalty,
       committeePenalty,
+      cfb27Rating,
+      cfb27TalentScore,
     };
   });
 
@@ -348,7 +373,30 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
 
   const qbReplacementPoints = replacementByPos.QB ?? 0;
 
-  const providedBoardSorted = [...marScores].sort((left, right) => {
+  const scoredBoard = marScores.map((entry) => {
+    const computedRank = computedRankById.get(entry.player.id) ?? marScores.length;
+    const providedRank = getProjectionAwareProvidedRank(entry, computedRank, qbReplacementPoints);
+    const fantasyProjectionScore =
+      0.65 * percentileFromValue(entry.scarcity, scarcityAll) +
+      0.35 * percentileFromValue(entry.projectedPoints, projectedPointsAll);
+    const marketRankScore =
+      0.60 * percentileFromRank(computedRank, marScores.length) +
+      0.40 * percentileFromRank(providedRank ?? getProvidedBoardRank(entry.player), marScores.length);
+    const riskPenalty = entry.injuryPenalty + entry.committeePenalty;
+    const finalDraftScore =
+      0.60 * fantasyProjectionScore +
+      0.20 * marketRankScore +
+      0.12 * entry.cfb27TalentScore +
+      0.08 * entry.roleCertainty -
+      riskPenalty;
+
+    return {
+      ...entry,
+      finalDraftScore,
+    };
+  });
+
+  const providedBoardSorted = [...scoredBoard].sort((left, right) => {
     const leftLowProjectionQb = isLowProjectionQb(left, qbReplacementPoints);
     const rightLowProjectionQb = isLowProjectionQb(right, qbReplacementPoints);
     if (leftLowProjectionQb !== rightLowProjectionQb) {
@@ -360,16 +408,13 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
       }
     }
 
+    if (left.finalDraftScore !== right.finalDraftScore) {
+      return right.finalDraftScore - left.finalDraftScore;
+    }
+
     const leftComputedRank = computedRankById.get(left.player.id) ?? Number.POSITIVE_INFINITY;
     const rightComputedRank = computedRankById.get(right.player.id) ?? Number.POSITIVE_INFINITY;
-    const leftRank = getProjectionAwareProvidedRank(left, leftComputedRank, qbReplacementPoints);
-    const rightRank = getProjectionAwareProvidedRank(right, rightComputedRank, qbReplacementPoints);
-    if (leftRank !== null || rightRank !== null) {
-      if (leftRank === null) return 1;
-      if (rightRank === null) return -1;
-      if (leftRank !== rightRank) return leftRank - rightRank;
-    }
-    return right.tprScore - left.tprScore;
+    return leftComputedRank - rightComputedRank;
   });
 
   const prePenaltyRanks = providedBoardSorted.map((entry, idx) => {
@@ -497,6 +542,9 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
       tier: entry.tier,
       tprScore: entry.tprScore,
       marScore: entry.marScore,
+      finalDraftScore: Number(entry.finalDraftScore.toFixed(4)),
+      cfb27Overall: entry.cfb27Rating?.ovr ?? null,
+      cfb27TalentScore: Number(entry.cfb27TalentScore.toFixed(4)),
     };
   });
 };

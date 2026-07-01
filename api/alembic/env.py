@@ -10,6 +10,7 @@ from collegefootballfantasy_api.app.models import (
     defense_rating,
     defense_vs_position,
     draft,
+    draft_pick,
     game,
     game_odds,
     injury,

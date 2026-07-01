@@ -166,3 +166,136 @@ export interface LeagueNewsResponse {
   total: number;
   limit: number;
 }
+
+export interface LeagueRosterPlayer {
+  id: number;
+  league_id?: number | null;
+  team_id?: number;
+  fantasy_team_id: number;
+  fantasy_team_name: string;
+  player_id: number;
+  player_name: string;
+  player_school?: string | null;
+  player_position?: string | null;
+  school?: string | null;
+  position?: string | null;
+  slot?: string;
+  roster_slot?: string | null;
+  status?: string;
+  acquisition_type?: string;
+  draft_pick_id?: number | null;
+  is_starter?: boolean;
+  is_ir?: boolean;
+  opponent: string | null;
+  projected_points?: number;
+  floor?: number;
+  ceiling?: number;
+  boom_prob?: number;
+  bust_prob?: number;
+  weekly_projected_fantasy_points: number;
+}
+
+export interface LeagueRosterTabResponse {
+  league_id: number;
+  season?: number;
+  fantasy_team_id: number | null;
+  fantasy_team_name: string | null;
+  owned_team?: LeagueWorkspaceTeam | null;
+  week: number;
+  roster?: LeagueRosterPlayer[];
+  roster_slot_limits?: Record<string, number>;
+  ir_slots?: number;
+  message?: string | null;
+  data: LeagueRosterPlayer[];
+}
+
+export interface LeagueMatchupTeam {
+  id?: number;
+  name?: string;
+  fantasy_team_id: number;
+  fantasy_team_name: string;
+  record: string;
+  projected_points?: number;
+  projected_total: number;
+  win_probability: number;
+  roster: LeagueRosterPlayer[];
+}
+
+export interface LeagueMatchupTabResponse {
+  league_id: number;
+  season?: number;
+  matchup_id: number | null;
+  week: number;
+  status: string | null;
+  my_team?: LeagueMatchupTeam | null;
+  user_team: LeagueMatchupTeam | null;
+  opponent_team: LeagueMatchupTeam | null;
+  my_roster?: LeagueRosterPlayer[];
+  opponent_roster?: LeagueRosterPlayer[];
+  projection_source?: string;
+  message?: string | null;
+}
+
+export interface LeagueScheduleRow {
+  matchup_id: number;
+  week: number;
+  home_team_id: number;
+  home_team_name: string;
+  away_team_id: number;
+  away_team_name: string;
+  home_projected_total: number;
+  away_projected_total: number;
+  home_win_probability: number;
+  away_win_probability: number;
+}
+
+export interface LeagueMemberSettings {
+  id: number;
+  user_id: number;
+  role: string;
+  joined_at: string;
+}
+
+export interface LeagueWaiverPlayer {
+  id: number;
+  name: string;
+  school: string | null;
+  position: string | null;
+  weekly_projected_fantasy_points: number;
+}
+
+export interface LeagueWaiverClaim {
+  id: number;
+  league_id: number;
+  fantasy_team_id: number;
+  add_player_id: number;
+  add_player_name: string;
+  drop_player_id: number | null;
+  drop_player_name: string | null;
+  priority: number | null;
+  status: string;
+  created_at: string;
+}
+
+export interface LeagueWaiverTabResponse {
+  league_id: number;
+  fantasy_team_id: number | null;
+  available_players: LeagueWaiverPlayer[];
+  claims: LeagueWaiverClaim[];
+  total_available: number;
+}
+
+export interface LeagueSettingsTabResponse {
+  league_id: number;
+  league_name: string;
+  league_info: Record<string, string | number | boolean | null>;
+  members: LeagueMemberSettings[];
+  scoring_settings: Record<string, number | string | boolean>;
+  roster_settings: Record<string, number>;
+  waiver_rules: Record<string, string | number | boolean>;
+  standings: Array<Record<string, string | number>>;
+  schedule: LeagueScheduleRow[];
+  rosters: LeagueRosterPlayer[];
+  draft_results: Array<Record<string, string | number | null>>;
+  commissioner_controls: string[];
+}

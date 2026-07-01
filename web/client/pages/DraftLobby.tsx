@@ -1,33 +1,66 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Clock, Users, Zap } from "lucide-react";
+import { AlertTriangle, CalendarClock, Clock, Users, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useLeagueDetail } from "@/hooks/use-leagues";
+import { Input } from "@/components/ui/input";
+import { ApiError } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
+import { useLeagueDetail, useRescheduleDraft } from "@/hooks/use-leagues";
+
+const toDateTimeLocalValue = (date: Date | null) => {
+  if (!date || Number.isNaN(date.getTime())) return "";
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+};
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof ApiError) return error.message;
+  if (error instanceof Error) return error.message;
+  return "Unable to reschedule draft.";
+};
 
 export default function DraftLobby() {
   const { leagueId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const parsedLeagueId =
     leagueId && !Number.isNaN(Number(leagueId)) ? Number(leagueId) : undefined;
   const { data: league, error, isLoading } = useLeagueDetail(parsedLeagueId);
+  const rescheduleDraft = useRescheduleDraft(parsedLeagueId);
+  const [now, setNow] = useState(Date.now());
+  const [showReschedule, setShowReschedule] = useState(false);
+  const [draftDateTime, setDraftDateTime] = useState("");
+  const [rescheduleError, setRescheduleError] = useState<string | null>(null);
 
   const draftTime = league?.draft?.draft_datetime_utc ? new Date(league.draft.draft_datetime_utc) : null;
+
+  useEffect(() => {
+    setDraftDateTime(toDateTimeLocalValue(draftTime));
+  }, [draftTime]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   const countdown = useMemo(() => {
     if (!draftTime) return "--";
-    const diff = draftTime.getTime() - Date.now();
+    const diff = draftTime.getTime() - now;
     const hours = Math.max(0, Math.floor(diff / (1000 * 60 * 60)));
     const minutes = Math.max(0, Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)));
     return `${hours}h ${minutes}m`;
-  }, [draftTime]);
+  }, [draftTime, now]);
 
   const canEnterDraft = useMemo(() => {
     if (!draftTime) return false;
-    const diff = draftTime.getTime() - Date.now();
+    const diff = draftTime.getTime() - now;
     return diff <= 15 * 60 * 1000;
-  }, [draftTime]);
+  }, [draftTime, now]);
 
   const isFull = league ? league.members.length >= league.max_teams : false;
+  const missingManagers = league ? Math.max(0, league.max_teams - league.members.length) : 0;
+  const isCommissioner = Boolean(league && user?.id === league.commissioner_user_id);
 
   if (!parsedLeagueId) {
     return (
@@ -60,6 +93,29 @@ export default function DraftLobby() {
   }
 
   const draftRoomPath = `/league/${league.id}/draft`;
+  const draftIsReadyToCommence = isFull && canEnterDraft;
+
+  const handleRescheduleDraft = async () => {
+    const nextDraftTime = draftDateTime ? new Date(draftDateTime) : null;
+    if (!nextDraftTime || Number.isNaN(nextDraftTime.getTime())) {
+      setRescheduleError("Choose a valid draft date and time.");
+      return;
+    }
+
+    setRescheduleError(null);
+    try {
+      await rescheduleDraft.mutateAsync({
+        draft_datetime_utc: nextDraftTime.toISOString(),
+        timezone: league.draft?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        draft_type: league.draft?.draft_type || "snake",
+        pick_timer_seconds: league.draft?.pick_timer_seconds || 90,
+        status: "scheduled",
+      });
+      setShowReschedule(false);
+    } catch (error) {
+      setRescheduleError(getErrorMessage(error));
+    }
+  };
 
   return (
     <div className="max-w-5xl mx-auto py-12 space-y-10">
@@ -113,9 +169,60 @@ export default function DraftLobby() {
         </CardHeader>
         <CardContent className="px-10 pb-10 space-y-4">
           {!isFull && (
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-400">
-              Draft cannot start until {league.max_teams} teams join.
-            </p>
+            <div className="rounded-[2rem] border border-amber-300/20 bg-amber-400/10 p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex gap-4">
+                  <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-amber-300" />
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-300">
+                      Draft locked until league is full
+                    </p>
+                    <p className="text-sm font-bold leading-6 text-amber-50/90">
+                      {league.members.length}/{league.max_teams} managers have joined. The draft cannot commence
+                      until {missingManagers} more {missingManagers === 1 ? "manager joins" : "managers join"}.
+                    </p>
+                  </div>
+                </div>
+                {isCommissioner ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 shrink-0 rounded-2xl border-amber-200/25 bg-amber-300/10 px-5 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100 hover:bg-amber-300/15"
+                    onClick={() => setShowReschedule((current) => !current)}
+                  >
+                    <CalendarClock className="mr-2 h-4 w-4" />
+                    Reschedule Draft
+                  </Button>
+                ) : null}
+              </div>
+
+              {showReschedule && isCommissioner ? (
+                <div className="mt-5 grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                  <label className="grid gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+                      New Draft Time
+                    </span>
+                    <Input
+                      type="datetime-local"
+                      value={draftDateTime}
+                      onChange={(event) => setDraftDateTime(event.target.value)}
+                      className="h-12 rounded-2xl border-white/10 bg-white/5 text-sm font-bold"
+                    />
+                  </label>
+                  <Button
+                    type="button"
+                    className="h-12 rounded-2xl bg-primary px-6 text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground"
+                    disabled={rescheduleDraft.isPending}
+                    onClick={handleRescheduleDraft}
+                  >
+                    {rescheduleDraft.isPending ? "Saving..." : "Save New Time"}
+                  </Button>
+                  {rescheduleError ? (
+                    <p className="text-[11px] font-bold text-red-300 md:col-span-2">{rescheduleError}</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           )}
           {league.members.map((member) => (
             <div key={member.id} className="flex items-center justify-between px-6 py-4 rounded-2xl bg-white/5 border border-white/10">
@@ -128,7 +235,7 @@ export default function DraftLobby() {
 
       {(!isFull || !canEnterDraft) && (
         <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground/70">
-          Draft room is available in preview mode until the league is full and the scheduled draft window opens.
+          Draft room is available in preview mode. Picks unlock only when the league is full and the scheduled draft window opens.
         </p>
       )}
 
@@ -137,7 +244,7 @@ export default function DraftLobby() {
           className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em]"
           onClick={() => navigate(draftRoomPath)}
         >
-          Enter Draft Room
+          {draftIsReadyToCommence ? "Enter Draft Room" : "Open Draft Preview"}
         </Button>
         <Button
           variant="outline"

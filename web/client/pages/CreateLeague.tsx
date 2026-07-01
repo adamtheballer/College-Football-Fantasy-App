@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { Component, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Calendar, Check, ChevronLeft, ChevronRight, Copy, Loader2 } from "lucide-react";
+import { Calendar, Check, ChevronLeft, ChevronRight, Copy, Loader2, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +27,85 @@ const tradeReviewOptions = [
   { label: "None", value: "none" },
 ];
 
+const timezoneOptions = [
+  { label: "Eastern Time", value: "America/New_York" },
+  { label: "Central Time", value: "America/Chicago" },
+  { label: "Mountain Time", value: "America/Denver" },
+  { label: "Pacific Time", value: "America/Los_Angeles" },
+  { label: "Arizona Time", value: "America/Phoenix" },
+  { label: "Alaska Time", value: "America/Anchorage" },
+  { label: "Hawaii Time", value: "Pacific/Honolulu" },
+  { label: "UTC", value: "UTC" },
+];
+
+type RosterSlotKey = "QB" | "RB" | "WR" | "TE" | "FLEX" | "SUPERFLEX" | "K" | "BENCH" | "IR";
+
+const defaultRosterSlots: Record<RosterSlotKey, number> = {
+  QB: 1,
+  RB: 2,
+  WR: 2,
+  TE: 1,
+  FLEX: 1,
+  SUPERFLEX: 0,
+  K: 1,
+  BENCH: 5,
+  IR: 1,
+};
+
+const rosterSlotControls: Array<{
+  key: RosterSlotKey;
+  label: string;
+  min: number;
+  max: number;
+  helper: string;
+}> = [
+  { key: "QB", label: "QB", min: 1, max: 3, helper: "Starting quarterbacks" },
+  { key: "RB", label: "RB", min: 1, max: 5, helper: "Starting running backs" },
+  { key: "WR", label: "WR", min: 1, max: 5, helper: "Starting wide receivers" },
+  { key: "TE", label: "TE", min: 1, max: 3, helper: "Starting tight ends" },
+  { key: "FLEX", label: "FLEX", min: 0, max: 3, helper: "RB / WR / TE slot" },
+  { key: "K", label: "K", min: 1, max: 2, helper: "Kicker slots" },
+  { key: "BENCH", label: "Bench", min: 0, max: 10, helper: "Reserve spots" },
+  { key: "IR", label: "IR", min: 0, max: 4, helper: "Injury reserve" },
+];
+
+const defaultScoring = {
+  ppr: 1,
+  pass_td: 4,
+  pass_yds_per_pt: 25,
+  rush_yds_per_pt: 10,
+  rec_yds_per_pt: 10,
+  rush_td: 6,
+  rec_td: 6,
+  int: -2,
+  fumble_lost: -2,
+  fg: 3,
+  xp: 1,
+};
+
+type ScoringKey = keyof typeof defaultScoring;
+
+const scoringControls: Array<{
+  key: ScoringKey;
+  label: string;
+  step?: string;
+  helper: string;
+}> = [
+  { key: "ppr", label: "Reception", step: "0.5", helper: "Points per reception" },
+  { key: "pass_td", label: "Passing TD", helper: "Points per passing touchdown" },
+  { key: "pass_yds_per_pt", label: "Pass yards / point", helper: "Passing yards required for 1 point" },
+  { key: "rush_yds_per_pt", label: "Rush yards / point", helper: "Rushing yards required for 1 point" },
+  { key: "rec_yds_per_pt", label: "Receiving yards / point", helper: "Receiving yards required for 1 point" },
+  { key: "rush_td", label: "Rushing TD", helper: "Points per rushing touchdown" },
+  { key: "rec_td", label: "Receiving TD", helper: "Points per receiving touchdown" },
+  { key: "int", label: "Interception", helper: "Penalty for thrown interceptions" },
+  { key: "fumble_lost", label: "Fumble lost", helper: "Penalty for lost fumbles" },
+  { key: "fg", label: "Field goal", helper: "Points per made field goal" },
+  { key: "xp", label: "Extra point", helper: "Points per made extra point" },
+];
+
+const clampNumber = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
 const getDefaultDraftDate = () => {
   const now = new Date();
   const draft = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -49,6 +128,8 @@ const primaryButtonClass =
   "h-12 rounded-[10px] bg-[#60A5FA] bg-none px-6 text-sm font-bold text-[#06111F] shadow-none hover:bg-[#7DD3FC] hover:shadow-none focus-visible:ring-[#60A5FA]/30 disabled:bg-[#334155] disabled:text-[#94A3B8]";
 const secondaryButtonClass =
   "h-12 rounded-[10px] border border-white/[0.08] bg-[#161E2E] bg-none px-6 text-sm font-semibold text-[#F8FAFC] shadow-none hover:border-white/15 hover:bg-[#1E293B] hover:text-white";
+const smallControlButtonClass =
+  "flex h-8 w-8 items-center justify-center rounded-[8px] border border-white/[0.08] bg-[#0B1020] text-[#CBD5E1] transition hover:border-[#60A5FA]/35 hover:bg-[#60A5FA]/10 hover:text-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-35";
 
 type FieldProps = {
   label: string;
@@ -125,7 +206,73 @@ function ReviewItem({ label, value }: { label: string; value: React.ReactNode })
   );
 }
 
-export default function CreateLeague() {
+type CreateLeagueErrorBoundaryState = {
+  hasError: boolean;
+  message: string;
+};
+
+class CreateLeagueErrorBoundary extends Component<
+  { children: React.ReactNode },
+  CreateLeagueErrorBoundaryState
+> {
+  state: CreateLeagueErrorBoundaryState = {
+    hasError: false,
+    message: "",
+  };
+
+  static getDerivedStateFromError(error: Error): CreateLeagueErrorBoundaryState {
+    return {
+      hasError: true,
+      message: error.message || "The create league page hit an unexpected error.",
+    };
+  }
+
+  render() {
+    if (!this.state.hasError) {
+      return this.props.children;
+    }
+
+    return (
+      <div className="min-h-full bg-[#070A12] px-6 py-10 text-[#F8FAFC] md:px-10">
+        <div className="mx-auto max-w-2xl">
+          <div className={cn(cardClass, "p-8 text-center md:p-10")}>
+            <p className="text-sm font-semibold text-[#60A5FA]">Create League</p>
+            <h1 className="mt-3 text-3xl font-extrabold tracking-[-0.03em]">Something broke on this step</h1>
+            <p className="mt-3 text-sm leading-6 text-[#94A3B8]">
+              The page recovered instead of going blank. Go back to the leagues page, then reopen Create League.
+            </p>
+            <p className="mt-4 rounded-[12px] border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-3 text-left text-xs font-semibold text-[#FCA5A5]">
+              {this.state.message}
+            </p>
+            <Button
+              type="button"
+              className={cn(primaryButtonClass, "mt-8")}
+              onClick={() => {
+                window.location.assign("/leagues");
+              }}
+            >
+              Back to Leagues
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
+function formatDraftDateTime(value: Date | null): string {
+  if (!value || Number.isNaN(value.getTime())) {
+    return "--";
+  }
+
+  try {
+    return value.toLocaleString();
+  } catch {
+    return "--";
+  }
+}
+
+function CreateLeagueForm() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isLoggedIn } = useAuth();
@@ -134,7 +281,10 @@ export default function CreateLeague() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<LeagueCreateResponse | null>(null);
 
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
+  const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
+  const timezone = timezoneOptions.some((option) => option.value === detectedTimezone)
+    ? detectedTimezone
+    : "America/New_York";
   const currentYear = new Date().getFullYear();
 
   const [basics, setBasics] = useState({
@@ -146,29 +296,9 @@ export default function CreateLeague() {
     icon_url: "",
   });
 
-  const [scoring, setScoring] = useState({
-    ppr: 1,
-    pass_td: 4,
-    pass_yds_per_pt: 25,
-    rush_yds_per_pt: 10,
-    rec_yds_per_pt: 10,
-    rush_td: 6,
-    rec_td: 6,
-    int: -2,
-    fumble_lost: -2,
-    fg: 3,
-    xp: 1,
-  });
+  const [scoring, setScoring] = useState(defaultScoring);
 
-  const rosterSlots = {
-    QB: 1,
-    RB: 2,
-    WR: 2,
-    TE: 1,
-    K: 1,
-    BENCH: 4,
-    IR: 1,
-  };
+  const [rosterSlots, setRosterSlots] = useState<Record<RosterSlotKey, number>>(defaultRosterSlots);
 
   const [settings, setSettings] = useState({
     playoff_teams: 4,
@@ -208,6 +338,44 @@ export default function CreateLeague() {
 
   const nextStepLabel = step < steps.length - 1 ? `Continue to ${steps[step + 1]}` : "Create League";
 
+  const effectiveRosterSlots = useMemo(
+    () => ({
+      ...rosterSlots,
+      SUPERFLEX: 0,
+      K: Math.max(1, rosterSlots.K),
+    }),
+    [rosterSlots],
+  );
+
+  const rosterSummary = useMemo(
+    () =>
+      rosterSlotControls
+        .filter((control) => effectiveRosterSlots[control.key] > 0)
+        .map((control) => `${control.label} ${effectiveRosterSlots[control.key]}`)
+        .join(" · "),
+    [effectiveRosterSlots],
+  );
+
+  const scoringSummary = useMemo(
+    () => `PPR ${scoring.ppr} · Pass TD ${scoring.pass_td} · Rush TD ${scoring.rush_td} · Rec TD ${scoring.rec_td}`,
+    [scoring.pass_td, scoring.ppr, scoring.rec_td, scoring.rush_td],
+  );
+
+  const updateScoring = (key: ScoringKey, rawValue: number) => {
+    setScoring((prev) => ({
+      ...prev,
+      [key]: Number.isFinite(rawValue) ? rawValue : defaultScoring[key],
+    }));
+  };
+
+  const updateRosterSlot = (slot: RosterSlotKey, rawValue: number) => {
+    const control = rosterSlotControls.find((item) => item.key === slot);
+    if (!control) return;
+
+    const nextValue = clampNumber(Number.isFinite(rawValue) ? rawValue : control.min, control.min, control.max);
+    setRosterSlots((prev) => ({ ...prev, [slot]: nextValue }));
+  };
+
   const handleNext = () => {
     if (!canContinue) return;
     setStep((prev) => Math.min(prev + 1, steps.length - 1));
@@ -216,7 +384,12 @@ export default function CreateLeague() {
   const handleBack = () => setStep((prev) => Math.max(prev - 1, 0));
 
   const handleCreate = async () => {
-    if (!draftDateTime || !isLoggedIn) return;
+    if (!isLoggedIn) return;
+    if (!draftDateTime || Number.isNaN(draftDateTime.getTime())) {
+      setError("Choose a valid draft date and time before creating the league.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -231,7 +404,7 @@ export default function CreateLeague() {
         },
         settings: {
           scoring_json: scoring,
-          roster_slots_json: rosterSlots,
+          roster_slots_json: effectiveRosterSlots,
           playoff_teams: settings.playoff_teams,
           waiver_type: settings.waiver_type,
           trade_review_type: settings.trade_review_type,
@@ -247,6 +420,9 @@ export default function CreateLeague() {
         },
       };
       const response = await apiPost<LeagueCreateResponse>("/leagues", payload);
+      if (!response?.league?.id || !response.invite_code || !response.invite_link) {
+        throw new Error("League was created, but the API returned an incomplete invite response.");
+      }
       queryClient.invalidateQueries({ queryKey: ["leagues"] });
       queryClient.setQueryData(["league", response.league.id], response.league);
       setSuccess(response);
@@ -449,22 +625,74 @@ export default function CreateLeague() {
               <div className="space-y-8">
                 <SectionHeader
                   title="League Settings"
-                  description="Review roster structure and scoring settings that will be persisted with this league."
+                  description="Customize roster structure and scoring settings that will be persisted with this league."
                 />
 
                 <div className="space-y-4">
-                  <Label className={fieldLabelClass}>Fixed roster format</Label>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-                    {Object.entries(rosterSlots).map(([slot, value]) => (
-                      <div key={slot} className="rounded-[12px] border border-white/[0.08] bg-[#161E2E] p-4">
-                        <span className="text-xs font-semibold text-[#94A3B8]">{slot}</span>
-                        <p className="mt-2 text-2xl font-bold text-[#60A5FA]">{value}</p>
-                      </div>
-                    ))}
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <Label className={fieldLabelClass}>Roster format</Label>
+                      <p className="mt-2 text-sm leading-6 text-[#94A3B8]">
+                        Set starters, flex spots, bench depth, and IR. These settings drive draft length and roster rules.
+                      </p>
+                    </div>
+                    <p className="text-sm font-semibold text-[#60A5FA]">{rosterSummary || "No active slots"}</p>
                   </div>
-                  <p className="text-sm leading-6 text-[#94A3B8]">
-                    Locked for all leagues: QB, RB, RB, WR, WR, TE, K + 4 Bench + 1 IR. No defensive players.
-                  </p>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {rosterSlotControls.map((control) => {
+                      const value = effectiveRosterSlots[control.key];
+
+                      return (
+                        <div
+                          key={control.key}
+                          className={cn(
+                            "rounded-[14px] border bg-[#161E2E] p-4 transition",
+                            "border-white/[0.08] hover:border-[#60A5FA]/25",
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <span className="text-sm font-bold text-[#F8FAFC]">{control.label}</span>
+                              <p className="mt-1 text-xs leading-5 text-[#64748B]">{control.helper}</p>
+                            </div>
+                            <span className="rounded-full border border-[#60A5FA]/25 bg-[#60A5FA]/10 px-3 py-1 text-sm font-bold text-[#BFDBFE]">
+                              {value}
+                            </span>
+                          </div>
+                          <div className="mt-4 flex items-center gap-2">
+                            <button
+                              type="button"
+                              className={smallControlButtonClass}
+                              disabled={value <= control.min}
+                              onClick={() => updateRosterSlot(control.key, value - 1)}
+                              aria-label={`Decrease ${control.label} slots`}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </button>
+                            <Input
+                              type="number"
+                              min={control.min}
+                              max={control.max}
+                              value={value}
+                              onChange={(e) => updateRosterSlot(control.key, Number(e.target.value))}
+                              className={cn(inputClass, "h-10 text-center")}
+                              aria-label={`${control.label} slots`}
+                            />
+                            <button
+                              type="button"
+                              className={smallControlButtonClass}
+                              disabled={value >= control.max}
+                              onClick={() => updateRosterSlot(control.key, value + 1)}
+                              aria-label={`Increase ${control.label} slots`}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -521,40 +749,31 @@ export default function CreateLeague() {
                   </Field>
                 </div>
 
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                  <Field label="PPR">
-                    <Input
-                      type="number"
-                      step="0.5"
-                      value={scoring.ppr}
-                      onChange={(e) => setScoring((prev) => ({ ...prev, ppr: Number(e.target.value) }))}
-                      className={inputClass}
-                    />
-                  </Field>
-                  <Field label="Pass TD">
-                    <Input
-                      type="number"
-                      value={scoring.pass_td}
-                      onChange={(e) => setScoring((prev) => ({ ...prev, pass_td: Number(e.target.value) }))}
-                      className={inputClass}
-                    />
-                  </Field>
-                  <Field label="Interception">
-                    <Input
-                      type="number"
-                      value={scoring.int}
-                      onChange={(e) => setScoring((prev) => ({ ...prev, int: Number(e.target.value) }))}
-                      className={inputClass}
-                    />
-                  </Field>
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <Label className={fieldLabelClass}>Scoring settings</Label>
+                      <p className="mt-2 text-sm leading-6 text-[#94A3B8]">
+                        Customize every scoring value used for projections, matchups, and standings.
+                      </p>
+                    </div>
+                    <p className="text-sm font-semibold text-[#60A5FA]">{scoringSummary}</p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {scoringControls.map((control) => (
+                      <Field key={control.key} label={control.label} helper={control.helper}>
+                        <Input
+                          type="number"
+                          step={control.step ?? "1"}
+                          value={scoring[control.key]}
+                          onChange={(e) => updateScoring(control.key, Number(e.target.value))}
+                          className={inputClass}
+                        />
+                      </Field>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="flex flex-col gap-2 rounded-[14px] border border-white/[0.08] bg-[#161E2E] p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <span className={fieldLabelClass}>Format flags</span>
-                  <span className="text-sm font-semibold text-[#60A5FA]">
-                    Superflex Off · Kicker On · Defense Off
-                  </span>
-                </div>
               </div>
             )}
 
@@ -583,11 +802,21 @@ export default function CreateLeague() {
                     />
                   </Field>
                   <Field label="Time zone">
-                    <Input
+                    <Select
                       value={draft.timezone}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, timezone: e.target.value }))}
-                      className={inputClass}
-                    />
+                      onValueChange={(value) => setDraft((prev) => ({ ...prev, timezone: value }))}
+                    >
+                      <SelectTrigger className={selectTriggerClass}>
+                        <SelectValue placeholder="Select time zone" />
+                      </SelectTrigger>
+                      <SelectContent className={selectContentClass}>
+                        {timezoneOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value} className="text-sm font-medium">
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </Field>
                 </div>
 
@@ -634,8 +863,10 @@ export default function CreateLeague() {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <ReviewItem label="League name" value={basics.name} />
                   <ReviewItem label="Teams" value={basics.max_teams} />
-                  <ReviewItem label="Draft" value={draftDateTime?.toLocaleString() || "--"} />
+                  <ReviewItem label="Draft" value={formatDraftDateTime(draftDateTime)} />
                   <ReviewItem label="Commissioner" value="You" />
+                  <ReviewItem label="Roster format" value={rosterSummary || "--"} />
+                  <ReviewItem label="Scoring" value={scoringSummary} />
                 </div>
               </div>
             )}
@@ -676,5 +907,13 @@ export default function CreateLeague() {
         </section>
       </div>
     </div>
+  );
+}
+
+export default function CreateLeague() {
+  return (
+    <CreateLeagueErrorBoundary>
+      <CreateLeagueForm />
+    </CreateLeagueErrorBoundary>
   );
 }

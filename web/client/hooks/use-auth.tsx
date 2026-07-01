@@ -139,7 +139,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     let cancelled = false;
-    apiGet<UserReadPayload>("/auth/me")
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 5000);
+
+    apiGet<UserReadPayload>("/auth/me", undefined, controller.signal)
       .then((payload) => {
         if (cancelled) return;
         const nextUser = mapUserReadPayload(payload);
@@ -154,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       })
       .finally(() => {
+        window.clearTimeout(timeoutId);
         if (!cancelled) {
           setIsBootstrapping(false);
         }
@@ -161,6 +165,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timeoutId);
+      controller.abort();
     };
   }, []);
 

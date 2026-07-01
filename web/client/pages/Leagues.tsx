@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagues } from "@/hooks/use-leagues";
+import { DEMO_LEAGUE_DETAIL, DEMO_LEAGUE_ID } from "@/lib/leaguePreviewData";
 
 const LeagueCard = ({
   id,
@@ -38,8 +39,22 @@ const LeagueCard = ({
   draftStatus: string;
   onOpen: (leagueId: number) => void;
   onOpenDraft: (leagueId: number, draftStatus: string) => void;
-}) => (
-  <Card className="bg-card/40 backdrop-blur-md border-border/60 rounded-[2.5rem] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] group hover:border-primary/40 transition-all duration-500 relative">
+}) => {
+  const openLeague = () => onOpen(id);
+
+  return (
+    <Card
+      role="button"
+      tabIndex={0}
+      onClick={openLeague}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openLeague();
+        }
+      }}
+      className="bg-card/40 backdrop-blur-md border-border/60 rounded-[2.5rem] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] group hover:border-primary/40 transition-all duration-500 relative cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
     <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-primary/10 transition-colors" />
     <div className="flex flex-col md:flex-row relative z-10">
       <div className="flex-1 p-8 border-b md:border-b-0 md:border-r border-border/40 relative overflow-hidden">
@@ -83,14 +98,6 @@ const LeagueCard = ({
               </p>
               <p className="mt-2 text-sm font-bold text-foreground">{draftLabel}</p>
             </div>
-            <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
-              <p className="text-[10px] font-black tracking-[0.2em] uppercase text-muted-foreground/60">
-                League Context
-              </p>
-              <p className="mt-2 text-sm font-bold text-foreground">
-                Open your league hub for roster, matchup, scoreboard, and settings.
-              </p>
-            </div>
           </div>
         </div>
       </div>
@@ -99,7 +106,10 @@ const LeagueCard = ({
         <Button
           variant="outline"
           className="w-full border-white/5 bg-white/5 text-foreground font-black tracking-[0.2em] text-[10px] uppercase h-12 px-8 rounded-2xl hover:bg-white/10 transition-all duration-300"
-          onClick={() => onOpen(id)}
+          onClick={(event) => {
+            event.stopPropagation();
+            openLeague();
+          }}
         >
           League Hub
           <ChevronRight className="w-3 h-3 ml-2" />
@@ -108,7 +118,10 @@ const LeagueCard = ({
           <Button
             variant="outline"
             className="w-full border-primary/30 bg-primary/10 text-primary font-black tracking-[0.2em] text-[10px] uppercase h-12 px-8 rounded-2xl hover:bg-primary/15 transition-all duration-300"
-            onClick={() => onOpenDraft(id, draftStatus)}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenDraft(id, draftStatus);
+            }}
           >
             {draftStatus === "draft_live" ? "Enter Draft Room" : "Open Draft Lobby"}
             <ChevronRight className="w-3 h-3 ml-2" />
@@ -116,14 +129,19 @@ const LeagueCard = ({
         )}
       </div>
     </div>
-  </Card>
-);
+    </Card>
+  );
+};
 
 export default function Leagues() {
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
   const { setActiveLeagueId } = useActiveLeagueId();
   const { data: leagueRows = [], isLoading, isError } = useLeagues(20, isLoggedIn);
+  const displayLeagues =
+    !isLoading && isLoggedIn && !leagueRows.some((league) => league.id === DEMO_LEAGUE_ID)
+      ? [...leagueRows, DEMO_LEAGUE_DETAIL]
+      : leagueRows;
 
   return (
     <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-1000 relative z-10 pb-20">
@@ -153,7 +171,7 @@ export default function Leagues() {
         </div>
         <p className="text-muted-foreground text-xl font-medium max-w-2xl leading-relaxed">
           {isLoggedIn
-            ? "Manage your active leagues, jump into drafts, and navigate to the right league context in one tap."
+            ? "Manage your active leagues, jump into drafts, and open the right league hub."
             : "Sign in to create or join a league and use the supported React experience."}
         </p>
       </div>
@@ -170,9 +188,12 @@ export default function Leagues() {
               <p className="text-[11px] font-bold uppercase tracking-widest text-red-300">
                 Unable to load leagues. Confirm the backend is running and your session is valid.
               </p>
+              <p className="mt-3 text-xs font-semibold text-sky-200">
+                Showing the local 10-team placeholder league below so the roster and matchup flow can still be reviewed.
+              </p>
             </Card>
           )}
-          {leagueRows.map((league) => (
+          {displayLeagues.map((league) => (
             <LeagueCard
               key={league.id}
               id={league.id}
@@ -189,7 +210,7 @@ export default function Leagues() {
               draftStatus={league.draft?.status || "none"}
               onOpen={(leagueId) => {
                 setActiveLeagueId(leagueId);
-                navigate(`/league/${leagueId}`);
+                navigate(`/league/${leagueId}/roster`);
               }}
               onOpenDraft={(leagueId, draftStatus) => {
                 setActiveLeagueId(leagueId);
@@ -201,12 +222,12 @@ export default function Leagues() {
               }}
             />
           ))}
-          {!isLoading && !isError && leagueRows.length === 0 && (
+          {!isLoading && leagueRows.length === 0 && (
             <Card className="bg-card/40 backdrop-blur-md border-border/40 rounded-[3rem] p-12 space-y-8">
               <div className="space-y-3 text-center">
-                <h3 className="text-2xl font-black uppercase text-foreground">No leagues yet</h3>
+                <h3 className="text-2xl font-black uppercase text-foreground">Placeholder league loaded</h3>
                 <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">
-                  Use the top-right actions to create a league or join with an invite code.
+                  Open Matchup Test League to inspect the 10-manager Roster, Matchup, Waiver Wire, and Settings flow.
                 </p>
               </div>
 
@@ -218,7 +239,7 @@ export default function Leagues() {
                   <div className="space-y-2">
                     <h4 className="text-sm font-black uppercase tracking-[0.14em] text-foreground">Set the Draft</h4>
                     <p className="text-xs font-medium leading-6 text-muted-foreground/75">
-                      Pick your draft date, league size, scoring, and roster settings before the season starts.
+                      The demo uses a completed 10-team league with Week 1 matchup projections.
                     </p>
                   </div>
                 </div>
@@ -230,7 +251,7 @@ export default function Leagues() {
                   <div className="space-y-2">
                     <h4 className="text-sm font-black uppercase tracking-[0.14em] text-foreground">Invite Your League</h4>
                     <p className="text-xs font-medium leading-6 text-muted-foreground/75">
-                      Share a secure invite code so every manager joins the right league before draft night.
+                      Waiver Wire is league-specific and only appears once a league is opened.
                     </p>
                   </div>
                 </div>
@@ -242,12 +263,25 @@ export default function Leagues() {
                   <div className="space-y-2">
                     <h4 className="text-sm font-black uppercase tracking-[0.14em] text-foreground">Stay Ready</h4>
                     <p className="text-xs font-medium leading-6 text-muted-foreground/75">
-                      Supported notifications, settings, and league metadata are now wired to the live backend.
+                      Create or join a real league when the backend is running. The placeholder does not mutate data.
                     </p>
                   </div>
                 </div>
               </div>
             </Card>
+          )}
+          {!isLoading && leagueRows.length === 0 && (
+            <Button
+              type="button"
+              className="mx-auto flex h-12 rounded-2xl bg-primary px-8 text-[11px] font-black uppercase tracking-[0.16em] text-primary-foreground"
+              onClick={() => {
+                setActiveLeagueId(DEMO_LEAGUE_ID);
+                navigate(`/league/${DEMO_LEAGUE_ID}/roster`);
+              }}
+            >
+              Open Placeholder League
+              <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
           )}
         </div>
       ) : (

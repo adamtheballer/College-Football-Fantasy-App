@@ -74,6 +74,113 @@ def test_create_and_list_leagues(client):
     assert data["data"][0]["draft"]["draft_type"] == "snake"
 
 
+def test_create_league_persists_custom_roster_format_and_flags(client):
+    token = create_user_and_token(client, "custom-format")
+    payload = {
+        "basics": {
+            "name": "Custom Format League",
+            "season_year": 2026,
+            "max_teams": 12,
+            "is_private": True,
+            "description": None,
+            "icon_url": None,
+        },
+        "settings": {
+            "scoring_json": {"ppr": 0.5, "pass_td": 6},
+            "roster_slots_json": {
+                "QB": 1,
+                "RB": 3,
+                "WR": 2,
+                "TE": 1,
+                "FLEX": 2,
+                "SUPERFLEX": 1,
+                "K": 0,
+                "BENCH": 7,
+                "IR": 2,
+            },
+            "playoff_teams": 6,
+            "waiver_type": "rolling",
+            "trade_review_type": "league_vote",
+            "superflex_enabled": True,
+            "kicker_enabled": False,
+            "defense_enabled": True,
+        },
+        "draft": {
+            "draft_datetime_utc": "2026-08-19T18:00:00Z",
+            "timezone": "America/Los_Angeles",
+            "draft_type": "snake",
+            "pick_timer_seconds": 90,
+        },
+    }
+
+    response = client.post("/leagues", json=payload, headers=auth_headers(token))
+
+    assert response.status_code == 201
+    settings = response.json()["league"]["settings"]
+    assert settings["roster_slots_json"] == {
+        "QB": 1,
+        "RB": 3,
+        "WR": 2,
+        "TE": 1,
+        "FLEX": 2,
+        "SUPERFLEX": 1,
+        "K": 0,
+        "BENCH": 7,
+        "IR": 2,
+    }
+    assert settings["superflex_enabled"] is True
+    assert settings["kicker_enabled"] is False
+    assert settings["defense_enabled"] is True
+    assert settings["playoff_teams"] == 6
+    assert settings["waiver_type"] == "rolling"
+    assert settings["trade_review_type"] == "league_vote"
+
+
+def test_update_league_settings_persists_custom_roster_format_and_flags(client):
+    token = create_user_and_token(client, "update-format")
+    league = create_league(client, token)
+    payload = {
+        "scoring_json": {"ppr": 1, "pass_td": 4},
+        "roster_slots_json": {
+            "QB": 1,
+            "RB": 2,
+            "WR": 4,
+            "TE": 2,
+            "FLEX": 1,
+            "SUPERFLEX": 0,
+            "K": 2,
+            "BENCH": 8,
+            "IR": 3,
+        },
+        "playoff_teams": 8,
+        "waiver_type": "reverse",
+        "trade_review_type": "none",
+        "superflex_enabled": False,
+        "kicker_enabled": True,
+        "defense_enabled": False,
+    }
+
+    response = client.patch(f"/leagues/{league['id']}/settings", json=payload, headers=auth_headers(token))
+
+    assert response.status_code == 200
+    settings = response.json()["settings"]
+    assert settings["roster_slots_json"] == {
+        "QB": 1,
+        "RB": 2,
+        "WR": 4,
+        "TE": 2,
+        "FLEX": 1,
+        "SUPERFLEX": 0,
+        "K": 2,
+        "BENCH": 8,
+        "IR": 3,
+    }
+    assert settings["superflex_enabled"] is False
+    assert settings["kicker_enabled"] is True
+    assert settings["defense_enabled"] is False
+    assert settings["playoff_teams"] == 8
+
+
 def test_legacy_create_alias_still_works(client):
     token = create_user_and_token(client)
     payload = {
