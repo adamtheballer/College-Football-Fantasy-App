@@ -1,10 +1,11 @@
-import { ClipboardList, Settings2, ShieldCheck, Swords } from "lucide-react";
+import { Bookmark, ClipboardList, Settings2, ShieldCheck, Swords } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 const tabs = [
   { label: "Roster", path: "roster", icon: ClipboardList },
   { label: "Matchup", path: "matchup", icon: Swords },
   { label: "Waiver Wire", path: "waivers", icon: ShieldCheck },
+  { label: "Watchlist", path: "watchlist", icon: Bookmark },
   { label: "Settings", path: "settings", icon: Settings2 },
 ];
 
@@ -14,7 +15,7 @@ export function LeagueTabs({ leagueId }: { leagueId: number }) {
   return (
     <div
       className="w-full max-w-none gap-2 rounded-[1.25rem] border border-sky-300/15 bg-[linear-gradient(135deg,rgba(7,20,38,0.92),rgba(12,29,54,0.78))] p-2 shadow-[inset_0_1px_0_rgba(125,211,252,0.10),0_18px_50px_rgba(14,165,233,0.08)]"
-      style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
+      style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}
     >
       {tabs.map((tab) => {
         const href = `/league/${leagueId}/${tab.path}`;

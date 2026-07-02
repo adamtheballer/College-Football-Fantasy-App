@@ -269,26 +269,57 @@ export function createDemoLeagueMatchupResponse(): LeagueMatchupTabResponse {
   };
 }
 
+const demoWaiverCandidateRows = [
+  "Dylan Raiola|Nebraska|QB|15.2",
+  "LaNorris Sellers|South Carolina|QB|14.8",
+  "Haynes King|Georgia Tech|QB|13.7",
+  "Avery Johnson|Kansas State|QB|12.9",
+  "Maalik Murphy|Oregon State|QB|12.4",
+  "Dylan Lonergan|Boston College|QB|11.8",
+  "Taylen Green|Arkansas|QB|11.1",
+  "Brock Glenn|Florida State|QB|10.7",
+  "Malachi Toney|Miami|WR|12.8",
+  "Cam Coleman|Texas|WR|13.6",
+  "Jackson Harris|LSU|WR|9.1",
+  "Jordan Faison|Notre Dame|WR|10.4",
+  "Ryan Wingo|Texas|WR|10.2",
+  "Carnell Tate|Ohio State|WR|9.8",
+  "Dakorien Moore|Oregon|WR|9.4",
+  "Bryant Wesco Jr.|Clemson|WR|9.2",
+  "Nate Frazier|Georgia|RB|11.9",
+  "Isaac Brown|Louisville|RB|10.7",
+  "Jamarrion Morrow|Texas A&M|RB|9.8",
+  "Bo Jackson|Ohio State|RB|9.6",
+  "Wayne Knight|UCLA|RB|9.2",
+  "Jadan Baugh|Florida|RB|9.0",
+  "Mark Fletcher Jr.|Miami|RB|8.8",
+  "Hayden Hansen|Oklahoma|TE|9.4",
+  "Jaden Platt|Arkansas|TE|8.9",
+  "Lawson Luckie|Georgia|TE|8.6",
+  "Nick Townsend|Texas|TE|8.3",
+  "Ethan Davis|Tennessee|TE|8.1",
+  "Brett Norfleet|Missouri|TE|7.9",
+  "Terrance Carter Jr.|Texas Tech|TE|9.6",
+  "Trey'Dez Green|LSU|TE|9.5",
+  "Jamari Johnson|Oregon|TE|9.0",
+  "Dorian Thomas|Cal|TE|8.7",
+  "Benjamin Brahmer|Penn State|TE|8.5",
+  "DJ Vonnahme|Iowa|TE|8.2",
+  "Dylan Wade|UCF|TE|8.0",
+  "Peter Clarke|Temple|TE|7.8",
+  "Parker Lewis|Ohio State|K|7.8",
+  "Tate Sandell|Oklahoma|K|7.5",
+  "Peyton Woodring|Georgia|K|7.3",
+  "Brock Taylor|Vanderbilt|K|7.0",
+  "Lucas Carneiro|Ole Miss|K|6.8",
+];
+
 export function createDemoLeagueWaiverResponse(): LeagueWaiverTabResponse {
-  return {
-    league_id: DEMO_LEAGUE_ID,
-    fantasy_team_id: DEMO_LEAGUE_ID - 100,
-    total_available: 12,
-    claims: [],
-    available_players: [
-      "Malachi Toney|Miami|WR|12.8",
-      "Nate Frazier|Georgia|RB|11.9",
-      "Hayden Hansen|Oklahoma|TE|9.4",
-      "Dylan Raiola|Nebraska|QB|15.2",
-      "Parker Lewis|Ohio State|K|7.8",
-      "Jaden Platt|Arkansas|TE|8.9",
-      "Isaac Brown|Louisville|RB|10.7",
-      "Cam Coleman|Texas|WR|13.6",
-      "Lawson Luckie|Georgia|TE|8.6",
-      "Jackson Harris|LSU|WR|9.1",
-      "Jamarrion Morrow|Texas A&M|RB|9.8",
-      "Nick Townsend|Texas|TE|8.3",
-    ].map((row, index) => {
+  const draftedPlayerNames = new Set(
+    createDemoLeagueRosters().map((player) => player.player_name.toLowerCase())
+  );
+  const availablePlayers = demoWaiverCandidateRows
+    .map((row, index) => {
       const [name, school, position, points] = row.split("|");
       return {
         id: DEMO_LEAGUE_ID - 3000 - index,
@@ -297,30 +328,59 @@ export function createDemoLeagueWaiverResponse(): LeagueWaiverTabResponse {
         position,
         weekly_projected_fantasy_points: Number(points),
       };
-    }),
+    })
+    .filter((player) => !draftedPlayerNames.has(player.name.toLowerCase()))
+    .sort(
+      (first, second) =>
+        Number(second.weekly_projected_fantasy_points ?? 0) -
+        Number(first.weekly_projected_fantasy_points ?? 0) ||
+        first.name.localeCompare(second.name)
+    );
+
+  return {
+    league_id: DEMO_LEAGUE_ID,
+    fantasy_team_id: DEMO_LEAGUE_ID - 100,
+    total_available: availablePlayers.length,
+    claims: [],
+    available_players: availablePlayers,
   };
 }
 
 export function createDemoLeagueSettingsResponse(): LeagueSettingsTabResponse {
   const rosters = createDemoLeagueRosters();
-  const schedule = [
-    ["Adam's Team", "Bot Manager 1"],
-    ["Bot Manager 2", "Bot Manager 3"],
-    ["Bot Manager 4", "Bot Manager 5"],
-    ["Bot Manager 6", "Bot Manager 7"],
-    ["Bot Manager 8", "Bot Manager 9"],
-  ].map(([home, away], index) => ({
-    matchup_id: DEMO_LEAGUE_ID - 600 - index,
-    week: DEMO_WEEK,
-    home_team_id: DEMO_LEAGUE_ID - 100 - index * 2,
-    home_team_name: home,
-    away_team_id: DEMO_LEAGUE_ID - 101 - index * 2,
-    away_team_name: away,
-    home_projected_total: 112.4 - index * 2.2,
-    away_projected_total: 108.8 + index * 1.6,
-    home_win_probability: 54 - index,
-    away_win_probability: 46 + index,
-  }));
+  const schedule = Array.from({ length: 8 }, (_, weekIndex) => {
+    const week = weekIndex + 1;
+    const rotatedManagers = [
+      demoManagers[0],
+      ...demoManagers.slice(1 + weekIndex),
+      ...demoManagers.slice(1, 1 + weekIndex),
+    ];
+
+    return Array.from({ length: 5 }, (_, matchupIndex) => {
+      const homeIndex = matchupIndex * 2;
+      const awayIndex = homeIndex + 1;
+      const homeName = rotatedManagers[homeIndex];
+      const awayName = rotatedManagers[awayIndex];
+      const homeOriginalIndex = demoManagers.indexOf(homeName);
+      const awayOriginalIndex = demoManagers.indexOf(awayName);
+      const homeProjection = 112.4 - matchupIndex * 2.2 + weekIndex * 0.7;
+      const awayProjection = 108.8 + matchupIndex * 1.6 - weekIndex * 0.35;
+      const homeWinProbability = Math.round((homeProjection / (homeProjection + awayProjection)) * 100);
+
+      return {
+        matchup_id: DEMO_LEAGUE_ID - 600 - weekIndex * 10 - matchupIndex,
+        week,
+        home_team_id: DEMO_LEAGUE_ID - 100 - homeOriginalIndex,
+        home_team_name: homeName,
+        away_team_id: DEMO_LEAGUE_ID - 100 - awayOriginalIndex,
+        away_team_name: awayName,
+        home_projected_total: Number(homeProjection.toFixed(1)),
+        away_projected_total: Number(awayProjection.toFixed(1)),
+        home_win_probability: homeWinProbability,
+        away_win_probability: 100 - homeWinProbability,
+      };
+    });
+  }).flat();
 
   return {
     league_id: DEMO_LEAGUE_ID,

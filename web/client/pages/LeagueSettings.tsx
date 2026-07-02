@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   CalendarDays,
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLeagueSettingsTab } from "@/hooks/use-leagues";
 import { useLeagueTransactions } from "@/hooks/use-roster-actions";
 import { DEMO_LEAGUE_ID, createDemoLeagueSettingsResponse } from "@/lib/leaguePreviewData";
@@ -86,6 +87,8 @@ export default function LeagueSettings() {
   const parsedLeagueId = Number(leagueId);
   const isDemoLeague = parsedLeagueId === DEMO_LEAGUE_ID;
   const [activePanel, setActivePanel] = useState<SettingsPanel>("standings");
+  const [selectedRosterTeam, setSelectedRosterTeam] = useState<string>("");
+  const [selectedScheduleWeek, setSelectedScheduleWeek] = useState<number | null>(null);
   const settingsQuery = useLeagueSettingsTab(parsedLeagueId, !isDemoLeague);
   const transactionsQuery = useLeagueTransactions(parsedLeagueId, !isDemoLeague);
   const data = isDemoLeague ? createDemoLeagueSettingsResponse() : settingsQuery.data;
@@ -93,6 +96,38 @@ export default function LeagueSettings() {
     transaction.transaction_type.toLowerCase().includes("trade")
   );
   const rosterGroups = useMemo(() => groupRostersByTeam(data?.rosters ?? []), [data?.rosters]);
+  const rosterTeamNames = useMemo(() => Object.keys(rosterGroups), [rosterGroups]);
+  useEffect(() => {
+    if (rosterTeamNames.length === 0) {
+      if (selectedRosterTeam) setSelectedRosterTeam("");
+      return;
+    }
+
+    if (!selectedRosterTeam || !rosterGroups[selectedRosterTeam]) {
+      setSelectedRosterTeam(rosterTeamNames[0]);
+    }
+  }, [rosterGroups, rosterTeamNames, selectedRosterTeam]);
+  const selectedRosterPlayers = selectedRosterTeam ? rosterGroups[selectedRosterTeam] ?? [] : [];
+  const scheduleWeeks = useMemo(
+    () =>
+      Array.from(new Set((data?.schedule ?? []).map((row) => Number(row.week)).filter((week) => Number.isFinite(week))))
+        .sort((first, second) => first - second),
+    [data?.schedule]
+  );
+  useEffect(() => {
+    if (scheduleWeeks.length === 0) {
+      if (selectedScheduleWeek !== null) setSelectedScheduleWeek(null);
+      return;
+    }
+
+    if (selectedScheduleWeek === null || !scheduleWeeks.includes(selectedScheduleWeek)) {
+      setSelectedScheduleWeek(scheduleWeeks[0]);
+    }
+  }, [scheduleWeeks, selectedScheduleWeek]);
+  const selectedScheduleRows = useMemo(
+    () => (data?.schedule ?? []).filter((row) => Number(row.week) === selectedScheduleWeek),
+    [data?.schedule, selectedScheduleWeek]
+  );
   const scoringEntries = Object.entries(data?.scoring_settings ?? {});
   const rosterEntries = Object.entries(data?.roster_settings ?? {}).sort(
     ([first], [second]) => slotOrder.indexOf(first) - slotOrder.indexOf(second)
@@ -234,25 +269,53 @@ export default function LeagueSettings() {
 
       {activePanel === "schedule" ? (
         <section className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[#0b1424]/92 shadow-[0_18px_70px_rgba(14,165,233,0.10)]">
-          <PanelHeader title="Manager Schedules" subtitle="Every scheduled matchup by week." icon={CalendarDays} />
+          <PanelHeader title="Manager Schedules" subtitle="Choose a week to view every matchup scheduled for that week." icon={CalendarDays} />
           {(data?.schedule ?? []).length === 0 ? (
             <EmptyState message="Schedule has not been generated yet." />
           ) : (
-            <div className="grid gap-4 p-5 md:grid-cols-2">
-              {data?.schedule.map((row) => (
-                <div key={row.matchup_id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 transition hover:-translate-y-0.5 hover:border-sky-300/25 hover:bg-sky-300/[0.06]">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-300">Week {row.week}</p>
-                  <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                    <p className="text-sm font-black text-slate-50">{row.home_team_name}</p>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black text-slate-400">VS</span>
-                    <p className="text-right text-sm font-black text-slate-50">{row.away_team_name}</p>
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 gap-3 text-xs font-bold text-slate-400">
-                    <span>Proj {Number(row.home_projected_total ?? 0).toFixed(1)}</span>
-                    <span className="text-right">Proj {Number(row.away_projected_total ?? 0).toFixed(1)}</span>
-                  </div>
+            <div className="space-y-5 p-5">
+              <div className="flex flex-col gap-3 rounded-2xl border border-sky-300/15 bg-sky-300/[0.045] p-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-300">Select Week</p>
+                  <p className="mt-1 text-xs font-bold text-slate-500">Showing all league matchups for one week at a time.</p>
                 </div>
-              ))}
+                <Select
+                  value={selectedScheduleWeek === null ? undefined : String(selectedScheduleWeek)}
+                  onValueChange={(value) => setSelectedScheduleWeek(Number(value))}
+                >
+                  <SelectTrigger className="h-12 w-full rounded-2xl border-sky-300/20 bg-slate-950/45 text-[11px] font-black uppercase tracking-[0.14em] text-slate-100 md:w-[240px]">
+                    <SelectValue placeholder="Choose week" />
+                  </SelectTrigger>
+                  <SelectContent className="border-sky-300/20 bg-slate-950 text-slate-100">
+                    {scheduleWeeks.map((week) => (
+                      <SelectItem key={week} value={String(week)}>
+                        Week {week}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedScheduleRows.length === 0 ? (
+                <EmptyState message="No matchups are scheduled for this week." />
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {selectedScheduleRows.map((row) => (
+                    <div key={row.matchup_id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 transition hover:-translate-y-0.5 hover:border-sky-300/25 hover:bg-sky-300/[0.06]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-300">Week {row.week}</p>
+                      <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                        <p className="text-sm font-black text-slate-50">{row.home_team_name}</p>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black text-slate-400">VS</span>
+                        <p className="text-right text-sm font-black text-slate-50">{row.away_team_name}</p>
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-3 text-xs font-bold text-slate-400">
+                        <span>Proj {Number(row.home_projected_total ?? 0).toFixed(1)}</span>
+                        <span className="text-right">Proj {Number(row.away_projected_total ?? 0).toFixed(1)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -260,37 +323,60 @@ export default function LeagueSettings() {
 
       {activePanel === "rosters" ? (
         <section className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[#0b1424]/92 shadow-[0_18px_70px_rgba(14,165,233,0.10)]">
-          <PanelHeader title="Every Manager Roster" subtitle="League-scoped roster ownership for each fantasy team." icon={Users} />
-          {Object.keys(rosterGroups).length === 0 ? (
+          <PanelHeader title="Manager Roster" subtitle="Select one manager to inspect their league-scoped roster." icon={Users} />
+          {rosterTeamNames.length === 0 ? (
             <EmptyState message="No roster players have been imported yet." />
           ) : (
-            <div className="grid gap-5 p-5 lg:grid-cols-2">
-              {Object.entries(rosterGroups).map(([teamName, players]) => (
-                <div key={teamName} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035]">
-                  <div className="border-b border-white/10 px-4 py-3">
-                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-sky-200">{teamName}</p>
-                  </div>
-                  <div className="divide-y divide-white/10">
-                    {players.map((player) => {
-                      const slot = player.slot ?? player.roster_slot;
-                      return (
-                        <div key={player.id} className="grid grid-cols-[72px_minmax(0,1fr)_70px] items-center gap-3 px-4 py-3">
-                          <span className={`rounded-xl border px-2 py-2 text-center text-[10px] font-black uppercase tracking-[0.12em] ${slotTone(slot)}`}>
-                            {slot ?? "-"}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-black text-slate-50">{player.player_name}</p>
-                            <p className="truncate text-xs font-bold text-slate-500">{player.school ?? player.player_school ?? "-"}</p>
-                          </div>
-                          <p className="text-right text-sm font-black text-sky-100">
-                            {Number(player.weekly_projected_fantasy_points ?? player.projected_points ?? 0).toFixed(1)}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
+            <div className="space-y-5 p-5">
+              <div className="flex flex-col gap-3 rounded-2xl border border-sky-300/15 bg-sky-300/[0.045] p-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-300">Select Manager</p>
+                  <p className="mt-1 text-xs font-bold text-slate-500">Only one roster is shown at a time so this stays readable.</p>
                 </div>
-              ))}
+                <Select value={selectedRosterTeam} onValueChange={setSelectedRosterTeam}>
+                  <SelectTrigger className="h-12 w-full rounded-2xl border-sky-300/20 bg-slate-950/45 text-[11px] font-black uppercase tracking-[0.14em] text-slate-100 md:w-[340px]">
+                    <SelectValue placeholder="Choose manager" />
+                  </SelectTrigger>
+                  <SelectContent className="border-sky-300/20 bg-slate-950 text-slate-100">
+                    {rosterTeamNames.map((teamName) => (
+                      <SelectItem key={teamName} value={teamName}>
+                        {teamName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035]">
+                <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-4">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-sky-200">{selectedRosterTeam}</p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">{selectedRosterPlayers.length} roster spots</p>
+                  </div>
+                  <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-sky-100">
+                    League Scoped
+                  </span>
+                </div>
+                <div className="divide-y divide-white/10">
+                  {selectedRosterPlayers.map((player) => {
+                    const slot = player.slot ?? player.roster_slot;
+                    return (
+                      <div key={player.id} className="grid grid-cols-[72px_minmax(0,1fr)_70px] items-center gap-3 px-4 py-3 transition hover:bg-sky-300/[0.045] sm:grid-cols-[92px_minmax(0,1fr)_90px]">
+                        <span className={`rounded-xl border px-2 py-2 text-center text-[10px] font-black uppercase tracking-[0.12em] ${slotTone(slot)}`}>
+                          {slot ?? "-"}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-black text-slate-50">{player.player_name}</p>
+                          <p className="truncate text-xs font-bold text-slate-500">{player.school ?? player.player_school ?? "-"}</p>
+                        </div>
+                        <p className="text-right text-sm font-black text-sky-100">
+                          {Number(player.weekly_projected_fantasy_points ?? player.projected_points ?? 0).toFixed(1)}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
         </section>

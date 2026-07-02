@@ -119,10 +119,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </h1>
           </div>
 
-          <nav className="flex-1 px-5 space-y-2 mt-4 pb-6 relative z-10 flex flex-col overflow-hidden">
+          <nav className="flex-1 px-5 pb-8 pt-3 relative z-10 flex flex-col justify-between overflow-hidden">
             {sidebarItems.map((item) => {
               const isActive = location.pathname === item.path;
               const isGuestSignIn = !isLoggedIn && item.name === "SIGN IN";
+              const isSignOut = item.name === "SIGN OUT";
               const navId = `nav-${item.name.toLowerCase().replace(/\s+/g, "-")}`;
               const content = (
                 <div
@@ -130,24 +131,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   data-nav-item="true"
                   data-nav-active={isActive ? "true" : "false"}
                   className={cn(
-                    "flex items-center gap-4 px-4 py-3.5 rounded-2xl border font-sans text-[13px] font-extrabold uppercase tracking-[0.08em] transition-all duration-200 relative group w-full text-left",
-                    isGuestSignIn
-                      ? "mt-3 border-sky-200/45 bg-[linear-gradient(135deg,rgba(125,211,252,0.28),rgba(59,130,246,0.22))] text-white shadow-[0_0_0_1px_rgba(125,211,252,0.16),0_0_38px_rgba(56,189,248,0.28)] hover:border-sky-100/70 hover:brightness-110"
+                    "flex min-h-[58px] items-center gap-4 px-4 py-3 rounded-2xl border font-sans text-[13px] font-extrabold uppercase tracking-[0.08em] transition-all duration-300 relative group w-full text-left",
+                    isSignOut
+                      ? "border-transparent text-red-300/45 hover:-scale-x-100 hover:border-red-400/45 hover:bg-red-500/15 hover:text-red-100 hover:shadow-[0_0_36px_rgba(239,68,68,0.24)]"
+                      : isGuestSignIn
+                      ? "border-sky-200/45 bg-[linear-gradient(135deg,rgba(125,211,252,0.28),rgba(59,130,246,0.22))] text-white shadow-[0_0_0_1px_rgba(125,211,252,0.16),0_0_38px_rgba(56,189,248,0.28)] hover:border-sky-100/70 hover:brightness-110"
                       : isActive
                       ? "border-sky-300/45 bg-[linear-gradient(135deg,rgba(56,189,248,0.18),rgba(59,130,246,0.10))] text-white shadow-[0_0_0_1px_rgba(125,211,252,0.12),0_0_32px_rgba(56,189,248,0.20)]"
                       : "border-transparent text-[#9AA8BC] hover:border-sky-300/18 hover:bg-sky-300/[0.06] hover:text-[#F8FAFC]"
                   )}
                 >
                   <item.icon className={cn(
-                    "w-4 h-4 transition-colors duration-200",
-                    isGuestSignIn
+                    "w-4 h-4 transition-colors duration-300",
+                    isSignOut
+                      ? "text-red-300/45 group-hover:text-red-100"
+                      : isGuestSignIn
                       ? "text-[#BAE6FD]"
                       : isActive
                       ? "text-[#7DD3FC]"
                       : "text-[#64748B] group-hover:text-[#F8FAFC]"
                   )} />
-                  {item.name}
-                  {isActive && (
+                  <span className={isSignOut ? "transition-transform duration-300 group-hover:-scale-x-100" : undefined}>
+                    {item.name}
+                  </span>
+                  {isActive && !isSignOut && (
                     <div className="nav-active-overlay pointer-events-none absolute inset-0 rounded-xl bg-[radial-gradient(circle_at_22%_50%,rgba(125,211,252,0.18),transparent_58%)]" />
                   )}
                 </div>
@@ -162,7 +169,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               }
 
               return (
-                <Link key={item.name} to={item.path}>
+                <Link key={item.name} to={item.path} className="w-full">
                   {content}
                 </Link>
               );

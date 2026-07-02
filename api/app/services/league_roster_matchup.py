@@ -364,13 +364,21 @@ def build_waivers_view(
 ) -> LeagueWaiversRead:
     week = resolve_current_week(db, league, selected_week)
     team = _owned_team(db, league, user)
-    owned_player_ids = [
+    unavailable_player_ids = {
         player_id
         for (player_id,) in db.query(RosterEntry.player_id)
         .filter(RosterEntry.league_id == league.id)
         .all()
-    ]
-    query = db.query(Player).filter(~Player.id.in_(owned_player_ids)).order_by(
+    }
+    draft = db.query(Draft).filter(Draft.league_id == league.id).first()
+    if draft:
+        unavailable_player_ids.update(
+            player_id
+            for (player_id,) in db.query(DraftPick.player_id)
+            .filter(DraftPick.draft_id == draft.id)
+            .all()
+        )
+    query = db.query(Player).filter(~Player.id.in_(unavailable_player_ids)).order_by(
         Player.sheet_projected_season_points.desc().nullslast(),
         Player.name.asc(),
     )

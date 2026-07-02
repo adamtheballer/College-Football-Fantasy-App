@@ -165,13 +165,13 @@ The result is that the app feels busy and indirect even when the backend contrac
 
 ### 7. Reduce Clicks in Waiver and Watchlist Flows
 
-- `web/client/pages/WaiverWire.tsx` should inherit active league automatically.
+- `web/client/pages/LeagueWaivers.tsx` should inherit active league automatically.
 - The user’s owned team should be preselected without extra input.
 - The add/drop flow should reduce repetitive decisions where possible:
   - preselect a likely drop candidate
   - suggest the target slot
   - make league/team context implicit
-- `web/client/pages/Watchlist.tsx` should avoid forcing a browse-vs-watchlists mode decision up front.
+- `web/client/pages/LeagueWatchlist.tsx` should avoid forcing a browse-vs-watchlists mode decision up front.
 - The default saved state should be a built-in personal watchlist, such as `My Watchlist`.
 - Creating multiple named watchlists should be optional, not required before the first save.
 - Players saved from browse should require the fewest possible actions.
@@ -255,8 +255,8 @@ Short-term compatibility is acceptable, but the behavior should move toward this
 - The league workspace contract should be treated as the source of truth for role-aware league actions
 - Existing routes can be preserved initially while changing the behavior and defaults
 - This story should be coordinated with:
-  - [10_feature_frontend_architecture_consolidation.md](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/requirements/10_feature_frontend_architecture_consolidation.md)
-  - [12_epic_react_frontend_delivery.md](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/requirements/12_epic_react_frontend_delivery.md)
+  - [10_feature_frontend_architecture_consolidation.md](requirements/10_feature_frontend_architecture_consolidation.md)
+  - [12_epic_react_frontend_delivery.md](requirements/12_epic_react_frontend_delivery.md)
 
 ## Success Metrics
 
