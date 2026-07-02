@@ -1,0 +1,53 @@
+name: Staging Migration Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: "Staging API base URL. Defaults to STAGING_API_BASE_URL secret."
+        required: false
+        type: string
+
+jobs:
+  staging-migration-check:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      STAGING_API_BASE_URL: ${{ inputs.api_base_url || secrets.STAGING_API_BASE_URL }}
+      PYTHONPATH: .
+      JWT_SECRET_KEY: staging-migration-check-only
+      UI_BASE_URL: https://staging.example.invalid
+      CORS_ORIGINS: https://staging.example.invalid
+    steps:
+      - name: Check required staging secrets
+        run: |
+          test -n "$DATABASE_URL" || { echo "Missing STAGING_DATABASE_URL secret"; exit 1; }
+          test -n "$STAGING_API_BASE_URL" || { echo "Missing STAGING_API_BASE_URL secret or api_base_url input"; exit 1; }
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend dependencies
+        run: uv sync
+
+      - name: FastAPI import smoke
+        run: PYTHONPATH=. uv run python -c "from collegefootballfantasy_api.app.main import app; print(app.title)"
+
+      - name: Migrate staging database
+        run: uv run alembic -c api/alembic.ini upgrade head
+
+      - name: Verify staging database is at Alembic head
+        run: PYTHONPATH=. uv run python scripts/check_alembic_head.py
+
+      - name: Verify staging API readiness
+        run: |
+          curl --fail --show-error --silent "$STAGING_API_BASE_URL/health/ready"

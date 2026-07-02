@@ -85,14 +85,34 @@ See `.env.example` for the full list.
 
 - `DATABASE_URL`
 - `DB_PORT`
+- `ENVIRONMENT`
 - `API_HOST`
 - `API_PORT`
 - `API_LOG_LEVEL`
 - `UI_BASE_URL`
+- `CORS_ORIGINS`
+- `CORS_ORIGIN_REGEX`
+- `JWT_SECRET_KEY`
+- `JWT_ACCESS_TOKEN_TTL_MINUTES`
+- `REFRESH_TOKEN_TTL_DAYS`
+- `REFRESH_COOKIE_NAME`
+- `REFRESH_COOKIE_SECURE`
+- `REFRESH_COOKIE_SAMESITE`
+- `REFRESH_COOKIE_DOMAIN`
+- `ALLOW_LEGACY_API_TOKEN_AUTH`
 
 `UI_BASE_URL` should match your local web origin (`http://localhost:5173` for Vite dev).
 
-Production must use an explicit, non-default `JWT_SECRET_KEY` and explicit `CORS_ORIGINS`. Do not deploy production with localhost-only origins or the `.env.example` secret placeholder.
+Production must use:
+
+- `ENVIRONMENT=production`
+- an explicit, non-default `JWT_SECRET_KEY`
+- explicit HTTPS `CORS_ORIGINS` for the deployed web app
+- `CORS_ORIGIN_REGEX=` blank unless there is a production-safe regex requirement
+- `REFRESH_COOKIE_SECURE=true`
+- `REFRESH_COOKIE_SAMESITE=lax` or stricter unless the deployment requires cross-site cookies
+
+The API refuses to start in production with the `.env.example` JWT placeholder, default localhost CORS origins, wildcard CORS origins, or the default localhost CORS regex.
 
 Sports provider/cache variables:
 
@@ -189,11 +209,38 @@ Key entries:
 - `canonical_runtime.frontend.source_dir`: `web`
 - `environments.dev`: local Docker Postgres + FastAPI + Vite
 - `environments.production`: managed Postgres + FastAPI + static Vite build
+- `environments.production.api.readiness_path`: `/health/ready`
 
 Production deploy order:
 
 1. Install backend dependencies with `uv`.
 2. Run Alembic migrations against the managed Postgres database.
-3. Start Uvicorn with `collegefootballfantasy_api.app.main:app`.
-4. Build the Vite app with `npm --prefix web ci && npm --prefix web run build`.
-5. Serve `web/dist/spa` from the static frontend host.
+3. Verify the managed database is at the repository Alembic head.
+4. Start Uvicorn with `collegefootballfantasy_api.app.main:app`.
+5. Require `GET /health/ready` to return `200` before routing traffic.
+6. Build the Vite app with `npm --prefix web ci && npm --prefix web run build`.
+7. Serve `web/dist/spa` from the static frontend host.
+
+Useful migration verification command:
+
+```bash
+PYTHONPATH=. uv run python scripts/check_alembic_head.py
+```
+
+Readiness endpoints:
+
+- `GET /health`: process liveness only.
+- `GET /health/ready`: database connectivity plus Alembic migration readiness.
+
+## CI and staging gates
+
+Pull requests run `.github/workflows/ci.yml`, which starts a fresh Postgres service, imports the FastAPI app, runs Alembic migrations, verifies the database is at Alembic head, and then runs backend and frontend checks.
+
+Staging database verification is manual/protected through `.github/workflows/staging-migration-check.yml`.
+
+Required GitHub secrets for the staging workflow:
+
+- `STAGING_DATABASE_URL`
+- `STAGING_API_BASE_URL`
+
+Production deployment must use a protected deployment job or provider hook that sets `DATABASE_URL` from `PRODUCTION_DATABASE_URL`, runs migrations, runs `scripts/check_alembic_head.py`, promotes the API, and confirms `/health/ready` before traffic is sent to the new release.

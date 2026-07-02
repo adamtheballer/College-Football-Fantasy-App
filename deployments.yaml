@@ -33,8 +33,10 @@ environments:
       port: 8000
       migrate_before_start: true
       migrate_command: uv run alembic -c api/alembic.ini upgrade head
+      verify_migrations_command: PYTHONPATH=. uv run python scripts/check_alembic_head.py
       start_command: PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port 8000
       health_url: http://localhost:8000/health
+      readiness_url: http://localhost:8000/health/ready
     web:
       host: 0.0.0.0
       port: 8080
@@ -65,6 +67,8 @@ environments:
       engine: postgres
       managed: true
       url_env: DATABASE_URL
+      staging_url_secret: STAGING_DATABASE_URL
+      production_url_secret: PRODUCTION_DATABASE_URL
       migrations_before_api: true
       backups_required: true
     api:
@@ -73,9 +77,16 @@ environments:
       port_env: API_PORT
       build_command: uv sync --frozen
       migrate_command: cd api && PYTHONPATH=.. uv run alembic -c alembic.ini upgrade head
+      verify_migrations_command: PYTHONPATH=. uv run python scripts/check_alembic_head.py
       start_command: PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port ${API_PORT:-8000}
       health_path: /health
-      readiness_path: null
+      readiness_path: /health/ready
+      promotion_order:
+        - build_artifact
+        - run_database_migrations
+        - verify_alembic_head
+        - start_or_promote_api
+        - require_health_ready
     web:
       process_type: static
       build_command: npm --prefix web ci && npm --prefix web run build
@@ -95,13 +106,20 @@ environments:
       - UI_BASE_URL
       - PUBLIC_API_BASE_URL
       - VITE_API_BASE_URL
+      - REFRESH_COOKIE_SECURE
+      - REFRESH_COOKIE_SAMESITE
     optional_env:
+      - CORS_ORIGIN_REGEX
       - SPORTSDATA_API_KEY
       - SPORTSDATA_ENABLED
     safety_gates:
       environment_must_equal: production
       reject_default_jwt_secret: true
       cors_origins_must_be_explicit: true
+      cors_origin_regex_must_be_unset_or_production_safe: true
+      refresh_cookie_secure_must_be_true: true
       migrations_before_api: true
+      verify_alembic_head_before_promotion: true
+      require_health_ready_before_traffic: true
       no_express_backend: true
       no_localhost_public_urls: true
