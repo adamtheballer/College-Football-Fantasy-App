@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -10,6 +11,7 @@ from collegefootballfantasy_api.app.core.security import (
     generate_token,
     hash_password,
     hash_token,
+    needs_password_rehash,
     verify_password,
 )
 from collegefootballfantasy_api.app.api.deps import get_current_user
@@ -26,6 +28,28 @@ from collegefootballfantasy_api.app.schemas.auth import (
 )
 
 router = APIRouter()
+
+
+def _normalize_username(value: str | None, *, fallback: str) -> str:
+    raw_value = value or fallback
+    normalized = re.sub(r"[^a-z0-9_]+", "-", raw_value.strip().lower())
+    normalized = re.sub(r"-+", "-", normalized).strip("-_")
+    if len(normalized) < 3:
+        normalized = f"user-{normalized or 'manager'}"
+    return normalized[:80]
+
+
+def _unique_username(db: Session, desired: str) -> str:
+    candidate = desired[:80]
+    if not db.query(User).filter(User.username == candidate).first():
+        return candidate
+    suffix = 2
+    while True:
+        suffix_text = f"-{suffix}"
+        candidate = f"{desired[: 80 - len(suffix_text)]}{suffix_text}"
+        if not db.query(User).filter(User.username == candidate).first():
+            return candidate
+        suffix += 1
 
 
 def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
@@ -85,10 +109,14 @@ def signup(payload: UserCreate, response: Response, request: Request, db: Sessio
     existing = db.query(User).filter(User.email == payload.email.lower()).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email already registered")
+    username = _normalize_username(payload.username, fallback=payload.email.split("@", 1)[0])
+    if payload.username and db.query(User).filter(User.username == username).first():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="username already registered")
     now = datetime.utcnow()
     user = User(
         first_name=payload.first_name.strip(),
         email=payload.email.lower(),
+        username=_unique_username(db, username),
         password_hash=hash_password(payload.password),
         api_token=generate_token(32),
         last_login=now,
@@ -114,6 +142,8 @@ def login(payload: UserLogin, response: Response, request: Request, db: Session 
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
     now = datetime.utcnow()
     user.last_login = now
+    if needs_password_rehash(user.password_hash):
+        user.password_hash = hash_password(payload.password)
     refresh_token = _create_refresh_session(db, user_id=user.id, request=request)
     db.add(user)
     db.commit()

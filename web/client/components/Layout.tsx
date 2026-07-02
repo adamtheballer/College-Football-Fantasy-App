@@ -58,7 +58,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     : [
         { name: "HOME", path: "/", icon: Home },
         { name: "LEAGUES", path: "/leagues", icon: Trophy },
-        { name: "DRAFT", path: "/draft", icon: Timer },
         { name: "STATS", path: "/stats", icon: BarChart3 },
         { name: "SETTINGS", path: "/settings", icon: Settings },
         { name: "SIGN IN", path: "/login", icon: LogIn },

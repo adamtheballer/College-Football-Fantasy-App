@@ -2,6 +2,17 @@
 
 Fantasy football research + roster helper for college leagues. The supported UI is the React app in `web/`, backed by the FastAPI API over HTTP.
 
+## Backend strategy
+
+This repo has one supported backend: the FastAPI app under `api/`.
+
+- Canonical API import path: `collegefootballfantasy_api.app.main:app`
+- Canonical local API command: `PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port 8000`
+- Canonical frontend: React/Vite in `web/`
+- Unsupported legacy backend flow: Express/Vite server middleware under `web/server`
+
+Do not start, deploy, or reintroduce an Express backend for product API routes. The `web/` package is a static/client app that calls the FastAPI API through the configured API base URL.
+
 ## Quickstart
 
 1) Install dependencies
@@ -40,8 +51,14 @@ cd web && npm install
 6) Start API and UI
 
 ```bash
-uv run uvicorn api.app.main:app --host 0.0.0.0 --port 8000
+PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port 8000
 cd web && npm run dev
+```
+
+Backend import smoke check:
+
+```bash
+PYTHONPATH=. uv run python -c "from collegefootballfantasy_api.app.main import app; print(app.title)"
 ```
 
 Or run the helper script:
@@ -74,6 +91,8 @@ See `.env.example` for the full list.
 - `UI_BASE_URL`
 
 `UI_BASE_URL` should match your local web origin (`http://localhost:5173` for Vite dev).
+
+Production must use an explicit, non-default `JWT_SECRET_KEY` and explicit `CORS_ORIGINS`. Do not deploy production with localhost-only origins or the `.env.example` secret placeholder.
 
 Sports provider/cache variables:
 
@@ -151,3 +170,30 @@ docker compose up --build
 ```
 
 API runs on `http://localhost:8000`, UI runs on `http://localhost:8080`.
+
+Docker Compose runs Alembic migrations before Uvicorn starts the API. If local port `5433` is already in use, override the database host port without changing the container network URL:
+
+```bash
+DB_PORT=55433 docker compose up --build
+```
+
+## Deployment configuration
+
+Deployment environments are described in `deployments.yaml`.
+
+The deployment config intentionally names FastAPI as the only backend runtime and Vite/React as the only frontend runtime. Dev and production deploy flows should read from that file rather than inventing a second backend path.
+
+Key entries:
+
+- `canonical_runtime.backend.import_path`: `collegefootballfantasy_api.app.main:app`
+- `canonical_runtime.frontend.source_dir`: `web`
+- `environments.dev`: local Docker Postgres + FastAPI + Vite
+- `environments.production`: managed Postgres + FastAPI + static Vite build
+
+Production deploy order:
+
+1. Install backend dependencies with `uv`.
+2. Run Alembic migrations against the managed Postgres database.
+3. Start Uvicorn with `collegefootballfantasy_api.app.main:app`.
+4. Build the Vite app with `npm --prefix web ci && npm --prefix web run build`.
+5. Serve `web/dist/spa` from the static frontend host.

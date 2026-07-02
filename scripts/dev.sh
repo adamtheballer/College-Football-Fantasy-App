@@ -40,7 +40,7 @@ echo "Running migrations..."
 uv run alembic -c api/alembic.ini upgrade head
 
 echo "Starting API and UI..."
-uv run uvicorn api.app.main:app --host 0.0.0.0 --port 8000 &
+PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port 8000 &
 API_PID=$!
 
 npm --prefix web run dev -- --host 0.0.0.0 &

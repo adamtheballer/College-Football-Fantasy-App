@@ -9,6 +9,11 @@ services:
       - "${DB_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d collegefootballfantasy"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
   api:
     image: python:3.11-slim
     working_dir: /app
@@ -21,12 +26,14 @@ services:
       API_LOG_LEVEL: info
       UI_BASE_URL: http://localhost:8080
       UV_PROJECT_ENVIRONMENT: /tmp/cff-api-venv
+      PYTHONPATH: /app
     ports:
       - "8000:8000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     command: >-
-      sh -c "pip install uv && uv sync && uv run uvicorn api.app.main:app --host 0.0.0.0 --port 8000"
+      sh -c "pip install uv && uv sync && cd api && PYTHONPATH=/app uv run alembic -c alembic.ini upgrade head && cd /app && uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port 8000"
   web:
     image: node:20
     working_dir: /app/web

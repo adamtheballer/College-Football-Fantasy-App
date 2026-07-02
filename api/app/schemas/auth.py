@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -7,6 +8,7 @@ class UserCreate(BaseModel):
     first_name: str
     email: str
     password: str
+    username: Optional[str] = None
 
 
 class UserLogin(BaseModel):
@@ -19,6 +21,7 @@ class UserRead(BaseModel):
     id: int
     first_name: str
     email: str
+    username: str | None = None
     created_at: datetime
 
 

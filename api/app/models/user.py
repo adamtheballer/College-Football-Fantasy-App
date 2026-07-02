@@ -11,6 +11,7 @@ class User(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(200), unique=True, index=True)
+    username: Mapped[str | None] = mapped_column(String(80), unique=True, index=True, nullable=True)
     first_name: Mapped[str] = mapped_column(String(100))
     password_hash: Mapped[str] = mapped_column(String(200))
     api_token: Mapped[str] = mapped_column(String(100), unique=True, index=True)

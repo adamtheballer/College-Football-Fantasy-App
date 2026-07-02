@@ -1,5 +1,11 @@
 from collegefootballfantasy_api.app.core.config import settings
-from collegefootballfantasy_api.app.core.security import create_access_token
+from collegefootballfantasy_api.app.core.security import (
+    PASSWORD_HASH_ALGORITHM,
+    create_access_token,
+    hash_password,
+    needs_password_rehash,
+    verify_password,
+)
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
 
 
@@ -27,6 +33,59 @@ def test_signup_returns_access_token_and_refresh_cookie(client):
     assert payload["access_token_expires_at"]
     assert payload["user"]["email"] == "coach-signup@example.com"
     assert settings.refresh_cookie_name in client.cookies
+
+
+def test_signup_normalizes_and_returns_username(client):
+    response = client.post(
+        "/auth/signup",
+        json={
+            "first_name": "Coach",
+            "email": "username@example.com",
+            "username": " Saturday Coach! ",
+            "password": "secret123",
+        },
+    )
+    assert response.status_code == 201
+    assert response.json()["user"]["username"] == "saturday-coach"
+
+
+def test_signup_rejects_duplicate_username(client):
+    first = client.post(
+        "/auth/signup",
+        json={
+            "first_name": "Coach",
+            "email": "username-one@example.com",
+            "username": "Same Name",
+            "password": "secret123",
+        },
+    )
+    assert first.status_code == 201
+
+    duplicate = client.post(
+        "/auth/signup",
+        json={
+            "first_name": "Coach",
+            "email": "username-two@example.com",
+            "username": "same-name",
+            "password": "secret123",
+        },
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"] == "username already registered"
+
+
+def test_password_hashes_are_versioned_and_constant_time_verifiable():
+    stored = hash_password("secret123")
+    assert stored.startswith(f"{PASSWORD_HASH_ALGORITHM}$")
+    assert verify_password("secret123", stored) is True
+    assert verify_password("wrong", stored) is False
+    assert needs_password_rehash(stored) is False
+
+
+def test_legacy_password_hashes_verify_but_require_rehash():
+    legacy = "YWFhYWFhYWFhYWFhYWFhYQ==$LrogHhynYTZ+hDQlQR3OlxFU/vcPWPRb0AnWTRxIVRA="
+    assert verify_password("secret123", legacy) is True
+    assert needs_password_rehash(legacy) is True
 
 
 def test_auth_me_returns_current_authenticated_user(client):
