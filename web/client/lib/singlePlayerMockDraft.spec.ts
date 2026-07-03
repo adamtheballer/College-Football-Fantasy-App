@@ -16,8 +16,10 @@ import {
   MOCK_BOT_PICK_DELAY_SECONDS,
   MOCK_INTERMISSION_SECONDS,
   MOCK_PICK_TIMER_SECONDS,
+  MOCK_ROUNDS,
   MOCK_TOTAL_PICKS,
   MOCK_USER_TEAM_ID,
+  parseMockDraftSettings,
   resolveInitialSinglePlayerMockDraftState,
 } from "./singlePlayerMockDraft";
 import type { DraftPlayer } from "./draftRankings";
@@ -101,6 +103,16 @@ const fillTeamExceptK = (
 });
 
 describe("single-player mock draft engine", () => {
+  it("locks rounds to roster-fill size and ignores URL round overrides", () => {
+    const settings = parseMockDraftSettings("?teams=10&timer=60&rounds=99");
+    const state = createSinglePlayerMockDraft(1_000, settings);
+
+    expect(settings.rounds).toBe(MOCK_ROUNDS);
+    expect(state.settings?.rounds).toBe(MOCK_ROUNDS);
+    expect(state.settings?.leagueSize).toBe(10);
+    expect(state.settings?.pickTimerSeconds).toBe(60);
+  });
+
   it("starts a fresh mock when new=1 is present and clears stored state", () => {
     const stored = {
       ...createSinglePlayerMockDraft(1_000),
@@ -208,6 +220,36 @@ describe("single-player mock draft engine", () => {
     expect(tightEnds[0].masterDraftRank).toBeGreaterThan(1);
   });
 
+  it("excludes duplicate player identities after any copy is drafted", () => {
+    const start = 1_000;
+    const duplicateBoard = [
+      { ...player(1, "QB"), name: "LaNorris Sellers", school: "South Carolina" },
+      { ...player(2, "QB"), name: "Lanorris Sellers", school: "South Carolina" },
+      { ...player(3, "RB"), name: "Ahmad Hardy", school: "Missouri" },
+    ];
+    const state = {
+      ...createSinglePlayerMockDraft(start),
+      status: "live" as const,
+      currentPick: MOCK_USER_TEAM_ID,
+      pickStartedAt: start,
+      pickExpiresAt: start + MOCK_PICK_TIMER_SECONDS * 1000,
+      picks: [
+        {
+          ...pick(1, "QB", 1, "QB"),
+          playerName: "LaNorris Sellers",
+          school: "South Carolina",
+        },
+      ],
+    };
+
+    const available = getAvailablePlayers(duplicateBoard, state);
+
+    expect(available.map((row) => row.name)).not.toContain("Lanorris Sellers");
+    expect(() => makeUserMockPick(state, duplicateBoard, 2, start)).toThrow(
+      "That player has already been drafted."
+    );
+  });
+
   it("centers carousel picks from pick four onward and keeps early picks at start", () => {
     expect(
       getCenteredDraftCarouselScrollLeft({
@@ -288,6 +330,23 @@ describe("single-player mock draft engine", () => {
     expect(new Set(state.picks.map((pick) => pick.playerId)).size).toBe(MOCK_TOTAL_PICKS);
     expect(buildMockRoster(state).every((slot) => Boolean(slot.player))).toBe(true);
     expect(buildMockRoster(state).some((slot) => slot.label === "K" && slot.player?.position === "K")).toBe(true);
+  });
+
+  it("can build roster views for any selected mock team", () => {
+    const state = {
+      ...createSinglePlayerMockDraft(1_000),
+      picks: [
+        pick(201, "QB", MOCK_USER_TEAM_ID, "QB"),
+        pick(202, "RB", 1, "RB"),
+      ],
+    };
+
+    const userRoster = buildMockRoster(state, MOCK_USER_TEAM_ID);
+    const botRoster = buildMockRoster(state, 1);
+
+    expect(userRoster.find((slot) => slot.label === "QB")?.player?.playerName).toBe("QB Pick 201");
+    expect(botRoster.find((slot) => slot.label === "RB 1")?.player?.playerName).toBe("RB Pick 202");
+    expect(botRoster.find((slot) => slot.label === "QB")?.player).toBeUndefined();
   });
 
   it("only exposes kickers and rejects illegal user picks when the on-clock roster only has K open", () => {

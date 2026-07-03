@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+from fastapi import HTTPException
 import pytest
 from sqlalchemy.exc import IntegrityError
 
@@ -9,6 +10,9 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.user import User
+from collegefootballfantasy_api.app.schemas.draft_room import DraftPickCreate
+from collegefootballfantasy_api.app.services.draft_service import create_real_draft_pick
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.services.draft_completion import finalize_draft_rosters_and_matchups
 from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week
@@ -25,7 +29,7 @@ def create_user_and_token(client, suffix: str = "one") -> str:
         json={
             "first_name": f"Coach{suffix}",
             "email": f"coach-{suffix}@example.com",
-            "password": "secret123",
+            "password": "StrongPass123!",
         },
     )
     assert response.status_code == 201
@@ -167,6 +171,66 @@ def test_draft_pick_persists_and_creates_roster_entry(client):
     roster = roster_response.json()
     assert roster["total"] == 1
     assert roster["data"][0]["player"]["id"] == player_id
+
+
+def test_duplicate_draft_pick_returns_409_and_does_not_create_extra_rows(client, db_session):
+    token = create_user_and_token(client, "draft-duplicate")
+    league = create_league(client, token, roster_slots={"QB": 2})
+    player_id = create_player(client, "Duplicate Draft QB", "QB")
+
+    first_response = client.post(
+        f"/leagues/{league['id']}/draft-picks",
+        json={"player_id": player_id},
+        headers=auth_headers(token),
+    )
+    second_response = client.post(
+        f"/leagues/{league['id']}/draft-picks",
+        json={"player_id": player_id},
+        headers=auth_headers(token),
+    )
+
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    assert first_response.status_code == 201
+    assert second_response.status_code == 409
+    assert second_response.json()["detail"] == "player already drafted"
+    assert (
+        db_session.query(DraftPick)
+        .filter(DraftPick.draft_id == draft.id, DraftPick.player_id == player_id)
+        .count()
+        == 1
+    )
+    assert (
+        db_session.query(RosterEntry)
+        .filter(RosterEntry.league_id == league["id"], RosterEntry.player_id == player_id)
+        .count()
+        == 1
+    )
+
+
+def test_draft_pick_integrity_error_returns_409_and_rolls_back(client, db_session, monkeypatch):
+    token = create_user_and_token(client, "draft-integrity")
+    league = create_league(client, token)
+    player_id = create_player(client, "Integrity Rollback QB", "QB")
+    league_row = db_session.get(League, league["id"])
+    current_user = db_session.query(User).filter(User.email == "coach-draft-integrity@example.com").one()
+
+    def raise_integrity_error():
+        raise IntegrityError("INSERT draft pick", {}, Exception("duplicate"))
+
+    monkeypatch.setattr(db_session, "commit", raise_integrity_error)
+
+    with pytest.raises(HTTPException) as exc_info:
+        create_real_draft_pick(
+            db_session,
+            league=league_row,
+            payload=DraftPickCreate(player_id=player_id),
+            current_user=current_user,
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "draft pick conflicts with existing draft or roster state"
+    assert db_session.query(DraftPick).filter(DraftPick.player_id == player_id).count() == 0
+    assert db_session.query(RosterEntry).filter(RosterEntry.player_id == player_id).count() == 0
 
 
 def test_draft_pick_rejects_before_scheduled_start(client, db_session):

@@ -230,29 +230,15 @@ export function usePlayers(
         ),
       ]);
 
-      const projectionByPlayerId = new Map<number, BackendProjectionRead>();
       const overallRankByPlayer = new Map<number, number>();
-      const posRankByPlayer = new Map<number, number>();
 
       const sortedProjections = [...projections.data].sort((a, b) => b.fantasy_points - a.fantasy_points);
-      const positionCounters = new Map<string, number>();
       sortedProjections.forEach((row, index) => {
-        projectionByPlayerId.set(row.player_id, row);
         overallRankByPlayer.set(row.player_id, index + 1);
       });
-
-      [...payload.data]
-        .sort((left, right) => {
-          const leftRank = left.board_rank ?? left.sheet_adp ?? overallRankByPlayer.get(left.id) ?? Number.POSITIVE_INFINITY;
-          const rightRank = right.board_rank ?? right.sheet_adp ?? overallRankByPlayer.get(right.id) ?? Number.POSITIVE_INFINITY;
-          return leftRank - rightRank;
-        })
-        .forEach((player) => {
-        const current = positionCounters.get(player.position) ?? 0;
-        const nextRank = current + 1;
-        positionCounters.set(player.position, nextRank);
-        posRankByPlayer.set(player.id, nextRank);
-      });
+      const projectionByPlayerId = new Map<number, BackendProjectionRead>(
+        projections.data.map((row) => [row.player_id, row])
+      );
 
       const conferenceEntries: Array<[string, string]> = teams.data.map(
         (row): [string, string] => [row.team.toUpperCase(), row.conference]
@@ -270,9 +256,87 @@ export function usePlayers(
             conference: conferenceBySchool.get(player.school.toUpperCase()) ?? "N/A",
             rank: player.board_rank ?? player.sheet_adp ?? overallRankByPlayer.get(player.id) ?? 0,
             adp: player.sheet_adp ?? player.board_rank ?? overallRankByPlayer.get(player.id) ?? 0,
-            posRank: posRankByPlayer.get(player.id) ?? 0,
+            posRank: null,
             status: injuryByPlayerId.get(player.id),
             projection: projectionByPlayerId.get(player.id),
+          })
+        ),
+      };
+    },
+  });
+}
+
+export function useDraftPlayerPool(
+  params: {
+    search?: string;
+    position?: string;
+    school?: string;
+    league_id?: number;
+    available_only?: boolean;
+    sort?: string;
+    limit?: number;
+    offset?: number;
+    pages?: number;
+  } = {}
+) {
+  const {
+    search,
+    position,
+    school,
+    league_id,
+    available_only,
+    sort,
+    limit = 100,
+    offset = 0,
+    pages = 1,
+  } = params;
+
+  return useQuery({
+    queryKey: [
+      "draft-player-pool",
+      {
+        search: search || "",
+        position: position || "",
+        school: school || "",
+        league_id: league_id || 0,
+        available_only: available_only ? "true" : "false",
+        sort: sort || "",
+        limit,
+        offset,
+        pages,
+      },
+    ],
+    staleTime: 15_000,
+    queryFn: async () => {
+      const fetchPage = (pageOffset: number) =>
+        apiGet<BackendPlayerListResponse>("/players", {
+          search: search || undefined,
+          position: position || undefined,
+          school: school || undefined,
+          league_id,
+          available_only,
+          sort,
+          limit,
+          offset: pageOffset,
+        });
+
+      const firstPayload = await fetchPage(offset);
+      const pageCount = Math.max(1, pages);
+      const remainingOffsets = Array.from({ length: pageCount - 1 }, (_, index) => offset + limit * (index + 1));
+      const remainingPayloads = remainingOffsets.length
+        ? await Promise.all(remainingOffsets.map((pageOffset) => fetchPage(pageOffset)))
+        : [];
+      const rows = [firstPayload, ...remainingPayloads].flatMap((payload) => payload.data);
+
+      return {
+        ...firstPayload,
+        limit: limit * pageCount,
+        data: rows.map((player) =>
+          normalizePlayer(player, {
+            conference: "N/A",
+            rank: player.board_rank ?? player.sheet_adp ?? 0,
+            adp: player.sheet_adp ?? player.board_rank ?? 0,
+            posRank: null,
           })
         ),
       };
@@ -323,7 +387,7 @@ export function usePlayerDetail(playerId?: number | null, enabled = true) {
         conference: conferenceBySchool.get(payload.school.toUpperCase()) ?? "N/A",
         rank: 0,
         adp: 0,
-        posRank: 0,
+        posRank: null,
         status: injuryByPlayerId.get(payload.id),
         projection,
       });

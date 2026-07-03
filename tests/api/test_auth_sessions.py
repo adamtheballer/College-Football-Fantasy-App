@@ -2,11 +2,17 @@ from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.security import (
     PASSWORD_HASH_ALGORITHM,
     create_access_token,
+    generate_token,
     hash_password,
     needs_password_rehash,
     verify_password,
 )
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
+from collegefootballfantasy_api.app.models.user import User
+
+
+STRONG_PASSWORD = "StrongPass123!"
+LEGACY_PASSWORD = "secret123"
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -19,7 +25,7 @@ def signup_user(client, suffix: str = "one") -> dict:
         json={
             "first_name": f"Coach{suffix}",
             "email": f"coach-{suffix}@example.com",
-            "password": "secret123",
+            "password": STRONG_PASSWORD,
         },
     )
     assert response.status_code == 201
@@ -42,7 +48,7 @@ def test_signup_normalizes_and_returns_username(client):
             "first_name": "Coach",
             "email": "username@example.com",
             "username": " Saturday Coach! ",
-            "password": "secret123",
+            "password": STRONG_PASSWORD,
         },
     )
     assert response.status_code == 201
@@ -56,7 +62,7 @@ def test_signup_rejects_duplicate_username(client):
             "first_name": "Coach",
             "email": "username-one@example.com",
             "username": "Same Name",
-            "password": "secret123",
+            "password": STRONG_PASSWORD,
         },
     )
     assert first.status_code == 201
@@ -67,25 +73,133 @@ def test_signup_rejects_duplicate_username(client):
             "first_name": "Coach",
             "email": "username-two@example.com",
             "username": "same-name",
-            "password": "secret123",
+            "password": STRONG_PASSWORD,
         },
     )
     assert duplicate.status_code == 409
     assert duplicate.json()["detail"] == "username already registered"
 
 
+def test_signup_rejects_password_under_12_chars(client):
+    response = client.post(
+        "/auth/signup",
+        json={"first_name": "Coach", "email": "short@example.com", "password": "Short1!"},
+    )
+    assert response.status_code == 422
+
+
+def test_signup_rejects_password_missing_uppercase(client):
+    response = client.post(
+        "/auth/signup",
+        json={"first_name": "Coach", "email": "upper@example.com", "password": "lowercase123!"},
+    )
+    assert response.status_code == 422
+
+
+def test_signup_rejects_password_missing_number(client):
+    response = client.post(
+        "/auth/signup",
+        json={"first_name": "Coach", "email": "number@example.com", "password": "NoNumberHere!"},
+    )
+    assert response.status_code == 422
+
+
+def test_signup_rejects_password_missing_special_character(client):
+    response = client.post(
+        "/auth/signup",
+        json={"first_name": "Coach", "email": "special@example.com", "password": "NoSpecial123"},
+    )
+    assert response.status_code == 422
+
+
+def test_signup_accepts_valid_strong_password(client):
+    response = client.post(
+        "/auth/signup",
+        json={"first_name": "Coach", "email": "valid@example.com", "password": STRONG_PASSWORD},
+    )
+    assert response.status_code == 201
+    assert response.json()["user"]["email"] == "valid@example.com"
+
+
+def test_signup_stores_hash_not_plaintext(client, db_session):
+    signup_user(client, "stored")
+    user = db_session.query(User).filter(User.email == "coach-stored@example.com").one()
+
+    assert user.password_hash != STRONG_PASSWORD
+    assert STRONG_PASSWORD not in user.password_hash
+    assert user.password_hash.startswith(f"{PASSWORD_HASH_ALGORITHM}$")
+
+
+def test_duplicate_email_rejected_case_insensitively(client):
+    response = client.post(
+        "/auth/signup",
+        json={"first_name": "Coach", "email": "CaseEmail@example.com", "password": STRONG_PASSWORD},
+    )
+    assert response.status_code == 201
+
+    duplicate = client.post(
+        "/auth/signup",
+        json={"first_name": "Coach", "email": " caseemail@EXAMPLE.com ", "password": STRONG_PASSWORD},
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"] == "email already registered"
+
+
+def test_login_succeeds_only_with_exact_password(client):
+    signup_user(client, "exact")
+
+    good = client.post(
+        "/auth/login",
+        json={"email": " coach-exact@EXAMPLE.com ", "password": STRONG_PASSWORD},
+    )
+    assert good.status_code == 200
+
+    bad = client.post(
+        "/auth/login",
+        json={"email": "coach-exact@example.com", "password": "StrongPass123?"},
+    )
+    assert bad.status_code == 401
+    assert bad.json()["detail"] == "invalid credentials"
+
+
 def test_password_hashes_are_versioned_and_constant_time_verifiable():
-    stored = hash_password("secret123")
+    stored = hash_password(STRONG_PASSWORD)
     assert stored.startswith(f"{PASSWORD_HASH_ALGORITHM}$")
-    assert verify_password("secret123", stored) is True
+    assert verify_password(STRONG_PASSWORD, stored) is True
     assert verify_password("wrong", stored) is False
     assert needs_password_rehash(stored) is False
 
 
 def test_legacy_password_hashes_verify_but_require_rehash():
     legacy = "YWFhYWFhYWFhYWFhYWFhYQ==$LrogHhynYTZ+hDQlQR3OlxFU/vcPWPRb0AnWTRxIVRA="
-    assert verify_password("secret123", legacy) is True
+    assert verify_password(LEGACY_PASSWORD, legacy) is True
     assert needs_password_rehash(legacy) is True
+
+
+def test_legacy_pbkdf2_hash_rehashes_to_argon2_on_login(client, db_session):
+    legacy_hash = "YWFhYWFhYWFhYWFhYWFhYQ==$LrogHhynYTZ+hDQlQR3OlxFU/vcPWPRb0AnWTRxIVRA="
+    user = User(
+        first_name="Legacy",
+        email="legacy@example.com",
+        username="legacy",
+        password_hash=legacy_hash,
+        api_token=generate_token(32),
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/auth/login",
+        json={"email": " LEGACY@example.com ", "password": LEGACY_PASSWORD},
+    )
+    assert response.status_code == 200
+
+    db_session.expire_all()
+    refreshed_user = db_session.query(User).filter(User.email == "legacy@example.com").one()
+    assert refreshed_user.password_hash != legacy_hash
+    assert refreshed_user.password_hash.startswith(f"{PASSWORD_HASH_ALGORITHM}$")
+    assert verify_password(LEGACY_PASSWORD, refreshed_user.password_hash) is True
+    assert needs_password_rehash(refreshed_user.password_hash) is False
 
 
 def test_auth_me_returns_current_authenticated_user(client):

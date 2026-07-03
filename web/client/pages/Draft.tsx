@@ -6,14 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDraftPick, useDraftRoom } from "@/hooks/use-draft";
 import { useLeagueDetail } from "@/hooks/use-leagues";
-import { usePlayers } from "@/hooks/use-players";
+import { useDraftPlayerPool } from "@/hooks/use-players";
 import { ApiError } from "@/lib/api";
 import { buildDraftBoard, type DraftConfig, type DraftPlayer } from "@/lib/draftRankings";
+import { buildProjectedStats, formatStat, statRowsForPosition, statValue } from "@/lib/playerProjectionStats";
 import { filterDraftablePlayers, getLegalPositionsForRoster } from "@/lib/rosterLegality";
 import { cn } from "@/lib/utils";
 import type { DraftRoomTeam } from "@/types/draft";
 
 const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K"];
+const DRAFT_PLAYER_PAGE_SIZE = 80;
 const DRAFT_SLOT_KEYS = ["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "BENCH"] as const;
 
 const POSITION_STYLES: Record<string, string> = {
@@ -78,6 +80,11 @@ const getDraftConfig = (
   },
 });
 
+const projectionStatsForPlayer = (player: DraftPlayer | null) => {
+  if (!player) return null;
+  return buildProjectedStats(player.projection, player.projectedPoints, player.sheetProjectionStats);
+};
+
 const getRoundNumber = (overallPick: number, teamCount: number) =>
   Math.floor((overallPick - 1) / Math.max(1, teamCount)) + 1;
 
@@ -134,10 +141,6 @@ export default function Draft() {
     isLoading: draftRoomLoading,
     error: draftRoomError,
   } = useDraftRoom(parsedLeagueId);
-  const { data: playersPayload, isLoading: playersLoading, isError: playersError } = usePlayers({
-    limit: 1000,
-    sort: "draft_rank",
-  });
   const pickMutation = useDraftPick(parsedLeagueId);
 
   useEffect(() => {
@@ -166,63 +169,87 @@ export default function Draft() {
     [draftRoom?.roster_slots, leagueSize]
   );
 
-  const draftBoard = useMemo(
-    () => buildDraftBoard(playersPayload?.data ?? [], draftConfig),
-    [draftConfig, playersPayload?.data]
-  );
-
   const draftedIds = useMemo(
     () => new Set(draftRoom?.picks.map((pick) => pick.player_id) ?? []),
     [draftRoom?.picks]
   );
 
-  const currentTeamRoster = useMemo(() => {
-    if (!draftRoom?.current_team_id) return [];
+  const viewerDraftBoardTeamId = draftRoom?.user_team_id ?? draftRoom?.current_team_id ?? null;
+  const viewerDraftBoardTeamName =
+    draftRoom?.teams.find((team) => team.id === viewerDraftBoardTeamId)?.name ??
+    (viewerDraftBoardTeamId ? "Your Team" : "Draft complete");
+
+  const viewerTeamRoster = useMemo(() => {
+    if (!viewerDraftBoardTeamId || !draftRoom?.picks) return [];
     return draftRoom.picks
-      .filter((pick) => pick.team_id === draftRoom.current_team_id)
+      .filter((pick) => pick.team_id === viewerDraftBoardTeamId)
       .map((pick) => ({
         id: pick.player_id,
         position: pick.player_position,
       }));
-  }, [draftRoom?.current_team_id, draftRoom?.picks]);
+  }, [draftRoom?.picks, viewerDraftBoardTeamId]);
 
   const superflexEnabled = getSlotCount(draftRoom?.roster_slots, "SUPERFLEX") > 0;
 
   const legalPositions = useMemo(
     () =>
       draftRoom
-        ? getLegalPositionsForRoster(currentTeamRoster, draftRoom.roster_slots, {
+        ? getLegalPositionsForRoster(viewerTeamRoster, draftRoom.roster_slots, {
             superflexEnabled,
           })
         : [],
-    [currentTeamRoster, draftRoom, superflexEnabled]
+    [viewerTeamRoster, draftRoom, superflexEnabled]
   );
+
+  const serverPositionFilter =
+    position === "ALL" ? (legalPositions.length > 0 ? legalPositions.join(",") : undefined) : position;
+  const draftSearch = search.trim();
+  const { data: playersPayload, isLoading: playersLoading, isError: playersError } = useDraftPlayerPool({
+    search: draftSearch || undefined,
+    position: serverPositionFilter,
+    league_id: parsedLeagueId,
+    available_only: Boolean(parsedLeagueId),
+    limit: DRAFT_PLAYER_PAGE_SIZE,
+    offset: 0,
+    sort: "draft_rank",
+  });
+
+  const draftBoard = useMemo(() => {
+    const board = buildDraftBoard(playersPayload?.data ?? [], draftConfig);
+    return board
+      .map((player) => {
+        const stableRank =
+          player.sourceBoardRank ?? player.boardRank ?? player.sheetAdp ?? player.masterDraftRank ?? player.draftRank;
+        return {
+          ...player,
+          draftRank: stableRank,
+          masterDraftRank: stableRank,
+        };
+      })
+      .sort((left, right) => {
+        const leftRank = left.masterDraftRank ?? Number.POSITIVE_INFINITY;
+        const rightRank = right.masterDraftRank ?? Number.POSITIVE_INFINITY;
+        if (leftRank !== rightRank) return leftRank - rightRank;
+        if (left.projectedPoints !== right.projectedPoints) return right.projectedPoints - left.projectedPoints;
+        return left.name.localeCompare(right.name);
+      });
+  }, [draftConfig, playersPayload?.data]);
 
   const draftablePlayers = useMemo(
     () =>
       draftRoom
         ? filterDraftablePlayers(
             draftBoard,
-            currentTeamRoster,
+            viewerTeamRoster,
             draftRoom.roster_slots,
             draftedIds,
             { superflexEnabled }
           )
         : [],
-    [currentTeamRoster, draftedIds, draftBoard, draftRoom, superflexEnabled]
+    [viewerTeamRoster, draftedIds, draftBoard, draftRoom, superflexEnabled]
   );
 
-  const visiblePlayers = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-    return draftablePlayers.filter((player) => {
-      const matchesPosition = position === "ALL" || player.pos === position;
-      const matchesSearch =
-        !normalizedSearch ||
-        player.name.toLowerCase().includes(normalizedSearch) ||
-        player.school.toLowerCase().includes(normalizedSearch);
-      return matchesPosition && matchesSearch;
-    });
-  }, [draftablePlayers, position, search]);
+  const visiblePlayers = useMemo(() => draftablePlayers, [draftablePlayers]);
 
   const selectedPlayer = useMemo(
     () => draftBoard.find((player) => player.id === selectedPlayerId) ?? null,
@@ -517,10 +544,10 @@ export default function Draft() {
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-200 drop-shadow-[0_0_14px_rgba(103,232,249,0.28)]">Available Players</p>
                 <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-                  Showing legal players for: {currentTeamLabel}
+                  Showing your roster needs: {viewerDraftBoardTeamName}
                 </p>
                 <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100/80">
-                  Legal positions: {legalPositions.length ? legalPositions.join(", ") : "None"}
+                  Your legal positions: {legalPositions.length ? legalPositions.join(", ") : "None"}
                 </p>
               </div>
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -576,11 +603,11 @@ export default function Draft() {
                 {legalPositions.length === 0
                   ? "Roster is full. No legal picks remain."
                   : position !== "ALL" && !legalPositions.includes(position as (typeof legalPositions)[number])
-                    ? `No ${position} players fit the current team's remaining roster slots.`
-                    : `No legal players available for the current roster slots. Remaining legal positions: ${legalPositions.join(", ")}.`}
+                    ? `No ${position} players fit your remaining roster slots.`
+                    : `No legal players available for your remaining roster slots. Remaining legal positions: ${legalPositions.join(", ")}.`}
               </div>
             ) : (
-              visiblePlayers.slice(0, 180).map((player) => {
+              visiblePlayers.map((player) => {
                 const positionClass = POSITION_STYLES[player.pos] ?? "border-white/20 bg-white/10 text-foreground";
                 const isSelected = selectedPlayerId === player.id;
                 const visibleRank = player.masterDraftRank ?? player.draftRank;
@@ -678,22 +705,14 @@ export default function Draft() {
             <section className="rounded-3xl border border-cyan-200/12 bg-white/[0.035] p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">Projected 2026</p>
               <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Fantasy</p>
-                  <p className="mt-2 text-lg font-black tabular-nums text-white">{selectedPlayer.projectedPoints.toFixed(1)}</p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Tier</p>
-                  <p className="mt-2 text-lg font-black tabular-nums text-white">{selectedPlayer.tier}</p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Floor</p>
-                  <p className="mt-2 text-lg font-black tabular-nums text-white">{selectedPlayer.projection.floor ?? "-"}</p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Ceiling</p>
-                  <p className="mt-2 text-lg font-black tabular-nums text-white">{selectedPlayer.projection.ceiling ?? "-"}</p>
-                </div>
+                {statRowsForPosition(selectedPlayer.pos).map((row) => (
+                  <div key={`projection-${row.label}`} className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">{row.label}</p>
+                    <p className="mt-2 text-lg font-black tabular-nums text-white">
+                      {formatStat(statValue(projectionStatsForPlayer(selectedPlayer), row.projectionKeys))}
+                    </p>
+                  </div>
+                ))}
               </div>
             </section>
             <section className="mt-4 rounded-3xl border border-cyan-200/12 bg-white/[0.035] p-4">

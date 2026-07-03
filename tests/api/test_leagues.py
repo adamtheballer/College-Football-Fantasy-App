@@ -17,7 +17,7 @@ def create_user_and_token(client, suffix: str = "one") -> str:
         json={
             "first_name": f"Coach{suffix}",
             "email": f"coach-{suffix}@example.com",
-            "password": "secret123",
+            "password": "StrongPass123!",
         },
     )
     assert response.status_code == 201

@@ -20,6 +20,8 @@ from collegefootballfantasy_api.app.models import (
     league_member,
     league_settings,
     matchup,
+    mock_draft,
+    mock_draft_pick,
     notification,
     player,
     player_game_stat,

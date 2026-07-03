@@ -4,8 +4,9 @@ import { ArrowLeft, Bot, Loader2, RefreshCcw, Search, Trophy, User, X } from "lu
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { usePlayerDetail, usePlayers, usePlayerSeasonStats } from "@/hooks/use-players";
+import { useDraftPlayerPool, usePlayerDetail, usePlayerSeasonStats } from "@/hooks/use-players";
 import { buildDraftBoard, type DraftPlayer } from "@/lib/draftRankings";
+import { buildProjectedStats, formatStat, statRowsForPosition, statValue } from "@/lib/playerProjectionStats";
 import {
   advanceSinglePlayerMockDraft,
   buildMockRoster,
@@ -51,13 +52,21 @@ const POSITION_STYLES: Record<string, string> = {
   K: "border-slate-300/40 bg-slate-400/15 text-slate-100 shadow-[0_0_16px_rgba(203,213,225,0.14)]",
 };
 
-const ROSTER_POSITION_STYLES: Record<string, { border: string; bg: string; text: string; dot: string }> = {
-  QB: { border: "border-blue-300/30", bg: "bg-[#0b1830]", text: "text-blue-100/85", dot: "bg-blue-400/60" },
-  RB: { border: "border-emerald-300/30", bg: "bg-[#0a1f24]", text: "text-emerald-100/85", dot: "bg-emerald-400/60" },
-  WR: { border: "border-violet-300/30", bg: "bg-[#151530]", text: "text-violet-100/85", dot: "bg-violet-400/60" },
-  TE: { border: "border-amber-300/30", bg: "bg-[#211b16]", text: "text-amber-100/85", dot: "bg-amber-400/60" },
-  K: { border: "border-slate-300/25", bg: "bg-[#182235]", text: "text-slate-100/85", dot: "bg-slate-400/55" },
-  EMPTY: { border: "border-white/10", bg: "bg-[#071224]", text: "text-muted-foreground", dot: "bg-white/18" },
+const POSITION_ROW_HOVER_STYLES: Record<string, string> = {
+  QB: "hover:bg-blue-400/[0.06] hover:shadow-[inset_3px_0_0_rgba(96,165,250,0.65),0_0_28px_rgba(96,165,250,0.10)] focus:bg-blue-400/[0.08]",
+  RB: "hover:bg-emerald-400/[0.06] hover:shadow-[inset_3px_0_0_rgba(52,211,153,0.65),0_0_28px_rgba(52,211,153,0.10)] focus:bg-emerald-400/[0.08]",
+  WR: "hover:bg-violet-400/[0.06] hover:shadow-[inset_3px_0_0_rgba(167,139,250,0.65),0_0_28px_rgba(167,139,250,0.10)] focus:bg-violet-400/[0.08]",
+  TE: "hover:bg-amber-400/[0.06] hover:shadow-[inset_3px_0_0_rgba(251,191,36,0.65),0_0_28px_rgba(251,191,36,0.10)] focus:bg-amber-400/[0.08]",
+  K: "hover:bg-slate-200/[0.06] hover:shadow-[inset_3px_0_0_rgba(226,232,240,0.65),0_0_28px_rgba(226,232,240,0.10)] focus:bg-slate-200/[0.08]",
+};
+
+const ROSTER_POSITION_STYLES: Record<string, { border: string; bg: string; text: string; dot: string; hover: string }> = {
+  QB: { border: "border-blue-300/30", bg: "bg-[#0b1830]", text: "text-blue-100/85", dot: "bg-blue-400/60", hover: "hover:border-blue-300/55 hover:shadow-[0_0_34px_rgba(96,165,250,0.14)]" },
+  RB: { border: "border-emerald-300/30", bg: "bg-[#0a1f24]", text: "text-emerald-100/85", dot: "bg-emerald-400/60", hover: "hover:border-emerald-300/55 hover:shadow-[0_0_34px_rgba(52,211,153,0.14)]" },
+  WR: { border: "border-violet-300/30", bg: "bg-[#151530]", text: "text-violet-100/85", dot: "bg-violet-400/60", hover: "hover:border-violet-300/55 hover:shadow-[0_0_34px_rgba(167,139,250,0.14)]" },
+  TE: { border: "border-amber-300/30", bg: "bg-[#211b16]", text: "text-amber-100/85", dot: "bg-amber-400/60", hover: "hover:border-amber-300/55 hover:shadow-[0_0_34px_rgba(251,191,36,0.14)]" },
+  K: { border: "border-slate-300/25", bg: "bg-[#182235]", text: "text-slate-100/85", dot: "bg-slate-400/55", hover: "hover:border-slate-200/55 hover:shadow-[0_0_34px_rgba(226,232,240,0.12)]" },
+  EMPTY: { border: "border-white/10", bg: "bg-[#071224]", text: "text-muted-foreground", dot: "bg-white/18", hover: "hover:border-cyan-200/18 hover:shadow-[0_0_24px_rgba(34,211,238,0.08)]" },
 };
 
 const readStoredDraft = () => {
@@ -84,71 +93,9 @@ const groupPicksByRound = (picks: MockDraftPick[]) => {
   return [...rounds.entries()].sort(([left], [right]) => left - right);
 };
 
-const statValue = (
-  stats: Record<string, unknown> | null | undefined,
-  candidates: string[]
-) => {
-  if (!stats) return null;
-  for (const key of candidates) {
-    const value = stats[key];
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return value;
-    }
-    if (typeof value === "string" && value.trim() !== "" && !Number.isNaN(Number(value))) {
-      return Number(value);
-    }
-  }
-  return null;
-};
-
-const formatStat = (value: number | null | undefined) => {
-  if (value === null || value === undefined || !Number.isFinite(value)) return "-";
-  if (Math.abs(value) >= 100) return Math.round(value).toLocaleString();
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-};
-
-const statRowsForPosition = (position: string) => {
-  if (position === "QB") {
-    return [
-      { label: "Pass Yds", projectionKeys: ["pass_yds", "passingYards"], previousKeys: ["PassingYards", "Passing Yards", "pass_yards", "pass_yds"] },
-      { label: "Pass TD", projectionKeys: ["pass_tds", "passingTds"], previousKeys: ["PassingTouchdowns", "Passing TD", "pass_tds"] },
-      { label: "INT", projectionKeys: ["ints", "interceptions"], previousKeys: ["Interceptions", "ints", "interceptions"] },
-      { label: "Rush Yds", projectionKeys: ["rush_yds", "rushingYards"], previousKeys: ["RushingYards", "Rushing Yards", "rush_yards", "rush_yds"] },
-      { label: "Rush TD", projectionKeys: ["rush_tds", "rushingTds"], previousKeys: ["RushingTouchdowns", "Rushing TD", "rush_tds"] },
-    ];
-  }
-
-  if (position === "K") {
-    return [
-      { label: "FG", projectionKeys: ["fg", "field_goals"], previousKeys: ["FieldGoalsMade", "FieldGoals", "fg"] },
-      { label: "XP", projectionKeys: ["xp", "extra_points"], previousKeys: ["ExtraPointsMade", "ExtraPoints", "xp"] },
-      { label: "Fantasy", projectionKeys: ["fpts"], previousKeys: ["FantasyPoints", "fantasy_points", "fpts"] },
-    ];
-  }
-
-  return [
-    { label: "Rush Yds", projectionKeys: ["rush_yds", "rushingYards"], previousKeys: ["RushingYards", "Rushing Yards", "rush_yards", "rush_yds"] },
-    { label: "Rush TD", projectionKeys: ["rush_tds", "rushingTds"], previousKeys: ["RushingTouchdowns", "Rushing TD", "rush_tds"] },
-    { label: "Rec", projectionKeys: ["receptions"], previousKeys: ["Receptions", "receptions"] },
-    { label: "Rec Yds", projectionKeys: ["rec_yds", "receivingYards"], previousKeys: ["ReceivingYards", "Receiving Yards", "rec_yards", "rec_yds"] },
-    { label: "Rec TD", projectionKeys: ["rec_tds", "receivingTds"], previousKeys: ["ReceivingTouchdowns", "Receiving TD", "rec_tds"] },
-  ];
-};
-
 const projectionStatsForPlayer = (player: DraftPlayer | null) => {
   if (!player) return null;
-  return {
-    ...(player.sheetProjectionStats ?? {}),
-    passingYards: player.projection.passingYards,
-    passingTds: player.projection.passingTds,
-    ints: player.projection.ints,
-    rushingYards: player.projection.rushingYards,
-    rushingTds: player.projection.rushingTds,
-    receptions: player.projection.receptions,
-    receivingYards: player.projection.receivingYards,
-    receivingTds: player.projection.receivingTds,
-    fpts: player.projectedPoints,
-  };
+  return buildProjectedStats(player.projection, player.projectedPoints, player.sheetProjectionStats);
 };
 
 const buildPlayerSummary = (
@@ -189,10 +136,12 @@ export default function SinglePlayerMockDraftRoom() {
   const [activeTab, setActiveTab] = useState<MockDraftTab>("draft");
   const [error, setError] = useState<string | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
+  const [selectedRosterTeamId, setSelectedRosterTeamId] = useState<number | null>(null);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const pickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
-  const { data: playersPayload, isLoading, isError } = usePlayers({
-    limit: 1000,
+  const { data: playersPayload, isLoading, isError } = useDraftPlayerPool({
+    limit: 100,
+    pages: 5,
     sort: "draft_rank",
   });
   const mockSettings = getMockDraftSettings(draftState);
@@ -284,22 +233,26 @@ export default function SinglePlayerMockDraftRoom() {
   }, [draftState.currentPick, draftState.status]);
 
   const currentTeam = getCurrentTeam(draftState);
-  const legalPositions = useMemo(
-    () => (currentTeam ? getLegalMockPositionsForTeam(draftState, currentTeam.id) : []),
-    [currentTeam, draftState]
+  const userDraftBoardTeam = useMemo(
+    () => draftState.teams.find((team) => team.id === draftState.userTeamId) ?? null,
+    [draftState.teams, draftState.userTeamId]
   );
-  const draftablePlayersForCurrentTeam = useMemo(
-    () => (currentTeam ? getDraftablePlayersForTeam(draftBoard, draftState, currentTeam.id) : []),
-    [currentTeam, draftBoard, draftState]
+  const userLegalPositions = useMemo(
+    () => getLegalMockPositionsForTeam(draftState, draftState.userTeamId),
+    [draftState]
+  );
+  const draftablePlayersForUserTeam = useMemo(
+    () => getDraftablePlayersForTeam(draftBoard, draftState, draftState.userTeamId),
+    [draftBoard, draftState]
   );
   const draftablePlayerIds = useMemo(
-    () => new Set(draftablePlayersForCurrentTeam.map((player) => player.id)),
-    [draftablePlayersForCurrentTeam]
+    () => new Set(draftablePlayersForUserTeam.map((player) => player.id)),
+    [draftablePlayersForUserTeam]
   );
 
   const availablePlayers = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
-    return draftablePlayersForCurrentTeam.filter((player) => {
+    const filteredPlayers = draftablePlayersForUserTeam.filter((player) => {
       const matchesPosition = position === "ALL" || player.pos === position;
       const matchesSearch =
         !normalizedSearch ||
@@ -307,7 +260,23 @@ export default function SinglePlayerMockDraftRoom() {
         player.school.toLowerCase().includes(normalizedSearch);
       return matchesPosition && matchesSearch;
     });
-  }, [draftablePlayersForCurrentTeam, position, search]);
+
+    if (position === "ALL") {
+      return filteredPlayers;
+    }
+
+    return [...filteredPlayers].sort((left, right) => {
+      if (left.projectedPoints !== right.projectedPoints) {
+        return right.projectedPoints - left.projectedPoints;
+      }
+      const leftRank = left.masterDraftRank ?? left.draftRank;
+      const rightRank = right.masterDraftRank ?? right.draftRank;
+      if (leftRank !== rightRank) {
+        return leftRank - rightRank;
+      }
+      return left.name.localeCompare(right.name);
+    });
+  }, [draftablePlayersForUserTeam, position, search]);
 
   const queuedPlayers = useMemo(() => {
     const byId = new Map(draftBoard.map((player) => [player.id, player]));
@@ -316,7 +285,28 @@ export default function SinglePlayerMockDraftRoom() {
       .filter((player): player is DraftPlayer => Boolean(player));
   }, [draftBoard, draftState.queuedPlayerIds]);
 
-  const userRoster = useMemo(() => buildMockRoster(draftState), [draftState]);
+  useEffect(() => {
+    if (
+      selectedRosterTeamId !== null &&
+      !draftState.teams.some((team) => team.id === selectedRosterTeamId)
+    ) {
+      setSelectedRosterTeamId(null);
+    }
+  }, [draftState.teams, selectedRosterTeamId]);
+
+  const selectedRosterTeam = useMemo(() => {
+    const fallbackTeam =
+      draftState.teams.find((team) => team.id === draftState.userTeamId) ?? draftState.teams[0];
+    return (
+      draftState.teams.find((team) => team.id === selectedRosterTeamId) ??
+      fallbackTeam
+    );
+  }, [draftState.teams, draftState.userTeamId, selectedRosterTeamId]);
+
+  const selectedRoster = useMemo(
+    () => buildMockRoster(draftState, selectedRosterTeam?.id ?? draftState.userTeamId),
+    [draftState, selectedRosterTeam?.id]
+  );
   const secondsRemaining = getSecondsRemaining(draftState, now);
   const timerDanger = isPickTimerDanger(draftState, secondsRemaining);
   const userOnClock = isUserOnClock(draftState);
@@ -348,6 +338,7 @@ export default function SinglePlayerMockDraftRoom() {
     setDraftState(freshDraft);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(freshDraft));
     setActiveTab("draft");
+    setSelectedRosterTeamId(null);
     setError(null);
   };
 
@@ -372,10 +363,10 @@ export default function SinglePlayerMockDraftRoom() {
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-200 drop-shadow-[0_0_14px_rgba(103,232,249,0.28)]">Available Players</p>
             <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-              Showing legal players for: {currentTeam?.name ?? "Draft complete"}
+              Showing your roster needs: {userDraftBoardTeam?.name ?? "Your Team"}
             </p>
             <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100/80">
-              Legal positions: {legalPositions.length ? legalPositions.join(", ") : "None"}
+              Your legal positions: {userLegalPositions.length ? userLegalPositions.join(", ") : "None"}
             </p>
           </div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -428,16 +419,17 @@ export default function SinglePlayerMockDraftRoom() {
           </div>
         ) : availablePlayers.length === 0 ? (
           <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
-            {legalPositions.length === 0
+            {userLegalPositions.length === 0
               ? "Roster is full. No legal picks remain."
               : position !== "ALL" &&
-                  !legalPositions.includes(position as (typeof legalPositions)[number])
+                  !userLegalPositions.includes(position as (typeof userLegalPositions)[number])
                 ? `No ${position} players fit your remaining roster slots.`
-                : `No legal players available for your remaining roster slots. Remaining legal positions: ${legalPositions.join(", ")}.`}
+                : `No legal players available for your remaining roster slots. Remaining legal positions: ${userLegalPositions.join(", ")}.`}
           </div>
         ) : (
           availablePlayers.slice(0, 160).map((player) => {
             const positionClass = POSITION_STYLES[player.pos] ?? "border-white/20 bg-white/10 text-foreground";
+            const positionHoverClass = POSITION_ROW_HOVER_STYLES[player.pos] ?? "hover:bg-cyan-300/[0.045] focus:bg-cyan-300/[0.06]";
             const isQueued = draftState.queuedPlayerIds.includes(player.id);
             const isSelected = selectedPlayerId === player.id;
             const visibleRank = player.masterDraftRank ?? player.draftRank;
@@ -455,7 +447,8 @@ export default function SinglePlayerMockDraftRoom() {
                   }
                 }}
                 className={cn(
-                  "grid cursor-pointer grid-cols-[72px_minmax(0,1fr)_96px_110px_180px] items-center gap-3 border-b border-cyan-100/10 px-5 py-4 outline-none transition-colors hover:bg-cyan-300/[0.045] focus:bg-cyan-300/[0.06]",
+                  "grid cursor-pointer grid-cols-[72px_minmax(0,1fr)_96px_110px_180px] items-center gap-3 border-b border-cyan-100/10 px-5 py-4 outline-none transition-[background-color,box-shadow,color] duration-200",
+                  positionHoverClass,
                   isSelected && "bg-cyan-300/[0.075] shadow-[inset_3px_0_0_rgba(103,232,249,0.75)]"
                 )}
               >
@@ -642,7 +635,7 @@ export default function SinglePlayerMockDraftRoom() {
   );
 
   const renderRoster = () => {
-    const slotByLabel = new Map(userRoster.map((slot) => [slot.label, slot]));
+    const slotByLabel = new Map(selectedRoster.map((slot) => [slot.label, slot]));
     const starterRows = [
       { label: "Quarterback", accent: "QB", slots: ["QB"] },
       { label: "Running Backs", accent: "RB", slots: ["RB 1", "RB 2"] },
@@ -650,7 +643,7 @@ export default function SinglePlayerMockDraftRoom() {
       { label: "Tight End", accent: "TE", slots: ["TE"] },
       { label: "Flex + Kicker", accent: "K", slots: ["FLEX", "K"] },
     ];
-    const benchSlots = userRoster.filter((slot) => slot.label.startsWith("BENCH"));
+    const benchSlots = selectedRoster.filter((slot) => slot.label.startsWith("BENCH"));
 
     const renderSlotCard = (slotLabel: string) => {
       const slot = slotByLabel.get(slotLabel);
@@ -664,11 +657,12 @@ export default function SinglePlayerMockDraftRoom() {
         <div
           key={slot.label}
           className={cn(
-            "relative min-h-[82px] overflow-hidden rounded-2xl border px-4 py-3",
+            "relative min-h-[82px] overflow-hidden rounded-2xl border px-4 py-3 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5",
             "shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]",
             style.border,
             style.bg,
-            style.text
+            style.text,
+            style.hover
           )}
         >
           <div className={cn("absolute right-4 top-4 h-2.5 w-2.5 rounded-full shadow-[0_0_18px_currentColor]", style.dot)} />
@@ -688,17 +682,18 @@ export default function SinglePlayerMockDraftRoom() {
       );
     };
 
-    const renderBenchSlotCard = (slot: (typeof userRoster)[number]) => {
+    const renderBenchSlotCard = (slot: (typeof selectedRoster)[number]) => {
       const position = slot.player?.position ?? "EMPTY";
       const style = ROSTER_POSITION_STYLES[position] ?? ROSTER_POSITION_STYLES.EMPTY;
       return (
         <div
           key={slot.label}
           className={cn(
-            "grid min-h-[64px] grid-cols-[90px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border px-4 py-3",
+            "grid min-h-[64px] grid-cols-[90px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border px-4 py-3 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5",
             "bg-slate-950/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
             style.border,
-            style.text
+            style.text,
+            style.hover
           )}
         >
           <p className="text-[9px] font-black uppercase tracking-[0.2em]">{slot.label}</p>
@@ -722,16 +717,33 @@ export default function SinglePlayerMockDraftRoom() {
 
     return (
       <section className="rounded-[1.75rem] border border-cyan-200/15 bg-card/45 p-5 shadow-[0_0_44px_rgba(34,211,238,0.08),inset_0_1px_0_rgba(255,255,255,0.035)]">
-        <div className="mb-4 flex items-end justify-between gap-4">
+        <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary">Your Roster</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary">Roster Viewer</p>
             <p className="mt-1 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-              Starters by position group
+              Inspect every manager's roster by position group
             </p>
           </div>
-          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-            {userRoster.filter((slot) => slot.player).length}/{userRoster.length} filled
-          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label className="sr-only" htmlFor="mock-roster-team-select">
+              Select roster team
+            </label>
+            <select
+              id="mock-roster-team-select"
+              value={selectedRosterTeam?.id ?? draftState.userTeamId}
+              onChange={(event) => setSelectedRosterTeamId(Number(event.target.value))}
+              className="h-12 min-w-[220px] rounded-2xl border border-cyan-200/25 bg-slate-950/70 px-4 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-50 shadow-[0_0_24px_rgba(34,211,238,0.12)] outline-none transition focus:border-cyan-200/60 focus:ring-2 focus:ring-cyan-300/20"
+            >
+              {draftState.teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.id === draftState.userTeamId ? `${team.name} (You)` : team.name}
+                </option>
+              ))}
+            </select>
+            <p className="rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+              {selectedRoster.filter((slot) => slot.player).length}/{selectedRoster.length} filled
+            </p>
+          </div>
         </div>
 
         <div className="space-y-2.5">
@@ -932,14 +944,6 @@ export default function SinglePlayerMockDraftRoom() {
           </div>
         ) : null}
 
-        {draftState.status === "complete" ? (
-          <section className="rounded-[2rem] border border-primary/30 bg-primary/10 p-6 text-center">
-            <Trophy className="mx-auto mb-3 h-8 w-8 text-primary" />
-            <p className="text-xl font-black uppercase tracking-tight text-foreground">Draft Complete</p>
-            <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">{totalPicks} picks completed without real league mutations.</p>
-          </section>
-        ) : null}
-
         {activeTab === "draft" ? renderAvailablePlayers() : null}
         {activeTab === "queue" ? renderQueue() : null}
         {activeTab === "roster" ? renderRoster() : null}
@@ -947,6 +951,54 @@ export default function SinglePlayerMockDraftRoom() {
       </div>
 
       {renderScoutingPanel()}
+
+      {draftState.status === "complete" ? (
+        <div className="fixed inset-0 z-[1450] flex items-center justify-center bg-slate-950/58 px-4 backdrop-blur-[7px]">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mock-draft-complete-title"
+            className="w-full max-w-[560px] overflow-hidden rounded-[2rem] border border-cyan-200/25 bg-[#071225]/92 text-center shadow-[0_0_90px_rgba(34,211,238,0.22),inset_0_1px_0_rgba(255,255,255,0.08)]"
+          >
+            <div className="border-b border-cyan-100/10 bg-gradient-to-br from-cyan-400/12 via-blue-500/8 to-violet-500/10 px-8 py-10">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-cyan-200/35 bg-cyan-300/12 text-cyan-100 shadow-[0_0_48px_rgba(103,232,249,0.34)]">
+                <Trophy className="h-10 w-10" />
+              </div>
+              <p className="mt-6 text-[10px] font-black uppercase tracking-[0.28em] text-cyan-200">
+                Mock Draft Complete
+              </p>
+              <h2
+                id="mock-draft-complete-title"
+                className="mt-3 text-4xl font-black uppercase tracking-tight text-white md:text-5xl"
+              >
+                Draft Complete
+              </h2>
+              <p className="mx-auto mt-4 max-w-md text-sm font-bold leading-6 text-muted-foreground">
+                {totalPicks} picks completed. This single-player mock draft did not mutate real leagues,
+                rosters, standings, or transactions.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 px-8 py-6 sm:flex-row sm:justify-center">
+              <Button
+                type="button"
+                className="h-12 rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 px-8 text-[10px] font-black uppercase tracking-[0.18em] text-slate-950 shadow-[0_0_28px_rgba(103,232,249,0.24)]"
+                onClick={() => navigate("/draft")}
+              >
+                Exit to Draft Center
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12 rounded-2xl border-cyan-200/20 bg-white/[0.04] px-8 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100 hover:border-cyan-200/40 hover:bg-cyan-400/12 hover:text-white"
+                onClick={resetDraft}
+              >
+                <RefreshCcw className="mr-2 h-4 w-4" />
+                Start New Mock
+              </Button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[1200] flex justify-center px-4">
         <div className="pointer-events-auto grid w-full max-w-xl grid-cols-4 rounded-2xl border border-cyan-200/15 bg-slate-950/88 p-1 shadow-[0_0_40px_rgba(34,211,238,0.16)] backdrop-blur-xl">

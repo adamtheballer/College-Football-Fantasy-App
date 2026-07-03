@@ -9,7 +9,7 @@ This repo has one supported backend: the FastAPI app under `api/`.
 - Canonical API import path: `collegefootballfantasy_api.app.main:app`
 - Canonical local API command: `PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port 8000`
 - Canonical frontend: React/Vite in `web/`
-- Unsupported legacy backend flow: Express/Vite server middleware under `web/server`
+- Express/Vite server middleware is not part of the supported product backend.
 
 Do not start, deploy, or reintroduce an Express backend for product API routes. The `web/` package is a static/client app that calls the FastAPI API through the configured API base URL.
 
@@ -45,7 +45,7 @@ uv run alembic -c api/alembic.ini upgrade head
 5) Install web dependencies
 
 ```bash
-cd web && npm install
+cd web && npm ci
 ```
 
 6) Start API and UI

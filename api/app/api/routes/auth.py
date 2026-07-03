@@ -2,6 +2,7 @@ import re
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.core.config import settings
@@ -106,7 +107,7 @@ def current_user_profile(current_user: User = Depends(get_current_user)) -> User
 
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 def signup(payload: UserCreate, response: Response, request: Request, db: Session = Depends(get_db)) -> AuthResponse:
-    existing = db.query(User).filter(User.email == payload.email.lower()).first()
+    existing = db.query(User).filter(func.lower(User.email) == payload.email).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email already registered")
     username = _normalize_username(payload.username, fallback=payload.email.split("@", 1)[0])
@@ -114,8 +115,8 @@ def signup(payload: UserCreate, response: Response, request: Request, db: Sessio
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="username already registered")
     now = datetime.utcnow()
     user = User(
-        first_name=payload.first_name.strip(),
-        email=payload.email.lower(),
+        first_name=payload.first_name,
+        email=payload.email,
         username=_unique_username(db, username),
         password_hash=hash_password(payload.password),
         api_token=generate_token(32),
@@ -137,7 +138,7 @@ def signup(payload: UserCreate, response: Response, request: Request, db: Sessio
 
 @router.post("/login", response_model=AuthResponse)
 def login(payload: UserLogin, response: Response, request: Request, db: Session = Depends(get_db)) -> AuthResponse:
-    user = db.query(User).filter(User.email == payload.email.lower()).first()
+    user = db.query(User).filter(func.lower(User.email) == payload.email).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
     now = datetime.utcnow()

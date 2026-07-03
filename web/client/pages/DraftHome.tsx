@@ -1,15 +1,15 @@
 import { type ReactNode, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bot, CalendarClock, ClipboardList, Clock3, ShieldCheck, Trophy, Users } from "lucide-react";
+import { Bot, ClipboardList, Clock3, ShieldCheck, Trophy, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useLeagues } from "@/hooks/use-leagues";
+import { MOCK_ROUNDS } from "@/lib/singlePlayerMockDraft";
 import { cn } from "@/lib/utils";
 
 const LEAGUE_SIZE_OPTIONS = [8, 10, 12];
 const TIMER_OPTIONS = [30, 60, 90];
-const ROUND_OPTIONS = [10, 13, 15];
 
 const formatDraftTime = (value?: string | null) => {
   if (!value) return "Draft not scheduled";
@@ -46,11 +46,10 @@ export default function DraftHome() {
   const { data: leagues = [] } = useLeagues(20, true);
   const [leagueSize, setLeagueSize] = useState(12);
   const [pickTimer, setPickTimer] = useState(30);
-  const [rounds, setRounds] = useState(13);
 
   const mockDraftUrl = useMemo(
-    () => `/draft/mock/single-player?new=1&teams=${leagueSize}&timer=${pickTimer}&rounds=${rounds}`,
-    [leagueSize, pickTimer, rounds]
+    () => `/draft/mock/single-player?new=1&teams=${leagueSize}&timer=${pickTimer}`,
+    [leagueSize, pickTimer]
   );
 
   const realDrafts = leagues.filter(
@@ -134,17 +133,17 @@ export default function DraftHome() {
                 </div>
               </section>
 
-              <section className="rounded-[1.5rem] border border-white/10 bg-slate-950/40 p-5">
-                <div className="mb-4 flex items-center gap-3">
-                  <CalendarClock className="h-4 w-4 text-cyan-200" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-300">Rounds</p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {ROUND_OPTIONS.map((option) => (
-                    <OptionButton key={option} active={rounds === option} onClick={() => setRounds(option)}>
-                      {option} Rounds
-                    </OptionButton>
-                  ))}
+              <section className="rounded-[1.5rem] border border-cyan-200/16 bg-cyan-300/[0.055] p-5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200">Roster-Fill Rounds</p>
+                    <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-slate-300">
+                      Rounds are locked to the roster size: QB, 2 RB, 2 WR, TE, FLEX, K, and 5 bench spots.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-cyan-200/35 bg-slate-950/45 px-5 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-cyan-50">
+                    {MOCK_ROUNDS} Rounds
+                  </div>
                 </div>
               </section>
             </div>
@@ -159,7 +158,7 @@ export default function DraftHome() {
                 Current Mock Rules
               </p>
               <div className="grid gap-3 text-sm font-bold uppercase tracking-[0.14em] text-slate-200/74">
-                <p>{leagueSize} teams • snake order • {rounds} rounds</p>
+                <p>{leagueSize} teams • snake order • {MOCK_ROUNDS} roster-fill rounds</p>
                 <p>{pickTimer}s user pick timer</p>
                 <p>Bot picks advance automatically after about two seconds</p>
                 <p>No real rosters, league status, trades, or standings are touched</p>

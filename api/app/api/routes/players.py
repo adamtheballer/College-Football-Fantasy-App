@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.core.config import settings
@@ -33,8 +33,8 @@ def create_players_endpoint(
 
 @router.get("", response_model=PlayerList)
 def list_players_endpoint(
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     position: str | None = None,
     school: str | None = None,
     search: str | None = None,

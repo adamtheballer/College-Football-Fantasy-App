@@ -31,11 +31,24 @@ export default function Signup() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const passwordPolicyMessage =
+    "Password must be at least 12 characters and include one uppercase letter, one number, and one special character.";
+  const passwordChecks = [
+    { label: "12+ characters", isValid: password.length >= 12 },
+    { label: "One uppercase letter", isValid: /[A-Z]/.test(password) },
+    { label: "One number", isValid: /\d/.test(password) },
+    { label: "One special character", isValid: /[^A-Za-z0-9]/.test(password) },
+  ];
+  const isPasswordStrong = passwordChecks.every((check) => check.isValid);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError(null);
+    if (!isPasswordStrong) {
+      setError(passwordPolicyMessage);
+      return;
+    }
+    setIsLoading(true);
     try {
       const nextUser = await signup(firstName, email, password);
       if (nextUser) {
@@ -199,6 +212,26 @@ export default function Signup() {
                       />
                     </div>
                   </div>
+                </div>
+
+                <div className="grid gap-2 rounded-2xl border border-cyan-200/10 bg-white/[0.06] p-3" aria-live="polite">
+                  {passwordChecks.map((check) => (
+                    <div
+                      key={check.label}
+                      className={`flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.14em] ${
+                        check.isValid ? "text-emerald-100" : "text-slate-300/50"
+                      }`}
+                    >
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          check.isValid
+                            ? "bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,0.7)]"
+                            : "bg-slate-500/60"
+                        }`}
+                      />
+                      {check.label}
+                    </div>
+                  ))}
                 </div>
 
                 {error && (

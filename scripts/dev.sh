@@ -33,7 +33,7 @@ fi
 
 if [ ! -d web/node_modules ]; then
   echo "Installing web dependencies..."
-  npm --prefix web install
+  npm --prefix web ci
 fi
 
 echo "Running migrations..."

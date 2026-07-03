@@ -21,6 +21,8 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     league_member,
     league_settings,
     matchup,
+    mock_draft,
+    mock_draft_pick,
     notification,
     player,
     player_stat,

@@ -33,7 +33,7 @@ dev:
 
 bootstrap: db-up
 	uv sync
-	npm --prefix web install
+	npm --prefix web ci
 	$(MAKE) migrate
 
 test-backend:

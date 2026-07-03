@@ -15,7 +15,7 @@ def create_user(client, suffix: str = "one") -> dict:
         json={
             "first_name": f"Coach{suffix}",
             "email": f"coach-{suffix}@example.com",
-            "password": "secret123",
+            "password": "StrongPass123!",
         },
     )
     assert response.status_code == 201
