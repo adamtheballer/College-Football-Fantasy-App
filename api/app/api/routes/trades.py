@@ -2,12 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.api.deps import get_current_user
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.defense_rating import DefenseRating
 from collegefootballfantasy_api.app.models.defense_vs_position import DefenseVsPosition
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.trade import TradeAnalyzeRequest, TradeAnalyzeResponse
 from collegefootballfantasy_api.app.services.matchup_grades import build_matchup_row
@@ -43,7 +45,20 @@ GRADE_MULTIPLIER = {
 
 
 def _normalize_roster_slots(roster_slots: dict[str, int] | None) -> dict[str, int]:
-    return DEFAULT_ROSTER_SLOTS.copy()
+    normalized = DEFAULT_ROSTER_SLOTS.copy()
+    if not roster_slots:
+        return normalized
+
+    for slot in ("QB", "RB", "WR", "TE", "K", "IR"):
+        value = roster_slots.get(slot)
+        if value is not None:
+            normalized[slot] = max(0, int(value))
+
+    bench_value = roster_slots.get("BE", roster_slots.get("BENCH"))
+    if bench_value is not None:
+        normalized["BE"] = max(0, int(bench_value))
+
+    return normalized
 
 
 def _replacement_index(pos: str, league_size: int, roster_slots: dict[str, int]) -> int:
@@ -147,7 +162,11 @@ def _player_value(
 
 
 @router.post("/analyze", response_model=TradeAnalyzeResponse)
-def analyze_trade(payload: TradeAnalyzeRequest, db: Session = Depends(get_db)) -> TradeAnalyzeResponse:
+def analyze_trade(
+    payload: TradeAnalyzeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TradeAnalyzeResponse:
     if not payload.receive_ids or not payload.give_ids:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="receive_ids and give_ids required")
 

@@ -11,6 +11,8 @@ from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.main import app
 from collegefootballfantasy_api.app.models import (  # noqa: F401
     cfb_standing_snapshot,
+    auth_action_token,
+    auth_rate_limit_event,
     draft,
     draft_pick,
     game,
@@ -20,6 +22,9 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     league_invite,
     league_member,
     league_settings,
+    matchup,
+    mock_draft,
+    mock_draft_pick,
     notification,
     player,
     player_stat,
@@ -30,8 +35,10 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     team_stats_snapshot,
     transaction,
     team,
+    standing,
     user,
     watchlist,
+    weekly_projection,
 )
 
 TEST_DATABASE_URL = "sqlite://"

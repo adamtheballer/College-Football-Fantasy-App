@@ -133,7 +133,7 @@ Complete. Residual cleanup that is not required to keep Story 2 closed is tracke
 - Supporting indexes may be needed for league-scoped reads if aggregation queries become slow.
 
 ### Technical Notes
-- This story depends on the contract hardening work already described in [11_feature_backend_contract_and_access_hardening.md](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/requirements/11_feature_backend_contract_and_access_hardening.md).
+- This story depends on the contract hardening work already described in [11_feature_backend_contract_and_access_hardening.md](requirements/11_feature_backend_contract_and_access_hardening.md).
 - The React query layer should replace page-local `useEffect` fetch patterns where league-scoped caching matters.
 
 ## Story 3: Complete the React League Hub Pages

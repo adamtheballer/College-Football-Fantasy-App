@@ -16,6 +16,7 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
+    "types": ["node", "react", "react-dom", "vite/client"],
 
     /* Linting */
     "strict": false,
@@ -28,16 +29,12 @@
     /* Path mapping */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./client/*"],
-      "@shared/*": ["./shared/*"]
+      "@/*": ["./client/*"]
     }
   },
   "include": [
     "client/**/*",
-    "server/**/*",
-    "shared/**/*",
-    "vite.config.ts",
-    "vite.config.server.ts"
+    "vite.config.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

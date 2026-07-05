@@ -29,14 +29,21 @@ export interface Player {
   school: string;
   pos: string;
   imageUrl?: string;
+  playerClass?: string;
   conf: string;
   rank: number;
+  boardRank?: number | null;
   adp: number;
-  posRank: number;
+  posRank: number | null;
   rostered: number;
   status: "HEALTHY" | "OUT" | "QUESTIONABLE" | "DOUBTFUL" | "IR";
   projection: PlayerStats;
   history: PlayerHistory[];
   analysis: string;
+  sheetAdp?: number;
+  sheetProjectedSeasonPoints?: number;
+  sheetProjectionStats?: Record<string, number | null | undefined>;
+  sheetSourceSheetId?: string;
+  sheetSyncedAt?: string;
   number?: number;
 }

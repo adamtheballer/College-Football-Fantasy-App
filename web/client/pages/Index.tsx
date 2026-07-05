@@ -151,7 +151,7 @@ export default function Index() {
             College Football Fantasy
           </h1>
           <p className="max-w-2xl text-lg text-muted-foreground">
-            Backend-driven league management, roster actions, waivers, injuries, and projections
+            Backend-driven league management, roster actions, available players, injuries, and projections
             built for Power 4 fantasy.
           </p>
           <div className="flex flex-wrap gap-4">

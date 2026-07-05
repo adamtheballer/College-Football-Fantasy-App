@@ -1,10 +1,22 @@
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.models.draft import Draft
+from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.schemas.player import PlayerCreate
+from collegefootballfantasy_api.app.services.player_pool_filters import generated_test_player_filter
+
+
+def _player_board_sort_tuple(player: Player) -> tuple:
+    return (
+        player.sheet_adp is None,
+        float(player.sheet_adp) if player.sheet_adp is not None and player.sheet_adp > 0 else 9_999_999.0,
+        player.name.lower(),
+        player.id,
+    )
 
 
 def create_players(db: Session, players_in: list[PlayerCreate]) -> list[Player]:
@@ -27,22 +39,37 @@ def list_players(
     available_only: bool = False,
     sort: str | None = None,
 ) -> tuple[list[Player], int]:
-    stmt: Select = select(Player)
+    stmt: Select = select(Player).where(generated_test_player_filter())
     if position:
-        stmt = stmt.where(Player.position == position)
+        requested_positions = [value.strip().upper() for value in position.split(",") if value.strip()]
+        if len(requested_positions) == 1:
+            stmt = stmt.where(Player.position == requested_positions[0])
+        elif requested_positions:
+            stmt = stmt.where(Player.position.in_(requested_positions))
     if school:
         stmt = stmt.where(Player.school == school)
     if search:
         pattern = f"%{search}%"
-        stmt = stmt.where(Player.name.ilike(pattern) | Player.school.ilike(pattern))
+        stmt = stmt.where(Player.name.ilike(pattern) | Player.school.ilike(pattern) | Player.position.ilike(pattern))
     if league_id is not None and available_only:
-        unavailable_players = (
+        rostered_players = (
             select(RosterEntry.player_id)
             .join(Team, Team.id == RosterEntry.team_id)
             .where(Team.league_id == league_id)
         )
-        stmt = stmt.where(Player.id.not_in(unavailable_players))
+        draft_picked_players = (
+            select(DraftPick.player_id)
+            .join(Draft, Draft.id == DraftPick.draft_id)
+            .where(Draft.league_id == league_id, Draft.status.in_(("scheduled", "live", "active")))
+        )
+        stmt = stmt.where(Player.id.not_in(rostered_players), Player.id.not_in(draft_picked_players))
 
+    if sort in {"adp", "draft_rank", "rank"}:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = db.scalar(count_stmt)
+        players = db.scalars(stmt).all()
+        players.sort(key=_player_board_sort_tuple)
+        return players[offset : offset + limit], total or 0
     if sort == "school":
         stmt = stmt.order_by(Player.school.asc(), Player.name.asc())
     elif sort == "position":

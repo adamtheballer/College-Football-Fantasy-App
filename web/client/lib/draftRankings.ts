@@ -1,5 +1,6 @@
 import { Player } from "@/types/player";
 import { PlayerStats } from "@/types/player";
+import { findCfb27Rating, getCfb27PositionPercentile } from "@/lib/cfb27Ratings";
 
 export type DraftRosterSlots = {
   QB: number;
@@ -18,12 +19,17 @@ export type DraftConfig = {
 
 export type DraftPlayer = Player & {
   draftRank: number;
+  masterDraftRank: number;
+  sourceBoardRank: number | null;
   adpRank: number;
   adpEstimate: number;
   projectedPoints: number;
   tier: number;
   tprScore: number;
   marScore: number;
+  finalDraftScore: number;
+  cfb27Overall: number | null;
+  cfb27TalentScore: number;
 };
 
 const POWER4_CONFS = new Set(["SEC", "Big Ten", "Big 12", "ACC"]);
@@ -73,6 +79,19 @@ const normalCdf = (x: number, meanValue: number, sd: number) => {
   return 0.5 * (1 + erf(z));
 };
 
+const percentileFromValue = (value: number, values: number[]) => {
+  if (!values.length) return 0.5;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  if (max === min) return 0.5;
+  return clamp((value - min) / (max - min), 0, 1);
+};
+
+const percentileFromRank = (rank: number | null | undefined, total: number) => {
+  if (!rank || !Number.isFinite(rank) || rank <= 0 || total <= 1) return 0.5;
+  return clamp(1 - (rank - 1) / (total - 1), 0, 1);
+};
+
 const varianceByPos: Record<string, number> = {
   QB: 0.24,
   RB: 0.30,
@@ -82,6 +101,14 @@ const varianceByPos: Record<string, number> = {
 };
 
 const espnFantasyPoints = (player: Player) => {
+  if (
+    typeof player.sheetProjectedSeasonPoints === "number" &&
+    Number.isFinite(player.sheetProjectedSeasonPoints) &&
+    player.sheetProjectedSeasonPoints > 0
+  ) {
+    return player.sheetProjectedSeasonPoints;
+  }
+
   const proj: Partial<PlayerStats> = player.projection || {};
   const passYds = proj.passingYards ?? 0;
   const passTds = proj.passingTds ?? 0;
@@ -91,9 +118,13 @@ const espnFantasyPoints = (player: Player) => {
   const recs = proj.receptions ?? 0;
   const recYds = proj.receivingYards ?? 0;
   const recTds = proj.receivingTds ?? 0;
+  const projectedFantasyPoints =
+    typeof proj.fpts === "number" && Number.isFinite(proj.fpts) && proj.fpts > 0
+      ? proj.fpts
+      : null;
 
-  if (player.pos === "K") {
-    return proj.fpts ?? 0;
+  if (projectedFantasyPoints !== null) {
+    return projectedFantasyPoints;
   }
 
   return (
@@ -141,12 +172,54 @@ const BENCH_DISTRIBUTION: Record<string, number> = {
 };
 
 const positionMultiplier: Record<string, number> = {
-  QB: 0.92,
+  QB: 0.89,
   RB: 1.05,
-  WR: 1.03,
-  TE: 1.02,
+  WR: 1.08,
+  TE: 0.92,
   K: 0.65,
 };
+
+const PROJECTION_ORDERED_POSITIONS = new Set(["RB", "WR", "TE", "K"]);
+const POSITION_BOARD_SLOT_ADJUSTMENT: Record<string, number> = {
+  QB: 4,
+  WR: -3,
+  TE: 24,
+};
+const QB_BACKUP_MIN_PROJECTION = 60;
+const QB_BACKUP_REPLACEMENT_RATE = 0.4;
+const QB_STARTER_PROJECTION_FLOOR = 180;
+const QB_SOURCE_RANK_OUTLIER_GAP = 24;
+const QB_PROJECTION_RANK_BUFFER = 12;
+
+const getProvidedBoardRank = (player: Player) => {
+  const candidates = [player.boardRank, player.adp, player.rank];
+  const value = candidates.find(
+    (candidate): candidate is number =>
+      typeof candidate === "number" && Number.isFinite(candidate) && candidate > 0
+  );
+  return value ? Math.round(value) : null;
+};
+
+const normalizeDraftIdentityText = (value: string | null | undefined) =>
+  (value ?? "")
+    .normalize("NFKD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+export const getDraftPlayerIdentityKey = (player: {
+  name?: string | null;
+  playerName?: string | null;
+  school?: string | null;
+  pos?: string | null;
+  position?: string | null;
+}) =>
+  [
+    normalizeDraftIdentityText(player.name ?? player.playerName),
+    normalizeDraftIdentityText(player.school),
+    normalizeDraftIdentityText(player.pos ?? player.position),
+  ].join("|");
 
 const computeReplacementIndex = (
   pos: string,
@@ -161,6 +234,67 @@ const computeReplacementIndex = (
   return Math.max(1, Math.round(starters + benchShare));
 };
 
+const isLowProjectionQb = (
+  entry: { player: Player; projectedPoints: number },
+  qbReplacementPoints: number
+) =>
+  entry.player.pos === "QB" &&
+  entry.projectedPoints <
+    Math.max(QB_BACKUP_MIN_PROJECTION, qbReplacementPoints * QB_BACKUP_REPLACEMENT_RATE);
+
+const getProjectionAwareProvidedRank = (
+  entry: { player: Player; projectedPoints: number },
+  computedRank: number,
+  qbReplacementPoints: number
+) => {
+  const providedRank = getProvidedBoardRank(entry.player);
+  if (providedRank === null) return null;
+  if (entry.player.pos !== "QB") return providedRank;
+  if (isLowProjectionQb(entry, qbReplacementPoints)) return providedRank;
+
+  const starterProjectionCutoff = Math.max(
+    QB_STARTER_PROJECTION_FLOOR,
+    qbReplacementPoints * 0.85
+  );
+  const sourceIsClearlyStale =
+    providedRank - computedRank >= QB_SOURCE_RANK_OUTLIER_GAP &&
+    entry.projectedPoints >= starterProjectionCutoff;
+
+  if (!sourceIsClearlyStale) return providedRank;
+  return Math.min(providedRank, computedRank + QB_PROJECTION_RANK_BUFFER);
+};
+
+const enforceQuarterbackProjectionOrder = <T extends { player: Player; projectedPoints: number }>(
+  board: T[]
+) => {
+  const quarterbackIndexes = board
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => entry.player.pos === "QB")
+    .map(({ index }) => index);
+
+  if (quarterbackIndexes.length <= 1) return board;
+
+  const sortedQuarterbacks = quarterbackIndexes
+    .map((index) => board[index])
+    .sort((left, right) => {
+      if (left.projectedPoints !== right.projectedPoints) {
+        return right.projectedPoints - left.projectedPoints;
+      }
+      const leftSourceRank = getProvidedBoardRank(left.player) ?? Number.POSITIVE_INFINITY;
+      const rightSourceRank = getProvidedBoardRank(right.player) ?? Number.POSITIVE_INFINITY;
+      if (leftSourceRank !== rightSourceRank) {
+        return leftSourceRank - rightSourceRank;
+      }
+      return left.player.name.localeCompare(right.player.name);
+    });
+
+  const reordered = [...board];
+  quarterbackIndexes.forEach((index, qbIndex) => {
+    reordered[index] = sortedQuarterbacks[qbIndex];
+  });
+  return reordered;
+};
+
 export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPlayer[] => {
   const eligible = players
     .filter((p) => POWER4_CONFS.has(p.conf))
@@ -171,15 +305,42 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
   const projectedPointsAll: number[] = [];
   const scarcityAll: number[] = [];
 
-  const withPoints = eligible.map((player) => {
+  const rawWithPoints = eligible.map((player) => {
     const projectedPoints = espnFantasyPoints(player);
     const historyPoints = historyFantasyPoints(player);
+    return { player, projectedPoints, historyPoints };
+  });
+
+  const bestByIdentity = new Map<
+    string,
+    { player: Player; projectedPoints: number; historyPoints: number; originalIndex: number }
+  >();
+  rawWithPoints.forEach((entry, originalIndex) => {
+    const identityKey = getDraftPlayerIdentityKey(entry.player);
+    const existing = bestByIdentity.get(identityKey);
+    const entryRank = getProvidedBoardRank(entry.player) ?? Number.POSITIVE_INFINITY;
+    const existingRank = existing
+      ? getProvidedBoardRank(existing.player) ?? Number.POSITIVE_INFINITY
+      : Number.POSITIVE_INFINITY;
+    if (
+      !existing ||
+      entry.projectedPoints > existing.projectedPoints ||
+      (entry.projectedPoints === existing.projectedPoints && entryRank < existingRank)
+    ) {
+      bestByIdentity.set(identityKey, { ...entry, originalIndex });
+    }
+  });
+
+  const withPoints = [...bestByIdentity.values()]
+    .sort((left, right) => left.originalIndex - right.originalIndex)
+    .map(({ originalIndex: _originalIndex, ...entry }) => entry);
+
+  withPoints.forEach(({ player, projectedPoints, historyPoints }) => {
     projectedPointsAll.push(projectedPoints);
     projectedPointsByPos[player.pos] = projectedPointsByPos[player.pos] || [];
     projectedPointsByPos[player.pos].push(projectedPoints);
     historyPointsByPos[player.pos] = historyPointsByPos[player.pos] || [];
     historyPointsByPos[player.pos].push(historyPoints);
-    return { player, projectedPoints, historyPoints };
   });
 
   const replacementByPos: Record<string, number> = {};
@@ -220,6 +381,12 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
 
     const injuryPenalty = player.status && player.status !== "HEALTHY" ? 0.05 : 0.0;
     const committeePenalty = ["RB", "WR", "TE"].includes(player.pos) ? (1 - roleCertainty) * 0.05 : 0.0;
+    const cfb27Rating = findCfb27Rating({
+      name: player.name,
+      school: player.school,
+      pos: player.pos,
+    });
+    const cfb27TalentScore = getCfb27PositionPercentile(cfb27Rating);
 
     return {
       player,
@@ -231,6 +398,8 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
       consistency,
       injuryPenalty,
       committeePenalty,
+      cfb27Rating,
+      cfb27TalentScore,
     };
   });
 
@@ -266,7 +435,7 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
     };
   });
 
-  const tprSorted = [...marScores].sort((a, b) => b.tprScore - a.tprScore);
+  const computedSorted = [...marScores].sort((a, b) => b.tprScore - a.tprScore);
   const marSorted = [...marScores].sort((a, b) => b.marScore - a.marScore);
 
   const adpRankById = new Map<number, number>();
@@ -274,19 +443,136 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
     adpRankById.set(entry.player.id, idx + 1);
   });
 
-  const withRanks = tprSorted.map((entry, idx) => {
-    const adpRank = adpRankById.get(entry.player.id) || idx + 1;
-    const projectedPoints = entry.projectedPoints;
-    const adpEstimate = entry.player.adp && entry.player.adp > 0 ? entry.player.adp : adpRank;
+  const computedRankById = new Map<number, number>();
+  computedSorted.forEach((entry, index) => {
+    computedRankById.set(entry.player.id, index + 1);
+  });
+
+  const maxProvidedRank = Math.max(
+    0,
+    ...marScores.map((entry) => getProvidedBoardRank(entry.player) ?? 0)
+  );
+
+  const qbReplacementPoints = replacementByPos.QB ?? 0;
+
+  const scoredBoard = marScores.map((entry) => {
+    const computedRank = computedRankById.get(entry.player.id) ?? marScores.length;
+    const providedRank = getProjectionAwareProvidedRank(entry, computedRank, qbReplacementPoints);
+    const fantasyProjectionScore =
+      0.65 * percentileFromValue(entry.scarcity, scarcityAll) +
+      0.35 * percentileFromValue(entry.projectedPoints, projectedPointsAll);
+    const marketRankScore =
+      0.60 * percentileFromRank(computedRank, marScores.length) +
+      0.40 * percentileFromRank(providedRank ?? getProvidedBoardRank(entry.player), marScores.length);
+    const riskPenalty = entry.injuryPenalty + entry.committeePenalty;
+    const finalDraftScore =
+      0.60 * fantasyProjectionScore +
+      0.20 * marketRankScore +
+      0.12 * entry.cfb27TalentScore +
+      0.08 * entry.roleCertainty -
+      riskPenalty;
+
     return {
       ...entry,
-      draftRank: idx + 1,
+      finalDraftScore,
+    };
+  });
+
+  const providedBoardSorted = [...scoredBoard].sort((left, right) => {
+    const leftLowProjectionQb = isLowProjectionQb(left, qbReplacementPoints);
+    const rightLowProjectionQb = isLowProjectionQb(right, qbReplacementPoints);
+    if (leftLowProjectionQb !== rightLowProjectionQb) {
+      return leftLowProjectionQb ? 1 : -1;
+    }
+    if (leftLowProjectionQb && rightLowProjectionQb) {
+      if (left.projectedPoints !== right.projectedPoints) {
+        return right.projectedPoints - left.projectedPoints;
+      }
+    }
+
+    if (left.finalDraftScore !== right.finalDraftScore) {
+      return right.finalDraftScore - left.finalDraftScore;
+    }
+
+    const leftComputedRank = computedRankById.get(left.player.id) ?? Number.POSITIVE_INFINITY;
+    const rightComputedRank = computedRankById.get(right.player.id) ?? Number.POSITIVE_INFINITY;
+    return leftComputedRank - rightComputedRank;
+  });
+
+  const prePenaltyRanks = providedBoardSorted.map((entry, idx) => {
+    const providedRank = getProvidedBoardRank(entry.player);
+    const computedRank = computedRankById.get(entry.player.id) ?? idx + 1;
+    const projectionAwareRank = getProjectionAwareProvidedRank(
+      entry,
+      computedRank,
+      qbReplacementPoints
+    );
+    const adpRank = adpRankById.get(entry.player.id) || idx + 1;
+    const projectedPoints = entry.projectedPoints;
+    const adpEstimate = providedRank ?? adpRank;
+    return {
+      ...entry,
+      sourceBoardRank: providedRank,
+      prePenaltyRank: projectionAwareRank ?? maxProvidedRank + computedRank,
       adpRank,
       adpEstimate,
       projectedPoints,
       tier: 1,
     };
   });
+
+  const lowProjectionQbRanks = prePenaltyRanks
+    .filter((entry) => isLowProjectionQb(entry, qbReplacementPoints))
+    .sort((left, right) => {
+      if (left.projectedPoints !== right.projectedPoints) {
+        return right.projectedPoints - left.projectedPoints;
+      }
+      return (left.sourceBoardRank ?? Number.POSITIVE_INFINITY) - (right.sourceBoardRank ?? Number.POSITIVE_INFINITY);
+    });
+  const draftablePrePenaltyRanks = prePenaltyRanks.filter(
+    (entry) => !isLowProjectionQb(entry, qbReplacementPoints)
+  );
+
+  const positionAdjustedRanks = draftablePrePenaltyRanks
+    .map((entry, index) => ({
+      entry,
+      originalIndex: index + 1,
+      adjustedIndex: index + 1 + (POSITION_BOARD_SLOT_ADJUSTMENT[entry.player.pos] ?? 0),
+    }))
+    .sort((left, right) => {
+      if (left.adjustedIndex !== right.adjustedIndex) {
+        return left.adjustedIndex - right.adjustedIndex;
+      }
+      return left.originalIndex - right.originalIndex;
+    })
+    .map(({ entry }) => entry);
+
+  const projectionOrderedBoard = enforceQuarterbackProjectionOrder([
+    ...positionAdjustedRanks,
+    ...lowProjectionQbRanks,
+  ]);
+
+  const withRanks = projectionOrderedBoard.map((entry, index) => ({
+    ...entry,
+    draftRank: index + 1,
+    masterDraftRank: index + 1,
+  }));
+
+  const adjustedProjectionById = new Map<number, number>();
+  for (const position of PROJECTION_ORDERED_POSITIONS) {
+    let previousProjection = Number.POSITIVE_INFINITY;
+    withRanks
+      .filter((entry) => entry.player.pos === position)
+      .sort((left, right) => left.draftRank - right.draftRank)
+      .forEach((entry) => {
+        const adjustedProjection =
+          entry.projectedPoints >= previousProjection
+            ? Math.max(0, previousProjection - 0.1)
+            : entry.projectedPoints;
+        adjustedProjectionById.set(entry.player.id, Number(adjustedProjection.toFixed(1)));
+        previousProjection = adjustedProjection;
+      });
+  }
 
   let currentTier = 1;
   let tierStartIndex = 0;
@@ -306,19 +592,20 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
   });
 
   return withRanks.map((entry) => {
-    const perGame = entry.projectedPoints / SEASON_GAMES;
+    const projectedPoints = adjustedProjectionById.get(entry.player.id) ?? entry.projectedPoints;
+    const perGame = projectedPoints / SEASON_GAMES;
     const baseVar = varianceByPos[entry.player.pos] ?? 0.26;
     const rolePenalty = 1 + (1 - entry.roleCertainty) * 0.8;
     const sdPerGame = Math.max(3, perGame * baseVar * rolePenalty);
     const seasonSd = sdPerGame * Math.sqrt(SEASON_GAMES);
-    const floor = Math.max(0, entry.projectedPoints - seasonSd);
-    const ceiling = entry.projectedPoints + seasonSd;
-    const boomProb = 1 - normalCdf(entry.projectedPoints + seasonSd * 0.75, entry.projectedPoints, seasonSd);
-    const bustProb = normalCdf(entry.projectedPoints - seasonSd * 0.75, entry.projectedPoints, seasonSd);
+    const floor = Math.max(0, projectedPoints - seasonSd);
+    const ceiling = projectedPoints + seasonSd;
+    const boomProb = 1 - normalCdf(projectedPoints + seasonSd * 0.75, projectedPoints, seasonSd);
+    const bustProb = normalCdf(projectedPoints - seasonSd * 0.75, projectedPoints, seasonSd);
 
     const updatedProjection = {
       ...entry.player.projection,
-      fpts: Number(entry.projectedPoints.toFixed(1)),
+      fpts: Number(projectedPoints.toFixed(1)),
       floor: Number((floor / SEASON_GAMES).toFixed(1)),
       ceiling: Number((ceiling / SEASON_GAMES).toFixed(1)),
       boomProb: Number(clamp(boomProb, 0.05, 0.65).toFixed(2)),
@@ -328,12 +615,17 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
       ...entry.player,
       projection: updatedProjection,
       draftRank: entry.draftRank,
+      masterDraftRank: entry.masterDraftRank,
+      sourceBoardRank: entry.sourceBoardRank,
       adpRank: entry.adpRank,
       adpEstimate: entry.adpEstimate,
-      projectedPoints: Number(entry.projectedPoints.toFixed(1)),
+      projectedPoints: Number(projectedPoints.toFixed(1)),
       tier: entry.tier,
       tprScore: entry.tprScore,
       marScore: entry.marScore,
+      finalDraftScore: Number(entry.finalDraftScore.toFixed(4)),
+      cfb27Overall: entry.cfb27Rating?.ovr ?? null,
+      cfb27TalentScore: Number(entry.cfb27TalentScore.toFixed(4)),
     };
   });
 };

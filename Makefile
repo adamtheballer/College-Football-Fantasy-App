@@ -23,7 +23,7 @@ migrate:
 	uv run alembic -c api/alembic.ini upgrade head
 
 api:
-	uv run uvicorn api.app.main:app --host 0.0.0.0 --port 8000
+	PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port 8000
 
 web:
 	npm --prefix web run dev -- --host 0.0.0.0
@@ -33,7 +33,7 @@ dev:
 
 bootstrap: db-up
 	uv sync
-	npm --prefix web install
+	npm --prefix web ci
 	$(MAKE) migrate
 
 test-backend:

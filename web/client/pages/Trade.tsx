@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRightLeft, ChevronRight, ShieldAlert, Users } from "lucide-react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft, ArrowRightLeft, ChevronRight, Search, ShieldAlert, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,14 +12,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
+import { useAuth } from "@/hooks/use-auth";
 import {
   useLeagueDetail,
   useLeagues,
+  useLeagueSettingsTab,
   useLeagueWorkspace,
 } from "@/hooks/use-leagues";
 import { useLeagueTeams, useTeamRoster } from "@/hooks/use-teams";
 import { apiPost } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import type { LeagueRosterPlayer } from "@/types/league";
 import type { RosterEntry } from "@/types/roster";
 import type { Team } from "@/types/team";
 
@@ -44,10 +47,13 @@ type TradeAnalyzeResult = {
 type TradeRow = {
   rosterEntryId: number;
   playerId: number;
+  teamId: number;
+  teamName?: string | null;
   name: string;
   position: string;
   school: string;
   slot: string;
+  projectedPoints?: number;
 };
 
 const POS_STYLES: Record<string, string> = {
@@ -65,6 +71,7 @@ const toTradeRows = (entries: RosterEntry[] | undefined): TradeRow[] => {
     .map((entry) => ({
       rosterEntryId: entry.id,
       playerId: entry.player.id,
+      teamId: entry.team_id,
       name: entry.player.name,
       position: entry.player.position.toUpperCase(),
       school: entry.player.school,
@@ -76,6 +83,50 @@ const toTradeRows = (entries: RosterEntry[] | undefined): TradeRow[] => {
       if (starterA !== starterB) return starterA - starterB;
       return a.name.localeCompare(b.name);
     });
+};
+
+const toTradeRowsFromLeagueRoster = (entries: LeagueRosterPlayer[] | undefined): TradeRow[] => {
+  if (!entries?.length) return [];
+  return entries
+    .filter((entry) => {
+      const position = (entry.player_position ?? entry.position ?? "").toUpperCase();
+      return OFFENSE_POSITIONS.has(position);
+    })
+    .map((entry) => ({
+      rosterEntryId: entry.id,
+      playerId: entry.player_id,
+      teamId: entry.fantasy_team_id ?? entry.team_id ?? 0,
+      teamName: entry.fantasy_team_name,
+      name: entry.player_name,
+      position: (entry.player_position ?? entry.position ?? "").toUpperCase(),
+      school: entry.player_school ?? entry.school ?? "",
+      slot: (entry.roster_slot ?? entry.slot ?? "BENCH").toUpperCase(),
+      projectedPoints: entry.projected_points ?? entry.weekly_projected_fantasy_points ?? 0,
+    }))
+    .filter((entry) => entry.teamId > 0)
+    .sort((a, b) => {
+      const starterA = a.slot !== "BENCH" ? 0 : 1;
+      const starterB = b.slot !== "BENCH" ? 0 : 1;
+      if (starterA !== starterB) return starterA - starterB;
+      return a.name.localeCompare(b.name);
+    });
+};
+
+const mergeProjectedValues = (rows: TradeRow[], fallbackRows: TradeRow[]): TradeRow[] => {
+  if (!rows.length || !fallbackRows.length) return rows;
+  const fallbackByTeamPlayer = new Map(
+    fallbackRows.map((row) => [`${row.teamId}:${row.playerId}`, row])
+  );
+  return rows.map((row) => {
+    const fallback = fallbackByTeamPlayer.get(`${row.teamId}:${row.playerId}`);
+    return fallback
+      ? {
+          ...row,
+          teamName: row.teamName ?? fallback.teamName,
+          projectedPoints: row.projectedPoints ?? fallback.projectedPoints,
+        }
+      : row;
+  });
 };
 
 const toTradeRosterSlots = (slots: Record<string, number> | undefined): Record<string, number> => {
@@ -179,7 +230,9 @@ const TradeList = ({
 
 export default function Trade() {
   const { leagueId: leagueIdParam, playerId: playerIdParam } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: leagues = [] } = useLeagues(50, true);
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
 
@@ -191,20 +244,41 @@ export default function Trade() {
   const { data: league } = useLeagueDetail(leagueId, Boolean(leagueId));
   const { data: workspace } = useLeagueWorkspace(leagueId, Boolean(leagueId));
   const { data: teamsPayload } = useLeagueTeams(leagueId, Boolean(leagueId));
+  const { data: settingsView } = useLeagueSettingsTab(leagueId, Boolean(leagueId));
 
   const teams = teamsPayload?.data ?? [];
-  const ownedTeamId = workspace?.owned_team?.id ?? null;
+  const ownedTeamId =
+    workspace?.owned_team?.id ??
+    teams.find((team) => team.owner_user_id && team.owner_user_id === user?.id)?.id ??
+    null;
   const opponentTeams = useMemo(
     () => teams.filter((team) => team.id !== ownedTeamId),
     [ownedTeamId, teams]
   );
+  const allLeagueRosterRows = useMemo(
+    () => toTradeRowsFromLeagueRoster(settingsView?.rosters),
+    [settingsView?.rosters]
+  );
+  const fallbackRowsByTeam = useMemo(() => {
+    const rowsByTeam = new Map<number, TradeRow[]>();
+    allLeagueRosterRows.forEach((row) => {
+      rowsByTeam.set(row.teamId, [...(rowsByTeam.get(row.teamId) ?? []), row]);
+    });
+    return rowsByTeam;
+  }, [allLeagueRosterRows]);
 
   const [opponentTeamId, setOpponentTeamId] = useState<number | null>(null);
   const [giveIds, setGiveIds] = useState<number[]>([]);
   const [receiveIds, setReceiveIds] = useState<number[]>([]);
+  const [playerSearch, setPlayerSearch] = useState("");
   const [analysis, setAnalysis] = useState<TradeAnalyzeResult | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const targetTeamIdParam = searchParams.get("teamId");
+  const targetTeamId =
+    targetTeamIdParam && /^\d+$/.test(targetTeamIdParam)
+      ? Number(targetTeamIdParam)
+      : null;
 
   useEffect(() => {
     if (!leagueId) return;
@@ -224,6 +298,12 @@ export default function Trade() {
     });
   }, [opponentTeams]);
 
+  useEffect(() => {
+    if (!targetTeamId || targetTeamId === ownedTeamId) return;
+    if (!opponentTeams.some((team) => team.id === targetTeamId)) return;
+    setOpponentTeamId(targetTeamId);
+  }, [opponentTeams, ownedTeamId, targetTeamId]);
+
   const {
     data: myRosterPayload,
     isLoading: myRosterLoading,
@@ -237,20 +317,70 @@ export default function Trade() {
   } = useTeamRoster(opponentTeamId ?? undefined, Boolean(opponentTeamId));
 
   const myRows = useMemo(() => toTradeRows(myRosterPayload?.data), [myRosterPayload?.data]);
-  const theirRows = useMemo(() => toTradeRows(theirRosterPayload?.data), [theirRosterPayload?.data]);
+  const theirRows = useMemo(() => {
+    const directRows = toTradeRows(theirRosterPayload?.data);
+    const fallbackRows = fallbackRowsByTeam.get(opponentTeamId ?? -1) ?? [];
+    return directRows.length ? mergeProjectedValues(directRows, fallbackRows) : fallbackRows;
+  }, [fallbackRowsByTeam, opponentTeamId, theirRosterPayload?.data]);
+  const resolvedMyRows = useMemo(() => {
+    const fallbackRows = fallbackRowsByTeam.get(ownedTeamId ?? -1) ?? [];
+    if (myRows.length) return mergeProjectedValues(myRows, fallbackRows);
+    return fallbackRows;
+  }, [fallbackRowsByTeam, myRows, ownedTeamId]);
   const giveSet = useMemo(() => new Set(giveIds), [giveIds]);
   const receiveSet = useMemo(() => new Set(receiveIds), [receiveIds]);
+  const selectedGiveRows = useMemo(
+    () => resolvedMyRows.filter((row) => giveSet.has(row.playerId)),
+    [giveSet, resolvedMyRows]
+  );
+  const selectedReceiveRows = useMemo(
+    () => theirRows.filter((row) => receiveSet.has(row.playerId)),
+    [receiveSet, theirRows]
+  );
+  const liveGiveValue = useMemo(
+    () => selectedGiveRows.reduce((sum, row) => sum + (row.projectedPoints ?? 0), 0),
+    [selectedGiveRows]
+  );
+  const liveReceiveValue = useMemo(
+    () => selectedReceiveRows.reduce((sum, row) => sum + (row.projectedPoints ?? 0), 0),
+    [selectedReceiveRows]
+  );
+  const liveDelta = liveReceiveValue - liveGiveValue;
+  const partnerPlayerResults = useMemo(() => {
+    const query = playerSearch.trim().toLowerCase();
+    if (query.length < 2) return [];
+    return allLeagueRosterRows
+      .filter((row) => row.teamId !== ownedTeamId)
+      .filter((row) =>
+        [row.name, row.school, row.position, row.teamName ?? ""].some((value) =>
+          value.toLowerCase().includes(query)
+        )
+      )
+      .slice(0, 8);
+  }, [allLeagueRosterRows, ownedTeamId, playerSearch]);
 
   useEffect(() => {
     const parsedPlayerId =
       playerIdParam && /^\d+$/.test(playerIdParam) ? Number(playerIdParam) : null;
-    if (!parsedPlayerId || !theirRows.length) return;
+    if (!parsedPlayerId) return;
+    if (targetTeamId && targetTeamId === ownedTeamId && resolvedMyRows.some((row) => row.playerId === parsedPlayerId)) {
+      setGiveIds((current) =>
+        current.includes(parsedPlayerId) ? current : [...current, parsedPlayerId]
+      );
+      return;
+    }
     if (theirRows.some((row) => row.playerId === parsedPlayerId)) {
       setReceiveIds((current) =>
         current.includes(parsedPlayerId) ? current : [...current, parsedPlayerId]
       );
+      return;
     }
-  }, [playerIdParam, theirRows]);
+    if (resolvedMyRows.some((row) => row.playerId === parsedPlayerId)) {
+      setGiveIds((current) =>
+        current.includes(parsedPlayerId) ? current : [...current, parsedPlayerId]
+      );
+    }
+  }, [resolvedMyRows, ownedTeamId, playerIdParam, targetTeamId, theirRows]);
 
   useEffect(() => {
     setAnalysis(null);
@@ -259,6 +389,18 @@ export default function Trade() {
 
   const opponentTeam = teams.find((team) => team.id === opponentTeamId) ?? null;
   const ownedTeam = teams.find((team) => team.id === ownedTeamId) ?? null;
+
+  const selectOpponentTeam = (teamId: number) => {
+    setOpponentTeamId(teamId);
+    setReceiveIds([]);
+    setPlayerSearch("");
+  };
+
+  const selectTradeTargetPlayer = (row: TradeRow) => {
+    setOpponentTeamId(row.teamId);
+    setReceiveIds((current) => (current.includes(row.playerId) ? current : [...current, row.playerId]));
+    setPlayerSearch("");
+  };
 
   const toggleGive = (playerId: number) => {
     setGiveIds((current) =>
@@ -354,7 +496,7 @@ export default function Trade() {
               Your Team
             </p>
             <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-black uppercase tracking-[0.14em] text-foreground">
-              {ownedTeam?.name ?? "Loading team..."}
+              {ownedTeam?.name ?? (ownedTeamId ? "Your Team" : "No team found for this league")}
             </div>
           </div>
           <div className="space-y-2">
@@ -363,7 +505,7 @@ export default function Trade() {
             </p>
             <Select
               value={opponentTeamId ? String(opponentTeamId) : ""}
-              onValueChange={(value) => setOpponentTeamId(Number(value))}
+              onValueChange={(value) => selectOpponentTeam(Number(value))}
             >
               <SelectTrigger className="h-12 rounded-xl border-white/10 bg-white/[0.03] text-[10px] font-black uppercase tracking-[0.16em]">
                 <SelectValue placeholder="Select team" />
@@ -377,6 +519,47 @@ export default function Trade() {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-2 md:col-span-2">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+              Trade for specific player
+            </p>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-sky-200/50" />
+              <input
+                value={playerSearch}
+                onChange={(event) => setPlayerSearch(event.target.value)}
+                placeholder="Search league rosters by player, school, position, or manager..."
+                className="h-12 w-full rounded-xl border border-white/10 bg-white/[0.03] pl-11 pr-4 text-sm font-bold text-foreground outline-none transition focus:border-sky-300/50 focus:ring-2 focus:ring-sky-300/15"
+              />
+              {partnerPlayerResults.length > 0 ? (
+                <div className="absolute z-20 mt-2 max-h-80 w-full overflow-auto rounded-2xl border border-sky-300/20 bg-[#071120]/95 p-2 shadow-[0_22px_80px_rgba(56,189,248,0.18)] backdrop-blur-xl">
+                  {partnerPlayerResults.map((row) => (
+                    <button
+                      key={`${row.teamId}-${row.rosterEntryId}`}
+                      type="button"
+                      onClick={() => selectTradeTargetPlayer(row)}
+                      className="flex w-full items-center justify-between gap-4 rounded-xl px-3 py-3 text-left transition hover:bg-sky-300/10"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black text-foreground">{row.name}</p>
+                        <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                          {row.school} • {row.teamName ?? teams.find((team) => team.id === row.teamId)?.name ?? "Manager"}
+                        </p>
+                      </div>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-xl border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]",
+                          POS_STYLES[row.position] ?? POS_STYLES.QB
+                        )}
+                      >
+                        {row.position}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -384,7 +567,7 @@ export default function Trade() {
         <TradeList
           title="Players You Give"
           subtitle={myRosterLoading ? "Loading roster..." : "Select one or more players"}
-          rows={myRows}
+          rows={resolvedMyRows}
           selectedIds={giveSet}
           onToggle={toggleGive}
         />
@@ -427,20 +610,39 @@ export default function Trade() {
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
                 Giving
               </p>
-              <p className="mt-2 text-2xl font-black italic text-foreground">{giveIds.length}</p>
+              <p className="mt-2 text-2xl font-black italic text-foreground">
+                {liveGiveValue.toFixed(1)}
+              </p>
+              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                {giveIds.length} selected
+              </p>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
                 Receiving
               </p>
-              <p className="mt-2 text-2xl font-black italic text-foreground">{receiveIds.length}</p>
+              <p className="mt-2 text-2xl font-black italic text-foreground">
+                {liveReceiveValue.toFixed(1)}
+              </p>
+              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                {receiveIds.length} selected
+              </p>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                League Size
+                Live Delta
               </p>
-              <p className="mt-2 text-2xl font-black italic text-foreground">
-                {league?.max_teams ?? "-"}
+              <p
+                className={cn(
+                  "mt-2 text-2xl font-black italic",
+                  liveDelta > 0 ? "text-emerald-300" : liveDelta < 0 ? "text-red-300" : "text-foreground"
+                )}
+              >
+                {liveDelta >= 0 ? "+" : ""}
+                {liveDelta.toFixed(1)}
+              </p>
+              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                Projection-based
               </p>
             </div>
           </div>
@@ -495,6 +697,17 @@ export default function Trade() {
               </p>
             </div>
           )}
+          <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs font-bold text-muted-foreground">
+              Preview only. Sending requires the backend proposal workflow.
+            </p>
+            <Button
+              className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
+              disabled
+            >
+              Preview Only
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

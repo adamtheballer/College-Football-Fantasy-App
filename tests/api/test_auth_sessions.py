@@ -1,6 +1,18 @@
 from collegefootballfantasy_api.app.core.config import settings
-from collegefootballfantasy_api.app.core.security import create_access_token
+from collegefootballfantasy_api.app.core.security import (
+    PASSWORD_HASH_ALGORITHM,
+    create_access_token,
+    generate_token,
+    hash_password,
+    needs_password_rehash,
+    verify_password,
+)
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
+from collegefootballfantasy_api.app.models.user import User
+
+
+STRONG_PASSWORD = "StrongPass123!"
+LEGACY_PASSWORD = "secret123"
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -13,7 +25,7 @@ def signup_user(client, suffix: str = "one") -> dict:
         json={
             "first_name": f"Coach{suffix}",
             "email": f"coach-{suffix}@example.com",
-            "password": "secret123",
+            "password": STRONG_PASSWORD,
         },
     )
     assert response.status_code == 201
@@ -27,6 +39,212 @@ def test_signup_returns_access_token_and_refresh_cookie(client):
     assert payload["access_token_expires_at"]
     assert payload["user"]["email"] == "coach-signup@example.com"
     assert settings.refresh_cookie_name in client.cookies
+
+
+def test_signup_normalizes_and_returns_username(client):
+    response = client.post(
+        "/auth/signup",
+        json={
+            "first_name": "Coach",
+            "email": "username@example.com",
+            "username": " Saturday Coach! ",
+            "password": STRONG_PASSWORD,
+        },
+    )
+    assert response.status_code == 201
+    assert response.json()["user"]["username"] == "saturday-coach"
+
+
+def test_signup_rejects_duplicate_username(client):
+    first = client.post(
+        "/auth/signup",
+        json={
+            "first_name": "Coach",
+            "email": "username-one@example.com",
+            "username": "Same Name",
+            "password": STRONG_PASSWORD,
+        },
+    )
+    assert first.status_code == 201
+
+    duplicate = client.post(
+        "/auth/signup",
+        json={
+            "first_name": "Coach",
+            "email": "username-two@example.com",
+            "username": "same-name",
+            "password": STRONG_PASSWORD,
+        },
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"] == "username already registered"
+
+
+def test_signup_rejects_password_under_12_chars(client):
+    response = client.post(
+        "/auth/signup",
+        json={"first_name": "Coach", "email": "short@example.com", "password": "Short1!"},
+    )
+    assert response.status_code == 422
+
+
+def test_signup_rejects_password_missing_uppercase(client):
+    response = client.post(
+        "/auth/signup",
+        json={"first_name": "Coach", "email": "upper@example.com", "password": "lowercase123!"},
+    )
+    assert response.status_code == 422
+
+
+def test_signup_rejects_password_missing_number(client):
+    response = client.post(
+        "/auth/signup",
+        json={"first_name": "Coach", "email": "number@example.com", "password": "NoNumberHere!"},
+    )
+    assert response.status_code == 422
+
+
+def test_signup_rejects_password_missing_special_character(client):
+    response = client.post(
+        "/auth/signup",
+        json={"first_name": "Coach", "email": "special@example.com", "password": "NoSpecial123"},
+    )
+    assert response.status_code == 422
+
+
+def test_signup_accepts_valid_strong_password(client):
+    response = client.post(
+        "/auth/signup",
+        json={"first_name": "Coach", "email": "valid@example.com", "password": STRONG_PASSWORD},
+    )
+    assert response.status_code == 201
+    assert response.json()["user"]["email"] == "valid@example.com"
+
+
+def test_signup_stores_hash_not_plaintext(client, db_session):
+    signup_user(client, "stored")
+    user = db_session.query(User).filter(User.email == "coach-stored@example.com").one()
+
+    assert user.password_hash != STRONG_PASSWORD
+    assert STRONG_PASSWORD not in user.password_hash
+    assert user.password_hash.startswith(f"{PASSWORD_HASH_ALGORITHM}$")
+
+
+def test_duplicate_email_rejected_case_insensitively(client):
+    response = client.post(
+        "/auth/signup",
+        json={"first_name": "Coach", "email": "CaseEmail@example.com", "password": STRONG_PASSWORD},
+    )
+    assert response.status_code == 201
+
+    duplicate = client.post(
+        "/auth/signup",
+        json={"first_name": "Coach", "email": " caseemail@EXAMPLE.com ", "password": STRONG_PASSWORD},
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"] == "email already registered"
+
+
+def test_login_succeeds_only_with_exact_password(client):
+    signup_user(client, "exact")
+
+    good = client.post(
+        "/auth/login",
+        json={"email": " coach-exact@EXAMPLE.com ", "password": STRONG_PASSWORD},
+    )
+    assert good.status_code == 200
+
+    bad = client.post(
+        "/auth/login",
+        json={"email": "coach-exact@example.com", "password": "StrongPass123?"},
+    )
+    assert bad.status_code == 401
+    assert bad.json()["detail"] == "invalid credentials"
+
+
+def test_password_hashes_are_versioned_and_constant_time_verifiable():
+    stored = hash_password(STRONG_PASSWORD)
+    assert stored.startswith(f"{PASSWORD_HASH_ALGORITHM}$")
+    assert verify_password(STRONG_PASSWORD, stored) is True
+    assert verify_password("wrong", stored) is False
+    assert needs_password_rehash(stored) is False
+
+
+def test_legacy_password_hashes_verify_but_require_rehash():
+    legacy = "YWFhYWFhYWFhYWFhYWFhYQ==$LrogHhynYTZ+hDQlQR3OlxFU/vcPWPRb0AnWTRxIVRA="
+    assert verify_password(LEGACY_PASSWORD, legacy) is True
+    assert needs_password_rehash(legacy) is True
+
+
+def test_legacy_pbkdf2_hash_rehashes_to_argon2_on_login(client, db_session):
+    legacy_hash = "YWFhYWFhYWFhYWFhYWFhYQ==$LrogHhynYTZ+hDQlQR3OlxFU/vcPWPRb0AnWTRxIVRA="
+    user = User(
+        first_name="Legacy",
+        email="legacy@example.com",
+        username="legacy",
+        password_hash=legacy_hash,
+        api_token=generate_token(32),
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/auth/login",
+        json={"email": " LEGACY@example.com ", "password": LEGACY_PASSWORD},
+    )
+    assert response.status_code == 200
+
+    db_session.expire_all()
+    refreshed_user = db_session.query(User).filter(User.email == "legacy@example.com").one()
+    assert refreshed_user.password_hash != legacy_hash
+    assert refreshed_user.password_hash.startswith(f"{PASSWORD_HASH_ALGORITHM}$")
+    assert verify_password(LEGACY_PASSWORD, refreshed_user.password_hash) is True
+    assert needs_password_rehash(refreshed_user.password_hash) is False
+
+
+def test_auth_me_returns_current_authenticated_user(client):
+    payload = signup_user(client, "me")
+    response = client.get("/auth/me", headers=auth_headers(payload["access_token"]))
+    assert response.status_code == 200
+    assert response.json()["id"] == payload["user"]["id"]
+    assert response.json()["email"] == "coach-me@example.com"
+
+
+def test_login_token_survives_page_bootstrap_through_auth_me(client):
+    signup_payload = signup_user(client, "bootstrap")
+
+    login_response = client.post(
+        "/auth/login",
+        json={"email": "coach-bootstrap@example.com", "password": STRONG_PASSWORD},
+    )
+    assert login_response.status_code == 200
+    login_payload = login_response.json()
+    assert login_payload["access_token"]
+    assert login_payload["user"]["id"] == signup_payload["user"]["id"]
+
+    bootstrap_response = client.get("/auth/me", headers=auth_headers(login_payload["access_token"]))
+
+    assert bootstrap_response.status_code == 200
+    assert bootstrap_response.json()["id"] == signup_payload["user"]["id"]
+    assert bootstrap_response.json()["email"] == "coach-bootstrap@example.com"
+
+
+def test_auth_me_requires_authentication(client):
+    response = client.get("/auth/me")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "missing auth token"
+
+
+def test_local_dev_cors_allows_dynamic_vite_port(client):
+    response = client.options(
+        "/auth/signup",
+        headers={
+            "Origin": "http://localhost:8083",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:8083"
 
 
 def test_protected_route_accepts_bearer_access_token(client):

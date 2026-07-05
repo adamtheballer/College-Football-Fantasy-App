@@ -536,7 +536,9 @@ export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModal
               </div>
               <div className="flex flex-col gap-1">
                  <span className="text-[10px] font-black tracking-[0.2em] text-muted-foreground/40 uppercase">POS Rank</span>
-                 <span className="text-3xl font-black italic text-primary tracking-tighter leading-none">#{player.posRank}</span>
+                 <span className="text-3xl font-black italic text-primary tracking-tighter leading-none">
+                   {player.posRank ? `#${player.posRank}` : "N/A"}
+                 </span>
               </div>
            </div>
 

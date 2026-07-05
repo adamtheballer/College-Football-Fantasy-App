@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 
+from conftest import TestingSessionLocal
 from collegefootballfantasy_api.app.models.notification import NotificationDeliveryAttempt
 from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
+from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.notification_service import record_delivery_attempt
 
 
@@ -15,11 +17,15 @@ def create_user(client, suffix: str = "one") -> dict:
         json={
             "first_name": f"Coach{suffix}",
             "email": f"coach-{suffix}@example.com",
-            "password": "secret123",
+            "password": "StrongPass123!",
         },
     )
     assert response.status_code == 201
     payload = response.json()
+    with TestingSessionLocal() as session:
+        user = session.query(User).filter(User.email == f"coach-{suffix}@example.com").one()
+        user.email_verified_at = datetime.now(timezone.utc)
+        session.commit()
     return {"user": payload["user"], "access_token": payload["access_token"]}
 
 

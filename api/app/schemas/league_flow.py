@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class LeagueBasics(BaseModel):
@@ -10,6 +10,13 @@ class LeagueBasics(BaseModel):
     is_private: bool = True
     description: str | None = None
     icon_url: str | None = None
+
+    @field_validator("max_teams")
+    @classmethod
+    def validate_even_manager_count(cls, value: int) -> int:
+        if value < 2 or value % 2 != 0:
+            raise ValueError("max_teams must be an even number of at least 2")
+        return value
 
 
 class LeagueSettingsInput(BaseModel):
@@ -232,3 +239,124 @@ class JoinLeagueRequest(BaseModel):
 class LeagueMembersList(BaseModel):
     data: list[LeagueMemberRead]
     total: int
+
+
+class RosterTabTeamRead(BaseModel):
+    id: int
+    name: str
+    owner_user_id: int | None = None
+    record: str | None = None
+
+
+class RosterTabEntryRead(BaseModel):
+    id: int
+    league_id: int | None = None
+    team_id: int
+    fantasy_team_id: int | None = None
+    fantasy_team_name: str | None = None
+    player_id: int
+    slot: str
+    roster_slot: str | None = None
+    status: str
+    is_starter: bool
+    is_ir: bool
+    player_name: str | None = None
+    player_school: str | None = None
+    player_position: str | None = None
+    school: str | None = None
+    position: str | None = None
+    projected_points: float = 0.0
+    floor: float = 0.0
+    ceiling: float = 0.0
+    boom_prob: float = 0.0
+    bust_prob: float = 0.0
+    opponent: str | None = None
+    weekly_projected_fantasy_points: float = 0.0
+    acquisition_type: str = "ROSTER"
+    draft_pick_id: int | None = None
+
+
+class LeagueRosterTabRead(BaseModel):
+    league_id: int
+    season: int
+    week: int
+    owned_team: RosterTabTeamRead | None = None
+    roster: list[RosterTabEntryRead]
+    roster_slot_limits: dict[str, int]
+    ir_slots: int
+    message: str | None = None
+    fantasy_team_id: int | None = None
+    fantasy_team_name: str | None = None
+    data: list[RosterTabEntryRead] = []
+
+
+class MatchupTeamRead(BaseModel):
+    id: int
+    name: str
+    record: str | None = None
+    projected_points: float = 0.0
+    win_probability: float = 50.0
+    fantasy_team_id: int
+    fantasy_team_name: str
+    projected_total: float = 0.0
+    roster: list[RosterTabEntryRead]
+
+
+class LeagueMatchupTabRead(BaseModel):
+    league_id: int
+    season: int
+    week: int
+    matchup_id: int | None = None
+    status: str | None = None
+    my_team: MatchupTeamRead | None = None
+    opponent_team: MatchupTeamRead | None = None
+    my_roster: list[RosterTabEntryRead]
+    opponent_roster: list[RosterTabEntryRead]
+    projection_source: str = "weekly_projections"
+    message: str | None = None
+    user_team: MatchupTeamRead | None = None
+
+
+class LeagueWaiverPlayerRead(BaseModel):
+    id: int
+    name: str
+    school: str | None = None
+    position: str | None = None
+    weekly_projected_fantasy_points: float = 0.0
+
+
+class LeagueWaiversRead(BaseModel):
+    league_id: int
+    fantasy_team_id: int | None = None
+    available_players: list[LeagueWaiverPlayerRead]
+    claims: list[dict] = []
+    total_available: int
+    message: str | None = None
+
+
+class LeagueScheduleRowRead(BaseModel):
+    matchup_id: int
+    week: int
+    home_team_id: int
+    home_team_name: str
+    away_team_id: int
+    away_team_name: str
+    home_projected_total: float = 0.0
+    away_projected_total: float = 0.0
+    home_win_probability: float = 50.0
+    away_win_probability: float = 50.0
+
+
+class LeagueSettingsViewRead(BaseModel):
+    league_id: int
+    league_name: str
+    league_info: dict
+    members: list[LeagueMemberRead]
+    scoring_settings: dict
+    roster_settings: dict[str, int]
+    waiver_rules: dict
+    standings: list[dict]
+    schedule: list[LeagueScheduleRowRead]
+    rosters: list[RosterTabEntryRead]
+    draft_results: list[dict]
+    commissioner_controls: list[str]

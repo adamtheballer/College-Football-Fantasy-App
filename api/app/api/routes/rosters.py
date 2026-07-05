@@ -6,6 +6,7 @@ from collegefootballfantasy_api.app.api.deps import (
     require_league_member,
     require_team_member,
     require_team_owner,
+    require_verified_user,
 )
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
@@ -155,7 +156,7 @@ def add_roster_entry_endpoint(
     team_id: int,
     entry_in: RosterEntryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> RosterEntryRead:
     team = require_team_owner(db, team_id, current_user)
     _ensure_player_exists(db, entry_in.player_id)
@@ -214,7 +215,7 @@ def delete_roster_entry_endpoint(
     team_id: int,
     roster_entry_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> None:
     team = require_team_owner(db, team_id, current_user)
     entry = db.get(RosterEntry, roster_entry_id)
@@ -239,7 +240,7 @@ def update_lineup_endpoint(
     team_id: int,
     payload: LineupUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> LineupUpdateResponse:
     team = require_team_owner(db, team_id, current_user)
     settings_row = _league_settings(db, team.league_id)
@@ -288,7 +289,7 @@ def add_drop_endpoint(
     team_id: int,
     payload: AddDropRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> AddDropResponse:
     team = require_team_owner(db, team_id, current_user)
     add_player = _ensure_player_exists(db, payload.add_player_id)

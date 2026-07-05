@@ -45,6 +45,13 @@ const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]
       }),
     });
   });
+  await page.route("**/auth/me", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(mockAuthPayload.user),
+    });
+  });
 };
 
 test.describe("critical browser workflows", () => {
@@ -177,9 +184,12 @@ test.describe("critical browser workflows", () => {
     await page.goto("/leagues");
     await expect(page.getByRole("heading", { name: /Leagues/i })).toBeVisible();
     await expect(page.getByText("Codex Saturday League")).toBeVisible();
-    await page.getByRole("button", { name: /League Hub/i }).click();
-    await page.waitForURL("**/league/1");
-    await expect(page).toHaveURL(/\/league\/1$/);
+    await page
+      .locator(".cfb-panel", { hasText: "Codex Saturday League" })
+      .getByRole("button", { name: /^League Hub$/i })
+      .click();
+    await page.waitForURL("**/league/1**");
+    await expect(page.getByRole("heading", { name: /^Roster$/i })).toBeVisible();
   });
 
   test("invalid bootstrap session forces logout and redirects protected routes to login", async ({ page }) => {
@@ -318,15 +328,15 @@ test.describe("critical browser workflows", () => {
 
     await page.goto("/leagues/create");
     await expect(page.getByRole("heading", { name: /Create League/i })).toBeVisible();
-    await page.getByRole("button", { name: /^Continue$/i }).click();
-    await page.getByRole("button", { name: /^Continue$/i }).click();
-    await page.getByRole("button", { name: /^Continue$/i }).click();
+    await page.getByRole("button", { name: /^Continue to /i }).click();
+    await page.getByRole("button", { name: /^Continue to /i }).click();
+    await page.getByRole("button", { name: /^Continue to /i }).click();
     await page.getByRole("button", { name: /Create League/i }).click();
-    await expect(page.getByRole("heading", { name: /League Created/i })).toBeVisible();
-    await page.getByRole("button", { name: /Go to League Home/i }).click();
+    await expect(page.getByRole("heading", { name: /Invite managers/i })).toBeVisible();
+    await page.getByRole("button", { name: /Open League Hub/i }).click();
 
     await page.waitForURL("**/league/1");
-    await expect(page.getByRole("heading", { name: /Saturday League/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Roster$/i })).toBeVisible();
   });
 
   test("join-by-code flow previews league and joins with backend response", async ({ page }) => {
@@ -431,6 +441,19 @@ test.describe("critical browser workflows", () => {
       });
     });
 
+    await page.route("**/leagues/77/roster**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          league_id: 77,
+          roster: [],
+          team: { id: 19, league_id: 77, name: "Codex Team", owner_user_id: 42, owner_name: "Codex" },
+          roster_slots: { QB: 1, RB: 2, WR: 2, TE: 1, K: 1, BENCH: 4, IR: 1 },
+        }),
+      });
+    });
+
     await page.goto("/leagues/join");
     await page.getByPlaceholder("ENTER INVITE CODE").fill("abcdefghijklmnopqrst");
     await page.getByRole("button", { name: /Preview League/i }).click();
@@ -438,7 +461,8 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("Invite League")).toBeVisible();
     await page.getByRole("button", { name: /^Join League$/i }).click();
     await page.waitForURL("**/league/77");
-    await expect(page.getByRole("heading", { name: /Invite League/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Roster$/i })).toBeVisible();
+    await expect(page.getByText(/Week 1 placeholder roster/i)).toBeVisible();
   });
 
   test("draft-room pick mutation updates persisted draft state in UI", async ({ page }) => {
@@ -478,9 +502,12 @@ test.describe("critical browser workflows", () => {
         pick_timer_seconds: 90,
         status: "live",
       },
-      members: [
-        { id: 701, user_id: 42, role: "commissioner", joined_at: "2026-03-01T10:01:00Z" },
-      ],
+      members: Array.from({ length: 12 }, (_, index) => ({
+        id: 701 + index,
+        user_id: index === 0 ? 42 : 90 + index,
+        role: index === 0 ? "commissioner" : "manager",
+        joined_at: "2026-03-01T10:01:00Z",
+      })),
     };
 
     const players = [
@@ -585,10 +612,486 @@ test.describe("critical browser workflows", () => {
 
     await page.goto("/league/1/draft");
     await expect(page.getByRole("heading", { name: /Draft Test League/i })).toBeVisible();
-    await page.getByRole("button", { name: /^Save Pick$/i }).click();
-    await expect(page.getByText("1/12")).toBeVisible();
-    await expect(page.getByText(/No available players match this search/i)).toBeVisible();
-    await expect(page.getByText(/Codex Team • Pick 1/i)).toBeVisible();
+    await page.getByRole("button", { name: /^Draft$/i }).first().click();
+    await expect(page.getByText(/Last pick/i)).toBeVisible();
+    await expect(page.getByText(/Arch Manning/i).first()).toBeVisible();
+    await expect(page.getByText(/No legal players available/i)).toBeVisible();
+  });
+
+  test("league matchup page renders projected teams and honest empty state", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+
+    const rosterRow = (
+      id: number,
+      teamId: number,
+      teamName: string,
+      playerName: string,
+      projectedPoints: number,
+      slot = "QB"
+    ) => ({
+      id,
+      league_id: 1,
+      team_id: teamId,
+      fantasy_team_id: teamId,
+      fantasy_team_name: teamName,
+      player_id: id + 100,
+      player_name: playerName,
+      player_school: "Texas",
+      player_position: "QB",
+      school: "Texas",
+      position: "QB",
+      slot,
+      roster_slot: slot,
+      status: "active",
+      is_starter: slot !== "BENCH" && slot !== "IR",
+      is_ir: slot === "IR",
+      opponent: teamId === 11 ? "Rival Team" : "Codex Team",
+      projected_points: projectedPoints,
+      weekly_projected_fantasy_points: projectedPoints,
+    });
+    const myRoster = [
+      rosterRow(1, 11, "Codex Team", "Arch Manning", 24.0),
+      rosterRow(2, 11, "Codex Team", "Bench Reserve", 11.5, "BENCH"),
+    ];
+    const opponentRoster = [
+      rosterRow(3, 12, "Rival Team", "Rival QB", 18.2),
+      rosterRow(4, 12, "Rival Team", "Rival Bench", 10.0, "BENCH"),
+    ];
+    const scheduledPayload = {
+      league_id: 1,
+      season: 2026,
+      matchup_id: 101,
+      week: 1,
+      status: "projected",
+      my_team: {
+        id: 11,
+        name: "Codex Team",
+        fantasy_team_id: 11,
+        fantasy_team_name: "Codex Team",
+        record: "0-0-0",
+        projected_points: 24.0,
+        projected_total: 24.0,
+        win_probability: 57.3,
+        roster: myRoster,
+      },
+      user_team: {
+        id: 11,
+        name: "Codex Team",
+        fantasy_team_id: 11,
+        fantasy_team_name: "Codex Team",
+        record: "0-0-0",
+        projected_points: 24.0,
+        projected_total: 24.0,
+        win_probability: 57.3,
+        roster: myRoster,
+      },
+      opponent_team: {
+        id: 12,
+        name: "Rival Team",
+        fantasy_team_id: 12,
+        fantasy_team_name: "Rival Team",
+        record: "0-0-0",
+        projected_points: 18.2,
+        projected_total: 18.2,
+        win_probability: 42.7,
+        roster: opponentRoster,
+      },
+      my_roster: myRoster,
+      opponent_roster: opponentRoster,
+      projection_source: "weekly_projections",
+      message: "Projection-only alpha matchup.",
+    };
+    const emptyPayload = {
+      league_id: 1,
+      season: 2026,
+      matchup_id: null,
+      week: 1,
+      status: null,
+      my_team: {
+        id: 11,
+        name: "Codex Team",
+        fantasy_team_id: 11,
+        fantasy_team_name: "Codex Team",
+        record: "0-0-0",
+        projected_points: 24.0,
+        projected_total: 24.0,
+        win_probability: 50.0,
+        roster: myRoster,
+      },
+      user_team: {
+        id: 11,
+        name: "Codex Team",
+        fantasy_team_id: 11,
+        fantasy_team_name: "Codex Team",
+        record: "0-0-0",
+        projected_points: 24.0,
+        projected_total: 24.0,
+        win_probability: 50.0,
+        roster: myRoster,
+      },
+      opponent_team: null,
+      my_roster: myRoster,
+      opponent_roster: [],
+      projection_source: "weekly_projections",
+      message: "No matchup generated yet.",
+    };
+    let matchupPayload: unknown = scheduledPayload;
+
+    await page.route("**/leagues/1/matchup**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(matchupPayload),
+      });
+    });
+
+    await page.goto("/league/1/matchup");
+    await expect(page.getByRole("heading", { name: /^Matchup$/i })).toBeVisible();
+    await expect(page.getByText("Codex Team").first()).toBeVisible();
+    await expect(page.getByText("Rival Team").first()).toBeVisible();
+    await expect(page.getByText("24.0 - 18.2")).toBeVisible();
+    await expect(page.getByText("57.3% / 42.7%")).toBeVisible();
+    await expect(page.getByText("Arch Manning")).toBeVisible();
+    await expect(page.getByText("Rival QB")).toBeVisible();
+
+    matchupPayload = emptyPayload;
+    await page.reload();
+    await expect(page.getByText(/No matchup scheduled/i)).toBeVisible();
+    await expect(page.getByText(/No matchup generated yet/i)).toBeVisible();
+    await expect(page.getByText("Rival Team")).toHaveCount(0);
+  });
+
+  test("trade builder analyzes selected players but remains preview-only", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+    await page.addInitScript(() => {
+      window.localStorage.setItem("cfb_active_league_id", "1");
+    });
+
+    const leagueDetail = {
+      id: 1,
+      name: "Trade Test League",
+      commissioner_user_id: 42,
+      season_year: 2026,
+      max_teams: 2,
+      is_private: true,
+      invite_code: "TRADETESTCODE123456",
+      description: null,
+      icon_url: null,
+      status: "post_draft",
+      created_at: "2026-03-01T10:00:00Z",
+      updated_at: "2026-03-05T10:00:00Z",
+      settings: {
+        id: 1,
+        league_id: 1,
+        scoring_json: {},
+        roster_slots_json: { QB: 1, RB: 2, WR: 2, TE: 1, K: 1, BENCH: 4, IR: 1 },
+        playoff_teams: 4,
+        waiver_type: "faab",
+        trade_review_type: "commissioner",
+        superflex_enabled: false,
+        kicker_enabled: true,
+        defense_enabled: false,
+      },
+      draft: {
+        id: 1,
+        league_id: 1,
+        draft_datetime_utc: "2026-08-30T23:00:00Z",
+        timezone: "America/New_York",
+        draft_type: "snake",
+        pick_timer_seconds: 90,
+        status: "completed",
+      },
+      members: [
+        { id: 101, user_id: 42, role: "commissioner", joined_at: "2026-03-01T10:01:00Z" },
+        { id: 102, user_id: 43, role: "manager", joined_at: "2026-03-02T10:01:00Z" },
+      ],
+    };
+    const teams = [
+      {
+        id: 11,
+        league_id: 1,
+        name: "Codex Team",
+        owner_name: "Codex",
+        owner_user_id: 42,
+        created_at: "2026-03-01T10:00:00Z",
+        updated_at: "2026-03-01T10:00:00Z",
+      },
+      {
+        id: 12,
+        league_id: 1,
+        name: "Rival Team",
+        owner_name: "Rival",
+        owner_user_id: 43,
+        created_at: "2026-03-01T10:00:00Z",
+        updated_at: "2026-03-01T10:00:00Z",
+      },
+    ];
+    const rosterEntry = (id: number, teamId: number, playerId: number, name: string, position = "QB") => ({
+      id,
+      team_id: teamId,
+      player_id: playerId,
+      slot: position,
+      status: "active",
+      created_at: "2026-03-01T10:00:00Z",
+      updated_at: "2026-03-01T10:00:00Z",
+      player: {
+        id: playerId,
+        name,
+        position,
+        school: "Texas",
+      },
+    });
+    const settingsRosterRow = (
+      id: number,
+      teamId: number,
+      teamName: string,
+      playerId: number,
+      playerName: string,
+      projectedPoints: number
+    ) => ({
+      id,
+      league_id: 1,
+      team_id: teamId,
+      fantasy_team_id: teamId,
+      fantasy_team_name: teamName,
+      player_id: playerId,
+      player_name: playerName,
+      player_school: "Texas",
+      player_position: "QB",
+      school: "Texas",
+      position: "QB",
+      slot: "QB",
+      roster_slot: "QB",
+      status: "active",
+      is_starter: true,
+      is_ir: false,
+      opponent: null,
+      projected_points: projectedPoints,
+      weekly_projected_fantasy_points: projectedPoints,
+    });
+    const proposalCalls: string[] = [];
+    let analyzePayload: unknown = null;
+
+    await page.route("**/leagues?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [leagueDetail], total: 1, limit: 50, offset: 0 }),
+      });
+    });
+    await page.route("**/leagues/1", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(leagueDetail) });
+    });
+    await page.route("**/leagues/1/workspace", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          league: leagueDetail,
+          membership: { id: 101, user_id: 42, role: "commissioner", joined_at: "2026-03-01T10:01:00Z" },
+          owned_team: { id: 11, league_id: 1, name: "Codex Team", owner_user_id: 42 },
+          roster: [],
+          matchup_summary: { week: 1, opponent_team_id: 12, opponent_team_name: "Rival Team", status: "projected" },
+          standings_summary: [],
+          allowed_actions: ["view_roster"],
+        }),
+      });
+    });
+    await page.route("**/leagues/1/teams", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: teams, total: teams.length, limit: 50, offset: 0 }),
+      });
+    });
+    await page.route("**/leagues/1/settings-view", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          league_id: 1,
+          league_name: "Trade Test League",
+          league_info: { name: "Trade Test League", season: 2026, status: "post_draft", max_teams: 2 },
+          members: leagueDetail.members,
+          scoring_settings: {},
+          roster_settings: leagueDetail.settings.roster_slots_json,
+          waiver_rules: { waiver_type: "faab", trade_review_type: "commissioner" },
+          standings: [],
+          schedule: [],
+          rosters: [
+            settingsRosterRow(1, 11, "Codex Team", 201, "Arch Manning", 24.0),
+            settingsRosterRow(2, 12, "Rival Team", 301, "Rival QB", 18.0),
+          ],
+          draft_results: [],
+          commissioner_controls: [],
+        }),
+      });
+    });
+    await page.route("**/teams/11/roster**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [rosterEntry(1, 11, 201, "Arch Manning")], total: 1, limit: 50, offset: 0 }),
+      });
+    });
+    await page.route("**/teams/12/roster**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [rosterEntry(2, 12, 301, "Rival QB")], total: 1, limit: 50, offset: 0 }),
+      });
+    });
+    await page.route("**/trade/analyze", async (route) => {
+      analyzePayload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ give_value: 24.0, receive_value: 18.0, delta: -6.0, verdict: "Strong Loss" }),
+      });
+    });
+    await page.route("**/trade/proposals**", async (route) => {
+      proposalCalls.push(route.request().url());
+      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "proposal endpoint should not be called" }) });
+    });
+    await page.route("**/leagues/**/trades**", async (route) => {
+      proposalCalls.push(route.request().url());
+      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "proposal endpoint should not be called" }) });
+    });
+
+    await page.goto("/trade");
+    await expect(page.getByRole("heading", { name: /Trade Builder/i })).toBeVisible();
+    await expect(page.getByText("Codex Team").first()).toBeVisible();
+    await expect(page.getByText("Rival Team").first()).toBeVisible();
+
+    await page.getByRole("button", { name: /Arch Manning/i }).click();
+    await page.getByRole("button", { name: /Rival QB/i }).click();
+    await page.getByRole("button", { name: /Analyze Trade/i }).click();
+
+    await expect(page.getByText("Strong Loss")).toBeVisible();
+    await expect(page.getByText("-6.00")).toBeVisible();
+    expect(analyzePayload).toMatchObject({
+      give_ids: [201],
+      receive_ids: [301],
+      season: 2026,
+      week: 1,
+      league_size: 2,
+    });
+
+    await expect(page.getByText(/Preview only\. Sending requires the backend proposal workflow/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Preview Only$/i })).toBeDisabled();
+    await expect(page.getByRole("button", { name: /Send Trade/i })).toHaveCount(0);
+    expect(proposalCalls).toEqual([]);
+  });
+
+  test("single-player mock draft stays local and resets without real roster mutation", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+
+    const blockedMutations: string[] = [];
+    const positions = ["QB", "RB", "WR", "TE", "K"];
+    const players = Array.from({ length: 140 }, (_, index) => {
+      const rank = index + 1;
+      const position = positions[index % positions.length];
+      return {
+        id: rank,
+        name: `Mock ${position} ${String(rank).padStart(3, "0")}`,
+        position,
+        school: `Mock School ${rank}`,
+        image_url: null,
+        board_rank: rank,
+        sheet_adp: rank,
+        sheet_projected_season_points: 300 - rank,
+      };
+    });
+
+    await page.route("**/leagues/**/draft-picks", async (route) => {
+      blockedMutations.push(route.request().url());
+      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "real draft mutation blocked" }) });
+    });
+    await page.route("**/teams/**/roster", async (route) => {
+      blockedMutations.push(route.request().url());
+      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "real roster mutation blocked" }) });
+    });
+    await page.route("**/mock-drafts**", async (route) => {
+      blockedMutations.push(route.request().url());
+      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "backend mock draft blocked" }) });
+    });
+    await page.route("**/stats/teams?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: players.map((player) => ({
+            team: player.school,
+            conference: "SEC",
+          })),
+        }),
+      });
+    });
+    await page.route("**/players?**", async (route) => {
+      const url = new URL(route.request().url());
+      const offset = Number(url.searchParams.get("offset") ?? 0);
+      const limit = Number(url.searchParams.get("limit") ?? 100);
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: players.slice(offset, offset + limit),
+          total: players.length,
+          limit,
+          offset,
+        }),
+      });
+    });
+
+    await page.goto("/draft/mock/single-player?new=1&teams=8&timer=15");
+    await expect(page.getByText(/Draft is about to begin/i)).toBeVisible();
+
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const raw = window.localStorage.getItem("cfb_single_player_mock_draft");
+            const draft = raw ? JSON.parse(raw) : null;
+            return draft?.currentPick ?? 0;
+          }),
+        { timeout: 15_000 }
+      )
+      .toBe(4);
+
+    const beforeUserPick = await page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}"));
+    expect(beforeUserPick.picks).toHaveLength(3);
+    expect(beforeUserPick.picks.every((pick: { pickedBy: string }) => pick.pickedBy === "bot")).toBe(true);
+
+    await page.getByRole("button", { name: /^Draft$/ }).first().click();
+
+    await expect
+      .poll(() => page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}").picks?.length ?? 0))
+      .toBe(4);
+
+    const afterUserPick = await page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}"));
+    expect(afterUserPick.picks[3].pickedBy).toBe("user");
+
+    await expect
+      .poll(() => page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}").picks?.length ?? 0), {
+        timeout: 5_000,
+      })
+      .toBe(5);
+
+    const afterCpuPick = await page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}"));
+    expect(afterCpuPick.picks[4].pickedBy).toBe("bot");
+
+    await page.getByRole("button", { name: /Reset/i }).first().click();
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const draft = JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}");
+          return [draft.status, draft.currentPick, draft.picks?.length ?? -1];
+        })
+      )
+      .toEqual(["intermission", 1, 0]);
+
+    expect(blockedMutations).toEqual([]);
   });
 
   test("watchlist create/add/remove persists through backend contracts", async ({ page }) => {
@@ -726,163 +1229,83 @@ test.describe("critical browser workflows", () => {
       await route.fallback();
     });
 
-    await page.goto("/watchlists");
-    await expect(page.getByRole("heading", { name: /Browse Players/i })).toBeVisible();
+    await page.route("**/leagues/1/waivers**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          league_id: 1,
+          fantasy_team_id: 11,
+          available_players: players.map((player) => ({
+            id: player.id,
+            name: player.name,
+            position: player.position,
+            school: player.school,
+            weekly_projected_fantasy_points: player.id === 801 ? 24.0 : 18.5,
+          })),
+          claims: [],
+          total_available: players.length,
+          message: null,
+        }),
+      });
+    });
 
-    await page.getByRole("button", { name: /Save to watchlist/i }).first().dispatchEvent("click");
-    await expect(page.getByRole("heading", { name: /Create Watchlist/i })).toBeVisible();
-    await page.getByPlaceholder("e.g. Late-Round Targets").fill("My Targets");
-    await page.getByRole("button", { name: /^Create$/i }).click();
+    await page.goto("/league/1/waivers");
+    await expect(page.getByRole("heading", { level: 1, name: /^Available Players$/i })).toBeVisible();
 
-    await expect(page.getByRole("heading", { name: "My Targets" })).toBeVisible();
+    await page.getByRole("button", { name: /^Watch$/i }).first().click();
+    await expect(page.getByRole("button", { name: /^Watching$/i }).first()).toBeVisible();
+
+    await page.goto("/league/1/watchlist");
+    await expect(page.getByRole("heading", { name: /^Watchlist$/i })).toBeVisible();
     await expect(page.getByText("Arch Manning").first()).toBeVisible();
 
-    const archCard = page
-      .locator("div", { hasText: "Arch Manning" })
-      .filter({ has: page.locator("button.h-10.w-10.rounded-xl.border") })
-      .first();
-    await archCard.locator("button.h-10.w-10.rounded-xl.border").click({ force: true });
+    await page.getByRole("button", { name: /Remove Arch Manning from watchlist/i }).evaluate((button) => {
+      (button as HTMLButtonElement).click();
+    });
 
-    await expect(page.getByText(/Add players from browse mode to build this list/i)).toBeVisible();
+    await expect(page.getByText(/No watched players yet/i)).toBeVisible();
   });
 
-  test("waiver add/drop mutation flow persists roster transaction state", async ({ page }) => {
+  test("available players page marks claims disabled and avoids add-drop", async ({ page }) => {
     await seedAuthenticatedSession(page);
 
-    const leagues = [
-      {
-        id: 1,
-        name: "Waiver League",
-        commissioner_user_id: 42,
-        season_year: 2026,
-        max_teams: 12,
-        is_private: true,
-        invite_code: "ABCDEFGHIJKLMNOPQRST",
-        description: null,
-        icon_url: null,
-        status: "draft_scheduled",
-        created_at: "2026-03-01T10:00:00Z",
-        updated_at: "2026-03-05T10:00:00Z",
-        settings: {
-          id: 1,
-          league_id: 1,
-          scoring_json: {},
-          roster_slots_json: { QB: 1, RB: 2, WR: 2, TE: 1, K: 1, BENCH: 4, IR: 1 },
-          playoff_teams: 4,
-          waiver_type: "rolling",
-          trade_review_type: "commissioner",
-          superflex_enabled: false,
-          kicker_enabled: true,
-          defense_enabled: false,
-        },
-        draft: null,
-        members: [{ id: 1, user_id: 42, role: "commissioner", joined_at: "2026-03-01T10:01:00Z" }],
-      },
-    ];
-
-    const players = [
-      { id: 901, name: "Arch Manning", position: "QB", school: "Texas", image_url: null },
-      { id: 902, name: "Ryan Wingo", position: "WR", school: "Texas", image_url: null },
-    ];
-
-    let rosterRows = [
-      {
-        id: 610,
-        league_id: 1,
-        team_id: 11,
-        slot: "QB",
-        status: "active",
-        player: { id: 930, name: "Legacy QB", position: "QB", school: "Alabama", image_url: null },
-      },
-    ];
-
-    await page.route("**/leagues?**", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ data: leagues, total: leagues.length, limit: 20, offset: 0 }),
-      });
-    });
-
-    await page.route("**/leagues/1/workspace", async (route) => {
+    const addDropCalls: string[] = [];
+    await page.route("**/leagues/1/waivers**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           league_id: 1,
-          membership: { id: 1, user_id: 42, role: "commissioner", joined_at: "2026-03-01T10:01:00Z" },
-          owned_team: { id: 11, league_id: 1, name: "Codex Team", owner_user_id: 42, owner_name: "Codex" },
-          roster: rosterRows,
-          standings_summary: [],
-          allowed_actions: ["view_roster", "manage_waivers"],
+          fantasy_team_id: 11,
+          available_players: [
+            { id: 901, name: "Arch Manning", position: "QB", school: "Texas", weekly_projected_fantasy_points: 24.0 },
+            { id: 902, name: "Ryan Wingo", position: "WR", school: "Texas", weekly_projected_fantasy_points: 18.5 },
+          ],
+          claims: [],
+          total_available: 2,
+          message: null,
         }),
       });
     });
-
-    await page.route("**/teams/11/roster**", async (route) => {
+    await page.route("**/watchlists**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          data: rosterRows,
-          total: rosterRows.length,
-          limit: 100,
-          offset: 0,
-        }),
+        body: JSON.stringify({ data: [], total: 0, limit: 50, offset: 0 }),
       });
     });
-
-    await page.route("**/players?**", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ data: players, total: players.length, limit: 100, offset: 0 }),
-      });
+    await page.route("**/teams/**/add-drop", async (route) => {
+      addDropCalls.push(route.request().url());
+      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "add/drop disabled" }) });
     });
 
-    await page.route("**/teams/11/add-drop", async (route) => {
-      const payload = route.request().postDataJSON() as { add_player_id: number; drop_roster_entry_id: number };
-      const adding = players.find((player) => player.id === payload.add_player_id);
-      rosterRows = [
-        {
-          id: 611,
-          league_id: 1,
-          team_id: 11,
-          slot: adding?.position || "QB",
-          status: "active",
-          player: {
-            id: adding?.id || 0,
-            name: adding?.name || "Unknown",
-            position: adding?.position || "QB",
-            school: adding?.school || "Unknown",
-            image_url: null,
-          },
-        },
-      ];
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify({
-          transaction: {
-            id: 501,
-            league_id: 1,
-            team_id: 11,
-            transaction_type: "add_drop",
-            player_id: payload.add_player_id,
-            related_player_id: 930,
-            reason: "waiver upgrade",
-            created_at: "2026-03-21T10:00:00Z",
-          },
-          roster: rosterRows,
-        }),
-      });
-    });
-
-    await page.goto("/waivers");
-    await expect(page.getByRole("heading", { name: /Waiver Wire/i })).toBeVisible();
-    await page.getByRole("button", { name: /^Add$/i }).first().click();
-    await expect(page.getByRole("heading", { name: /Add \/ Drop/i })).toBeVisible();
-    await page.getByRole("button", { name: /^Confirm$/i }).click();
-    await expect(page.getByRole("heading", { name: /Add \/ Drop/i })).toBeHidden();
+    await page.goto("/league/1/waivers");
+    await expect(page.getByRole("heading", { level: 1, name: /^Available Players$/i })).toBeVisible();
+    await expect(page.getByText(/Claims are not enabled yet/i)).toBeVisible();
+    await expect(page.getByText("Arch Manning")).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Add$/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Claims Off/i }).first()).toBeDisabled();
+    expect(addDropCalls).toEqual([]);
   });
 });

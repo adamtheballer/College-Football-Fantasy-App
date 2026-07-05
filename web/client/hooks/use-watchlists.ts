@@ -3,9 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import type { Watchlist, WatchlistListResponse } from "@/types/watchlist";
 
-export function useWatchlists(leagueId?: number) {
+export function useWatchlists(leagueId?: number, enabled = true) {
   return useQuery({
     queryKey: ["watchlists", leagueId ?? "all"],
+    enabled,
     staleTime: 30_000,
     queryFn: () =>
       apiGet<WatchlistListResponse>("/watchlists", {

@@ -10,8 +10,8 @@ This story defines the workflows that need coverage, the test layers to add, and
 
 Current coverage is materially below the product surface:
 
-- Backend tests: [tests/api/test_health.py](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/tests/api/test_health.py) and [tests/api/test_leagues.py](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/tests/api/test_leagues.py)
-- Frontend tests: only [utils.spec.ts](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/web/client/lib/utils.spec.ts)
+- Backend tests: [tests/api/test_health.py](tests/api/test_health.py) and [tests/api/test_leagues.py](tests/api/test_leagues.py)
+- Frontend tests: only [utils.spec.ts](web/client/lib/utils.spec.ts)
 - No browser workflow suite
 - No component or hook coverage for auth, league flows, drafting, watchlists, roster management, or settings
 - No broad API contract coverage for auth, join flows, notifications, watchlists, rosters, transactions, or draft mutation edge cases
@@ -39,7 +39,7 @@ The goal is not generic coverage percentage. The goal is protecting the workflow
 
 ### Frontend routes
 
-Supported routes in [web/client/App.tsx](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/web/client/App.tsx):
+Supported routes in [web/client/App.tsx](web/client/App.tsx):
 
 - `/`
 - `/leagues`
@@ -63,12 +63,12 @@ Supported routes in [web/client/App.tsx](/Users/development/Desktop/Sandbox/code
 
 Critical backend route groups:
 
-- Auth: [auth.py](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/api/app/api/routes/auth.py)
-- Leagues and workspace: [leagues.py](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/api/app/api/routes/leagues.py)
-- Teams and rosters: [rosters.py](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/api/app/api/routes/rosters.py), [teams.py](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/api/app/api/routes/teams.py)
-- Watchlists: [watchlists.py](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/api/app/api/routes/watchlists.py)
-- Notifications: [notifications.py](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/api/app/api/routes/notifications.py)
-- Players and stats: [players.py](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/api/app/api/routes/players.py), [injuries.py](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/api/app/api/routes/injuries.py), [schedule.py](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/api/app/api/routes/schedule.py), [stats.py](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/api/app/api/routes/stats.py), [projections.py](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/api/app/api/routes/projections.py)
+- Auth: [auth.py](api/app/api/routes/auth.py)
+- Leagues and workspace: [leagues.py](api/app/api/routes/leagues.py)
+- Teams and rosters: [rosters.py](api/app/api/routes/rosters.py), [teams.py](api/app/api/routes/teams.py)
+- Watchlists: [watchlists.py](api/app/api/routes/watchlists.py)
+- Notifications: [notifications.py](api/app/api/routes/notifications.py)
+- Players and stats: [players.py](api/app/api/routes/players.py), [injuries.py](api/app/api/routes/injuries.py), [schedule.py](api/app/api/routes/schedule.py), [stats.py](api/app/api/routes/stats.py), [projections.py](api/app/api/routes/projections.py)
 
 ## Test Strategy
 
@@ -87,7 +87,7 @@ Use Vitest plus React Testing Library for:
 
 ### Layer 3: Backend contract and rule tests
 
-Use pytest plus FastAPI `TestClient` and the existing in-memory test DB pattern from [tests/conftest.py](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/tests/conftest.py) for:
+Use pytest plus FastAPI `TestClient` and the existing in-memory test DB pattern from [tests/conftest.py](tests/conftest.py) for:
 
 - authorization and ownership rules
 - persistence after mutations
@@ -122,7 +122,7 @@ Backend coverage:
 
 UI coverage:
 
-- authenticated user can complete the full 4-step wizard in [CreateLeague.tsx](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/web/client/pages/CreateLeague.tsx)
+- authenticated user can complete the full 4-step wizard in [CreateLeague.tsx](web/client/pages/CreateLeague.tsx)
 - clicking `Continue` advances each step
 - the final submit succeeds
 - success screen renders invite code and invite link
@@ -140,7 +140,7 @@ Backend coverage:
 
 UI coverage:
 
-- user can preview a league by invite code in [JoinLeague.tsx](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/web/client/pages/JoinLeague.tsx)
+- user can preview a league by invite code in [JoinLeague.tsx](web/client/pages/JoinLeague.tsx)
 - user can join from `/leagues/join`
 - user can join from `/join/:inviteCode`
 - invalid invite code shows an error
@@ -176,7 +176,7 @@ Backend coverage:
 
 UI coverage:
 
-- lobby loads from [DraftLobby.tsx](/Users/development/Desktop/Sandbox/code/College-Football-Fantasy-App/web/client/pages/DraftLobby.tsx)
+- lobby loads from [DraftLobby.tsx](web/client/pages/DraftLobby.tsx)
 - `Enter Draft Room` navigates into `/league/:leagueId/draft`
 - draft room loads available players and current state from the API
 - eligible user can save a pick

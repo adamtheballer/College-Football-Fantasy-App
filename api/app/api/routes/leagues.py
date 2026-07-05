@@ -1,7 +1,4 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.api.deps import (
@@ -9,24 +6,18 @@ from collegefootballfantasy_api.app.api.deps import (
     get_league_or_404,
     require_commissioner,
     require_league_member,
+    require_verified_user,
 )
 from collegefootballfantasy_api.app.crud.league import delete_league, list_leagues
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.draft import Draft
-from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
-from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
-from collegefootballfantasy_api.app.models.player import Player
-from collegefootballfantasy_api.app.models.roster import RosterEntry
-from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.draft_room import (
     DraftPickCreate,
-    DraftRoomPickRead,
     DraftRoomRead,
-    DraftRoomTeamRead,
 )
 from collegefootballfantasy_api.app.schemas.league import LeagueList
 from collegefootballfantasy_api.app.schemas.league_flow import (
@@ -35,18 +26,25 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueCreateRequest,
     LeagueCreateResponse,
     LeagueDetailRead,
+    LeagueMatchupTabRead,
     LeagueNewsList,
     LeagueMemberRead,
     LeagueMembersList,
     LeaguePowerRankingList,
     LeaguePreview,
+    LeagueRosterTabRead,
     LeagueScoreboardList,
+    LeagueSettingsViewRead,
     LeagueSettingsUpdate,
+    LeagueWaiversRead,
     LeagueWorkspaceRead,
     JoinByCodeRequest,
 )
+from collegefootballfantasy_api.app.services.draft_service import (
+    build_draft_room_state,
+    create_real_draft_pick,
+)
 from collegefootballfantasy_api.app.services.league_flow import (
-    FIXED_ROSTER_SLOTS,
     create_league,
     join_league as join_league_flow,
     regenerate_invite as regenerate_invite_flow,
@@ -60,136 +58,19 @@ from collegefootballfantasy_api.app.services.league_workspace import (
     build_league_workspace,
     get_league_detail,
 )
+from collegefootballfantasy_api.app.services.league_roster_matchup import (
+    build_matchup_tab_view,
+    build_roster_tab_view,
+    build_settings_view,
+    build_waivers_view,
+)
 
 router = APIRouter()
-
-
-def _ordered_draft_teams(db: Session, league_id: int) -> list[Team]:
-    teams = db.query(Team).filter(Team.league_id == league_id).all()
-    return sorted(teams, key=lambda team: (team.created_at, team.id))
-
-
-def _draft_pick_team_for_number(teams: list[Team], pick_number: int) -> tuple[int, int, Team | None]:
-    if not teams:
-        return 1, 1, None
-    total_teams = len(teams)
-    round_number = ((pick_number - 1) // total_teams) + 1
-    round_pick = ((pick_number - 1) % total_teams) + 1
-    ordered_teams = teams if round_number % 2 == 1 else list(reversed(teams))
-    return round_number, round_pick, ordered_teams[round_pick - 1]
-
-
-def _assign_roster_slot(
-    db: Session,
-    settings_row: LeagueSettings,
-    team_id: int,
-    player_position: str,
-) -> str:
-    roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
-    current_counts = dict(
-        db.query(RosterEntry.slot, func.count(RosterEntry.id))
-        .filter(RosterEntry.team_id == team_id)
-        .group_by(RosterEntry.slot)
-        .all()
-    )
-
-    primary_limit = int(roster_slots.get(player_position, 0))
-    if primary_limit and current_counts.get(player_position, 0) < primary_limit:
-        return player_position
-
-    if settings_row.superflex_enabled:
-        superflex_limit = int(roster_slots.get("SUPERFLEX", 0))
-        if player_position == "QB" and current_counts.get("SUPERFLEX", 0) < superflex_limit:
-            return "SUPERFLEX"
-
-    bench_limit = int(roster_slots.get("BENCH", 0))
-    if current_counts.get("BENCH", 0) < bench_limit:
-        return "BENCH"
-
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="team roster is full")
-
-
-def _draft_room_state(db: Session, league: League, current_user: User) -> DraftRoomRead:
-    membership = require_league_member(db, league.id, current_user)
-    draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
-    if not draft_row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
-
-    settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
-    if not settings_row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league settings not found")
-
-    teams = _ordered_draft_teams(db, league.id)
-    picks_rows = (
-        db.query(DraftPick, Team, Player)
-        .join(Team, Team.id == DraftPick.team_id)
-        .join(Player, Player.id == DraftPick.player_id)
-        .filter(DraftPick.draft_id == draft_row.id)
-        .order_by(DraftPick.overall_pick.asc())
-        .all()
-    )
-
-    roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
-    total_picks = sum(int(value) for value in roster_slots.values()) * len(teams)
-    current_pick = len(picks_rows) + 1
-    current_round, current_round_pick, current_team = _draft_pick_team_for_number(teams, current_pick)
-    if total_picks and len(picks_rows) >= total_picks:
-        current_team = None
-
-    user_team = next((team for team in teams if team.owner_user_id == current_user.id), None)
-    can_make_pick = bool(
-        current_team
-        and (
-            current_user.id == league.commissioner_user_id
-            or current_user.id == current_team.owner_user_id
-        )
-    )
-
-    return DraftRoomRead(
-        league_id=league.id,
-        draft_id=draft_row.id,
-        status=draft_row.status,
-        pick_timer_seconds=draft_row.pick_timer_seconds,
-        roster_slots=roster_slots,
-        teams=[
-            DraftRoomTeamRead(
-                id=team.id,
-                name=team.name,
-                owner_user_id=team.owner_user_id,
-                owner_name=team.owner_name,
-            )
-            for team in teams
-        ],
-        picks=[
-            DraftRoomPickRead(
-                id=pick.id,
-                overall_pick=pick.overall_pick,
-                round_number=pick.round_number,
-                round_pick=pick.round_pick,
-                team_id=team.id,
-                team_name=team.name,
-                player_id=player.id,
-                player_name=player.name,
-                player_position=player.position,
-                player_school=player.school,
-                made_by_user_id=pick.made_by_user_id,
-                created_at=pick.created_at,
-            )
-            for pick, team, player in picks_rows
-        ],
-        current_pick=current_pick,
-        current_round=current_round,
-        current_round_pick=current_round_pick,
-        current_team_id=current_team.id if current_team else None,
-        current_team_name=current_team.name if current_team else None,
-        user_team_id=user_team.id if user_team else None,
-        can_make_pick=can_make_pick,
-    )
 @router.post("", response_model=LeagueCreateResponse, status_code=status.HTTP_201_CREATED)
 def create_league_endpoint(
     payload: LeagueCreateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> LeagueCreateResponse:
     return create_league(payload, db, current_user)
 
@@ -198,7 +79,7 @@ def create_league_endpoint(
 def create_league_flow(
     payload: LeagueCreateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> LeagueCreateResponse:
     return create_league(payload, db, current_user)
 
@@ -248,6 +129,62 @@ def get_league_workspace_endpoint(
     return build_league_workspace(db, league, membership, current_user)
 
 
+@router.get("/{league_id}/roster", response_model=LeagueRosterTabRead)
+def get_league_roster_tab_endpoint(
+    league_id: int,
+    week: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeagueRosterTabRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return build_roster_tab_view(db, league, current_user, selected_week=week)
+
+
+@router.get("/{league_id}/matchup", response_model=LeagueMatchupTabRead)
+def get_league_matchup_tab_endpoint(
+    league_id: int,
+    week: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeagueMatchupTabRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return build_matchup_tab_view(db, league, current_user, selected_week=week)
+
+
+@router.get("/{league_id}/settings-view", response_model=LeagueSettingsViewRead)
+def get_league_settings_tab_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeagueSettingsViewRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return build_settings_view(db, league, current_user)
+
+
+@router.get("/{league_id}/waivers", response_model=LeagueWaiversRead)
+def get_league_waiver_tab_endpoint(
+    league_id: int,
+    limit: int = 50,
+    offset: int = 0,
+    week: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeagueWaiversRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return build_waivers_view(
+        db,
+        league,
+        current_user,
+        limit=max(1, min(limit, 100)),
+        offset=max(0, offset),
+        selected_week=week,
+    )
+
+
 @router.get("/{league_id}/matchups", response_model=LeagueScoreboardList)
 def get_league_matchups_endpoint(
     league_id: int,
@@ -293,7 +230,8 @@ def get_draft_room_endpoint(
     current_user: User = Depends(get_current_user),
 ) -> DraftRoomRead:
     league = get_league_or_404(db, league_id)
-    return _draft_room_state(db, league, current_user)
+    require_league_member(db, league.id, current_user)
+    return build_draft_room_state(db, league, current_user)
 
 
 @router.post("/{league_id}/draft-picks", response_model=DraftRoomRead, status_code=status.HTTP_201_CREATED)
@@ -301,90 +239,11 @@ def create_draft_pick_endpoint(
     league_id: int,
     payload: DraftPickCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> DraftRoomRead:
     league = get_league_or_404(db, league_id)
     require_league_member(db, league.id, current_user)
-    draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
-    if not draft_row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
-
-    settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
-    if not settings_row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league settings not found")
-
-    teams = _ordered_draft_teams(db, league.id)
-    if not teams:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="no teams available for draft")
-
-    existing_picks = db.query(DraftPick).filter(DraftPick.draft_id == draft_row.id).count()
-    roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
-    total_picks = sum(int(value) for value in roster_slots.values()) * len(teams)
-    if total_picks and existing_picks >= total_picks:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="draft is complete")
-
-    round_number, round_pick, current_team = _draft_pick_team_for_number(teams, existing_picks + 1)
-    if current_team is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="draft cannot determine current team")
-
-    if current_user.id not in {league.commissioner_user_id, current_team.owner_user_id}:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="not your turn to draft")
-
-    player = db.get(Player, payload.player_id)
-    if not player:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
-
-    existing_player_pick = (
-        db.query(DraftPick)
-        .filter(DraftPick.draft_id == draft_row.id, DraftPick.player_id == player.id)
-        .first()
-    )
-    if existing_player_pick:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player already drafted")
-
-    existing_roster_entry = (
-        db.query(RosterEntry)
-        .join(Team, Team.id == RosterEntry.team_id)
-        .filter(Team.league_id == league.id, RosterEntry.player_id == player.id)
-        .first()
-    )
-    if existing_roster_entry:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player already on a league roster")
-
-    slot = _assign_roster_slot(db, settings_row, current_team.id, player.position)
-    pick = DraftPick(
-        draft_id=draft_row.id,
-        team_id=current_team.id,
-        player_id=player.id,
-        made_by_user_id=current_user.id,
-        round_number=round_number,
-        round_pick=round_pick,
-        overall_pick=existing_picks + 1,
-    )
-    db.add(pick)
-    db.flush()
-
-    db.add(
-        RosterEntry(
-            league_id=league.id,
-            team_id=current_team.id,
-            player_id=player.id,
-            slot=slot,
-            status="active",
-        )
-    )
-
-    if draft_row.status == "scheduled":
-        draft_row.status = "live"
-    league.status = "draft_live"
-    if total_picks and existing_picks + 1 >= total_picks:
-        draft_row.status = "completed"
-        league.status = "post_draft"
-
-    db.add(draft_row)
-    db.add(league)
-    db.commit()
-    return _draft_room_state(db, league, current_user)
+    return create_real_draft_pick(db, league=league, payload=payload, current_user=current_user)
 
 
 @router.get("/{league_id}/members", response_model=LeagueMembersList)
@@ -430,7 +289,7 @@ def join_by_code(payload: JoinByCodeRequest, db: Session = Depends(get_db)) -> L
 def join_league(
     league_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> LeagueDetailRead:
     league = db.get(League, league_id)
     if not league:
@@ -442,7 +301,7 @@ def join_league(
 def regenerate_invite(
     league_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> LeagueCreateResponse:
     league, _ = require_commissioner(db, league_id, current_user)
     return regenerate_invite_flow(db, league, current_user)
@@ -453,7 +312,7 @@ def update_league_settings(
     league_id: int,
     payload: LeagueSettingsUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> LeagueDetailRead:
     league, _ = require_commissioner(db, league_id, current_user)
     return update_league_settings_flow(db, league, payload)
@@ -464,7 +323,7 @@ def reschedule_draft(
     league_id: int,
     payload: DraftUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> DraftRead:
     league, _ = require_commissioner(db, league_id, current_user)
     return reschedule_draft_flow(db, league, payload)
@@ -474,7 +333,7 @@ def reschedule_draft(
 def delete_league_endpoint(
     league_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> None:
     league, _ = require_commissioner(db, league_id, current_user)
     delete_league(db, league)

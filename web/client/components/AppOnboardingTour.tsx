@@ -11,11 +11,6 @@ type TourStep = {
 
 const TOUR_STEPS: TourStep[] = [
   {
-    title: "Welcome to College Football Fantasy",
-    description:
-      "This app helps you manage leagues, review roster access, track alerts, study stats, and configure your settings from one supported React app.",
-  },
-  {
     target: "#nav-home",
     title: "Home Dashboard",
     description:
@@ -28,10 +23,16 @@ const TOUR_STEPS: TourStep[] = [
       "Use Leagues to create, join, and manage your fantasy leagues, view league settings, and prepare for your draft.",
   },
   {
-    target: "#nav-roster",
-    title: "Roster",
+    target: "#nav-chats",
+    title: "Chats",
     description:
-      "Roster now takes you into supported league entry points instead of demo lineup screens and mock matchup pages.",
+      "Use Chats for league conversation, manager coordination, trade talk, and commissioner updates once league messaging is active.",
+  },
+  {
+    target: "#nav-injury-center",
+    title: "Injury Center",
+    description:
+      "Injury Center is where player availability and health context belongs so lineup and waiver decisions stay informed.",
   },
   {
     target: "#nav-alerts",
@@ -52,9 +53,10 @@ const TOUR_STEPS: TourStep[] = [
       "Customize notifications, league preferences, and account behavior here so the app fits how you play.",
   },
   {
-    title: "You're Ready to Explore",
+    target: "#nav-sign-out",
+    title: "Sign Out",
     description:
-      "You now know where everything lives. Use the navigation to move through the app and start managing your college fantasy season.",
+      "Use Sign Out when you are finished. Draft is intentionally skipped because it is temporary and only opens active draft workflows.",
   },
 ];
 

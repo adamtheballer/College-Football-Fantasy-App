@@ -1,14 +1,27 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, ApiError } from "@/lib/api";
+import { apiGet, apiPatch, ApiError } from "@/lib/api";
 import type {
+  DraftInfo,
   LeagueDetail,
   LeagueListResponse,
+  LeagueMatchupTabResponse,
   LeagueNewsResponse,
   LeaguePowerRankingResponse,
+  LeagueRosterTabResponse,
   LeagueScoreboardResponse,
+  LeagueSettingsTabResponse,
+  LeagueWaiverTabResponse,
   LeagueWorkspace,
 } from "@/types/league";
+
+export type DraftUpdatePayload = {
+  draft_datetime_utc: string;
+  timezone: string;
+  draft_type: string;
+  pick_timer_seconds: number;
+  status?: string;
+};
 
 export function useLeagues(limit = 20, enabled = true) {
   return useQuery({
@@ -34,6 +47,23 @@ export function useLeagueDetail(leagueId?: number, enabled = true) {
   });
 }
 
+export function useRescheduleDraft(leagueId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: DraftUpdatePayload) => {
+      if (typeof leagueId !== "number" || Number.isNaN(leagueId)) {
+        throw new ApiError(400, "Invalid league ID.");
+      }
+      return apiPatch<DraftInfo>(`/leagues/${leagueId}/draft`, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["league", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["leagues"] });
+      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "draft-room"] });
+    },
+  });
+}
+
 export function useLeagueWorkspace(leagueId?: number, enabled = true) {
   return useQuery({
     queryKey: ["league", leagueId, "workspace"],
@@ -46,6 +76,89 @@ export function useLeagueWorkspace(leagueId?: number, enabled = true) {
       return failureCount < 2;
     },
     queryFn: () => apiGet<LeagueWorkspace>(`/leagues/${leagueId}/workspace`),
+  });
+}
+
+export function useLeagueRosterTab(
+  leagueId?: number,
+  week?: number,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: ["league", leagueId, "roster", week ?? "auto"],
+    enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
+    staleTime: 30_000,
+    retry: (failureCount, error) => {
+      if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    queryFn: () =>
+      apiGet<LeagueRosterTabResponse>(`/leagues/${leagueId}/roster`, {
+        week: typeof week === "number" ? week : undefined,
+      }),
+  });
+}
+
+export function useLeagueMatchupTab(
+  leagueId?: number,
+  week?: number,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: ["league", leagueId, "matchup", week ?? "auto"],
+    enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
+    staleTime: 30_000,
+    retry: (failureCount, error) => {
+      if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    queryFn: () =>
+      apiGet<LeagueMatchupTabResponse>(`/leagues/${leagueId}/matchup`, {
+        week: typeof week === "number" ? week : undefined,
+      }),
+  });
+}
+
+export function useLeagueSettingsTab(leagueId?: number, enabled = true) {
+  return useQuery({
+    queryKey: ["league", leagueId, "settings-view"],
+    enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
+    staleTime: 30_000,
+    retry: (failureCount, error) => {
+      if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    queryFn: () => apiGet<LeagueSettingsTabResponse>(`/leagues/${leagueId}/settings-view`),
+  });
+}
+
+export function useLeagueWaiverTab(
+  leagueId?: number,
+  limit = 50,
+  offset = 0,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: ["league", leagueId, "waivers", limit, offset],
+    enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
+    staleTime: 30_000,
+    retry: (failureCount, error) => {
+      if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    queryFn: () =>
+      apiGet<LeagueWaiverTabResponse>(`/leagues/${leagueId}/waivers`, {
+        limit,
+        offset,
+      }),
   });
 }
 
