@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+from conftest import TestingSessionLocal
 from fastapi import HTTPException
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -10,6 +11,7 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.draft_room import DraftPickCreate
 from collegefootballfantasy_api.app.services.draft_service import create_real_draft_pick
@@ -24,15 +26,20 @@ def auth_headers(token: str) -> dict[str, str]:
 
 
 def create_user_and_token(client, suffix: str = "one") -> str:
+    email = f"coach-{suffix}@example.com"
     response = client.post(
         "/auth/signup",
         json={
             "first_name": f"Coach{suffix}",
-            "email": f"coach-{suffix}@example.com",
+            "email": email,
             "password": "StrongPass123!",
         },
     )
     assert response.status_code == 201
+    with TestingSessionLocal() as session:
+        user = session.query(User).filter(User.email == email).one()
+        user.email_verified_at = datetime.now(timezone.utc)
+        session.commit()
     return response.json()["access_token"]
 
 
@@ -41,8 +48,9 @@ def create_league(
     token: str,
     roster_slots: dict | None = None,
     draft_datetime_utc: str | None = None,
-    max_teams: int = 1,
+    max_teams: int = 2,
     kicker_enabled: bool = False,
+    fill_league: bool = True,
 ) -> dict:
     draft_start = draft_datetime_utc or (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
     payload = {
@@ -77,7 +85,11 @@ def create_league(
         headers=auth_headers(token),
     )
     assert response.status_code == 201
-    return response.json()["league"]
+    league = response.json()["league"]
+    if fill_league:
+        for index in range(len(league["members"]), max_teams):
+            join_league(client, league["id"], f"autofill-{league['id']}-{index}")
+    return league
 
 
 def create_player(client, name: str = "Arch Manning", position: str = "QB") -> int:
@@ -173,9 +185,112 @@ def test_draft_pick_persists_and_creates_roster_entry(client):
     assert roster["data"][0]["player"]["id"] == player_id
 
 
+def test_two_user_real_draft_stays_in_sync_and_creates_rosters(client, db_session):
+    owner_token = create_user_and_token(client, "two-browser-owner")
+    league = create_league(
+        client,
+        owner_token,
+        roster_slots={"QB": 1},
+        max_teams=2,
+        fill_league=False,
+    )
+    member_token = join_league(client, league["id"], "two-browser-member")
+    first_qb_id = create_player(client, "Two Browser QB One", "QB")
+    second_qb_id = create_player(client, "Two Browser QB Two", "QB")
+
+    owner_room_response = client.get(
+        f"/leagues/{league['id']}/draft-room",
+        headers=auth_headers(owner_token),
+    )
+    member_room_response = client.get(
+        f"/leagues/{league['id']}/draft-room",
+        headers=auth_headers(member_token),
+    )
+
+    assert owner_room_response.status_code == 200
+    assert member_room_response.status_code == 200
+    owner_room = owner_room_response.json()
+    member_room = member_room_response.json()
+    assert owner_room["current_pick"] == 1
+    assert member_room["current_pick"] == owner_room["current_pick"]
+    assert member_room["current_team_id"] == owner_room["current_team_id"]
+    assert owner_room["can_make_pick"] is True
+    assert member_room["can_make_pick"] is False
+
+    wrong_user_response = client.post(
+        f"/leagues/{league['id']}/draft-picks",
+        json={"player_id": second_qb_id},
+        headers=auth_headers(member_token),
+    )
+    assert wrong_user_response.status_code == 403
+    assert wrong_user_response.json()["detail"] == "not your turn to draft"
+
+    owner_pick_response = client.post(
+        f"/leagues/{league['id']}/draft-picks",
+        json={"player_id": first_qb_id},
+        headers=auth_headers(owner_token),
+    )
+    assert owner_pick_response.status_code == 201
+    after_owner_pick = owner_pick_response.json()
+    assert after_owner_pick["current_pick"] == 2
+    assert len(after_owner_pick["picks"]) == 1
+    assert after_owner_pick["picks"][0]["player_id"] == first_qb_id
+
+    member_updated_response = client.get(
+        f"/leagues/{league['id']}/draft-room",
+        headers=auth_headers(member_token),
+    )
+    assert member_updated_response.status_code == 200
+    member_updated_room = member_updated_response.json()
+    assert member_updated_room["current_pick"] == 2
+    assert member_updated_room["current_team_id"] != owner_room["current_team_id"]
+    assert member_updated_room["can_make_pick"] is True
+    assert [pick["player_id"] for pick in member_updated_room["picks"]] == [first_qb_id]
+
+    duplicate_response = client.post(
+        f"/leagues/{league['id']}/draft-picks",
+        json={"player_id": first_qb_id},
+        headers=auth_headers(member_token),
+    )
+    assert duplicate_response.status_code == 409
+    assert duplicate_response.json()["detail"] == "player already drafted"
+
+    member_pick_response = client.post(
+        f"/leagues/{league['id']}/draft-picks",
+        json={"player_id": second_qb_id},
+        headers=auth_headers(member_token),
+    )
+    assert member_pick_response.status_code == 201
+    completed_room = member_pick_response.json()
+    assert completed_room["status"] == "completed"
+    assert completed_room["current_team_id"] is None
+    assert completed_room["can_make_pick"] is False
+    assert [pick["player_id"] for pick in completed_room["picks"]] == [first_qb_id, second_qb_id]
+
+    db_session.expire_all()
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    league_row = db_session.get(League, league["id"])
+    roster_entries = (
+        db_session.query(RosterEntry)
+        .filter(RosterEntry.league_id == league["id"])
+        .order_by(RosterEntry.player_id.asc())
+        .all()
+    )
+    teams = {team.id: team for team in db_session.query(Team).filter(Team.league_id == league["id"]).all()}
+
+    assert draft.status == "completed"
+    assert league_row.status == "post_draft"
+    assert db_session.query(DraftPick).filter(DraftPick.draft_id == draft.id).count() == 2
+    assert len(roster_entries) == 2
+    assert len(teams) == 2
+    assert {entry.player_id for entry in roster_entries} == {first_qb_id, second_qb_id}
+    assert {entry.team_id for entry in roster_entries} == set(teams)
+
+
 def test_duplicate_draft_pick_returns_409_and_does_not_create_extra_rows(client, db_session):
     token = create_user_and_token(client, "draft-duplicate")
-    league = create_league(client, token, roster_slots={"QB": 2})
+    league = create_league(client, token, roster_slots={"QB": 2}, fill_league=False)
+    member_token = join_league(client, league["id"], f"duplicate-member-{league['id']}")
     player_id = create_player(client, "Duplicate Draft QB", "QB")
 
     first_response = client.post(
@@ -186,7 +301,7 @@ def test_duplicate_draft_pick_returns_409_and_does_not_create_extra_rows(client,
     second_response = client.post(
         f"/leagues/{league['id']}/draft-picks",
         json={"player_id": player_id},
-        headers=auth_headers(token),
+        headers=auth_headers(member_token),
     )
 
     draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
@@ -255,7 +370,7 @@ def test_draft_pick_rejects_before_scheduled_start(client, db_session):
 
 def test_draft_pick_rejects_when_league_is_not_full(client, db_session):
     token = create_user_and_token(client, "draft-not-full")
-    league = create_league(client, token, max_teams=2)
+    league = create_league(client, token, max_teams=2, fill_league=False)
     player_id = create_player(client, "Full League Required QB", "QB")
 
     room_response = client.get(
@@ -343,7 +458,7 @@ def test_draft_room_requires_membership(client):
 
 def test_draft_completion_finalizer_backfills_missing_roster_entries_once(client, db_session):
     owner_token = create_user_and_token(client, "roster-import-owner")
-    league = create_league(client, owner_token, max_teams=1)
+    league = create_league(client, owner_token, max_teams=2)
     first_player_id = create_player(client, "Import QB One", "QB")
 
     pick_response = client.post(
@@ -374,8 +489,8 @@ def test_draft_completion_finalizer_backfills_missing_roster_entries_once(client
 def test_roster_entries_are_league_scoped_and_same_player_can_exist_in_multiple_leagues(client, db_session):
     first_owner_token = create_user_and_token(client, "same-player-owner-a")
     second_owner_token = create_user_and_token(client, "same-player-owner-b")
-    first_league = create_league(client, first_owner_token, max_teams=1)
-    second_league = create_league(client, second_owner_token, max_teams=1)
+    first_league = create_league(client, first_owner_token, max_teams=2)
+    second_league = create_league(client, second_owner_token, max_teams=2)
     player_id = create_player(client, "Shared Player", "QB")
 
     assert client.post(
@@ -396,7 +511,7 @@ def test_roster_entries_are_league_scoped_and_same_player_can_exist_in_multiple_
 
 def test_same_player_cannot_be_owned_twice_in_one_league(client, db_session):
     owner_token = create_user_and_token(client, "same-league-owner")
-    league = create_league(client, owner_token, max_teams=1)
+    league = create_league(client, owner_token, max_teams=2)
     player_id = create_player(client, "One League Player", "QB")
 
     first_pick = client.post(
@@ -423,7 +538,7 @@ def test_same_player_cannot_be_owned_twice_in_one_league(client, db_session):
 
 def test_matchup_endpoint_returns_current_opponent_and_win_probability(client, db_session):
     owner_token = create_user_and_token(client, "matchup-owner")
-    league = create_league(client, owner_token, max_teams=2)
+    league = create_league(client, owner_token, max_teams=2, fill_league=False)
     member_token = join_league(client, league["id"], "matchup-member")
     first_player_id = create_player(client, "Matchup QB One", "QB")
     second_player_id = create_player(client, "Matchup QB Two", "QB")
@@ -467,13 +582,33 @@ def test_matchup_endpoint_returns_current_opponent_and_win_probability(client, d
     assert payload["opponent_team"] is not None
     assert payload["my_team"]["fantasy_team_id"] != payload["opponent_team"]["fantasy_team_id"]
     assert payload["my_team"]["projected_total"] == 24.0
+    assert payload["opponent_team"]["projected_total"] == 12.0
+    assert payload["my_roster"][0]["player_name"] == "Matchup QB One"
+    assert payload["opponent_roster"][0]["player_name"] == "Matchup QB Two"
     assert round(payload["my_team"]["win_probability"] + payload["opponent_team"]["win_probability"], 2) == 100.0
+
+
+def test_matchup_endpoint_returns_empty_state_when_no_matchup_exists(client):
+    owner_token = create_user_and_token(client, "matchup-empty-owner")
+    league = create_league(client, owner_token, max_teams=2, fill_league=False)
+
+    response = client.get(
+        f"/leagues/{league['id']}/matchup",
+        headers=auth_headers(owner_token),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["matchup_id"] is None
+    assert payload["opponent_team"] is None
+    assert payload["opponent_roster"] == []
+    assert payload["message"] == "No matchup generated yet."
 
 
 def test_non_league_members_cannot_view_roster_matchup_waivers_or_settings(client):
     owner_token = create_user_and_token(client, "tabs-owner")
     outsider_token = create_user_and_token(client, "tabs-outsider")
-    league = create_league(client, owner_token, max_teams=1)
+    league = create_league(client, owner_token, max_teams=2)
 
     for path in ("roster", "matchup", "waivers", "settings-view"):
         response = client.get(
@@ -487,8 +622,8 @@ def test_non_league_members_cannot_view_roster_matchup_waivers_or_settings(clien
 def test_waiver_available_players_are_scoped_to_current_league(client):
     first_owner_token = create_user_and_token(client, "waiver-owner-a")
     second_owner_token = create_user_and_token(client, "waiver-owner-b")
-    first_league = create_league(client, first_owner_token, max_teams=1)
-    second_league = create_league(client, second_owner_token, max_teams=1)
+    first_league = create_league(client, first_owner_token, max_teams=2)
+    second_league = create_league(client, second_owner_token, max_teams=2)
     owned_player_id = create_player(client, "Scoped Waiver Owned QB", "QB")
     available_player_id = create_player(client, "Scoped Waiver Available QB", "QB")
 
@@ -519,7 +654,7 @@ def test_waiver_available_players_are_scoped_to_current_league(client):
 
 def test_roster_endpoint_returns_zero_projection_and_ir_capacity(client):
     owner_token = create_user_and_token(client, "roster-view-owner")
-    league = create_league(client, owner_token, max_teams=1)
+    league = create_league(client, owner_token, max_teams=2)
     player_id = create_player(client, "Projection Missing QB", "QB")
     assert client.post(
         f"/leagues/{league['id']}/draft-picks",

@@ -57,6 +57,24 @@ class Settings(BaseSettings):
     refresh_cookie_samesite: str = "lax"
     refresh_cookie_domain: str | None = None
     allow_legacy_api_token_auth: bool = False
+    auth_email_verification_ttl_hours: int = 24
+    auth_password_reset_ttl_minutes: int = 30
+    auth_failed_login_limit: int = 5
+    auth_failed_login_window_minutes: int = 15
+    auth_lockout_minutes: int = 15
+    auth_rate_limit_window_minutes: int = 15
+    auth_signup_rate_limit: int = 5
+    auth_login_rate_limit: int = 10
+    auth_refresh_rate_limit: int = 30
+    auth_password_reset_rate_limit: int = 5
+    auth_resend_verification_rate_limit: int = 5
+    email_delivery_mode: str = "console"
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str | None = None
+    smtp_use_tls: bool = True
 
     model_config = SettingsConfigDict(
         env_file=(str(PROJECT_ROOT / ".env"), ".env"),
@@ -112,6 +130,11 @@ class Settings(BaseSettings):
 
         if not self.refresh_cookie_secure:
             raise ValueError("REFRESH_COOKIE_SECURE must be true when ENVIRONMENT=production")
+
+        if self.email_delivery_mode.strip().lower() == "smtp" and (
+            not self.smtp_host or not self.smtp_from_email
+        ):
+            raise ValueError("SMTP_HOST and SMTP_FROM_EMAIL are required when ENVIRONMENT=production")
 
         return self
 

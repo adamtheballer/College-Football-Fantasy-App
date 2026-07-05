@@ -17,9 +17,9 @@ const steps = ["Basics", "Settings", "Draft", "Review"] as const;
 const leagueSizes = [6, 8, 10, 12, 14, 16];
 const playoffOptions = [2, 4, 6, 8];
 const waiverOptions = [
-  { label: "FAAB", value: "faab" },
-  { label: "Rolling Waivers", value: "rolling" },
-  { label: "Reverse Standings", value: "reverse" },
+  { label: "FAAB (future claims)", value: "faab" },
+  { label: "Rolling Priority (future claims)", value: "rolling" },
+  { label: "Reverse Standings (future claims)", value: "reverse" },
 ];
 const tradeReviewOptions = [
   { label: "Commissioner", value: "commissioner" },
@@ -713,7 +713,7 @@ function CreateLeagueForm() {
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field label="Waiver type">
+                  <Field label="Claims policy (not enabled yet)">
                     <Select
                       value={settings.waiver_type}
                       onValueChange={(value) => setSettings((prev) => ({ ...prev, waiver_type: value }))}

@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from collegefootballfantasy_api.app.api.deps import get_current_user, get_league_or_404, require_league_member
+from collegefootballfantasy_api.app.api.deps import (
+    get_current_user,
+    get_league_or_404,
+    require_league_member,
+    require_verified_user,
+)
 from collegefootballfantasy_api.app.crud.team import list_teams
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.team import Team
@@ -20,7 +25,7 @@ def create_team_endpoint(
     league_id: int,
     team_in: TeamCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> TeamRead:
     get_league_or_404(db, league_id)
     require_league_member(db, league_id, current_user)

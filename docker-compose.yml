@@ -39,6 +39,7 @@ services:
     working_dir: /app/web
     volumes:
       - ./:/app
+      - /app/web/node_modules
     ports:
       - "8080:8080"
     depends_on:

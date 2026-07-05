@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ApiError } from "@/lib/api";
 import Layout from "./components/Layout";
 
 const Index = lazy(() => import("./pages/Index"));
@@ -34,7 +35,25 @@ const Chats = lazy(() => import("./pages/Chats"));
 const InjuryCenter = lazy(() => import("./pages/InjuryCenter"));
 const Trade = lazy(() => import("./pages/Trade"));
 
-const queryClient = new QueryClient();
+const NON_RETRYABLE_STATUSES = new Set([401, 403, 404]);
+
+const shouldRetryQuery = (failureCount: number, error: unknown) => {
+  if (error instanceof ApiError && NON_RETRYABLE_STATUSES.has(error.status)) {
+    return false;
+  }
+  return failureCount < 3;
+};
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: shouldRetryQuery,
+    },
+    mutations: {
+      retry: shouldRetryQuery,
+    },
+  },
+});
 
 const RouteFallback = () => (
   <div className="flex min-h-[45vh] items-center justify-center">

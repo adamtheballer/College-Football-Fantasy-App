@@ -108,7 +108,7 @@ export default function Login() {
               </span>
             </h1>
             <p className="max-w-xl text-sm font-bold uppercase tracking-[0.16em] text-slate-200/70">
-              Draft boards, live scoring, waiver runs, and league bragging rights in one electric college football command center.
+              Draft boards, live scoring, available-player tracking, and league bragging rights in one electric college football command center.
             </p>
           </div>
 
@@ -127,7 +127,7 @@ export default function Login() {
           </div>
 
           <div className="flex max-w-xl flex-wrap gap-3">
-            {["CFB rankings", "Rivalry week", "Waiver wire", "Draft room"].map((label) => (
+            {["CFB rankings", "Rivalry week", "Available players", "Draft room"].map((label) => (
               <span key={label} className="rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/75">
                 {label}
               </span>

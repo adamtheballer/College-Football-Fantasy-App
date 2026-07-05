@@ -6,6 +6,7 @@ from collegefootballfantasy_api.app.api.deps import (
     get_league_or_404,
     require_commissioner,
     require_league_member,
+    require_verified_user,
 )
 from collegefootballfantasy_api.app.crud.league import delete_league, list_leagues
 from collegefootballfantasy_api.app.db.session import get_db
@@ -69,7 +70,7 @@ router = APIRouter()
 def create_league_endpoint(
     payload: LeagueCreateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> LeagueCreateResponse:
     return create_league(payload, db, current_user)
 
@@ -78,7 +79,7 @@ def create_league_endpoint(
 def create_league_flow(
     payload: LeagueCreateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> LeagueCreateResponse:
     return create_league(payload, db, current_user)
 
@@ -238,7 +239,7 @@ def create_draft_pick_endpoint(
     league_id: int,
     payload: DraftPickCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> DraftRoomRead:
     league = get_league_or_404(db, league_id)
     require_league_member(db, league.id, current_user)
@@ -288,7 +289,7 @@ def join_by_code(payload: JoinByCodeRequest, db: Session = Depends(get_db)) -> L
 def join_league(
     league_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> LeagueDetailRead:
     league = db.get(League, league_id)
     if not league:
@@ -300,7 +301,7 @@ def join_league(
 def regenerate_invite(
     league_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> LeagueCreateResponse:
     league, _ = require_commissioner(db, league_id, current_user)
     return regenerate_invite_flow(db, league, current_user)
@@ -311,7 +312,7 @@ def update_league_settings(
     league_id: int,
     payload: LeagueSettingsUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> LeagueDetailRead:
     league, _ = require_commissioner(db, league_id, current_user)
     return update_league_settings_flow(db, league, payload)
@@ -322,7 +323,7 @@ def reschedule_draft(
     league_id: int,
     payload: DraftUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> DraftRead:
     league, _ = require_commissioner(db, league_id, current_user)
     return reschedule_draft_flow(db, league, payload)
@@ -332,7 +333,7 @@ def reschedule_draft(
 def delete_league_endpoint(
     league_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_verified_user),
 ) -> None:
     league, _ = require_commissioner(db, league_id, current_user)
     delete_league(db, league)

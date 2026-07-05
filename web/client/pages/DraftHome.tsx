@@ -74,7 +74,7 @@ export default function DraftHome() {
             Draft
           </h1>
           <p className="max-w-3xl text-base font-semibold leading-7 text-slate-300">
-            Practice in a single-player mock, preview league drafts, and enter the real draft room only when a league draft is ready.
+            Practice in a local-only single-player mock, preview league drafts, and enter the real draft room only when a league draft is ready.
           </p>
         </div>
         <Button
@@ -99,7 +99,7 @@ export default function DraftHome() {
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-200">Mock Draft Setup</p>
                 <h2 className="mt-2 text-2xl font-black tracking-tight text-white">Tune the room before you enter</h2>
                 <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-300">
-                  These settings apply to the next new single-player mock. The draft room stays fullscreen; this page stays a normal app tab.
+                  These settings apply to the next new single-player mock. Mock drafts run in this browser only and are not saved to the backend.
                 </p>
               </div>
             </div>

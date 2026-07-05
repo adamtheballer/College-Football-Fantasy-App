@@ -9,8 +9,26 @@ import { useLeagueMatchupTab } from "@/hooks/use-leagues";
 import {
   DEMO_LEAGUE_ID,
   createDemoLeagueMatchupResponse,
-  createWeekOnePreviewMatchup,
 } from "@/lib/leaguePreviewData";
+
+function MatchupEmptyState({
+  title,
+  detail,
+}: {
+  title: string;
+  detail: string;
+}) {
+  return (
+    <section className="rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(13,23,39,0.96),rgba(16,30,52,0.9)_48%,rgba(15,23,42,0.96))] p-8 text-center shadow-[0_24px_90px_rgba(14,165,233,0.12)]">
+      <p className="text-[11px] font-black uppercase tracking-[0.24em] text-sky-300">
+        {title}
+      </p>
+      <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-400">
+        {detail}
+      </p>
+    </section>
+  );
+}
 
 export default function LeagueMatchup() {
   const { leagueId } = useParams();
@@ -21,11 +39,8 @@ export default function LeagueMatchup() {
   const data = isDemoLeague ? createDemoLeagueMatchupResponse() : matchupQuery.data;
   const myTeam = data?.my_team ?? data?.user_team ?? null;
   const opponentTeam = data?.opponent_team ?? null;
-  const previewMatchup = createWeekOnePreviewMatchup(myTeam?.fantasy_team_name ?? "Your Team");
-  const isPreviewMatchup = !isDemoLeague && !matchupQuery.isLoading && (!myTeam || !opponentTeam);
-  const displayMyTeam = myTeam ?? previewMatchup.myTeam;
-  const displayOpponentTeam = opponentTeam ?? previewMatchup.opponentTeam;
   const displayWeek = selectedWeek ?? data?.week ?? 1;
+  const hasScheduledMatchup = Boolean(data?.matchup_id && myTeam && opponentTeam);
 
   return (
     <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
@@ -50,53 +65,62 @@ export default function LeagueMatchup() {
         <LeagueTabs leagueId={parsedLeagueId} />
       </div>
 
-      {isPreviewMatchup ? (
-        <section className="rounded-[1.25rem] border border-sky-300/25 bg-sky-400/[0.08] px-5 py-4 shadow-[0_0_36px_rgba(56,189,248,0.12)]">
-          <p className="text-sm font-bold text-sky-100">
-            Week 1 matchup preview is shown until the schedule and roster projections are generated.
-          </p>
-        </section>
-      ) : null}
+      {matchupQuery.isLoading && !isDemoLeague ? (
+        <MatchupEmptyState
+          title="Loading matchup"
+          detail="Checking whether this league has a scheduled matchup for the selected week."
+        />
+      ) : !hasScheduledMatchup ? (
+        <MatchupEmptyState
+          title="No matchup scheduled"
+          detail={
+            data?.message ??
+            "No real matchup exists for this league and week yet. Once the schedule is generated, the opponent, win chance, and side-by-side lineup will appear here."
+          }
+        />
+      ) : (
+        <>
+          <section className="rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(13,23,39,0.96),rgba(16,30,52,0.9)_48%,rgba(15,23,42,0.96))] p-6 shadow-[0_24px_90px_rgba(14,165,233,0.12)]">
+            <div className="grid gap-5 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
+                  Your Team
+                </p>
+                <p className="mt-2 text-3xl font-black italic text-slate-50">
+                  {myTeam.fantasy_team_name}
+                </p>
+                <p className="text-sm font-bold text-slate-400">{myTeam.record}</p>
+              </div>
+              <div className="rounded-[1.5rem] border border-sky-300/25 bg-sky-400/10 px-8 py-5 text-center shadow-[0_0_40px_rgba(56,189,248,0.14)]">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-sky-200">
+                  Week {displayWeek}
+                </p>
+                <p className="mt-1 text-2xl font-black text-slate-50">
+                  {(myTeam.projected_total ?? 0).toFixed(1)} - {(opponentTeam.projected_total ?? 0).toFixed(1)}
+                </p>
+              </div>
+              <div className="text-left lg:text-right">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
+                  Opponent
+                </p>
+                <p className="mt-2 text-3xl font-black italic text-slate-50">
+                  {opponentTeam.fantasy_team_name}
+                </p>
+                <p className="text-sm font-bold text-slate-400">{opponentTeam.record}</p>
+              </div>
+            </div>
+            <div className="mt-6">
+              <WinChanceMeter
+                myPercent={myTeam.win_probability}
+                opponentPercent={opponentTeam.win_probability}
+              />
+            </div>
+            {data?.message ? <p className="mt-4 text-sm text-slate-400">{data.message}</p> : null}
+          </section>
 
-      <section className="rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(13,23,39,0.96),rgba(16,30,52,0.9)_48%,rgba(15,23,42,0.96))] p-6 shadow-[0_24px_90px_rgba(14,165,233,0.12)]">
-        <div className="grid gap-5 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-              Your Team
-            </p>
-            <p className="mt-2 text-3xl font-black italic text-slate-50">
-              {displayMyTeam.fantasy_team_name}
-            </p>
-            <p className="text-sm font-bold text-slate-400">{displayMyTeam.record}</p>
-          </div>
-          <div className="rounded-[1.5rem] border border-sky-300/25 bg-sky-400/10 px-8 py-5 text-center shadow-[0_0_40px_rgba(56,189,248,0.14)]">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-sky-200">
-              Week {displayWeek}
-            </p>
-            <p className="mt-1 text-2xl font-black text-slate-50">
-              {(displayMyTeam.projected_total ?? 0).toFixed(1)} - {(displayOpponentTeam.projected_total ?? 0).toFixed(1)}
-            </p>
-          </div>
-          <div className="text-left lg:text-right">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-              Opponent
-            </p>
-            <p className="mt-2 text-3xl font-black italic text-slate-50">
-              {displayOpponentTeam.fantasy_team_name}
-            </p>
-            <p className="text-sm font-bold text-slate-400">{displayOpponentTeam.record}</p>
-          </div>
-        </div>
-        <div className="mt-6">
-          <WinChanceMeter
-            myPercent={displayMyTeam.win_probability}
-            opponentPercent={displayOpponentTeam.win_probability}
-          />
-        </div>
-        {data?.message ? <p className="mt-4 text-sm text-slate-400">{data.message}</p> : null}
-      </section>
-
-      <SideBySideMatchup myTeam={displayMyTeam} opponentTeam={displayOpponentTeam} leagueId={parsedLeagueId} />
+          <SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={parsedLeagueId} />
+        </>
+      )}
     </main>
   );
 }

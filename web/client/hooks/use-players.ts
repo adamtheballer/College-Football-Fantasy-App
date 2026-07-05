@@ -320,20 +320,33 @@ export function useDraftPlayerPool(
           offset: pageOffset,
         });
 
-      const firstPayload = await fetchPage(offset);
+      const [firstPayload, teams] = await Promise.all([
+        fetchPage(offset),
+        apiGet<BackendTeamSummaryResponse>("/stats/teams", {
+          season: new Date().getFullYear(),
+          conference: "ALL",
+        }).catch(
+          (): BackendTeamSummaryResponse => ({
+            data: [],
+          })
+        ),
+      ]);
       const pageCount = Math.max(1, pages);
       const remainingOffsets = Array.from({ length: pageCount - 1 }, (_, index) => offset + limit * (index + 1));
       const remainingPayloads = remainingOffsets.length
         ? await Promise.all(remainingOffsets.map((pageOffset) => fetchPage(pageOffset)))
         : [];
       const rows = [firstPayload, ...remainingPayloads].flatMap((payload) => payload.data);
+      const conferenceBySchool = new Map(
+        teams.data.map((row): [string, string] => [row.team.toUpperCase(), row.conference])
+      );
 
       return {
         ...firstPayload,
         limit: limit * pageCount,
         data: rows.map((player) =>
           normalizePlayer(player, {
-            conference: "N/A",
+            conference: conferenceBySchool.get(player.school.toUpperCase()) ?? "N/A",
             rank: player.board_rank ?? player.sheet_adp ?? 0,
             adp: player.sheet_adp ?? player.board_rank ?? 0,
             posRank: null,

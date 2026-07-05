@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -10,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import {
   ApiError,
+  apiDelete,
   apiGet,
   apiPost,
   clearAccessTokenSession,
@@ -21,22 +23,46 @@ export interface User {
   firstName: string;
   email: string;
   id: number;
+  emailVerifiedAt: string | null;
 }
+
+export type AuthSession = {
+  id: number;
+  issuedAt: string;
+  expiresAt: string;
+  lastUsedAt: string | null;
+  userAgent: string | null;
+  ipAddress: string | null;
+  isCurrent: boolean;
+};
+
+type AuthUserPayload = {
+  id: number;
+  first_name: string;
+  email: string;
+  email_verified_at?: string | null;
+};
 
 type AuthPayload = {
   access_token: string;
   access_token_expires_at: string;
-  user: {
-    id: number;
-    first_name: string;
-    email: string;
-  };
+  user: AuthUserPayload;
 };
 
-type UserReadPayload = {
+type UserReadPayload = AuthUserPayload;
+
+type AuthSessionPayload = {
   id: number;
-  first_name: string;
-  email: string;
+  issued_at: string;
+  expires_at: string;
+  last_used_at?: string | null;
+  user_agent?: string | null;
+  ip_address?: string | null;
+  is_current?: boolean;
+};
+
+type SessionsPayload = {
+  sessions: AuthSessionPayload[];
 };
 
 type AuthContextValue = {
@@ -44,6 +70,13 @@ type AuthContextValue = {
   login: (email: string, password: string) => Promise<User>;
   signup: (firstName: string, email: string, password: string) => Promise<User>;
   logout: () => void;
+  resendVerification: (email?: string) => Promise<void>;
+  verifyEmail: (token: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  confirmPasswordReset: (token: string, newPassword: string) => Promise<void>;
+  listSessions: () => Promise<AuthSession[]>;
+  revokeSession: (sessionId: number) => Promise<void>;
+  logoutAll: () => Promise<void>;
   isLoggedIn: boolean;
   isBootstrapping: boolean;
 };
@@ -100,7 +133,7 @@ const loadStoredUser = (): User | null => {
       clearStoredAuth();
       return null;
     }
-    return parsedUser;
+    return { ...parsedUser, emailVerifiedAt: parsedUser.emailVerifiedAt ?? null };
   } catch {
     clearStoredAuth();
     return null;
@@ -112,16 +145,23 @@ const persistUser = (user: User, accessToken: string, accessTokenExpiresAt: stri
   storeAccessTokenSession(accessToken, accessTokenExpiresAt);
 };
 
-const mapAuthPayload = (payload: AuthPayload): User => ({
-  id: payload.user.id,
-  firstName: payload.user.first_name,
-  email: payload.user.email,
-});
-
-const mapUserReadPayload = (payload: UserReadPayload): User => ({
+const mapUserPayload = (payload: AuthUserPayload): User => ({
   id: payload.id,
   firstName: payload.first_name,
   email: payload.email,
+  emailVerifiedAt: payload.email_verified_at ?? null,
+});
+
+const mapAuthPayload = (payload: AuthPayload): User => mapUserPayload(payload.user);
+
+const mapSessionPayload = (payload: AuthSessionPayload): AuthSession => ({
+  id: payload.id,
+  issuedAt: payload.issued_at,
+  expiresAt: payload.expires_at,
+  lastUsedAt: payload.last_used_at ?? null,
+  userAgent: payload.user_agent ?? null,
+  ipAddress: payload.ip_address ?? null,
+  isCurrent: !!payload.is_current,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -145,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     apiGet<UserReadPayload>("/auth/me", undefined, controller.signal)
       .then((payload) => {
         if (cancelled) return;
-        const nextUser = mapUserReadPayload(payload);
+        const nextUser = mapUserPayload(payload);
         safeStorageSet(USER_STORAGE_KEY, JSON.stringify(nextUser));
         setUser(nextUser);
       })
@@ -180,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     const payload = await apiPost<AuthPayload>("/auth/login", { email, password });
     const nextUser = mapAuthPayload(payload);
     persistUser(nextUser, payload.access_token, payload.access_token_expires_at);
@@ -188,9 +228,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(nextUser);
     dispatchAuthChanged();
     return nextUser;
-  };
+  }, [queryClient]);
 
-  const signup = async (firstName: string, email: string, password: string) => {
+  const signup = useCallback(async (firstName: string, email: string, password: string) => {
     const payload = await apiPost<AuthPayload>("/auth/signup", {
       first_name: firstName,
       email,
@@ -202,9 +242,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(nextUser);
     dispatchAuthChanged();
     return nextUser;
-  };
+  }, [queryClient]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     void apiPost("/auth/logout", {}).catch(() => {
       // Ignore network failures; local logout must still complete.
     });
@@ -212,7 +252,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
     setUser(null);
     dispatchAuthChanged();
-  };
+  }, [queryClient]);
+
+  const resendVerification = useCallback(async (email?: string) => {
+    const targetEmail = (email || user?.email || "").trim();
+    if (!targetEmail) {
+      throw new Error("Email is required to resend verification.");
+    }
+    await apiPost("/auth/resend-verification", { email: targetEmail });
+  }, [user?.email]);
+
+  const verifyEmail = useCallback(async (token: string) => {
+    await apiPost("/auth/verify-email", { token });
+    const nextUserPayload = await apiGet<UserReadPayload>("/auth/me");
+    const nextUser = mapUserPayload(nextUserPayload);
+    safeStorageSet(USER_STORAGE_KEY, JSON.stringify(nextUser));
+    queryClient.invalidateQueries();
+    setUser(nextUser);
+    dispatchAuthChanged();
+  }, [queryClient]);
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    await apiPost("/auth/password-reset/request", { email });
+  }, []);
+
+  const confirmPasswordReset = useCallback(async (token: string, newPassword: string) => {
+    await apiPost("/auth/password-reset/confirm", { token, new_password: newPassword });
+    clearStoredAuth();
+    queryClient.clear();
+    setUser(null);
+    dispatchAuthChanged();
+  }, [queryClient]);
+
+  const listSessions = useCallback(async () => {
+    const payload = await apiGet<SessionsPayload>("/auth/sessions");
+    return payload.sessions.map(mapSessionPayload);
+  }, []);
+
+  const revokeSession = useCallback(async (sessionId: number) => {
+    await apiDelete(`/auth/sessions/${sessionId}`);
+  }, []);
+
+  const logoutAll = useCallback(async () => {
+    await apiPost("/auth/logout-all", {});
+    clearStoredAuth();
+    queryClient.clear();
+    setUser(null);
+    dispatchAuthChanged();
+  }, [queryClient]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -220,10 +307,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       signup,
       logout,
+      resendVerification,
+      verifyEmail,
+      requestPasswordReset,
+      confirmPasswordReset,
+      listSessions,
+      revokeSession,
+      logoutAll,
       isLoggedIn: !!user,
       isBootstrapping,
     }),
-    [isBootstrapping, user]
+    [
+      confirmPasswordReset,
+      isBootstrapping,
+      listSessions,
+      login,
+      logout,
+      logoutAll,
+      requestPasswordReset,
+      resendVerification,
+      revokeSession,
+      signup,
+      user,
+      verifyEmail,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

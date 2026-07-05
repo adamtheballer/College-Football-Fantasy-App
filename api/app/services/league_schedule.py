@@ -50,8 +50,10 @@ def ensure_league_schedule(
         .order_by(Team.created_at.asc(), Team.id.asc())
         .all()
     )
-    if len(teams) < 2 or len(teams) % 2 != 0:
+    if len(teams) < 2:
         return 0
+    if len(teams) % 2 != 0:
+        raise ValueError("Even number of teams required for every team to play each week.")
 
     created = 0
     for week_index, week_matchups in enumerate(

@@ -39,6 +39,12 @@ def get_current_user(
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing auth token")
 
 
+def require_verified_user(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.email_verified_at is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="email verification required")
+    return current_user
+
+
 def get_league_or_404(db: Session, league_id: int) -> League:
     league = db.get(League, league_id)
     if not league:

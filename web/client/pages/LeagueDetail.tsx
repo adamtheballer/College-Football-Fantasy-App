@@ -39,7 +39,7 @@ type LeagueTab = "roster" | "matchup" | "waivers" | "settings";
 const tabs: Array<{ id: LeagueTab; label: string; icon: ComponentType<{ className?: string }> }> = [
   { id: "roster", label: "Roster", icon: ClipboardList },
   { id: "matchup", label: "Matchup", icon: Trophy },
-  { id: "waivers", label: "Waiver Wire", icon: ShieldCheck },
+  { id: "waivers", label: "Available Players", icon: ShieldCheck },
   { id: "settings", label: "Settings", icon: Settings2 },
 ];
 
@@ -291,12 +291,29 @@ function MatchupTab({
 }) {
   const userTeam = data?.user_team ?? null;
   const opponentTeam = data?.opponent_team ?? null;
+  const hasScheduledMatchup = Boolean(data?.matchup_id && userTeam && opponentTeam);
 
   if (isLoading) {
     return (
       <Card className="rounded-[2rem] border-white/10 bg-[#0d1727]/90">
         <CardContent className="p-6">
           <EmptyState title="Loading matchup" detail="Fetching your current week matchup." />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!hasScheduledMatchup) {
+    return (
+      <Card className="rounded-[2rem] border-white/10 bg-[#0d1727]/90">
+        <CardContent className="p-6">
+          <EmptyState
+            title="No matchup scheduled"
+            detail={
+              data?.message ??
+              "No real matchup exists for this league and week yet. Once the schedule is generated, matchup projections will appear here."
+            }
+          />
         </CardContent>
       </Card>
     );
@@ -312,10 +329,10 @@ function MatchupTab({
                 Your Team
               </p>
               <p className="mt-2 text-3xl font-black italic text-slate-50">
-                {userTeam?.fantasy_team_name || "Team pending"}
+                {userTeam.fantasy_team_name}
               </p>
               <p className="text-sm font-bold text-slate-400">
-                {userTeam?.record || "0-0-0"}
+                {userTeam.record}
               </p>
             </div>
             <div className="rounded-[1.5rem] border border-sky-300/20 bg-sky-400/10 px-8 py-5 text-center">
@@ -323,7 +340,7 @@ function MatchupTab({
                 Week {data?.week ?? 1}
               </p>
               <p className="mt-1 text-2xl font-black text-slate-50">
-                {formatNumber(userTeam?.projected_total)} - {formatNumber(opponentTeam?.projected_total)}
+                {formatNumber(userTeam.projected_total)} - {formatNumber(opponentTeam.projected_total)}
               </p>
             </div>
             <div className="text-left lg:text-right">
@@ -331,17 +348,17 @@ function MatchupTab({
                 Opponent
               </p>
               <p className="mt-2 text-3xl font-black italic text-slate-50">
-                {opponentTeam?.fantasy_team_name || "Opponent pending"}
+                {opponentTeam.fantasy_team_name}
               </p>
               <p className="text-sm font-bold text-slate-400">
-                {opponentTeam?.record || "0-0-0"}
+                {opponentTeam.record}
               </p>
             </div>
           </div>
           <div className="mt-6">
             <ProbabilityMeter
-              userProbability={userTeam?.win_probability ?? 50}
-              opponentProbability={opponentTeam?.win_probability ?? 50}
+              userProbability={userTeam.win_probability}
+              opponentProbability={opponentTeam.win_probability}
             />
           </div>
         </CardContent>
@@ -367,7 +384,7 @@ function WaiverTab({
       <CardHeader className="border-b border-white/10">
         <CardTitle className="flex items-center justify-between gap-4">
           <span className="text-[11px] font-black uppercase tracking-[0.24em] text-sky-300">
-            Waiver Wire
+            Available Players
           </span>
           <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
             {data?.total_available ?? 0} available
@@ -380,7 +397,7 @@ function WaiverTab({
             Available In This League
           </p>
           {isLoading ? (
-            <EmptyState title="Loading waivers" detail="Checking current league ownership only." />
+            <EmptyState title="Loading available players" detail="Checking current league ownership only." />
           ) : (data?.available_players ?? []).length === 0 ? (
             <EmptyState title="No available players" detail="Every visible player is already owned in this league." />
           ) : (
@@ -412,12 +429,12 @@ function WaiverTab({
 
         <div>
           <p className="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-            Your Claims
+            Claims Not Enabled
           </p>
           {(data?.claims ?? []).length === 0 ? (
             <EmptyState
-              title="No claims pending"
-              detail="Claims created through the league waiver API will appear here with league and team scope."
+              title="Claims disabled"
+              detail="Backend claims are not enabled yet. Use this page to find available players and watch targets."
             />
           ) : (
             <div className="space-y-3">
@@ -496,10 +513,10 @@ function SettingsTab({
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-              Waiver Rules
+              Future Claims Policy
             </p>
             <p className="mt-2 text-sm font-black uppercase tracking-[0.12em] text-slate-100">
-              {String(data?.waiver_rules.waiver_type ?? "Waivers pending")}
+              Claims not enabled · {String(data?.waiver_rules.waiver_type ?? "policy pending")}
             </p>
           </div>
           <div>

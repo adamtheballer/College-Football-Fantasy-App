@@ -1,8 +1,12 @@
+from datetime import datetime, timezone
+
+from conftest import TestingSessionLocal
 import pytest
 from sqlalchemy.exc import IntegrityError
 
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.user import User
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -19,6 +23,10 @@ def create_user_and_token(client, suffix: str = "one") -> str:
         },
     )
     assert response.status_code == 201
+    with TestingSessionLocal() as session:
+        user = session.query(User).filter(User.email == f"coach-{suffix}@example.com").one()
+        user.email_verified_at = datetime.now(timezone.utc)
+        session.commit()
     return response.json()["access_token"]
 
 

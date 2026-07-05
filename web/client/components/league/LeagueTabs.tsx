@@ -4,7 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 const tabs = [
   { label: "Roster", path: "roster", icon: ClipboardList },
   { label: "Matchup", path: "matchup", icon: Swords },
-  { label: "Waiver Wire", path: "waivers", icon: ShieldCheck },
+  { label: "Available Players", path: "waivers", icon: ShieldCheck },
   { label: "Watchlist", path: "watchlist", icon: Bookmark },
   { label: "Settings", path: "settings", icon: Settings2 },
 ];

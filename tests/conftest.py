@@ -11,6 +11,8 @@ from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.main import app
 from collegefootballfantasy_api.app.models import (  # noqa: F401
     cfb_standing_snapshot,
+    auth_action_token,
+    auth_rate_limit_event,
     draft,
     draft_pick,
     game,

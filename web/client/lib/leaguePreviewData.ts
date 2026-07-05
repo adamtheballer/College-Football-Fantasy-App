@@ -51,13 +51,13 @@ const schoolByPosition: Record<string, string[]> = {
 
 export const DEMO_LEAGUE_DETAIL: LeagueDetail = {
   id: DEMO_LEAGUE_ID,
-  name: "Matchup Test League",
+  name: "Alpha Demo League",
   commissioner_user_id: 1,
   season_year: 2026,
   max_teams: 10,
   is_private: true,
   invite_code: "DEMOLEAGUE",
-  description: "Dev-only 10-manager demo league for roster, matchup, waiver wire, and settings visuals.",
+  description: "Dev-only 10-manager demo league for roster, matchup, Available Players, and settings visuals.",
   icon_url: null,
   status: "post_draft",
   created_at: nowIso,
@@ -600,51 +600,4 @@ export function createWeekOnePreviewRoster(
       projection: previewProjection.BENCH4,
     }),
   ];
-}
-
-export function createWeekOnePreviewMatchup(
-  teamName = "Your Team"
-): { myTeam: LeagueMatchupTeam; opponentTeam: LeagueMatchupTeam } {
-  const myRoster = createWeekOnePreviewRoster(-100, teamName);
-  const opponentRoster = createWeekOnePreviewRoster(-200, "Week 1 Opponent").map((player) => ({
-    ...player,
-    id: player.id - 100,
-    player_id: player.player_id - 100,
-    fantasy_team_id: -200,
-    fantasy_team_name: "Week 1 Opponent",
-    team_id: -200,
-    projected_points: Number((player.weekly_projected_fantasy_points * 0.94).toFixed(1)),
-    weekly_projected_fantasy_points: Number((player.weekly_projected_fantasy_points * 0.94).toFixed(1)),
-  }));
-  const myTotal = myRoster
-    .filter((player) => player.is_starter)
-    .reduce((total, player) => total + Number(player.weekly_projected_fantasy_points ?? 0), 0);
-  const opponentTotal = opponentRoster
-    .filter((player) => player.is_starter)
-    .reduce((total, player) => total + Number(player.weekly_projected_fantasy_points ?? 0), 0);
-
-  return {
-    myTeam: {
-      id: -100,
-      name: teamName,
-      fantasy_team_id: -100,
-      fantasy_team_name: teamName,
-      record: "0-0",
-      projected_points: myTotal,
-      projected_total: myTotal,
-      win_probability: 54,
-      roster: myRoster,
-    },
-    opponentTeam: {
-      id: -200,
-      name: "Week 1 Opponent",
-      fantasy_team_id: -200,
-      fantasy_team_name: "Week 1 Opponent",
-      record: "0-0",
-      projected_points: opponentTotal,
-      projected_total: opponentTotal,
-      win_probability: 46,
-      roster: opponentRoster,
-    },
-  };
 }

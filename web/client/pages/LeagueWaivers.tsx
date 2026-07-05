@@ -142,7 +142,7 @@ export default function LeagueWaivers() {
 
       toast({
         title: watchedPlayerIds.has(playerId) ? "Removed from watchlist" : "Added to watchlist",
-        description: "Open the Watchlist tab to review saved waiver targets.",
+        description: "Open the Watchlist tab to review saved available-player targets.",
       });
     } catch (error) {
       toast({
@@ -158,13 +158,13 @@ export default function LeagueWaivers() {
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[460px] rounded-[3rem] bg-[radial-gradient(circle_at_20%_8%,rgba(56,189,248,0.2),transparent_32%),radial-gradient(circle_at_72%_0%,rgba(99,102,241,0.18),transparent_38%),radial-gradient(circle_at_50%_30%,rgba(14,165,233,0.12),transparent_42%)] blur-2xl" />
       <div className="space-y-4">
         <p className="text-[11px] font-black uppercase tracking-[0.24em] text-sky-300">
-          League Waivers
+          League Players
         </p>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-4xl font-black italic text-slate-50">Waiver Wire</h1>
+            <h1 className="text-4xl font-black italic text-slate-50">Available Players</h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              League-scoped available players only. Drafted players are on rosters; ownership in other leagues does not remove a player here.
+              League-scoped available players only. Claims are not enabled yet, so this page is for finding and watching free agents.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3 sm:min-w-[430px]">
@@ -178,7 +178,7 @@ export default function LeagueWaivers() {
             </div>
             <div className="rounded-[1.25rem] border border-violet-300/20 bg-violet-400/10 p-4 shadow-[0_0_34px_rgba(167,139,250,0.10)]">
               <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Claims</p>
-              <p className="mt-1 text-2xl font-black text-violet-100">{waiverData?.claims?.length ?? 0}</p>
+              <p className="mt-1 text-sm font-black uppercase tracking-[0.14em] text-violet-100">Not Enabled</p>
             </div>
           </div>
         </div>
@@ -193,7 +193,7 @@ export default function LeagueWaivers() {
                 Available Players
               </h2>
               <p className="mt-2 text-xs font-semibold text-slate-500">
-                Only players not selected in this league draft appear here. Watch targets or add them from this league only.
+                Only players not selected in this league draft appear here. Watch targets for now; claims and add/drop are not enabled yet.
               </p>
             </div>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -262,7 +262,7 @@ export default function LeagueWaivers() {
                         {player.name}
                       </p>
                       <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                        Claim candidate
+                        Available player
                       </p>
                     </div>
                   </div>
@@ -299,10 +299,11 @@ export default function LeagueWaivers() {
                     </Button>
                     <Button
                       type="button"
+                      disabled
                       className="h-11 rounded-2xl bg-sky-300 px-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-950 shadow-[0_10px_28px_rgba(14,165,233,0.18)] transition-all hover:bg-sky-200"
                     >
                       <UserPlus className="mr-2 h-3.5 w-3.5" />
-                      Add
+                      Claims Off
                     </Button>
                   </div>
                 </div>

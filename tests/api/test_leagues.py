@@ -1,10 +1,17 @@
+from datetime import datetime, timezone
+
+from conftest import TestingSessionLocal
+import pytest
 from collegefootballfantasy_api.app.models.injury import Injury
+from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.transaction import Transaction
+from collegefootballfantasy_api.app.models.user import User
+from collegefootballfantasy_api.app.services.league_schedule import ensure_league_schedule
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -12,24 +19,29 @@ def auth_headers(token: str) -> dict[str, str]:
 
 
 def create_user_and_token(client, suffix: str = "one") -> str:
+    email = f"coach-{suffix}@example.com"
     response = client.post(
         "/auth/signup",
         json={
             "first_name": f"Coach{suffix}",
-            "email": f"coach-{suffix}@example.com",
+            "email": email,
             "password": "StrongPass123!",
         },
     )
     assert response.status_code == 201
+    with TestingSessionLocal() as session:
+        user = session.query(User).filter(User.email == email).one()
+        user.email_verified_at = datetime.now(timezone.utc)
+        session.commit()
     return response.json()["access_token"]
 
 
-def create_league(client, token: str, name: str = "Test League") -> dict:
+def create_league(client, token: str, name: str = "Test League", max_teams: int = 12) -> dict:
     payload = {
         "basics": {
             "name": name,
             "season_year": 2026,
-            "max_teams": 12,
+            "max_teams": max_teams,
             "is_private": True,
             "description": "Workspace league",
             "icon_url": None,
@@ -134,6 +146,135 @@ def test_create_league_persists_custom_roster_format_and_flags(client):
     assert settings["playoff_teams"] == 6
     assert settings["waiver_type"] == "rolling"
     assert settings["trade_review_type"] == "league_vote"
+
+
+def test_create_league_rejects_odd_manager_count(client):
+    token = create_user_and_token(client, "odd-size")
+    payload = {
+        "basics": {
+            "name": "Odd League",
+            "season_year": 2026,
+            "max_teams": 11,
+            "is_private": True,
+            "description": None,
+            "icon_url": None,
+        },
+        "settings": {
+            "scoring_json": {"ppr": 1},
+            "roster_slots_json": {"QB": 1},
+            "playoff_teams": 4,
+            "waiver_type": "faab",
+            "trade_review_type": "commissioner",
+            "superflex_enabled": False,
+            "kicker_enabled": True,
+            "defense_enabled": False,
+        },
+        "draft": {
+            "draft_datetime_utc": "2026-08-19T18:00:00Z",
+            "timezone": "America/Los_Angeles",
+            "draft_type": "snake",
+            "pick_timer_seconds": 90,
+        },
+    }
+
+    response = client.post("/leagues", json=payload, headers=auth_headers(token))
+
+    assert response.status_code == 422
+    assert "even number" in str(response.json()["detail"])
+
+
+def test_schedule_generation_rejects_legacy_odd_team_count(client, db_session):
+    token = create_user_and_token(client, "legacy-odd")
+    league = create_league(client, token, name="Legacy Odd League", max_teams=4)
+    league_row = db_session.get(League, league["id"])
+    db_session.flush()
+    db_session.add_all(
+        [
+            Team(league_id=league_row.id, name="Legacy Team Two"),
+            Team(league_id=league_row.id, name="Legacy Team Three"),
+        ]
+    )
+    db_session.commit()
+
+    with pytest.raises(ValueError, match="Even number of teams required"):
+        ensure_league_schedule(db_session, league_row)
+
+
+def test_create_invite_join_assigns_one_team_per_user_and_enforces_max_teams(client, db_session):
+    owner_token = create_user_and_token(client, "invite-owner")
+    member_token = create_user_and_token(client, "invite-member")
+    third_token = create_user_and_token(client, "invite-third")
+
+    create_response = client.post(
+        "/leagues",
+        json={
+            "basics": {
+                "name": "Invite Capacity League",
+                "season_year": 2026,
+                "max_teams": 2,
+                "is_private": True,
+                "description": "Invite link league",
+                "icon_url": None,
+            },
+            "settings": {
+                "scoring_json": {"ppr": 1},
+                "roster_slots_json": {"QB": 1},
+                "playoff_teams": 2,
+                "waiver_type": "faab",
+                "trade_review_type": "commissioner",
+                "superflex_enabled": False,
+                "kicker_enabled": True,
+                "defense_enabled": False,
+            },
+            "draft": {
+                "draft_datetime_utc": "2026-08-19T18:00:00Z",
+                "timezone": "America/Los_Angeles",
+                "draft_type": "snake",
+                "pick_timer_seconds": 90,
+            },
+        },
+        headers=auth_headers(owner_token),
+    )
+    assert create_response.status_code == 201
+    created = create_response.json()
+    league = created["league"]
+    invite_code = created["invite_code"]
+
+    assert invite_code
+    assert created["invite_link"].endswith(f"/join/{invite_code}")
+    assert league["max_teams"] == 2
+    assert len(league["members"]) == 1
+
+    preview_response = client.post("/leagues/join-by-code", json={"invite_code": invite_code.lower()})
+    assert preview_response.status_code == 200
+    preview = preview_response.json()
+    assert preview["id"] == league["id"]
+    assert preview["member_count"] == 1
+    assert preview["max_teams"] == 2
+
+    join_response = client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token))
+    assert join_response.status_code == 200
+    joined = join_response.json()
+    assert len(joined["members"]) == 2
+
+    duplicate_join_response = client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token))
+    assert duplicate_join_response.status_code == 200
+    assert len(duplicate_join_response.json()["members"]) == 2
+
+    full_join_response = client.post(f"/leagues/{league['id']}/join", headers=auth_headers(third_token))
+    assert full_join_response.status_code == 409
+    assert full_join_response.json()["detail"] == "league is full"
+
+    owner = db_session.query(User).filter(User.email == "coach-invite-owner@example.com").one()
+    member = db_session.query(User).filter(User.email == "coach-invite-member@example.com").one()
+    third = db_session.query(User).filter(User.email == "coach-invite-third@example.com").one()
+    teams = db_session.query(Team).filter(Team.league_id == league["id"]).order_by(Team.owner_user_id.asc()).all()
+
+    assert len(teams) == 2
+    assert {team.owner_user_id for team in teams} == {owner.id, member.id}
+    assert db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id == owner.id).count() == 1
+    assert db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id == member.id).count() == 1
+    assert db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id == third.id).count() == 0
 
 
 def test_update_league_settings_persists_custom_roster_format_and_flags(client):

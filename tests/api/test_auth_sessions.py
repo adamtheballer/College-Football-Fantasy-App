@@ -210,6 +210,25 @@ def test_auth_me_returns_current_authenticated_user(client):
     assert response.json()["email"] == "coach-me@example.com"
 
 
+def test_login_token_survives_page_bootstrap_through_auth_me(client):
+    signup_payload = signup_user(client, "bootstrap")
+
+    login_response = client.post(
+        "/auth/login",
+        json={"email": "coach-bootstrap@example.com", "password": STRONG_PASSWORD},
+    )
+    assert login_response.status_code == 200
+    login_payload = login_response.json()
+    assert login_payload["access_token"]
+    assert login_payload["user"]["id"] == signup_payload["user"]["id"]
+
+    bootstrap_response = client.get("/auth/me", headers=auth_headers(login_payload["access_token"]))
+
+    assert bootstrap_response.status_code == 200
+    assert bootstrap_response.json()["id"] == signup_payload["user"]["id"]
+    assert bootstrap_response.json()["email"] == "coach-bootstrap@example.com"
+
+
 def test_auth_me_requires_authentication(client):
     response = client.get("/auth/me")
     assert response.status_code == 401

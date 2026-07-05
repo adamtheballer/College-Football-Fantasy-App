@@ -211,6 +211,7 @@ export default function Draft() {
     available_only: Boolean(parsedLeagueId),
     limit: DRAFT_PLAYER_PAGE_SIZE,
     offset: 0,
+    pages: 5,
     sort: "draft_rank",
   });
 

@@ -87,6 +87,7 @@ class UserRead(BaseModel):
     email: str
     username: str | None = None
     created_at: datetime
+    email_verified_at: datetime | None = None
 
 
 class AuthResponse(BaseModel):
@@ -104,3 +105,70 @@ class RefreshResponse(BaseModel):
 
 class LogoutResponse(BaseModel):
     success: bool
+
+
+class AuthMessageResponse(BaseModel):
+    success: bool = True
+    message: str
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+    @field_validator("token")
+    @classmethod
+    def validate_token(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("token is required")
+        return normalized
+
+
+class ResendVerificationRequest(BaseModel):
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email_field(cls, value: str) -> str:
+        return normalize_email(value)
+
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email_field(cls, value: str) -> str:
+        return normalize_email(value)
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
+
+    @field_validator("token")
+    @classmethod
+    def validate_token(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("token is required")
+        return normalized
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, value: str) -> str:
+        return validate_password_strength(value)
+
+
+class SessionRead(BaseModel):
+    id: int
+    issued_at: datetime
+    expires_at: datetime
+    last_used_at: datetime | None = None
+    user_agent: str | None = None
+    ip_address: str | None = None
+    is_current: bool = False
+
+
+class SessionsResponse(BaseModel):
+    sessions: list[SessionRead]

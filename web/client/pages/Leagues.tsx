@@ -227,7 +227,7 @@ export default function Leagues() {
               <div className="space-y-3 text-center">
                 <h3 className="text-2xl font-black uppercase text-foreground">Placeholder league loaded</h3>
                 <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">
-                  Open Matchup Test League to inspect the 10-manager Roster, Matchup, Waiver Wire, and Settings flow.
+                  Open Alpha Demo League to inspect the 10-manager Roster, Matchup, Available Players, and Settings flow.
                 </p>
               </div>
 
@@ -251,7 +251,7 @@ export default function Leagues() {
                   <div className="space-y-2">
                     <h4 className="text-sm font-black uppercase tracking-[0.14em] text-foreground">Invite Your League</h4>
                     <p className="text-xs font-medium leading-6 text-muted-foreground/75">
-                      Waiver Wire is league-specific and only appears once a league is opened.
+                      Available Players is league-specific and only appears once a league is opened.
                     </p>
                   </div>
                 </div>

@@ -61,7 +61,7 @@ export default function LeagueWatchlist() {
           <div>
             <h1 className="text-4xl font-black italic text-slate-50">Watchlist</h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              Your saved league-specific waiver targets. Players stay available only if they are not rostered in this league.
+              Your saved league-specific available-player targets. Players stay available only if they are not rostered in this league.
             </p>
           </div>
           <div className="rounded-[1.25rem] border border-sky-300/20 bg-sky-400/10 p-4 shadow-[0_0_34px_rgba(56,189,248,0.12)]">
@@ -78,7 +78,7 @@ export default function LeagueWatchlist() {
             Saved Targets
           </h2>
           <p className="mt-2 text-xs font-semibold text-slate-500">
-            Use the Waiver Wire tab to add players here.
+            Use the Available Players tab to add players here.
           </p>
         </div>
 
@@ -95,7 +95,7 @@ export default function LeagueWatchlist() {
           <div className="px-5 py-12 text-center">
             <Search className="mx-auto h-10 w-10 text-sky-300/70" />
             <p className="mt-4 text-sm font-bold text-slate-300">No watched players yet.</p>
-            <p className="mt-2 text-xs font-semibold text-slate-500">Open Waiver Wire and press Watch on any available player.</p>
+            <p className="mt-2 text-xs font-semibold text-slate-500">Open Available Players and press Watch on any available player.</p>
           </div>
         ) : (
           <div className="divide-y divide-sky-300/10">
@@ -122,6 +122,7 @@ export default function LeagueWatchlist() {
                     <Button
                       type="button"
                       variant="outline"
+                      aria-label={`Remove ${player.name} from watchlist`}
                       onClick={() =>
                         void toggleWatchlistPlayer.mutateAsync({
                           watchlistId,

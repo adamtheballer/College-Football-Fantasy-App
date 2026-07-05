@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class LeagueBasics(BaseModel):
@@ -10,6 +10,13 @@ class LeagueBasics(BaseModel):
     is_private: bool = True
     description: str | None = None
     icon_url: str | None = None
+
+    @field_validator("max_teams")
+    @classmethod
+    def validate_even_manager_count(cls, value: int) -> int:
+        if value < 2 or value % 2 != 0:
+            raise ValueError("max_teams must be an even number of at least 2")
+        return value
 
 
 class LeagueSettingsInput(BaseModel):

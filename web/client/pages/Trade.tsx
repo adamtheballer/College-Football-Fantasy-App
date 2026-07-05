@@ -271,7 +271,6 @@ export default function Trade() {
   const [giveIds, setGiveIds] = useState<number[]>([]);
   const [receiveIds, setReceiveIds] = useState<number[]>([]);
   const [playerSearch, setPlayerSearch] = useState("");
-  const [sendStatus, setSendStatus] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<TradeAnalyzeResult | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -395,14 +394,12 @@ export default function Trade() {
     setOpponentTeamId(teamId);
     setReceiveIds([]);
     setPlayerSearch("");
-    setSendStatus(null);
   };
 
   const selectTradeTargetPlayer = (row: TradeRow) => {
     setOpponentTeamId(row.teamId);
     setReceiveIds((current) => (current.includes(row.playerId) ? current : [...current, row.playerId]));
     setPlayerSearch("");
-    setSendStatus(null);
   };
 
   const toggleGive = (playerId: number) => {
@@ -444,21 +441,6 @@ export default function Trade() {
     } finally {
       setIsAnalyzing(false);
     }
-  };
-
-  const handleSendTrade = () => {
-    if (!giveIds.length || !receiveIds.length) return;
-    if (giveIds.length !== receiveIds.length) {
-      setSendStatus("MVP trade proposals require equal player counts: 1-for-1, 2-for-2, or 3-for-3.");
-      return;
-    }
-    const confirmed = window.confirm(
-      `Send this ${giveIds.length}-for-${receiveIds.length} trade offer to ${opponentTeam?.name ?? "the selected manager"}?`
-    );
-    if (!confirmed) return;
-    setSendStatus(
-      "Trade proposal sending is not wired on this branch yet. The builder now selects managers and players correctly; backend proposal, alert, and mobile push delivery still need the trade-system API."
-    );
   };
 
   if (!leagueId) {
@@ -717,22 +699,15 @@ export default function Trade() {
           )}
           <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs font-bold text-muted-foreground">
-              Final trade evaluation updates from the selected players. Sending requires the backend proposal workflow.
+              Preview only. Sending requires the backend proposal workflow.
             </p>
             <Button
               className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
-              disabled={!giveIds.length || !receiveIds.length || !opponentTeamId}
-              onClick={handleSendTrade}
+              disabled
             >
-              Send Trade
-              <ChevronRight className="ml-2 h-4 w-4" />
+              Preview Only
             </Button>
           </div>
-          {sendStatus ? (
-            <div className="rounded-xl border border-amber-300/30 bg-amber-400/10 p-4 text-[11px] font-black uppercase tracking-[0.16em] text-amber-100">
-              {sendStatus}
-            </div>
-          ) : null}
         </CardContent>
       </Card>
 
