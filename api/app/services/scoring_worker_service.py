@@ -27,6 +27,10 @@ class ProviderSyncFailed(RuntimeError):
         self.latency_ms = latency_ms
 
 
+class ProviderDataValidationFailed(RuntimeError):
+    pass
+
+
 @dataclass(frozen=True)
 class RetryPolicy:
     max_attempts: int = 3
@@ -42,6 +46,7 @@ class WorkerRunResult:
     players_updated: int = 0
     teams_updated: int = 0
     matchups_updated: int = 0
+    standings_updated: int = 0
     retry_count: int = 0
     message: str | None = None
 
@@ -58,7 +63,7 @@ def _aware(value: datetime) -> datetime:
 
 def scoring_lock_key(provider: str, season: int, week: int, league_id: int | None) -> str:
     scope = league_id if league_id is not None else "all"
-    return f"{provider}:{season}:{week}:{scope}"
+    return f"scoring:{season}:{week}:{scope}"
 
 
 def acquire_scoring_lock(
@@ -84,6 +89,10 @@ def acquire_scoring_lock(
     if lock:
         if lock.status == "active" and _aware(lock.expires_at) > timestamp:
             return None
+        lock.provider = provider
+        lock.league_id = league_id
+        lock.season = season
+        lock.week = week
         lock.status = "active"
         lock.worker_id = worker_id
         lock.acquired_at = timestamp
@@ -138,6 +147,15 @@ def release_scoring_lock(
     lock.heartbeat_at = timestamp
     lock.expires_at = timestamp
     db.flush()
+
+
+def _commit_lock_state(db: Session, lock: ScoringJobLock) -> ScoringJobLock:
+    lock_id = lock.id
+    db.commit()
+    refreshed = db.get(ScoringJobLock, lock_id)
+    if refreshed is None:
+        raise RuntimeError("scoring lock disappeared after commit")
+    return refreshed
 
 
 def recover_stale_scoring_runs(
@@ -217,6 +235,48 @@ def _int_result(result: dict[str, Any], key: str) -> int:
         return 0
 
 
+def _result_allows_empty_data(result: dict[str, Any]) -> bool:
+    return bool(result.get("allow_empty"))
+
+
+def _has_league_matchups(db: Session, *, season: int, week: int, league_id: int | None) -> bool:
+    from collegefootballfantasy_api.app.models.matchup import Matchup
+
+    league_ids = _target_league_ids(db, season=season, league_id=league_id)
+    if not league_ids:
+        return False
+    return (
+        db.query(Matchup.id)
+        .filter(
+            Matchup.league_id.in_(league_ids),
+            Matchup.season == season,
+            Matchup.week == week,
+        )
+        .first()
+        is not None
+    )
+
+
+def validate_provider_sync_result(
+    db: Session,
+    result: dict[str, Any],
+    *,
+    season: int,
+    week: int,
+    league_id: int | None,
+) -> None:
+    if _result_allows_empty_data(result):
+        return
+    rows_seen = _int_result(result, "rows_seen")
+    events_seen = _int_result(result, "events")
+    if rows_seen > 0 or events_seen > 0:
+        return
+    if _has_league_matchups(db, season=season, week=week, league_id=league_id):
+        raise ProviderDataValidationFailed(
+            "provider returned zero stat rows/events for a league week with matchups; preserving existing scores"
+        )
+
+
 def _target_league_ids(db: Session, *, season: int, league_id: int | None) -> list[int]:
     if league_id is not None:
         if not db.get(League, league_id):
@@ -245,6 +305,7 @@ def run_scoring_worker_once(
     retry_policy = retry_policy or RetryPolicy()
     worker_id = worker_id or f"scoring-worker-{uuid.uuid4()}"
     recover_stale_scoring_runs(db, older_than_seconds=stale_run_seconds)
+    db.commit()
     lock = acquire_scoring_lock(
         db,
         provider=provider,
@@ -257,6 +318,7 @@ def run_scoring_worker_once(
     if not lock:
         db.commit()
         return WorkerRunResult(status="skipped", lock_acquired=False, message="scoring job already running")
+    lock = _commit_lock_state(db, lock)
 
     run = ScoringRun(
         league_id=league_id,
@@ -277,14 +339,26 @@ def run_scoring_worker_once(
     )
     db.add(run)
     db.flush()
+    run_id = run.id
+    db.commit()
+    run = db.get(ScoringRun, run_id)
+    lock = db.get(ScoringJobLock, lock.id)
+    if run is None or lock is None:
+        raise RuntimeError("scoring worker state disappeared after commit")
 
     try:
         run.data_started_at = _now()
+        db.commit()
+        run = db.get(ScoringRun, run_id)
+        lock = db.get(ScoringJobLock, lock.id)
+        if run is None or lock is None:
+            raise RuntimeError("scoring worker state disappeared before provider sync")
         sync_result, retry_count, latency_ms = _run_with_retry(
             sync_provider_stats,
             retry_policy=retry_policy,
             sleeper=sleeper,
         )
+        validate_provider_sync_result(db, sync_result, season=season, week=week, league_id=league_id)
         run.data_completed_at = _now()
         run.provider_latency_ms = latency_ms
         run.retry_count = retry_count
@@ -293,10 +367,19 @@ def run_scoring_worker_once(
         run.rows_unmatched = _int_result(sync_result, "skipped")
         run.provider_events_seen = _int_result(sync_result, "events")
         run.data_age_seconds = _int_result(sync_result, "data_age_seconds") if "data_age_seconds" in sync_result else None
+        db.commit()
+        run = db.get(ScoringRun, run_id)
+        lock = db.get(ScoringJobLock, lock.id)
+        if run is None or lock is None:
+            raise RuntimeError("scoring worker state disappeared after provider sync")
 
         totals = ScoringSummary(0, 0, 0, 0)
         for target_league_id in _target_league_ids(db, season=season, league_id=league_id):
             heartbeat_scoring_lock(db, lock, ttl_seconds=lock_ttl_seconds)
+            lock = _commit_lock_state(db, lock)
+            run = db.get(ScoringRun, run_id)
+            if run is None:
+                raise RuntimeError("scoring run disappeared during heartbeat")
             current = recalculate_league_week_scores(db, target_league_id, season, week)
             totals = ScoringSummary(
                 players_scored=totals.players_scored + current.players_scored,
@@ -319,11 +402,13 @@ def run_scoring_worker_once(
             players_updated=totals.players_scored,
             teams_updated=totals.teams_scored,
             matchups_updated=totals.matchups_updated,
+            standings_updated=totals.standings_updated,
             retry_count=run.retry_count,
         )
-    except ProviderSyncFailed as exc:
-        run.retry_count = exc.retry_count
-        run.provider_latency_ms = exc.latency_ms
+    except (ProviderSyncFailed, ProviderDataValidationFailed) as exc:
+        if isinstance(exc, ProviderSyncFailed):
+            run.retry_count = exc.retry_count
+            run.provider_latency_ms = exc.latency_ms
         run.status = "failed"
         run.completed_at = _now()
         run.error_message = str(exc)[:1000]

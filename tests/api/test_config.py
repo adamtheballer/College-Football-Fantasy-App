@@ -83,6 +83,9 @@ def test_production_accepts_explicit_safe_cors_and_jwt_secret():
         cors_origins="https://app.example.com,https://www.example.com",
         cors_origin_regex=None,
         refresh_cookie_secure=True,
+        email_delivery_mode="smtp",
+        smtp_host="smtp.example.com",
+        smtp_from_email="noreply@example.com",
     )
 
     assert settings.is_production
@@ -96,9 +99,24 @@ def test_blank_cors_origin_regex_disables_regex_for_production():
         cors_origins="https://app.example.com",
         cors_origin_regex="",
         refresh_cookie_secure=True,
+        email_delivery_mode="smtp",
+        smtp_host="smtp.example.com",
+        smtp_from_email="noreply@example.com",
     )
 
     assert settings.allowed_cors_origin_regex is None
+
+
+def test_production_rejects_console_email_delivery_mode():
+    with pytest.raises(ValidationError, match="EMAIL_DELIVERY_MODE=console is not allowed"):
+        make_settings(
+            environment="production",
+            jwt_secret_key="safe-production-secret",
+            cors_origins="https://app.example.com",
+            cors_origin_regex=None,
+            refresh_cookie_secure=True,
+            email_delivery_mode="console",
+        )
 
 
 def test_production_rejects_insecure_refresh_cookie():

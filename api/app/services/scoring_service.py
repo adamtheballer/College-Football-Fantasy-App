@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
@@ -156,10 +158,48 @@ def _league_settings(db: Session, league_id: int) -> LeagueSettings | None:
     return db.query(LeagueSettings).filter(LeagueSettings.league_id == league_id).first()
 
 
+def _identity(value: str | None) -> str:
+    return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
+
+
+def _player_is_locked_for_week(
+    db: Session,
+    *,
+    player: Player,
+    season: int,
+    week: int,
+    now: datetime,
+) -> bool:
+    school_key = _identity(player.school)
+    if not school_key:
+        return False
+    games = (
+        db.query(Game)
+        .filter(
+            Game.season == season,
+            Game.week == week,
+            Game.start_date.isnot(None),
+        )
+        .order_by(Game.start_date.asc())
+        .all()
+    )
+    for game in games:
+        if _identity(game.home_team) != school_key and _identity(game.away_team) != school_key:
+            continue
+        start_date = game.start_date
+        if start_date is None:
+            continue
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+        if start_date <= now:
+            return True
+    return False
+
+
 def create_or_refresh_lineup_snapshots(db: Session, league_id: int, season: int, week: int) -> int:
-    existing_player_ids = {
-        player_id
-        for (player_id,) in db.query(LineupWeekSnapshot.player_id)
+    existing_by_player = {
+        snapshot.player_id: snapshot
+        for snapshot in db.query(LineupWeekSnapshot)
         .filter(
             LineupWeekSnapshot.league_id == league_id,
             LineupWeekSnapshot.season == season,
@@ -173,26 +213,45 @@ def create_or_refresh_lineup_snapshots(db: Session, league_id: int, season: int,
         .order_by(RosterEntry.team_id.asc(), RosterEntry.id.asc())
         .all()
     )
+    players_by_id = {
+        player.id: player
+        for player in db.query(Player)
+        .filter(Player.id.in_({entry.player_id for entry in roster_entries} or {0}))
+        .all()
+    }
     locked_at = _now()
-    created = 0
+    changed = 0
     for entry in roster_entries:
-        if entry.player_id in existing_player_ids:
-            continue
-        snapshot = LineupWeekSnapshot(
-            league_id=league_id,
-            team_id=entry.team_id,
-            player_id=entry.player_id,
-            season=season,
-            week=week,
-            slot=(entry.slot or "BENCH").upper(),
-            is_starter=is_starting_slot(entry.slot or ""),
-            locked_at=locked_at,
+        snapshot = existing_by_player.get(entry.player_id)
+        player = players_by_id.get(entry.player_id)
+        player_locked = bool(
+            player
+            and _player_is_locked_for_week(db, player=player, season=season, week=week, now=locked_at)
         )
-        db.add(snapshot)
-        created += 1
-    if created:
+        if snapshot and player_locked:
+            continue
+        if not snapshot:
+            snapshot = LineupWeekSnapshot(
+                league_id=league_id,
+                team_id=entry.team_id,
+                player_id=entry.player_id,
+                season=season,
+                week=week,
+                slot=(entry.slot or "BENCH").upper(),
+                is_starter=is_starting_slot(entry.slot or ""),
+                locked_at=locked_at,
+            )
+            db.add(snapshot)
+            changed += 1
+            continue
+        snapshot.team_id = entry.team_id
+        snapshot.slot = (entry.slot or "BENCH").upper()
+        snapshot.is_starter = is_starting_slot(entry.slot or "")
+        snapshot.locked_at = locked_at
+        changed += 1
+    if changed:
         db.flush()
-    return created
+    return changed
 
 
 def _stat_map(db: Session, season: int, week: int, player_ids: set[int]) -> dict[int, PlayerStat]:
@@ -547,22 +606,40 @@ def apply_stat_correction(
         stat.stats = corrected_stats
         db.flush()
 
-    recalculate_league_week_scores(db, league_id, season, week)
-    matchups = (
-        db.query(Matchup)
-        .filter(Matchup.league_id == league_id, Matchup.season == season, Matchup.week == week)
+    affected_league_ids = [
+        row[0]
+        for row in db.query(RosterEntry.league_id)
+        .join(League, League.id == RosterEntry.league_id)
+        .filter(
+            RosterEntry.player_id == player_id,
+            League.season_year == season,
+        )
+        .distinct()
         .all()
-    )
-    for matchup in matchups:
-        matchup.status = "stat_corrected"
-    team_scores = (
-        db.query(TeamWeekScore)
-        .filter(TeamWeekScore.league_id == league_id, TeamWeekScore.season == season, TeamWeekScore.week == week)
-        .all()
-    )
-    for team_score in team_scores:
-        team_score.status = "stat_corrected"
-    recalculate_standings_for_week(db, league_id, season, week)
+    ]
+    if league_id not in affected_league_ids:
+        affected_league_ids.append(league_id)
+    for affected_league_id in sorted(affected_league_ids):
+        recalculate_league_week_scores(db, affected_league_id, season, week)
+        matchups = (
+            db.query(Matchup)
+            .filter(Matchup.league_id == affected_league_id, Matchup.season == season, Matchup.week == week)
+            .all()
+        )
+        for matchup in matchups:
+            matchup.status = "stat_corrected"
+        team_scores = (
+            db.query(TeamWeekScore)
+            .filter(
+                TeamWeekScore.league_id == affected_league_id,
+                TeamWeekScore.season == season,
+                TeamWeekScore.week == week,
+            )
+            .all()
+        )
+        for team_score in team_scores:
+            team_score.status = "stat_corrected"
+        recalculate_standings_for_week(db, affected_league_id, season, week)
     new_score = (
         db.query(PlayerWeekScore)
         .filter(
@@ -600,42 +677,27 @@ def run_league_scoring_recalculation(
     week: int,
     provider: str = "manual",
 ) -> ScoringSummary:
-    run = ScoringRun(
-        league_id=league_id,
+    from collegefootballfantasy_api.app.services.scoring_worker_service import (
+        RetryPolicy,
+        run_scoring_worker_once,
+    )
+
+    result = run_scoring_worker_once(
+        db,
+        provider=provider,
         season=season,
         week=week,
-        provider=provider,
-        status="running",
-        started_at=_now(),
+        league_id=league_id,
+        sync_provider_stats=lambda: {"rows_seen": 0, "upserted": 0, "skipped": 0, "events": 0, "allow_empty": True},
+        retry_policy=RetryPolicy(max_attempts=1, initial_backoff_seconds=0),
+        worker_id=f"manual-recalc-{league_id or 'all'}-{season}-{week}",
+        sleeper=lambda _seconds: None,
     )
-    db.add(run)
-    db.flush()
-    try:
-        if league_id is not None:
-            if not db.get(League, league_id):
-                raise ValueError(f"league {league_id} not found")
-            summary = recalculate_league_week_scores(db, league_id, season, week)
-        else:
-            summary = ScoringSummary(0, 0, 0, 0)
-            leagues = db.query(League).filter(League.season_year == season).all()
-            for league in leagues:
-                current = recalculate_league_week_scores(db, league.id, season, week)
-                summary = ScoringSummary(
-                    players_scored=summary.players_scored + current.players_scored,
-                    teams_scored=summary.teams_scored + current.teams_scored,
-                    matchups_updated=summary.matchups_updated + current.matchups_updated,
-                    standings_updated=summary.standings_updated + current.standings_updated,
-                )
-        run.status = "success"
-        run.completed_at = _now()
-        run.players_updated = summary.players_scored
-        run.teams_updated = summary.teams_scored
-        run.matchups_updated = summary.matchups_updated
-        db.commit()
-        return summary
-    except Exception as exc:
-        run.status = "failed"
-        run.completed_at = _now()
-        run.error_message = str(exc)[:1000]
-        db.commit()
-        raise
+    if result.status == "skipped":
+        raise ValueError("scoring job already running for this league/week")
+    return ScoringSummary(
+        players_scored=result.players_updated,
+        teams_scored=result.teams_updated,
+        matchups_updated=result.matchups_updated,
+        standings_updated=result.standings_updated,
+    )

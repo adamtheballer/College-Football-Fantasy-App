@@ -136,9 +136,11 @@ class Settings(BaseSettings):
         if not self.refresh_cookie_secure:
             raise ValueError("REFRESH_COOKIE_SECURE must be true when ENVIRONMENT=production")
 
-        if self.email_delivery_mode.strip().lower() == "smtp" and (
-            not self.smtp_host or not self.smtp_from_email
-        ):
+        email_mode = self.email_delivery_mode.strip().lower()
+        if email_mode == "console":
+            raise ValueError("EMAIL_DELIVERY_MODE=console is not allowed when ENVIRONMENT=production")
+
+        if email_mode == "smtp" and (not self.smtp_host or not self.smtp_from_email):
             raise ValueError("SMTP_HOST and SMTP_FROM_EMAIL are required when ENVIRONMENT=production")
 
         return self
