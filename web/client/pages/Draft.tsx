@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Bot, Loader2, Lock, Search, ShieldAlert, Trophy, User, Users, X } from "lucide-react";
+import { Activity, AlertTriangle, ArrowLeft, Bot, ClipboardList, Info, Loader2, Lock, Search, ShieldAlert, Trophy, User, Users, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDraftPick, useDraftRoom } from "@/hooks/use-draft";
 import { useLeagueDetail } from "@/hooks/use-leagues";
-import { useDraftPlayerPool } from "@/hooks/use-players";
+import { useDraftPlayerPool, usePlayerCard } from "@/hooks/use-players";
 import { ApiError } from "@/lib/api";
 import { buildDraftBoard, type DraftConfig, type DraftPlayer } from "@/lib/draftRankings";
 import { buildProjectedStats, formatStat, statRowsForPosition, statValue } from "@/lib/playerProjectionStats";
@@ -17,6 +17,9 @@ import type { DraftRoomTeam } from "@/types/draft";
 const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K"];
 const DRAFT_PLAYER_PAGE_SIZE = 80;
 const DRAFT_SLOT_KEYS = ["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "BENCH"] as const;
+const PLAYER_CARD_TABS = ["about", "injuries", "stats", "projections"] as const;
+
+type PlayerCardTab = (typeof PLAYER_CARD_TABS)[number];
 
 const POSITION_STYLES: Record<string, string> = {
   QB: "border-blue-300/40 bg-blue-500/15 text-blue-100 shadow-[0_0_16px_rgba(96,165,250,0.18)]",
@@ -85,6 +88,32 @@ const projectionStatsForPlayer = (player: DraftPlayer | null) => {
   return buildProjectedStats(player.projection, player.projectedPoints, player.sheetProjectionStats);
 };
 
+const formatCardValue = (value: unknown, fallback = "—") => {
+  if (value === null || value === undefined || value === "") return fallback;
+  if (typeof value === "number") return Number.isFinite(value) ? value.toLocaleString() : fallback;
+  return String(value);
+};
+
+const statDisplayKeys = [
+  ["Passing Yards", ["pass_yards", "PassingYards", "passingYards"]],
+  ["Passing TD", ["pass_tds", "PassingTouchdowns", "passingTouchdowns"]],
+  ["Interceptions", ["interceptions", "Interceptions"]],
+  ["Rush Yards", ["rush_yards", "RushingYards", "rushingYards"]],
+  ["Rush TD", ["rush_tds", "RushingTouchdowns", "rushingTouchdowns"]],
+  ["Receptions", ["receptions", "Receptions"]],
+  ["Rec Yards", ["rec_yards", "ReceivingYards", "receivingYards"]],
+  ["Rec TD", ["rec_tds", "ReceivingTouchdowns", "receivingTouchdowns"]],
+  ["Fumbles Lost", ["fumbles_lost", "FumblesLost", "fumblesLost"]],
+] as const;
+
+const getStatValue = (stats: Record<string, unknown>, keys: readonly string[]) => {
+  for (const key of keys) {
+    const value = stats[key];
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return null;
+};
+
 const getRoundNumber = (overallPick: number, teamCount: number) =>
   Math.floor((overallPick - 1) / Math.max(1, teamCount)) + 1;
 
@@ -127,6 +156,7 @@ export default function Draft() {
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState("ALL");
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
+  const [activePlayerCardTab, setActivePlayerCardTab] = useState<PlayerCardTab>("about");
   const [localError, setLocalError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const carouselRef = useRef<HTMLDivElement | null>(null);
@@ -256,6 +286,14 @@ export default function Draft() {
     () => draftBoard.find((player) => player.id === selectedPlayerId) ?? null,
     [draftBoard, selectedPlayerId]
   );
+  const { data: playerCard, isLoading: playerCardLoading } = usePlayerCard(
+    selectedPlayer?.id,
+    Boolean(selectedPlayer)
+  );
+
+  useEffect(() => {
+    setActivePlayerCardTab("about");
+  }, [selectedPlayerId]);
 
   const previewTeams = useMemo(
     () => buildPreviewTeams(draftRoom?.teams ?? [], leagueSize),
@@ -702,26 +740,154 @@ export default function Draft() {
               </span>
             </div>
           </div>
+          <div className="border-b border-cyan-100/10 px-5 py-3">
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: "about", label: "About", icon: Info },
+                { id: "injuries", label: "Alerts", icon: AlertTriangle },
+                { id: "stats", label: "Stats", icon: ClipboardList },
+                { id: "projections", label: "Proj", icon: Activity },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activePlayerCardTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActivePlayerCardTab(tab.id as PlayerCardTab)}
+                    className={cn(
+                      "flex items-center justify-center gap-2 rounded-2xl border px-3 py-2 text-[9px] font-black uppercase tracking-[0.16em] transition",
+                      isActive
+                        ? "border-cyan-200/50 bg-cyan-300 text-slate-950"
+                        : "border-white/10 bg-white/[0.04] text-muted-foreground hover:border-cyan-200/30 hover:text-cyan-100"
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-5">
-            <section className="rounded-3xl border border-cyan-200/12 bg-white/[0.035] p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">Projected 2026</p>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                {statRowsForPosition(selectedPlayer.pos).map((row) => (
-                  <div key={`projection-${row.label}`} className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
-                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">{row.label}</p>
-                    <p className="mt-2 text-lg font-black tabular-nums text-white">
-                      {formatStat(statValue(projectionStatsForPlayer(selectedPlayer), row.projectionKeys))}
-                    </p>
-                  </div>
-                ))}
+            {playerCardLoading ? (
+              <div className="flex min-h-40 items-center justify-center gap-3 rounded-3xl border border-cyan-200/12 bg-white/[0.035] p-4 text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading player card...
               </div>
-            </section>
-            <section className="mt-4 rounded-3xl border border-cyan-200/12 bg-white/[0.035] p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">Draft Note</p>
-              <p className="mt-3 text-sm font-medium leading-6 text-slate-200">
-                This real draft room uses the same master board ranking model as the single-player mock draft. Picks stay locked until the scheduled start time.
-              </p>
-            </section>
+            ) : activePlayerCardTab === "about" ? (
+              <section className="rounded-3xl border border-cyan-200/12 bg-white/[0.035] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">About Player</p>
+                {playerCard?.about.headshot_url ? (
+                  <img
+                    src={playerCard.about.headshot_url}
+                    alt={selectedPlayer.name}
+                    className="mt-4 h-28 w-28 rounded-3xl border border-cyan-200/15 object-cover"
+                  />
+                ) : null}
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  {[
+                    ["Height", playerCard?.about.height],
+                    ["Weight", playerCard?.about.weight],
+                    ["Class", playerCard?.about.player_class ?? selectedPlayer.playerClass],
+                    ["Birthplace", playerCard?.about.birthplace],
+                    ["Status", playerCard?.about.status ?? selectedPlayer.status],
+                    ["Jersey", playerCard?.about.jersey],
+                    ["Position", playerCard?.about.position ?? selectedPlayer.pos],
+                    ["Team", playerCard?.about.team ?? selectedPlayer.school],
+                  ].map(([label, value]) => (
+                    <div key={`about-${label}`} className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+                      <p className="mt-2 text-sm font-black text-white">{formatCardValue(value)}</p>
+                    </div>
+                  ))}
+                </div>
+                {playerCard?.about.message ? (
+                  <p className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 text-xs font-bold leading-5 text-amber-100">
+                    {playerCard.about.message}
+                  </p>
+                ) : null}
+              </section>
+            ) : activePlayerCardTab === "injuries" ? (
+              <section className="rounded-3xl border border-cyan-200/12 bg-white/[0.035] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">Injury Report / Alerts</p>
+                {playerCard?.injuries.length ? (
+                  <div className="mt-4 space-y-3">
+                    {playerCard.injuries.map((injury) => (
+                      <div key={injury.id} className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-black text-white">{injury.status}</p>
+                          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                            {injury.season} W{injury.week}
+                          </p>
+                        </div>
+                        <p className="mt-2 text-xs font-bold leading-5 text-slate-200">
+                          {[injury.injury, injury.practice_level, injury.return_timeline].filter(Boolean).join(" • ") || "No injury detail provided."}
+                        </p>
+                        {injury.notes ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{injury.notes}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-4 rounded-2xl border border-white/10 bg-slate-950/45 p-4 text-sm font-bold leading-6 text-muted-foreground">
+                    No injury alerts are recorded for this player yet.
+                  </p>
+                )}
+              </section>
+            ) : activePlayerCardTab === "stats" ? (
+              <section className="rounded-3xl border border-cyan-200/12 bg-white/[0.035] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">Past Season Stats</p>
+                {playerCard?.season_stats.length ? (
+                  <div className="mt-4 space-y-3">
+                    {playerCard.season_stats.map((row) => (
+                      <div key={`${row.source}-${row.season}-${row.week}`} className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-black text-white">{row.season}{row.week > 0 ? ` • Week ${row.week}` : " Season"}</p>
+                          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">{row.source}</p>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          {statDisplayKeys
+                            .map(([label, keys]) => [label, getStatValue(row.stats, keys)] as const)
+                            .filter(([, value]) => value !== null)
+                            .slice(0, 8)
+                            .map(([label, value]) => (
+                              <div key={`${row.source}-${row.season}-${row.week}-${label}`} className="rounded-xl bg-white/[0.04] p-2">
+                                <p className="text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+                                <p className="mt-1 text-sm font-black tabular-nums text-white">{formatCardValue(value)}</p>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-4 rounded-2xl border border-white/10 bg-slate-950/45 p-4 text-sm font-bold leading-6 text-muted-foreground">
+                    No past season stats are available yet. This can be blank for first-year players.
+                  </p>
+                )}
+              </section>
+            ) : (
+              <>
+                <section className="rounded-3xl border border-cyan-200/12 bg-white/[0.035] p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">Projected 2026</p>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    {statRowsForPosition(selectedPlayer.pos).map((row) => (
+                      <div key={`projection-${row.label}`} className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
+                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">{row.label}</p>
+                        <p className="mt-2 text-lg font-black tabular-nums text-white">
+                          {formatStat(statValue(projectionStatsForPlayer(selectedPlayer), row.projectionKeys))}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                <section className="mt-4 rounded-3xl border border-cyan-200/12 bg-white/[0.035] p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">Draft Note</p>
+                  <p className="mt-3 text-sm font-medium leading-6 text-slate-200">
+                    This real draft room uses the same master board ranking model as the single-player mock draft. Picks stay locked until the scheduled start time.
+                  </p>
+                </section>
+              </>
+            )}
           </div>
         </aside>
       ) : null}

@@ -7,12 +7,91 @@ from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.crud.player import create_players, get_player, list_players
 from collegefootballfantasy_api.app.crud.player_stat import get_player_stat, upsert_player_stat
 from collegefootballfantasy_api.app.db.session import get_db
+from collegefootballfantasy_api.app.integrations.espn import ESPNClient
 from collegefootballfantasy_api.app.integrations.sportsdata import SportsDataClient
-from collegefootballfantasy_api.app.schemas.player import PlayerCreate, PlayerList, PlayerRead
+from collegefootballfantasy_api.app.models.injury import Injury
+from collegefootballfantasy_api.app.models.player_stat import PlayerStat
+from collegefootballfantasy_api.app.schemas.player import (
+    PlayerCardAboutRead,
+    PlayerCardInjuryRead,
+    PlayerCardRead,
+    PlayerCardStatRowRead,
+    PlayerCreate,
+    PlayerList,
+    PlayerRead,
+)
 from collegefootballfantasy_api.app.schemas.player_stat import PlayerStatResponse
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
 
 router = APIRouter()
+
+
+def _espn_player_id(external_id: str | None) -> str | None:
+    if not external_id:
+        return None
+    normalized = str(external_id).strip()
+    if not normalized:
+        return None
+    if normalized.lower().startswith("espn:"):
+        normalized = normalized.split(":", 1)[1].strip()
+    return normalized or None
+
+
+def _profile_text(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _birthplace(athlete: dict) -> str | None:
+    birth_place = athlete.get("birthPlace")
+    if isinstance(birth_place, dict):
+        parts = [
+            _profile_text(birth_place.get("city")),
+            _profile_text(birth_place.get("state")),
+            _profile_text(birth_place.get("country")),
+        ]
+        return ", ".join(part for part in parts if part) or None
+    if isinstance(birth_place, str):
+        return _profile_text(birth_place)
+    parts = [
+        _profile_text(athlete.get("birthCity")),
+        _profile_text(athlete.get("birthState")),
+        _profile_text(athlete.get("birthCountry")),
+    ]
+    return ", ".join(part for part in parts if part) or None
+
+
+def _map_espn_about(player: PlayerRead, payload: dict | None, message: str | None = None) -> PlayerCardAboutRead:
+    athlete = payload.get("athlete") if isinstance(payload, dict) else None
+    if not isinstance(athlete, dict):
+        return PlayerCardAboutRead(
+            espn_player_id=_espn_player_id(player.external_id),
+            player_class=player.player_class,
+            position=player.position,
+            team=player.school,
+            source="local",
+            message=message,
+        )
+    status = athlete.get("status") if isinstance(athlete.get("status"), dict) else {}
+    position = athlete.get("position") if isinstance(athlete.get("position"), dict) else {}
+    team = athlete.get("team") if isinstance(athlete.get("team"), dict) else {}
+    headshot = athlete.get("headshot") if isinstance(athlete.get("headshot"), dict) else {}
+    return PlayerCardAboutRead(
+        espn_player_id=_profile_text(athlete.get("id")) or _espn_player_id(player.external_id),
+        height=_profile_text(athlete.get("displayHeight")),
+        weight=_profile_text(athlete.get("displayWeight")),
+        player_class=player.player_class,
+        birthplace=_birthplace(athlete),
+        status=_profile_text(status.get("name") or status.get("abbreviation")) or "Active",
+        jersey=_profile_text(athlete.get("jersey")),
+        position=_profile_text(position.get("displayName") or position.get("abbreviation")) or player.position,
+        team=_profile_text(team.get("displayName") or team.get("shortDisplayName")) or player.school,
+        headshot_url=_profile_text(headshot.get("href")) or player.image_url,
+        source="espn",
+        message=message,
+    )
 
 
 def _is_stale(updated_at: datetime | None, ttl_days: int) -> bool:
@@ -63,6 +142,71 @@ def get_player_endpoint(player_id: int, db: Session = Depends(get_db)) -> Player
     if not player:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
     return player
+
+
+@router.get("/{player_id}/card", response_model=PlayerCardRead)
+def get_player_card_endpoint(
+    player_id: int,
+    refresh: bool = False,
+    db: Session = Depends(get_db),
+) -> PlayerCardRead:
+    player = get_player(db, player_id)
+    if not player:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
+
+    profile_payload: dict | None = None
+    profile_message: str | None = None
+    espn_id = _espn_player_id(player.external_id)
+    if espn_id:
+        try:
+            profile_payload = ESPNClient().get_athlete_profile(espn_id)
+        except Exception as exc:
+            profile_message = f"ESPN profile unavailable: {exc}"
+    else:
+        profile_message = "No ESPN player ID is set for this player."
+
+    injury_rows = (
+        db.query(Injury)
+        .filter(Injury.player_id == player.id)
+        .order_by(Injury.season.desc(), Injury.week.desc(), Injury.updated_at.desc())
+        .all()
+    )
+    stat_rows = (
+        db.query(PlayerStat)
+        .filter(PlayerStat.player_id == player.id)
+        .order_by(PlayerStat.season.desc(), PlayerStat.week.desc(), PlayerStat.updated_at.desc())
+        .all()
+    )
+    return PlayerCardRead(
+        player=player,
+        about=_map_espn_about(player, profile_payload, profile_message),
+        injuries=[
+            PlayerCardInjuryRead(
+                id=row.id,
+                season=row.season,
+                week=row.week,
+                status=row.status,
+                injury=row.injury,
+                return_timeline=row.return_timeline,
+                practice_level=row.practice_level,
+                is_game_time_decision=row.is_game_time_decision,
+                is_returning=row.is_returning,
+                notes=row.notes,
+                updated_at=row.updated_at,
+            )
+            for row in injury_rows
+        ],
+        season_stats=[
+            PlayerCardStatRowRead(
+                season=row.season,
+                week=row.week,
+                source=row.source,
+                stats=row.stats,
+                updated_at=row.updated_at,
+            )
+            for row in stat_rows
+        ],
+    )
 
 
 @router.get("/{player_id}/season-stats", response_model=PlayerStatResponse)

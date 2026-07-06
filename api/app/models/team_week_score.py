@@ -1,4 +1,6 @@
-from sqlalchemy import Float, ForeignKey, Index, Integer, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, JSON, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -8,6 +10,7 @@ class TeamWeekScore(TimestampMixin, Base):
     __tablename__ = "team_week_scores"
     __table_args__ = (
         UniqueConstraint("team_id", "season", "week", name="uq_team_week_scores_team_season_week"),
+        UniqueConstraint("league_id", "team_id", "season", "week", name="uq_team_week_scores_league_team_week"),
         Index("ix_team_week_scores_team_id", "team_id"),
         Index("ix_team_week_scores_league_week", "league_id", "season", "week"),
     )
@@ -20,3 +23,9 @@ class TeamWeekScore(TimestampMixin, Base):
     points_total: Mapped[float] = mapped_column(Float, default=0.0)
     points_starters: Mapped[float] = mapped_column(Float, default=0.0)
     points_bench: Mapped[float] = mapped_column(Float, default=0.0)
+    starter_points: Mapped[float] = mapped_column(Float, default=0.0)
+    bench_points: Mapped[float] = mapped_column(Float, default=0.0)
+    total_points: Mapped[float] = mapped_column(Float, default=0.0)
+    breakdown_json: Mapped[dict] = mapped_column(JSON, default={})
+    status: Mapped[str] = mapped_column(String(50), default="live")
+    calculated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

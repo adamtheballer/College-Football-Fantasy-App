@@ -120,6 +120,13 @@ export function useLeagueMatchupTab(
       apiGet<LeagueMatchupTabResponse>(`/leagues/${leagueId}/matchup`, {
         week: typeof week === "number" ? week : undefined,
       }),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status?.toLowerCase();
+      if (status === "live") return 10_000;
+      if (status === "final" || status === "stat_corrected") return false;
+      return 30_000;
+    },
+    refetchIntervalInBackground: true,
   });
 }
 
