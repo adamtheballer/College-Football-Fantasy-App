@@ -44,6 +44,15 @@ def test_signup_returns_access_token_and_refresh_cookie(client):
     assert settings.refresh_cookie_name in client.cookies
 
 
+def test_signup_creates_verification_token_with_timestamps(client, db_session):
+    signup_user(client, "verify-token")
+
+    token = db_session.query(AuthActionToken).filter_by(email="coach-verify-token@example.com").one()
+    assert token.token_type == "email_verification"
+    assert token.created_at is not None
+    assert token.updated_at is not None
+
+
 def test_signup_normalizes_and_returns_username(client):
     response = client.post(
         "/auth/signup",
