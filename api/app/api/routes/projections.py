@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
-from collegefootballfantasy_api.app.api.deps import get_league_or_404, get_optional_current_user, require_league_member
+from collegefootballfantasy_api.app.api.deps import get_current_user, get_league_or_404, require_league_member
 from collegefootballfantasy_api.app.crud.projection import get_projection, list_projections
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.defense_rating import DefenseRating
@@ -11,7 +11,6 @@ from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.projection_explanation import ProjectionExplanation
 from collegefootballfantasy_api.app.models.team_environment import TeamEnvironment
 from collegefootballfantasy_api.app.models.usage_share import UsageShare
-from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.projection import ProjectionList, ProjectionRead
 from collegefootballfantasy_api.app.services.projection_scoring_service import (
@@ -23,10 +22,11 @@ from collegefootballfantasy_api.app.services.projections.explanations import bui
 router = APIRouter()
 
 
-def _league_scoring_json(db: Session, league_id: int, current_user: User | None) -> dict:
-    if not current_user:
+def _league_scoring_json(db: Session, league_id: int, authorization: str | None) -> dict:
+    if not authorization:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing auth token")
 
+    current_user = get_current_user(db, authorization)
     league = get_league_or_404(db, league_id)
     require_league_member(db, league.id, current_user)
     settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
@@ -62,10 +62,10 @@ def list_projections_endpoint(
     limit: int = 100,
     offset: int = 0,
     db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_optional_current_user),
+    authorization: str | None = Header(default=None),
 ) -> ProjectionList:
     rows, total = list_projections(db, season=season, week=week, limit=limit, offset=offset)
-    scoring_json = _league_scoring_json(db, league_id, current_user) if league_id is not None else None
+    scoring_json = _league_scoring_json(db, league_id, authorization) if league_id is not None else None
     return ProjectionList(
         data=[_projection_read(row, scoring_json) for row in rows],
         total=total,
@@ -81,12 +81,12 @@ def get_projection_endpoint(
     week: int,
     league_id: int | None = None,
     db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_optional_current_user),
+    authorization: str | None = Header(default=None),
 ) -> ProjectionRead:
     row = get_projection(db, player_id=player_id, season=season, week=week)
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="projection not found")
-    scoring_json = _league_scoring_json(db, league_id, current_user) if league_id is not None else None
+    scoring_json = _league_scoring_json(db, league_id, authorization) if league_id is not None else None
     return _projection_read(row, scoring_json)
 
 

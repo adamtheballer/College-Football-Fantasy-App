@@ -22,11 +22,21 @@ def projection_to_normalized_stats(projection: WeeklyProjection) -> dict[str, fl
     }
 
 
+def _has_projected_stat_line(stats: dict[str, float]) -> bool:
+    return any(float(value or 0.0) != 0.0 for value in stats.values())
+
+
 def calculate_league_projection_points(
     projection: WeeklyProjection,
     scoring_json: dict,
 ) -> tuple[float, dict]:
     stats = projection_to_normalized_stats(projection)
+    if not _has_projected_stat_line(stats) and projection.fantasy_points:
+        fallback_points = round(float(projection.fantasy_points or 0.0), 2)
+        return fallback_points, {
+            "total": fallback_points,
+            "source": "global_projection_fallback",
+        }
     return calculate_player_fantasy_points(stats, scoring_json)
 
 

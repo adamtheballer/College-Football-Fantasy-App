@@ -141,6 +141,20 @@ def test_projection_without_league_id_returns_default_fantasy_points(client):
     assert payload["scoring_context"] is None
 
 
+def test_projection_without_league_id_ignores_invalid_auth_header(client):
+    player_id, _ = create_projection()
+
+    response = client.get(
+        f"/projections/{player_id}",
+        params={"season": 2026, "week": 1},
+        headers={"Authorization": "Bearer not-a-real-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["fantasy_points"] == 18.5
+    assert response.json()["league_fantasy_points"] is None
+
+
 def test_projection_with_league_id_returns_league_fantasy_points(client):
     token = create_user_and_token(client, "member")
     league = create_league(client, token, "ppr", {"ppr": 1})
@@ -158,6 +172,19 @@ def test_projection_with_league_id_returns_league_fantasy_points(client):
     assert payload["league_fantasy_points"] == 18.5
     assert payload["league_breakdown_json"]["receptions"]["points"] == 5.0
     assert payload["scoring_context"] == "league"
+
+
+def test_projection_with_league_id_requires_auth(client):
+    token = create_user_and_token(client, "requires-auth-owner")
+    league = create_league(client, token, "requires-auth", {"ppr": 1})
+    player_id, _ = create_projection()
+
+    response = client.get(
+        f"/projections/{player_id}",
+        params={"season": 2026, "week": 1, "league_id": league["id"]},
+    )
+
+    assert response.status_code == 401
 
 
 def test_custom_ppr_changes_league_fantasy_points_without_changing_stat_line(client):

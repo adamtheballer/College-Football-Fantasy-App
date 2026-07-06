@@ -33,6 +33,10 @@ from collegefootballfantasy_api.app.services.matchup_probability import (
     estimate_player_std_dev,
     is_starting_slot,
 )
+from collegefootballfantasy_api.app.services.projection_scoring_service import (
+    calculate_league_projection_points,
+    calculate_league_projection_range,
+)
 
 DEFAULT_ROSTER_SLOTS = {
     "QB": 1,
@@ -51,6 +55,13 @@ def _slot_limits(db: Session, league: League) -> dict[str, int]:
     if settings and settings.roster_slots_json:
         slot_limits.update(settings.roster_slots_json)
     return slot_limits
+
+
+def _league_scoring_json(db: Session, league: League) -> dict | None:
+    settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
+    if not settings:
+        return None
+    return settings.scoring_json or {}
 
 
 def _owned_team(db: Session, league: League, user: User) -> Team | None:
@@ -124,12 +135,23 @@ def _roster_rows(db: Session, team_id: int) -> list[RosterEntry]:
 def _serialize_roster_entry(
     entry: RosterEntry,
     projection: WeeklyProjection | None,
+    scoring_json: dict | None = None,
     opponent: str | None = None,
 ) -> RosterTabEntryRead:
     slot = (entry.slot or "BENCH").upper()
-    projected = float(projection.fantasy_points or 0.0) if projection else 0.0
-    floor = float(projection.floor or 0.0) if projection else 0.0
-    ceiling = float(projection.ceiling or 0.0) if projection else 0.0
+    projected = 0.0
+    floor = 0.0
+    ceiling = 0.0
+    if projection:
+        if scoring_json is not None:
+            projected, _breakdown = calculate_league_projection_points(projection, scoring_json)
+            league_floor, league_ceiling = calculate_league_projection_range(projection, scoring_json)
+            floor = float(league_floor if league_floor is not None else projection.floor or 0.0)
+            ceiling = float(league_ceiling if league_ceiling is not None else projection.ceiling or 0.0)
+        else:
+            projected = float(projection.fantasy_points or 0.0)
+            floor = float(projection.floor or 0.0)
+            ceiling = float(projection.ceiling or 0.0)
     return RosterTabEntryRead(
         id=entry.id,
         league_id=entry.league_id,
@@ -171,8 +193,9 @@ def _serialize_team_roster(
         week,
         {entry.player_id for entry in entries},
     )
+    scoring_json = _league_scoring_json(db, league)
     return [
-        _serialize_roster_entry(entry, projection_by_player.get(entry.player_id), opponent)
+        _serialize_roster_entry(entry, projection_by_player.get(entry.player_id), scoring_json, opponent)
         for entry in entries
     ]
 
@@ -397,6 +420,7 @@ def build_waivers_view(
     players = query.offset(max(0, offset)).limit(max(1, min(limit, 100))).all()
     player_ids = {player.id for player in players}
     projection_by_player = _projection_map(db, league.season_year, week, player_ids)
+    scoring_json = _league_scoring_json(db, league)
     score_by_player = {
         row.player_id: row
         for row in db.query(PlayerWeekScore)
@@ -420,6 +444,8 @@ def build_waivers_view(
                 weekly_projected_fantasy_points=float(
                     score_by_player[player.id].fantasy_points
                     if player.id in score_by_player
+                    else calculate_league_projection_points(projection_by_player[player.id], scoring_json)[0]
+                    if player.id in projection_by_player and scoring_json is not None
                     else projection_by_player[player.id].fantasy_points
                     if player.id in projection_by_player
                     else 0.0
@@ -449,8 +475,9 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
         resolve_current_week(db, league),
         {entry.player_id for entry in roster_entries},
     )
+    scoring_json = _league_scoring_json(db, league)
     roster_rows = [
-        _serialize_roster_entry(entry, projection_by_player.get(entry.player_id))
+        _serialize_roster_entry(entry, projection_by_player.get(entry.player_id), scoring_json)
         for entry in roster_entries
     ]
     standings = [
