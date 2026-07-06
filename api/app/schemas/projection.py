@@ -34,6 +34,11 @@ class ProjectionRead(ProjectionBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    league_fantasy_points: float | None = None
+    league_floor: float | None = None
+    league_ceiling: float | None = None
+    league_breakdown_json: dict | None = None
+    scoring_context: str | None = None
 
 
 class ProjectionList(BaseModel):

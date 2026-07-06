@@ -39,6 +39,15 @@ def get_current_user(
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing auth token")
 
 
+def get_optional_current_user(
+    db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
+) -> User | None:
+    if not authorization:
+        return None
+    return get_current_user(db, authorization)
+
+
 def require_verified_user(current_user: User = Depends(get_current_user)) -> User:
     if current_user.email_verified_at is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="email verification required")

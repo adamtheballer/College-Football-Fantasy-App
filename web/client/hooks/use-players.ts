@@ -44,6 +44,11 @@ type BackendProjectionRead = {
   expected_plays: number;
   expected_rush_per_play: number;
   expected_td_per_play: number;
+  league_fantasy_points?: number | null;
+  league_floor?: number | null;
+  league_ceiling?: number | null;
+  league_breakdown_json?: Record<string, unknown> | null;
+  scoring_context?: string | null;
 };
 
 type BackendProjectionListResponse = {
@@ -130,7 +135,7 @@ const mapProjection = (
   projection?: BackendProjectionRead,
   fallbackFantasyPoints = 0
 ): Player["projection"] => ({
-  fpts: projection?.fantasy_points ?? fallbackFantasyPoints,
+  fpts: projection?.league_fantasy_points ?? projection?.fantasy_points ?? fallbackFantasyPoints,
   passingYards: projection?.pass_yards ?? 0,
   passingTds: projection?.pass_tds ?? 0,
   ints: projection?.interceptions ?? 0,
@@ -139,8 +144,8 @@ const mapProjection = (
   receptions: projection?.receptions ?? 0,
   receivingYards: projection?.rec_yards ?? 0,
   receivingTds: projection?.rec_tds ?? 0,
-  floor: projection?.floor ?? 0,
-  ceiling: projection?.ceiling ?? 0,
+  floor: projection?.league_floor ?? projection?.floor ?? 0,
+  ceiling: projection?.league_ceiling ?? projection?.ceiling ?? 0,
   boomProb: projection?.boom_prob ?? 0,
   bustProb: projection?.bust_prob ?? 0,
   qbr: projection?.qb_rating ?? undefined,
@@ -242,6 +247,7 @@ export function usePlayers(
         apiGet<BackendProjectionListResponse>("/projections", {
           season,
           week,
+          league_id,
           limit: 2000,
           offset: 0,
         }).catch(
@@ -270,7 +276,9 @@ export function usePlayers(
 
       const overallRankByPlayer = new Map<number, number>();
 
-      const sortedProjections = [...projections.data].sort((a, b) => b.fantasy_points - a.fantasy_points);
+      const projectionPoints = (projection: BackendProjectionRead) =>
+        projection.league_fantasy_points ?? projection.fantasy_points;
+      const sortedProjections = [...projections.data].sort((a, b) => projectionPoints(b) - projectionPoints(a));
       sortedProjections.forEach((row, index) => {
         overallRankByPlayer.set(row.player_id, index + 1);
       });
