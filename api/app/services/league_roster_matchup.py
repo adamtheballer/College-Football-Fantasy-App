@@ -8,6 +8,7 @@ from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
@@ -306,6 +307,15 @@ def build_matchup_tab_view(
     opponent_roster = _serialize_team_roster(db, league, opponent, week, team.name) if opponent else []
     my_total, my_variance = _starter_projection_summary(my_roster)
     opponent_total, opponent_variance = _starter_projection_summary(opponent_roster)
+    status = (matchup.status or "").lower()
+    use_scored_totals = status in {"live", "final", "stat_corrected"}
+    if use_scored_totals:
+        if matchup.home_team_id == team.id:
+            my_total = float(matchup.home_score or 0.0)
+            opponent_total = float(matchup.away_score or 0.0)
+        else:
+            my_total = float(matchup.away_score or 0.0)
+            opponent_total = float(matchup.home_score or 0.0)
     my_probability, opponent_probability = calculate_matchup_win_probability(
         my_total,
         opponent_total,
@@ -350,6 +360,7 @@ def build_matchup_tab_view(
         opponent_team=opponent_team,
         my_roster=my_roster,
         opponent_roster=opponent_roster,
+        projection_source="live_scoring" if use_scored_totals else "weekly_projections",
         message=None,
     )
 
@@ -384,7 +395,19 @@ def build_waivers_view(
     )
     total = query.count()
     players = query.offset(max(0, offset)).limit(max(1, min(limit, 100))).all()
-    projection_by_player = _projection_map(db, league.season_year, week, {player.id for player in players})
+    player_ids = {player.id for player in players}
+    projection_by_player = _projection_map(db, league.season_year, week, player_ids)
+    score_by_player = {
+        row.player_id: row
+        for row in db.query(PlayerWeekScore)
+        .filter(
+            PlayerWeekScore.league_id == league.id,
+            PlayerWeekScore.season == league.season_year,
+            PlayerWeekScore.week == week,
+            PlayerWeekScore.player_id.in_(player_ids or {0}),
+        )
+        .all()
+    }
     return LeagueWaiversRead(
         league_id=league.id,
         fantasy_team_id=team.id if team else None,
@@ -395,7 +418,9 @@ def build_waivers_view(
                 school=player.school,
                 position=player.position,
                 weekly_projected_fantasy_points=float(
-                    projection_by_player[player.id].fantasy_points
+                    score_by_player[player.id].fantasy_points
+                    if player.id in score_by_player
+                    else projection_by_player[player.id].fantasy_points
                     if player.id in projection_by_player
                     else 0.0
                 ),

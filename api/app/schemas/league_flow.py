@@ -334,6 +334,16 @@ class LeagueWaiversRead(BaseModel):
     message: str | None = None
 
 
+class LeagueScoreRecalculateResponse(BaseModel):
+    league_id: int
+    season: int
+    week: int
+    players_scored: int
+    teams_scored: int
+    matchups_updated: int
+    standings_updated: int
+
+
 class LeagueScheduleRowRead(BaseModel):
     matchup_id: int
     week: int

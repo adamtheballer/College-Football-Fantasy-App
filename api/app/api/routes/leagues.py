@@ -34,6 +34,7 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     LeaguePreview,
     LeagueRosterTabRead,
     LeagueScoreboardList,
+    LeagueScoreRecalculateResponse,
     LeagueSettingsViewRead,
     LeagueSettingsUpdate,
     LeagueWaiversRead,
@@ -64,6 +65,7 @@ from collegefootballfantasy_api.app.services.league_roster_matchup import (
     build_settings_view,
     build_waivers_view,
 )
+from collegefootballfantasy_api.app.services.scoring_service import run_league_scoring_recalculation
 
 router = APIRouter()
 @router.post("", response_model=LeagueCreateResponse, status_code=status.HTTP_201_CREATED)
@@ -196,6 +198,32 @@ def get_league_matchups_endpoint(
     require_league_member(db, league.id, current_user)
     rows = build_scoreboard_rows(db, league, week=week)
     return LeagueScoreboardList(data=rows, total=len(rows))
+
+
+@router.post("/{league_id}/weeks/{week}/recalculate-scores", response_model=LeagueScoreRecalculateResponse)
+def recalculate_league_week_scores_endpoint(
+    league_id: int,
+    week: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> LeagueScoreRecalculateResponse:
+    league, _ = require_commissioner(db, league_id, current_user)
+    summary = run_league_scoring_recalculation(
+        db,
+        league_id=league.id,
+        season=league.season_year,
+        week=week,
+        provider="manual",
+    )
+    return LeagueScoreRecalculateResponse(
+        league_id=league.id,
+        season=league.season_year,
+        week=week,
+        players_scored=summary.players_scored,
+        teams_scored=summary.teams_scored,
+        matchups_updated=summary.matchups_updated,
+        standings_updated=summary.standings_updated,
+    )
 
 
 @router.get("/{league_id}/power-rankings", response_model=LeaguePowerRankingList)

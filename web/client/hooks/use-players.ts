@@ -78,6 +78,44 @@ export type PlayerSeasonStatsResponse = {
   message?: string | null;
 };
 
+export type PlayerCardResponse = {
+  player: BackendPlayerRead;
+  about: {
+    espn_player_id?: string | null;
+    height?: string | null;
+    weight?: string | null;
+    player_class?: string | null;
+    birthplace?: string | null;
+    status?: string | null;
+    jersey?: string | null;
+    position?: string | null;
+    team?: string | null;
+    headshot_url?: string | null;
+    source: string;
+    message?: string | null;
+  };
+  injuries: Array<{
+    id: number;
+    season: number;
+    week: number;
+    status: string;
+    injury?: string | null;
+    return_timeline?: string | null;
+    practice_level?: string | null;
+    is_game_time_decision: boolean;
+    is_returning: boolean;
+    notes?: string | null;
+    updated_at: string;
+  }>;
+  season_stats: Array<{
+    season: number;
+    week: number;
+    source: string;
+    stats: Record<string, unknown>;
+    updated_at: string;
+  }>;
+};
+
 const VALID_STATUSES = new Set(["HEALTHY", "OUT", "QUESTIONABLE", "DOUBTFUL", "IR"]);
 
 const normalizeStatus = (value?: string | null): Player["status"] => {
@@ -405,6 +443,15 @@ export function usePlayerDetail(playerId?: number | null, enabled = true) {
         projection,
       });
     },
+  });
+}
+
+export function usePlayerCard(playerId?: number | null, enabled = true) {
+  return useQuery({
+    queryKey: ["player-card", playerId],
+    enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
+    staleTime: 60_000,
+    queryFn: () => apiGet<PlayerCardResponse>(`/players/${playerId}/card`),
   });
 }
 

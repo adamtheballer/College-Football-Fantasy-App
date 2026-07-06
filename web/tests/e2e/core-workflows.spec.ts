@@ -207,7 +207,7 @@ test.describe("critical browser workflows", () => {
       window.localStorage.setItem(`cfb_completed_guide_${payload.user.id}`, "true");
     }, mockAuthPayload);
 
-    await page.route("**/notifications/preferences**", async (route) => {
+    await page.route("**/auth/me", async (route) => {
       await route.fulfill({
         status: 401,
         contentType: "application/json",
@@ -517,6 +517,12 @@ test.describe("critical browser workflows", () => {
         position: "QB",
         school: "Texas",
         image_url: null,
+        board_rank: 1,
+        sheet_adp: 1,
+        sheet_projected_season_points: 300,
+        sheet_projection_stats: null,
+        player_class: "FR",
+        external_id: "arch-manning",
       },
     ];
 
@@ -565,6 +571,16 @@ test.describe("critical browser workflows", () => {
           total: players.length,
           limit: 250,
           offset: 0,
+        }),
+      });
+    });
+
+    await page.route("**/stats/teams?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: [{ team: "Texas", conference: "SEC" }],
         }),
       });
     });

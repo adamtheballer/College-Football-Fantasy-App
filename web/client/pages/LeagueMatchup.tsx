@@ -30,6 +30,14 @@ function MatchupEmptyState({
   );
 }
 
+function formatMatchupStatus(status: string | null | undefined) {
+  const normalized = (status || "projected").toLowerCase();
+  if (normalized === "live") return "Live";
+  if (normalized === "final") return "Final";
+  if (normalized === "stat_corrected") return "Final";
+  return "Projected";
+}
+
 export default function LeagueMatchup() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
@@ -41,6 +49,7 @@ export default function LeagueMatchup() {
   const opponentTeam = data?.opponent_team ?? null;
   const displayWeek = selectedWeek ?? data?.week ?? 1;
   const hasScheduledMatchup = Boolean(data?.matchup_id && myTeam && opponentTeam);
+  const matchupStatusLabel = formatMatchupStatus(data?.status);
 
   return (
     <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
@@ -93,7 +102,7 @@ export default function LeagueMatchup() {
               </div>
               <div className="rounded-[1.5rem] border border-sky-300/25 bg-sky-400/10 px-8 py-5 text-center shadow-[0_0_40px_rgba(56,189,248,0.14)]">
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-sky-200">
-                  Week {displayWeek}
+                  Week {displayWeek} • {matchupStatusLabel}
                 </p>
                 <p className="mt-1 text-2xl font-black text-slate-50">
                   {(myTeam.projected_total ?? 0).toFixed(1)} - {(opponentTeam.projected_total ?? 0).toFixed(1)}
