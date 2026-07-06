@@ -12,6 +12,7 @@ import {
   MessageSquare,
   ShieldAlert,
   Timer,
+  Activity,
 } from "lucide-react";
 
 import { BackgroundEffects } from "./BackgroundEffects";
@@ -47,6 +48,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: "ALERTS", path: "/alerts", icon: Bell },
         { name: "STATS", path: "/stats", icon: BarChart3 },
         { name: "MOCK DRAFT", path: "/draft", icon: Timer },
+        { name: "SCORING OPS", path: "/admin/scoring", icon: Activity },
         { name: "SETTINGS", path: "/settings", icon: Settings },
         {
           name: "SIGN OUT",

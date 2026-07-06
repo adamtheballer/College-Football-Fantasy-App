@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from collegefootballfantasy_api.app.api.routes import (
+    admin_scoring,
     auth,
     health,
     insights,
@@ -35,6 +36,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(admin_scoring.router, prefix="/admin/scoring", tags=["admin-scoring"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(leagues.router, prefix="/leagues", tags=["leagues"])
 app.include_router(teams.router, tags=["teams"])

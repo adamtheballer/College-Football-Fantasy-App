@@ -25,6 +25,7 @@ from collegefootballfantasy_api.app.schemas.roster import (
     RosterEntryRead,
 )
 from collegefootballfantasy_api.app.schemas.transaction import TransactionList, TransactionRead
+from collegefootballfantasy_api.app.services.roster_lock_service import RosterLockError, ensure_player_unlocked
 
 router = APIRouter()
 
@@ -82,6 +83,13 @@ def _ensure_player_exists(db: Session, player_id: int) -> Player:
     if not player:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
     return player
+
+
+def _ensure_unlocked_for_roster_change(db: Session, team: Team, player: Player) -> None:
+    try:
+        ensure_player_unlocked(db, team.league, player)
+    except RosterLockError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 def _ensure_player_available(db: Session, league_id: int, player_id: int) -> None:
@@ -159,7 +167,8 @@ def add_roster_entry_endpoint(
     current_user: User = Depends(require_verified_user),
 ) -> RosterEntryRead:
     team = require_team_owner(db, team_id, current_user)
-    _ensure_player_exists(db, entry_in.player_id)
+    player = _ensure_player_exists(db, entry_in.player_id)
+    _ensure_unlocked_for_roster_change(db, team, player)
     _ensure_player_available(db, team.league_id, entry_in.player_id)
 
     settings_row = _league_settings(db, team.league_id)
@@ -221,6 +230,7 @@ def delete_roster_entry_endpoint(
     entry = db.get(RosterEntry, roster_entry_id)
     if not entry or entry.team_id != team_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="roster entry not found")
+    _ensure_unlocked_for_roster_change(db, team, entry.player)
 
     dropped_player_id = entry.player_id
     db.delete(entry)
@@ -259,6 +269,7 @@ def update_lineup_endpoint(
         next_slot = assignment.slot if assignment else entry.slot
         desired_slots.append(next_slot)
         if assignment and assignment.slot != entry.slot:
+            _ensure_unlocked_for_roster_change(db, team, entry.player)
             changed_entries.append((entry, entry.slot))
 
     if any(entry_id not in roster_by_id for entry_id in requested_ids):
@@ -293,11 +304,13 @@ def add_drop_endpoint(
 ) -> AddDropResponse:
     team = require_team_owner(db, team_id, current_user)
     add_player = _ensure_player_exists(db, payload.add_player_id)
+    _ensure_unlocked_for_roster_change(db, team, add_player)
     _ensure_player_available(db, team.league_id, add_player.id)
 
     drop_entry = db.get(RosterEntry, payload.drop_roster_entry_id)
     if not drop_entry or drop_entry.team_id != team.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="roster entry not found")
+    _ensure_unlocked_for_roster_change(db, team, drop_entry.player)
 
     new_slot = _best_available_slot(db, team, add_player.position, exclude_entry_id=drop_entry.id)
     dropped_player_id = drop_entry.player_id

@@ -1,10 +1,11 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from conftest import TestingSessionLocal
 import pytest
 from sqlalchemy.exc import IntegrityError
 
 from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 
@@ -157,6 +158,88 @@ def test_add_drop_lineup_and_transactions_workflow(client, db_session):
     assert "add" in types
     assert "lineup" in types
     assert "add_drop" in types
+
+
+def test_roster_mutations_block_locked_players_after_kickoff(client, db_session):
+    token = create_user_and_token(client, "lockowner")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    add_player_id, swap_player_id = create_players(client)
+
+    add_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": add_player_id, "slot": "RB", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert add_response.status_code == 201
+    added_entry = add_response.json()
+
+    db_session.add(
+        Game(
+            external_id="started-texas",
+            season=2026,
+            week=1,
+            start_date=datetime.now(timezone.utc) - timedelta(minutes=5),
+            home_team="Texas",
+            away_team="Oklahoma",
+        )
+    )
+    db_session.commit()
+
+    lineup_response = client.patch(
+        f"/teams/{team.id}/lineup",
+        json={"assignments": [{"roster_entry_id": added_entry["id"], "slot": "BENCH"}]},
+        headers=auth_headers(token),
+    )
+    assert lineup_response.status_code == 409
+    assert "kicked off" in lineup_response.json()["detail"]
+
+    drop_response = client.delete(
+        f"/teams/{team.id}/roster/{added_entry['id']}",
+        headers=auth_headers(token),
+    )
+    assert drop_response.status_code == 409
+
+    add_drop_response = client.post(
+        f"/teams/{team.id}/add-drop",
+        json={"add_player_id": swap_player_id, "drop_roster_entry_id": added_entry["id"], "reason": "Too late"},
+        headers=auth_headers(token),
+    )
+    assert add_drop_response.status_code == 409
+
+
+def test_roster_mutations_allow_players_before_kickoff(client, db_session):
+    token = create_user_and_token(client, "futurelock")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    add_player_id, _swap_player_id = create_players(client)
+    db_session.add(
+        Game(
+            external_id="future-texas",
+            season=2026,
+            week=1,
+            start_date=datetime.now(timezone.utc) + timedelta(hours=2),
+            home_team="Texas",
+            away_team="Oklahoma",
+        )
+    )
+    db_session.commit()
+
+    add_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": add_player_id, "slot": "RB", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert add_response.status_code == 201
+    added_entry = add_response.json()
+
+    lineup_response = client.patch(
+        f"/teams/{team.id}/lineup",
+        json={"assignments": [{"roster_entry_id": added_entry["id"], "slot": "BENCH"}]},
+        headers=auth_headers(token),
+    )
+    assert lineup_response.status_code == 200
+    assert lineup_response.json()["data"][0]["slot"] == "BENCH"
 
 
 def test_team_and_roster_db_constraints_enforce_league_invariants(client, db_session):

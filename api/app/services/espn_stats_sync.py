@@ -8,6 +8,10 @@ from sqlalchemy.orm import Session
 from collegefootballfantasy_api.app.integrations.espn import ESPNClient, extract_player_box_score_stats
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
+from collegefootballfantasy_api.app.services.provider_identity_audit import (
+    record_provider_identity_audit,
+    record_unmatched_provider_row,
+)
 
 
 def _identity(value: str | None) -> str:
@@ -22,9 +26,9 @@ def _school_keys(row: dict[str, Any]) -> set[str]:
     return {key for key in keys if key}
 
 
-def _build_player_indexes(players: list[Player]) -> tuple[dict[str, Player], dict[tuple[str, str], Player]]:
+def _build_player_indexes(players: list[Player]) -> tuple[dict[str, Player], dict[tuple[str, str], list[Player]]]:
     external_index: dict[str, Player] = {}
-    name_school_index: dict[tuple[str, str], Player] = {}
+    name_school_index: dict[tuple[str, str], list[Player]] = {}
     for player in players:
         if player.external_id:
             external_id = str(player.external_id)
@@ -33,29 +37,31 @@ def _build_player_indexes(players: list[Player]) -> tuple[dict[str, Player], dic
         name_key = _identity(player.name)
         school_key = _identity(player.school)
         if name_key and school_key:
-            name_school_index[(name_key, school_key)] = player
+            name_school_index.setdefault((name_key, school_key), []).append(player)
     return external_index, name_school_index
 
 
 def _match_player(
     row: dict[str, Any],
     external_index: dict[str, Player],
-    name_school_index: dict[tuple[str, str], Player],
-) -> Player | None:
+    name_school_index: dict[tuple[str, str], list[Player]],
+) -> tuple[Player | None, str, str]:
     espn_player_id = str(row.get("ESPNPlayerID") or "")
     for external_id in (espn_player_id, f"espn:{espn_player_id}"):
         player = external_index.get(external_id)
         if player:
-            return player
+            return player, "external_id", "matched by provider player id"
 
     name_key = _identity(str(row.get("PlayerName") or ""))
     if not name_key:
-        return None
+        return None, "unmatched", "missing provider player name"
     for school_key in _school_keys(row):
-        player = name_school_index.get((name_key, school_key))
-        if player:
-            return player
-    return None
+        players = name_school_index.get((name_key, school_key), [])
+        if len(players) == 1:
+            return players[0], "name_school", "matched by normalized name and school"
+        if len(players) > 1:
+            return None, "duplicate_name_school", "duplicate local players share provider name and school"
+    return None, "unmatched", "no local player matched provider row"
 
 
 def upsert_espn_weekly_player_stats(
@@ -75,10 +81,28 @@ def upsert_espn_weekly_player_stats(
     upserted = 0
     skipped = 0
     for row in rows:
-        player = _match_player(row, external_index, name_school_index)
+        player, match_type, reason = _match_player(row, external_index, name_school_index)
         if not player:
+            record_unmatched_provider_row(
+                db,
+                provider="espn",
+                season=season,
+                week=week,
+                row=row,
+                reason=reason,
+            )
             skipped += 1
             continue
+        record_provider_identity_audit(
+            db,
+            provider="espn",
+            season=season,
+            week=week,
+            row=row,
+            player_id=player.id,
+            match_type=match_type,
+            confidence=100 if match_type == "external_id" else 70,
+        )
         stat = (
             db.query(PlayerStat)
             .filter(

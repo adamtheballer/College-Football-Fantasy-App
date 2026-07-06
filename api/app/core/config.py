@@ -75,6 +75,7 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_from_email: str | None = None
     smtp_use_tls: bool = True
+    admin_emails: str = ""
 
     model_config = SettingsConfigDict(
         env_file=(str(PROJECT_ROOT / ".env"), ".env"),
@@ -96,6 +97,10 @@ class Settings(BaseSettings):
             return None
         normalized = self.cors_origin_regex.strip()
         return normalized or None
+
+    @property
+    def configured_admin_emails(self) -> set[str]:
+        return {email.strip().lower() for email in self.admin_emails.split(",") if email.strip()}
 
     @staticmethod
     def _is_local_origin(origin: str) -> bool:

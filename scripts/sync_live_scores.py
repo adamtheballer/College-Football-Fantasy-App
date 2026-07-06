@@ -2,13 +2,9 @@ from __future__ import annotations
 
 import argparse
 import time
-from typing import Any
 
 from collegefootballfantasy_api.app.db.session import SessionLocal
-from collegefootballfantasy_api.app.integrations.sportsdata import SportsDataClient
-from collegefootballfantasy_api.app.models.player import Player
-from collegefootballfantasy_api.app.models.player_stat import PlayerStat
-from collegefootballfantasy_api.app.services.espn_stats_sync import upsert_espn_weekly_player_stats
+from collegefootballfantasy_api.app.services.provider_stats_service import sync_provider_weekly_player_stats
 from collegefootballfantasy_api.app.services.scoring_worker_service import RetryPolicy, run_scoring_worker_once
 
 
@@ -33,62 +29,9 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def provider_player_id(row: dict[str, Any]) -> str | None:
-    for key in ("PlayerID", "PlayerId", "player_id", "playerId", "ExternalID", "external_id"):
-        value = row.get(key)
-        if value is not None and value != "":
-            return str(value)
-    return None
-
-
-def upsert_player_stats(season: int, week: int) -> int:
-    client = SportsDataClient()
-    rows = client.get_weekly_player_stats(season, week)
-    updated = 0
-    with SessionLocal() as db:
-        players_by_external_id = {
-            str(external_id): player
-            for external_id, player in db.query(Player.external_id, Player).filter(Player.external_id.isnot(None)).all()
-        }
-        for row in rows:
-            external_id = provider_player_id(row)
-            if not external_id:
-                continue
-            player = players_by_external_id.get(external_id)
-            if not player:
-                continue
-            stat = (
-                db.query(PlayerStat)
-                .filter(
-                    PlayerStat.player_id == player.id,
-                    PlayerStat.season == season,
-                    PlayerStat.week == week,
-                )
-                .first()
-            )
-            if not stat:
-                stat = PlayerStat(
-                    player_id=player.id,
-                    season=season,
-                    week=week,
-                    source="sportsdata",
-                    stats=row,
-                )
-                db.add(stat)
-            else:
-                stat.source = "sportsdata"
-                stat.stats = row
-            updated += 1
-        db.commit()
-    return updated
-
-
 def upsert_provider_player_stats(provider: str, season: int, week: int) -> dict[str, int]:
-    if provider == "espn":
-        with SessionLocal() as db:
-            return upsert_espn_weekly_player_stats(db, season=season, week=week)
-    updated = upsert_player_stats(season, week)
-    return {"rows_seen": updated, "upserted": updated, "skipped": 0, "events": 0}
+    with SessionLocal() as db:
+        return sync_provider_weekly_player_stats(db, provider=provider, season=season, week=week)
 
 
 def run_once(args: argparse.Namespace) -> None:
