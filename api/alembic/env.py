@@ -35,6 +35,7 @@ from collegefootballfantasy_api.app.models import (
     refresh_session,
     roster,
     scheduled_notification,
+    scoring_job_lock,
     scoring_run,
     standing,
     team,

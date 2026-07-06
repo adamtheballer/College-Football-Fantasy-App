@@ -34,6 +34,7 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     roster,
     refresh_session,
     scheduled_notification,
+    scoring_job_lock,
     scoring_run,
     team_stats_snapshot,
     transaction,
