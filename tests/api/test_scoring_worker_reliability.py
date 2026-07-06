@@ -5,6 +5,7 @@ import pytest
 from conftest import TestingSessionLocal
 from collegefootballfantasy_api.app.models.scoring_job_lock import ScoringJobLock
 from collegefootballfantasy_api.app.models.scoring_run import ScoringRun
+from collegefootballfantasy_api.app.services import scoring_worker_service
 from collegefootballfantasy_api.app.services.scoring_worker_service import (
     ProviderDataValidationFailed,
     ProviderSyncFailed,
@@ -116,6 +117,56 @@ def test_duplicate_worker_run_exits_without_scoring(client, db_session):
     assert db_session.query(ScoringRun).count() == 0
 
 
+def test_all_league_lock_blocks_specific_league_lock(client, db_session):
+    league, *_ = create_scoring_fixture(db_session)
+    all_lock = acquire_scoring_lock(
+        db_session,
+        provider="espn",
+        season=2026,
+        week=1,
+        league_id=None,
+        worker_id="all-worker",
+        ttl_seconds=300,
+    )
+    specific_lock = acquire_scoring_lock(
+        db_session,
+        provider="espn",
+        season=2026,
+        week=1,
+        league_id=league.id,
+        worker_id="specific-worker",
+        ttl_seconds=300,
+    )
+
+    assert all_lock is not None
+    assert specific_lock is None
+
+
+def test_specific_league_lock_blocks_all_league_lock(client, db_session):
+    league, *_ = create_scoring_fixture(db_session)
+    specific_lock = acquire_scoring_lock(
+        db_session,
+        provider="espn",
+        season=2026,
+        week=1,
+        league_id=league.id,
+        worker_id="specific-worker",
+        ttl_seconds=300,
+    )
+    all_lock = acquire_scoring_lock(
+        db_session,
+        provider="espn",
+        season=2026,
+        week=1,
+        league_id=None,
+        worker_id="all-worker",
+        ttl_seconds=300,
+    )
+
+    assert specific_lock is not None
+    assert all_lock is None
+
+
 def test_committed_lock_is_visible_to_second_worker_session(client, db_session):
     league, *_ = create_scoring_fixture(db_session)
 
@@ -216,6 +267,62 @@ def test_empty_provider_success_does_not_recalculate_existing_scores(client, db_
     assert failed_run.status == "failed"
     assert "zero stat rows" in failed_run.error_message
     assert refreshed_matchup.home_score == original_home_score
+
+
+def test_provider_events_without_player_rows_do_not_recalculate_scores(client, db_session):
+    league, _home, _away, _players, matchup = create_scoring_fixture(db_session)
+    result = run_scoring_worker_once(
+        db_session,
+        provider="espn",
+        season=2026,
+        week=1,
+        league_id=league.id,
+        sync_provider_stats=lambda: {"rows_seen": 1, "upserted": 1, "skipped": 0, "events": 1},
+        worker_id="initial-worker",
+    )
+    assert result.status == "success"
+    original_home_score = db_session.get(type(matchup), matchup.id).home_score
+
+    with pytest.raises(ProviderDataValidationFailed):
+        run_scoring_worker_once(
+            db_session,
+            provider="espn",
+            season=2026,
+            week=1,
+            league_id=league.id,
+            sync_provider_stats=lambda: {"rows_seen": 0, "upserted": 0, "skipped": 0, "events": 3},
+            worker_id="events-only-worker",
+        )
+
+    failed_run = db_session.query(ScoringRun).filter_by(worker_id="events-only-worker").one()
+    assert failed_run.status == "failed"
+    assert db_session.get(type(matchup), matchup.id).home_score == original_home_score
+
+
+def test_worker_heartbeats_before_and_after_each_league_recalculation(client, db_session, monkeypatch):
+    create_scoring_fixture(db_session)
+    create_scoring_fixture(db_session)
+    heartbeat_calls = []
+    original_heartbeat = scoring_worker_service.heartbeat_scoring_lock
+
+    def spy_heartbeat(*args, **kwargs):
+        heartbeat_calls.append(kwargs.get("now"))
+        return original_heartbeat(*args, **kwargs)
+
+    monkeypatch.setattr(scoring_worker_service, "heartbeat_scoring_lock", spy_heartbeat)
+
+    result = run_scoring_worker_once(
+        db_session,
+        provider="espn",
+        season=2026,
+        week=1,
+        league_id=None,
+        sync_provider_stats=lambda: {"rows_seen": 1, "upserted": 1, "skipped": 0, "events": 1},
+        worker_id="heartbeat-worker",
+    )
+
+    assert result.status == "success"
+    assert len(heartbeat_calls) == 4
 
 
 def test_permanent_provider_failure_records_failed_run_and_releases_lock(client, db_session):

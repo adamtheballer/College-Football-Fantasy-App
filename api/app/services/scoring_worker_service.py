@@ -66,6 +66,32 @@ def scoring_lock_key(provider: str, season: int, week: int, league_id: int | Non
     return f"scoring:{season}:{week}:{scope}"
 
 
+def _has_active_overlapping_lock(
+    db: Session,
+    *,
+    season: int,
+    week: int,
+    league_id: int | None,
+    now: datetime,
+) -> bool:
+    locks = (
+        db.query(ScoringJobLock)
+        .filter(
+            ScoringJobLock.season == season,
+            ScoringJobLock.week == week,
+            ScoringJobLock.status == "active",
+        )
+        .with_for_update()
+        .all()
+    )
+    for lock in locks:
+        if _aware(lock.expires_at) <= now:
+            continue
+        if league_id is None or lock.league_id is None:
+            return True
+    return False
+
+
 def acquire_scoring_lock(
     db: Session,
     *,
@@ -78,6 +104,8 @@ def acquire_scoring_lock(
     now: datetime | None = None,
 ) -> ScoringJobLock | None:
     timestamp = now or _now()
+    if _has_active_overlapping_lock(db, season=season, week=week, league_id=league_id, now=timestamp):
+        return None
     lock_key = scoring_lock_key(provider, season, week, league_id)
     lock = (
         db.query(ScoringJobLock)
@@ -268,8 +296,8 @@ def validate_provider_sync_result(
     if _result_allows_empty_data(result):
         return
     rows_seen = _int_result(result, "rows_seen")
-    events_seen = _int_result(result, "events")
-    if rows_seen > 0 or events_seen > 0:
+    rows_matched = _int_result(result, "upserted") + _int_result(result, "rows_matched")
+    if rows_seen > 0 or rows_matched > 0:
         return
     if _has_league_matchups(db, season=season, week=week, league_id=league_id):
         raise ProviderDataValidationFailed(
@@ -381,6 +409,11 @@ def run_scoring_worker_once(
             if run is None:
                 raise RuntimeError("scoring run disappeared during heartbeat")
             current = recalculate_league_week_scores(db, target_league_id, season, week)
+            heartbeat_scoring_lock(db, lock, ttl_seconds=lock_ttl_seconds)
+            lock = _commit_lock_state(db, lock)
+            run = db.get(ScoringRun, run_id)
+            if run is None:
+                raise RuntimeError("scoring run disappeared after league recalculation heartbeat")
             totals = ScoringSummary(
                 players_scored=totals.players_scored + current.players_scored,
                 teams_scored=totals.teams_scored + current.teams_scored,
