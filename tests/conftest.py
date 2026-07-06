@@ -11,6 +11,8 @@ from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.main import app
 from collegefootballfantasy_api.app.models import (  # noqa: F401
     cfb_standing_snapshot,
+    cfb_ranking_snapshot,
+    college_football_team,
     auth_action_token,
     auth_rate_limit_event,
     draft,
@@ -31,6 +33,8 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     player_stat,
     player_week_score,
     provider_player_identity_audit,
+    provider_ingestion_run,
+    provider_response_cache,
     provider_sync_state,
     provider_unmatched_player_row,
     roster,

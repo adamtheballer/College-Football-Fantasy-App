@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.security import (
     PASSWORD_HASH_ALGORITHM,
@@ -8,6 +10,7 @@ from collegefootballfantasy_api.app.core.security import (
     verify_password,
 )
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
+from collegefootballfantasy_api.app.models.auth_action_token import AuthActionToken
 from collegefootballfantasy_api.app.models.user import User
 
 
@@ -160,6 +163,65 @@ def test_login_succeeds_only_with_exact_password(client):
     )
     assert bad.status_code == 401
     assert bad.json()["detail"] == "invalid credentials"
+
+
+def test_password_reset_changes_hash_revokes_sessions_and_requires_new_password(client, db_session):
+    signup_payload = signup_user(client, "reset")
+    old_cookie = client.cookies.get(settings.refresh_cookie_name)
+    assert old_cookie
+
+    request_response = client.post(
+        "/auth/password-reset/request",
+        json={"email": "coach-reset@example.com"},
+    )
+    assert request_response.status_code == 200
+
+    from collegefootballfantasy_api.app.services.auth_security import PASSWORD_RESET_TOKEN, create_auth_action_token
+
+    db_session.query(AuthActionToken).filter(
+        AuthActionToken.email == "coach-reset@example.com",
+        AuthActionToken.token_type == PASSWORD_RESET_TOKEN,
+    ).one()
+    from collegefootballfantasy_api.app.core.security import verify_password as _verify_password
+
+    user = db_session.query(User).filter(User.email == "coach-reset@example.com").one()
+    old_hash = user.password_hash
+    assert _verify_password(STRONG_PASSWORD, old_hash) is True
+
+    # The raw token is only shown by the console email service, so create a fresh token through the same service path.
+    raw_token = create_auth_action_token(
+        db_session,
+        user=user,
+        token_type=PASSWORD_RESET_TOKEN,
+        ttl=timedelta(minutes=30),
+        request=type("Req", (), {"headers": {}, "client": None})(),
+    )
+    db_session.commit()
+
+    confirm_response = client.post(
+        "/auth/password-reset/confirm",
+        json={"token": raw_token, "new_password": "NewStrongPass123!"},
+    )
+    assert confirm_response.status_code == 200
+
+    db_session.expire_all()
+    reset_user = db_session.query(User).filter(User.email == "coach-reset@example.com").one()
+    assert reset_user.password_hash != old_hash
+    assert verify_password("NewStrongPass123!", reset_user.password_hash) is True
+    assert verify_password(STRONG_PASSWORD, reset_user.password_hash) is False
+    assert db_session.query(RefreshSession).filter_by(user_id=signup_payload["user"]["id"], revoked_at=None).count() == 0
+
+    old_login = client.post(
+        "/auth/login",
+        json={"email": "coach-reset@example.com", "password": STRONG_PASSWORD},
+    )
+    assert old_login.status_code == 401
+
+    new_login = client.post(
+        "/auth/login",
+        json={"email": "coach-reset@example.com", "password": "NewStrongPass123!"},
+    )
+    assert new_login.status_code == 200
 
 
 def test_password_hashes_are_versioned_and_constant_time_verifiable():

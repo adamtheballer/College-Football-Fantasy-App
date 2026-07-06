@@ -19,7 +19,9 @@ import {
   Sparkles,
   Users,
   Radio,
-  Star
+  Star,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export default function Login() {
@@ -33,6 +35,13 @@ export default function Login() {
     typeof location.state.from === "string"
       ? location.state.from
       : "/";
+  const initialNotice =
+    typeof location.state === "object" &&
+    location.state &&
+    "notice" in location.state &&
+    typeof location.state.notice === "string"
+      ? location.state.notice
+      : null;
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -42,20 +51,16 @@ export default function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [recoveryNotice, setRecoveryNotice] = useState<string | null>(null);
-
-  const handleForgotPassword = () => {
-    setError(null);
-    setRecoveryNotice("Password reset emails are not configured yet. For now, contact support or try signing in again.");
-  };
+  const [notice, setNotice] = useState<string | null>(initialNotice);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    setRecoveryNotice(null);
+    setNotice(null);
     try {
       const signedInUser = await login(email, password);
       if (signedInUser) {
@@ -79,14 +84,14 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-8rem)] overflow-hidden rounded-[2.25rem] border border-white/10 bg-[#06111f] p-4 shadow-[0_0_80px_rgba(14,165,233,0.18)] sm:p-6 lg:p-8">
+    <div className="relative h-full max-h-full overflow-hidden rounded-[2rem] border border-white/10 bg-[#06111f] p-3 shadow-[0_0_80px_rgba(14,165,233,0.18)] sm:p-4 lg:p-5">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(34,211,238,0.34),transparent_34%),radial-gradient(circle_at_84%_18%,rgba(251,191,36,0.24),transparent_28%),radial-gradient(circle_at_70%_82%,rgba(244,63,94,0.22),transparent_30%),linear-gradient(135deg,rgba(15,23,42,0.15),rgba(2,6,23,0.88))]" />
       <div className="absolute inset-0 opacity-[0.16] [background-image:linear-gradient(rgba(255,255,255,0.16)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.16)_1px,transparent_1px)] [background-size:48px_48px]" />
       <div className="absolute left-8 right-8 top-1/2 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
-      <div className="absolute bottom-8 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full border-2 border-white/10" />
+      <div className="absolute bottom-8 left-1/2 h-28 w-28 -translate-x-1/2 rounded-full border-2 border-white/10" />
 
-      <div className="relative grid min-h-[calc(100vh-12rem)] items-center gap-8 lg:grid-cols-[minmax(0,1fr)_480px]">
-        <section className="hidden space-y-7 pl-2 lg:block xl:pl-8">
+      <div className="relative grid h-full min-h-0 items-center gap-5 lg:grid-cols-[minmax(0,1fr)_440px]">
+        <section className="hidden space-y-4 pl-2 lg:block xl:pl-6">
           <Link
             to="/"
             aria-label="Back to home"
@@ -96,12 +101,12 @@ export default function Login() {
             CFB Fantasy
           </Link>
 
-          <div className="max-w-3xl space-y-4">
+          <div className="max-w-3xl space-y-3">
             <div className="inline-flex items-center gap-2 rounded-full border border-amber-200/25 bg-amber-300/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] text-amber-100">
               <Sparkles className="h-3.5 w-3.5" />
               Saturday night is live
             </div>
-            <h1 className="text-6xl font-black uppercase italic leading-[0.9] tracking-tight text-white xl:text-7xl">
+            <h1 className="text-5xl font-black uppercase italic leading-[0.9] tracking-tight text-white xl:text-6xl">
               Build your
               <span className="block bg-gradient-to-r from-cyan-200 via-sky-300 to-amber-200 bg-clip-text text-transparent">
                 title team
@@ -118,25 +123,25 @@ export default function Login() {
               { label: "Managers", value: "12", icon: Users, tone: "from-emerald-400/25 to-teal-500/15 text-emerald-100" },
               { label: "Power Plays", value: "24/7", icon: Star, tone: "from-amber-300/25 to-orange-500/15 text-amber-100" },
             ].map((item) => (
-              <div key={item.label} className={`rounded-2xl border border-white/10 bg-gradient-to-br ${item.tone} p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]`}>
-                <item.icon className="mb-4 h-5 w-5" />
-                <p className="text-2xl font-black italic leading-none text-white">{item.value}</p>
+              <div key={item.label} className={`rounded-2xl border border-white/10 bg-gradient-to-br ${item.tone} p-3 shadow-[0_18px_40px_rgba(0,0,0,0.22)]`}>
+                <item.icon className="mb-3 h-4 w-4" />
+                <p className="text-xl font-black italic leading-none text-white">{item.value}</p>
                 <p className="mt-2 text-[9px] font-black uppercase tracking-[0.18em] opacity-75">{item.label}</p>
               </div>
             ))}
           </div>
 
-          <div className="flex max-w-xl flex-wrap gap-3">
+          <div className="flex max-w-xl flex-wrap gap-2">
             {["CFB rankings", "Rivalry week", "Available players", "Draft room"].map((label) => (
-              <span key={label} className="rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/75">
+              <span key={label} className="rounded-full border border-white/10 bg-white/[0.08] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-white/75">
                 {label}
               </span>
             ))}
           </div>
         </section>
 
-        <div className="mx-auto w-full max-w-[480px] animate-in fade-in slide-in-from-bottom-8 duration-700">
-          <div className="mb-5 flex flex-col items-center text-center lg:hidden">
+        <div className="mx-auto w-full max-w-[440px] animate-in fade-in slide-in-from-bottom-8 duration-700">
+          <div className="mb-3 flex flex-col items-center text-center lg:hidden">
             <Link
               to="/"
               aria-label="Back to home"
@@ -147,28 +152,28 @@ export default function Login() {
             <p className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan-100/80">College Football Fantasy</p>
           </div>
 
-          <Card className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/72 shadow-[0_28px_80px_rgba(0,0,0,0.42)] backdrop-blur-2xl">
+          <Card className="relative overflow-hidden rounded-[1.75rem] border border-white/15 bg-slate-950/72 shadow-[0_28px_80px_rgba(0,0,0,0.42)] backdrop-blur-2xl">
             <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-cyan-300 via-amber-200 to-rose-400" />
             <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-cyan-400/18 blur-3xl" />
             <div className="absolute -bottom-20 left-8 h-44 w-44 rounded-full bg-rose-400/14 blur-3xl" />
 
-            <CardContent className="relative space-y-8 p-7 sm:p-9">
-              <div className="space-y-3 text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-200 via-cyan-300 to-blue-500 shadow-[0_0_38px_rgba(34,211,238,0.34)]">
-                  <Trophy className="h-7 w-7 text-slate-950" />
+            <CardContent className="relative space-y-5 p-5 sm:p-6">
+              <div className="space-y-2 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-200 via-cyan-300 to-blue-500 shadow-[0_0_38px_rgba(34,211,238,0.34)]">
+                  <Trophy className="h-5 w-5 text-slate-950" />
                 </div>
                 <div>
-                  <h2 className="text-4xl font-black uppercase italic tracking-tight text-white">
+                  <h2 className="text-3xl font-black uppercase italic tracking-tight text-white">
                     Welcome Back
                   </h2>
-                  <p className="mt-2 text-[10px] font-black uppercase tracking-[0.28em] text-cyan-100/60">
+                  <p className="mt-1 text-[9px] font-black uppercase tracking-[0.24em] text-cyan-100/60">
                     Lock in and run your league
                   </p>
                 </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-3">
                   <div className="space-y-2">
                     <label className="ml-3 text-[10px] font-black uppercase tracking-widest text-cyan-100/70">Email Address</label>
                     <div className="group relative">
@@ -176,7 +181,7 @@ export default function Login() {
                       <Input
                         type="email"
                         placeholder="coach@saturday.com"
-                        className="h-14 rounded-2xl border-cyan-200/10 bg-white/10 pl-12 text-sm font-bold text-white placeholder:text-slate-300/40 transition-all focus:border-cyan-200/50 focus:ring-cyan-300/25"
+                        className="h-12 rounded-2xl border-cyan-200/10 bg-white/10 pl-12 text-sm font-bold text-white placeholder:text-slate-300/40 transition-all focus:border-cyan-200/50 focus:ring-cyan-300/25"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
@@ -186,33 +191,34 @@ export default function Login() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between px-3">
                       <label className="text-[10px] font-black uppercase tracking-widest text-cyan-100/70">Password</label>
-                      <button
-                        type="button"
-                        onClick={handleForgotPassword}
+                      <Link
+                        to="/password-reset"
                         className="text-[9px] font-black uppercase tracking-widest text-amber-200/80 transition-colors hover:text-amber-100"
                       >
                         Forgot Password?
-                      </button>
+                      </Link>
                     </div>
                     <div className="group relative">
                       <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-100/45 transition-colors group-focus-within:text-cyan-200" />
                       <Input
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         placeholder="••••••••"
-                        className="h-14 rounded-2xl border-cyan-200/10 bg-white/10 pl-12 text-sm font-bold text-white placeholder:text-slate-300/40 transition-all focus:border-cyan-200/50 focus:ring-cyan-300/25"
+                        className="h-12 rounded-2xl border-cyan-200/10 bg-white/10 pl-12 pr-12 text-sm font-bold text-white placeholder:text-slate-300/40 transition-all focus:border-cyan-200/50 focus:ring-cyan-300/25"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
                       />
+                      <button
+                        type="button"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        onClick={() => setShowPassword((current) => !current)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-1 text-cyan-100/45 transition-colors hover:text-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-300/30"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                     </div>
                   </div>
                 </div>
-
-                {recoveryNotice && (
-                  <div className="rounded-2xl border border-amber-200/35 bg-amber-300/12 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-100">
-                    {recoveryNotice}
-                  </div>
-                )}
 
                 {error && (
                   <div className="rounded-2xl border border-red-300/35 bg-red-500/15 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-red-100">
@@ -220,9 +226,15 @@ export default function Login() {
                   </div>
                 )}
 
+                {notice && (
+                  <div className="rounded-2xl border border-emerald-200/35 bg-emerald-300/12 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-100">
+                    {notice}
+                  </div>
+                )}
+
                 <Button
                   type="submit"
-                  className="group h-14 w-full overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-500 text-[11px] font-black uppercase tracking-[0.22em] text-slate-950 shadow-[0_18px_42px_rgba(14,165,233,0.32)] transition-all hover:brightness-110"
+                  className="group h-12 w-full overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-500 text-[10px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-[0_18px_42px_rgba(14,165,233,0.32)] transition-all hover:brightness-110"
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -242,26 +254,26 @@ export default function Login() {
               </div>
 
               <div className="grid grid-cols-3 gap-3">
-                <Button variant="outline" className="h-14 rounded-2xl border-white/10 bg-white/10 text-white hover:border-cyan-200/35 hover:bg-cyan-300/15">
+                <Button variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/10 text-white hover:border-cyan-200/35 hover:bg-cyan-300/15">
                   <Chrome className="h-5 w-5" />
                 </Button>
-                <Button variant="outline" className="h-14 rounded-2xl border-white/10 bg-white/10 text-white hover:border-amber-200/35 hover:bg-amber-300/15">
+                <Button variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/10 text-white hover:border-amber-200/35 hover:bg-amber-300/15">
                   <Apple className="h-5 w-5" />
                 </Button>
-                <Button variant="outline" className="h-14 rounded-2xl border-white/10 bg-white/10 text-white hover:border-rose-200/35 hover:bg-rose-300/15">
+                <Button variant="outline" className="h-11 rounded-2xl border-white/10 bg-white/10 text-white hover:border-rose-200/35 hover:bg-rose-300/15">
                   <Github className="h-5 w-5" />
                 </Button>
               </div>
             </CardContent>
 
-            <div className="relative border-t border-white/10 bg-white/[0.06] px-7 py-5 text-center">
+            <div className="relative border-t border-white/10 bg-white/[0.06] px-6 py-3 text-center">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-300/70">
                 Don't have an account? <Link to="/signup" className="ml-1 font-black text-amber-200 hover:text-amber-100">Create One</Link>
               </p>
             </div>
           </Card>
 
-          <div className="mt-5 flex items-center justify-center gap-5 text-slate-200/55">
+          <div className="mt-3 flex items-center justify-center gap-5 text-slate-200/55">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-200" />
               <span className="text-[8px] font-black uppercase tracking-widest">Secure SSL</span>

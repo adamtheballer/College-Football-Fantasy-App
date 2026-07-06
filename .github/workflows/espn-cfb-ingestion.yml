@@ -1,0 +1,117 @@
+name: ESPN CFB Ingestion
+
+on:
+  schedule:
+    # 6:00 AM America/Los_Angeles is 13:00 UTC during PDT and 14:00 UTC during PST.
+    # The job gate below prevents duplicate daily runs.
+    - cron: "0 13,14 * * *"
+  workflow_dispatch:
+    inputs:
+      season:
+        description: "Season year"
+        required: false
+        type: string
+      date:
+        description: "Run date in YYYY-MM-DD"
+        required: false
+        type: string
+      targets:
+        description: "Comma-separated ingestion targets"
+        required: false
+        default: "teams,schedules,rankings,scores,game_summaries,box_scores,standings"
+        type: string
+      dry_run:
+        description: "Run without writing normalized records"
+        required: false
+        default: false
+        type: boolean
+      rate_limit_seconds:
+        description: "Seconds between ESPN requests"
+        required: false
+        default: "2"
+        type: string
+      http_cache_ttl_minutes:
+        description: "HTTP response cache TTL, 10-30 minutes"
+        required: false
+        default: "20"
+        type: string
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.ESPN_INGESTION_DATABASE_URL || secrets.STAGING_DATABASE_URL }}
+      PYTHONPATH: .
+      JWT_SECRET_KEY: espn-ingestion-ci-only
+      UI_BASE_URL: https://staging.example.invalid
+      CORS_ORIGINS: https://staging.example.invalid
+    steps:
+      - name: Skip duplicate DST schedule window
+        if: github.event_name == 'schedule'
+        run: |
+          hour="$(TZ=America/Los_Angeles date +%H)"
+          if [ "$hour" != "06" ]; then
+            echo "Not 6 AM America/Los_Angeles; skipping ingestion steps."
+            echo "skip_ingestion=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Check required database secret
+        if: env.skip_ingestion != 'true'
+        run: |
+          test -n "$DATABASE_URL" || { echo "Missing ESPN_INGESTION_DATABASE_URL or STAGING_DATABASE_URL secret"; exit 1; }
+
+      - name: Check out repository
+        if: env.skip_ingestion != 'true'
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        if: env.skip_ingestion != 'true'
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        if: env.skip_ingestion != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend dependencies
+        if: env.skip_ingestion != 'true'
+        run: uv sync
+
+      - name: Run migrations
+        if: env.skip_ingestion != 'true'
+        run: uv run alembic -c api/alembic.ini upgrade head
+
+      - name: Run ESPN ingestion
+        if: env.skip_ingestion != 'true'
+        run: |
+          season="${{ inputs.season }}"
+          run_date="${{ inputs.date }}"
+          targets="${{ inputs.targets || 'teams,schedules,rankings,scores,game_summaries,box_scores,standings' }}"
+          rate_limit="${{ inputs.rate_limit_seconds || '2' }}"
+          http_cache_ttl="${{ inputs.http_cache_ttl_minutes || '20' }}"
+          dry_run="${{ inputs.dry_run }}"
+
+          if [ -z "$season" ]; then season="$(TZ=America/Los_Angeles date +%Y)"; fi
+          if [ -z "$run_date" ]; then run_date="$(TZ=America/Los_Angeles date +%F)"; fi
+
+          dry_run_flag=""
+          if [ "$dry_run" = "true" ]; then dry_run_flag="--dry-run"; fi
+
+          PYTHONPATH=. uv run python scripts/ingest_espn_college_football.py \
+            --season "$season" \
+            --date "$run_date" \
+            --targets "$targets" \
+            --rate-limit-seconds "$rate_limit" \
+            --http-cache-ttl-minutes "$http_cache_ttl" \
+            --max-requests-per-run 250 \
+            --max-concurrent-requests 1 \
+            --output-location data/espn_college_football \
+            $dry_run_flag
+
+      - name: Upload ingestion summary
+        uses: actions/upload-artifact@v4
+        if: always() && env.skip_ingestion != 'true'
+        with:
+          name: espn-cfb-ingestion-summary
+          path: data/espn_college_football/latest_summary.json

@@ -7,6 +7,8 @@ from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.base import Base
 from collegefootballfantasy_api.app.models import (
     cfb_standing_snapshot,
+    cfb_ranking_snapshot,
+    college_football_team,
     defense_rating,
     defense_vs_position,
     draft,
@@ -30,6 +32,8 @@ from collegefootballfantasy_api.app.models import (
     player_week_score,
     preseason_prior,
     provider_player_identity_audit,
+    provider_ingestion_run,
+    provider_response_cache,
     provider_sync_state,
     provider_unmatched_player_row,
     projection_explanation,
