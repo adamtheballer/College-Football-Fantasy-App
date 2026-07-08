@@ -14,6 +14,7 @@ class TransactionRead(BaseModel):
     related_player_id: int | None = None
     created_by_user_id: int | None = None
     reason: str | None = None
+    idempotency_key: str | None = None
     created_at: datetime
     updated_at: datetime
 

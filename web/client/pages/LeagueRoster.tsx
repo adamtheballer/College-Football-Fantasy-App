@@ -1,19 +1,26 @@
 import { useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
 import { WeekSelector } from "@/components/league/WeekSelector";
-import { useLeagueRosterTab } from "@/hooks/use-leagues";
+import { PageErrorState, PageLoadingState } from "@/components/PageState";
+import { useLeagueRosterTab, useLeagueSettingsTab } from "@/hooks/use-leagues";
 import {
   DEMO_LEAGUE_ID,
   createDemoLeagueRosterResponse,
   createWeekOnePreviewRoster,
 } from "@/lib/leaguePreviewData";
+import { isPreDraftLeague } from "@/lib/leagueState";
 
 const starterSlot = (slot?: string | null) => {
   const normalized = (slot || "").toUpperCase();
   return normalized !== "BENCH" && normalized !== "IR";
+};
+
+const projectionValue = (player: { projected_points?: number | null; weekly_projected_fantasy_points?: number | null }) => {
+  const value = player.projected_points ?? player.weekly_projected_fantasy_points;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 };
 
 export default function LeagueRoster() {
@@ -21,7 +28,13 @@ export default function LeagueRoster() {
   const parsedLeagueId = Number(leagueId);
   const isDemoLeague = parsedLeagueId === DEMO_LEAGUE_ID;
   const [selectedWeek, setSelectedWeek] = useState<number | null>(1);
-  const rosterQuery = useLeagueRosterTab(parsedLeagueId, selectedWeek ?? undefined, !isDemoLeague);
+  const settingsQuery = useLeagueSettingsTab(parsedLeagueId, !isDemoLeague);
+  const isPreDraft = !isDemoLeague && isPreDraftLeague(settingsQuery.data);
+  const rosterQuery = useLeagueRosterTab(
+    parsedLeagueId,
+    selectedWeek ?? undefined,
+    !isDemoLeague && !isPreDraft
+  );
   const demoData = isDemoLeague ? createDemoLeagueRosterResponse() : null;
   const rosterData = demoData ?? rosterQuery.data;
   const fetchedRoster = rosterData?.roster ?? rosterData?.data ?? [];
@@ -43,15 +56,36 @@ export default function LeagueRoster() {
     () => roster.filter((player) => (player.slot ?? player.roster_slot ?? "").toUpperCase() === "IR"),
     [roster]
   );
-  const starterTotal = starters.reduce(
-    (total, player) => total + Number(player.projected_points ?? player.weekly_projected_fantasy_points ?? 0),
-    0
-  );
+  const starterTotal = isPreviewRoster
+    ? null
+    : starters.reduce((total, player) => total + (projectionValue(player) ?? 0), 0);
 
-  const benchTotal = bench.reduce(
-    (total, player) => total + Number(player.projected_points ?? player.weekly_projected_fantasy_points ?? 0),
-    0
-  );
+  const benchTotal = isPreviewRoster
+    ? null
+    : bench.reduce((total, player) => total + (projectionValue(player) ?? 0), 0);
+
+  if (settingsQuery.isLoading && !settingsQuery.isError && !isDemoLeague) {
+    return <PageLoadingState title="Loading league state" description="Checking whether this league has completed the draft." />;
+  }
+
+  if (rosterQuery.isError && !isDemoLeague) {
+    return (
+      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+        <PageErrorState
+          title="Unable to load roster"
+          description="Retry after confirming your session and league access are still valid."
+          onAction={() => {
+            void settingsQuery.refetch();
+            void rosterQuery.refetch();
+          }}
+        />
+      </main>
+    );
+  }
+
+  if (isPreDraft) {
+    return <Navigate to={`/league/${parsedLeagueId}/waivers`} replace />;
+  }
 
   return (
     <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
@@ -89,13 +123,17 @@ export default function LeagueRoster() {
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
             Starter Projection
           </p>
-          <p className="mt-1 text-3xl font-black text-sky-100">{starterTotal.toFixed(1)}</p>
+          <p className="mt-1 text-3xl font-black text-sky-100">
+            {starterTotal === null ? "" : starterTotal.toFixed(1)}
+          </p>
         </div>
         <div className="rounded-[1.35rem] border border-white/10 bg-[#0b1424]/90 p-5">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
             Bench Depth
           </p>
-          <p className="mt-1 text-3xl font-black text-slate-100">{benchTotal.toFixed(1)}</p>
+          <p className="mt-1 text-3xl font-black text-slate-100">
+            {benchTotal === null ? "" : benchTotal.toFixed(1)}
+          </p>
         </div>
         <div className="rounded-[1.35rem] border border-white/10 bg-[#0b1424]/90 p-5">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">

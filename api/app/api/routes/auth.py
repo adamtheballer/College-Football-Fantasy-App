@@ -51,6 +51,7 @@ from collegefootballfantasy_api.app.services.auth_security import (
     utcnow,
 )
 from collegefootballfantasy_api.app.services.email_service import get_email_service
+from collegefootballfantasy_api.app.services.notification_service import create_notification_event
 
 router = APIRouter()
 
@@ -90,6 +91,21 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     )
 
 
+def _set_csrf_cookie(response: Response) -> str:
+    csrf_token = generate_token(32)
+    response.set_cookie(
+        key=settings.csrf_cookie_name,
+        value=csrf_token,
+        max_age=settings.refresh_token_ttl_days * 24 * 60 * 60,
+        httponly=False,
+        secure=settings.refresh_cookie_secure,
+        samesite=settings.refresh_cookie_samesite,
+        path="/",
+        domain=settings.refresh_cookie_domain,
+    )
+    return csrf_token
+
+
 def _clear_refresh_cookie(response: Response) -> None:
     response.delete_cookie(
         key=settings.refresh_cookie_name,
@@ -99,6 +115,33 @@ def _clear_refresh_cookie(response: Response) -> None:
         path="/",
         domain=settings.refresh_cookie_domain,
     )
+
+
+def _clear_csrf_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=settings.csrf_cookie_name,
+        secure=settings.refresh_cookie_secure,
+        samesite=settings.refresh_cookie_samesite,
+        path="/",
+        domain=settings.refresh_cookie_domain,
+    )
+
+
+def _set_auth_cookies(response: Response, refresh_token: str) -> None:
+    _set_refresh_cookie(response, refresh_token)
+    _set_csrf_cookie(response)
+
+
+def _clear_auth_cookies(response: Response) -> None:
+    _clear_refresh_cookie(response)
+    _clear_csrf_cookie(response)
+
+
+def _require_csrf(request: Request) -> None:
+    cookie_token = request.cookies.get(settings.csrf_cookie_name)
+    header_token = request.headers.get(settings.csrf_header_name)
+    if not cookie_token or not header_token or cookie_token != header_token:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invalid csrf token")
 
 
 def _create_refresh_session(
@@ -154,6 +197,37 @@ def _send_password_reset_email(db: Session, *, user: User, request: Request) -> 
     get_email_service().send_password_reset(user.email, token)
 
 
+def _notify_suspicious_login(db: Session, *, user: User, request: Request) -> None:
+    current_ip = request_ip(request)
+    current_agent = request.headers.get("user-agent")
+    prior_session = (
+        db.query(RefreshSession)
+        .filter(
+            RefreshSession.user_id == user.id,
+            RefreshSession.revoked_at.is_(None),
+        )
+        .order_by(RefreshSession.issued_at.desc())
+        .first()
+    )
+    if not prior_session:
+        return
+    if prior_session.ip_address == current_ip and prior_session.user_agent == current_agent:
+        return
+    create_notification_event(
+        db,
+        user_id=user.id,
+        alert_type="commissioner_action",
+        title="New sign-in detected",
+        body="A new device or location signed in to your account.",
+        payload={
+            "ip_address": current_ip,
+            "user_agent": current_agent,
+        },
+        dedupe_key=f"auth-login:{user.id}:{hash_token(str(current_ip))}:{hash_token(str(current_agent))}",
+        source_entity_type="auth_session",
+    )
+
+
 @router.get("/me", response_model=UserRead)
 def current_user_profile(current_user: User = Depends(get_current_user)) -> UserRead:
     return UserRead.model_validate(current_user)
@@ -196,7 +270,7 @@ def signup(payload: UserCreate, response: Response, request: Request, db: Sessio
     db.refresh(user)
 
     access_token, access_expires_at = create_access_token(user_id=user.id, email=user.email)
-    _set_refresh_cookie(response, refresh_token)
+    _set_auth_cookies(response, refresh_token)
     return AuthResponse(
         access_token=access_token,
         access_token_expires_at=access_expires_at,
@@ -234,13 +308,14 @@ def login(payload: UserLogin, response: Response, request: Request, db: Session 
         user.password_hash = hash_password(payload.password)
         user.password_changed_at = now
 
+    _notify_suspicious_login(db, user=user, request=request)
     refresh_token = _create_refresh_session(db, user_id=user.id, request=request)
     db.add(user)
     db.commit()
     db.refresh(user)
 
     access_token, access_expires_at = create_access_token(user_id=user.id, email=user.email)
-    _set_refresh_cookie(response, refresh_token)
+    _set_auth_cookies(response, refresh_token)
     return AuthResponse(
         access_token=access_token,
         access_token_expires_at=access_expires_at,
@@ -250,6 +325,7 @@ def login(payload: UserLogin, response: Response, request: Request, db: Session 
 
 @router.post("/refresh", response_model=RefreshResponse)
 def refresh_session(response: Response, request: Request, db: Session = Depends(get_db)) -> RefreshResponse:
+    _require_csrf(request)
     refresh_token = request.cookies.get(settings.refresh_cookie_name)
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing refresh token")
@@ -267,8 +343,13 @@ def refresh_session(response: Response, request: Request, db: Session = Depends(
         db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid refresh token")
     if session.revoked_at:
+        now = utcnow()
+        revoke_user_sessions(db, user_id=session.user_id, now=now)
+        session.last_used_at = now
+        db.add(session)
         db.commit()
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="revoked refresh token")
+        _clear_auth_cookies(response)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="refresh token reuse detected")
 
     now = utcnow()
     expires_at = ensure_aware(session.expires_at)
@@ -277,7 +358,7 @@ def refresh_session(response: Response, request: Request, db: Session = Depends(
         session.last_used_at = now
         db.add(session)
         db.commit()
-        _clear_refresh_cookie(response)
+        _clear_auth_cookies(response)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="expired refresh token")
 
     user = db.get(User, session.user_id)
@@ -286,7 +367,7 @@ def refresh_session(response: Response, request: Request, db: Session = Depends(
         session.last_used_at = now
         db.add(session)
         db.commit()
-        _clear_refresh_cookie(response)
+        _clear_auth_cookies(response)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid refresh token")
 
     session.revoked_at = now
@@ -303,12 +384,13 @@ def refresh_session(response: Response, request: Request, db: Session = Depends(
     db.add(user)
     db.commit()
     access_token, access_expires_at = create_access_token(user_id=user.id, email=user.email)
-    _set_refresh_cookie(response, new_refresh_token)
+    _set_auth_cookies(response, new_refresh_token)
     return RefreshResponse(access_token=access_token, access_token_expires_at=access_expires_at)
 
 
 @router.post("/logout", response_model=LogoutResponse)
 def logout(response: Response, request: Request, db: Session = Depends(get_db)) -> LogoutResponse:
+    _require_csrf(request)
     session = _current_refresh_session(db, request)
     if session and not session.revoked_at:
         now = utcnow()
@@ -316,7 +398,7 @@ def logout(response: Response, request: Request, db: Session = Depends(get_db)) 
         session.last_used_at = now
         db.add(session)
         db.commit()
-    _clear_refresh_cookie(response)
+    _clear_auth_cookies(response)
     return LogoutResponse(success=True)
 
 
@@ -450,6 +532,7 @@ def revoke_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> AuthMessageResponse:
+    _require_csrf(request)
     session = db.get(RefreshSession, session_id)
     if not session or session.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="session not found")
@@ -461,17 +544,19 @@ def revoke_session(
         db.add(session)
         db.commit()
     if current and current.id == session.id:
-        _clear_refresh_cookie(response)
+        _clear_auth_cookies(response)
     return AuthMessageResponse(message="session revoked")
 
 
 @router.post("/logout-all", response_model=AuthMessageResponse)
 def logout_all(
     response: Response,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> AuthMessageResponse:
+    _require_csrf(request)
     revoke_user_sessions(db, user_id=current_user.id)
     db.commit()
-    _clear_refresh_cookie(response)
+    _clear_auth_cookies(response)
     return AuthMessageResponse(message="all sessions revoked")

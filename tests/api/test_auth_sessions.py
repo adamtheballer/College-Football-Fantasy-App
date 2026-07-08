@@ -11,6 +11,7 @@ from collegefootballfantasy_api.app.core.security import (
 )
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
 from collegefootballfantasy_api.app.models.auth_action_token import AuthActionToken
+from collegefootballfantasy_api.app.models.notification import NotificationLog
 from collegefootballfantasy_api.app.models.user import User
 
 
@@ -20,6 +21,12 @@ LEGACY_PASSWORD = "secret123"
 
 def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def csrf_headers(client) -> dict[str, str]:
+    token = client.cookies.get(settings.csrf_cookie_name)
+    assert token
+    return {settings.csrf_header_name: token}
 
 
 def signup_user(client, suffix: str = "one") -> dict:
@@ -42,6 +49,7 @@ def test_signup_returns_access_token_and_refresh_cookie(client):
     assert payload["access_token_expires_at"]
     assert payload["user"]["email"] == "coach-signup@example.com"
     assert settings.refresh_cookie_name in client.cookies
+    assert settings.csrf_cookie_name in client.cookies
 
 
 def test_signup_creates_verification_token_with_timestamps(client, db_session):
@@ -51,6 +59,27 @@ def test_signup_creates_verification_token_with_timestamps(client, db_session):
     assert token.token_type == "email_verification"
     assert token.created_at is not None
     assert token.updated_at is not None
+
+
+def test_email_verification_token_is_single_use(client, db_session):
+    signup_user(client, "verify-single-use")
+    from collegefootballfantasy_api.app.services.auth_security import EMAIL_VERIFICATION_TOKEN, create_auth_action_token
+
+    user = db_session.query(User).filter(User.email == "coach-verify-single-use@example.com").one()
+    raw_token = create_auth_action_token(
+        db_session,
+        user=user,
+        token_type=EMAIL_VERIFICATION_TOKEN,
+        ttl=timedelta(hours=24),
+        request=type("Req", (), {"headers": {}, "client": None})(),
+    )
+    db_session.commit()
+
+    first_response = client.post("/auth/verify-email", json={"token": raw_token})
+    assert first_response.status_code == 200
+
+    second_response = client.post("/auth/verify-email", json={"token": raw_token})
+    assert second_response.status_code == 400
 
 
 def test_signup_normalizes_and_returns_username(client):
@@ -174,6 +203,25 @@ def test_login_succeeds_only_with_exact_password(client):
     assert bad.json()["detail"] == "invalid credentials"
 
 
+def test_login_from_new_device_creates_security_notification(client, db_session):
+    signup_user(client, "new-device")
+
+    response = client.post(
+        "/auth/login",
+        json={"email": "coach-new-device@example.com", "password": STRONG_PASSWORD},
+        headers={"user-agent": "New Browser"},
+    )
+    assert response.status_code == 200
+
+    notification = (
+        db_session.query(NotificationLog)
+        .filter(NotificationLog.alert_type == "commissioner_action", NotificationLog.source_entity_type == "auth_session")
+        .one()
+    )
+    assert notification.title == "New sign-in detected"
+    assert notification.payload["user_agent"] == "New Browser"
+
+
 def test_password_reset_changes_hash_revokes_sessions_and_requires_new_password(client, db_session):
     signup_payload = signup_user(client, "reset")
     old_cookie = client.cookies.get(settings.refresh_cookie_name)
@@ -212,6 +260,11 @@ def test_password_reset_changes_hash_revokes_sessions_and_requires_new_password(
         json={"token": raw_token, "new_password": "NewStrongPass123!"},
     )
     assert confirm_response.status_code == 200
+    reuse_response = client.post(
+        "/auth/password-reset/confirm",
+        json={"token": raw_token, "new_password": "AnotherStrongPass123!"},
+    )
+    assert reuse_response.status_code == 400
 
     db_session.expire_all()
     reset_user = db_session.query(User).filter(User.email == "coach-reset@example.com").one()
@@ -349,7 +402,11 @@ def test_refresh_rotates_and_revokes_previous_session(client, db_session):
     first_refresh_cookie = client.cookies.get(settings.refresh_cookie_name)
     assert first_refresh_cookie
 
-    first_response = client.post("/auth/refresh")
+    missing_csrf_response = client.post("/auth/refresh")
+    assert missing_csrf_response.status_code == 403
+    assert missing_csrf_response.json()["detail"] == "invalid csrf token"
+
+    first_response = client.post("/auth/refresh", headers=csrf_headers(client))
     assert first_response.status_code == 200
     assert first_response.json()["access_token"]
 
@@ -366,19 +423,32 @@ def test_refresh_rotates_and_revokes_previous_session(client, db_session):
     assert old_session is not None
     assert old_session.revoked_at is not None
 
+    csrf_before_reuse = client.cookies.get(settings.csrf_cookie_name)
+    assert csrf_before_reuse
     revoked_response = client.post(
         "/auth/refresh",
         cookies={settings.refresh_cookie_name: first_refresh_cookie},
+        headers={settings.csrf_header_name: csrf_before_reuse},
     )
     assert revoked_response.status_code == 401
-    assert revoked_response.json()["detail"] == "revoked refresh token"
+    assert revoked_response.json()["detail"] == "refresh token reuse detected"
+    assert (
+        db_session.query(RefreshSession)
+        .filter_by(user_id=signup_payload["user"]["id"], revoked_at=None)
+        .count()
+        == 0
+    )
 
     valid_response = client.post(
         "/auth/refresh",
-        cookies={settings.refresh_cookie_name: second_cookie},
+        cookies={
+            settings.refresh_cookie_name: second_cookie,
+            settings.csrf_cookie_name: csrf_before_reuse,
+        },
+        headers={settings.csrf_header_name: csrf_before_reuse},
     )
-    assert valid_response.status_code == 200
-    assert valid_response.json()["access_token"] != signup_payload["access_token"]
+    assert valid_response.status_code == 401
+    assert valid_response.json()["detail"] == "refresh token reuse detected"
 
 
 def test_logout_revokes_session_and_clears_cookie(client, db_session):
@@ -386,10 +456,14 @@ def test_logout_revokes_session_and_clears_cookie(client, db_session):
     refresh_cookie = client.cookies.get(settings.refresh_cookie_name)
     assert refresh_cookie
 
-    logout_response = client.post("/auth/logout")
+    missing_csrf_response = client.post("/auth/logout")
+    assert missing_csrf_response.status_code == 403
+
+    logout_response = client.post("/auth/logout", headers=csrf_headers(client))
     assert logout_response.status_code == 200
     assert logout_response.json()["success"] is True
     assert settings.refresh_cookie_name not in client.cookies
+    assert settings.csrf_cookie_name not in client.cookies
 
     session_row = db_session.query(RefreshSession).first()
     assert session_row is not None
@@ -398,6 +472,28 @@ def test_logout_revokes_session_and_clears_cookie(client, db_session):
     refresh_after_logout = client.post(
         "/auth/refresh",
         cookies={settings.refresh_cookie_name: refresh_cookie},
+        headers={settings.csrf_header_name: "stale"},
     )
-    assert refresh_after_logout.status_code == 401
-    assert refresh_after_logout.json()["detail"] == "revoked refresh token"
+    assert refresh_after_logout.status_code == 403
+
+
+def test_session_management_lists_and_revokes_sessions(client):
+    payload = signup_user(client, "session-ui")
+    sessions_response = client.get("/auth/sessions", headers=auth_headers(payload["access_token"]))
+    assert sessions_response.status_code == 200
+    sessions = sessions_response.json()["sessions"]
+    assert len(sessions) == 1
+    assert sessions[0]["is_current"] is True
+
+    missing_csrf_delete = client.delete(
+        f"/auth/sessions/{sessions[0]['id']}",
+        headers=auth_headers(payload["access_token"]),
+    )
+    assert missing_csrf_delete.status_code == 403
+
+    revoke_response = client.delete(
+        f"/auth/sessions/{sessions[0]['id']}",
+        headers={**auth_headers(payload["access_token"]), **csrf_headers(client)},
+    )
+    assert revoke_response.status_code == 200
+    assert settings.refresh_cookie_name not in client.cookies

@@ -1,0 +1,24 @@
+{
+  "position": "RB",
+  "raw_stats": {
+    "RushingYards": 80,
+    "RushingTouchdowns": 1,
+    "Receptions": 3,
+    "ReceivingYards": 20
+  },
+  "scoring_rules": { "ppr": 1 },
+  "expected_normalized": {
+    "rush_yards": 80.0,
+    "rush_tds": 1.0,
+    "receptions": 3.0,
+    "rec_yards": 20.0
+  },
+  "expected_breakdown": {
+    "rush_yards": { "stat": 80.0, "multiplier": 0.1, "points": 8.0 },
+    "rush_tds": { "stat": 1.0, "multiplier": 6.0, "points": 6.0 },
+    "receptions": { "stat": 3.0, "multiplier": 1.0, "points": 3.0 },
+    "rec_yards": { "stat": 20.0, "multiplier": 0.1, "points": 2.0 },
+    "total": 19.0
+  },
+  "expected_total": 19.0
+}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
@@ -24,6 +25,7 @@ class AlembicReadiness:
     expected_revisions: list[str]
     current_revisions: list[str]
     detail: str
+    database_latency_ms: float | None = None
 
     @property
     def ready(self) -> bool:
@@ -37,6 +39,7 @@ class AlembicReadiness:
             "expected_revisions": self.expected_revisions,
             "current_revisions": self.current_revisions,
             "detail": self.detail,
+            "database_latency_ms": self.database_latency_ms,
         }
 
 
@@ -54,7 +57,9 @@ def check_alembic_readiness(
 ) -> AlembicReadiness:
     expected_revisions = get_alembic_heads(alembic_ini_path)
     try:
+        db_started = perf_counter()
         db.execute(text("SELECT 1"))
+        database_latency_ms = round((perf_counter() - db_started) * 1000, 2)
     except SQLAlchemyError:
         return AlembicReadiness(
             status="not_ready",
@@ -63,6 +68,7 @@ def check_alembic_readiness(
             expected_revisions=expected_revisions,
             current_revisions=[],
             detail="database connection failed",
+            database_latency_ms=None,
         )
 
     try:
@@ -75,6 +81,7 @@ def check_alembic_readiness(
             expected_revisions=expected_revisions,
             current_revisions=[],
             detail="alembic_version table is missing",
+            database_latency_ms=database_latency_ms,
         )
 
     current_revisions = sorted(str(row[0]) for row in rows if row[0])
@@ -86,6 +93,7 @@ def check_alembic_readiness(
             expected_revisions=expected_revisions,
             current_revisions=[],
             detail="alembic_version table has no revision rows",
+            database_latency_ms=database_latency_ms,
         )
 
     if current_revisions != expected_revisions:
@@ -96,6 +104,7 @@ def check_alembic_readiness(
             expected_revisions=expected_revisions,
             current_revisions=current_revisions,
             detail="database migration revision does not match repository head",
+            database_latency_ms=database_latency_ms,
         )
 
     return AlembicReadiness(
@@ -105,4 +114,5 @@ def check_alembic_readiness(
         expected_revisions=expected_revisions,
         current_revisions=current_revisions,
         detail="database is reachable and migrations are at repository head",
+        database_latency_ms=database_latency_ms,
     )

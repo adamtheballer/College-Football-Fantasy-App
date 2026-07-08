@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, JSON, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -34,6 +34,7 @@ class NotificationPreference(TimestampMixin, Base):
     user_key: Mapped[str] = mapped_column(String(100))
     push_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     email_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    in_app_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     draft_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
     injury_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
     touchdown_alerts: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -41,6 +42,7 @@ class NotificationPreference(TimestampMixin, Base):
     waiver_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
     projection_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
     lineup_reminders: Mapped[bool] = mapped_column(Boolean, default=True)
+    category_toggles: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     quiet_hours_start: Mapped[str | None] = mapped_column(String(10), nullable=True)
     quiet_hours_end: Mapped[str | None] = mapped_column(String(10), nullable=True)
 
@@ -50,17 +52,29 @@ class NotificationLog(Base):
     __table_args__ = (
         Index("ix_notification_logs_user_id", "user_id"),
         Index("ix_notification_logs_user_key", "user_key"),
+        Index("ix_notification_logs_league_id", "league_id"),
         Index("ix_notification_logs_type", "alert_type"),
+        Index("ix_notification_logs_delivery_state", "delivery_state"),
+        Index("ix_notification_logs_dedupe_user_id", "user_id", "dedupe_key", unique=True),
+        Index("ix_notification_logs_dedupe_user_key", "user_key", "dedupe_key", unique=True),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     user_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    league_id: Mapped[int | None] = mapped_column(ForeignKey("leagues.id", ondelete="SET NULL"), nullable=True)
     alert_type: Mapped[str] = mapped_column(String(30))
     title: Mapped[str] = mapped_column(String(200))
     body: Mapped[str] = mapped_column(String(500))
     payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    delivery_state: Mapped[str] = mapped_column(String(30), default="sent")
+    dedupe_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_entity_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    source_entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    deep_link: Mapped[str | None] = mapped_column(String(500), nullable=True)
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class NotificationDeliveryAttempt(TimestampMixin, Base):

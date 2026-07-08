@@ -1,0 +1,21 @@
+{
+  "position": "WR",
+  "raw_stats": {
+    "Receptions": 5,
+    "ReceivingYards": 100,
+    "ReceivingTouchdowns": 1
+  },
+  "scoring_rules": { "ppr": 1 },
+  "expected_normalized": {
+    "receptions": 5.0,
+    "rec_yards": 100.0,
+    "rec_tds": 1.0
+  },
+  "expected_breakdown": {
+    "receptions": { "stat": 5.0, "multiplier": 1.0, "points": 5.0 },
+    "rec_yards": { "stat": 100.0, "multiplier": 0.1, "points": 10.0 },
+    "rec_tds": { "stat": 1.0, "multiplier": 6.0, "points": 6.0 },
+    "total": 21.0
+  },
+  "expected_total": 21.0
+}

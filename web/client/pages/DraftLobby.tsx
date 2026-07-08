@@ -96,6 +96,8 @@ export default function DraftLobby() {
   const draftIsReadyToCommence = isFull && canEnterDraft;
 
   const handleRescheduleDraft = async () => {
+    if (rescheduleDraft.isPending) return;
+
     const nextDraftTime = draftDateTime ? new Date(draftDateTime) : null;
     if (!nextDraftTime || Number.isNaN(nextDraftTime.getTime())) {
       setRescheduleError("Choose a valid draft date and time.");
@@ -115,6 +117,11 @@ export default function DraftLobby() {
     } catch (error) {
       setRescheduleError(getErrorMessage(error));
     }
+  };
+
+  const handleRescheduleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void handleRescheduleDraft();
   };
 
   return (
@@ -197,7 +204,10 @@ export default function DraftLobby() {
               </div>
 
               {showReschedule && isCommissioner ? (
-                <div className="mt-5 grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                <form
+                  className="mt-5 grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"
+                  onSubmit={handleRescheduleSubmit}
+                >
                   <label className="grid gap-2">
                     <span className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
                       New Draft Time
@@ -206,21 +216,30 @@ export default function DraftLobby() {
                       type="datetime-local"
                       value={draftDateTime}
                       onChange={(event) => setDraftDateTime(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void handleRescheduleDraft();
+                        }
+                      }}
                       className="h-12 rounded-2xl border-white/10 bg-white/5 text-sm font-bold"
                     />
                   </label>
                   <Button
-                    type="button"
+                    type="submit"
                     className="h-12 rounded-2xl bg-primary px-6 text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground"
                     disabled={rescheduleDraft.isPending}
-                    onClick={handleRescheduleDraft}
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      void handleRescheduleDraft();
+                    }}
                   >
                     {rescheduleDraft.isPending ? "Saving..." : "Save New Time"}
                   </Button>
                   {rescheduleError ? (
                     <p className="text-[11px] font-bold text-red-300 md:col-span-2">{rescheduleError}</p>
                   ) : null}
-                </div>
+                </form>
               ) : null}
             </div>
           )}

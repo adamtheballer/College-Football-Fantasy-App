@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
 
 from conftest import TestingSessionLocal
-from collegefootballfantasy_api.app.models.notification import NotificationDeliveryAttempt
+from collegefootballfantasy_api.app.models.notification import NotificationDeliveryAttempt, NotificationLog
 from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.user import User
-from collegefootballfantasy_api.app.services.notification_service import record_delivery_attempt
+from collegefootballfantasy_api.app.services.notification_delivery import deliver_due_scheduled_notifications
+from collegefootballfantasy_api.app.services.notification_service import create_notification_event, record_delivery_attempt
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -263,3 +264,122 @@ def test_delivery_attempts_only_mark_scheduled_row_sent_after_terminal_results(c
     db_session.commit()
     db_session.refresh(scheduled)
     assert scheduled.sent_at is not None
+
+
+def test_notifications_have_unread_read_dismiss_and_deep_link_state(client, db_session):
+    identity = create_user(client, "unread")
+    user = identity["user"]
+    token = identity["access_token"]
+    league = create_league(client, token, "Unread League")
+
+    create_notification_event(
+        db_session,
+        user_id=user["id"],
+        league_id=league["id"],
+        alert_type="league_invite",
+        title="Invite Ready",
+        body="Your invite link is ready.",
+        payload={"league_id": league["id"]},
+        dedupe_key=f"league-invite:{league['id']}:{user['id']}",
+        source_entity_type="league",
+        source_entity_id=league["id"],
+        deep_link=f"/leagues/{league['id']}/settings",
+    )
+    create_notification_event(
+        db_session,
+        user_id=user["id"],
+        league_id=league["id"],
+        alert_type="league_invite",
+        title="Invite Ready",
+        body="Your invite link is ready.",
+        payload={"league_id": league["id"]},
+        dedupe_key=f"league-invite:{league['id']}:{user['id']}",
+        source_entity_type="league",
+        source_entity_id=league["id"],
+        deep_link=f"/leagues/{league['id']}/settings",
+    )
+    db_session.commit()
+
+    alerts_response = client.get("/notifications/alerts", headers=auth_headers(token))
+    assert alerts_response.status_code == 200
+    alerts = alerts_response.json()["data"]
+    invite_alerts = [alert for alert in alerts if alert["alert_type"] == "league_invite"]
+    assert len(invite_alerts) == 1
+    assert invite_alerts[0]["delivery_state"] == "sent"
+    assert invite_alerts[0]["deep_link"] == f"/leagues/{league['id']}/settings"
+
+    unread_response = client.get("/notifications/unread-count", headers=auth_headers(token))
+    assert unread_response.status_code == 200
+    assert unread_response.json()["unread_count"] >= 1
+
+    notification_id = invite_alerts[0]["id"]
+    read_response = client.post(f"/notifications/{notification_id}/read", headers=auth_headers(token))
+    assert read_response.status_code == 200
+    assert read_response.json()["delivery_state"] == "read"
+    unread_after_read = client.get("/notifications/unread-count", headers=auth_headers(token))
+    assert unread_after_read.json()["unread_count"] == unread_response.json()["unread_count"] - 1
+
+    dismiss_response = client.post(f"/notifications/{notification_id}/dismiss", headers=auth_headers(token))
+    assert dismiss_response.status_code == 200
+    assert dismiss_response.json()["delivery_state"] == "dismissed"
+    alerts_after_dismiss = client.get("/notifications/alerts", headers=auth_headers(token))
+    assert notification_id not in {alert["id"] for alert in alerts_after_dismiss.json()["data"]}
+
+
+def test_notification_category_preferences_block_events(client, db_session):
+    identity = create_user(client, "category")
+    user = identity["user"]
+    token = identity["access_token"]
+
+    prefs_response = client.post(
+        "/notifications/preferences",
+        json={
+            "push_enabled": True,
+            "email_enabled": True,
+            "in_app_enabled": True,
+            "draft_alerts": True,
+            "injury_alerts": True,
+            "touchdown_alerts": True,
+            "usage_alerts": True,
+            "waiver_alerts": True,
+            "projection_alerts": True,
+            "lineup_reminders": True,
+            "category_toggles": {"waiver": False},
+            "quiet_hours_start": None,
+            "quiet_hours_end": None,
+        },
+        headers=auth_headers(token),
+    )
+    assert prefs_response.status_code == 200
+
+    created = create_notification_event(
+        db_session,
+        user_id=user["id"],
+        alert_type="waiver_processed",
+        title="Waiver Processed",
+        body="Your claim processed.",
+        payload={"source": "test"},
+        dedupe_key=f"waiver-blocked:{user['id']}",
+    )
+    db_session.commit()
+    assert created is None
+    assert db_session.query(NotificationLog).filter(NotificationLog.user_id == user["id"], NotificationLog.alert_type == "waiver_processed").count() == 0
+
+
+def test_due_scheduled_notifications_deliver_in_app_idempotently(client, db_session):
+    identity = create_user(client, "scheduled-delivery")
+    user = identity["user"]
+    league = create_league(client, identity["access_token"], "Scheduled Delivery League")
+    due_at = datetime(2026, 8, 19, 18, 0, tzinfo=timezone.utc)
+    db_session.query(ScheduledNotification).filter(ScheduledNotification.league_id == league["id"]).update({"scheduled_for": due_at})
+    db_session.commit()
+
+    first_summary = deliver_due_scheduled_notifications(db_session, now=due_at)
+    assert first_summary.scheduled_seen == 2
+    assert first_summary.delivered == 2
+    assert db_session.query(NotificationLog).filter(NotificationLog.user_id == user["id"], NotificationLog.source_entity_type == "scheduled_notification").count() == 2
+
+    second_summary = deliver_due_scheduled_notifications(db_session, now=due_at)
+    assert second_summary.scheduled_seen == 2
+    assert second_summary.delivered == 0
+    assert db_session.query(NotificationLog).filter(NotificationLog.user_id == user["id"], NotificationLog.source_entity_type == "scheduled_notification").count() == 2

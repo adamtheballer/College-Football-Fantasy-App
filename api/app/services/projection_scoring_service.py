@@ -8,7 +8,7 @@ def projection_to_normalized_stats(projection: WeeklyProjection) -> dict[str, fl
     return {
         "pass_yards": projection.pass_yards or 0.0,
         "pass_tds": projection.pass_tds or 0.0,
-        "interceptions": projection.interceptions or 0.0,
+        "passing_interceptions": projection.interceptions or 0.0,
         "rush_yards": projection.rush_yards or 0.0,
         "rush_tds": projection.rush_tds or 0.0,
         "receptions": projection.receptions or 0.0,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from math import erf, sqrt
 from typing import Any
 
@@ -11,6 +12,8 @@ from collegefootballfantasy_api.app.models.usage_share import UsageShare
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.scoring import calculate_fantasy_points, get_scoring_rules
 from collegefootballfantasy_api.app.services.projections.efficiency import compute_efficiency
+from collegefootballfantasy_api.app.services.projections.confidence import calculate_projection_confidence
+from collegefootballfantasy_api.app.services.projections.snapshots import stable_snapshot_hash
 
 
 DEFAULT_QB = {"ypa": 7.5, "pass_td_rate": 0.05, "int_rate": 0.02, "rush_ypc": 4.5, "comp_pct": 0.62}
@@ -44,6 +47,54 @@ def _health_multiplier(status: str | None) -> float:
 def _qb_rating(comp_pct: float, ypa: float, td_rate: float, int_rate: float) -> float:
     rating = (8.4 * ypa) + (330 * td_rate) + (100 * comp_pct) - (200 * int_rate)
     return round(rating, 2)
+
+
+def _source_freshness(stats: dict[str, Any], injury: Injury | None, team_env: TeamEnvironment | None, usage: UsageShare | None) -> str:
+    if not stats and not team_env and not usage:
+        return "unknown"
+    if injury and injury.status and injury.status.upper() not in {"FULL", "ACTIVE", "PROBABLE"}:
+        return "injury_watch"
+    return "fresh" if stats else "limited"
+
+
+def _metadata(
+    *,
+    player: Player,
+    season: int,
+    week: int,
+    stats: dict[str, Any],
+    injury: Injury | None,
+    team_env: TeamEnvironment | None,
+    usage: UsageShare | None,
+    defense: DefenseRating | None,
+    projection: WeeklyProjection,
+) -> dict:
+    freshness = _source_freshness(stats, injury, team_env, usage)
+    snapshot = {
+        "player_id": player.id,
+        "season": season,
+        "week": week,
+        "position": player.position,
+        "school": player.school,
+        "stats": stats,
+        "injury": injury.status if injury else None,
+        "team_environment_id": team_env.id if team_env else None,
+        "usage_id": usage.id if usage else None,
+        "defense_rating_id": defense.id if defense else None,
+    }
+    projection.source_freshness = freshness
+    projection.input_snapshot_hash = stable_snapshot_hash(snapshot)
+    projection.generated_at = datetime.now(timezone.utc)
+    projection.model_version = "projection-v1"
+    projection.projection_version = 1
+    projection.confidence_score = calculate_projection_confidence(
+        projection=projection,
+        usage=usage,
+        team_environment=team_env,
+        injury=injury,
+        source_freshness=freshness,
+    )
+    return snapshot
 
 
 def build_weekly_projections(
@@ -129,33 +180,43 @@ def build_weekly_projections(
             boom_prob = 1 - _normal_cdf(fpts * 1.5, fpts, sd)
             bust_prob = _normal_cdf(fpts * 0.5, fpts, sd)
 
-            projections.append(
-                WeeklyProjection(
-                    player_id=player.id,
-                    season=season,
-                    week=week,
-                    pass_attempts=pass_attempts,
-                    rush_attempts=player_rush_attempts,
-                    targets=0.0,
-                    receptions=0.0,
-                    expected_plays=expected_plays,
-                    expected_rush_per_play=expected_rush_per_play,
-                    expected_td_per_play=expected_td_per_play,
-                    pass_yards=pass_yards,
-                    rush_yards=rush_yards,
-                    rec_yards=0.0,
-                    pass_tds=pass_tds,
-                    rush_tds=rush_tds,
-                    rec_tds=0.0,
-                    interceptions=interceptions,
-                    fantasy_points=fpts,
-                    floor=floor,
-                    ceiling=ceiling,
-                    boom_prob=boom_prob,
-                    bust_prob=bust_prob,
-                    qb_rating=qb_rating,
-                )
+            projection = WeeklyProjection(
+                player_id=player.id,
+                season=season,
+                week=week,
+                pass_attempts=pass_attempts,
+                rush_attempts=player_rush_attempts,
+                targets=0.0,
+                receptions=0.0,
+                expected_plays=expected_plays,
+                expected_rush_per_play=expected_rush_per_play,
+                expected_td_per_play=expected_td_per_play,
+                pass_yards=pass_yards,
+                rush_yards=rush_yards,
+                rec_yards=0.0,
+                pass_tds=pass_tds,
+                rush_tds=rush_tds,
+                rec_tds=0.0,
+                interceptions=interceptions,
+                fantasy_points=fpts,
+                floor=floor,
+                ceiling=ceiling,
+                boom_prob=boom_prob,
+                bust_prob=bust_prob,
+                qb_rating=qb_rating,
             )
+            _metadata(
+                player=player,
+                season=season,
+                week=week,
+                stats=stats,
+                injury=injury,
+                team_env=team_env,
+                usage=usage,
+                defense=defense,
+                projection=projection,
+            )
+            projections.append(projection)
             continue
 
         if player.position.upper() in {"RB", "WR", "TE"}:
@@ -212,32 +273,42 @@ def build_weekly_projections(
             boom_prob = 1 - _normal_cdf(fpts * 1.5, fpts, sd)
             bust_prob = _normal_cdf(fpts * 0.5, fpts, sd)
 
-            projections.append(
-                WeeklyProjection(
-                    player_id=player.id,
-                    season=season,
-                    week=week,
-                    pass_attempts=0.0,
-                    rush_attempts=player_rush_attempts,
-                    targets=player_targets,
-                    receptions=receptions,
-                    expected_plays=expected_plays,
-                    expected_rush_per_play=expected_rush_per_play,
-                    expected_td_per_play=expected_td_per_play,
-                    pass_yards=0.0,
-                    rush_yards=rush_yards,
-                    rec_yards=rec_yards,
-                    pass_tds=0.0,
-                    rush_tds=rush_tds,
-                    rec_tds=rec_tds,
-                    interceptions=0.0,
-                    fantasy_points=fpts,
-                    floor=floor,
-                    ceiling=ceiling,
-                    boom_prob=boom_prob,
-                    bust_prob=bust_prob,
-                    qb_rating=None,
-                )
+            projection = WeeklyProjection(
+                player_id=player.id,
+                season=season,
+                week=week,
+                pass_attempts=0.0,
+                rush_attempts=player_rush_attempts,
+                targets=player_targets,
+                receptions=receptions,
+                expected_plays=expected_plays,
+                expected_rush_per_play=expected_rush_per_play,
+                expected_td_per_play=expected_td_per_play,
+                pass_yards=0.0,
+                rush_yards=rush_yards,
+                rec_yards=rec_yards,
+                pass_tds=0.0,
+                rush_tds=rush_tds,
+                rec_tds=rec_tds,
+                interceptions=0.0,
+                fantasy_points=fpts,
+                floor=floor,
+                ceiling=ceiling,
+                boom_prob=boom_prob,
+                bust_prob=bust_prob,
+                qb_rating=None,
             )
+            _metadata(
+                player=player,
+                season=season,
+                week=week,
+                stats=stats,
+                injury=injury,
+                team_env=team_env,
+                usage=usage,
+                defense=defense,
+                projection=projection,
+            )
+            projections.append(projection)
 
     return projections

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from collegefootballfantasy_api.app.api.deps import get_current_user
+from collegefootballfantasy_api.app.api.deps import get_current_user, get_league_or_404
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.defense_rating import DefenseRating
 from collegefootballfantasy_api.app.models.defense_vs_position import DefenseVsPosition
@@ -11,8 +11,27 @@ from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
-from collegefootballfantasy_api.app.schemas.trade import TradeAnalyzeRequest, TradeAnalyzeResponse
+from collegefootballfantasy_api.app.schemas.trade import (
+    TradeActionRequest,
+    TradeAnalyzeRequest,
+    TradeAnalyzeResponse,
+    TradeCounterRequest,
+    TradeOfferCreate,
+    TradeOfferList,
+    TradeOfferRead,
+)
 from collegefootballfantasy_api.app.services.matchup_grades import build_matchup_row
+from collegefootballfantasy_api.app.services.trade_service import (
+    accept_trade_offer,
+    cancel_trade_offer,
+    commissioner_approve_trade,
+    commissioner_veto_trade,
+    counter_trade_offer,
+    create_trade_offer,
+    get_trade_offer,
+    list_trade_offers,
+    reject_trade_offer,
+)
 
 router = APIRouter()
 
@@ -161,7 +180,7 @@ def _player_value(
     return round(value, 2)
 
 
-@router.post("/analyze", response_model=TradeAnalyzeResponse)
+@router.post("/trade/analyze", response_model=TradeAnalyzeResponse)
 def analyze_trade(
     payload: TradeAnalyzeRequest,
     db: Session = Depends(get_db),
@@ -241,3 +260,96 @@ def analyze_trade(
         delta=round(delta, 2),
         verdict=verdict,
     )
+
+
+@router.post("/leagues/{league_id}/trades", response_model=TradeOfferRead, status_code=status.HTTP_201_CREATED)
+def create_trade_endpoint(
+    league_id: int,
+    payload: TradeOfferCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TradeOfferRead:
+    league = get_league_or_404(db, league_id)
+    return create_trade_offer(db, league=league, payload=payload, current_user=current_user)
+
+
+@router.get("/leagues/{league_id}/trades", response_model=TradeOfferList)
+def list_trades_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TradeOfferList:
+    league = get_league_or_404(db, league_id)
+    return list_trade_offers(db, league=league, current_user=current_user)
+
+
+@router.get("/leagues/{league_id}/trades/{trade_id}", response_model=TradeOfferRead)
+def get_trade_endpoint(
+    league_id: int,
+    trade_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TradeOfferRead:
+    trade = get_trade_offer(db, trade_id, current_user)
+    if trade.league_id != league_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="trade offer not found")
+    return trade
+
+
+@router.post("/trades/{trade_id}/accept", response_model=TradeOfferRead)
+def accept_trade_endpoint(
+    trade_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TradeOfferRead:
+    return accept_trade_offer(db, trade_id=trade_id, current_user=current_user)
+
+
+@router.post("/trades/{trade_id}/reject", response_model=TradeOfferRead)
+def reject_trade_endpoint(
+    trade_id: int,
+    payload: TradeActionRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TradeOfferRead:
+    return reject_trade_offer(db, trade_id=trade_id, current_user=current_user, reason=payload.reason if payload else None)
+
+
+@router.post("/trades/{trade_id}/cancel", response_model=TradeOfferRead)
+def cancel_trade_endpoint(
+    trade_id: int,
+    payload: TradeActionRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TradeOfferRead:
+    return cancel_trade_offer(db, trade_id=trade_id, current_user=current_user, reason=payload.reason if payload else None)
+
+
+@router.post("/trades/{trade_id}/counter", response_model=TradeOfferRead, status_code=status.HTTP_201_CREATED)
+def counter_trade_endpoint(
+    trade_id: int,
+    payload: TradeCounterRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TradeOfferRead:
+    return counter_trade_offer(db, trade_id=trade_id, payload=payload, current_user=current_user)
+
+
+@router.post("/trades/{trade_id}/commissioner/veto", response_model=TradeOfferRead)
+def commissioner_veto_trade_endpoint(
+    trade_id: int,
+    payload: TradeActionRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TradeOfferRead:
+    return commissioner_veto_trade(db, trade_id=trade_id, current_user=current_user, reason=payload.reason if payload else None)
+
+
+@router.post("/trades/{trade_id}/commissioner/approve", response_model=TradeOfferRead)
+def commissioner_approve_trade_endpoint(
+    trade_id: int,
+    payload: TradeActionRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TradeOfferRead:
+    return commissioner_approve_trade(db, trade_id=trade_id, current_user=current_user, reason=payload.reason if payload else None)

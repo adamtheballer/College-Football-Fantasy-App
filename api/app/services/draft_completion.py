@@ -6,6 +6,8 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.transaction import Transaction
+from collegefootballfantasy_api.app.services.audit_service import record_audit_event
 from collegefootballfantasy_api.app.services.league_schedule import ensure_league_schedule
 from collegefootballfantasy_api.app.services.roster_legality import assign_best_roster_slot_for_team
 
@@ -65,6 +67,26 @@ def finalize_draft_rosters_and_matchups(db: Session, league: League) -> dict[str
                 slot=slot,
                 status="active",
             )
+        )
+        db.add(
+            Transaction(
+                league_id=league.id,
+                team_id=pick.team_id,
+                transaction_type="draft_pick",
+                player_id=pick.player_id,
+                created_by_user_id=pick.made_by_user_id,
+                reason=f"Draft backfill pick {pick.overall_pick}",
+            )
+        )
+        record_audit_event(
+            db,
+            action="draft.roster.backfill",
+            entity_type="draft_pick",
+            entity_id=pick.id,
+            league_id=league.id,
+            team_id=pick.team_id,
+            actor_user_id=pick.made_by_user_id,
+            after={"player_id": pick.player_id, "slot": slot, "overall_pick": pick.overall_pick},
         )
         rosters_backfilled += 1
 

@@ -5,6 +5,7 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.matchup import Matchup
+from collegefootballfantasy_api.app.models.matchup_score_version import MatchupScoreVersion
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.scoring_correction_audit import ScoringCorrectionAudit
 from collegefootballfantasy_api.app.models.standing import Standing
@@ -69,6 +70,9 @@ def test_stat_correction_recalculates_scores_standings_and_records_audit(client,
     refreshed_matchup = db_session.get(Matchup, matchup.id)
     assert refreshed_matchup.status == "stat_corrected"
     assert refreshed_matchup.home_score == 62.0
+    versions = db_session.query(MatchupScoreVersion).filter_by(matchup_id=matchup.id).order_by(MatchupScoreVersion.version.asc()).all()
+    assert versions[-1].reason == "stat_correction"
+    assert versions[-1].home_score == 62.0
     assert audit.old_fantasy_points == 16.0
     assert audit.new_fantasy_points == 22.0
     assert audit.old_matchup_statuses[str(matchup.id)] == "final"

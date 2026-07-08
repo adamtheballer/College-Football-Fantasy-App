@@ -20,7 +20,10 @@ class MockDraft(TimestampMixin, Base):
     league_size: Mapped[int] = mapped_column(Integer, default=12)
     rounds: Mapped[int] = mapped_column(Integer, default=13)
     current_pick: Mapped[int] = mapped_column(Integer, default=1)
+    user_team_index: Mapped[int] = mapped_column(Integer, default=1)
+    cpu_strategy: Mapped[str] = mapped_column(String(40), default="rank_position_need")
     settings_json: Mapped[dict] = mapped_column(JSON, default=dict)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     picks = relationship("MockDraftPick", back_populates="mock_draft", cascade="all, delete-orphan")
+    queue = relationship("MockDraftQueueEntry", cascade="all, delete-orphan")

@@ -4,9 +4,13 @@ from conftest import TestingSessionLocal
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from collegefootballfantasy_api.app.models.audit_event import AuditEvent
+from collegefootballfantasy_api.app.models.injury import Injury
+from collegefootballfantasy_api.app.models.lineup_change_event import LineupChangeEvent
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
 
 
@@ -158,6 +162,153 @@ def test_add_drop_lineup_and_transactions_workflow(client, db_session):
     assert "add" in types
     assert "lineup" in types
     assert "add_drop" in types
+
+
+def test_roster_add_rejects_unknown_slot_and_wrong_position(client, db_session):
+    token = create_user_and_token(client, "slotrules")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    player_id, _ = create_players(client)
+
+    unknown_slot_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": player_id, "slot": "TAXI", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert unknown_slot_response.status_code == 400
+    assert "cannot be placed in TAXI" in unknown_slot_response.json()["detail"]
+
+    wrong_position_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": player_id, "slot": "QB", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert wrong_position_response.status_code == 400
+    assert "RB cannot be placed in QB" in wrong_position_response.json()["detail"]
+
+
+def test_ir_slot_requires_eligible_injury_status(client, db_session):
+    token = create_user_and_token(client, "irrules")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    player_id, _ = create_players(client)
+
+    ineligible_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": player_id, "slot": "IR", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert ineligible_response.status_code == 409
+    assert ineligible_response.json()["detail"] == "player is not IR eligible"
+
+    db_session.add(
+        Injury(
+            player_id=player_id,
+            season=2026,
+            week=1,
+            status="OUT",
+            injury="Ankle",
+        )
+    )
+    db_session.commit()
+
+    eligible_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": player_id, "slot": "IR", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert eligible_response.status_code == 201
+    assert eligible_response.json()["slot"] == "IR"
+
+
+def test_lineup_move_records_history_transaction_and_audit(client, db_session):
+    token = create_user_and_token(client, "lineuphist")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    player_id, _ = create_players(client)
+
+    add_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": player_id, "slot": "RB", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert add_response.status_code == 201
+    added_entry = add_response.json()
+
+    lineup_response = client.patch(
+        f"/teams/{team.id}/lineup",
+        json={"assignments": [{"roster_entry_id": added_entry["id"], "slot": "BENCH"}]},
+        headers=auth_headers(token),
+    )
+    assert lineup_response.status_code == 200
+
+    event = db_session.query(LineupChangeEvent).filter(LineupChangeEvent.team_id == team.id).one()
+    assert event.player_id == player_id
+    assert event.from_slot == "RB"
+    assert event.to_slot == "BENCH"
+    assert event.lock_state == "unlocked"
+
+    transaction = (
+        db_session.query(Transaction)
+        .filter(Transaction.team_id == team.id, Transaction.transaction_type == "lineup")
+        .one()
+    )
+    assert transaction.reason == "RB -> BENCH"
+
+    audit = (
+        db_session.query(AuditEvent)
+        .filter(AuditEvent.team_id == team.id, AuditEvent.action == "roster.lineup.move")
+        .one()
+    )
+    assert audit.before_json == {"slot": "RB"}
+    assert audit.after_json["slot"] == "BENCH"
+
+
+def test_add_drop_is_idempotent_by_team_key(client, db_session):
+    token = create_user_and_token(client, "idem")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    add_player_id, swap_player_id = create_players(client)
+
+    add_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": add_player_id, "slot": "RB", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert add_response.status_code == 201
+    added_entry = add_response.json()
+
+    payload = {
+        "add_player_id": swap_player_id,
+        "drop_roster_entry_id": added_entry["id"],
+        "reason": "Same request retried",
+        "idempotency_key": "retry-add-drop-1",
+    }
+    first_response = client.post(
+        f"/teams/{team.id}/add-drop",
+        json=payload,
+        headers=auth_headers(token),
+    )
+    assert first_response.status_code == 201
+
+    second_response = client.post(
+        f"/teams/{team.id}/add-drop",
+        json=payload,
+        headers=auth_headers(token),
+    )
+    assert second_response.status_code == 201
+    assert second_response.json()["transaction"]["id"] == first_response.json()["transaction"]["id"]
+
+    transactions = (
+        db_session.query(Transaction)
+        .filter(Transaction.team_id == team.id, Transaction.transaction_type == "add_drop")
+        .all()
+    )
+    assert len(transactions) == 1
+
+    roster_entries = db_session.query(RosterEntry).filter(RosterEntry.team_id == team.id).all()
+    assert len(roster_entries) == 1
+    assert roster_entries[0].player_id == swap_player_id
 
 
 def test_roster_mutations_block_locked_players_after_kickoff(client, db_session):

@@ -1,4 +1,6 @@
-from sqlalchemy import Float, ForeignKey, Index, Integer, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -40,3 +42,9 @@ class WeeklyProjection(TimestampMixin, Base):
     boom_prob: Mapped[float] = mapped_column(Float, default=0.0)
     bust_prob: Mapped[float] = mapped_column(Float, default=0.0)
     qb_rating: Mapped[float | None] = mapped_column(Float, nullable=True)
+    projection_version: Mapped[int] = mapped_column(Integer, default=1)
+    model_version: Mapped[str] = mapped_column(String(50), default="projection-v1")
+    input_snapshot_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    source_freshness: Mapped[str] = mapped_column(String(30), default="unknown")
+    confidence_score: Mapped[float] = mapped_column(Float, default=0.5)

@@ -1,3 +1,5 @@
+import { dispatchAuthExpired } from "@/lib/auth-events";
+
 const resolveDefaultApiBase = () => {
   if (typeof window === "undefined") {
     return "http://127.0.0.1:8000";
@@ -11,6 +13,8 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || resolveDefaultApiBase();
 
 const ACCESS_TOKEN_STORAGE_KEY = "cfb_access_token";
 const ACCESS_TOKEN_EXPIRES_AT_STORAGE_KEY = "cfb_access_token_expires_at";
+const CSRF_COOKIE_NAME = "cfb_csrf_token";
+const CSRF_HEADER_NAME = "X-CSRF-Token";
 
 export class ApiError extends Error {
   status: number;
@@ -92,14 +96,32 @@ export const isStoredAccessTokenExpired = (bufferMs = 0): boolean => {
   return parsed <= Date.now() + bufferMs;
 };
 
+const getCookieValue = (name: string): string | null => {
+  if (typeof document === "undefined") return null;
+  const encodedName = `${encodeURIComponent(name)}=`;
+  const cookie = document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(encodedName));
+  if (!cookie) return null;
+  return decodeURIComponent(cookie.slice(encodedName.length));
+};
+
+const buildCsrfHeaders = () => {
+  const token = getCookieValue(CSRF_COOKIE_NAME);
+  return token ? { [CSRF_HEADER_NAME]: token } : {};
+};
+
 type RefreshPayload = {
   access_token: string;
   access_token_expires_at: string;
 };
 
-let inflightRefresh: Promise<boolean> | null = null;
+type RefreshResult = "refreshed" | "auth-expired" | "unavailable";
 
-const refreshAccessToken = async (): Promise<boolean> => {
+let inflightRefresh: Promise<RefreshResult> | null = null;
+
+const refreshAccessToken = async (): Promise<RefreshResult> => {
   if (inflightRefresh) {
     return inflightRefresh;
   }
@@ -108,21 +130,29 @@ const refreshAccessToken = async (): Promise<boolean> => {
       const res = await fetch(buildUrl("/auth/refresh"), {
         method: "POST",
         credentials: "include",
+        headers: {
+          ...buildCsrfHeaders(),
+        },
       });
       if (!res.ok) {
         clearAccessTokenSession();
-        return false;
+        if (res.status === 401 || res.status === 403) {
+          dispatchAuthExpired();
+          return "auth-expired";
+        }
+        return "unavailable";
       }
       const payload = (await res.json()) as RefreshPayload;
       if (!payload.access_token || !payload.access_token_expires_at) {
         clearAccessTokenSession();
-        return false;
+        dispatchAuthExpired();
+        return "auth-expired";
       }
       storeAccessTokenSession(payload.access_token, payload.access_token_expires_at);
-      return true;
+      return "refreshed";
     } catch {
       clearAccessTokenSession();
-      return false;
+      return "unavailable";
     } finally {
       inflightRefresh = null;
     }
@@ -190,6 +220,9 @@ const apiRequest = async <T>({
   const headers: Record<string, string> = {
     ...buildAuthHeaders(),
   };
+  if (method !== "GET") {
+    Object.assign(headers, buildCsrfHeaders());
+  }
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
@@ -213,8 +246,8 @@ const apiRequest = async <T>({
     );
   }
   if (res.status === 401 && retryOn401 && !path.startsWith("/auth/")) {
-    const refreshed = await refreshAccessToken();
-    if (refreshed) {
+    const refreshResult = await refreshAccessToken();
+    if (refreshResult === "refreshed") {
       return apiRequest<T>({
         method,
         path,

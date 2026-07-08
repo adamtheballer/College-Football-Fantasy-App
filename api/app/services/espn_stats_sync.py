@@ -5,6 +5,10 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.domain.provider_payload_validation import (
+    ESPNPlayerStatPayload,
+    ProviderPayloadValidationError,
+)
 from collegefootballfantasy_api.app.integrations.espn import ESPNClient, extract_player_box_score_stats
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
@@ -12,6 +16,7 @@ from collegefootballfantasy_api.app.services.provider_identity_audit import (
     record_provider_identity_audit,
     record_unmatched_provider_row,
 )
+from collegefootballfantasy_api.app.services.provider_sync_jobs import run_provider_sync_job
 
 
 def _identity(value: str | None) -> str:
@@ -70,7 +75,25 @@ def upsert_espn_weekly_player_stats(
     season: int,
     week: int,
     client: ESPNClient | None = None,
+    record_job: bool = True,
 ) -> dict[str, int]:
+    if record_job:
+        return run_provider_sync_job(
+            db,
+            provider="espn",
+            feed="player_game_stats_week",
+            season=season,
+            week=week,
+            scope=f"season:{season}:week:{week}",
+            operation=lambda: upsert_espn_weekly_player_stats(
+                db,
+                season=season,
+                week=week,
+                client=client,
+                record_job=False,
+            ),
+        )
+
     espn = client or ESPNClient()
     summaries = espn.get_weekly_boxscore_summaries(season=season, week=week)
     rows = [row for summary in summaries for row in extract_player_box_score_stats(summary)]
@@ -78,9 +101,23 @@ def upsert_espn_weekly_player_stats(
     players = db.query(Player).all()
     external_index, name_school_index = _build_player_indexes(players)
 
-    upserted = 0
+    inserted = 0
+    updated = 0
     skipped = 0
     for row in rows:
+        try:
+            ESPNPlayerStatPayload.validate_row(row)
+        except ProviderPayloadValidationError as exc:
+            record_unmatched_provider_row(
+                db,
+                provider="espn",
+                season=season,
+                week=week,
+                row=row,
+                reason=f"invalid provider payload: {exc}",
+            )
+            skipped += 1
+            continue
         player, match_type, reason = _match_player(row, external_index, name_school_index)
         if not player:
             record_unmatched_provider_row(
@@ -115,15 +152,21 @@ def upsert_espn_weekly_player_stats(
         if not stat:
             stat = PlayerStat(player_id=player.id, season=season, week=week, source="espn", stats=row)
             db.add(stat)
+            inserted += 1
         else:
             stat.source = "espn"
             stat.stats = row
-        upserted += 1
+            updated += 1
 
     db.commit()
     return {
         "events": len(summaries),
         "rows_seen": len(rows),
-        "upserted": upserted,
+        "upserted": inserted + updated,
+        "inserted": inserted,
+        "updated": updated,
+        "rows_inserted": inserted,
+        "rows_updated": updated,
+        "rows_rejected": skipped,
         "skipped": skipped,
     }

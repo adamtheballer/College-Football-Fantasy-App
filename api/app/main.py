@@ -2,13 +2,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from collegefootballfantasy_api.app.api.routes import (
+    admin_ops,
+    admin_provider_sync,
     admin_scoring,
     auth,
+    chat,
     health,
     insights,
     injuries,
     leagues,
     matchups,
+    mock_drafts,
     notifications,
     players,
     projections,
@@ -17,15 +21,18 @@ from collegefootballfantasy_api.app.api.routes import (
     stats,
     teams,
     trades,
+    waivers,
     watchlists,
 )
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.logging import configure_logging
+from collegefootballfantasy_api.app.middleware.request_telemetry import RequestTelemetryMiddleware
 
 configure_logging(settings.api_log_level)
 
 app = FastAPI(title="CollegeFootballFantasy API")
 
+app.add_middleware(RequestTelemetryMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_cors_origins,
@@ -36,8 +43,11 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(admin_ops.router, prefix="/admin/ops", tags=["admin-ops"])
+app.include_router(admin_provider_sync.router, prefix="/admin/provider-sync", tags=["admin-provider-sync"])
 app.include_router(admin_scoring.router, prefix="/admin/scoring", tags=["admin-scoring"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(chat.router, tags=["chat"])
 app.include_router(leagues.router, prefix="/leagues", tags=["leagues"])
 app.include_router(teams.router, tags=["teams"])
 app.include_router(players.router, prefix="/players", tags=["players"])
@@ -45,9 +55,11 @@ app.include_router(rosters.router, tags=["rosters"])
 app.include_router(projections.router, prefix="/projections", tags=["projections"])
 app.include_router(injuries.router, prefix="/injuries", tags=["injuries"])
 app.include_router(matchups.router, prefix="/matchups", tags=["matchups"])
+app.include_router(mock_drafts.router, prefix="/mock-drafts", tags=["mock-drafts"])
 app.include_router(schedule.router, prefix="/schedule", tags=["schedule"])
 app.include_router(stats.router, prefix="/stats", tags=["stats"])
 app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 app.include_router(watchlists.router, prefix="/watchlists", tags=["watchlists"])
-app.include_router(trades.router, prefix="/trade", tags=["trade"])
+app.include_router(trades.router, tags=["trade"])
+app.include_router(waivers.router, tags=["waivers"])
 app.include_router(insights.router, prefix="/insights", tags=["insights"])

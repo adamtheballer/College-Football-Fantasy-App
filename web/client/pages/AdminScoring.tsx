@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
+import { PageErrorState, PageLoadingState } from "@/components/PageState";
 import { apiGet, ApiError } from "@/lib/api";
 
 type ScoringRun = {
@@ -53,6 +54,30 @@ export default function AdminScoring() {
   const unmatchedQuery = useQuery({
     queryKey: ["admin", "scoring", "unmatched", season, week],
     queryFn: () => apiGet<JsonObject>("/admin/scoring/unmatched-provider-rows", { season, week, limit: 100 }),
+    retry: false,
+  });
+
+  const opsQuery = useQuery({
+    queryKey: ["admin", "ops", "metrics"],
+    queryFn: () => apiGet<JsonObject>("/admin/ops/metrics"),
+    refetchInterval: 30_000,
+    retry: false,
+  });
+
+  const failedJobsQuery = useQuery({
+    queryKey: ["admin", "ops", "failed-jobs"],
+    queryFn: () => apiGet<JsonObject>("/admin/ops/failed-jobs", { limit: 50 }),
+    refetchInterval: 30_000,
+    retry: false,
+  });
+
+  const auditQuery = useQuery({
+    queryKey: ["admin", "ops", "audit-events", leagueId],
+    queryFn: () =>
+      apiGet<JsonObject>("/admin/ops/audit-events", {
+        league_id: leagueId.trim() ? Number(leagueId) : undefined,
+        limit: 100,
+      }),
     retry: false,
   });
 
@@ -114,9 +139,23 @@ export default function AdminScoring() {
       </section>
 
       {adminError ? (
-        <section className="rounded-[1.75rem] border border-red-300/30 bg-red-500/10 p-5 text-sm font-semibold text-red-100">
-          {adminError}
-        </section>
+        <PageErrorState
+          title="Unable to load scoring operations"
+          description={adminError}
+          onAction={() => {
+            void runsQuery.refetch();
+            void identityQuery.refetch();
+            void unmatchedQuery.refetch();
+            void reconciliationQuery.refetch();
+            void opsQuery.refetch();
+            void failedJobsQuery.refetch();
+            void auditQuery.refetch();
+          }}
+        />
+      ) : null}
+
+      {runsQuery.isLoading ? (
+        <PageLoadingState title="Loading scoring runs" description="Fetching scoring worker telemetry and provider audit data." />
       ) : null}
 
       <section className="grid gap-4 md:grid-cols-4">
@@ -138,6 +177,9 @@ export default function AdminScoring() {
         <JsonPanel title="Recent Runs" data={runsQuery.data ?? { loading: runsQuery.isLoading }} />
         <JsonPanel title="Provider Identity" data={identityQuery.data ?? { loading: identityQuery.isLoading }} />
         <JsonPanel title="Unmatched Provider Rows" data={unmatchedQuery.data ?? { loading: unmatchedQuery.isLoading }} />
+        <JsonPanel title="Operations Metrics" data={opsQuery.data ?? { loading: opsQuery.isLoading }} />
+        <JsonPanel title="Failed Jobs" data={failedJobsQuery.data ?? { loading: failedJobsQuery.isLoading }} />
+        <JsonPanel title="Audit Events" data={auditQuery.data ?? { loading: auditQuery.isLoading }} />
         <JsonPanel
           title="League Week Reconciliation"
           data={

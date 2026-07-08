@@ -1,9 +1,14 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from conftest import TestingSessionLocal
 import pytest
 from collegefootballfantasy_api.app.models.injury import Injury
+from collegefootballfantasy_api.app.models.draft import Draft
+from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
+from collegefootballfantasy_api.app.models.league_member import LeagueMember
+from collegefootballfantasy_api.app.models.league_settings_version import LeagueSettingsVersion
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
@@ -33,6 +38,19 @@ def create_user_and_token(client, suffix: str = "one") -> str:
         user = session.query(User).filter(User.email == email).one()
         user.email_verified_at = datetime.now(timezone.utc)
         session.commit()
+    return response.json()["access_token"]
+
+
+def create_unverified_user_and_token(client, suffix: str = "unverified") -> str:
+    response = client.post(
+        "/auth/signup",
+        json={
+            "first_name": f"Coach{suffix}",
+            "email": f"coach-{suffix}@example.com",
+            "password": "StrongPass123!",
+        },
+    )
+    assert response.status_code == 201
     return response.json()["access_token"]
 
 
@@ -84,6 +102,13 @@ def test_create_and_list_leagues(client):
     assert data["data"][0]["max_teams"] == created["max_teams"]
     assert len(data["data"][0]["members"]) == 1
     assert data["data"][0]["draft"]["draft_type"] == "snake"
+
+
+def test_development_allows_unverified_user_to_create_league(client):
+    token = create_unverified_user_and_token(client)
+    created = create_league(client, token, name="Local Dev League")
+
+    assert created["name"] == "Local Dev League"
 
 
 def test_create_league_persists_custom_roster_format_and_flags(client):
@@ -277,6 +302,24 @@ def test_create_invite_join_assigns_one_team_per_user_and_enforces_max_teams(cli
     assert db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id == third.id).count() == 0
 
 
+def test_expired_invite_cannot_be_previewed_or_used(client, db_session):
+    owner_token = create_user_and_token(client, "expired-invite-owner")
+    member_token = create_user_and_token(client, "expired-invite-member")
+    league = create_league(client, owner_token, name="Expired Invite League", max_teams=2)
+    invite = db_session.query(LeagueInvite).filter(LeagueInvite.league_id == league["id"]).one()
+    invite.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    db_session.add(invite)
+    db_session.commit()
+
+    preview_response = client.post("/leagues/join-by-code", json={"invite_code": invite.code})
+    assert preview_response.status_code == 410
+    assert preview_response.json()["detail"] == "invite code expired"
+
+    join_response = client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token))
+    assert join_response.status_code == 410
+    assert join_response.json()["detail"] == "invite code expired"
+
+
 def test_update_league_settings_persists_custom_roster_format_and_flags(client):
     token = create_user_and_token(client, "update-format")
     league = create_league(client, token)
@@ -320,6 +363,81 @@ def test_update_league_settings_persists_custom_roster_format_and_flags(client):
     assert settings["kicker_enabled"] is True
     assert settings["defense_enabled"] is False
     assert settings["playoff_teams"] == 8
+
+
+def test_league_creation_and_settings_update_create_settings_versions(client, db_session):
+    token = create_user_and_token(client, "settings-version")
+    league = create_league(client, token)
+
+    initial_versions = (
+        db_session.query(LeagueSettingsVersion)
+        .filter(LeagueSettingsVersion.league_id == league["id"])
+        .order_by(LeagueSettingsVersion.version.asc())
+        .all()
+    )
+    assert [version.version for version in initial_versions] == [1]
+    assert initial_versions[0].settings_json["scoring_json"] == {"ppr": 1}
+
+    payload = {
+        "scoring_json": {"ppr": 1, "pass_td": 6},
+        "roster_slots_json": {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 1, "K": 1, "BENCH": 6, "IR": 1},
+        "playoff_teams": 6,
+        "waiver_type": "faab",
+        "trade_review_type": "commissioner",
+        "superflex_enabled": False,
+        "kicker_enabled": True,
+        "defense_enabled": False,
+    }
+
+    response = client.patch(f"/leagues/{league['id']}/settings", json=payload, headers=auth_headers(token))
+
+    assert response.status_code == 200
+    versions = (
+        db_session.query(LeagueSettingsVersion)
+        .filter(LeagueSettingsVersion.league_id == league["id"])
+        .order_by(LeagueSettingsVersion.version.asc())
+        .all()
+    )
+    assert [version.version for version in versions] == [1, 2]
+    assert versions[1].settings_json["scoring_json"] == {"ppr": 1, "pass_td": 6}
+
+
+def test_roster_size_change_is_rejected_after_draft_has_picks(client, db_session):
+    token = create_user_and_token(client, "post-draft-settings")
+    league = create_league(client, token)
+    player = Player(name="Drafted QB", position="QB", school="Texas")
+    db_session.add(player)
+    db_session.flush()
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    db_session.add(
+        DraftPick(
+            draft_id=draft.id,
+            team_id=team.id,
+            player_id=player.id,
+            made_by_user_id=team.owner_user_id,
+            round_number=1,
+            round_pick=1,
+            overall_pick=1,
+        )
+    )
+    db_session.commit()
+
+    payload = {
+        "scoring_json": {"ppr": 1},
+        "roster_slots_json": {"QB": 2, "RB": 2, "WR": 2, "TE": 1, "FLEX": 1, "K": 1, "BENCH": 5, "IR": 1},
+        "playoff_teams": 4,
+        "waiver_type": "faab",
+        "trade_review_type": "commissioner",
+        "superflex_enabled": False,
+        "kicker_enabled": True,
+        "defense_enabled": False,
+    }
+
+    response = client.patch(f"/leagues/{league['id']}/settings", json=payload, headers=auth_headers(token))
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "roster size cannot be changed after draft starts"
 
 
 def test_legacy_create_alias_still_works(client):
@@ -384,6 +502,120 @@ def test_delete_league_requires_commissioner(client):
     response = client.delete(f"/leagues/{league['id']}", headers=auth_headers(member_token))
     assert response.status_code == 403
     assert response.json()["detail"] == "commissioner only"
+
+
+def test_commissioner_can_transfer_commissioner_role(client, db_session):
+    commissioner_token = create_user_and_token(client, "transfer-owner")
+    member_token = create_user_and_token(client, "transfer-member")
+    league = create_league(client, commissioner_token, max_teams=2)
+    join_response = client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token))
+    assert join_response.status_code == 200
+    member = db_session.query(User).filter(User.email == "coach-transfer-member@example.com").one()
+
+    response = client.post(
+        f"/leagues/{league['id']}/commissioner",
+        json={"user_id": member.id},
+        headers=auth_headers(commissioner_token),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["commissioner_user_id"] == member.id
+    roles = {
+        row.user_id: row.role
+        for row in db_session.query(LeagueMember).filter(LeagueMember.league_id == league["id"]).all()
+    }
+    assert roles[member.id] == "commissioner"
+
+
+def test_commissioner_can_remove_member_before_draft_picks(client, db_session):
+    commissioner_token = create_user_and_token(client, "remove-owner")
+    member_token = create_user_and_token(client, "remove-member")
+    league = create_league(client, commissioner_token, max_teams=4)
+    join_response = client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token))
+    assert join_response.status_code == 200
+    member = db_session.query(User).filter(User.email == "coach-remove-member@example.com").one()
+
+    response = client.delete(
+        f"/leagues/{league['id']}/members/{member.id}",
+        headers=auth_headers(commissioner_token),
+    )
+
+    assert response.status_code == 200
+    assert db_session.query(LeagueMember).filter(LeagueMember.league_id == league["id"], LeagueMember.user_id == member.id).count() == 0
+    assert db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id == member.id).count() == 0
+
+
+def test_commissioner_can_reset_draft_before_completed_games(client, db_session):
+    token = create_user_and_token(client, "reset-draft")
+    league = create_league(client, token)
+    player = Player(name="Reset Draft QB", position="QB", school="Texas")
+    db_session.add(player)
+    db_session.flush()
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    draft.status = "completed"
+    db_session.add_all(
+        [
+            draft,
+            DraftPick(
+                draft_id=draft.id,
+                team_id=team.id,
+                player_id=player.id,
+                made_by_user_id=team.owner_user_id,
+                round_number=1,
+                round_pick=1,
+                overall_pick=1,
+            ),
+            RosterEntry(
+                league_id=league["id"],
+                team_id=team.id,
+                player_id=player.id,
+                slot="QB",
+                status="active",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.post(f"/leagues/{league['id']}/reset-draft", headers=auth_headers(token))
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "draft_scheduled"
+    db_session.refresh(draft)
+    assert draft.status == "scheduled"
+    assert db_session.query(DraftPick).filter(DraftPick.draft_id == draft.id).count() == 0
+    assert db_session.query(RosterEntry).filter(RosterEntry.league_id == league["id"]).count() == 0
+
+
+def test_league_with_completed_games_must_be_archived_not_deleted(client, db_session):
+    token = create_user_and_token(client, "archive-required")
+    member_token = create_user_and_token(client, "archive-member")
+    league = create_league(client, token, max_teams=2)
+    join_response = client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token))
+    assert join_response.status_code == 200
+    teams = db_session.query(Team).filter(Team.league_id == league["id"]).order_by(Team.id.asc()).all()
+    db_session.add(
+        Matchup(
+            league_id=league["id"],
+            season=2026,
+            week=1,
+            home_team_id=teams[0].id,
+            away_team_id=teams[1].id,
+            status="final",
+            home_score=100.0,
+            away_score=90.0,
+        )
+    )
+    db_session.commit()
+
+    delete_response = client.delete(f"/leagues/{league['id']}", headers=auth_headers(token))
+    assert delete_response.status_code == 409
+    assert delete_response.json()["detail"] == "league has completed games and must be archived instead of deleted"
+
+    archive_response = client.post(f"/leagues/{league['id']}/archive", headers=auth_headers(token))
+    assert archive_response.status_code == 200
+    assert archive_response.json()["status"] == "archived"
 
 
 def test_league_workspace_returns_real_matchup_and_standings(client, db_session):

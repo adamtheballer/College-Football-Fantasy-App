@@ -22,9 +22,17 @@ type InjuryItem = {
   conference: string;
   pos: string;
   status: string;
+  normalizedStatus: string;
   injury: string;
+  bodyPart: string;
   returnTimeline: string;
   projectionDelta: number;
+  projectionMultiplier: number | null;
+  source: string;
+  sourceUpdatedAt: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  clearedAt: string;
   lastUpdated: string;
 };
 
@@ -63,6 +71,9 @@ const statusSortOrder: Record<string, number> = {
 
 const statusLabel = (value: string) => value.split("_").join(" ");
 
+const formatDateTime = (value?: string | null) =>
+  value ? new Date(value).toLocaleString() : "Not reported";
+
 export default function InjuryCenter() {
   const [searchQuery, setSearchQuery] = useState("");
   const [conferenceFilter, setConferenceFilter] = useState("ALL");
@@ -93,12 +104,18 @@ export default function InjuryCenter() {
           conference: row.conference || "UNKNOWN",
           pos: row.position,
           status: row.status,
+          normalizedStatus: row.normalized_status || "unknown",
           injury: row.injury || "Injury designation",
+          bodyPart: row.body_part || row.injury || "Not specified",
           returnTimeline: row.return_timeline || "TBD",
           projectionDelta: row.projection_delta ?? 0,
-          lastUpdated: row.last_updated
-            ? new Date(row.last_updated).toLocaleString()
-            : "Updated recently",
+          projectionMultiplier: row.projection_multiplier ?? null,
+          source: row.source || "unknown",
+          sourceUpdatedAt: formatDateTime(row.source_updated_at),
+          firstSeenAt: formatDateTime(row.first_seen_at),
+          lastSeenAt: formatDateTime(row.last_seen_at),
+          clearedAt: row.cleared_at ? formatDateTime(row.cleared_at) : "",
+          lastUpdated: formatDateTime(row.last_updated),
         }));
         setInjuries(mapped);
       })
@@ -217,7 +234,7 @@ export default function InjuryCenter() {
               <div
                 key={row.id}
                 onClick={() => openPlayer(row.id)}
-                className="grid grid-cols-1 md:grid-cols-[1.3fr_0.6fr_0.9fr_0.9fr_0.6fr] gap-6 items-center px-10 py-6 hover:bg-white/[0.04] transition-all cursor-pointer"
+                className="grid grid-cols-1 md:grid-cols-[1.25fr_0.55fr_0.85fr_0.85fr_0.8fr] gap-6 items-center px-10 py-6 hover:bg-white/[0.04] transition-all cursor-pointer"
               >
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
@@ -228,7 +245,15 @@ export default function InjuryCenter() {
                   </div>
                   <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
                     <AlertTriangle className="w-3 h-3" />
-                    {row.injury}
+                    {row.bodyPart} • {row.injury}
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground/45">
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">
+                      Source: {row.source}
+                    </span>
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">
+                      Source updated: {row.sourceUpdatedAt}
+                    </span>
                   </div>
                 </div>
 
@@ -247,14 +272,26 @@ export default function InjuryCenter() {
                   {row.returnTimeline}
                 </div>
 
-                <div className="text-[12px] font-black text-foreground">
-                  {row.projectionDelta > 0 ? "+" : ""}
-                  {row.projectionDelta.toFixed(1)} pts
+                <div className="space-y-1 text-[12px] font-black text-foreground">
+                  <div>
+                    {row.projectionDelta > 0 ? "+" : ""}
+                    {row.projectionDelta.toFixed(1)} pts
+                  </div>
+                  {row.projectionMultiplier !== null ? (
+                    <div className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/50">
+                      {(row.projectionMultiplier * 100).toFixed(0)}% projection
+                    </div>
+                  ) : null}
                 </div>
 
-                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40 flex items-center gap-2">
-                  <TimerReset className="w-3 h-3" />
-                  {row.lastUpdated}
+                <div className="space-y-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">
+                  <div className="flex items-center gap-2">
+                    <TimerReset className="w-3 h-3" />
+                    {row.lastUpdated}
+                  </div>
+                  <div>First seen: {row.firstSeenAt}</div>
+                  <div>Last seen: {row.lastSeenAt}</div>
+                  {row.clearedAt ? <div>Cleared: {row.clearedAt}</div> : null}
                 </div>
               </div>
             ))}

@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -8,7 +10,7 @@ from collegefootballfantasy_api.app.api.deps import (
     require_league_member,
     require_verified_user,
 )
-from collegefootballfantasy_api.app.crud.league import delete_league, list_leagues
+from collegefootballfantasy_api.app.crud.league import list_leagues
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.league import League
@@ -16,6 +18,7 @@ from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.draft_room import (
+    DraftClockUpdate,
     DraftPickCreate,
     DraftRoomRead,
 )
@@ -40,16 +43,27 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueWaiversRead,
     LeagueWorkspaceRead,
     JoinByCodeRequest,
+    LeagueCommissionerTransferRequest,
 )
 from collegefootballfantasy_api.app.services.draft_service import (
+    autopick_expired_draft_pick,
     build_draft_room_state,
+    change_draft_clock,
     create_real_draft_pick,
+    pause_draft,
+    resume_draft,
+    undo_last_draft_pick,
 )
 from collegefootballfantasy_api.app.services.league_flow import (
+    archive_league,
     create_league,
+    delete_league_with_lifecycle_guard,
     join_league as join_league_flow,
     regenerate_invite as regenerate_invite_flow,
+    remove_member as remove_member_flow,
+    reset_draft as reset_draft_flow,
     reschedule_draft as reschedule_draft_flow,
+    transfer_commissioner as transfer_commissioner_flow,
     update_league_settings as update_league_settings_flow,
 )
 from collegefootballfantasy_api.app.services.league_workspace import (
@@ -274,6 +288,68 @@ def create_draft_pick_endpoint(
     return create_real_draft_pick(db, league=league, payload=payload, current_user=current_user)
 
 
+@router.post("/{league_id}/draft/autopick", response_model=DraftRoomRead)
+def autopick_draft_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> DraftRoomRead:
+    league, _ = require_commissioner(db, league_id, current_user)
+    return autopick_expired_draft_pick(db, league=league, current_user=current_user)
+
+
+@router.post("/{league_id}/draft/pause", response_model=DraftRoomRead)
+def pause_draft_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> DraftRoomRead:
+    league, _ = require_commissioner(db, league_id, current_user)
+    return pause_draft(db, league=league, current_user=current_user)
+
+
+@router.post("/{league_id}/draft/resume", response_model=DraftRoomRead)
+def resume_draft_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> DraftRoomRead:
+    league, _ = require_commissioner(db, league_id, current_user)
+    return resume_draft(db, league=league, current_user=current_user)
+
+
+@router.post("/{league_id}/draft/undo-last-pick", response_model=DraftRoomRead)
+def undo_last_draft_pick_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> DraftRoomRead:
+    league, _ = require_commissioner(db, league_id, current_user)
+    return undo_last_draft_pick(db, league=league, current_user=current_user)
+
+
+@router.post("/{league_id}/draft/force-pick", response_model=DraftRoomRead, status_code=status.HTTP_201_CREATED)
+def force_draft_pick_endpoint(
+    league_id: int,
+    payload: DraftPickCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> DraftRoomRead:
+    league, _ = require_commissioner(db, league_id, current_user)
+    return create_real_draft_pick(db, league=league, payload=payload, current_user=current_user)
+
+
+@router.patch("/{league_id}/draft/clock", response_model=DraftRoomRead)
+def change_draft_clock_endpoint(
+    league_id: int,
+    payload: DraftClockUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> DraftRoomRead:
+    league, _ = require_commissioner(db, league_id, current_user)
+    return change_draft_clock(db, league=league, clock_seconds=payload.clock_seconds, current_user=current_user)
+
+
 @router.get("/{league_id}/members", response_model=LeagueMembersList)
 def list_league_members(
     league_id: int,
@@ -294,6 +370,16 @@ def join_by_code(payload: JoinByCodeRequest, db: Session = Depends(get_db)) -> L
     )
     if not invite:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="invite code not found")
+    now = datetime.now(timezone.utc)
+    expires_at = invite.expires_at
+    if expires_at is not None and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if invite.revoked_at is not None or invite.disabled_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="invite code not found")
+    if expires_at is not None and expires_at <= now:
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="invite code expired")
+    if invite.max_uses is not None and invite.uses_count >= invite.max_uses:
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="invite code max uses reached")
     league = db.get(League, invite.league_id)
     if not league:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
@@ -343,7 +429,7 @@ def update_league_settings(
     current_user: User = Depends(require_verified_user),
 ) -> LeagueDetailRead:
     league, _ = require_commissioner(db, league_id, current_user)
-    return update_league_settings_flow(db, league, payload)
+    return update_league_settings_flow(db, league, payload, current_user)
 
 
 @router.patch("/{league_id}/draft", response_model=DraftRead)
@@ -354,7 +440,49 @@ def reschedule_draft(
     current_user: User = Depends(require_verified_user),
 ) -> DraftRead:
     league, _ = require_commissioner(db, league_id, current_user)
-    return reschedule_draft_flow(db, league, payload)
+    return reschedule_draft_flow(db, league, payload, current_user)
+
+
+@router.post("/{league_id}/archive", response_model=LeagueDetailRead)
+def archive_league_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> LeagueDetailRead:
+    league, _ = require_commissioner(db, league_id, current_user)
+    return archive_league(db, league, current_user)
+
+
+@router.post("/{league_id}/commissioner", response_model=LeagueDetailRead)
+def transfer_commissioner_endpoint(
+    league_id: int,
+    payload: LeagueCommissionerTransferRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> LeagueDetailRead:
+    league, _ = require_commissioner(db, league_id, current_user)
+    return transfer_commissioner_flow(db, league, target_user_id=payload.user_id, current_user=current_user)
+
+
+@router.delete("/{league_id}/members/{user_id}", response_model=LeagueDetailRead)
+def remove_member_endpoint(
+    league_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> LeagueDetailRead:
+    league, _ = require_commissioner(db, league_id, current_user)
+    return remove_member_flow(db, league, target_user_id=user_id, current_user=current_user)
+
+
+@router.post("/{league_id}/reset-draft", response_model=LeagueDetailRead)
+def reset_draft_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> LeagueDetailRead:
+    league, _ = require_commissioner(db, league_id, current_user)
+    return reset_draft_flow(db, league, current_user)
 
 
 @router.delete("/{league_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -364,4 +492,4 @@ def delete_league_endpoint(
     current_user: User = Depends(require_verified_user),
 ) -> None:
     league, _ = require_commissioner(db, league_id, current_user)
-    delete_league(db, league)
+    delete_league_with_lifecycle_guard(db, league, current_user)

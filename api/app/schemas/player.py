@@ -57,12 +57,19 @@ class PlayerCardInjuryRead(BaseModel):
     season: int
     week: int
     status: str
+    normalized_status: str = "unknown"
     injury: str | None = None
+    body_part: str | None = None
     return_timeline: str | None = None
     practice_level: str | None = None
     is_game_time_decision: bool = False
     is_returning: bool = False
     notes: str | None = None
+    source: str = "unknown"
+    source_updated_at: datetime | None = None
+    first_seen_at: datetime | None = None
+    last_seen_at: datetime | None = None
+    cleared_at: datetime | None = None
     updated_at: datetime
 
 
@@ -79,3 +86,46 @@ class PlayerCardRead(BaseModel):
     about: PlayerCardAboutRead
     injuries: list[PlayerCardInjuryRead]
     season_stats: list[PlayerCardStatRowRead]
+
+
+class PlayerAvailabilityRead(BaseModel):
+    status: str
+    league_id: int | None = None
+    team_id: int | None = None
+    team_name: str | None = None
+    roster_entry_id: int | None = None
+    roster_slot: str | None = None
+    locked: bool = False
+    drafted: bool = False
+    watchlisted: bool = False
+
+
+class PlayerPoolRowRead(BaseModel):
+    player: PlayerRead
+    availability: PlayerAvailabilityRead
+    ownership_percentage: float = 0.0
+    projection: dict | None = None
+    injury: PlayerCardInjuryRead | None = None
+    recent_trend: dict | None = None
+    watchlisted: bool = False
+
+
+class PlayerPoolList(BaseModel):
+    data: list[PlayerPoolRowRead]
+    total: int
+    limit: int
+    offset: int
+
+
+class PlayerProfileRead(BaseModel):
+    player: PlayerRead
+    bio: PlayerCardAboutRead
+    availability: PlayerAvailabilityRead
+    ownership_percentage: float
+    watchlisted: bool
+    projection: dict | None = None
+    injury: PlayerCardInjuryRead | None = None
+    schedule: list[dict] = []
+    stats: list[PlayerCardStatRowRead] = []
+    recent_trend: dict | None = None
+    news: list[dict] = []

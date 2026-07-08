@@ -1,7 +1,11 @@
-import { Bookmark, ClipboardList, Settings2, ShieldCheck, Swords } from "lucide-react";
+import { Bookmark, ClipboardList, Settings2, ShieldCheck, Swords, UserPlus } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
-const tabs = [
+import { useLeagueSettingsTab } from "@/hooks/use-leagues";
+import { DEMO_LEAGUE_ID } from "@/lib/leaguePreviewData";
+import { isPreDraftLeague } from "@/lib/leagueState";
+
+const postDraftTabs = [
   { label: "Roster", path: "roster", icon: ClipboardList },
   { label: "Matchup", path: "matchup", icon: Swords },
   { label: "Available Players", path: "waivers", icon: ShieldCheck },
@@ -9,13 +13,22 @@ const tabs = [
   { label: "Settings", path: "settings", icon: Settings2 },
 ];
 
+const preDraftTabs = [
+  { label: "Available Players", path: "waivers", icon: ShieldCheck },
+  { label: "Invite Members", path: "invite", icon: UserPlus },
+  { label: "Settings", path: "settings", icon: Settings2 },
+];
+
 export function LeagueTabs({ leagueId }: { leagueId: number }) {
   const location = useLocation();
+  const isDemoLeague = leagueId === DEMO_LEAGUE_ID;
+  const settingsQuery = useLeagueSettingsTab(leagueId, !isDemoLeague);
+  const tabs = !isDemoLeague && isPreDraftLeague(settingsQuery.data) ? preDraftTabs : postDraftTabs;
 
   return (
     <div
       className="w-full max-w-none gap-2 rounded-[1.25rem] border border-sky-300/15 bg-[linear-gradient(135deg,rgba(7,20,38,0.92),rgba(12,29,54,0.78))] p-2 shadow-[inset_0_1px_0_rgba(125,211,252,0.10),0_18px_50px_rgba(14,165,233,0.08)]"
-      style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}
+      style={{ display: "grid", gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
     >
       {tabs.map((tab) => {
         const href = `/league/${leagueId}/${tab.path}`;

@@ -16,4 +16,6 @@ class InjuryImpact(TimestampMixin, Base):
     season: Mapped[int] = mapped_column(Integer)
     week: Mapped[int] = mapped_column(Integer)
     delta_fpts: Mapped[float] = mapped_column(Float, default=0.0)
+    multiplier: Mapped[float] = mapped_column(Float, default=1.0)
+    confidence: Mapped[float] = mapped_column(Float, default=0.5)
     reason: Mapped[str | None] = mapped_column(String(200), nullable=True)

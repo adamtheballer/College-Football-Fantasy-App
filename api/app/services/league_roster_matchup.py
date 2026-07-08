@@ -1,6 +1,7 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.core.config import settings as app_settings
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league import League
@@ -13,6 +14,7 @@ from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
+from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueMatchupTabRead,
@@ -398,26 +400,35 @@ def build_waivers_view(
 ) -> LeagueWaiversRead:
     week = resolve_current_week(db, league, selected_week)
     team = _owned_team(db, league, user)
-    unavailable_player_ids = {
-        player_id
-        for (player_id,) in db.query(RosterEntry.player_id)
-        .filter(RosterEntry.league_id == league.id)
-        .all()
-    }
     draft = db.query(Draft).filter(Draft.league_id == league.id).first()
-    if draft:
+    draft_status = (draft.status if draft else "").lower()
+    draft_pick_count = (
+        db.query(func.count(DraftPick.id)).filter(DraftPick.draft_id == draft.id).scalar()
+        if draft
+        else 0
+    )
+    is_pre_draft_preview = draft_status != "completed" and int(draft_pick_count or 0) == 0
+    unavailable_player_ids: set[int] = set()
+    if not is_pre_draft_preview:
         unavailable_player_ids.update(
             player_id
-            for (player_id,) in db.query(DraftPick.player_id)
-            .filter(DraftPick.draft_id == draft.id)
+            for (player_id,) in db.query(RosterEntry.player_id)
+            .filter(RosterEntry.league_id == league.id)
             .all()
         )
+        if draft:
+            unavailable_player_ids.update(
+                player_id
+                for (player_id,) in db.query(DraftPick.player_id)
+                .filter(DraftPick.draft_id == draft.id)
+                .all()
+            )
     query = db.query(Player).filter(~Player.id.in_(unavailable_player_ids)).order_by(
         Player.sheet_projected_season_points.desc().nullslast(),
         Player.name.asc(),
     )
     total = query.count()
-    players = query.offset(max(0, offset)).limit(max(1, min(limit, 100))).all()
+    players = query.offset(max(0, offset)).limit(max(1, min(limit, 2000))).all()
     player_ids = {player.id for player in players}
     projection_by_player = _projection_map(db, league.season_year, week, player_ids)
     scoring_json = _league_scoring_json(db, league)
@@ -432,6 +443,15 @@ def build_waivers_view(
         )
         .all()
     }
+    claims = (
+        db.query(WaiverClaim)
+        .filter(WaiverClaim.league_id == league.id, WaiverClaim.team_id == team.id)
+        .order_by(WaiverClaim.created_at.desc(), WaiverClaim.id.desc())
+        .limit(50)
+        .all()
+        if team
+        else []
+    )
     return LeagueWaiversRead(
         league_id=league.id,
         fantasy_team_id=team.id if team else None,
@@ -453,14 +473,34 @@ def build_waivers_view(
             )
             for player in players
         ],
-        claims=[],
+        claims=[
+            {
+                "id": claim.id,
+                "add_player_id": claim.add_player_id,
+                "drop_player_id": claim.drop_player_id,
+                "bid_amount": claim.bid_amount,
+                "priority_at_submission": claim.priority_at_submission,
+                "status": claim.status,
+                "failure_reason": claim.failure_reason,
+                "process_after": claim.process_after.isoformat(),
+                "processed_at": claim.processed_at.isoformat() if claim.processed_at else None,
+            }
+            for claim in claims
+        ],
         total_available=total,
-        message=None if team else "No team found for your user in this league.",
+        message=(
+            "Pre-draft player pool is locked until the league draft starts."
+            if is_pre_draft_preview
+            else None
+            if team
+            else "No team found for your user in this league."
+        ),
     )
 
 
 def build_settings_view(db: Session, league: League, user: User) -> LeagueSettingsViewRead:
     settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
+    is_commissioner = league.commissioner_user_id == user.id
     members = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).all()
     teams = db.query(Team).filter(Team.league_id == league.id).order_by(Team.id.asc()).all()
     roster_entries = (
@@ -508,6 +548,7 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
         for matchup, home_name, _home_id in schedule_rows
     ]
     draft = db.query(Draft).filter(Draft.league_id == league.id).first()
+    draft_status = draft.status if draft else None
     draft_results: list[dict] = []
     if draft:
         pick_rows = (
@@ -535,6 +576,14 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
     return LeagueSettingsViewRead(
         league_id=league.id,
         league_name=league.name,
+        league_status=league.status,
+        draft_status=draft_status,
+        invite_code=league.invite_code if is_commissioner else None,
+        invite_link=(
+            f"{app_settings.ui_base_url.rstrip('/')}/join/{league.invite_code}"
+            if is_commissioner and league.invite_code
+            else None
+        ),
         league_info={
             "name": league.name,
             "season": league.season_year,
@@ -556,7 +605,7 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
         draft_results=draft_results,
         commissioner_controls=(
             ["reschedule_draft", "update_settings", "regenerate_invite"]
-            if league.commissioner_user_id == user.id
+            if is_commissioner
             else []
         ),
     )

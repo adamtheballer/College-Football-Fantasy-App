@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { User, Bell, Sliders, Shield, Save, LogOut } from "lucide-react";
+import { User, Bell, Sliders, Shield, Save, LogOut, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useNavigate } from "react-router-dom";
 import { apiGet, apiPost } from "@/lib/api";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, type AuthSession } from "@/hooks/use-auth";
 import { restartGuide } from "@/lib/onboarding";
 import { useLeagues } from "@/hooks/use-leagues";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
@@ -92,11 +92,14 @@ const CheckboxItem = ({ id, label, description, checked, onCheckedChange, disabl
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, listSessions, revokeSession, logoutAll } = useAuth();
   const { data: leagues = [] } = useLeagues(50, Boolean(user));
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [leaguePrefs, setLeaguePrefs] = useState<LeagueNotificationPreference[]>([]);
+  const [sessions, setSessions] = useState<AuthSession[]>([]);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [sessionActionId, setSessionActionId] = useState<number | "all" | null>(null);
   const [profileName, setProfileName] = useState("");
   const [profileEmail, setProfileEmail] = useState("");
   const [prefs, setPrefs] = useState({
@@ -116,6 +119,20 @@ export default function Settings() {
     setProfileName(user.firstName || "");
     setProfileEmail(user.email || "");
   }, [user]);
+
+  const refreshSessions = async () => {
+    if (!user) return;
+    try {
+      setSessionError(null);
+      setSessions(await listSessions());
+    } catch (error) {
+      setSessionError(error instanceof Error ? error.message : "Unable to load sessions.");
+    }
+  };
+
+  useEffect(() => {
+    void refreshSessions();
+  }, [user, listSessions]);
 
   useEffect(() => {
     if (!user) return;
@@ -177,6 +194,29 @@ export default function Settings() {
     if (!user) return;
     restartGuide(user.id);
     navigate("/", { replace: true });
+  };
+
+  const handleRevokeSession = async (sessionId: number) => {
+    setSessionActionId(sessionId);
+    try {
+      await revokeSession(sessionId);
+      await refreshSessions();
+    } catch (error) {
+      setSessionError(error instanceof Error ? error.message : "Unable to revoke session.");
+    } finally {
+      setSessionActionId(null);
+    }
+  };
+
+  const handleLogoutAll = async () => {
+    setSessionActionId("all");
+    try {
+      await logoutAll();
+      navigate("/login", { replace: true });
+    } catch (error) {
+      setSessionError(error instanceof Error ? error.message : "Unable to sign out all devices.");
+      setSessionActionId(null);
+    }
   };
 
   return (
@@ -479,6 +519,76 @@ export default function Settings() {
           icon={Shield}
         >
           <div className="space-y-8">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-6">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black italic uppercase tracking-tight text-foreground">Active Sessions</h4>
+                  <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest">
+                    Review signed-in browsers and revoke anything you do not recognize.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="h-10 px-5 rounded-2xl border-primary/20 bg-primary/5 text-[9px] font-black uppercase tracking-widest text-primary hover:bg-primary/10"
+                  onClick={() => void refreshSessions()}
+                  disabled={!user}
+                >
+                  Refresh
+                </Button>
+              </div>
+              {sessionError && (
+                <p className="rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-red-200">
+                  {sessionError}
+                </p>
+              )}
+              <div className="space-y-3">
+                {sessions.length === 0 ? (
+                  <div className="rounded-2xl border border-border/50 bg-white/[0.03] p-5">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                      No active sessions loaded.
+                    </p>
+                  </div>
+                ) : (
+                  sessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="flex flex-col gap-4 rounded-2xl border border-border/60 bg-white/[0.03] p-5 md:flex-row md:items-center md:justify-between"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">
+                            {session.isCurrent ? "Current Session" : "Signed-In Session"}
+                          </p>
+                          {session.isCurrent && (
+                            <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[8px] font-black uppercase tracking-[0.18em] text-primary">
+                              This Device
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] font-bold text-muted-foreground/70">
+                          {session.userAgent || "Unknown browser"}
+                        </p>
+                        <p className="text-[10px] font-medium text-muted-foreground/50">
+                          IP {session.ipAddress || "unknown"} · Last used{" "}
+                          {session.lastUsedAt ? new Date(session.lastUsedAt).toLocaleString() : "not yet"} · Expires{" "}
+                          {new Date(session.expiresAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="h-10 rounded-xl border-red-500/20 bg-red-500/5 px-4 text-[9px] font-black uppercase tracking-widest text-red-300 hover:bg-red-500/10"
+                        onClick={() => void handleRevokeSession(session.id)}
+                        disabled={sessionActionId === session.id}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        {sessionActionId === session.id ? "Revoking" : "Revoke"}
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
             <div className="flex items-center justify-between p-6 rounded-3xl bg-red-500/5 border border-red-500/10">
               <div className="space-y-1">
                 <h4 className="text-sm font-black italic uppercase tracking-tight text-foreground">Danger Zone</h4>
@@ -488,9 +598,14 @@ export default function Settings() {
             </div>
             
             <div className="flex justify-center pt-8">
-               <Button variant="ghost" className="text-muted-foreground hover:text-red-400 gap-3 text-[11px] font-black uppercase tracking-[0.2em]">
+               <Button
+                 variant="ghost"
+                 className="text-muted-foreground hover:text-red-400 gap-3 text-[11px] font-black uppercase tracking-[0.2em]"
+                 onClick={() => void handleLogoutAll()}
+                 disabled={!user || sessionActionId === "all"}
+               >
                   <LogOut className="w-4 h-4" />
-                  Sign Out of All Devices
+                  {sessionActionId === "all" ? "Signing Out..." : "Sign Out of All Devices"}
                </Button>
             </div>
           </div>

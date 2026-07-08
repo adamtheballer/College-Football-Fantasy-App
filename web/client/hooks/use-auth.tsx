@@ -18,6 +18,7 @@ import {
   getStoredAccessToken,
   storeAccessTokenSession,
 } from "@/lib/api";
+import { AUTH_CHANGED_EVENT, AUTH_EXPIRED_EVENT, dispatchAuthChanged } from "@/lib/auth-events";
 
 export interface User {
   firstName: string;
@@ -81,7 +82,6 @@ type AuthContextValue = {
   isBootstrapping: boolean;
 };
 
-const AUTH_CHANGED_EVENT = "cfb-auth-changed";
 const USER_STORAGE_KEY = "cfb_user";
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -108,10 +108,6 @@ const safeStorageRemove = (key: string) => {
   } catch {
     // Ignore storage errors to keep app usable.
   }
-};
-
-const dispatchAuthChanged = () => {
-  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 };
 
 const clearStoredAuth = () => {
@@ -212,13 +208,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const syncAuth = () => setUser(loadStoredUser());
+    const handleAuthExpired = () => {
+      clearStoredAuth();
+      queryClient.clear();
+      setUser(null);
+    };
     window.addEventListener("storage", syncAuth);
     window.addEventListener(AUTH_CHANGED_EVENT, syncAuth);
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
     return () => {
       window.removeEventListener("storage", syncAuth);
       window.removeEventListener(AUTH_CHANGED_EVENT, syncAuth);
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
     };
-  }, []);
+  }, [queryClient]);
 
   const login = useCallback(async (email: string, password: string) => {
     const payload = await apiPost<AuthPayload>("/auth/login", { email, password });

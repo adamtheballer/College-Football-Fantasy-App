@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, Index, Integer, JSON, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
@@ -26,3 +26,24 @@ class ProviderSyncState(TimestampMixin, Base):
     error_message: Mapped[str | None] = mapped_column(String(500))
     meta: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
     consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
+
+    @property
+    def is_stale(self) -> bool:
+        if self.expires_at is None:
+            return True
+        expires_at = self.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        return expires_at <= datetime.now(timezone.utc)
+
+    @property
+    def last_successful_sync_at(self) -> datetime | None:
+        return self.last_success_at
+
+    @property
+    def source_updated_at(self) -> datetime:
+        return self.updated_at
+
+    @property
+    def cache_expires_at(self) -> datetime | None:
+        return self.expires_at

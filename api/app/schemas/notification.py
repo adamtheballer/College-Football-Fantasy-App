@@ -18,6 +18,7 @@ class PushTokenRead(PushTokenCreate):
 class NotificationPreferences(BaseModel):
     push_enabled: bool = True
     email_enabled: bool = True
+    in_app_enabled: bool = True
     draft_alerts: bool = True
     injury_alerts: bool = True
     touchdown_alerts: bool = False
@@ -25,6 +26,7 @@ class NotificationPreferences(BaseModel):
     waiver_alerts: bool = True
     projection_alerts: bool = True
     lineup_reminders: bool = True
+    category_toggles: dict[str, bool] | None = None
     quiet_hours_start: str | None = None
     quiet_hours_end: str | None = None
 
@@ -61,9 +63,20 @@ class NotificationRead(BaseModel):
     title: str
     body: str
     payload: dict | None = None
+    league_id: int | None = None
+    delivery_state: str = "sent"
+    source_entity_type: str | None = None
+    source_entity_id: int | None = None
+    deep_link: str | None = None
     sent_at: datetime
+    read_at: datetime | None = None
+    dismissed_at: datetime | None = None
 
 
 class NotificationList(BaseModel):
     data: list[NotificationRead]
     total: int
+
+
+class NotificationUnreadCount(BaseModel):
+    unread_count: int

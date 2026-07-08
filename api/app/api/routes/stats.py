@@ -692,7 +692,7 @@ def list_power4_injuries(
     rows = query.order_by(Injury.updated_at.desc()).all()
 
     impacts = {
-        impact.player_id: impact.delta_fpts
+        impact.player_id: impact
         for impact in db.query(InjuryImpact)
         .filter(InjuryImpact.season == season, InjuryImpact.week == week)
         .all()
@@ -706,6 +706,7 @@ def list_power4_injuries(
             continue
         if conference_key and conference_name != conference_key:
             continue
+        impact = impacts.get(player.id)
         data.append(
             TeamInjuryRow(
                 player_id=player.id,
@@ -714,12 +715,22 @@ def list_power4_injuries(
                 conference=conference_name,
                 position=player.position,
                 status=injury.status,
+                normalized_status=injury.normalized_status,
                 injury=injury.injury,
+                body_part=injury.body_part,
                 return_timeline=injury.return_timeline,
                 practice_level=injury.practice_level,
                 notes=injury.notes,
+                source=injury.source,
+                source_updated_at=injury.source_updated_at,
+                first_seen_at=injury.first_seen_at,
+                last_seen_at=injury.last_seen_at,
+                cleared_at=injury.cleared_at,
                 last_updated=injury.updated_at or datetime.utcnow(),
-                projection_delta=impacts.get(player.id),
+                projection_delta=impact.delta_fpts if impact else None,
+                projection_multiplier=impact.multiplier if impact else None,
+                impact_confidence=impact.confidence if impact else None,
+                impact_reason=impact.reason if impact else None,
             )
         )
     return TeamInjuriesList(data=data, total=len(data))

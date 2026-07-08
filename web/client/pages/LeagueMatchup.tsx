@@ -1,15 +1,17 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
+import { PageErrorState, PageLoadingState } from "@/components/PageState";
 import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
 import { WeekSelector } from "@/components/league/WeekSelector";
 import { WinChanceMeter } from "@/components/league/WinChanceMeter";
-import { useLeagueMatchupTab } from "@/hooks/use-leagues";
+import { useLeagueMatchupTab, useLeagueSettingsTab } from "@/hooks/use-leagues";
 import {
   DEMO_LEAGUE_ID,
   createDemoLeagueMatchupResponse,
 } from "@/lib/leaguePreviewData";
+import { isPreDraftLeague } from "@/lib/leagueState";
 
 function MatchupEmptyState({
   title,
@@ -107,7 +109,13 @@ export default function LeagueMatchup() {
   const parsedLeagueId = Number(leagueId);
   const isDemoLeague = parsedLeagueId === DEMO_LEAGUE_ID;
   const [selectedWeek, setSelectedWeek] = useState<number | null>(1);
-  const matchupQuery = useLeagueMatchupTab(parsedLeagueId, selectedWeek ?? undefined, !isDemoLeague);
+  const settingsQuery = useLeagueSettingsTab(parsedLeagueId, !isDemoLeague);
+  const isPreDraft = !isDemoLeague && isPreDraftLeague(settingsQuery.data);
+  const matchupQuery = useLeagueMatchupTab(
+    parsedLeagueId,
+    selectedWeek ?? undefined,
+    !isDemoLeague && !isPreDraft
+  );
   const data = isDemoLeague ? createDemoLeagueMatchupResponse() : matchupQuery.data;
   const myTeam = data?.my_team ?? data?.user_team ?? null;
   const opponentTeam = data?.opponent_team ?? null;
@@ -120,6 +128,29 @@ export default function LeagueMatchup() {
     isFetching: matchupQuery.isFetching,
     isError: matchupQuery.isError,
   });
+
+  if (settingsQuery.isLoading && !settingsQuery.isError && !isDemoLeague) {
+    return <PageLoadingState title="Loading league state" description="Checking whether this league has a scheduled matchup." />;
+  }
+
+  if (matchupQuery.isError && !isDemoLeague) {
+    return (
+      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+        <PageErrorState
+          title="Unable to load matchup"
+          description="Retry after confirming the backend is reachable and your league access is still valid."
+          onAction={() => {
+            void settingsQuery.refetch();
+            void matchupQuery.refetch();
+          }}
+        />
+      </main>
+    );
+  }
+
+  if (isPreDraft) {
+    return <Navigate to={`/league/${parsedLeagueId}/waivers`} replace />;
+  }
 
   return (
     <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">

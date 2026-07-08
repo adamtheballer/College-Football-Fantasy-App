@@ -423,29 +423,12 @@ export function createDemoLeagueSettingsResponse(): LeagueSettingsTabResponse {
   };
 }
 
-const previewProjection = {
-  QB: 22.4,
-  RB1: 17.8,
-  RB2: 14.6,
-  WR1: 18.9,
-  WR2: 15.2,
-  TE: 11.7,
-  FLEX: 13.8,
-  K: 8.4,
-  BENCH1: 10.2,
-  BENCH2: 9.8,
-  BENCH3: 7.6,
-  BENCH4: 6.9,
-};
-
 function previewPlayer({
   id,
   teamId,
   teamName,
   slot,
   position,
-  name,
-  projection,
   opponent = "TBD",
 }: {
   id: number;
@@ -453,8 +436,6 @@ function previewPlayer({
   teamName: string;
   slot: string;
   position: string;
-  name: string;
-  projection: number;
   opponent?: string;
 }): LeagueRosterPlayer {
   return {
@@ -464,25 +445,25 @@ function previewPlayer({
     fantasy_team_id: teamId,
     fantasy_team_name: teamName,
     player_id: id,
-    player_name: name,
-    player_school: "Week 1 Preview",
-    player_position: position,
-    school: "Week 1 Preview",
+    player_name: "",
+    player_school: null,
+    player_position: null,
+    school: null,
     position,
     slot,
     roster_slot: slot,
-    status: "PREVIEW",
-    acquisition_type: "PREVIEW",
+    status: "EMPTY_SLOT",
+    acquisition_type: "EMPTY_SLOT",
     draft_pick_id: null,
     is_starter: slot !== "BENCH" && slot !== "IR",
     is_ir: slot === "IR",
     opponent,
-    projected_points: projection,
-    floor: Math.max(0, projection - 4),
-    ceiling: projection + 6,
-    boom_prob: 0.24,
-    bust_prob: 0.18,
-    weekly_projected_fantasy_points: projection,
+    projected_points: null,
+    floor: null,
+    ceiling: null,
+    boom_prob: undefined,
+    bust_prob: undefined,
+    weekly_projected_fantasy_points: null,
   };
 }
 
@@ -497,8 +478,6 @@ export function createWeekOnePreviewRoster(
       teamName,
       slot: "QB",
       position: "QB",
-      name: "QB Starter Preview",
-      projection: previewProjection.QB,
     }),
     previewPlayer({
       id: -102,
@@ -506,8 +485,6 @@ export function createWeekOnePreviewRoster(
       teamName,
       slot: "RB",
       position: "RB",
-      name: "RB Starter Preview",
-      projection: previewProjection.RB1,
     }),
     previewPlayer({
       id: -103,
@@ -515,8 +492,6 @@ export function createWeekOnePreviewRoster(
       teamName,
       slot: "RB",
       position: "RB",
-      name: "RB Flex Preview",
-      projection: previewProjection.RB2,
     }),
     previewPlayer({
       id: -104,
@@ -524,8 +499,6 @@ export function createWeekOnePreviewRoster(
       teamName,
       slot: "WR",
       position: "WR",
-      name: "WR Starter Preview",
-      projection: previewProjection.WR1,
     }),
     previewPlayer({
       id: -105,
@@ -533,8 +506,6 @@ export function createWeekOnePreviewRoster(
       teamName,
       slot: "WR",
       position: "WR",
-      name: "WR Route Preview",
-      projection: previewProjection.WR2,
     }),
     previewPlayer({
       id: -106,
@@ -542,8 +513,6 @@ export function createWeekOnePreviewRoster(
       teamName,
       slot: "TE",
       position: "TE",
-      name: "TE Starter Preview",
-      projection: previewProjection.TE,
     }),
     previewPlayer({
       id: -107,
@@ -551,8 +520,6 @@ export function createWeekOnePreviewRoster(
       teamName,
       slot: "FLEX",
       position: "RB",
-      name: "Flex Preview",
-      projection: previewProjection.FLEX,
     }),
     previewPlayer({
       id: -108,
@@ -560,8 +527,6 @@ export function createWeekOnePreviewRoster(
       teamName,
       slot: "K",
       position: "K",
-      name: "Kicker Preview",
-      projection: previewProjection.K,
     }),
     previewPlayer({
       id: -109,
@@ -569,8 +534,6 @@ export function createWeekOnePreviewRoster(
       teamName,
       slot: "BENCH",
       position: "QB",
-      name: "Bench QB Preview",
-      projection: previewProjection.BENCH1,
     }),
     previewPlayer({
       id: -110,
@@ -578,8 +541,6 @@ export function createWeekOnePreviewRoster(
       teamName,
       slot: "BENCH",
       position: "RB",
-      name: "Bench RB Preview",
-      projection: previewProjection.BENCH2,
     }),
     previewPlayer({
       id: -111,
@@ -587,8 +548,6 @@ export function createWeekOnePreviewRoster(
       teamName,
       slot: "BENCH",
       position: "WR",
-      name: "Bench WR Preview",
-      projection: previewProjection.BENCH3,
     }),
     previewPlayer({
       id: -112,
@@ -596,8 +555,6 @@ export function createWeekOnePreviewRoster(
       teamName,
       slot: "BENCH",
       position: "TE",
-      name: "Bench TE Preview",
-      projection: previewProjection.BENCH4,
     }),
   ];
 }

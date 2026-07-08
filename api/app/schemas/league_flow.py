@@ -2,6 +2,19 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from collegefootballfantasy_api.app.domain.scoring_engine import (
+    ScoringRulesValidationError,
+    validate_scoring_rules,
+)
+
+
+def _validate_scoring_json(value: dict) -> dict:
+    try:
+        validate_scoring_rules(value)
+    except ScoringRulesValidationError as exc:
+        raise ValueError(str(exc)) from exc
+    return value
+
 
 class LeagueBasics(BaseModel):
     name: str
@@ -28,6 +41,11 @@ class LeagueSettingsInput(BaseModel):
     superflex_enabled: bool
     kicker_enabled: bool
     defense_enabled: bool
+
+    @field_validator("scoring_json")
+    @classmethod
+    def validate_scoring_json(cls, value: dict) -> dict:
+        return _validate_scoring_json(value)
 
 
 class DraftScheduleInput(BaseModel):
@@ -85,6 +103,11 @@ class LeagueSettingsUpdate(BaseModel):
     superflex_enabled: bool
     kicker_enabled: bool
     defense_enabled: bool
+
+    @field_validator("scoring_json")
+    @classmethod
+    def validate_scoring_json(cls, value: dict) -> dict:
+        return _validate_scoring_json(value)
 
 
 class DraftUpdate(BaseModel):
@@ -232,6 +255,10 @@ class JoinByCodeRequest(BaseModel):
     invite_code: str
 
 
+class LeagueCommissionerTransferRequest(BaseModel):
+    user_id: int
+
+
 class JoinLeagueRequest(BaseModel):
     league_id: int
 
@@ -360,6 +387,10 @@ class LeagueScheduleRowRead(BaseModel):
 class LeagueSettingsViewRead(BaseModel):
     league_id: int
     league_name: str
+    league_status: str | None = None
+    draft_status: str | None = None
+    invite_code: str | None = None
+    invite_link: str | None = None
     league_info: dict
     members: list[LeagueMemberRead]
     scoring_settings: dict

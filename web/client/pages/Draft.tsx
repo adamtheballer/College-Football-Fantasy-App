@@ -231,17 +231,24 @@ export default function Draft() {
     [viewerTeamRoster, draftRoom, superflexEnabled]
   );
 
+  const showMasterBoardPreview = isScheduledPreview && !isDraftActive;
   const serverPositionFilter =
-    position === "ALL" ? (legalPositions.length > 0 ? legalPositions.join(",") : undefined) : position;
+    position === "ALL"
+      ? showMasterBoardPreview
+        ? undefined
+        : legalPositions.length > 0
+          ? legalPositions.join(",")
+          : undefined
+      : position;
   const draftSearch = search.trim();
   const { data: playersPayload, isLoading: playersLoading, isError: playersError } = useDraftPlayerPool({
     search: draftSearch || undefined,
     position: serverPositionFilter,
     league_id: parsedLeagueId,
-    available_only: Boolean(parsedLeagueId),
+    available_only: Boolean(parsedLeagueId) && !showMasterBoardPreview,
     limit: DRAFT_PLAYER_PAGE_SIZE,
     offset: 0,
-    pages: 5,
+    pages: showMasterBoardPreview ? 10 : 5,
     sort: "draft_rank",
   });
 
@@ -280,7 +287,10 @@ export default function Draft() {
     [viewerTeamRoster, draftedIds, draftBoard, draftRoom, superflexEnabled]
   );
 
-  const visiblePlayers = useMemo(() => draftablePlayers, [draftablePlayers]);
+  const visiblePlayers = useMemo(
+    () => (showMasterBoardPreview ? draftBoard : draftablePlayers),
+    [draftBoard, draftablePlayers, showMasterBoardPreview]
+  );
 
   const selectedPlayer = useMemo(
     () => draftBoard.find((player) => player.id === selectedPlayerId) ?? null,
@@ -583,10 +593,14 @@ export default function Draft() {
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-200 drop-shadow-[0_0_14px_rgba(103,232,249,0.28)]">Available Players</p>
                 <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-                  Showing your roster needs: {viewerDraftBoardTeamName}
+                  {showMasterBoardPreview
+                    ? "Master draft board preview. Picks are locked."
+                    : `Showing your roster needs: ${viewerDraftBoardTeamName}`}
                 </p>
                 <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100/80">
-                  Your legal positions: {legalPositions.length ? legalPositions.join(", ") : "None"}
+                  {showMasterBoardPreview
+                    ? "All positions are visible until the draft unlocks."
+                    : `Your legal positions: ${legalPositions.length ? legalPositions.join(", ") : "None"}`}
                 </p>
               </div>
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -639,7 +653,9 @@ export default function Draft() {
               </div>
             ) : visiblePlayers.length === 0 ? (
               <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
-                {legalPositions.length === 0
+                {showMasterBoardPreview
+                  ? "No players found on the master draft board."
+                  : legalPositions.length === 0
                   ? "Roster is full. No legal picks remain."
                   : position !== "ALL" && !legalPositions.includes(position as (typeof legalPositions)[number])
                     ? `No ${position} players fit your remaining roster slots.`
@@ -821,7 +837,11 @@ export default function Draft() {
                           </p>
                         </div>
                         <p className="mt-2 text-xs font-bold leading-5 text-slate-200">
-                          {[injury.injury, injury.practice_level, injury.return_timeline].filter(Boolean).join(" • ") || "No injury detail provided."}
+                          {[injury.body_part, injury.injury, injury.practice_level, injury.return_timeline].filter(Boolean).join(" • ") || "No injury detail provided."}
+                        </p>
+                        <p className="mt-2 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                          Source: {injury.source ?? "unknown"} • Last seen:{" "}
+                          {injury.last_seen_at ? new Date(injury.last_seen_at).toLocaleString() : "Not reported"}
                         </p>
                         {injury.notes ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{injury.notes}</p> : null}
                       </div>

@@ -89,6 +89,10 @@ type TeamInjury = {
   position: string;
   status: string;
   injury: string | null;
+  source?: string | null;
+  last_updated?: string | null;
+  source_updated_at?: string | null;
+  projection_delta?: number | null;
 };
 
 type CompareSide = {
@@ -1038,6 +1042,8 @@ export default function Stats() {
                           <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Pos</th>
                           <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Status</th>
                           <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Injury</th>
+                          <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Source</th>
+                          <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Impact</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/10">
@@ -1047,6 +1053,10 @@ export default function Stats() {
                             <td className="px-6 py-3 text-[11px] font-bold text-muted-foreground/80">{row.position}</td>
                             <td className="px-6 py-3 text-[11px] font-bold text-muted-foreground/80">{row.status}</td>
                             <td className="px-6 py-3 text-[11px] font-bold text-muted-foreground/80">{row.injury || "-"}</td>
+                            <td className="px-6 py-3 text-[11px] font-bold uppercase text-muted-foreground/80">{row.source || "unknown"}</td>
+                            <td className="px-6 py-3 text-[11px] font-bold text-muted-foreground/80">
+                              {typeof row.projection_delta === "number" ? `${row.projection_delta.toFixed(1)} pts` : "-"}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

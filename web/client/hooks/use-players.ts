@@ -104,12 +104,19 @@ export type PlayerCardResponse = {
     season: number;
     week: number;
     status: string;
+    normalized_status?: string | null;
     injury?: string | null;
+    body_part?: string | null;
     return_timeline?: string | null;
     practice_level?: string | null;
     is_game_time_decision: boolean;
     is_returning: boolean;
     notes?: string | null;
+    source?: string | null;
+    source_updated_at?: string | null;
+    first_seen_at?: string | null;
+    last_seen_at?: string | null;
+    cleared_at?: string | null;
     updated_at: string;
   }>;
   season_stats: Array<{
@@ -323,6 +330,7 @@ export function useDraftPlayerPool(
     limit?: number;
     offset?: number;
     pages?: number;
+    enabled?: boolean;
   } = {}
 ) {
   const {
@@ -335,6 +343,7 @@ export function useDraftPlayerPool(
     limit = 100,
     offset = 0,
     pages = 1,
+    enabled = true,
   } = params;
 
   return useQuery({
@@ -352,6 +361,7 @@ export function useDraftPlayerPool(
         pages,
       },
     ],
+    enabled,
     staleTime: 15_000,
     queryFn: async () => {
       const fetchPage = (pageOffset: number) =>

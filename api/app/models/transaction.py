@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Index, String
+from sqlalchemy import ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -10,6 +10,7 @@ class Transaction(TimestampMixin, Base):
         Index("ix_transactions_league_id", "league_id"),
         Index("ix_transactions_team_id", "team_id"),
         Index("ix_transactions_created_at", "created_at"),
+        UniqueConstraint("team_id", "idempotency_key", name="uq_transactions_team_idempotency_key"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -24,3 +25,4 @@ class Transaction(TimestampMixin, Base):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)

@@ -6,12 +6,14 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from collegefootballfantasy_api.app.models.draft import Draft
+from collegefootballfantasy_api.app.models.draft_event import DraftEvent
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.draft_room import DraftPickCreate
 from collegefootballfantasy_api.app.services.draft_service import create_real_draft_pick
@@ -183,6 +185,143 @@ def test_draft_pick_persists_and_creates_roster_entry(client):
     roster = roster_response.json()
     assert roster["total"] == 1
     assert roster["data"][0]["player"]["id"] == player_id
+
+
+def test_draft_room_starts_server_authoritative_clock_when_ready(client, db_session):
+    token = create_user_and_token(client, "clock-start")
+    league = create_league(client, token)
+
+    room_response = client.get(
+        f"/leagues/{league['id']}/draft-room",
+        headers=auth_headers(token),
+    )
+
+    assert room_response.status_code == 200
+    payload = room_response.json()
+    assert payload["status"] == "live"
+    assert payload["clock_seconds"] == 90
+    assert payload["pick_started_at"] is not None
+    assert payload["pick_expires_at"] is not None
+    assert payload["seconds_remaining"] is not None
+
+    db_session.expire_all()
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    assert draft.status == "live"
+    assert draft.pick_started_at is not None
+    assert draft.pick_expires_at is not None
+
+
+def test_manual_pick_after_clock_expiry_is_blocked_until_autopick(client, db_session):
+    token = create_user_and_token(client, "clock-expired")
+    league = create_league(client, token)
+    player_id = create_player(client, "Expired Clock QB", "QB")
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    draft.status = "live"
+    draft.pick_started_at = datetime.now(timezone.utc) - timedelta(minutes=2)
+    draft.pick_expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    db_session.commit()
+
+    response = client.post(
+        f"/leagues/{league['id']}/draft-picks",
+        json={"player_id": player_id},
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "draft pick clock expired"
+    assert db_session.query(DraftPick).filter(DraftPick.player_id == player_id).count() == 0
+
+
+def test_commissioner_autopick_requires_expired_clock_and_creates_roster(client, db_session):
+    token = create_user_and_token(client, "autopick")
+    league = create_league(client, token, fill_league=False)
+    join_league(client, league["id"], "autopick-member")
+    early_player_id = create_player(client, "Early Autopick QB", "QB")
+    chosen_player_id = create_player(client, "Chosen Autopick QB", "QB")
+
+    early_response = client.post(
+        f"/leagues/{league['id']}/draft/autopick",
+        headers=auth_headers(token),
+    )
+    assert early_response.status_code == 400
+    assert early_response.json()["detail"] == "draft clock has not expired"
+
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    draft.status = "live"
+    draft.pick_started_at = datetime.now(timezone.utc) - timedelta(minutes=2)
+    draft.pick_expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    db_session.commit()
+
+    response = client.post(
+        f"/leagues/{league['id']}/draft/autopick",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["picks"]) == 1
+    assert payload["picks"][0]["player_id"] == early_player_id
+    assert db_session.query(RosterEntry).filter(RosterEntry.player_id == early_player_id).count() == 1
+    assert db_session.query(RosterEntry).filter(RosterEntry.player_id == chosen_player_id).count() == 0
+    assert db_session.query(DraftEvent).filter(DraftEvent.event_type == "autopick").count() == 1
+    assert db_session.query(Transaction).filter(Transaction.transaction_type == "draft_pick").count() == 1
+
+
+def test_commissioner_pause_resume_and_change_clock(client, db_session):
+    token = create_user_and_token(client, "draft-controls")
+    league = create_league(client, token)
+    assert client.get(f"/leagues/{league['id']}/draft-room", headers=auth_headers(token)).status_code == 200
+
+    pause_response = client.post(f"/leagues/{league['id']}/draft/pause", headers=auth_headers(token))
+    assert pause_response.status_code == 200
+    assert pause_response.json()["status"] == "paused"
+    assert pause_response.json()["paused_at"] is not None
+
+    resume_response = client.post(f"/leagues/{league['id']}/draft/resume", headers=auth_headers(token))
+    assert resume_response.status_code == 200
+    assert resume_response.json()["status"] == "live"
+    assert resume_response.json()["paused_at"] is None
+
+    clock_response = client.patch(
+        f"/leagues/{league['id']}/draft/clock",
+        json={"clock_seconds": 45},
+        headers=auth_headers(token),
+    )
+    assert clock_response.status_code == 200
+    assert clock_response.json()["clock_seconds"] == 45
+
+    db_session.expire_all()
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    assert draft.clock_seconds == 45
+    assert draft.pick_timer_seconds == 45
+
+
+def test_commissioner_can_undo_last_pick_and_restore_current_pick(client, db_session):
+    token = create_user_and_token(client, "undo-pick")
+    league = create_league(client, token)
+    player_id = create_player(client, "Undo Pick QB", "QB")
+
+    pick_response = client.post(
+        f"/leagues/{league['id']}/draft-picks",
+        json={"player_id": player_id},
+        headers=auth_headers(token),
+    )
+    assert pick_response.status_code == 201
+    assert db_session.query(DraftPick).filter(DraftPick.player_id == player_id).count() == 1
+    assert db_session.query(RosterEntry).filter(RosterEntry.player_id == player_id).count() == 1
+
+    undo_response = client.post(
+        f"/leagues/{league['id']}/draft/undo-last-pick",
+        headers=auth_headers(token),
+    )
+
+    assert undo_response.status_code == 200
+    payload = undo_response.json()
+    assert payload["current_pick"] == 1
+    assert payload["picks"] == []
+    assert db_session.query(DraftPick).filter(DraftPick.player_id == player_id).count() == 0
+    assert db_session.query(RosterEntry).filter(RosterEntry.player_id == player_id).count() == 0
+    assert db_session.query(DraftEvent).filter(DraftEvent.event_type == "pick_undone").count() == 1
 
 
 def test_two_user_real_draft_stays_in_sync_and_creates_rosters(client, db_session):
@@ -617,6 +756,32 @@ def test_non_league_members_cannot_view_roster_matchup_waivers_or_settings(clien
         )
         assert response.status_code == 403
         assert response.json()["detail"] == "league membership required"
+
+
+def test_commissioner_can_revisit_invite_code_and_link_from_settings(client):
+    owner_token = create_user_and_token(client, "settings-invite-owner")
+    league = create_league(client, owner_token, max_teams=2, fill_league=False)
+    member_token = join_league(client, league["id"], "settings-invite-member")
+
+    owner_response = client.get(
+        f"/leagues/{league['id']}/settings-view",
+        headers=auth_headers(owner_token),
+    )
+    assert owner_response.status_code == 200
+    owner_payload = owner_response.json()
+    assert owner_payload["invite_code"] == league["invite_code"]
+    assert owner_payload["invite_link"].endswith(f"/join/{league['invite_code']}")
+    assert "regenerate_invite" in owner_payload["commissioner_controls"]
+
+    member_response = client.get(
+        f"/leagues/{league['id']}/settings-view",
+        headers=auth_headers(member_token),
+    )
+    assert member_response.status_code == 200
+    member_payload = member_response.json()
+    assert member_payload["invite_code"] is None
+    assert member_payload["invite_link"] is None
+    assert "regenerate_invite" not in member_payload["commissioner_controls"]
 
 
 def test_waiver_available_players_are_scoped_to_current_league(client):

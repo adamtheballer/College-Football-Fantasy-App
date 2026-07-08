@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from collegefootballfantasy_api.app.api.deps import (
@@ -9,7 +10,10 @@ from collegefootballfantasy_api.app.api.deps import (
     require_verified_user,
 )
 from collegefootballfantasy_api.app.db.session import get_db
+from collegefootballfantasy_api.app.domain.roster_rules import RosterRuleError, normalize_slot, validate_slot_for_position
+from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
+from collegefootballfantasy_api.app.models.lineup_change_event import LineupChangeEvent
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
@@ -25,7 +29,14 @@ from collegefootballfantasy_api.app.schemas.roster import (
     RosterEntryRead,
 )
 from collegefootballfantasy_api.app.schemas.transaction import TransactionList, TransactionRead
-from collegefootballfantasy_api.app.services.roster_lock_service import RosterLockError, ensure_player_unlocked
+from collegefootballfantasy_api.app.services.audit_service import record_audit_event
+from collegefootballfantasy_api.app.services.roster_lock_service import (
+    RosterLockError,
+    active_scoring_week,
+    ensure_player_unlocked,
+    is_player_locked,
+)
+from collegefootballfantasy_api.app.services.watchlist_alerts import notify_watchlisted_player
 
 router = APIRouter()
 
@@ -50,6 +61,17 @@ def _load_roster_entry_rows(db: Session, team_id: int) -> list[RosterEntry]:
     )
 
 
+def _load_roster_entry_rows_for_update(db: Session, team_id: int) -> list[RosterEntry]:
+    return (
+        db.query(RosterEntry)
+        .options(joinedload(RosterEntry.player))
+        .filter(RosterEntry.team_id == team_id)
+        .with_for_update()
+        .order_by(RosterEntry.id.asc())
+        .all()
+    )
+
+
 def _serialize_roster(db: Session, team_id: int) -> list[RosterEntryRead]:
     return [RosterEntryRead.model_validate(entry) for entry in _load_roster_entry_rows(db, team_id)]
 
@@ -68,9 +90,10 @@ def _slot_limits(settings_row: LeagueSettings) -> dict[str, int]:
 def _validate_slot_counts(slot_limits: dict[str, int], slots: list[str]) -> None:
     counts: dict[str, int] = {}
     for slot in slots:
-        if slot not in slot_limits:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"invalid roster slot: {slot}")
-        counts[slot] = counts.get(slot, 0) + 1
+        normalized_slot = normalize_slot(slot)
+        if normalized_slot not in slot_limits:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"invalid roster slot: {normalized_slot}")
+        counts[normalized_slot] = counts.get(normalized_slot, 0) + 1
 
     for slot, count in counts.items():
         limit = int(slot_limits.get(slot, 0))
@@ -90,6 +113,29 @@ def _ensure_unlocked_for_roster_change(db: Session, team: Team, player: Player) 
         ensure_player_unlocked(db, team.league, player)
     except RosterLockError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+def _validate_slot_assignment(db: Session, team: Team, player: Player, slot: str) -> str:
+    try:
+        normalized_slot = normalize_slot(slot)
+        validate_slot_for_position(normalized_slot, player.position)
+    except RosterRuleError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if normalized_slot == "IR" and not _is_ir_eligible(db, team.league.season_year, player.id):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player is not IR eligible")
+    return normalized_slot
+
+
+def _is_ir_eligible(db: Session, season: int, player_id: int) -> bool:
+    injury = (
+        db.query(Injury)
+        .filter(Injury.player_id == player_id, Injury.season == season)
+        .order_by(Injury.week.desc(), Injury.id.desc())
+        .first()
+    )
+    if not injury:
+        return False
+    return (injury.status or "").upper() not in {"", "FULL", "ACTIVE", "AVAILABLE"}
 
 
 def _ensure_player_available(db: Session, league_id: int, player_id: int) -> None:
@@ -113,6 +159,7 @@ def _record_transaction(
     player_id: int | None = None,
     related_player_id: int | None = None,
     reason: str | None = None,
+    idempotency_key: str | None = None,
 ) -> Transaction:
     row = Transaction(
         league_id=league_id,
@@ -122,11 +169,64 @@ def _record_transaction(
         related_player_id=related_player_id,
         created_by_user_id=created_by_user_id,
         reason=reason,
+        idempotency_key=idempotency_key,
     )
     db.add(row)
     db.flush()
     db.refresh(row)
     return row
+
+
+def _record_lineup_change(
+    db: Session,
+    *,
+    team: Team,
+    player: Player,
+    from_slot: str,
+    to_slot: str,
+    changed_by: int,
+) -> None:
+    week = active_scoring_week(db, team.league) or 1
+    lock_state = "locked" if is_player_locked(db, team.league, player) else "unlocked"
+    db.add(
+        LineupChangeEvent(
+            league_id=team.league_id,
+            team_id=team.id,
+            week=week,
+            player_id=player.id,
+            from_slot=from_slot,
+            to_slot=to_slot,
+            lock_state=lock_state,
+            changed_by=changed_by,
+        )
+    )
+
+
+def _notify_watchlist_roster_change(
+    db: Session,
+    *,
+    league_id: int,
+    player_id: int,
+    player_name: str,
+    team_name: str,
+    alert_kind: str,
+) -> None:
+    if alert_kind == "ownership_change":
+        title = f"{player_name} is now rostered"
+        body = f"{player_name} was added by {team_name}."
+    else:
+        title = f"{player_name} is available"
+        body = f"{player_name} was dropped and is available to watch."
+    notify_watchlisted_player(
+        db,
+        player_id=player_id,
+        league_id=league_id,
+        alert_kind=alert_kind,
+        title=title,
+        body=body,
+        payload={"team_name": team_name},
+        source_entity_type="roster",
+    )
 
 
 def _best_available_slot(
@@ -142,7 +242,7 @@ def _best_available_slot(
     for entry in roster_entries:
         if exclude_entry_id is not None and entry.id == exclude_entry_id:
             continue
-        counts[entry.slot] = counts.get(entry.slot, 0) + 1
+        counts[normalize_slot(entry.slot)] = counts.get(normalize_slot(entry.slot), 0) + 1
 
     primary_limit = int(slot_limits.get(player_position, 0))
     if primary_limit and counts.get(player_position, 0) < primary_limit:
@@ -169,18 +269,19 @@ def add_roster_entry_endpoint(
     team = require_team_owner(db, team_id, current_user)
     player = _ensure_player_exists(db, entry_in.player_id)
     _ensure_unlocked_for_roster_change(db, team, player)
+    normalized_slot = _validate_slot_assignment(db, team, player, entry_in.slot)
     _ensure_player_available(db, team.league_id, entry_in.player_id)
 
     settings_row = _league_settings(db, team.league_id)
     slot_limits = _slot_limits(settings_row)
-    slots = [entry.slot for entry in _load_roster_entry_rows(db, team.id)] + [entry_in.slot]
+    slots = [entry.slot for entry in _load_roster_entry_rows_for_update(db, team.id)] + [normalized_slot]
     _validate_slot_counts(slot_limits, slots)
 
     entry = RosterEntry(
         league_id=team.league_id,
         team_id=team.id,
         player_id=entry_in.player_id,
-        slot=entry_in.slot,
+        slot=normalized_slot,
         status=entry_in.status,
     )
     db.add(entry)
@@ -192,7 +293,29 @@ def add_roster_entry_endpoint(
         created_by_user_id=current_user.id,
         player_id=entry.player_id,
     )
-    db.commit()
+    record_audit_event(
+        db,
+        action="roster.add",
+        entity_type="roster_entry",
+        entity_id=entry.id,
+        league_id=team.league_id,
+        team_id=team.id,
+        actor_user_id=current_user.id,
+        after={"player_id": entry.player_id, "slot": entry.slot, "status": entry.status},
+    )
+    _notify_watchlist_roster_change(
+        db,
+        league_id=team.league_id,
+        player_id=entry.player_id,
+        player_name=player.name,
+        team_name=team.name,
+        alert_kind="ownership_change",
+    )
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player already on a league roster") from exc
     db.refresh(entry)
     refreshed = (
         db.query(RosterEntry)
@@ -233,6 +356,8 @@ def delete_roster_entry_endpoint(
     _ensure_unlocked_for_roster_change(db, team, entry.player)
 
     dropped_player_id = entry.player_id
+    dropped_player_name = entry.player.name
+    previous_slot = entry.slot
     db.delete(entry)
     _record_transaction(
         db,
@@ -241,6 +366,24 @@ def delete_roster_entry_endpoint(
         transaction_type="drop",
         created_by_user_id=current_user.id,
         player_id=dropped_player_id,
+    )
+    record_audit_event(
+        db,
+        action="roster.drop",
+        entity_type="roster_entry",
+        entity_id=entry.id,
+        league_id=team.league_id,
+        team_id=team.id,
+        actor_user_id=current_user.id,
+        before={"player_id": dropped_player_id, "slot": previous_slot},
+    )
+    _notify_watchlist_roster_change(
+        db,
+        league_id=team.league_id,
+        player_id=dropped_player_id,
+        player_name=dropped_player_name,
+        team_name=team.name,
+        alert_kind="available_after_waiver",
     )
     db.commit()
 
@@ -266,7 +409,7 @@ def update_lineup_endpoint(
     changed_entries: list[tuple[RosterEntry, str]] = []
     for entry in roster_entries:
         assignment = next((item for item in payload.assignments if item.roster_entry_id == entry.id), None)
-        next_slot = assignment.slot if assignment else entry.slot
+        next_slot = _validate_slot_assignment(db, team, entry.player, assignment.slot) if assignment else entry.slot
         desired_slots.append(next_slot)
         if assignment and assignment.slot != entry.slot:
             _ensure_unlocked_for_roster_change(db, team, entry.player)
@@ -278,9 +421,18 @@ def update_lineup_endpoint(
     _validate_slot_counts(slot_limits, desired_slots)
 
     for assignment in payload.assignments:
-        roster_by_id[assignment.roster_entry_id].slot = assignment.slot
+        entry = roster_by_id[assignment.roster_entry_id]
+        entry.slot = _validate_slot_assignment(db, team, entry.player, assignment.slot)
 
     for entry, previous_slot in changed_entries:
+        _record_lineup_change(
+            db,
+            team=team,
+            player=entry.player,
+            from_slot=previous_slot,
+            to_slot=entry.slot,
+            changed_by=current_user.id,
+        )
         _record_transaction(
             db,
             league_id=team.league_id,
@@ -289,6 +441,17 @@ def update_lineup_endpoint(
             created_by_user_id=current_user.id,
             player_id=entry.player_id,
             reason=f"{previous_slot} -> {entry.slot}",
+        )
+        record_audit_event(
+            db,
+            action="roster.lineup.move",
+            entity_type="roster_entry",
+            entity_id=entry.id,
+            league_id=team.league_id,
+            team_id=team.id,
+            actor_user_id=current_user.id,
+            before={"slot": previous_slot},
+            after={"slot": entry.slot, "player_id": entry.player_id},
         )
 
     db.commit()
@@ -303,6 +466,20 @@ def add_drop_endpoint(
     current_user: User = Depends(require_verified_user),
 ) -> AddDropResponse:
     team = require_team_owner(db, team_id, current_user)
+    idempotency_key = payload.idempotency_key.strip() if payload.idempotency_key else None
+    if idempotency_key:
+        existing_transaction = (
+            db.query(Transaction)
+            .filter(Transaction.team_id == team.id, Transaction.idempotency_key == idempotency_key)
+            .first()
+        )
+        if existing_transaction:
+            return AddDropResponse(
+                roster=_serialize_roster(db, team.id),
+                transaction=TransactionRead.model_validate(existing_transaction),
+            )
+
+    _load_roster_entry_rows_for_update(db, team.id)
     add_player = _ensure_player_exists(db, payload.add_player_id)
     _ensure_unlocked_for_roster_change(db, team, add_player)
     _ensure_player_available(db, team.league_id, add_player.id)
@@ -313,7 +490,10 @@ def add_drop_endpoint(
     _ensure_unlocked_for_roster_change(db, team, drop_entry.player)
 
     new_slot = _best_available_slot(db, team, add_player.position, exclude_entry_id=drop_entry.id)
+    new_slot = _validate_slot_assignment(db, team, add_player, new_slot)
     dropped_player_id = drop_entry.player_id
+    dropped_player_name = drop_entry.player.name
+    previous_slot = drop_entry.slot
     db.delete(drop_entry)
     db.flush()
 
@@ -335,8 +515,51 @@ def add_drop_endpoint(
         player_id=add_player.id,
         related_player_id=dropped_player_id,
         reason=payload.reason,
+        idempotency_key=idempotency_key,
     )
-    db.commit()
+    record_audit_event(
+        db,
+        action="roster.add_drop",
+        entity_type="transaction",
+        entity_id=transaction.id,
+        league_id=team.league_id,
+        team_id=team.id,
+        actor_user_id=current_user.id,
+        before={"drop_player_id": dropped_player_id, "drop_slot": previous_slot},
+        after={"add_player_id": add_player.id, "add_slot": new_slot, "idempotency_key": idempotency_key},
+    )
+    _notify_watchlist_roster_change(
+        db,
+        league_id=team.league_id,
+        player_id=add_player.id,
+        player_name=add_player.name,
+        team_name=team.name,
+        alert_kind="ownership_change",
+    )
+    _notify_watchlist_roster_change(
+        db,
+        league_id=team.league_id,
+        player_id=dropped_player_id,
+        player_name=dropped_player_name,
+        team_name=team.name,
+        alert_kind="available_after_waiver",
+    )
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        if idempotency_key:
+            existing_transaction = (
+                db.query(Transaction)
+                .filter(Transaction.team_id == team.id, Transaction.idempotency_key == idempotency_key)
+                .first()
+            )
+            if existing_transaction:
+                return AddDropResponse(
+                    roster=_serialize_roster(db, team.id),
+                    transaction=TransactionRead.model_validate(existing_transaction),
+                )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="roster move conflict") from exc
 
     return AddDropResponse(
         roster=_serialize_roster(db, team.id),

@@ -66,6 +66,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm --prefix web ci
 
+      - name: Install Playwright browsers
+        run: npm --prefix web exec playwright install -- --with-deps chromium
+
       - name: Typecheck frontend
         run: npm --prefix web run typecheck
 
@@ -74,3 +77,6 @@ jobs:
 
       - name: Build frontend
         run: npm --prefix web run build
+
+      - name: Run browser e2e tests
+        run: npm --prefix web run e2e

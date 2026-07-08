@@ -27,6 +27,13 @@ def test_development_allows_local_default_cors_and_jwt_secret():
     assert settings.environment == "development"
     assert settings.jwt_secret_key == DEFAULT_JWT_SECRET_KEY
     assert "http://localhost:5173" in settings.allowed_cors_origins
+    assert settings.email_verification_required is False
+
+
+def test_development_can_require_email_verification_when_enabled():
+    settings = make_settings(auth_require_email_verification=True)
+
+    assert settings.email_verification_required is True
 
 
 def test_production_rejects_default_jwt_secret():
@@ -90,6 +97,7 @@ def test_production_accepts_explicit_safe_cors_and_jwt_secret():
 
     assert settings.is_production
     assert settings.allowed_cors_origins == ["https://app.example.com", "https://www.example.com"]
+    assert settings.email_verification_required is True
 
 
 def test_blank_cors_origin_regex_disables_regex_for_production():

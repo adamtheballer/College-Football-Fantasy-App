@@ -23,6 +23,14 @@ def test_recalculate_league_week_scores_is_idempotent_and_sums_starters_only(cli
     assert db_session.query(LineupWeekSnapshot).filter_by(league_id=league.id, season=2026, week=1).count() == 6
     available_score = db_session.query(PlayerWeekScore).filter_by(league_id=league.id, player_id=players["available"].id, season=2026, week=1).one()
     assert available_score.fantasy_points == 0.0
+    assert available_score.stat_version == 1
+    assert available_score.calculation_version == "2026.1"
+
+    qb_score = db_session.query(PlayerWeekScore).filter_by(league_id=league.id, player_id=players["qb"].id, season=2026, week=1).one()
+    assert qb_score.stat_version == 1
+    assert qb_score.source_provider == "sportsdata"
+    assert qb_score.previous_score is None
+    assert qb_score.correction_delta == 0.0
 
     home_score = db_session.query(TeamWeekScore).filter_by(league_id=league.id, team_id=home.id, season=2026, week=1).one()
     assert home_score.starter_points == 56.0
@@ -43,7 +51,15 @@ def test_stat_correction_changes_scores_without_incrementing(client, db_session)
     qb_score = db_session.query(PlayerWeekScore).filter_by(league_id=league.id, player_id=players["qb"].id, season=2026, week=1).one()
     home_score = db_session.query(TeamWeekScore).filter_by(league_id=league.id, team_id=home.id, season=2026, week=1).one()
     assert qb_score.fantasy_points == 28.0
+    assert qb_score.stat_version == 2
+    assert qb_score.previous_score == 16.0
+    assert qb_score.correction_delta == 12.0
     assert home_score.total_points == 68.0
+
+    recalculate_league_week_scores(db_session, league.id, 2026, 1)
+    db_session.commit()
+    db_session.refresh(qb_score)
+    assert qb_score.stat_version == 2
 
 
 def test_scoring_run_records_success_and_failure(client, db_session):

@@ -1,9 +1,11 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.security import create_access_token, generate_token, hash_password
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.provider_player_identity_audit import ProviderPlayerIdentityAudit
+from collegefootballfantasy_api.app.models.provider_sync_job import ProviderSyncJob
+from collegefootballfantasy_api.app.models.provider_sync_state import ProviderSyncState
 from collegefootballfantasy_api.app.models.provider_unmatched_player_row import ProviderUnmatchedPlayerRow
 from collegefootballfantasy_api.app.models.scoring_run import ScoringRun
 from collegefootballfantasy_api.app.models.user import User
@@ -27,6 +29,14 @@ class FakeSportsDataClient:
             {"PlayerID": "sd-1", "Name": "Matched RB", "RushingYards": 40},
             {"PlayerID": "sd-missing", "Name": "Missing RB", "RushingYards": 20},
             {"Name": "No ID WR", "ReceivingYards": 10},
+        ]
+
+
+class InvalidSportsDataClient:
+    def get_weekly_player_stats(self, season, week):
+        return [
+            {"PlayerID": "sd-1", "Name": "Matched RB", "RushingYards": 40},
+            {"PlayerID": "sd-invalid", "Name": "No Stats"},
         ]
 
 
@@ -103,12 +113,43 @@ def test_sportsdata_provider_adapter_records_unmatched_rows(client, db_session):
         client=FakeSportsDataClient(),
     )
 
-    assert result == {"events": 0, "rows_seen": 3, "upserted": 1, "skipped": 2}
+    assert result["events"] == 0
+    assert result["rows_seen"] == 3
+    assert result["upserted"] == 1
+    assert result["skipped"] == 2
+    assert result["rows_inserted"] == 1
+    assert result["rows_updated"] == 0
+    assert result["rows_rejected"] == 2
+    assert result["provider_sync_job_id"]
+    job = db_session.get(ProviderSyncJob, result["provider_sync_job_id"])
+    assert job is not None
+    assert job.provider == "sportsdata"
+    assert job.feed == "player_game_stats_week"
+    assert job.rows_seen == 3
+    assert job.rows_inserted == 1
+    assert job.rows_rejected == 2
     unmatched = db_session.query(ProviderUnmatchedPlayerRow).order_by(ProviderUnmatchedPlayerRow.id.asc()).all()
-    assert [row.reason for row in unmatched] == [
-        "no local player matched provider row",
-        "missing provider player id",
-    ]
+    assert unmatched[0].reason == "no local player matched provider row"
+    assert unmatched[1].reason.startswith("invalid provider payload:")
+
+
+def test_sportsdata_invalid_provider_rows_are_quarantined(client, db_session):
+    matched = Player(name="Matched RB", position="RB", school="Texas", external_id="sd-1")
+    db_session.add(matched)
+    db_session.commit()
+
+    result = upsert_sportsdata_weekly_player_stats(
+        db_session,
+        season=2026,
+        week=1,
+        client=InvalidSportsDataClient(),
+    )
+
+    assert result["rows_seen"] == 2
+    assert result["upserted"] == 1
+    assert result["rows_rejected"] == 1
+    unmatched = db_session.query(ProviderUnmatchedPlayerRow).filter_by(provider="sportsdata").one()
+    assert unmatched.reason.startswith("invalid provider payload:")
 
 
 def test_admin_scoring_routes_require_configured_admin(client, db_session, monkeypatch):
@@ -161,6 +202,49 @@ def test_admin_provider_identity_report_surfaces_missing_ids_and_duplicates(clie
     assert missing_by_name["No ID"]["missing_espn_id"] is True
     assert missing_by_name["No ID"]["missing_sportsdata_id"] is True
     assert payload["duplicate_name_school_pairs"] == [{"name": "Same Name", "school": "D", "count": 2}]
+
+
+def test_admin_provider_sync_status_shows_freshness_and_job_history(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "admin_emails", "admin@example.com")
+    admin = _create_user(db_session, "admin@example.com")
+    now = datetime.now(timezone.utc)
+    db_session.add(
+        ProviderSyncState(
+            provider="sportsdata",
+            feed="player_game_stats_week",
+            scope_key='{"season":2026,"week":1}',
+            status="ready",
+            last_attempted_at=now,
+            last_success_at=now,
+            expires_at=now + timedelta(minutes=10),
+        )
+    )
+    db_session.add(
+        ProviderSyncJob(
+            provider="sportsdata",
+            feed="player_game_stats_week",
+            season=2026,
+            week=1,
+            scope="season:2026:week:1",
+            status="success",
+            started_at=now,
+            finished_at=now,
+            rows_seen=3,
+            rows_inserted=1,
+            rows_updated=1,
+            rows_rejected=1,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/admin/provider-sync/status?provider=sportsdata", headers=_auth_headers(admin))
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["states"][0]["is_stale"] is False
+    assert payload["states"][0]["last_successful_sync_at"] is not None
+    assert payload["states"][0]["cache_expires_at"] is not None
+    assert payload["recent_jobs"][0]["rows_rejected"] == 1
 
 
 def test_admin_player_reconciliation_shows_raw_stats_and_breakdown(client, db_session, monkeypatch):

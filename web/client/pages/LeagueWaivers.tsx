@@ -3,16 +3,21 @@ import { useParams } from "react-router-dom";
 import { Search, Sparkles, TrendingUp, UserPlus, Zap } from "lucide-react";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
+import { PageEmptyState, PageErrorState, PageLoadingState } from "@/components/PageState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import { useLeagueWaiverTab } from "@/hooks/use-leagues";
+import { useLeagueSettingsTab } from "@/hooks/use-leagues";
 import {
   useCreateWatchlist,
   useToggleWatchlistPlayer,
   useWatchlists,
 } from "@/hooks/use-watchlists";
+import { useDraftPlayerPool } from "@/hooks/use-players";
 import { DEMO_LEAGUE_ID, createDemoLeagueWaiverResponse } from "@/lib/leaguePreviewData";
+import { isPreDraftLeague } from "@/lib/leagueState";
+import type { LeagueWaiverPlayer } from "@/types/league";
 
 const positions = ["ALL", "QB", "RB", "WR", "TE", "K"] as const;
 
@@ -75,7 +80,26 @@ export default function LeagueWaivers() {
   const isDemoLeague = parsedLeagueId === DEMO_LEAGUE_ID;
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState<(typeof positions)[number]>("ALL");
-  const waiverQuery = useLeagueWaiverTab(parsedLeagueId, 50, 0, !isDemoLeague);
+  const settingsQuery = useLeagueSettingsTab(parsedLeagueId, !isDemoLeague);
+  const isPreDraft = !isDemoLeague && isPreDraftLeague(settingsQuery.data);
+  const settingsReady = isDemoLeague || Boolean(settingsQuery.data);
+  const waiverQuery = useLeagueWaiverTab(
+    parsedLeagueId,
+    50,
+    0,
+    !isDemoLeague && settingsReady && !isPreDraft
+  );
+  const draftPoolQuery = useDraftPlayerPool({
+    search: undefined,
+    position: undefined,
+    league_id: parsedLeagueId,
+    available_only: false,
+    sort: "draft_rank",
+    limit: 100,
+    offset: 0,
+    pages: 50,
+    enabled: !isDemoLeague && settingsReady && isPreDraft,
+  });
   const waiverData = isDemoLeague ? createDemoLeagueWaiverResponse() : waiverQuery.data;
   const watchlistsQuery = useWatchlists(
     parsedLeagueId,
@@ -83,7 +107,18 @@ export default function LeagueWaivers() {
   );
   const createWatchlist = useCreateWatchlist();
   const toggleWatchlistPlayer = useToggleWatchlistPlayer();
-  const players = waiverData?.available_players ?? [];
+  const draftPoolPlayers = useMemo<LeagueWaiverPlayer[]>(
+    () =>
+      (draftPoolQuery.data?.data ?? []).map((player) => ({
+        id: player.id,
+        name: player.name,
+        school: player.school,
+        position: player.pos,
+        weekly_projected_fantasy_points: Number(player.projection?.fpts ?? player.sheetProjectedSeasonPoints ?? 0),
+      })),
+    [draftPoolQuery.data?.data]
+  );
+  const players = isPreDraft ? draftPoolPlayers : waiverData?.available_players ?? [];
   const watchlists = watchlistsQuery.data?.data ?? [];
   const primaryWatchlist = watchlists[0] ?? null;
   const watchedPlayerIds = useMemo(
@@ -118,6 +153,14 @@ export default function LeagueWaivers() {
   }, {});
 
   const handleWatchPlayer = async (playerId: number) => {
+    if (isPreDraft) {
+      toast({
+        title: "Draft pool is locked",
+        description: "You can scout every draft-pool player here, but watchlists and claims stay locked until league setup is complete.",
+      });
+      return;
+    }
+
     if (isDemoLeague) {
       toast({
         title: "Demo league watchlist",
@@ -153,6 +196,43 @@ export default function LeagueWaivers() {
     }
   };
 
+  const isLoadingPlayers =
+    !isDemoLeague &&
+    (settingsQuery.isLoading || (isPreDraft ? draftPoolQuery.isLoading : waiverQuery.isLoading));
+
+  if (isLoadingPlayers) {
+    return (
+      <PageLoadingState
+        title="Loading player pool"
+        description={
+          isPreDraft
+            ? "Fetching the locked master draft board for this league."
+            : "Fetching league-scoped player availability and watchlist state."
+        }
+      />
+    );
+  }
+
+  const playerPoolError =
+    !isDemoLeague &&
+    (settingsQuery.isError || (isPreDraft ? draftPoolQuery.isError : waiverQuery.isError));
+
+  if (playerPoolError) {
+    return (
+      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+        <PageErrorState
+          title="Unable to load players"
+          description="The player pool could not load. Retry once the backend is reachable and your league access is valid."
+          onAction={() => {
+            void settingsQuery.refetch();
+            void waiverQuery.refetch();
+            void draftPoolQuery.refetch();
+          }}
+        />
+      </main>
+    );
+  }
+
   return (
     <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[460px] rounded-[3rem] bg-[radial-gradient(circle_at_20%_8%,rgba(56,189,248,0.2),transparent_32%),radial-gradient(circle_at_72%_0%,rgba(99,102,241,0.18),transparent_38%),radial-gradient(circle_at_50%_30%,rgba(14,165,233,0.12),transparent_42%)] blur-2xl" />
@@ -162,15 +242,23 @@ export default function LeagueWaivers() {
         </p>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-4xl font-black italic text-slate-50">Available Players</h1>
+            <h1 className="text-4xl font-black italic text-slate-50">
+              {isPreDraft ? "Pre-Draft Player Pool" : "Available Players"}
+            </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              League-scoped available players only. Claims are not enabled yet, so this page is for finding and watching free agents.
+              {isPreDraft
+                ? "All draft-pool players are visible before the league draft. The board is locked here, so managers can scout without making picks."
+                : "League-scoped available players only. Claims are not enabled yet, so this page is for finding and watching free agents."}
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3 sm:min-w-[430px]">
             <div className="rounded-[1.25rem] border border-sky-300/20 bg-sky-400/10 p-4 shadow-[0_0_34px_rgba(56,189,248,0.12)]">
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Available</p>
-              <p className="mt-1 text-2xl font-black text-sky-100">{players.length}</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+                {isPreDraft ? "Draft Pool" : "Available"}
+              </p>
+              <p className="mt-1 text-2xl font-black text-sky-100">
+                {isPreDraft ? draftPoolQuery.data?.total ?? players.length : players.length}
+              </p>
             </div>
             <div className="rounded-[1.25rem] border border-emerald-300/20 bg-emerald-400/10 p-4 shadow-[0_0_34px_rgba(52,211,153,0.10)]">
               <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Top Proj</p>
@@ -190,16 +278,19 @@ export default function LeagueWaivers() {
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <h2 className="text-[11px] font-black uppercase tracking-[0.22em] text-sky-300">
-                Available Players
+                {isPreDraft ? "Locked Draft Pool" : "Available Players"}
               </h2>
               <p className="mt-2 text-xs font-semibold text-slate-500">
-                Only players not selected in this league draft appear here. Watch targets for now; claims and add/drop are not enabled yet.
+                {isPreDraft
+                  ? "These are the same players managers will see in the draft room. They are view-only until the draft opens."
+                  : "Only players not selected in this league draft appear here. Watch targets for now; claims and add/drop are not enabled yet."}
               </p>
             </div>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               <div className="relative min-w-[280px]">
                 <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-sky-200/45" />
                 <Input
+                  aria-label="Search available players"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search players, schools..."
@@ -231,9 +322,27 @@ export default function LeagueWaivers() {
           </div>
         </div>
         {filteredPlayers.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-slate-400">
-            No league-scoped available players match the current filters.
-          </p>
+          <div className="p-5">
+            <PageEmptyState
+              eyebrow={search || position !== "ALL" ? "No Matches" : "No Players"}
+              title={search || position !== "ALL" ? "No players match these filters" : "No player pool loaded"}
+              description={
+                search || position !== "ALL"
+                  ? "Clear the search or switch position filters to see more available players."
+                  : "The draft pool should appear here before the draft. If this remains empty, the backend player pool needs to be seeded."
+              }
+              actionLabel={search || position !== "ALL" ? "Clear Filters" : undefined}
+              onAction={
+                search || position !== "ALL"
+                  ? () => {
+                      setSearch("");
+                      setPosition("ALL");
+                    }
+                  : undefined
+              }
+              className="shadow-none"
+            />
+          </div>
         ) : (
           <div className="divide-y divide-sky-300/10">
             {filteredPlayers.map((player, index) => {
@@ -262,7 +371,7 @@ export default function LeagueWaivers() {
                         {player.name}
                       </p>
                       <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                        Available player
+                        {isPreDraft ? "Draft pool player" : "Available player"}
                       </p>
                     </div>
                   </div>
@@ -291,11 +400,11 @@ export default function LeagueWaivers() {
                       type="button"
                       variant="outline"
                       onClick={() => void handleWatchPlayer(player.id)}
-                      disabled={createWatchlist.isPending || toggleWatchlistPlayer.isPending}
+                      disabled={isPreDraft || createWatchlist.isPending || toggleWatchlistPlayer.isPending}
                       className="h-11 rounded-2xl border-sky-300/20 bg-sky-300/[0.06] px-4 text-[10px] font-black uppercase tracking-[0.16em] text-sky-100 transition-all hover:border-sky-200/45 hover:bg-sky-300/15 hover:shadow-[0_0_26px_rgba(56,189,248,0.16)]"
                     >
                       <Sparkles className="mr-2 h-3.5 w-3.5" />
-                      {watchedPlayerIds.has(player.id) ? "Watching" : "Watch"}
+                      {isPreDraft ? "Locked" : watchedPlayerIds.has(player.id) ? "Watching" : "Watch"}
                     </Button>
                     <Button
                       type="button"
@@ -303,7 +412,7 @@ export default function LeagueWaivers() {
                       className="h-11 rounded-2xl bg-sky-300 px-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-950 shadow-[0_10px_28px_rgba(14,165,233,0.18)] transition-all hover:bg-sky-200"
                     >
                       <UserPlus className="mr-2 h-3.5 w-3.5" />
-                      Claims Off
+                      {isPreDraft ? "Draft Locked" : "Claims Off"}
                     </Button>
                   </div>
                 </div>
@@ -332,7 +441,9 @@ export default function LeagueWaivers() {
                   <Zap className={`h-4 w-4 ${tone.text} transition-transform group-hover:rotate-12 group-hover:scale-110`} />
                 </div>
                 <p className="mt-2 text-3xl font-black text-slate-50">{positionCounts[item] ?? 0}</p>
-                <p className="mt-2 text-xs font-bold text-slate-500">Available in this league only</p>
+                <p className="mt-2 text-xs font-bold text-slate-500">
+                  {isPreDraft ? "In draft pool" : "Available in this league only"}
+                </p>
               </button>
             );
           })}

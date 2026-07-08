@@ -25,6 +25,13 @@ export interface DraftRoom {
   draft_id: number;
   status: string;
   pick_timer_seconds: number;
+  clock_seconds: number;
+  pick_started_at: string | null;
+  pick_expires_at: string | null;
+  seconds_remaining: number | null;
+  paused_at: string | null;
+  pause_accumulated_seconds: number;
+  server_time: string | null;
   roster_slots: Record<string, number>;
   teams: DraftRoomTeam[];
   picks: DraftRoomPick[];

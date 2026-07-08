@@ -8,6 +8,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { PageErrorBoundary } from "@/components/PageErrorBoundary";
+import { PageLoadingState } from "@/components/PageState";
 import { ApiError } from "@/lib/api";
 import Layout from "./components/Layout";
 
@@ -26,6 +28,7 @@ const LeagueRoster = lazy(() => import("./pages/LeagueRoster"));
 const LeagueSettings = lazy(() => import("./pages/LeagueSettings"));
 const LeagueWaivers = lazy(() => import("./pages/LeagueWaivers"));
 const LeagueWatchlist = lazy(() => import("./pages/LeagueWatchlist"));
+const LeagueInviteMembers = lazy(() => import("./pages/LeagueInviteMembers"));
 const DraftHome = lazy(() => import("./pages/DraftHome"));
 const DraftLobby = lazy(() => import("./pages/DraftLobby"));
 const Draft = lazy(() => import("./pages/Draft"));
@@ -58,13 +61,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const RouteFallback = () => (
-  <div className="flex min-h-[45vh] items-center justify-center">
-    <div className="rounded-[2rem] border border-sky-300/20 bg-slate-950/55 px-8 py-6 text-[11px] font-black uppercase tracking-[0.22em] text-sky-200 shadow-[0_0_40px_rgba(56,189,248,0.12)]">
-      Loading view...
-    </div>
-  </div>
-);
+const RouteFallback = () => <PageLoadingState title="Loading view" description="Preparing this screen." />;
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -74,8 +71,9 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Layout>
-            <Suspense fallback={<RouteFallback />}>
-              <Routes>
+            <PageErrorBoundary>
+              <Suspense fallback={<RouteFallback />}>
+                <Routes>
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/leagues" element={<Leagues />} />
                 <Route
@@ -151,6 +149,14 @@ const App = () => (
                   }
                 />
                 <Route
+                  path="/league/:leagueId/invite"
+                  element={
+                    <ProtectedRoute>
+                      <LeagueInviteMembers />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/league/:leagueId/watchlist"
                   element={
                     <ProtectedRoute>
@@ -199,8 +205,9 @@ const App = () => (
                 <Route path="/password-reset" element={<PasswordResetRequest />} />
                 <Route path="/password-reset/confirm" element={<PasswordResetConfirm />} />
                 <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
+                </Routes>
+              </Suspense>
+            </PageErrorBoundary>
           </Layout>
         </BrowserRouter>
       </TooltipProvider>

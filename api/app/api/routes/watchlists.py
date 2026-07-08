@@ -10,42 +10,18 @@ from collegefootballfantasy_api.app.schemas.watchlist import (
     WatchlistCreate,
     WatchlistList,
     WatchlistPlayerCreate,
+    WatchlistPlayerUpdate,
     WatchlistRead,
     WatchlistUpdate,
 )
+from collegefootballfantasy_api.app.services.watchlist_service import (
+    add_watchlist_player,
+    owned_watchlist_or_404,
+    serialize_watchlist,
+    update_watchlist_player,
+)
 
 router = APIRouter()
-
-
-def _owned_watchlist_or_404(db: Session, watchlist_id: int, current_user: User) -> Watchlist:
-    watchlist = (
-        db.query(Watchlist)
-        .options(joinedload(Watchlist.players).joinedload(WatchlistPlayer.player))
-        .filter(Watchlist.id == watchlist_id, Watchlist.user_id == current_user.id)
-        .first()
-    )
-    if not watchlist:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="watchlist not found")
-    return watchlist
-
-
-def _serialize_watchlist(db: Session, watchlist_id: int) -> WatchlistRead:
-    watchlist = (
-        db.query(Watchlist)
-        .options(joinedload(Watchlist.players).joinedload(WatchlistPlayer.player))
-        .filter(Watchlist.id == watchlist_id)
-        .one()
-    )
-    players = [item.player for item in sorted(watchlist.players, key=lambda row: row.created_at)]
-    return WatchlistRead(
-        id=watchlist.id,
-        user_id=watchlist.user_id,
-        league_id=watchlist.league_id,
-        name=watchlist.name,
-        players=players,
-        created_at=watchlist.created_at,
-        updated_at=watchlist.updated_at,
-    )
 
 
 @router.get("", response_model=WatchlistList)
@@ -69,15 +45,7 @@ def list_watchlists_endpoint(
 
     rows = query.all()
     data = [
-        WatchlistRead(
-            id=row.id,
-            user_id=row.user_id,
-            league_id=row.league_id,
-            name=row.name,
-            players=[item.player for item in sorted(row.players, key=lambda item: item.created_at)],
-            created_at=row.created_at,
-            updated_at=row.updated_at,
-        )
+        serialize_watchlist(db, row.id, current_user=current_user)
         for row in rows
     ]
     return WatchlistList(data=data, total=len(data))
@@ -96,7 +64,7 @@ def create_watchlist_endpoint(
     watchlist = Watchlist(user_id=current_user.id, league_id=payload.league_id, name=payload.name.strip())
     db.add(watchlist)
     db.commit()
-    return _serialize_watchlist(db, watchlist.id)
+    return serialize_watchlist(db, watchlist.id, current_user=current_user)
 
 
 @router.patch("/{watchlist_id}", response_model=WatchlistRead)
@@ -106,11 +74,11 @@ def rename_watchlist_endpoint(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> WatchlistRead:
-    watchlist = _owned_watchlist_or_404(db, watchlist_id, current_user)
+    watchlist = owned_watchlist_or_404(db, watchlist_id, current_user)
     watchlist.name = payload.name.strip()
     db.add(watchlist)
     db.commit()
-    return _serialize_watchlist(db, watchlist.id)
+    return serialize_watchlist(db, watchlist.id, current_user=current_user)
 
 
 @router.post("/{watchlist_id}/players", response_model=WatchlistRead)
@@ -120,20 +88,35 @@ def add_watchlist_player_endpoint(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> WatchlistRead:
-    watchlist = _owned_watchlist_or_404(db, watchlist_id, current_user)
+    watchlist = owned_watchlist_or_404(db, watchlist_id, current_user)
     player = db.get(Player, payload.player_id)
     if not player:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
 
-    existing = (
+    add_watchlist_player(db, watchlist=watchlist, payload=payload)
+    db.commit()
+    return serialize_watchlist(db, watchlist.id, current_user=current_user)
+
+
+@router.patch("/{watchlist_id}/players/{player_id}", response_model=WatchlistRead)
+def update_watchlist_player_endpoint(
+    watchlist_id: int,
+    player_id: int,
+    payload: WatchlistPlayerUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> WatchlistRead:
+    watchlist = owned_watchlist_or_404(db, watchlist_id, current_user)
+    row = (
         db.query(WatchlistPlayer)
-        .filter(WatchlistPlayer.watchlist_id == watchlist.id, WatchlistPlayer.player_id == payload.player_id)
+        .filter(WatchlistPlayer.watchlist_id == watchlist.id, WatchlistPlayer.player_id == player_id)
         .first()
     )
-    if not existing:
-        db.add(WatchlistPlayer(watchlist_id=watchlist.id, player_id=payload.player_id))
-        db.commit()
-    return _serialize_watchlist(db, watchlist.id)
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="watchlist player not found")
+    update_watchlist_player(db, row=row, payload=payload)
+    db.commit()
+    return serialize_watchlist(db, watchlist.id, current_user=current_user)
 
 
 @router.delete("/{watchlist_id}/players/{player_id}", response_model=WatchlistRead)
@@ -143,7 +126,7 @@ def remove_watchlist_player_endpoint(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> WatchlistRead:
-    watchlist = _owned_watchlist_or_404(db, watchlist_id, current_user)
+    watchlist = owned_watchlist_or_404(db, watchlist_id, current_user)
     row = (
         db.query(WatchlistPlayer)
         .filter(WatchlistPlayer.watchlist_id == watchlist.id, WatchlistPlayer.player_id == player_id)
@@ -152,4 +135,4 @@ def remove_watchlist_player_endpoint(
     if row:
         db.delete(row)
         db.commit()
-    return _serialize_watchlist(db, watchlist.id)
+    return serialize_watchlist(db, watchlist.id, current_user=current_user)

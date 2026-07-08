@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.api.deps import get_current_user, get_league_or_404, require_league_member
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.crud.player import create_players, get_player, list_players
 from collegefootballfantasy_api.app.crud.player_stat import get_player_stat, upsert_player_stat
@@ -18,9 +19,13 @@ from collegefootballfantasy_api.app.schemas.player import (
     PlayerCardStatRowRead,
     PlayerCreate,
     PlayerList,
+    PlayerPoolList,
+    PlayerProfileRead,
     PlayerRead,
 )
 from collegefootballfantasy_api.app.schemas.player_stat import PlayerStatResponse
+from collegefootballfantasy_api.app.services.player_profile import build_player_profile
+from collegefootballfantasy_api.app.services.player_search import list_player_pool
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
 
 router = APIRouter()
@@ -103,6 +108,12 @@ def _is_stale(updated_at: datetime | None, ttl_days: int) -> bool:
     return updated_at <= now - timedelta(days=max(1, ttl_days))
 
 
+def _optional_user_from_header(db: Session, authorization: str | None):
+    if not authorization:
+        return None
+    return get_current_user(db, authorization)
+
+
 @router.post("", response_model=list[PlayerRead], status_code=status.HTTP_201_CREATED)
 def create_players_endpoint(
     players_in: list[PlayerCreate], db: Session = Depends(get_db)
@@ -136,12 +147,84 @@ def list_players_endpoint(
     return PlayerList(data=players, total=total, limit=limit, offset=offset)
 
 
+@router.get("/pool", response_model=PlayerPoolList)
+def list_player_pool_endpoint(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    search: str | None = None,
+    position: str | None = None,
+    team: str | None = None,
+    conference: str | None = None,
+    league_id: int | None = None,
+    season: int | None = None,
+    week: int | None = None,
+    availability: str | None = None,
+    injury_status: str | None = None,
+    sort: str | None = None,
+    db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
+) -> PlayerPoolList:
+    current_user = _optional_user_from_header(db, authorization)
+    league = None
+    if league_id is not None:
+        if current_user is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing auth token")
+        league = get_league_or_404(db, league_id)
+        require_league_member(db, league.id, current_user)
+    return list_player_pool(
+        db,
+        current_user=current_user,
+        league=league,
+        season=season,
+        week=week,
+        limit=limit,
+        offset=offset,
+        search=search,
+        position=position,
+        team=team,
+        conference=conference,
+        availability=availability,
+        injury_status=injury_status,
+        sort=sort,
+    )
+
+
 @router.get("/{player_id}", response_model=PlayerRead)
 def get_player_endpoint(player_id: int, db: Session = Depends(get_db)) -> PlayerRead:
     player = get_player(db, player_id)
     if not player:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
     return player
+
+
+@router.get("/{player_id}/profile", response_model=PlayerProfileRead)
+def get_player_profile_endpoint(
+    player_id: int,
+    league_id: int | None = None,
+    season: int | None = None,
+    week: int | None = None,
+    db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
+) -> PlayerProfileRead:
+    player = get_player(db, player_id)
+    if not player:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
+    current_user = _optional_user_from_header(db, authorization)
+    league = None
+    if league_id is not None:
+        if current_user is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing auth token")
+        league = get_league_or_404(db, league_id)
+        require_league_member(db, league.id, current_user)
+    target_season = season or (league.season_year if league else 2026)
+    return build_player_profile(
+        db,
+        player=player,
+        current_user=current_user,
+        league=league,
+        season=target_season,
+        week=week,
+    )
 
 
 @router.get("/{player_id}/card", response_model=PlayerCardRead)

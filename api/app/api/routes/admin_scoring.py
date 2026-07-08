@@ -134,6 +134,13 @@ def league_week_reconciliation(
                 "fantasy_points": row.fantasy_points,
                 "breakdown_json": row.breakdown_json,
                 "source_stat_id": row.source_stat_id,
+                "stat_version": row.stat_version,
+                "source_provider": row.source_provider,
+                "source_event_id": row.source_event_id,
+                "source_updated_at": row.source_updated_at,
+                "calculation_version": row.calculation_version,
+                "previous_score": row.previous_score,
+                "correction_delta": row.correction_delta,
                 "calculated_at": row.calculated_at,
             }
             for row in player_scores

@@ -11,14 +11,18 @@ from collegefootballfantasy_api.app.schemas.notification import (
     NotificationList,
     NotificationPreferences,
     NotificationRead,
+    NotificationUnreadCount,
     PushTokenCreate,
     PushTokenRead,
 )
 from collegefootballfantasy_api.app.services.notification_service import (
     create_test_alert as create_test_alert_record,
+    dismiss_notification as dismiss_notification_record,
     get_league_preferences as get_league_preferences_data,
     get_notification_preferences,
+    get_unread_count as get_unread_count_data,
     list_user_alerts,
+    mark_notification_read as mark_notification_read_record,
     register_push_token as register_push_token_record,
     update_league_preferences as update_league_preferences_data,
     update_notification_preferences,
@@ -68,6 +72,32 @@ def list_alerts(
     current_user: User = Depends(get_current_user),
 ) -> NotificationList:
     return list_user_alerts(db=db, current_user_id=current_user.id, limit=limit)
+
+
+@router.get("/unread-count", response_model=NotificationUnreadCount)
+def get_unread_count(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> NotificationUnreadCount:
+    return get_unread_count_data(db=db, current_user_id=current_user.id)
+
+
+@router.post("/{notification_id}/read", response_model=NotificationRead)
+def mark_notification_read(
+    notification_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> NotificationRead:
+    return mark_notification_read_record(db=db, notification_id=notification_id, current_user_id=current_user.id)
+
+
+@router.post("/{notification_id}/dismiss", response_model=NotificationRead)
+def dismiss_notification(
+    notification_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> NotificationRead:
+    return dismiss_notification_record(db=db, notification_id=notification_id, current_user_id=current_user.id)
 
 
 @router.post("/alerts/test", response_model=NotificationRead)

@@ -187,12 +187,12 @@ export interface LeagueRosterPlayer {
   is_starter?: boolean;
   is_ir?: boolean;
   opponent: string | null;
-  projected_points?: number;
-  floor?: number;
-  ceiling?: number;
+  projected_points?: number | null;
+  floor?: number | null;
+  ceiling?: number | null;
   boom_prob?: number;
   bust_prob?: number;
-  weekly_projected_fantasy_points: number;
+  weekly_projected_fantasy_points?: number | null;
 }
 
 export interface LeagueRosterTabResponse {
@@ -283,11 +283,16 @@ export interface LeagueWaiverTabResponse {
   available_players: LeagueWaiverPlayer[];
   claims: LeagueWaiverClaim[];
   total_available: number;
+  message?: string | null;
 }
 
 export interface LeagueSettingsTabResponse {
   league_id: number;
   league_name: string;
+  league_status?: string | null;
+  draft_status?: string | null;
+  invite_code?: string | null;
+  invite_link?: string | null;
   league_info: Record<string, string | number | boolean | null>;
   members: LeagueMemberSettings[];
   scoring_settings: Record<string, number | string | boolean>;

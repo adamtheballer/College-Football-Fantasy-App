@@ -4,11 +4,16 @@ from sqlalchemy.orm import Session
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.security import JWTError, JWTExpiredError, verify_access_token
 from collegefootballfantasy_api.app.db.session import get_db
+from collegefootballfantasy_api.app.domain.permissions import PermissionAction
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
+from collegefootballfantasy_api.app.services.access_control import (
+    get_league_membership as get_access_league_membership,
+    require_permission,
+)
 
 
 def get_current_user(
@@ -50,15 +55,21 @@ def get_optional_current_user(
 
 
 def require_verified_user(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.email_verified_at is None:
+    if settings.email_verification_required and current_user.email_verified_at is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="email verification required")
     return current_user
 
 
-def require_admin_user(current_user: User = Depends(get_current_user)) -> User:
-    admin_emails = settings.configured_admin_emails
-    if not admin_emails or current_user.email.lower() not in admin_emails:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin access required")
+def require_admin_user(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> User:
+    require_permission(
+        db,
+        user=current_user,
+        action=PermissionAction.ADMIN_ACCESS,
+        detail="admin access required",
+    )
     return current_user
 
 
@@ -70,15 +81,21 @@ def get_league_or_404(db: Session, league_id: int) -> League:
 
 
 def get_league_membership(db: Session, league_id: int, user_id: int) -> LeagueMember | None:
-    return (
-        db.query(LeagueMember)
-        .filter(LeagueMember.league_id == league_id, LeagueMember.user_id == user_id)
-        .first()
-    )
+    return get_access_league_membership(db, league_id, user_id)
 
 
 def require_league_member(db: Session, league_id: int, current_user: User) -> LeagueMember:
+    league = get_league_or_404(db, league_id)
+    require_permission(
+        db,
+        user=current_user,
+        action=PermissionAction.READ_LEAGUE,
+        league=league,
+        detail="league membership required",
+    )
     membership = get_league_membership(db, league_id, current_user.id)
+    if not membership and current_user.email.lower() in settings.configured_admin_emails:
+        return LeagueMember(league_id=league_id, user_id=current_user.id, role="admin")
     if not membership:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="league membership required")
     return membership
@@ -86,9 +103,16 @@ def require_league_member(db: Session, league_id: int, current_user: User) -> Le
 
 def require_commissioner(db: Session, league_id: int, current_user: User) -> tuple[League, LeagueMember]:
     league = get_league_or_404(db, league_id)
-    membership = require_league_member(db, league_id, current_user)
-    if league.commissioner_user_id != current_user.id and membership.role != "commissioner":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="commissioner only")
+    require_permission(
+        db,
+        user=current_user,
+        action=PermissionAction.COMMISSIONER_OVERRIDE,
+        league=league,
+        detail="commissioner only",
+    )
+    membership = get_league_membership(db, league_id, current_user.id)
+    if not membership:
+        membership = LeagueMember(league_id=league_id, user_id=current_user.id, role="admin")
     return league, membership
 
 
@@ -107,8 +131,13 @@ def require_team_member(db: Session, team_id: int, current_user: User) -> Team:
 
 def require_team_owner(db: Session, team_id: int, current_user: User) -> Team:
     team = require_team_member(db, team_id, current_user)
-    if team.owner_user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="team ownership required")
+    require_permission(
+        db,
+        user=current_user,
+        action=PermissionAction.ROSTER_MOVE,
+        team=team,
+        detail="team ownership required",
+    )
     return team
 
 

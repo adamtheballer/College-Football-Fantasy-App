@@ -16,6 +16,9 @@ const slotLabel = (slot?: string | null) => (slot || "BENCH").toUpperCase();
 const positionLabel = (player: LeagueRosterPlayer) =>
   (player.position ?? player.player_position ?? "FLEX").toUpperCase();
 
+const isEmptyRosterSlot = (player: LeagueRosterPlayer) =>
+  player.status === "EMPTY_SLOT" || player.acquisition_type === "EMPTY_SLOT";
+
 const positionStyles: Record<
   string,
   {
@@ -96,8 +99,13 @@ const positionStyles: Record<
 const getPositionStyle = (position?: string | null) =>
   positionStyles[(position || "").toUpperCase()] ?? positionStyles.FLEX;
 
+const projectionValue = (player?: LeagueRosterPlayer | null) => {
+  const value = player?.projected_points ?? player?.weekly_projected_fantasy_points;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+};
+
 const formatPoints = (value?: number | null) =>
-  typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "-";
+  typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "N/A";
 
 const formatPercent = (value?: number | null) => {
   if (typeof value !== "number" || !Number.isFinite(value)) return "-";
@@ -125,15 +133,23 @@ const readStats = (player: LeagueRosterPlayer) => {
 };
 
 const buildOutlook = (player: LeagueRosterPlayer) => {
+  if (isEmptyRosterSlot(player)) {
+    return "This roster slot is empty. Player stats and projections will populate after a real drafted player is assigned.";
+  }
+
   const position = positionLabel(player);
   const school = player.school ?? player.player_school ?? "school not listed";
-  const projection = player.projected_points ?? player.weekly_projected_fantasy_points ?? 0;
+  const projection = projectionValue(player);
   const floor = player.floor;
   const ceiling = player.ceiling;
   const range =
     typeof floor === "number" && typeof ceiling === "number"
       ? ` Projection range: ${floor.toFixed(1)}-${ceiling.toFixed(1)}.`
       : "";
+
+  if (projection === null) {
+    return `${player.player_name} is listed as a ${position} from ${school}. Projection data is not available until this league has real drafted players and player projections loaded.`;
+  }
 
   return `${player.player_name} is listed as a ${position} from ${school} with a Week 1 projection of ${projection.toFixed(
     1
@@ -163,13 +179,13 @@ export function RosterSlotTable({
   const sorted = [...players].sort((left, right) => {
     const slotDelta = slotRank(left.roster_slot || left.slot) - slotRank(right.roster_slot || right.slot);
     if (slotDelta !== 0) return slotDelta;
+    if (isEmptyRosterSlot(left) || isEmptyRosterSlot(right)) return 0;
     return left.player_name.localeCompare(right.player_name);
   });
 
   const selectedPosition = selectedPlayer ? positionLabel(selectedPlayer) : null;
   const selectedStyle = getPositionStyle(selectedPosition);
-  const selectedProjection =
-    selectedPlayer?.projected_points ?? selectedPlayer?.weekly_projected_fantasy_points ?? 0;
+  const selectedProjection = projectionValue(selectedPlayer);
   const selectedNews =
     selectedPlayer
       ? readText(selectedPlayer, ["news", "player_news", "latest_news", "headline"])
@@ -229,16 +245,21 @@ export function RosterSlotTable({
             <span className="text-right">Proj</span>
           </div>
           {sorted.map((player) => {
+            const isEmptySlot = isEmptyRosterSlot(player);
             const position = positionLabel(player);
             const style = getPositionStyle(position);
-            const projection = player.projected_points ?? player.weekly_projected_fantasy_points ?? 0;
+            const projection = projectionValue(player);
             return (
               <button
                 key={`${player.team_id ?? player.fantasy_team_id}-${player.player_id}-${player.slot ?? player.roster_slot}`}
                 type="button"
-                onClick={() => setSelectedPlayer(player)}
+                onClick={() => {
+                  if (!isEmptySlot) setSelectedPlayer(player);
+                }}
+                aria-disabled={isEmptySlot}
                 className={cn(
                   "grid w-full gap-3 px-5 py-4 text-left text-sm text-slate-200 transition focus:outline-none focus-visible:bg-sky-300/[0.06] focus-visible:ring-2 focus-visible:ring-sky-300/50 md:items-center",
+                  isEmptySlot ? "cursor-default" : "",
                   tableColumns,
                   style.row
                 )}
@@ -255,23 +276,25 @@ export function RosterSlotTable({
                   <span className={cn("h-2.5 w-2.5 rounded-full", style.dot)} />
                 </span>
                 <span className="flex flex-col gap-1">
-                  <span className="font-black text-slate-50">{player.player_name}</span>
-                  <span
-                    className={cn(
-                      "inline-flex w-fit shrink-0 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em]",
-                      style.pill
-                    )}
-                  >
-                    {position}
-                  </span>
+                  <span className="font-black text-slate-50">{isEmptySlot ? "" : player.player_name}</span>
+                  {isEmptySlot ? null : (
+                    <span
+                      className={cn(
+                        "inline-flex w-fit shrink-0 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em]",
+                        style.pill
+                      )}
+                    >
+                      {position}
+                    </span>
+                  )}
                 </span>
-                <span className="text-slate-400">{player.school ?? player.player_school ?? "-"}</span>
+                <span className="text-slate-400">{isEmptySlot ? "" : player.school ?? player.player_school ?? "-"}</span>
                 {showPositionColumn ? (
-                  <span className={cn("font-black", style.text)}>{position}</span>
+                  <span className={cn("font-black", style.text)}>{isEmptySlot ? "" : position}</span>
                 ) : null}
-                <span className="text-slate-400">{player.opponent ?? "TBD"}</span>
-                <span className={cn("text-right font-black", style.text)}>
-                  {projection.toFixed(1)}
+                <span className="text-slate-400">{isEmptySlot ? "" : player.opponent ?? "TBD"}</span>
+                <span className={cn("text-right font-black", isEmptySlot || projection === null ? "text-slate-500" : style.text)}>
+                  {isEmptySlot ? "" : formatPoints(projection)}
                 </span>
               </button>
             );

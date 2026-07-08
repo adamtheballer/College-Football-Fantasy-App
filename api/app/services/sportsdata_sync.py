@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import and_, case, select
@@ -11,8 +11,18 @@ from collegefootballfantasy_api.app.integrations.rotowire import RotowireClient
 from collegefootballfantasy_api.app.integrations.sportsdata import SportsDataClient
 from collegefootballfantasy_api.app.models.cfb_standing_snapshot import CFBStandingSnapshot
 from collegefootballfantasy_api.app.models.game import Game
-from collegefootballfantasy_api.app.models.injury import Injury
+from collegefootballfantasy_api.app.models.injury import Injury, InjuryHistory
+from collegefootballfantasy_api.app.models.injury_impact import InjuryImpact
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+from collegefootballfantasy_api.app.services.injury_impact import injury_projection_delta
+from collegefootballfantasy_api.app.services.injury_normalization import (
+    display_injury_status,
+    injury_is_active,
+    normalize_injury_status,
+    parse_source_datetime,
+)
+from collegefootballfantasy_api.app.services.injury_sync import notify_injury_change
 from collegefootballfantasy_api.app.services.power4 import (
     conference_for_school,
     list_power4_teams,
@@ -44,27 +54,7 @@ def _pick_int(row: dict[str, Any], *keys: str) -> int | None:
 
 
 def _normalize_status(raw_status: str | None) -> str:
-    status = (raw_status or "FULL").upper()
-    if any(
-        token in status
-        for token in (
-            "OUT FOR SEASON",
-            "SEASON ENDING",
-            "SEASON-ENDING",
-            "SEASON END",
-            "LOST FOR THE SEASON",
-        )
-    ):
-        return "OUT_FOR_SEASON"
-    if "OUT" in status:
-        return "OUT"
-    if "DOUBTFUL" in status:
-        return "DOUBTFUL"
-    if "QUESTION" in status or "GTD" in status or "GAME-TIME" in status:
-        return "QUESTIONABLE"
-    if "PROBABLE" in status:
-        return "PROBABLE"
-    return "FULL"
+    return display_injury_status(raw_status)
 
 
 def _parse_datetime(value: str | None) -> datetime | None:
@@ -242,8 +232,8 @@ def _normalize_injury_rows_for_ingest(
     rows: list[dict[str, Any]],
     *,
     source: str,
-) -> list[dict[str, str | None]]:
-    normalized: list[dict[str, str | None]] = []
+) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
     for row in rows:
         player_name = _pick_str(row, "Player", "Name", "PlayerName", "FullName")
         team_raw = _pick_str(row, "TeamName", "School", "Team", "College")
@@ -251,14 +241,18 @@ def _normalize_injury_rows_for_ingest(
         if not player_name or not team_name:
             continue
 
-        status = _normalize_status(_pick_str(row, "Status", "InjuryStatus", "GameStatus"))
+        raw_status = _pick_str(row, "Status", "InjuryStatus", "GameStatus")
+        status = _normalize_status(raw_status)
+        body_part = _pick_str(row, "BodyPart", "InjuryBodyPart", "Injury")
         normalized.append(
             {
                 "player_name": player_name,
                 "team_name": team_name,
                 "position": (_pick_str(row, "Position", "Pos") or "UNK").upper(),
                 "status": status,
-                "injury": _pick_str(row, "Injury", "BodyPart", "InjuryBodyPart", "Title"),
+                "normalized_status": normalize_injury_status(raw_status),
+                "injury": _pick_str(row, "Injury", "Title", "BodyPart", "InjuryBodyPart"),
+                "body_part": body_part,
                 "return_timeline": _pick_str(
                     row,
                     "ExpectedReturn",
@@ -274,10 +268,90 @@ def _normalize_injury_rows_for_ingest(
                 ),
                 "notes": _pick_str(row, "Notes", "Comment", "Headline"),
                 "external_id": _pick_str(row, "PlayerID", "PlayerId"),
+                "source_updated_at": parse_source_datetime(
+                    _pick_str(row, "Updated", "UpdatedAt", "LastUpdated", "DateTime", "Timestamp")
+                ),
                 "source": source,
             }
         )
     return normalized
+
+
+def _upsert_injury_history(
+    db: Session,
+    *,
+    injury: Injury,
+    source_updated_at: datetime | None,
+) -> None:
+    existing = (
+        db.query(InjuryHistory)
+        .filter(
+            InjuryHistory.player_id == injury.player_id,
+            InjuryHistory.season == injury.season,
+            InjuryHistory.week == injury.week,
+            InjuryHistory.status == injury.status,
+            InjuryHistory.injury == injury.injury,
+            InjuryHistory.source == injury.source,
+        )
+        .first()
+    )
+    if existing:
+        existing.normalized_status = injury.normalized_status
+        existing.body_part = injury.body_part
+        existing.return_timeline = injury.return_timeline
+        existing.practice_level = injury.practice_level
+        existing.notes = injury.notes
+        existing.source_updated_at = source_updated_at or existing.source_updated_at
+        db.add(existing)
+        return
+    db.add(
+        InjuryHistory(
+            player_id=injury.player_id,
+            season=injury.season,
+            week=injury.week,
+            status=injury.status,
+            normalized_status=injury.normalized_status,
+            injury=injury.injury,
+            body_part=injury.body_part,
+            return_timeline=injury.return_timeline,
+            practice_level=injury.practice_level,
+            notes=injury.notes,
+            source=injury.source,
+            source_updated_at=source_updated_at,
+        )
+    )
+
+
+def _upsert_injury_impact(
+    db: Session,
+    *,
+    injury: Injury,
+    projection_points: float | None,
+) -> None:
+    delta, multiplier, confidence, reason = injury_projection_delta(
+        projection_points,
+        injury.normalized_status,
+    )
+    impact = (
+        db.query(InjuryImpact)
+        .filter(
+            InjuryImpact.player_id == injury.player_id,
+            InjuryImpact.season == injury.season,
+            InjuryImpact.week == injury.week,
+        )
+        .first()
+    )
+    if not impact:
+        impact = InjuryImpact(
+            player_id=injury.player_id,
+            season=injury.season,
+            week=injury.week,
+        )
+    impact.delta_fpts = delta
+    impact.multiplier = multiplier
+    impact.confidence = confidence
+    impact.reason = reason
+    db.add(impact)
 
 
 def _upsert_power4_injuries(
@@ -286,7 +360,7 @@ def _upsert_power4_injuries(
     season: int,
     week: int,
     conference: str | None,
-    rows: list[dict[str, str | None]],
+    rows: list[dict[str, Any]],
 ) -> dict[str, int]:
     conference_key = conference.upper().replace(" ", "") if conference else None
 
@@ -307,9 +381,18 @@ def _upsert_power4_injuries(
         existing_by_player_id[player.id] = injury
         scoped_existing_player_ids.add(player.id)
 
+    projection_by_player = {
+        projection.player_id: projection
+        for projection in db.query(WeeklyProjection)
+        .filter(WeeklyProjection.season == season, WeeklyProjection.week == week)
+        .all()
+    }
     seen_player_ids: set[int] = set()
     created = 0
     updated = 0
+    cleared = 0
+    notifications = 0
+    now = datetime.now(timezone.utc)
 
     for row in rows:
         conference_name = conference_for_school(row["team_name"] or "")
@@ -350,43 +433,107 @@ def _upsert_power4_injuries(
             db.add(player)
 
         seen_player_ids.add(player.id)
+        normalized_status = row.get("normalized_status") or normalize_injury_status(row.get("status"))
+        source_updated_at = row.get("source_updated_at")
+        projection_points = (
+            projection_by_player[player.id].fantasy_points
+            if player.id in projection_by_player
+            else player.sheet_projected_season_points
+        )
         existing = existing_by_player_id.get(player.id)
         if existing:
+            old_status = existing.status
             existing.status = row["status"] or existing.status
+            existing.normalized_status = normalized_status
             existing.injury = row["injury"]
+            existing.body_part = row.get("body_part")
             existing.return_timeline = row["return_timeline"]
             existing.practice_level = row["practice_level"]
             existing.notes = row["notes"]
-            existing.is_game_time_decision = "QUESTIONABLE" == (row["status"] or "").upper()
+            existing.source = row.get("source") or existing.source or "unknown"
+            existing.source_updated_at = source_updated_at or existing.source_updated_at
+            existing.first_seen_at = existing.first_seen_at or now
+            existing.last_seen_at = now
+            existing.cleared_at = None if injury_is_active(normalized_status) else now
+            existing.is_game_time_decision = normalized_status == "questionable"
             db.add(existing)
+            _upsert_injury_history(db, injury=existing, source_updated_at=source_updated_at)
+            _upsert_injury_impact(db, injury=existing, projection_points=projection_points)
+            notifications += notify_injury_change(
+                db,
+                player_id=player.id,
+                player_name=player.name,
+                old_status=old_status,
+                new_status=existing.status,
+                injury_id=existing.id,
+            )
             updated += 1
             continue
 
-        db.add(
-            Injury(
-                player_id=player.id,
-                season=season,
-                week=week,
-                status=row["status"] or "FULL",
-                injury=row["injury"],
-                return_timeline=row["return_timeline"],
-                practice_level=row["practice_level"],
-                is_game_time_decision="QUESTIONABLE" == (row["status"] or "").upper(),
-                is_returning=False,
-                notes=row["notes"],
-            )
+        injury = Injury(
+            player_id=player.id,
+            season=season,
+            week=week,
+            status=row["status"] or "HEALTHY",
+            normalized_status=normalized_status,
+            injury=row["injury"],
+            body_part=row.get("body_part"),
+            return_timeline=row["return_timeline"],
+            practice_level=row["practice_level"],
+            is_game_time_decision=normalized_status == "questionable",
+            is_returning=False,
+            notes=row["notes"],
+            source=row.get("source") or "unknown",
+            source_updated_at=source_updated_at,
+            first_seen_at=now,
+            last_seen_at=now,
+            cleared_at=None if injury_is_active(normalized_status) else now,
+        )
+        db.add(injury)
+        db.flush()
+        _upsert_injury_history(db, injury=injury, source_updated_at=source_updated_at)
+        _upsert_injury_impact(db, injury=injury, projection_points=projection_points)
+        notifications += notify_injury_change(
+            db,
+            player_id=player.id,
+            player_name=player.name,
+            old_status=None,
+            new_status=injury.status,
+            injury_id=injury.id,
         )
         created += 1
 
-    removed = 0
     for player_id in scoped_existing_player_ids - seen_player_ids:
         row = existing_by_player_id.get(player_id)
         if row:
-            db.delete(row)
-            removed += 1
+            old_status = row.status
+            row.status = "HEALTHY"
+            row.normalized_status = "healthy"
+            row.last_seen_at = now
+            row.cleared_at = row.cleared_at or now
+            db.add(row)
+            _upsert_injury_history(db, injury=row, source_updated_at=row.source_updated_at)
+            _upsert_injury_impact(
+                db,
+                injury=row,
+                projection_points=(
+                    projection_by_player[player_id].fantasy_points
+                    if player_id in projection_by_player
+                    else None
+                ),
+            )
+            notifications += notify_injury_change(
+                db,
+                player_id=player_id,
+                player_name="Player",
+                old_status=old_status,
+                new_status=row.status,
+                injury_id=row.id,
+            )
+            cleared += 1
 
     db.flush()
-    return {"created": created, "updated": updated, "removed": removed}
+    return {"created": created, "updated": updated, "cleared": cleared, "notifications": notifications}
 
 
 def sync_power4_injuries(
@@ -399,7 +546,7 @@ def sync_power4_injuries(
     source = "sportsdata"
     provider_error: str | None = None
 
-    normalized_rows: list[dict[str, str | None]] = []
+    normalized_rows: list[dict[str, Any]] = []
     if settings.sportsdata_enabled:
         try:
             provider_rows = SportsDataClient().get_injuries(season=season)

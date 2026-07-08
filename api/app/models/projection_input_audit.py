@@ -1,4 +1,6 @@
-from sqlalchemy import ForeignKey, Index, Integer, JSON, String, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, JSON, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -18,3 +20,6 @@ class ProjectionInputAudit(TimestampMixin, Base):
     week: Mapped[int] = mapped_column(Integer)
     model_version: Mapped[str] = mapped_column(String(50), default="v1")
     inputs: Mapped[dict] = mapped_column(JSON)
+    input_snapshot_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_freshness: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -6,18 +6,23 @@ from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.mock_draft import (
     MockDraftCreate,
+    MockDraftExport,
     MockDraftList,
     MockDraftPickCreate,
+    MockDraftQueueUpdate,
     MockDraftRead,
 )
 from collegefootballfantasy_api.app.services.mock_draft_service import (
     MockDraftError,
     auto_pick_mock_draft,
     create_mock_draft,
+    export_mock_draft_results,
     get_mock_draft,
     list_mock_drafts,
     make_mock_pick,
     reset_mock_draft,
+    resume_mock_draft,
+    update_mock_draft_queue,
 )
 
 router = APIRouter()
@@ -90,5 +95,42 @@ def reset_my_mock_draft(
 ) -> MockDraftRead:
     try:
         return reset_mock_draft(db, mock_draft_id, current_user.id)
+    except MockDraftError as exc:
+        raise _mock_draft_http_error(exc) from exc
+
+
+@router.post("/{mock_draft_id}/resume", response_model=MockDraftRead)
+def resume_my_mock_draft(
+    mock_draft_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> MockDraftRead:
+    try:
+        return resume_mock_draft(db, mock_draft_id, current_user.id)
+    except MockDraftError as exc:
+        raise _mock_draft_http_error(exc) from exc
+
+
+@router.put("/{mock_draft_id}/queue", response_model=MockDraftRead)
+def update_my_mock_draft_queue(
+    mock_draft_id: int,
+    payload: MockDraftQueueUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> MockDraftRead:
+    try:
+        return update_mock_draft_queue(db, mock_draft_id, current_user.id, payload.player_ids)
+    except MockDraftError as exc:
+        raise _mock_draft_http_error(exc) from exc
+
+
+@router.get("/{mock_draft_id}/export", response_model=MockDraftExport)
+def export_my_mock_draft(
+    mock_draft_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> MockDraftExport:
+    try:
+        return export_mock_draft_results(db, mock_draft_id, current_user.id)
     except MockDraftError as exc:
         raise _mock_draft_http_error(exc) from exc

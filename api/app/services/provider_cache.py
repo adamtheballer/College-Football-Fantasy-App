@@ -9,6 +9,10 @@ from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.provider_sync_state import ProviderSyncState
+from collegefootballfantasy_api.app.services.provider_sync_jobs import (
+    finish_provider_sync_job,
+    start_provider_sync_job,
+)
 
 
 def scope_dict_to_key(scope: dict[str, object] | None = None) -> str:
@@ -95,11 +99,33 @@ def ensure_feed_fresh(
         return False, state
 
     mark_sync_attempt(db, state=state, status="syncing")
+    job = start_provider_sync_job(
+        db,
+        provider=provider,
+        feed=feed,
+        season=int(scope["season"]) if scope and isinstance(scope.get("season"), int) else None,
+        week=int(scope["week"]) if scope and isinstance(scope.get("week"), int) else None,
+        scope=scope_key,
+    )
 
     try:
-        refresh_fn()
+        result = refresh_fn()
         mark_sync_attempt(db, state=state, status="ready", ttl_days=ttl_days)
+        rows_seen = int(result.get("rows_seen", result.get("total", 0)) or 0) if isinstance(result, dict) else 0
+        rows_inserted = int(result.get("inserted", result.get("created", 0)) or 0) if isinstance(result, dict) else 0
+        rows_updated = int(result.get("updated", result.get("upserted", 0)) or 0) if isinstance(result, dict) else 0
+        rows_rejected = int(result.get("rows_rejected", result.get("skipped", 0)) or 0) if isinstance(result, dict) else 0
+        finish_provider_sync_job(
+            db,
+            job,
+            status="success",
+            rows_seen=rows_seen,
+            rows_inserted=rows_inserted,
+            rows_updated=rows_updated,
+            rows_rejected=rows_rejected,
+        )
         return True, state
     except Exception as exc:
         mark_sync_attempt(db, state=state, status="failed", error_message=str(exc))
+        finish_provider_sync_job(db, job, status="failed", error_summary=str(exc))
         raise

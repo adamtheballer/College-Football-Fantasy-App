@@ -12,6 +12,7 @@ import {
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageEmptyState, PageErrorState, PageLoadingState } from "@/components/PageState";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagues } from "@/hooks/use-leagues";
@@ -137,7 +138,7 @@ export default function Leagues() {
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
   const { setActiveLeagueId } = useActiveLeagueId();
-  const { data: leagueRows = [], isLoading, isError } = useLeagues(20, isLoggedIn);
+  const { data: leagueRows = [], isLoading, isError, refetch } = useLeagues(20, isLoggedIn);
   const displayLeagues =
     !isLoading && isLoggedIn && !leagueRows.some((league) => league.id === DEMO_LEAGUE_ID)
       ? [...leagueRows, DEMO_LEAGUE_DETAIL]
@@ -178,20 +179,13 @@ export default function Leagues() {
 
       {isLoggedIn ? (
         <div className="space-y-8">
-          {isLoading && (
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
-              Loading leagues...
-            </div>
-          )}
+          {isLoading && <PageLoadingState title="Loading leagues" description="Fetching your leagues and draft links." />}
           {isError && (
-            <Card className="bg-card/40 backdrop-blur-md border-border/40 rounded-[3rem] p-12 text-center">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-red-300">
-                Unable to load leagues. Confirm the backend is running and your session is valid.
-              </p>
-              <p className="mt-3 text-xs font-semibold text-sky-200">
-                Showing the local 10-team placeholder league below so the roster and matchup flow can still be reviewed.
-              </p>
-            </Card>
+            <PageErrorState
+              title="Unable to load leagues"
+              description="Confirm the backend is running and your session is valid. The local placeholder league is still shown for review."
+              onAction={() => void refetch()}
+            />
           )}
           {displayLeagues.map((league) => (
             <LeagueCard
@@ -223,13 +217,13 @@ export default function Leagues() {
             />
           ))}
           {!isLoading && leagueRows.length === 0 && (
-            <Card className="bg-card/40 backdrop-blur-md border-border/40 rounded-[3rem] p-12 space-y-8">
-              <div className="space-y-3 text-center">
-                <h3 className="text-2xl font-black uppercase text-foreground">Placeholder league loaded</h3>
-                <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">
-                  Open Alpha Demo League to inspect the 10-manager Roster, Matchup, Available Players, and Settings flow.
-                </p>
-              </div>
+            <Card className="bg-card/40 backdrop-blur-md border-border/40 rounded-[3rem] p-6 sm:p-12 space-y-8">
+              <PageEmptyState
+                eyebrow="Demo Mode"
+                title="Placeholder league loaded"
+                description="Open Alpha Demo League to inspect the 10-manager Roster, Matchup, Available Players, and Settings flow."
+                className="border-0 bg-transparent p-0 shadow-none"
+              />
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 space-y-4">

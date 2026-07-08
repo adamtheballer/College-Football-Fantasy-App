@@ -1,0 +1,21 @@
+{
+  "position": "QB",
+  "raw_stats": {
+    "PassingYards": 275,
+    "PassingTouchdowns": 3,
+    "Interceptions": 1
+  },
+  "scoring_rules": {},
+  "expected_normalized": {
+    "pass_yards": 275.0,
+    "pass_tds": 3.0,
+    "passing_interceptions": 1.0
+  },
+  "expected_breakdown": {
+    "pass_yards": { "stat": 275.0, "multiplier": 0.04, "points": 11.0 },
+    "pass_tds": { "stat": 3.0, "multiplier": 4.0, "points": 12.0 },
+    "passing_interceptions": { "stat": 1.0, "multiplier": -2.0, "points": -2.0 },
+    "total": 21.0
+  },
+  "expected_total": 21.0
+}

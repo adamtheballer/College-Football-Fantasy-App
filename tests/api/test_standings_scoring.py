@@ -6,15 +6,15 @@ from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.user import User
-from collegefootballfantasy_api.app.services.scoring_service import recalculate_league_week_scores
+from collegefootballfantasy_api.app.services.scoring_service import finalize_league_week_scores
+from collegefootballfantasy_api.app.services.standings_recalc import recalculate_standings_for_week
 from tests.api.scoring_helpers import create_scoring_fixture
 
 
 def test_standings_update_from_final_matchups(client, db_session):
-    league, home, away, _players, matchup = create_scoring_fixture(db_session)
-    matchup.status = "final"
+    league, home, away, _players, _matchup = create_scoring_fixture(db_session)
 
-    summary = recalculate_league_week_scores(db_session, league.id, 2026, 1)
+    summary = finalize_league_week_scores(db_session, league.id, 2026, 1)
     db_session.commit()
 
     assert summary.standings_updated == 2
@@ -24,6 +24,24 @@ def test_standings_update_from_final_matchups(client, db_session):
     assert (away_standing.wins, away_standing.losses, away_standing.ties) == (0, 1, 0)
     assert home_standing.points_for == 56.0
     assert away_standing.points_against == 56.0
+
+
+def test_standings_handle_ties_explicitly(client, db_session):
+    league, home, away, _players, matchup = create_scoring_fixture(db_session)
+    matchup.status = "final"
+    matchup.home_score = 21.5
+    matchup.away_score = 21.5
+
+    updated = recalculate_standings_for_week(db_session, league.id, 2026, 1)
+    db_session.commit()
+
+    assert updated == 2
+    home_standing = db_session.query(Standing).filter_by(league_id=league.id, team_id=home.id, season=2026, week=1).one()
+    away_standing = db_session.query(Standing).filter_by(league_id=league.id, team_id=away.id, season=2026, week=1).one()
+    assert (home_standing.wins, home_standing.losses, home_standing.ties) == (0, 0, 1)
+    assert (away_standing.wins, away_standing.losses, away_standing.ties) == (0, 0, 1)
+    assert home_standing.points_for == 21.5
+    assert away_standing.points_against == 21.5
 
 
 def auth_headers(token: str) -> dict[str, str]:

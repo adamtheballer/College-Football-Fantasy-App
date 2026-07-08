@@ -30,6 +30,13 @@ class DraftRoomRead(BaseModel):
     draft_id: int
     status: str
     pick_timer_seconds: int
+    clock_seconds: int
+    pick_started_at: datetime | None = None
+    pick_expires_at: datetime | None = None
+    seconds_remaining: int | None = None
+    paused_at: datetime | None = None
+    pause_accumulated_seconds: int = 0
+    server_time: datetime | None = None
     roster_slots: dict[str, int]
     teams: list[DraftRoomTeamRead]
     picks: list[DraftRoomPickRead]
@@ -44,3 +51,7 @@ class DraftRoomRead(BaseModel):
 
 class DraftPickCreate(BaseModel):
     player_id: int
+
+
+class DraftClockUpdate(BaseModel):
+    clock_seconds: int

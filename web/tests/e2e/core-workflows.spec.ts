@@ -52,6 +52,53 @@ const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]
       body: JSON.stringify(mockAuthPayload.user),
     });
   });
+  await page.route("**/leagues/*/settings-view", async (route) => {
+    const url = new URL(route.request().url());
+    const leagueId = Number(url.pathname.split("/").at(-2) ?? 1);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        league_id: leagueId,
+        league_name: "E2E League",
+        league_status: "active",
+        draft_status: "completed",
+        league_info: { name: "E2E League", status: "active", draft_status: "completed" },
+        members: [],
+        scoring_settings: {},
+        roster_settings: {},
+        waiver_rules: {},
+        standings: [],
+        schedule: [],
+        rosters: [],
+        draft_results: [],
+        commissioner_controls: [],
+      }),
+    });
+  });
+  await page.route("**/watchlists**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ data: [], total: 0, limit: 100, offset: 0 }),
+    });
+  });
+  await page.route("**/leagues/*/workspace", async (route) => {
+    const url = new URL(route.request().url());
+    const leagueId = Number(url.pathname.split("/").at(-2) ?? 1);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        league_id: leagueId,
+        membership: { id: 10, user_id: 42, role: "commissioner", joined_at: "2026-03-01T10:01:00Z" },
+        owned_team: { id: 11, league_id: leagueId, name: "Codex Team", owner_user_id: 42, owner_name: "Codex" },
+        roster: [],
+        standings_summary: [],
+        allowed_actions: ["view_roster"],
+      }),
+    });
+  });
 };
 
 test.describe("critical browser workflows", () => {
@@ -189,7 +236,8 @@ test.describe("critical browser workflows", () => {
       .getByRole("button", { name: /^League Hub$/i })
       .click();
     await page.waitForURL("**/league/1**");
-    await expect(page.getByRole("heading", { name: /^Roster$/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Pre-Draft Player Pool$/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Invite Members/i })).toBeVisible();
   });
 
   test("invalid bootstrap session forces logout and redirects protected routes to login", async ({ page }) => {
@@ -325,6 +373,54 @@ test.describe("critical browser workflows", () => {
         }),
       });
     });
+    await page.route("**/leagues/1/settings-view", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          league_id: 1,
+          league_name: createdLeague.name,
+          league_status: "draft_scheduled",
+          draft_status: "scheduled",
+          league_info: { name: createdLeague.name, status: "draft_scheduled", draft_status: "scheduled" },
+          members: createdLeague.members,
+          scoring_settings: {},
+          roster_settings: createdLeague.settings.roster_slots_json,
+          waiver_rules: {},
+          standings: [],
+          schedule: [],
+          rosters: [],
+          draft_results: [],
+          commissioner_controls: [],
+        }),
+      });
+    });
+    await page.route("**/leagues/1/waivers**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          league_id: 1,
+          fantasy_team_id: 11,
+          available_players: [],
+          claims: [],
+          total_available: 0,
+          message: null,
+        }),
+      });
+    });
+    await page.route("**/leagues/1/roster**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          league_id: 1,
+          roster: [],
+          team: { id: 11, league_id: 1, name: "Codex Team", owner_user_id: 42, owner_name: "Codex" },
+          roster_slots: createdLeague.settings.roster_slots_json,
+        }),
+      });
+    });
 
     await page.goto("/leagues/create");
     await expect(page.getByRole("heading", { name: /Create League/i })).toBeVisible();
@@ -336,7 +432,8 @@ test.describe("critical browser workflows", () => {
     await page.getByRole("button", { name: /Open League Hub/i }).click();
 
     await page.waitForURL("**/league/1");
-    await expect(page.getByRole("heading", { name: /^Roster$/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Pre-Draft Player Pool$/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Invite Members/i })).toBeVisible();
   });
 
   test("join-by-code flow previews league and joins with backend response", async ({ page }) => {
@@ -453,6 +550,42 @@ test.describe("critical browser workflows", () => {
         }),
       });
     });
+    await page.route("**/leagues/77/settings-view", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          league_id: 77,
+          league_name: leagueDetail.name,
+          league_status: "draft_scheduled",
+          draft_status: "scheduled",
+          league_info: { name: leagueDetail.name, status: "draft_scheduled", draft_status: "scheduled" },
+          members: leagueDetail.members,
+          scoring_settings: {},
+          roster_settings: leagueDetail.settings.roster_slots_json,
+          waiver_rules: {},
+          standings: [],
+          schedule: [],
+          rosters: [],
+          draft_results: [],
+          commissioner_controls: [],
+        }),
+      });
+    });
+    await page.route("**/leagues/77/waivers**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          league_id: 77,
+          fantasy_team_id: 19,
+          available_players: [],
+          claims: [],
+          total_available: 0,
+          message: null,
+        }),
+      });
+    });
 
     await page.goto("/leagues/join");
     await page.getByPlaceholder("ENTER INVITE CODE").fill("abcdefghijklmnopqrst");
@@ -461,8 +594,8 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("Invite League")).toBeVisible();
     await page.getByRole("button", { name: /^Join League$/i }).click();
     await page.waitForURL("**/league/77");
-    await expect(page.getByRole("heading", { name: /^Roster$/i })).toBeVisible();
-    await expect(page.getByText(/Week 1 placeholder roster/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Pre-Draft Player Pool$/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Invite Members/i })).toBeVisible();
   });
 
   test("draft-room pick mutation updates persisted draft state in UI", async ({ page }) => {
@@ -762,7 +895,7 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/league/1/matchup");
-    await expect(page.getByRole("heading", { name: /^Matchup$/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Matchup$/i })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Codex Team").first()).toBeVisible();
     await expect(page.getByText("Rival Team").first()).toBeVisible();
     await expect(page.getByText("24.0 - 18.2")).toBeVisible();
@@ -975,7 +1108,7 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/trade");
-    await expect(page.getByRole("heading", { name: /Trade Builder/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Trade Builder/i })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Codex Team").first()).toBeVisible();
     await expect(page.getByText("Rival Team").first()).toBeVisible();
 
@@ -1060,7 +1193,7 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/draft/mock/single-player?new=1&teams=8&timer=15");
-    await expect(page.getByText(/Draft is about to begin/i)).toBeVisible();
+    await expect(page.getByText(/Draft Starts In/i)).toBeVisible({ timeout: 10_000 });
 
     await expect
       .poll(

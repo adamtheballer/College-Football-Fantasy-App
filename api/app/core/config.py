@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     jwt_access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 14
     refresh_cookie_name: str = "cfb_refresh_token"
+    csrf_cookie_name: str = "cfb_csrf_token"
+    csrf_header_name: str = "X-CSRF-Token"
     refresh_cookie_secure: bool = False
     refresh_cookie_samesite: str = "lax"
     refresh_cookie_domain: str | None = None
@@ -68,6 +70,7 @@ class Settings(BaseSettings):
     auth_refresh_rate_limit: int = 30
     auth_password_reset_rate_limit: int = 5
     auth_resend_verification_rate_limit: int = 5
+    auth_require_email_verification: bool = False
     email_delivery_mode: str = "console"
     smtp_host: str | None = None
     smtp_port: int = 587
@@ -101,6 +104,10 @@ class Settings(BaseSettings):
     @property
     def configured_admin_emails(self) -> set[str]:
         return {email.strip().lower() for email in self.admin_emails.split(",") if email.strip()}
+
+    @property
+    def email_verification_required(self) -> bool:
+        return self.is_production or self.auth_require_email_verification
 
     @staticmethod
     def _is_local_origin(origin: str) -> bool:

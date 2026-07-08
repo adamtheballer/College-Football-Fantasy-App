@@ -52,6 +52,7 @@ class AddDropRequest(BaseModel):
     add_player_id: int
     drop_roster_entry_id: int
     reason: str | None = None
+    idempotency_key: str | None = None
 
 
 class AddDropResponse(BaseModel):

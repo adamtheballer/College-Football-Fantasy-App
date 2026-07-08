@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.models.league import League
@@ -21,16 +23,81 @@ from collegefootballfantasy_api.app.schemas.notification import (
     NotificationList,
     NotificationPreferences,
     NotificationRead,
+    NotificationUnreadCount,
     PushTokenCreate,
     PushTokenRead,
 )
 
 DEFAULT_DELIVERY_CHANNELS = ("push", "email")
 TERMINAL_ATTEMPT_STATUSES = {"delivered", "failed", "canceled", "skipped"}
+NOTIFICATION_DELIVERY_STATES = {"pending", "sent", "failed", "read", "dismissed"}
+NOTIFICATION_TYPE_CATEGORIES = {
+    "draft_on_clock": "draft",
+    "draft_pick_made": "draft",
+    "draft_1h": "draft",
+    "draft_start": "draft",
+    "trade_proposed": "trade",
+    "trade_accepted": "trade",
+    "trade_vetoed": "trade",
+    "trade_processed": "trade",
+    "waiver_processed": "waiver",
+    "waiver_failed": "waiver",
+    "lineup_lock_warning": "lineup",
+    "player_injury": "injury",
+    "score_close_game": "score",
+    "stat_correction": "scoring",
+    "league_invite": "league",
+    "commissioner_action": "commissioner",
+    "injury": "injury",
+    "touchdown": "score",
+    "big_play": "score",
+    "usage": "usage",
+    "waiver": "waiver",
+    "projection": "projection",
+    "trade": "trade",
+    "trade_sent": "trade",
+    "trade_accepted": "trade",
+    "trade_rejected": "trade",
+    "trade_proposed": "trade",
+    "trade_cancelled": "trade",
+    "trade_vetoed": "trade",
+    "trade_processed": "trade",
+}
 
 
 def legacy_user_key(user_id: int) -> str:
     return str(user_id)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def normalize_notification_type(alert_type: str) -> str:
+    return alert_type.strip().lower()
+
+
+def notification_category(alert_type: str) -> str:
+    normalized = normalize_notification_type(alert_type)
+    return NOTIFICATION_TYPE_CATEGORIES.get(normalized, normalized.split("_", 1)[0] or "general")
+
+
+def _serialize_log(row: NotificationLog) -> NotificationRead:
+    return NotificationRead(
+        id=row.id,
+        alert_type=row.alert_type,
+        title=row.title,
+        body=row.body,
+        payload=row.payload,
+        league_id=row.league_id,
+        delivery_state=row.delivery_state,
+        source_entity_type=row.source_entity_type,
+        source_entity_id=row.source_entity_id,
+        deep_link=row.deep_link,
+        sent_at=row.sent_at,
+        read_at=row.read_at,
+        dismissed_at=row.dismissed_at,
+    )
 
 
 def register_push_token(
@@ -68,6 +135,7 @@ def get_notification_preferences(db: Session, current_user_id: int) -> Notificat
     return NotificationPreferences(
         push_enabled=prefs.push_enabled,
         email_enabled=prefs.email_enabled,
+        in_app_enabled=prefs.in_app_enabled,
         draft_alerts=prefs.draft_alerts,
         injury_alerts=prefs.injury_alerts,
         touchdown_alerts=prefs.touchdown_alerts,
@@ -75,6 +143,7 @@ def get_notification_preferences(db: Session, current_user_id: int) -> Notificat
         waiver_alerts=prefs.waiver_alerts,
         projection_alerts=prefs.projection_alerts,
         lineup_reminders=prefs.lineup_reminders,
+        category_toggles=prefs.category_toggles,
         quiet_hours_start=prefs.quiet_hours_start,
         quiet_hours_end=prefs.quiet_hours_end,
     )
@@ -93,6 +162,7 @@ def update_notification_preferences(
         prefs.user_key = legacy_user_key(current_user_id)
     prefs.push_enabled = payload.push_enabled
     prefs.email_enabled = payload.email_enabled
+    prefs.in_app_enabled = payload.in_app_enabled
     prefs.draft_alerts = payload.draft_alerts
     prefs.injury_alerts = payload.injury_alerts
     prefs.touchdown_alerts = payload.touchdown_alerts
@@ -100,6 +170,7 @@ def update_notification_preferences(
     prefs.waiver_alerts = payload.waiver_alerts
     prefs.projection_alerts = payload.projection_alerts
     prefs.lineup_reminders = payload.lineup_reminders
+    prefs.category_toggles = payload.category_toggles
     prefs.quiet_hours_start = payload.quiet_hours_start
     prefs.quiet_hours_end = payload.quiet_hours_end
     db.add(prefs)
@@ -117,17 +188,25 @@ def _log_matches_user(log: NotificationLog, user_id: int) -> bool:
 def _global_pref_allows(alert_type: str, prefs: NotificationPreference | None) -> bool:
     if not prefs:
         return True
-    if alert_type == "INJURY":
+    if not prefs.in_app_enabled:
+        return False
+    category = notification_category(alert_type)
+    toggles = prefs.category_toggles or {}
+    if category in toggles:
+        return bool(toggles[category])
+    if category == "injury":
         return prefs.injury_alerts
-    if alert_type in {"TOUCHDOWN", "BIG_PLAY"}:
+    if category == "score":
         return prefs.touchdown_alerts
-    if alert_type == "USAGE":
+    if category == "usage":
         return prefs.usage_alerts
-    if alert_type == "WAIVER":
+    if category == "waiver":
         return prefs.waiver_alerts
-    if alert_type == "PROJECTION":
+    if category == "projection":
         return prefs.projection_alerts
-    if alert_type.startswith("draft_"):
+    if category == "lineup":
+        return prefs.lineup_reminders
+    if category == "draft":
         return prefs.draft_alerts
     return True
 
@@ -137,13 +216,66 @@ def _league_pref_allows(alert_type: str, pref: NotificationLeaguePreference | No
         return True
     if not pref.enabled:
         return False
-    if alert_type == "INJURY":
+    category = notification_category(alert_type)
+    if category == "injury":
         return pref.injury_alerts
-    if alert_type in {"TOUCHDOWN", "BIG_PLAY"}:
+    if category == "score":
         return pref.big_play_alerts
-    if alert_type == "PROJECTION":
+    if category == "projection":
         return pref.projection_alerts
     return True
+
+
+def _log_league_allowed(
+    *,
+    row: NotificationLog,
+    current_user_id: int,
+    rostered_player_ids: set[int],
+    rostered_player_leagues: dict[int, set[int]],
+    league_pref_by_id: dict[int, NotificationLeaguePreference],
+) -> bool:
+    payload = row.payload or {}
+    payload_league_id = row.league_id or payload.get("league_id")
+    if isinstance(payload_league_id, int):
+        return _league_pref_allows(row.alert_type, league_pref_by_id.get(payload_league_id))
+
+    if row.user_id == current_user_id or row.user_key == legacy_user_key(current_user_id):
+        return True
+
+    player_id = payload.get("player_id")
+    if not isinstance(player_id, int) or player_id not in rostered_player_ids:
+        return False
+    return any(
+        _league_pref_allows(row.alert_type, league_pref_by_id.get(league_id))
+        for league_id in rostered_player_leagues.get(player_id, set())
+    )
+
+
+def _is_visible_log(
+    *,
+    row: NotificationLog,
+    current_user_id: int,
+    global_prefs: NotificationPreference | None,
+    rostered_player_ids: set[int],
+    rostered_player_leagues: dict[int, set[int]],
+    league_pref_by_id: dict[int, NotificationLeaguePreference],
+) -> bool:
+    if row.dismissed_at is not None or row.delivery_state == "dismissed":
+        return False
+    if not _log_matches_user(row, current_user_id):
+        payload = row.payload or {}
+        player_id = payload.get("player_id")
+        if not isinstance(player_id, int) or player_id not in rostered_player_ids:
+            return False
+    if not _global_pref_allows(row.alert_type, global_prefs):
+        return False
+    return _log_league_allowed(
+        row=row,
+        current_user_id=current_user_id,
+        rostered_player_ids=rostered_player_ids,
+        rostered_player_leagues=rostered_player_leagues,
+        league_pref_by_id=league_pref_by_id,
+    )
 
 
 def list_user_alerts(db: Session, current_user_id: int, limit: int = 50) -> NotificationList:
@@ -172,40 +304,116 @@ def list_user_alerts(db: Session, current_user_id: int, limit: int = 50) -> Noti
     rows = db.query(NotificationLog).order_by(NotificationLog.sent_at.desc()).limit(limit * 8).all()
     data: list[NotificationRead] = []
     for row in rows:
-        if not _log_matches_user(row, current_user_id):
-            continue
-        if not _global_pref_allows(row.alert_type, global_prefs):
-            continue
-        payload = row.payload or {}
-        player_id = payload.get("player_id")
-        if not isinstance(player_id, int) or player_id not in rostered_player_ids:
-            continue
-        payload_league_id = payload.get("league_id")
-        candidate_league_ids = (
-            {payload_league_id}
-            if isinstance(payload_league_id, int)
-            else rostered_player_leagues.get(player_id, set())
-        )
-        if not candidate_league_ids:
-            continue
-        if not any(
-            _league_pref_allows(row.alert_type, league_pref_by_id.get(league_id))
-            for league_id in candidate_league_ids
+        if not _is_visible_log(
+            row=row,
+            current_user_id=current_user_id,
+            global_prefs=global_prefs,
+            rostered_player_ids=rostered_player_ids,
+            rostered_player_leagues=rostered_player_leagues,
+            league_pref_by_id=league_pref_by_id,
         ):
             continue
-        data.append(
-            NotificationRead(
-                id=row.id,
-                alert_type=row.alert_type,
-                title=row.title,
-                body=row.body,
-                payload=row.payload,
-                sent_at=row.sent_at,
-            )
-        )
+        data.append(_serialize_log(row))
         if len(data) >= limit:
             break
     return NotificationList(data=data, total=len(data))
+
+
+def get_unread_count(db: Session, current_user_id: int) -> NotificationUnreadCount:
+    visible = list_user_alerts(db, current_user_id=current_user_id, limit=500)
+    unread = sum(1 for row in visible.data if row.read_at is None and row.delivery_state not in {"read", "dismissed"})
+    return NotificationUnreadCount(unread_count=unread)
+
+
+def _get_user_notification(db: Session, *, notification_id: int, current_user_id: int) -> NotificationLog:
+    row = db.get(NotificationLog, notification_id)
+    if not row or not _log_matches_user(row, current_user_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="notification not found")
+    return row
+
+
+def mark_notification_read(db: Session, *, notification_id: int, current_user_id: int) -> NotificationRead:
+    row = _get_user_notification(db, notification_id=notification_id, current_user_id=current_user_id)
+    now = _utc_now()
+    row.read_at = row.read_at or now
+    if row.delivery_state != "dismissed":
+        row.delivery_state = "read"
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _serialize_log(row)
+
+
+def dismiss_notification(db: Session, *, notification_id: int, current_user_id: int) -> NotificationRead:
+    row = _get_user_notification(db, notification_id=notification_id, current_user_id=current_user_id)
+    now = _utc_now()
+    row.read_at = row.read_at or now
+    row.dismissed_at = row.dismissed_at or now
+    row.delivery_state = "dismissed"
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _serialize_log(row)
+
+
+def create_notification_event(
+    db: Session,
+    *,
+    user_id: int,
+    alert_type: str,
+    title: str,
+    body: str,
+    league_id: int | None = None,
+    payload: dict | None = None,
+    dedupe_key: str | None = None,
+    source_entity_type: str | None = None,
+    source_entity_id: int | None = None,
+    deep_link: str | None = None,
+    delivery_state: str = "sent",
+) -> NotificationLog | None:
+    if delivery_state not in NOTIFICATION_DELIVERY_STATES:
+        raise ValueError(f"unsupported notification delivery state: {delivery_state}")
+    prefs = db.query(NotificationPreference).filter(NotificationPreference.user_id == user_id).first()
+    if not _global_pref_allows(alert_type, prefs):
+        return None
+
+    if dedupe_key:
+        existing = (
+            db.query(NotificationLog)
+            .filter(NotificationLog.user_id == user_id, NotificationLog.dedupe_key == dedupe_key)
+            .first()
+        )
+        if existing:
+            return existing
+
+    row = NotificationLog(
+        user_id=user_id,
+        user_key=legacy_user_key(user_id),
+        league_id=league_id,
+        alert_type=alert_type,
+        title=title,
+        body=body,
+        payload=payload,
+        delivery_state=delivery_state,
+        dedupe_key=dedupe_key,
+        source_entity_type=source_entity_type,
+        source_entity_id=source_entity_id,
+        deep_link=deep_link,
+        sent_at=_utc_now(),
+    )
+    db.add(row)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        if dedupe_key:
+            return (
+                db.query(NotificationLog)
+                .filter(NotificationLog.user_id == user_id, NotificationLog.dedupe_key == dedupe_key)
+                .first()
+            )
+        raise
+    return row
 
 
 def create_test_alert(db: Session, current_user_id: int) -> NotificationRead:
@@ -222,23 +430,20 @@ def create_test_alert(db: Session, current_user_id: int) -> NotificationRead:
     alert = NotificationLog(
         user_id=current_user_id,
         user_key=legacy_user_key(current_user_id),
+        league_id=int(payload["league_id"]) if isinstance(payload.get("league_id"), int) else None,
         alert_type="PROJECTION",
         title="Projection Change",
         body="Test projection alert created.",
         payload=payload,
+        delivery_state="sent",
+        source_entity_type="test",
+        deep_link="/alerts",
         sent_at=datetime.utcnow(),
     )
     db.add(alert)
     db.commit()
     db.refresh(alert)
-    return NotificationRead(
-        id=alert.id,
-        alert_type=alert.alert_type,
-        title=alert.title,
-        body=alert.body,
-        payload=alert.payload,
-        sent_at=alert.sent_at,
-    )
+    return _serialize_log(alert)
 
 
 def get_league_preferences(db: Session, current_user_id: int) -> LeagueNotificationPreferences:
@@ -452,4 +657,3 @@ def refresh_scheduled_notification_state(db: Session, scheduled_notification_id:
     if delivered_times:
         scheduled.sent_at = max(ts for ts in delivered_times if ts is not None)
     db.add(scheduled)
-
