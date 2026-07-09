@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import type { DraftRoomTeam } from "@/types/draft";
 
 const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K"];
-const DRAFT_PLAYER_PAGE_SIZE = 80;
+const DRAFT_PLAYER_PAGE_SIZE = 200;
 const DRAFT_SLOT_KEYS = ["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "BENCH"] as const;
 const PLAYER_CARD_TABS = ["about", "injuries", "stats", "projections"] as const;
 
@@ -244,7 +244,7 @@ export default function Draft() {
   const { data: playersPayload, isLoading: playersLoading, isError: playersError } = useDraftPlayerPool({
     search: draftSearch || undefined,
     position: serverPositionFilter,
-    league_id: parsedLeagueId,
+    league_id: showMasterBoardPreview ? undefined : parsedLeagueId,
     available_only: Boolean(parsedLeagueId) && !showMasterBoardPreview,
     limit: DRAFT_PLAYER_PAGE_SIZE,
     offset: 0,

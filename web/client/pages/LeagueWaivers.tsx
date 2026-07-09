@@ -20,6 +20,7 @@ import { isPreDraftLeague } from "@/lib/leagueState";
 import type { LeagueWaiverPlayer } from "@/types/league";
 
 const positions = ["ALL", "QB", "RB", "WR", "TE", "K"] as const;
+type DraftPoolPlayer = LeagueWaiverPlayer & { draft_rank?: number | null };
 
 const positionTone = (position?: string | null) => {
   switch ((position ?? "").toUpperCase()) {
@@ -81,7 +82,8 @@ export default function LeagueWaivers() {
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState<(typeof positions)[number]>("ALL");
   const settingsQuery = useLeagueSettingsTab(parsedLeagueId, !isDemoLeague);
-  const isPreDraft = !isDemoLeague && isPreDraftLeague(settingsQuery.data);
+  const hasDraftResults = Boolean(settingsQuery.data?.draft_results?.length);
+  const isPreDraft = !isDemoLeague && Boolean(settingsQuery.data) && (!hasDraftResults || isPreDraftLeague(settingsQuery.data));
   const settingsReady = isDemoLeague || Boolean(settingsQuery.data);
   const waiverQuery = useLeagueWaiverTab(
     parsedLeagueId,
@@ -92,10 +94,10 @@ export default function LeagueWaivers() {
   const draftPoolQuery = useDraftPlayerPool({
     search: undefined,
     position: undefined,
-    league_id: parsedLeagueId,
+    league_id: undefined,
     available_only: false,
     sort: "draft_rank",
-    limit: 100,
+    limit: 200,
     offset: 0,
     pages: 50,
     enabled: !isDemoLeague && settingsReady && isPreDraft,
@@ -107,13 +109,14 @@ export default function LeagueWaivers() {
   );
   const createWatchlist = useCreateWatchlist();
   const toggleWatchlistPlayer = useToggleWatchlistPlayer();
-  const draftPoolPlayers = useMemo<LeagueWaiverPlayer[]>(
+  const draftPoolPlayers = useMemo<DraftPoolPlayer[]>(
     () =>
       (draftPoolQuery.data?.data ?? []).map((player) => ({
         id: player.id,
         name: player.name,
         school: player.school,
         position: player.pos,
+        draft_rank: player.rank ?? player.adp ?? null,
         weekly_projected_fantasy_points: Number(player.projection?.fpts ?? player.sheetProjectedSeasonPoints ?? 0),
       })),
     [draftPoolQuery.data?.data]
@@ -125,9 +128,9 @@ export default function LeagueWaivers() {
     () => new Set(watchlists.flatMap((watchlist) => watchlist.players.map((player) => player.id))),
     [watchlists]
   );
-  const filteredPlayers = useMemo(() => {
+  const filteredPlayers = useMemo<DraftPoolPlayer[]>(() => {
     const query = search.trim().toLowerCase();
-    return players
+    return (players as DraftPoolPlayer[])
       .filter((player) => position === "ALL" || (player.position ?? "").toUpperCase() === position)
       .filter((player) => {
         if (!query) return true;
@@ -135,12 +138,18 @@ export default function LeagueWaivers() {
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(query));
       })
-      .sort(
-        (first, second) =>
+      .sort((first, second) => {
+        if (isPreDraft) {
+          const firstRank = Number(first.draft_rank ?? Number.POSITIVE_INFINITY);
+          const secondRank = Number(second.draft_rank ?? Number.POSITIVE_INFINITY);
+          if (firstRank !== secondRank) return firstRank - secondRank;
+        }
+        return (
           Number(second.weekly_projected_fantasy_points ?? 0) -
           Number(first.weekly_projected_fantasy_points ?? 0)
-      );
-  }, [players, position, search]);
+        );
+      });
+  }, [isPreDraft, players, position, search]);
 
   const topProjection = players.reduce(
     (top, player) => Math.max(top, Number(player.weekly_projected_fantasy_points ?? 0)),

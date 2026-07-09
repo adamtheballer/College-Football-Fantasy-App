@@ -9,7 +9,6 @@ import { useLeagueRosterTab, useLeagueSettingsTab } from "@/hooks/use-leagues";
 import {
   DEMO_LEAGUE_ID,
   createDemoLeagueRosterResponse,
-  createWeekOnePreviewRoster,
 } from "@/lib/leaguePreviewData";
 import { isPreDraftLeague } from "@/lib/leagueState";
 
@@ -21,6 +20,21 @@ const starterSlot = (slot?: string | null) => {
 const projectionValue = (player: { projected_points?: number | null; weekly_projected_fantasy_points?: number | null }) => {
   const value = player.projected_points ?? player.weekly_projected_fantasy_points;
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+};
+
+const isPlaceholderRosterPlayer = (player: {
+  acquisition_type?: string | null;
+  player_name?: string | null;
+  status?: string | null;
+}) => {
+  const status = (player.status ?? "").toUpperCase();
+  const acquisitionType = (player.acquisition_type ?? "").toUpperCase();
+  const name = player.player_name ?? "";
+  return (
+    status === "EMPTY_SLOT" ||
+    acquisitionType === "EMPTY_SLOT" ||
+    /\b(starter preview|week\s+\d+\s+preview)\b/i.test(name)
+  );
 };
 
 export default function LeagueRoster() {
@@ -39,11 +53,10 @@ export default function LeagueRoster() {
   const rosterData = demoData ?? rosterQuery.data;
   const fetchedRoster = rosterData?.roster ?? rosterData?.data ?? [];
   const previewTeamName = rosterData?.owned_team?.name ?? rosterData?.fantasy_team_name ?? "Your Team";
-  const previewTeamId = rosterData?.owned_team?.id ?? rosterData?.fantasy_team_id ?? -100;
-  const isPreviewRoster = !isDemoLeague && !rosterQuery.isLoading && fetchedRoster.length === 0;
-  const roster = isPreviewRoster
-    ? createWeekOnePreviewRoster(previewTeamId ?? -100, previewTeamName ?? "Your Team")
-    : fetchedRoster;
+  const roster = fetchedRoster;
+  const realRosterPlayers = roster.filter((player) => !isPlaceholderRosterPlayer(player));
+  const hasRealRosterPlayers = realRosterPlayers.length > 0;
+  const isEmptyRealRoster = !isDemoLeague && !rosterQuery.isLoading && !hasRealRosterPlayers;
   const starters = useMemo(
     () => roster.filter((player) => starterSlot(player.slot ?? player.roster_slot)),
     [roster]
@@ -56,13 +69,19 @@ export default function LeagueRoster() {
     () => roster.filter((player) => (player.slot ?? player.roster_slot ?? "").toUpperCase() === "IR"),
     [roster]
   );
-  const starterTotal = isPreviewRoster
+  const starterTotal = isEmptyRealRoster
     ? null
-    : starters.reduce((total, player) => total + (projectionValue(player) ?? 0), 0);
+    : starters.reduce(
+        (total, player) => total + (isPlaceholderRosterPlayer(player) ? 0 : projectionValue(player) ?? 0),
+        0
+      );
 
-  const benchTotal = isPreviewRoster
+  const benchTotal = isEmptyRealRoster
     ? null
-    : bench.reduce((total, player) => total + (projectionValue(player) ?? 0), 0);
+    : bench.reduce(
+        (total, player) => total + (isPlaceholderRosterPlayer(player) ? 0 : projectionValue(player) ?? 0),
+        0
+      );
 
   if (settingsQuery.isLoading && !settingsQuery.isError && !isDemoLeague) {
     return <PageLoadingState title="Loading league state" description="Checking whether this league has completed the draft." />;
@@ -110,10 +129,10 @@ export default function LeagueRoster() {
         <LeagueTabs leagueId={parsedLeagueId} />
       </div>
 
-      {isPreviewRoster ? (
+      {isEmptyRealRoster ? (
         <section className="rounded-[1.25rem] border border-sky-300/25 bg-sky-400/[0.08] px-5 py-4 shadow-[0_0_36px_rgba(56,189,248,0.12)]">
           <p className="text-sm font-bold text-sky-100">
-            Week 1 placeholder roster is shown until this league imports real draft results.
+            No roster has been drafted yet. Player rows and projections will appear after the draft completes.
           </p>
         </section>
       ) : null}
@@ -124,7 +143,7 @@ export default function LeagueRoster() {
             Starter Projection
           </p>
           <p className="mt-1 text-3xl font-black text-sky-100">
-            {starterTotal === null ? "" : starterTotal.toFixed(1)}
+            {starterTotal === null ? "N/A" : starterTotal.toFixed(1)}
           </p>
         </div>
         <div className="rounded-[1.35rem] border border-white/10 bg-[#0b1424]/90 p-5">
@@ -132,7 +151,7 @@ export default function LeagueRoster() {
             Bench Depth
           </p>
           <p className="mt-1 text-3xl font-black text-slate-100">
-            {benchTotal === null ? "" : benchTotal.toFixed(1)}
+            {benchTotal === null ? "N/A" : benchTotal.toFixed(1)}
           </p>
         </div>
         <div className="rounded-[1.35rem] border border-white/10 bg-[#0b1424]/90 p-5">

@@ -32,7 +32,6 @@ export type DraftPlayer = Player & {
   cfb27TalentScore: number;
 };
 
-const POWER4_CONFS = new Set(["SEC", "Big Ten", "Big 12", "ACC"]);
 const DRAFT_POSITIONS = new Set(["QB", "RB", "WR", "TE", "K"]);
 const SEASON_GAMES = 12;
 
@@ -297,7 +296,6 @@ const enforceQuarterbackProjectionOrder = <T extends { player: Player; projected
 
 export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPlayer[] => {
   const eligible = players
-    .filter((p) => POWER4_CONFS.has(p.conf))
     .filter((p) => DRAFT_POSITIONS.has(p.pos));
 
   const projectedPointsByPos: Record<string, number[]> = {};
