@@ -120,7 +120,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </h1>
           </div>
 
-          <nav className="px-5 pb-7 pt-3 relative z-10 flex flex-col gap-4 overflow-y-auto">
+          <nav className="app-sidebar-nav px-5 pb-7 pt-3 relative z-10 flex flex-col gap-4 overflow-y-auto">
             {sidebarItems.map((item) => {
               const isActive = isLoggedIn && location.pathname === item.path;
               const isSignOut = item.name === "SIGN OUT";
