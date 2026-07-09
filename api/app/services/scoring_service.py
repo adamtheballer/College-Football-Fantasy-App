@@ -2,10 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
 
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.domain.scoring_engine import (
+    calculate_player_fantasy_points,
+    is_starting_slot,
+    normalize_player_stats,
+)
+from collegefootballfantasy_api.app.domain.scoring_rules import NON_SCORING_SLOTS, normalize_scoring_rules
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
@@ -20,59 +25,6 @@ from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.team_week_score import TeamWeekScore
 
 
-DEFAULT_SCORING_RULES = {
-    "pass_yards": 0.04,
-    "pass_tds": 4,
-    "interceptions": -2,
-    "rush_yards": 0.1,
-    "rush_tds": 6,
-    "receptions": 1,
-    "rec_yards": 0.1,
-    "rec_tds": 6,
-    "fumbles_lost": -2,
-    "fg_made_0_39": 3,
-    "fg_made_40_49": 4,
-    "fg_made_50_plus": 5,
-    "xp_made": 1,
-}
-
-SCORING_RULE_ALIASES = {
-    "ppr": "receptions",
-    "pass_td": "pass_tds",
-    "passing_td": "pass_tds",
-    "passing_tds": "pass_tds",
-    "rush_td": "rush_tds",
-    "rushing_td": "rush_tds",
-    "rushing_tds": "rush_tds",
-    "rec_td": "rec_tds",
-    "receiving_td": "rec_tds",
-    "receiving_tds": "rec_tds",
-    "pass_yd": "pass_yards",
-    "passing_yards": "pass_yards",
-    "rush_yd": "rush_yards",
-    "rushing_yards": "rush_yards",
-    "receiving_yards": "rec_yards",
-    "interception": "interceptions",
-}
-
-STAT_FIELD_ALIASES = {
-    "pass_yards": ["pass_yards", "PassingYards", "passing_yards", "PassYards", "PassingYardage"],
-    "pass_tds": ["pass_tds", "PassingTouchdowns", "PassingTD", "passing_tds", "PassTD"],
-    "interceptions": ["interceptions", "PassingInterceptions", "Interceptions", "passing_interceptions"],
-    "rush_yards": ["rush_yards", "RushingYards", "rushing_yards", "RushYards"],
-    "rush_tds": ["rush_tds", "RushingTouchdowns", "RushingTD", "rushing_tds", "RushTD"],
-    "receptions": ["receptions", "Receptions", "ReceivingReceptions", "Rec"],
-    "rec_yards": ["rec_yards", "ReceivingYards", "receiving_yards", "ReceivingYardage"],
-    "rec_tds": ["rec_tds", "ReceivingTouchdowns", "ReceivingTD", "receiving_tds", "RecTD"],
-    "fumbles_lost": ["fumbles_lost", "FumblesLost", "fumblesLost"],
-    "fg_made_0_39": ["fg_made_0_39", "FieldGoalsMade0to39", "FieldGoalsMade0To39", "FgMade0To39"],
-    "fg_made_40_49": ["fg_made_40_49", "FieldGoalsMade40to49", "FieldGoalsMade40To49", "FgMade40To49"],
-    "fg_made_50_plus": ["fg_made_50_plus", "FieldGoalsMade50Plus", "FieldGoalsMade50", "FgMade50Plus"],
-    "xp_made": ["xp_made", "ExtraPointsMade", "ExtraPoints", "XpMade"],
-}
-
-BENCH_SLOTS = {"BE", "BENCH"}
-NON_SCORING_SLOTS = {"IR", "INJURED_RESERVE"}
 FINAL_MATCHUP_STATUSES = {"final", "stat_corrected"}
 
 
@@ -82,69 +34,6 @@ class ScoringSummary:
     teams_scored: int
     matchups_updated: int
     standings_updated: int
-
-
-def _number(value: Any) -> float:
-    if value is None or value == "":
-        return 0.0
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return 0.0
-
-
-def _first_number(raw_stats: dict[str, Any], aliases: list[str]) -> float:
-    for key in aliases:
-        if key in raw_stats:
-            return _number(raw_stats.get(key))
-    lower_map = {str(key).lower(): value for key, value in raw_stats.items()}
-    for key in aliases:
-        value = lower_map.get(key.lower())
-        if value is not None:
-            return _number(value)
-    return 0.0
-
-
-def normalize_player_stats(raw_stats: dict) -> dict:
-    return {
-        stat_key: _first_number(raw_stats or {}, aliases)
-        for stat_key, aliases in STAT_FIELD_ALIASES.items()
-    }
-
-
-def normalize_scoring_rules(scoring_rules: dict | None) -> dict[str, float]:
-    normalized = DEFAULT_SCORING_RULES.copy()
-    for key, value in (scoring_rules or {}).items():
-        canonical_key = SCORING_RULE_ALIASES.get(str(key), str(key))
-        if canonical_key in normalized:
-            normalized[canonical_key] = _number(value)
-    return normalized
-
-
-def calculate_player_fantasy_points(
-    normalized_stats: dict,
-    scoring_rules: dict,
-) -> tuple[float, dict]:
-    rules = normalize_scoring_rules(scoring_rules)
-    breakdown: dict[str, dict[str, float] | float] = {}
-    total = 0.0
-    for key, multiplier in rules.items():
-        stat = _number(normalized_stats.get(key))
-        points = round(stat * multiplier, 4)
-        breakdown[key] = {
-            "stat": stat,
-            "multiplier": multiplier,
-            "points": points,
-        }
-        total += points
-    rounded_total = round(total, 2)
-    breakdown["total"] = rounded_total
-    return rounded_total, breakdown
-
-
-def is_starting_slot(slot: str) -> bool:
-    normalized = (slot or "").upper()
-    return normalized not in BENCH_SLOTS and normalized not in NON_SCORING_SLOTS
 
 
 def _now() -> datetime:
@@ -212,22 +101,20 @@ def _stat_map(db: Session, season: int, week: int, player_ids: set[int]) -> dict
 def recalculate_player_week_scores(db: Session, league_id: int, season: int, week: int) -> int:
     settings = _league_settings(db, league_id)
     scoring_rules = settings.scoring_json if settings else {}
-    player_ids = {
-        player_id
-        for (player_id,) in db.query(Player.id).order_by(Player.id.asc()).all()
-    }
+    players = db.query(Player).order_by(Player.id.asc()).all()
+    player_ids = {player.id for player in players}
     stat_by_player = _stat_map(db, season, week, player_ids)
     calculated_at = _now()
     scored = 0
-    for player_id in sorted(player_ids):
-        stat_row = stat_by_player.get(player_id)
-        normalized_stats = normalize_player_stats(stat_row.stats if stat_row else {})
-        fantasy_points, breakdown = calculate_player_fantasy_points(normalized_stats, scoring_rules)
+    for player in players:
+        stat_row = stat_by_player.get(player.id)
+        normalized_stats = normalize_player_stats(stat_row.stats if stat_row else {}, player.position)
+        fantasy_points, breakdown = calculate_player_fantasy_points(normalized_stats, scoring_rules, player.position)
         score = (
             db.query(PlayerWeekScore)
             .filter(
                 PlayerWeekScore.league_id == league_id,
-                PlayerWeekScore.player_id == player_id,
+                PlayerWeekScore.player_id == player.id,
                 PlayerWeekScore.season == season,
                 PlayerWeekScore.week == week,
             )
@@ -236,7 +123,7 @@ def recalculate_player_week_scores(db: Session, league_id: int, season: int, wee
         if not score:
             score = PlayerWeekScore(
                 league_id=league_id,
-                player_id=player_id,
+                player_id=player.id,
                 season=season,
                 week=week,
             )
