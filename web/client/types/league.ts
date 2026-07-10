@@ -81,7 +81,7 @@ export interface LeagueWorkspaceTeam {
 export interface LeagueWorkspaceRosterEntry {
   id: number;
   team_id: number;
-  player_id: number;
+  player_id: number | null;
   slot: string | null;
   status?: string | null;
   player_name?: string | null;
@@ -173,7 +173,7 @@ export interface LeagueRosterPlayer {
   team_id?: number;
   fantasy_team_id: number;
   fantasy_team_name: string;
-  player_id: number;
+  player_id: number | null;
   player_name: string;
   player_school?: string | null;
   player_position?: string | null;
@@ -187,12 +187,12 @@ export interface LeagueRosterPlayer {
   is_starter?: boolean;
   is_ir?: boolean;
   opponent: string | null;
-  projected_points?: number;
-  floor?: number;
-  ceiling?: number;
+  projected_points?: number | null;
+  floor?: number | null;
+  ceiling?: number | null;
   boom_prob?: number;
   bust_prob?: number;
-  weekly_projected_fantasy_points: number;
+  weekly_projected_fantasy_points?: number | null;
 }
 
 export interface LeagueRosterTabResponse {
@@ -288,6 +288,8 @@ export interface LeagueWaiverTabResponse {
 export interface LeagueSettingsTabResponse {
   league_id: number;
   league_name: string;
+  league_status?: string | null;
+  draft_status?: string | null;
   league_info: Record<string, string | number | boolean | null>;
   members: LeagueMemberSettings[];
   scoring_settings: Record<string, number | string | boolean>;

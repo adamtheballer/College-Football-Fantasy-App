@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Activity, ArrowRightLeft, BarChart3, Newspaper, X } from "lucide-react";
 
 import type { LeagueRosterPlayer } from "@/types/league";
+import { canOpenRosterPlayerCard, isPlaceholderRosterPlayer } from "@/lib/rosterDisplay";
 import { cn } from "@/lib/utils";
 
 const slotRank = (slot?: string | null) => {
@@ -15,6 +16,8 @@ const slotLabel = (slot?: string | null) => (slot || "BENCH").toUpperCase();
 
 const positionLabel = (player: LeagueRosterPlayer) =>
   (player.position ?? player.player_position ?? "FLEX").toUpperCase();
+
+const isEmptyRosterSlot = (player: LeagueRosterPlayer) => isPlaceholderRosterPlayer(player);
 
 const positionStyles: Record<
   string,
@@ -96,8 +99,14 @@ const positionStyles: Record<
 const getPositionStyle = (position?: string | null) =>
   positionStyles[(position || "").toUpperCase()] ?? positionStyles.FLEX;
 
+const projectionValue = (player?: LeagueRosterPlayer | null) => {
+  if (player && isEmptyRosterSlot(player)) return null;
+  const value = player?.projected_points ?? player?.weekly_projected_fantasy_points;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+};
+
 const formatPoints = (value?: number | null) =>
-  typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "-";
+  typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "N/A";
 
 const formatPercent = (value?: number | null) => {
   if (typeof value !== "number" || !Number.isFinite(value)) return "-";
@@ -125,15 +134,23 @@ const readStats = (player: LeagueRosterPlayer) => {
 };
 
 const buildOutlook = (player: LeagueRosterPlayer) => {
+  if (isEmptyRosterSlot(player)) {
+    return "This roster slot is empty. Player stats and projections will populate after a real drafted player is assigned.";
+  }
+
   const position = positionLabel(player);
   const school = player.school ?? player.player_school ?? "school not listed";
-  const projection = player.projected_points ?? player.weekly_projected_fantasy_points ?? 0;
+  const projection = projectionValue(player);
   const floor = player.floor;
   const ceiling = player.ceiling;
   const range =
     typeof floor === "number" && typeof ceiling === "number"
       ? ` Projection range: ${floor.toFixed(1)}-${ceiling.toFixed(1)}.`
       : "";
+
+  if (projection === null) {
+    return `${player.player_name} is listed as a ${position} from ${school}. Projection data is not available until this league has real drafted players and player projections loaded.`;
+  }
 
   return `${player.player_name} is listed as a ${position} from ${school} with a Week 1 projection of ${projection.toFixed(
     1
@@ -149,6 +166,7 @@ export function RosterSlotTable({
   showPositionColumn = true,
   tone = "default",
   leagueId,
+  forceBlank = false,
 }: {
   title: string;
   players: LeagueRosterPlayer[];
@@ -156,6 +174,7 @@ export function RosterSlotTable({
   showPositionColumn?: boolean;
   tone?: RosterSlotTableTone;
   leagueId?: number | string;
+  forceBlank?: boolean;
 }) {
   const navigate = useNavigate();
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueRosterPlayer | null>(null);
@@ -163,13 +182,14 @@ export function RosterSlotTable({
   const sorted = [...players].sort((left, right) => {
     const slotDelta = slotRank(left.roster_slot || left.slot) - slotRank(right.roster_slot || right.slot);
     if (slotDelta !== 0) return slotDelta;
+    if (forceBlank || isEmptyRosterSlot(left) || isEmptyRosterSlot(right)) return 0;
     return left.player_name.localeCompare(right.player_name);
   });
 
   const selectedPosition = selectedPlayer ? positionLabel(selectedPlayer) : null;
   const selectedStyle = getPositionStyle(selectedPosition);
-  const selectedProjection =
-    selectedPlayer?.projected_points ?? selectedPlayer?.weekly_projected_fantasy_points ?? 0;
+  const selectedProjection = projectionValue(selectedPlayer);
+  const hasSelectedRealPlayer = Boolean(selectedPlayer && canOpenRosterPlayerCard(selectedPlayer, forceBlank));
   const selectedNews =
     selectedPlayer
       ? readText(selectedPlayer, ["news", "player_news", "latest_news", "headline"])
@@ -229,16 +249,21 @@ export function RosterSlotTable({
             <span className="text-right">Proj</span>
           </div>
           {sorted.map((player) => {
+            const isEmptySlot = forceBlank || isEmptyRosterSlot(player);
             const position = positionLabel(player);
             const style = getPositionStyle(position);
-            const projection = player.projected_points ?? player.weekly_projected_fantasy_points ?? 0;
+            const projection = projectionValue(player);
             return (
               <button
-                key={`${player.team_id ?? player.fantasy_team_id}-${player.player_id}-${player.slot ?? player.roster_slot}`}
+                key={`${player.id}-${player.team_id ?? player.fantasy_team_id}-${player.player_id ?? "empty"}-${player.slot ?? player.roster_slot}`}
                 type="button"
-                onClick={() => setSelectedPlayer(player)}
+                onClick={() => {
+                  if (canOpenRosterPlayerCard(player, forceBlank)) setSelectedPlayer(player);
+                }}
+                aria-disabled={isEmptySlot}
                 className={cn(
                   "grid w-full gap-3 px-5 py-4 text-left text-sm text-slate-200 transition focus:outline-none focus-visible:bg-sky-300/[0.06] focus-visible:ring-2 focus-visible:ring-sky-300/50 md:items-center",
+                  isEmptySlot ? "cursor-default" : "",
                   tableColumns,
                   style.row
                 )}
@@ -255,30 +280,32 @@ export function RosterSlotTable({
                   <span className={cn("h-2.5 w-2.5 rounded-full", style.dot)} />
                 </span>
                 <span className="flex flex-col gap-1">
-                  <span className="font-black text-slate-50">{player.player_name}</span>
-                  <span
-                    className={cn(
-                      "inline-flex w-fit shrink-0 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em]",
-                      style.pill
-                    )}
-                  >
-                    {position}
-                  </span>
+                  <span className="font-black text-slate-50">{isEmptySlot ? "N/A" : player.player_name}</span>
+                  {isEmptySlot ? null : (
+                    <span
+                      className={cn(
+                        "inline-flex w-fit shrink-0 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em]",
+                        style.pill
+                      )}
+                    >
+                      {position}
+                    </span>
+                  )}
                 </span>
-                <span className="text-slate-400">{player.school ?? player.player_school ?? "-"}</span>
+                <span className="text-slate-400">{isEmptySlot ? "N/A" : player.school ?? player.player_school ?? "-"}</span>
                 {showPositionColumn ? (
                   <span className={cn("font-black", style.text)}>{position}</span>
                 ) : null}
-                <span className="text-slate-400">{player.opponent ?? "TBD"}</span>
-                <span className={cn("text-right font-black", style.text)}>
-                  {projection.toFixed(1)}
+                <span className="text-slate-400">{isEmptySlot ? "N/A" : player.opponent ?? "TBD"}</span>
+                <span className={cn("text-right font-black", isEmptySlot || projection === null ? "text-slate-500" : style.text)}>
+                  {isEmptySlot ? "-" : formatPoints(projection)}
                 </span>
               </button>
             );
           })}
         </div>
       )}
-      {selectedPlayer ? (
+      {hasSelectedRealPlayer && selectedPlayer ? (
         <div
           className="fixed inset-0 z-[120] flex justify-end bg-slate-950/70 p-4 backdrop-blur-sm"
           role="dialog"
@@ -358,7 +385,7 @@ export function RosterSlotTable({
               </div>
             </div>
 
-            <div className="mt-5 space-y-4 overflow-y-auto pr-1">
+            <div className="mt-5 space-y-4 overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="mb-3 flex items-center gap-2 text-sky-200">
                   <Newspaper className="h-4 w-4" />
