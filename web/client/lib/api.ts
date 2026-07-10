@@ -135,6 +135,31 @@ const buildAuthHeaders = () => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
+const formatValidationLocation = (loc: unknown) => {
+  if (!Array.isArray(loc)) return null;
+  return loc
+    .filter((part) => part !== "body")
+    .map((part) => String(part))
+    .join(".");
+};
+
+const formatValidationDetail = (detail: unknown) => {
+  if (!Array.isArray(detail)) return null;
+
+  const messages = detail
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const record = item as Record<string, unknown>;
+      const message = typeof record.msg === "string" ? record.msg : null;
+      if (!message) return null;
+      const location = formatValidationLocation(record.loc);
+      return location ? `${location}: ${message}` : message;
+    })
+    .filter((message): message is string => Boolean(message));
+
+  return messages.length ? messages.join("; ") : null;
+};
+
 const buildError = async (res: Response) => {
   let detail: unknown = null;
   try {
@@ -154,6 +179,13 @@ const buildError = async (res: Response) => {
     typeof detail.detail === "string"
   ) {
     return new ApiError(res.status, detail.detail, detail);
+  }
+
+  if (detail && typeof detail === "object" && "detail" in detail) {
+    const validationMessage = formatValidationDetail((detail as { detail?: unknown }).detail);
+    if (validationMessage) {
+      return new ApiError(res.status, validationMessage, detail);
+    }
   }
 
   if (typeof detail === "string" && detail.trim()) {

@@ -14,8 +14,9 @@ import { LeagueCreateResponse } from "@/types/league";
 
 const steps = ["Basics", "Settings", "Draft", "Review"] as const;
 
-const leagueSizes = [6, 8, 10, 12, 14, 16];
+const leagueSizes = [4, 6, 8, 10, 12, 14, 16];
 const playoffOptions = [2, 4, 6, 8];
+const MIN_DRAFT_LEAD_TIME_MS = 5 * 60 * 1000;
 const waiverOptions = [
   { label: "FAAB (future claims)", value: "faab" },
   { label: "Rolling Priority (future claims)", value: "rolling" },
@@ -113,6 +114,13 @@ const getDefaultDraftDate = () => {
 };
 
 const getDefaultDraftTime = () => "19:00";
+
+const isDraftTimeSafelyInFuture = (draftDateTime: Date | null) =>
+  Boolean(
+    draftDateTime &&
+      Number.isFinite(draftDateTime.getTime()) &&
+      draftDateTime.getTime() > Date.now() + MIN_DRAFT_LEAD_TIME_MS
+  );
 
 const fieldLabelClass =
   "text-xs font-semibold uppercase tracking-[0.04em] text-[#94A3B8]";
@@ -331,10 +339,10 @@ function CreateLeagueForm() {
       return basics.name.trim().length > 2 && basics.max_teams > 0;
     }
     if (step === 2) {
-      return !!draft.draft_date && !!draft.draft_time;
+      return isDraftTimeSafelyInFuture(draftDateTime);
     }
     return true;
-  }, [basics.name, basics.max_teams, draft.draft_date, draft.draft_time, step]);
+  }, [basics.name, basics.max_teams, draftDateTime, step]);
 
   const nextStepLabel = step < steps.length - 1 ? `Continue to ${steps[step + 1]}` : "Create League";
 
@@ -376,6 +384,14 @@ function CreateLeagueForm() {
     setRosterSlots((prev) => ({ ...prev, [slot]: nextValue }));
   };
 
+  const updateLeagueSize = (rawValue: number) => {
+    setBasics((prev) => ({ ...prev, max_teams: rawValue }));
+    setSettings((prev) => ({
+      ...prev,
+      playoff_teams: Math.min(prev.playoff_teams, rawValue),
+    }));
+  };
+
   const handleNext = () => {
     if (!canContinue) return;
     setStep((prev) => Math.min(prev + 1, steps.length - 1));
@@ -387,6 +403,10 @@ function CreateLeagueForm() {
     if (!isLoggedIn) return;
     if (!draftDateTime || Number.isNaN(draftDateTime.getTime())) {
       setError("Choose a valid draft date and time before creating the league.");
+      return;
+    }
+    if (!isDraftTimeSafelyInFuture(draftDateTime)) {
+      setError("Draft time must be at least 5 minutes in the future.");
       return;
     }
 
@@ -577,7 +597,7 @@ function CreateLeagueForm() {
                   <Field label="League size">
                     <Select
                       value={String(basics.max_teams)}
-                      onValueChange={(value) => setBasics((prev) => ({ ...prev, max_teams: Number(value) }))}
+                      onValueChange={(value) => updateLeagueSize(Number(value))}
                     >
                       <SelectTrigger className={selectTriggerClass}>
                         <SelectValue />
@@ -705,7 +725,9 @@ function CreateLeagueForm() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className={selectContentClass}>
-                        {playoffOptions.map((option) => (
+                        {playoffOptions
+                          .filter((option) => option <= basics.max_teams)
+                          .map((option) => (
                           <SelectItem key={option} value={String(option)} className="text-sm font-medium">
                             {option} Teams
                           </SelectItem>
@@ -847,7 +869,9 @@ function CreateLeagueForm() {
                   <Field label="Preview">
                     <div className="flex h-12 items-center gap-3 rounded-[10px] border border-white/[0.08] bg-[#161E2E] px-4 text-sm font-semibold text-[#CBD5E1]">
                       <Calendar className="h-4 w-4 text-[#60A5FA]" />
-                      Draft starts in {draftCountdown || "--"}
+                      {isDraftTimeSafelyInFuture(draftDateTime)
+                        ? `Draft starts in ${draftCountdown || "--"}`
+                        : "Choose a future draft time"}
                     </div>
                   </Field>
                 </div>
