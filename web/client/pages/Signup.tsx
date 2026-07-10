@@ -54,7 +54,7 @@ export default function Signup() {
       if (nextUser) {
         setPendingGuide(nextUser.id);
       }
-      navigate("/", { replace: true });
+      navigate("/verify-email", { replace: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
       if (err instanceof ApiError && err.status === 0) {

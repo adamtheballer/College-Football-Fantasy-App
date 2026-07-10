@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.security import (
     PASSWORD_HASH_ALGORITHM,
@@ -7,12 +9,25 @@ from collegefootballfantasy_api.app.core.security import (
     needs_password_rehash,
     verify_password,
 )
+from collegefootballfantasy_api.app.api.routes import auth as auth_routes
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
 from collegefootballfantasy_api.app.models.user import User
 
 
 STRONG_PASSWORD = "StrongPass123!"
 LEGACY_PASSWORD = "secret123"
+
+
+class CaptureEmailService:
+    def __init__(self) -> None:
+        self.verification_tokens: list[tuple[str, str]] = []
+        self.password_reset_tokens: list[tuple[str, str]] = []
+
+    def send_email_verification(self, email: str, token: str) -> None:
+        self.verification_tokens.append((email, token))
+
+    def send_password_reset(self, email: str, token: str) -> None:
+        self.password_reset_tokens.append((email, token))
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -233,6 +248,50 @@ def test_auth_me_requires_authentication(client):
     response = client.get("/auth/me")
     assert response.status_code == 401
     assert response.json()["detail"] == "missing auth token"
+
+
+def test_email_verification_token_marks_user_verified(client, db_session, monkeypatch):
+    capture = CaptureEmailService()
+    monkeypatch.setattr(auth_routes, "get_email_service", lambda: capture)
+
+    signup_payload = signup_user(client, "verify")
+    assert capture.verification_tokens
+    email, token = capture.verification_tokens[-1]
+    assert email == "coach-verify@example.com"
+
+    response = client.post("/auth/verify-email", json={"token": token})
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "email verified"
+    db_session.expire_all()
+    user = db_session.get(User, signup_payload["user"]["id"])
+    assert user.email_verified_at is not None
+
+
+def test_email_verification_rejects_invalid_or_expired_token(client):
+    response = client.post("/auth/verify-email", json={"token": "not-a-real-token"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "invalid or expired token"
+
+
+def test_resend_verification_sends_only_for_unverified_users(client, db_session, monkeypatch):
+    capture = CaptureEmailService()
+    monkeypatch.setattr(auth_routes, "get_email_service", lambda: capture)
+    signup_payload = signup_user(client, "resend")
+    assert len(capture.verification_tokens) == 1
+
+    resend_response = client.post("/auth/resend-verification", json={"email": "coach-resend@example.com"})
+    assert resend_response.status_code == 200
+    assert len(capture.verification_tokens) == 2
+
+    user = db_session.get(User, signup_payload["user"]["id"])
+    user.email_verified_at = datetime.now(timezone.utc)
+    db_session.commit()
+
+    verified_resend_response = client.post("/auth/resend-verification", json={"email": "coach-resend@example.com"})
+    assert verified_resend_response.status_code == 200
+    assert len(capture.verification_tokens) == 2
 
 
 def test_local_dev_cors_allows_dynamic_vite_port(client):

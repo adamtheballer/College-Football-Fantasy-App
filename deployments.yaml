@@ -108,10 +108,17 @@ environments:
       - VITE_API_BASE_URL
       - REFRESH_COOKIE_SECURE
       - REFRESH_COOKIE_SAMESITE
+      - EMAIL_DELIVERY_MODE
     optional_env:
       - CORS_ORIGIN_REGEX
       - SPORTSDATA_API_KEY
       - SPORTSDATA_ENABLED
+      - SMTP_HOST
+      - SMTP_PORT
+      - SMTP_USERNAME
+      - SMTP_PASSWORD
+      - SMTP_FROM_EMAIL
+      - SMTP_USE_TLS
     safety_gates:
       environment_must_equal: production
       reject_default_jwt_secret: true
@@ -123,3 +130,4 @@ environments:
       require_health_ready_before_traffic: true
       no_express_backend: true
       no_localhost_public_urls: true
+      email_verification_route_required: /verify-email

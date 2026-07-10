@@ -100,6 +100,15 @@ See `.env.example` for the full list.
 - `REFRESH_COOKIE_SAMESITE`
 - `REFRESH_COOKIE_DOMAIN`
 - `ALLOW_LEGACY_API_TOKEN_AUTH`
+- `AUTH_EMAIL_VERIFICATION_TTL_HOURS`
+- `AUTH_RESEND_VERIFICATION_RATE_LIMIT`
+- `EMAIL_DELIVERY_MODE`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USERNAME`
+- `SMTP_PASSWORD`
+- `SMTP_FROM_EMAIL`
+- `SMTP_USE_TLS`
 
 `UI_BASE_URL` should match your local web origin (`http://localhost:5173` for Vite dev).
 
@@ -111,8 +120,11 @@ Production must use:
 - `CORS_ORIGIN_REGEX=` blank unless there is a production-safe regex requirement
 - `REFRESH_COOKIE_SECURE=true`
 - `REFRESH_COOKIE_SAMESITE=lax` or stricter unless the deployment requires cross-site cookies
+- `EMAIL_DELIVERY_MODE=smtp` or another production mail adapter
+- valid SMTP sender configuration so `/verify-email?token=...` links are deliverable
 
 The API refuses to start in production with the `.env.example` JWT placeholder, default localhost CORS origins, wildcard CORS origins, or the default localhost CORS regex.
+When SMTP delivery is enabled, production startup also requires `SMTP_HOST` and `SMTP_FROM_EMAIL`.
 
 Sports provider/cache variables:
 

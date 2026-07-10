@@ -264,11 +264,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const verifyEmail = useCallback(async (token: string) => {
     await apiPost("/auth/verify-email", { token });
-    const nextUserPayload = await apiGet<UserReadPayload>("/auth/me");
-    const nextUser = mapUserPayload(nextUserPayload);
-    safeStorageSet(USER_STORAGE_KEY, JSON.stringify(nextUser));
-    queryClient.invalidateQueries();
-    setUser(nextUser);
+    const storedToken = getStoredAccessToken();
+    if (storedToken) {
+      try {
+        const nextUserPayload = await apiGet<UserReadPayload>("/auth/me");
+        const nextUser = mapUserPayload(nextUserPayload);
+        safeStorageSet(USER_STORAGE_KEY, JSON.stringify(nextUser));
+        queryClient.invalidateQueries();
+        setUser(nextUser);
+      } catch (error) {
+        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+          clearStoredAuth();
+          setUser(null);
+        } else {
+          throw error;
+        }
+      }
+    }
     dispatchAuthChanged();
   }, [queryClient]);
 
