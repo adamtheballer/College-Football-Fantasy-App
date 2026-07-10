@@ -147,7 +147,7 @@ def _notify_user(db: Session, *, user_id: int | None, alert_type: str, title: st
         dedupe_key=f"trade:{trade_id}:{alert_type}:{user_id}" if isinstance(trade_id, int) else None,
         source_entity_type="trade_offer" if isinstance(trade_id, int) else None,
         source_entity_id=trade_id if isinstance(trade_id, int) else None,
-        deep_link=f"/leagues/{payload.get('league_id')}/trades/{trade_id}" if isinstance(payload.get("league_id"), int) and isinstance(trade_id, int) else None,
+        deep_link=f"/trade/{payload.get('league_id')}" if isinstance(payload.get("league_id"), int) and isinstance(trade_id, int) else None,
     )
 
 

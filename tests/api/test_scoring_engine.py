@@ -68,6 +68,32 @@ def test_custom_league_scoring_changes_points():
     assert points == 12.0
 
 
+def test_create_league_form_scoring_aliases_are_normalized():
+    rules = validate_scoring_rules(
+        {
+            "ppr": 1,
+            "pass_td": 4,
+            "pass_yds_per_pt": 25,
+            "rush_yds_per_pt": 10,
+            "rec_yds_per_pt": 10,
+            "rush_td": 6,
+            "rec_td": 6,
+            "int": -2,
+            "fumble_lost": -2,
+            "fg": 3,
+            "xp": 1,
+        }
+    )
+
+    assert rules.offense["pass_yards"] == 0.04
+    assert rules.offense["rush_yards"] == 0.1
+    assert rules.offense["rec_yards"] == 0.1
+    assert rules.offense["passing_interceptions"] == -2
+    assert rules.offense["fumbles_lost"] == -2
+    assert rules.kicker["fg_made_0_39"] == 3
+    assert rules.kicker["xp_made"] == 1
+
+
 def test_starting_slot_detection_excludes_bench_and_ir():
     assert is_starting_slot("QB") is True
     assert is_starting_slot("FLEX") is True

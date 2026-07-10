@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRightLeft, ChevronRight, Search, ShieldAlert, Users } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Check, ChevronRight, Clock3, Search, ShieldAlert, Users, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +21,7 @@ import {
   useLeagueWorkspace,
 } from "@/hooks/use-leagues";
 import { useLeagueTeams, useTeamRoster } from "@/hooks/use-teams";
-import { apiPost } from "@/lib/api";
+import { apiGet, apiPost } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { LeagueRosterPlayer } from "@/types/league";
 import type { RosterEntry } from "@/types/roster";
@@ -44,6 +45,55 @@ type TradeAnalyzeResult = {
   verdict: string;
 };
 
+type TradeOfferItemCreate = {
+  player_id: number;
+};
+
+type TradeOfferCreatePayload = {
+  proposing_team_id: number;
+  receiving_team_id: number;
+  proposing_items: TradeOfferItemCreate[];
+  receiving_items: TradeOfferItemCreate[];
+  message?: string | null;
+};
+
+type TradeOfferItem = {
+  id: number;
+  trade_offer_id: number;
+  team_id: number;
+  player_id: number | null;
+  draft_pick_id: number | null;
+};
+
+type TradeReview = {
+  id: number;
+  trade_offer_id: number;
+  reviewer_user_id: number | null;
+  action: string;
+  reason: string | null;
+  created_at: string;
+};
+
+type TradeOffer = {
+  id: number;
+  league_id: number;
+  proposing_team_id: number;
+  receiving_team_id: number;
+  status: string;
+  expires_at: string | null;
+  message: string | null;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  items: TradeOfferItem[];
+  reviews: TradeReview[];
+};
+
+type TradeOfferListResponse = {
+  data: TradeOffer[];
+  total: number;
+};
+
 type TradeRow = {
   rosterEntryId: number;
   playerId: number;
@@ -54,6 +104,52 @@ type TradeRow = {
   school: string;
   slot: string;
   projectedPoints?: number;
+};
+
+export const canSubmitTradeOffer = (
+  ownedTeamId: number | null,
+  opponentTeamId: number | null,
+  giveIds: number[],
+  receiveIds: number[]
+) =>
+  typeof ownedTeamId === "number" &&
+  ownedTeamId > 0 &&
+  typeof opponentTeamId === "number" &&
+  opponentTeamId > 0 &&
+  ownedTeamId !== opponentTeamId &&
+  giveIds.length > 0 &&
+  receiveIds.length > 0;
+
+export const buildTradeOfferPayload = ({
+  ownedTeamId,
+  opponentTeamId,
+  giveIds,
+  receiveIds,
+  message,
+}: {
+  ownedTeamId: number | null;
+  opponentTeamId: number | null;
+  giveIds: number[];
+  receiveIds: number[];
+  message?: string;
+}): TradeOfferCreatePayload => {
+  if (!canSubmitTradeOffer(ownedTeamId, opponentTeamId, giveIds, receiveIds)) {
+    throw new Error("Select at least one player from each team before sending a trade.");
+  }
+  return {
+    proposing_team_id: ownedTeamId,
+    receiving_team_id: opponentTeamId,
+    proposing_items: giveIds.map((playerId) => ({ player_id: playerId })),
+    receiving_items: receiveIds.map((playerId) => ({ player_id: playerId })),
+    message: message?.trim() || null,
+  };
+};
+
+export const tradeStatusLabel = (status: string) => {
+  const normalized = status.toLowerCase();
+  if (normalized === "proposed") return "Pending";
+  if (normalized === "commissioner_review") return "Accepted · Commissioner Review";
+  return normalized.replace(/_/g, " ");
 };
 
 const POS_STYLES: Record<string, string> = {
@@ -90,11 +186,11 @@ const toTradeRowsFromLeagueRoster = (entries: LeagueRosterPlayer[] | undefined):
   return entries
     .filter((entry) => {
       const position = (entry.player_position ?? entry.position ?? "").toUpperCase();
-      return OFFENSE_POSITIONS.has(position);
+      return entry.player_id !== null && OFFENSE_POSITIONS.has(position);
     })
     .map((entry) => ({
       rosterEntryId: entry.id,
-      playerId: entry.player_id,
+      playerId: Number(entry.player_id),
       teamId: entry.fantasy_team_id ?? entry.team_id ?? 0,
       teamName: entry.fantasy_team_name,
       name: entry.player_name,
@@ -233,6 +329,7 @@ export default function Trade() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: leagues = [] } = useLeagues(50, true);
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
 
@@ -274,6 +371,8 @@ export default function Trade() {
   const [analysis, setAnalysis] = useState<TradeAnalyzeResult | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [tradeMessage, setTradeMessage] = useState("");
+  const [tradeActionError, setTradeActionError] = useState<string | null>(null);
   const targetTeamIdParam = searchParams.get("teamId");
   const targetTeamId =
     targetTeamIdParam && /^\d+$/.test(targetTeamIdParam)
@@ -389,6 +488,60 @@ export default function Trade() {
 
   const opponentTeam = teams.find((team) => team.id === opponentTeamId) ?? null;
   const ownedTeam = teams.find((team) => team.id === ownedTeamId) ?? null;
+  const userMembership = settingsView?.members.find((member) => member.user_id === user?.id) ?? null;
+  const isCommissioner = Boolean(
+    league?.commissioner_user_id === user?.id || userMembership?.role === "commissioner"
+  );
+  const knownRowsByPlayerId = useMemo(() => {
+    const rows = [...allLeagueRosterRows, ...resolvedMyRows, ...theirRows];
+    return new Map(rows.map((row) => [row.playerId, row]));
+  }, [allLeagueRosterRows, resolvedMyRows, theirRows]);
+
+  const tradeOffersQuery = useQuery({
+    queryKey: ["league", leagueId, "trades"],
+    enabled: Boolean(leagueId),
+    staleTime: 15_000,
+    queryFn: () => apiGet<TradeOfferListResponse>(`/leagues/${leagueId}/trades`),
+  });
+
+  const invalidateTradeState = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "trades"] }),
+      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "settings-view"] }),
+      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] }),
+      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "transactions"] }),
+      queryClient.invalidateQueries({ queryKey: ["team", ownedTeamId, "roster"] }),
+      queryClient.invalidateQueries({ queryKey: ["team", opponentTeamId, "roster"] }),
+    ]);
+  };
+
+  const createTradeMutation = useMutation({
+    mutationFn: (payload: TradeOfferCreatePayload) =>
+      apiPost<TradeOffer>(`/leagues/${leagueId}/trades`, payload),
+    onSuccess: async () => {
+      setTradeMessage("");
+      setGiveIds([]);
+      setReceiveIds([]);
+      setTradeActionError(null);
+      await invalidateTradeState();
+    },
+  });
+
+  const tradeActionMutation = useMutation({
+    mutationFn: ({ tradeId, action }: { tradeId: number; action: "accept" | "reject" | "cancel" | "approve" | "veto" }) => {
+      const path =
+        action === "approve"
+          ? `/trades/${tradeId}/commissioner/approve`
+          : action === "veto"
+          ? `/trades/${tradeId}/commissioner/veto`
+          : `/trades/${tradeId}/${action}`;
+      return apiPost<TradeOffer>(path, {});
+    },
+    onSuccess: async () => {
+      setTradeActionError(null);
+      await invalidateTradeState();
+    },
+  });
 
   const selectOpponentTeam = (teamId: number) => {
     setOpponentTeamId(teamId);
@@ -442,6 +595,46 @@ export default function Trade() {
       setIsAnalyzing(false);
     }
   };
+
+  const handleSendTrade = async () => {
+    setTradeActionError(null);
+    try {
+      const payload = buildTradeOfferPayload({
+        ownedTeamId,
+        opponentTeamId,
+        giveIds,
+        receiveIds,
+        message: tradeMessage,
+      });
+      await createTradeMutation.mutateAsync(payload);
+    } catch (error) {
+      setTradeActionError(error instanceof Error ? error.message : "Unable to send trade offer.");
+    }
+  };
+
+  const handleTradeAction = async (
+    tradeId: number,
+    action: "accept" | "reject" | "cancel" | "approve" | "veto"
+  ) => {
+    setTradeActionError(null);
+    try {
+      await tradeActionMutation.mutateAsync({ tradeId, action });
+    } catch (error) {
+      setTradeActionError(error instanceof Error ? error.message : "Unable to update trade offer.");
+    }
+  };
+
+  const teamName = (teamId: number) => teams.find((team) => team.id === teamId)?.name ?? `Team #${teamId}`;
+  const tradePlayerName = (playerId: number | null) =>
+    playerId ? knownRowsByPlayerId.get(playerId)?.name ?? `Player #${playerId}` : "Draft pick";
+  const tradeItemsForTeam = (offer: TradeOffer, teamId: number) =>
+    offer.items.filter((item) => item.team_id === teamId);
+  const tradeIsOpen = (offer: TradeOffer) =>
+    ["proposed", "commissioner_review"].includes(offer.status.toLowerCase());
+  const tradeOffers = tradeOffersQuery.data?.data ?? [];
+  const sendTradeDisabled =
+    createTradeMutation.isPending ||
+    !canSubmitTradeOffer(ownedTeamId, opponentTeamId, giveIds, receiveIds);
 
   if (!leagueId) {
     return (
@@ -699,15 +892,148 @@ export default function Trade() {
           )}
           <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs font-bold text-muted-foreground">
-              Preview only. Sending requires the backend proposal workflow.
+              Trade offers are submitted to the backend proposal workflow and stay auditable through final processing.
             </p>
             <Button
               className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
-              disabled
+              disabled={sendTradeDisabled}
+              onClick={() => void handleSendTrade()}
             >
-              Preview Only
+              {createTradeMutation.isPending ? "Sending..." : "Send Trade Offer"}
             </Button>
           </div>
+          <div className="space-y-2 border-t border-white/10 pt-5">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+              Message to manager
+            </p>
+            <textarea
+              value={tradeMessage}
+              onChange={(event) => setTradeMessage(event.target.value)}
+              maxLength={500}
+              placeholder="Optional note explaining this trade."
+              className="min-h-24 w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-bold text-foreground outline-none transition placeholder:text-muted-foreground/50 focus:border-sky-300/50 focus:ring-2 focus:ring-sky-300/15"
+            />
+          </div>
+          {tradeActionError && (
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-300">
+              {tradeActionError}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-[2rem] border border-white/10 bg-card/40">
+        <CardHeader className="border-b border-white/10">
+          <CardTitle className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-primary">
+            <Clock3 className="h-4 w-4" />
+            Trade Offers
+          </CardTitle>
+          <p className="text-xs font-bold text-muted-foreground">
+            Pending, accepted, rejected, cancelled, vetoed, and processed trade records for this league.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4 p-6">
+          {tradeOffersQuery.isLoading ? (
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+              Loading trade offers...
+            </p>
+          ) : tradeOffers.length === 0 ? (
+            <p className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+              No trade offers have been submitted in this league yet.
+            </p>
+          ) : (
+            tradeOffers.map((offer) => {
+              const proposingItems = tradeItemsForTeam(offer, offer.proposing_team_id);
+              const receivingItems = tradeItemsForTeam(offer, offer.receiving_team_id);
+              const canAccept = offer.status === "proposed" && offer.receiving_team_id === ownedTeamId;
+              const canReject = tradeIsOpen(offer) && offer.receiving_team_id === ownedTeamId;
+              const canCancel = tradeIsOpen(offer) && offer.proposing_team_id === ownedTeamId;
+              const canReview = isCommissioner && offer.status === "commissioner_review";
+              return (
+                <div key={offer.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+                        {tradeStatusLabel(offer.status)}
+                      </p>
+                      <p className="mt-2 text-lg font-black text-foreground">
+                        {teamName(offer.proposing_team_id)} ↔ {teamName(offer.receiving_team_id)}
+                      </p>
+                      <p className="mt-1 text-xs font-bold text-muted-foreground">
+                        Created {new Date(offer.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {canAccept && (
+                        <Button size="sm" className="rounded-xl text-[10px] font-black uppercase tracking-[0.16em]" onClick={() => void handleTradeAction(offer.id, "accept")} disabled={tradeActionMutation.isPending}>
+                          <Check className="mr-2 h-3.5 w-3.5" />
+                          Accept
+                        </Button>
+                      )}
+                      {canReject && (
+                        <Button size="sm" variant="outline" className="rounded-xl border-red-300/30 bg-red-500/10 text-[10px] font-black uppercase tracking-[0.16em] text-red-200" onClick={() => void handleTradeAction(offer.id, "reject")} disabled={tradeActionMutation.isPending}>
+                          <X className="mr-2 h-3.5 w-3.5" />
+                          Reject
+                        </Button>
+                      )}
+                      {canCancel && (
+                        <Button size="sm" variant="outline" className="rounded-xl text-[10px] font-black uppercase tracking-[0.16em]" onClick={() => void handleTradeAction(offer.id, "cancel")} disabled={tradeActionMutation.isPending}>
+                          Cancel
+                        </Button>
+                      )}
+                      {canReview && (
+                        <>
+                          <Button size="sm" className="rounded-xl text-[10px] font-black uppercase tracking-[0.16em]" onClick={() => void handleTradeAction(offer.id, "approve")} disabled={tradeActionMutation.isPending}>
+                            Approve
+                          </Button>
+                          <Button size="sm" variant="outline" className="rounded-xl border-red-300/30 bg-red-500/10 text-[10px] font-black uppercase tracking-[0.16em] text-red-200" onClick={() => void handleTradeAction(offer.id, "veto")} disabled={tradeActionMutation.isPending}>
+                            Veto
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <div className="rounded-xl border border-white/10 bg-black/10 p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
+                        {teamName(offer.proposing_team_id)} sends
+                      </p>
+                      <p className="mt-2 text-sm font-black text-foreground">
+                        {proposingItems.map((item) => tradePlayerName(item.player_id)).join(", ")}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-black/10 p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
+                        {teamName(offer.receiving_team_id)} sends
+                      </p>
+                      <p className="mt-2 text-sm font-black text-foreground">
+                        {receivingItems.map((item) => tradePlayerName(item.player_id)).join(", ")}
+                      </p>
+                    </div>
+                  </div>
+                  {offer.message && (
+                    <p className="mt-4 rounded-xl border border-white/10 bg-black/10 p-3 text-sm font-semibold text-muted-foreground">
+                      {offer.message}
+                    </p>
+                  )}
+                  {offer.reviews.length > 0 && (
+                    <div className="mt-4 border-t border-white/10 pt-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
+                        Audit Trail
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {offer.reviews.map((review) => (
+                          <span key={review.id} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                            {review.action} · {new Date(review.created_at).toLocaleDateString()}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </CardContent>
       </Card>
 

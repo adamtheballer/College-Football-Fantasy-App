@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   advanceSinglePlayerMockDraft,
   buildMockRoster,
+  createLocalMockDraftPlayerPool,
   createSinglePlayerMockDraft,
   getCurrentTeam,
   getAvailablePlayers,
@@ -22,6 +23,7 @@ import {
   parseMockDraftSettings,
   resolveInitialSinglePlayerMockDraftState,
 } from "./singlePlayerMockDraft";
+import { buildDraftBoard } from "./draftRankings";
 import type { DraftPlayer } from "./draftRankings";
 import type { MockDraftPick, SinglePlayerMockDraftState } from "./singlePlayerMockDraft";
 
@@ -330,6 +332,43 @@ describe("single-player mock draft engine", () => {
     expect(new Set(state.picks.map((pick) => pick.playerId)).size).toBe(MOCK_TOTAL_PICKS);
     expect(buildMockRoster(state).every((slot) => Boolean(slot.player))).toBe(true);
     expect(buildMockRoster(state).some((slot) => slot.label === "K" && slot.player?.position === "K")).toBe(true);
+  });
+
+  it("local fallback player pool keeps the mock draft board populated without backend players", () => {
+    const fallbackBoard = buildDraftBoard(createLocalMockDraftPlayerPool(), {
+      leagueSize: 12,
+      rosterSlots: {
+        QB: 1,
+        RB: 2,
+        WR: 2,
+        TE: 1,
+        K: 1,
+        BE: 5,
+        IR: 0,
+      },
+    });
+    let state = createSinglePlayerMockDraft(1_000);
+    let now = state.intermissionEndsAt;
+
+    state = advanceSinglePlayerMockDraft(state, fallbackBoard, now);
+
+    expect(fallbackBoard.length).toBeGreaterThanOrEqual(MOCK_TOTAL_PICKS);
+    expect(getDraftablePlayersForTeam(fallbackBoard, state, MOCK_USER_TEAM_ID).length).toBeGreaterThan(0);
+
+    while (state.status !== "complete") {
+      if (isUserOnClock(state)) {
+        const bestAvailable = getDraftablePlayersForTeam(fallbackBoard, state)[0];
+        expect(bestAvailable).toBeDefined();
+        state = makeUserMockPick(state, fallbackBoard, bestAvailable!.id, now);
+      } else {
+        now += MOCK_BOT_PICK_DELAY_SECONDS * 1000;
+        state = advanceSinglePlayerMockDraft(state, fallbackBoard, now);
+      }
+    }
+
+    expect(state.picks).toHaveLength(MOCK_TOTAL_PICKS);
+    expect(new Set(state.picks.map((draftPick) => draftPick.playerId)).size).toBe(MOCK_TOTAL_PICKS);
+    expect(buildMockRoster(state).every((slot) => Boolean(slot.player))).toBe(true);
   });
 
   it("can build roster views for any selected mock team", () => {

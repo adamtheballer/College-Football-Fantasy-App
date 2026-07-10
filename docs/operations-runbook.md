@@ -14,6 +14,7 @@ Use these endpoints to diagnose issues without direct database access:
 | `GET /admin/ops/users/{user_id}/security` | User login/session/security diagnostics. |
 | `GET /admin/ops/leagues/{league_id}/diagnostics` | League teams, members, scoring runs, and audit trail. |
 | `GET /admin/scoring/runs` | Scoring worker telemetry. |
+| `docs/SCORING_PRODUCTION_RUNBOOK.md` | Live scoring worker cadence, alerts, and incident runbook. |
 | `GET /admin/provider-sync/status` | Provider freshness and sync history. |
 
 Every response includes `X-Request-ID`. Logs include `request_id`, `user_id`, `league_id`, route, status, latency, and error code.

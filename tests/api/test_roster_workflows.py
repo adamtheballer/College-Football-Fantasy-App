@@ -12,6 +12,7 @@ from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
+from collegefootballfantasy_api.app.services.team_provider_mapping import upsert_team_provider_id
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -325,14 +326,24 @@ def test_roster_mutations_block_locked_players_after_kickoff(client, db_session)
     assert add_response.status_code == 201
     added_entry = add_response.json()
 
+    upsert_team_provider_id(
+        db_session,
+        canonical_school="Texas",
+        provider="sportsdata",
+        provider_team_id="texas",
+        provider_team_name="Texas",
+    )
     db_session.add(
         Game(
             external_id="started-texas",
+            provider="sportsdata",
             season=2026,
             week=1,
             start_date=datetime.now(timezone.utc) - timedelta(minutes=5),
             home_team="Texas",
             away_team="Oklahoma",
+            home_provider_team_id="texas",
+            away_provider_team_id="oklahoma",
         )
     )
     db_session.commit()
@@ -364,14 +375,24 @@ def test_roster_mutations_allow_players_before_kickoff(client, db_session):
     league = create_league(client, token)
     team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
     add_player_id, _swap_player_id = create_players(client)
+    upsert_team_provider_id(
+        db_session,
+        canonical_school="Texas",
+        provider="sportsdata",
+        provider_team_id="texas",
+        provider_team_name="Texas",
+    )
     db_session.add(
         Game(
             external_id="future-texas",
+            provider="sportsdata",
             season=2026,
             week=1,
             start_date=datetime.now(timezone.utc) + timedelta(hours=2),
             home_team="Texas",
             away_team="Oklahoma",
+            home_provider_team_id="texas",
+            away_provider_team_id="oklahoma",
         )
     )
     db_session.commit()

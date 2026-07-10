@@ -33,6 +33,8 @@ export interface LeagueMember {
   user_id: number;
   role: string;
   joined_at: string;
+  first_name?: string | null;
+  display_name?: string | null;
 }
 
 export interface LeagueDetail {
@@ -81,7 +83,7 @@ export interface LeagueWorkspaceTeam {
 export interface LeagueWorkspaceRosterEntry {
   id: number;
   team_id: number;
-  player_id: number;
+  player_id: number | null;
   slot: string | null;
   status?: string | null;
   player_name?: string | null;
@@ -173,7 +175,7 @@ export interface LeagueRosterPlayer {
   team_id?: number;
   fantasy_team_id: number;
   fantasy_team_name: string;
-  player_id: number;
+  player_id: number | null;
   player_name: string;
   player_school?: string | null;
   player_position?: string | null;
@@ -267,13 +269,20 @@ export interface LeagueWaiverPlayer {
 export interface LeagueWaiverClaim {
   id: number;
   league_id: number;
-  fantasy_team_id: number;
+  team_id?: number;
+  fantasy_team_id?: number;
   add_player_id: number;
-  add_player_name: string;
+  add_player_name?: string | null;
   drop_player_id: number | null;
-  drop_player_name: string | null;
-  priority: number | null;
+  drop_player_name?: string | null;
+  bid_amount?: number | null;
+  bid?: number | null;
+  priority_at_submission?: number | null;
+  priority?: number | null;
   status: string;
+  failure_reason?: string | null;
+  process_after?: string | null;
+  processed_at?: string | null;
   created_at: string;
 }
 
@@ -282,6 +291,9 @@ export interface LeagueWaiverTabResponse {
   fantasy_team_id: number | null;
   available_players: LeagueWaiverPlayer[];
   claims: LeagueWaiverClaim[];
+  waiver_rules?: Record<string, string | number | boolean | null>;
+  waiver_priority?: number | null;
+  faab_remaining?: number | null;
   total_available: number;
   message?: string | null;
 }

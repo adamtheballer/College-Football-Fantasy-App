@@ -22,7 +22,7 @@ import { useLeagueTransactions } from "@/hooks/use-roster-actions";
 import { DEMO_LEAGUE_ID, createDemoLeagueSettingsResponse } from "@/lib/leaguePreviewData";
 import type { LeagueRosterPlayer } from "@/types/league";
 
-type SettingsPanel = "standings" | "scoring" | "schedule" | "rosters" | "trades" | "draft";
+type SettingsPanel = "invite" | "standings" | "scoring" | "schedule" | "rosters" | "trades" | "draft";
 
 const panels: Array<{ id: SettingsPanel; label: string; icon: typeof Trophy }> = [
   { id: "standings", label: "Standings", icon: Trophy },
@@ -48,6 +48,11 @@ const scoringLabels: Record<string, string> = {
 };
 
 const slotOrder = ["QB", "RB", "WR", "TE", "FLEX", "K", "BENCH", "IR"];
+
+const POST_DRAFT_DRAFT_STATUSES = new Set(["completed", "complete"]);
+const POST_DRAFT_LEAGUE_STATUSES = new Set(["post_draft", "active", "playoffs", "completed", "archived"]);
+
+const normalizeStatus = (value: unknown) => String(value ?? "").trim().toLowerCase();
 
 const slotTone = (slot?: string | null) => {
   switch ((slot ?? "").toUpperCase()) {
@@ -138,11 +143,27 @@ export default function LeagueSettings() {
     ([first], [second]) => slotOrder.indexOf(first) - slotOrder.indexOf(second)
   );
   const leagueInfo = data?.league_info ?? {};
-  const canManageInvite = (data?.commissioner_controls ?? []).includes("regenerate_invite");
   const inviteCode = data?.invite_code ?? null;
   const inviteLink =
     data?.invite_link ??
     (inviteCode && typeof window !== "undefined" ? `${window.location.origin}/join/${inviteCode}` : null);
+  const draftStatus = normalizeStatus(data?.draft_status ?? leagueInfo.draft_status);
+  const leagueStatus = normalizeStatus(data?.league_status ?? leagueInfo.status);
+  const isPostDraft = draftStatus
+    ? POST_DRAFT_DRAFT_STATUSES.has(draftStatus)
+    : POST_DRAFT_LEAGUE_STATUSES.has(leagueStatus);
+  const forceBlankRosters = !isPostDraft;
+  const showInviteCode = Boolean(inviteCode && !isPostDraft);
+  const visiblePanels = useMemo(
+    () => (showInviteCode ? [{ id: "invite" as const, label: "Invite Code", icon: Link2 }, ...panels] : panels),
+    [showInviteCode]
+  );
+
+  useEffect(() => {
+    if (activePanel === "invite" && !showInviteCode) {
+      setActivePanel("standings");
+    }
+  }, [activePanel, showInviteCode]);
 
   const copyInviteValue = async (value: string | null | undefined, field: "code" | "link") => {
     if (!value) return;
@@ -190,17 +211,48 @@ export default function LeagueSettings() {
         <LeagueTabs leagueId={parsedLeagueId} />
       </div>
 
-      {canManageInvite && inviteCode ? (
-        <section className="rounded-[2rem] border border-sky-300/20 bg-[#0b1424]/92 p-5 shadow-[0_18px_70px_rgba(14,165,233,0.10)]">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
+      <section className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(13,23,39,0.96),rgba(16,30,52,0.9)_48%,rgba(15,23,42,0.96))] p-3 shadow-[0_24px_90px_rgba(14,165,233,0.12)]">
+        <div className={`grid gap-2 md:grid-cols-3 ${showInviteCode ? "xl:grid-cols-7" : "xl:grid-cols-6"}`}>
+          {visiblePanels.map((panel) => {
+            const Icon = panel.icon;
+            const active = activePanel === panel.id;
+            return (
+              <button
+                key={panel.id}
+                type="button"
+                onClick={() => setActivePanel(panel.id)}
+                className={[
+                  "flex min-h-[72px] items-center justify-center gap-2 rounded-2xl border px-3 text-center text-[10px] font-black uppercase tracking-[0.14em] transition-all duration-200",
+                  active
+                    ? "border-sky-300/55 bg-sky-300/18 text-sky-50 shadow-[0_0_28px_rgba(56,189,248,0.22)]"
+                    : "border-white/10 bg-white/[0.04] text-slate-400 hover:-translate-y-0.5 hover:border-sky-300/25 hover:bg-sky-300/[0.07] hover:text-slate-100",
+                ].join(" ")}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span>{panel.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {activePanel === "invite" && showInviteCode ? (
+        <section className="rounded-[2rem] border border-sky-300/20 bg-[#0b1424]/92 shadow-[0_18px_70px_rgba(14,165,233,0.10)]">
+          <PanelHeader
+            title="Invite Code"
+            subtitle="Commissioner-only join details stay available here until the draft is complete."
+            icon={Link2}
+          />
+          <div className="grid gap-4 p-5 lg:grid-cols-[0.9fr_1.1fr]">
+            <div className="rounded-2xl border border-sky-300/15 bg-sky-300/[0.055] p-5">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-300">Invite Managers</p>
-              <h2 className="mt-2 text-xl font-black text-slate-50">League invite code and link</h2>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
-                Come back here anytime if someone misses the original invite after league creation.
+              <h2 className="mt-2 text-2xl font-black text-slate-50">League invite code and link</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-400">
+                Share this code with managers who still need to join. It is removed from settings after the draft is
+                complete.
               </p>
             </div>
-            <div className="grid gap-3 lg:min-w-[520px]">
+            <div className="grid gap-3">
               <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Invite Code</p>
@@ -236,31 +288,6 @@ export default function LeagueSettings() {
           </div>
         </section>
       ) : null}
-
-      <section className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(13,23,39,0.96),rgba(16,30,52,0.9)_48%,rgba(15,23,42,0.96))] p-3 shadow-[0_24px_90px_rgba(14,165,233,0.12)]">
-        <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
-          {panels.map((panel) => {
-            const Icon = panel.icon;
-            const active = activePanel === panel.id;
-            return (
-              <button
-                key={panel.id}
-                type="button"
-                onClick={() => setActivePanel(panel.id)}
-                className={[
-                  "flex min-h-[72px] items-center justify-center gap-2 rounded-2xl border px-3 text-center text-[10px] font-black uppercase tracking-[0.14em] transition-all duration-200",
-                  active
-                    ? "border-sky-300/55 bg-sky-300/18 text-sky-50 shadow-[0_0_28px_rgba(56,189,248,0.22)]"
-                    : "border-white/10 bg-white/[0.04] text-slate-400 hover:-translate-y-0.5 hover:border-sky-300/25 hover:bg-sky-300/[0.07] hover:text-slate-100",
-                ].join(" ")}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{panel.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
 
       {activePanel === "standings" ? (
         <section className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[#0b1424]/92 shadow-[0_18px_70px_rgba(14,165,233,0.10)]">
@@ -420,6 +447,7 @@ export default function LeagueSettings() {
                 emptyText="This manager does not have imported roster players yet."
                 showPositionColumn={false}
                 leagueId={parsedLeagueId}
+                forceBlank={forceBlankRosters}
               />
             </div>
           )}

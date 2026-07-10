@@ -15,6 +15,7 @@ from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
+from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueMatchupTabRead,
@@ -49,6 +50,22 @@ DEFAULT_ROSTER_SLOTS = {
     "BENCH": 4,
     "IR": 1,
 }
+
+
+POST_DRAFT_LEAGUE_STATUSES = {"post_draft", "active", "playoffs", "completed", "archived"}
+POST_DRAFT_DRAFT_STATUSES = {"completed", "complete"}
+
+
+def _normalize_status(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def _is_post_draft_league(db: Session, league: League) -> bool:
+    draft = db.query(Draft).filter(Draft.league_id == league.id).first()
+    draft_status = _normalize_status(draft.status if draft else None)
+    if draft_status:
+        return draft_status in POST_DRAFT_DRAFT_STATUSES
+    return _normalize_status(league.status) in POST_DRAFT_LEAGUE_STATUSES
 
 
 def _slot_limits(db: Session, league: League) -> dict[str, int]:
@@ -236,6 +253,22 @@ def build_roster_tab_view(
             message="No team found for your user in this league.",
         )
 
+    team_read = _team_read(db, league, team)
+    if not _is_post_draft_league(db, league):
+        return LeagueRosterTabRead(
+            league_id=league.id,
+            season=league.season_year,
+            week=week,
+            owned_team=team_read,
+            fantasy_team_id=team.id,
+            fantasy_team_name=team.name,
+            roster=[],
+            data=[],
+            roster_slot_limits=slot_limits,
+            ir_slots=int(slot_limits.get("IR", 0)),
+            message="No players on this roster yet. Complete the draft to populate your roster.",
+        )
+
     matchup = (
         db.query(Matchup)
         .filter(
@@ -253,7 +286,6 @@ def build_roster_tab_view(
         opponent_name = opponent.name if opponent else None
 
     roster = _serialize_team_roster(db, league, team, week, opponent_name)
-    team_read = _team_read(db, league, team)
     return LeagueRosterTabRead(
         league_id=league.id,
         season=league.season_year,
@@ -452,6 +484,24 @@ def build_waivers_view(
         if team
         else []
     )
+    settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
+    priority_row = (
+        db.query(WaiverPriority)
+        .filter(WaiverPriority.league_id == league.id, WaiverPriority.team_id == team.id)
+        .first()
+        if team
+        else None
+    )
+    claim_player_ids = {
+        player_id
+        for claim in claims
+        for player_id in (claim.add_player_id, claim.drop_player_id)
+        if player_id is not None
+    }
+    claim_player_by_id = {
+        player.id: player
+        for player in db.query(Player).filter(Player.id.in_(claim_player_ids or {0})).all()
+    }
     return LeagueWaiversRead(
         league_id=league.id,
         fantasy_team_id=team.id if team else None,
@@ -476,17 +526,37 @@ def build_waivers_view(
         claims=[
             {
                 "id": claim.id,
+                "league_id": claim.league_id,
+                "team_id": claim.team_id,
+                "fantasy_team_id": claim.team_id,
                 "add_player_id": claim.add_player_id,
+                "add_player_name": claim_player_by_id[claim.add_player_id].name
+                if claim.add_player_id in claim_player_by_id
+                else None,
                 "drop_player_id": claim.drop_player_id,
+                "drop_player_name": claim_player_by_id[claim.drop_player_id].name
+                if claim.drop_player_id in claim_player_by_id
+                else None,
                 "bid_amount": claim.bid_amount,
+                "bid": claim.bid_amount,
                 "priority_at_submission": claim.priority_at_submission,
+                "priority": claim.priority_at_submission,
                 "status": claim.status,
                 "failure_reason": claim.failure_reason,
                 "process_after": claim.process_after.isoformat(),
                 "processed_at": claim.processed_at.isoformat() if claim.processed_at else None,
+                "created_at": claim.created_at.isoformat() if claim.created_at else None,
             }
             for claim in claims
         ],
+        waiver_rules={
+            "waiver_type": settings_row.waiver_mode if settings_row else None,
+            "waiver_period_hours": settings_row.waiver_period_hours if settings_row else None,
+            "faab_budget": settings_row.faab_budget if settings_row else None,
+            "allow_zero_dollar_bids": settings_row.allow_zero_dollar_bids if settings_row else None,
+        },
+        waiver_priority=priority_row.priority if priority_row else None,
+        faab_remaining=priority_row.faab_remaining if priority_row else (settings_row.faab_budget if settings_row else None),
         total_available=total,
         message=(
             "Pre-draft player pool is locked until the league draft starts."
@@ -503,11 +573,14 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
     is_commissioner = league.commissioner_user_id == user.id
     members = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).all()
     teams = db.query(Team).filter(Team.league_id == league.id).order_by(Team.id.asc()).all()
+    is_post_draft = _is_post_draft_league(db, league)
     roster_entries = (
         db.query(RosterEntry)
         .filter(RosterEntry.league_id == league.id)
         .order_by(RosterEntry.team_id.asc(), RosterEntry.slot.asc(), RosterEntry.id.asc())
         .all()
+        if is_post_draft
+        else []
     )
     projection_by_player = _projection_map(
         db,
@@ -550,7 +623,7 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
     draft = db.query(Draft).filter(Draft.league_id == league.id).first()
     draft_status = draft.status if draft else None
     draft_results: list[dict] = []
-    if draft:
+    if draft and is_post_draft:
         pick_rows = (
             db.query(DraftPick, Team, Player)
             .join(Team, Team.id == DraftPick.team_id)
@@ -573,15 +646,22 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
             for pick, team, player in pick_rows
         ]
 
+    show_invite = bool(is_commissioner and not is_post_draft and league.invite_code)
+    commissioner_controls = []
+    if is_commissioner:
+        commissioner_controls = ["reschedule_draft", "update_settings"]
+        if show_invite:
+            commissioner_controls.append("regenerate_invite")
+
     return LeagueSettingsViewRead(
         league_id=league.id,
         league_name=league.name,
         league_status=league.status,
         draft_status=draft_status,
-        invite_code=league.invite_code if is_commissioner else None,
+        invite_code=league.invite_code if show_invite else None,
         invite_link=(
             f"{app_settings.ui_base_url.rstrip('/')}/join/{league.invite_code}"
-            if is_commissioner and league.invite_code
+            if show_invite
             else None
         ),
         league_info={
@@ -603,9 +683,5 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
         schedule=schedule,
         rosters=roster_rows,
         draft_results=draft_results,
-        commissioner_controls=(
-            ["reschedule_draft", "update_settings", "regenerate_invite"]
-            if is_commissioner
-            else []
-        ),
+        commissioner_controls=commissioner_controls,
     )

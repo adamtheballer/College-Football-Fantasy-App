@@ -13,6 +13,7 @@ from collegefootballfantasy_api.app.integrations.espn import ESPNClient, extract
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.services.provider_identity_audit import (
+    provider_player_index,
     record_provider_identity_audit,
     record_unmatched_provider_row,
 )
@@ -100,6 +101,7 @@ def upsert_espn_weekly_player_stats(
 
     players = db.query(Player).all()
     external_index, name_school_index = _build_player_indexes(players)
+    external_index.update(provider_player_index(db, "espn"))
 
     inserted = 0
     updated = 0

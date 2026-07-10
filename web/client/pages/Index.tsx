@@ -6,7 +6,7 @@ import {
   ChevronRight,
   ShieldCheck,
   Trophy,
-  Users,
+  UserPlus,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -113,7 +113,10 @@ export default function Index() {
 
   const stats = useMemo(() => {
     const leagueCount = leagues.length;
-    const totalMembers = leagues.reduce((sum, league) => sum + league.members.length, 0);
+    const openLeagueSpots = leagues.reduce(
+      (sum, league) => sum + Math.max(0, league.max_teams - league.members.length),
+      0
+    );
     const rosterSize = workspace?.roster?.length ?? 0;
     const draftReadyCount = leagues.filter(
       (league) => league.status === "draft_live" || league.status === "draft_scheduled"
@@ -121,7 +124,7 @@ export default function Index() {
 
     return [
       { label: "Active Leagues", value: String(leagueCount), icon: Trophy },
-      { label: "Managers Joined", value: String(totalMembers), icon: Users },
+      { label: "Open League Spots", value: String(openLeagueSpots), icon: UserPlus },
       { label: "Rostered Players", value: String(rosterSize), icon: ShieldCheck },
       { label: "Draft Ready", value: String(draftReadyCount), icon: CalendarClock },
     ];

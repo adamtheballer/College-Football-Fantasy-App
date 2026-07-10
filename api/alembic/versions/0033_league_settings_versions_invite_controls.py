@@ -17,6 +17,14 @@ depends_on = None
 
 
 def upgrade() -> None:
+    if op.get_bind().dialect.name == "postgresql":
+        op.alter_column(
+            "alembic_version",
+            "version_num",
+            existing_type=sa.String(length=32),
+            type_=sa.String(length=255),
+        )
+
     op.create_table(
         "league_settings_versions",
         sa.Column("id", sa.Integer(), nullable=False),

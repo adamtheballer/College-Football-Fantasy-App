@@ -1,7 +1,7 @@
 import type { LeagueSettingsTabResponse } from "@/types/league";
 
-const POST_DRAFT_LEAGUE_STATUSES = new Set(["active", "playoffs", "completed", "archived"]);
-const POST_DRAFT_DRAFT_STATUSES = new Set(["completed"]);
+const POST_DRAFT_LEAGUE_STATUSES = new Set(["post_draft", "active", "playoffs", "completed", "archived"]);
+const POST_DRAFT_DRAFT_STATUSES = new Set(["completed", "complete"]);
 
 const normalizeStatus = (value: unknown) => String(value ?? "").trim().toLowerCase();
 
@@ -15,7 +15,7 @@ export function leagueStatusForLeague(settings?: LeagueSettingsTabResponse | nul
 
 export function isPostDraftLeague(settings?: LeagueSettingsTabResponse | null) {
   const draftStatus = draftStatusForLeague(settings);
-  if (POST_DRAFT_DRAFT_STATUSES.has(draftStatus)) return true;
+  if (draftStatus) return POST_DRAFT_DRAFT_STATUSES.has(draftStatus);
 
   const leagueStatus = leagueStatusForLeague(settings);
   return POST_DRAFT_LEAGUE_STATUSES.has(leagueStatus);

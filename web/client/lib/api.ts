@@ -165,6 +165,17 @@ const buildAuthHeaders = () => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
+const REFRESH_EXCLUDED_PATHS = new Set([
+  "/auth/login",
+  "/auth/signup",
+  "/auth/refresh",
+  "/auth/logout",
+  "/auth/logout-all",
+]);
+
+const shouldRefreshAfterUnauthorized = (path: string) =>
+  !REFRESH_EXCLUDED_PATHS.has(path);
+
 const buildError = async (res: Response) => {
   let detail: unknown = null;
   try {
@@ -174,6 +185,31 @@ const buildError = async (res: Response) => {
       detail = await res.text();
     } catch {
       detail = null;
+    }
+  }
+
+  if (
+    detail &&
+    typeof detail === "object" &&
+    "detail" in detail &&
+    Array.isArray(detail.detail)
+  ) {
+    const validationMessages = detail.detail
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const record = item as Record<string, unknown>;
+        const loc = Array.isArray(record.loc)
+          ? record.loc.filter((part) => part !== "body").join(".")
+          : "";
+        const message = typeof record.msg === "string" ? record.msg : null;
+        if (!message) return null;
+        return loc ? `${loc}: ${message}` : message;
+      })
+      .filter(Boolean)
+      .join("; ");
+
+    if (validationMessages) {
+      return new ApiError(res.status, validationMessages, detail);
     }
   }
 
@@ -245,7 +281,7 @@ const apiRequest = async <T>({
       { cause: error instanceof Error ? error.message : String(error), apiBase: API_BASE }
     );
   }
-  if (res.status === 401 && retryOn401 && !path.startsWith("/auth/")) {
+  if (res.status === 401 && retryOn401 && shouldRefreshAfterUnauthorized(path)) {
     const refreshResult = await refreshAccessToken();
     if (refreshResult === "refreshed") {
       return apiRequest<T>({

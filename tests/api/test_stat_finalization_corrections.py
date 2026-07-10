@@ -135,7 +135,7 @@ def test_stat_correction_recalculates_all_leagues_using_global_stat_row(client, 
     finalize_league_week_scores(db_session, second_league.id, 2026, 1)
     db_session.commit()
 
-    apply_stat_correction(
+    audit = apply_stat_correction(
         db_session,
         league_id=league.id,
         season=2026,
@@ -156,6 +156,9 @@ def test_stat_correction_recalculates_all_leagues_using_global_stat_row(client, 
     assert second_matchup.status == "stat_corrected"
     assert second_team_score.status == "stat_corrected"
     assert second_matchup.home_score == 22.0
+    assert audit.league_id == league.id
+    assert audit.affected_league_ids == [league.id, second_league.id]
+    assert db_session.query(ScoringCorrectionAudit).count() == 1
 
 
 def test_lineup_snapshot_updates_before_player_game_locks(client, db_session):

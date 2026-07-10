@@ -26,6 +26,7 @@ class Player(TimestampMixin, Base):
     sheet_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     roster_entries = relationship("RosterEntry", back_populates="player", cascade="all, delete-orphan")
+    provider_ids = relationship("PlayerProviderId", back_populates="player", cascade="all, delete-orphan")
 
     @property
     def board_rank(self) -> int | None:

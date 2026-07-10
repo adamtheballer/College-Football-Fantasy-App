@@ -14,12 +14,12 @@ import { LeagueCreateResponse } from "@/types/league";
 
 const steps = ["Basics", "Settings", "Draft", "Review"] as const;
 
-const leagueSizes = [6, 8, 10, 12, 14, 16];
+const leagueSizes = [4, 6, 8, 10, 12, 14, 16];
 const playoffOptions = [2, 4, 6, 8];
 const waiverOptions = [
-  { label: "FAAB (future claims)", value: "faab" },
-  { label: "Rolling Priority (future claims)", value: "rolling" },
-  { label: "Reverse Standings (future claims)", value: "reverse" },
+  { label: "FAAB", value: "faab" },
+  { label: "Rolling Priority", value: "rolling" },
+  { label: "Reverse Standings", value: "reverse" },
 ];
 const tradeReviewOptions = [
   { label: "Commissioner", value: "commissioner" },
@@ -713,7 +713,7 @@ function CreateLeagueForm() {
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field label="Claims policy (not enabled yet)">
+                  <Field label="Claims policy">
                     <Select
                       value={settings.waiver_type}
                       onValueChange={(value) => setSettings((prev) => ({ ...prev, waiver_type: value }))}

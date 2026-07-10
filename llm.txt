@@ -1,0 +1,10 @@
+UI verification rule:
+
+- For any frontend change that affects visible UI, routing, player/roster/draft display, modals, forms, disabled states, or browser behavior, always run browser-based UI verification before calling the work complete.
+- Prefer the `$ui-browser-verification` skill. Use Chrome MCP when available; otherwise use the Browser plugin or Playwright/Chromium.
+- Verification must check the exact reported route/state, not only unit tests or nearby components.
+- For stale UI bugs, verify both:
+  - the rendered DOM does not contain forbidden stale text/values, and
+  - the app is serving the current local source, not an old tunnel/build.
+- If the browser shows old UI after a fix, restart the local UI server and open Chrome to the fresh local Vite URL.
+- If Codex hooks are available in the environment, turn this into an automatic post-frontend-change hook so UI verification runs after React/Vite edits.

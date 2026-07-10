@@ -1,29 +1,17 @@
-import { Bookmark, ClipboardList, Settings2, ShieldCheck, Swords, UserPlus } from "lucide-react";
+import { Bookmark, ClipboardList, ListOrdered, Settings2, ShieldCheck, Swords } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
-import { useLeagueSettingsTab } from "@/hooks/use-leagues";
-import { DEMO_LEAGUE_ID } from "@/lib/leaguePreviewData";
-import { isPreDraftLeague } from "@/lib/leagueState";
-
-const postDraftTabs = [
+const tabs = [
   { label: "Roster", path: "roster", icon: ClipboardList },
   { label: "Matchup", path: "matchup", icon: Swords },
-  { label: "Available Players", path: "waivers", icon: ShieldCheck },
   { label: "Watchlist", path: "watchlist", icon: Bookmark },
-  { label: "Settings", path: "settings", icon: Settings2 },
-];
-
-const preDraftTabs = [
-  { label: "Available Players", path: "waivers", icon: ShieldCheck },
-  { label: "Invite Members", path: "invite", icon: UserPlus },
+  { label: "Waivers", path: "waivers", icon: ShieldCheck },
+  { label: "Draft Room", path: "lobby", icon: ListOrdered },
   { label: "Settings", path: "settings", icon: Settings2 },
 ];
 
 export function LeagueTabs({ leagueId }: { leagueId: number }) {
   const location = useLocation();
-  const isDemoLeague = leagueId === DEMO_LEAGUE_ID;
-  const settingsQuery = useLeagueSettingsTab(leagueId, !isDemoLeague);
-  const tabs = !isDemoLeague && isPreDraftLeague(settingsQuery.data) ? preDraftTabs : postDraftTabs;
 
   return (
     <div

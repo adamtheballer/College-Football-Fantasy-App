@@ -57,20 +57,29 @@ SCORING_RULE_ALIASES = {
     "pass_td": "pass_tds",
     "passing_td": "pass_tds",
     "passing_tds": "pass_tds",
+    "pass_tds": "pass_tds",
     "pass_int": "passing_interceptions",
+    "int": "passing_interceptions",
     "interception": "passing_interceptions",
     "interceptions": "passing_interceptions",
     "rush_td": "rush_tds",
     "rushing_td": "rush_tds",
     "rushing_tds": "rush_tds",
+    "rush_tds": "rush_tds",
     "rec_td": "rec_tds",
     "receiving_td": "rec_tds",
     "receiving_tds": "rec_tds",
+    "rec_tds": "rec_tds",
     "pass_yd": "pass_yards",
     "passing_yards": "pass_yards",
     "rush_yd": "rush_yards",
     "rushing_yards": "rush_yards",
+    "rec_yd": "rec_yards",
+    "rec_yards": "rec_yards",
     "receiving_yards": "rec_yards",
+    "fumble_lost": "fumbles_lost",
+    "fg": "fg_made_0_39",
+    "xp": "xp_made",
     "FieldGoalsMade0To49": "fg_made_0_39",
     "FieldGoalsMade0to49": "fg_made_0_39",
     "FieldGoalsMade0To39": "fg_made_0_39",
@@ -80,6 +89,21 @@ SCORING_RULE_ALIASES = {
     "FieldGoalsMade50Plus": "fg_made_50_plus",
     "ExtraPointsMade": "xp_made",
     "FieldGoalsMissed": "fg_missed",
+}
+
+YARDS_PER_POINT_ALIASES = {
+    "pass_yds_per_pt": "pass_yards",
+    "passing_yds_per_pt": "pass_yards",
+    "pass_yards_per_point": "pass_yards",
+    "passing_yards_per_point": "pass_yards",
+    "rush_yds_per_pt": "rush_yards",
+    "rushing_yds_per_pt": "rush_yards",
+    "rush_yards_per_point": "rush_yards",
+    "rushing_yards_per_point": "rush_yards",
+    "rec_yds_per_pt": "rec_yards",
+    "receiving_yds_per_pt": "rec_yards",
+    "rec_yards_per_point": "rec_yards",
+    "receiving_yards_per_point": "rec_yards",
 }
 
 
@@ -138,8 +162,15 @@ def _coerce_rule_value(key: str, value: Any) -> float:
     return number
 
 
+def _coerce_yards_per_point_rule_value(key: str, value: Any) -> float:
+    yards_per_point = _coerce_rule_value(key, value)
+    if yards_per_point <= 0:
+        raise ScoringRulesValidationError(f"scoring rule {key!r} must be greater than zero")
+    return 1 / yards_per_point
+
+
 def _canonical_rule_key(raw_key: str, allowed: set[str]) -> str:
-    canonical = SCORING_RULE_ALIASES.get(raw_key, raw_key)
+    canonical = YARDS_PER_POINT_ALIASES.get(raw_key, SCORING_RULE_ALIASES.get(raw_key, raw_key))
     if canonical not in allowed:
         raise ScoringRulesValidationError(f"unknown scoring rule {raw_key!r}")
     return canonical
@@ -157,7 +188,11 @@ def _normalize_profile_rules(profile: str, raw_rules: Mapping[str, Any]) -> dict
                 f"ambiguous scoring aliases {previous!r} and {key!r} both map to {canonical!r}"
             )
         seen_aliases[canonical] = key
-        defaults[canonical] = _coerce_rule_value(key, raw_value)
+        defaults[canonical] = (
+            _coerce_yards_per_point_rule_value(key, raw_value)
+            if key in YARDS_PER_POINT_ALIASES
+            else _coerce_rule_value(key, raw_value)
+        )
     return defaults
 
 
@@ -166,7 +201,7 @@ def _partition_flat_rules(raw_rules: Mapping[str, Any]) -> tuple[dict[str, Any],
     kicker_raw: dict[str, Any] = {}
     for raw_key, raw_value in raw_rules.items():
         key = str(raw_key)
-        canonical = SCORING_RULE_ALIASES.get(key, key)
+        canonical = YARDS_PER_POINT_ALIASES.get(key, SCORING_RULE_ALIASES.get(key, key))
         in_offense = canonical in OFFENSE_RULES
         in_kicker = canonical in KICKER_RULES
         if in_offense and in_kicker:

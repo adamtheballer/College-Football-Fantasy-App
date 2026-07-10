@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
@@ -9,6 +8,7 @@ from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.services.team_provider_mapping import games_for_player_school
 
 FINAL_MATCHUP_STATUSES = {"final", "stat_corrected"}
 
@@ -27,10 +27,6 @@ def _aware(value: datetime) -> datetime:
     return value
 
 
-def _identity(value: str | None) -> str:
-    return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
-
-
 def active_scoring_week(db: Session, league: League) -> int | None:
     row = (
         db.query(Matchup.week)
@@ -47,23 +43,13 @@ def active_scoring_week(db: Session, league: League) -> int | None:
 
 def player_lock_game(db: Session, league: League, player: Player, now: datetime | None = None) -> Game | None:
     timestamp = _aware(now or _now())
-    school_key = _identity(player.school)
-    if not school_key:
-        return None
 
     week = active_scoring_week(db, league)
-    query = db.query(Game).filter(
-        Game.season == league.season_year,
-        Game.start_date.isnot(None),
-    )
-    if week is not None:
-        query = query.filter(Game.week == week)
-
-    for game in query.order_by(Game.start_date.asc()).all():
-        if _identity(game.home_team) != school_key and _identity(game.away_team) != school_key:
-            continue
-        if game.start_date and _aware(game.start_date) <= timestamp:
-            return game
+    weeks = [week] if week is not None else sorted({row[0] for row in db.query(Game.week).filter(Game.season == league.season_year).all()})
+    for scoring_week in weeks:
+        for game in games_for_player_school(db, player=player, season=league.season_year, week=scoring_week):
+            if game.start_date and _aware(game.start_date) <= timestamp:
+                return game
     return None
 
 

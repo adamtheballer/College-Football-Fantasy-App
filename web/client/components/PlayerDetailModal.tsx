@@ -544,11 +544,13 @@ export function PlayerDetailModal({ player, isOpen, onClose }: PlayerDetailModal
 
            <div className="flex gap-6 relative">
               <Button
-                disabled
-                title="Trade flow is not part of the supported React surface yet."
+                onClick={() => {
+                  window.location.href = `/trade`;
+                }}
+                title="Open the trade builder."
                 className="h-16 px-12 bg-primary text-primary-foreground rounded-2xl text-[11px] font-black uppercase tracking-[0.3em] shadow-[0_20px_40px_rgba(var(--primary),0.3)] hover:scale-105 transition-all duration-500 border border-white/10"
               >
-                Trade Flow Coming Soon
+                Open Trade Builder
               </Button>
            </div>
         </div>

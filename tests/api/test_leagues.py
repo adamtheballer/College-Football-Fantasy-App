@@ -101,7 +101,21 @@ def test_create_and_list_leagues(client):
     assert data["data"][0]["name"] == created["name"]
     assert data["data"][0]["max_teams"] == created["max_teams"]
     assert len(data["data"][0]["members"]) == 1
+    assert data["data"][0]["members"][0]["display_name"] == "Coachone"
     assert data["data"][0]["draft"]["draft_type"] == "snake"
+
+    members_response = client.get(f"/leagues/{created['id']}/members", headers=auth_headers(token))
+    assert members_response.status_code == 200
+    assert members_response.json()["data"][0]["display_name"] == "Coachone"
+
+
+def test_create_league_allows_four_manager_minimum(client):
+    token = create_user_and_token(client, "four-team-minimum")
+    created = create_league(client, token, name="Four Team League", max_teams=4)
+
+    assert created["name"] == "Four Team League"
+    assert created["max_teams"] == 4
+    assert len(created["members"]) == 1
 
 
 def test_development_allows_unverified_user_to_create_league(client):
@@ -171,6 +185,68 @@ def test_create_league_persists_custom_roster_format_and_flags(client):
     assert settings["playoff_teams"] == 6
     assert settings["waiver_type"] == "rolling"
     assert settings["trade_review_type"] == "league_vote"
+
+
+def test_create_league_accepts_react_form_default_scoring_payload(client):
+    token = create_user_and_token(client, "react-form-scoring")
+    payload = {
+        "basics": {
+            "name": "React Form League",
+            "season_year": 2026,
+            "max_teams": 12,
+            "is_private": True,
+            "description": None,
+            "icon_url": None,
+        },
+        "settings": {
+            "scoring_json": {
+                "ppr": 1,
+                "pass_td": 4,
+                "pass_yds_per_pt": 25,
+                "rush_yds_per_pt": 10,
+                "rec_yds_per_pt": 10,
+                "rush_td": 6,
+                "rec_td": 6,
+                "int": -2,
+                "fumble_lost": -2,
+                "fg": 3,
+                "xp": 1,
+            },
+            "roster_slots_json": {
+                "QB": 1,
+                "RB": 2,
+                "WR": 2,
+                "TE": 1,
+                "FLEX": 1,
+                "SUPERFLEX": 0,
+                "K": 1,
+                "BENCH": 5,
+                "IR": 1,
+            },
+            "playoff_teams": 4,
+            "waiver_type": "faab",
+            "trade_review_type": "commissioner",
+            "superflex_enabled": False,
+            "kicker_enabled": True,
+            "defense_enabled": False,
+        },
+        "draft": {
+            "draft_datetime_utc": "2026-08-19T18:00:00Z",
+            "timezone": "America/New_York",
+            "draft_type": "snake",
+            "pick_timer_seconds": 90,
+        },
+    }
+
+    response = client.post("/leagues", json=payload, headers=auth_headers(token))
+
+    assert response.status_code == 201
+    settings = response.json()["league"]["settings"]
+    assert settings["scoring_json"]["offense"]["pass_yards"] == 0.04
+    assert settings["scoring_json"]["offense"]["rush_yards"] == 0.1
+    assert settings["scoring_json"]["offense"]["rec_yards"] == 0.1
+    assert settings["scoring_json"]["offense"]["passing_interceptions"] == -2
+    assert settings["scoring_json"]["kicker"]["xp_made"] == 1
 
 
 def test_create_league_rejects_odd_manager_count(client):
@@ -302,6 +378,40 @@ def test_create_invite_join_assigns_one_team_per_user_and_enforces_max_teams(cli
     assert db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id == third.id).count() == 0
 
 
+def test_join_league_generates_unique_team_names_for_duplicate_first_names(client, db_session):
+    owner_token = create_user_and_token(client, "duplicate-name-owner")
+    league = create_league(client, owner_token, name="Duplicate Name League", max_teams=4)
+
+    tokens = []
+    for suffix in ("same-name-one", "same-name-two"):
+        email = f"coach-{suffix}@example.com"
+        response = client.post(
+            "/auth/signup",
+            json={
+                "first_name": "Sam",
+                "email": email,
+                "password": "StrongPass123!",
+            },
+        )
+        assert response.status_code == 201
+        user = db_session.query(User).filter(User.email == email).one()
+        user.email_verified_at = datetime.now(timezone.utc)
+        db_session.commit()
+        tokens.append(response.json()["access_token"])
+
+    for token in tokens:
+        response = client.post(f"/leagues/{league['id']}/join", headers=auth_headers(token))
+        assert response.status_code == 200
+
+    teams = (
+        db_session.query(Team)
+        .filter(Team.league_id == league["id"], Team.owner_name == "Sam")
+        .order_by(Team.name.asc())
+        .all()
+    )
+    assert [team.name for team in teams] == ["Sam's Team", "Sam's Team 2"]
+
+
 def test_expired_invite_cannot_be_previewed_or_used(client, db_session):
     owner_token = create_user_and_token(client, "expired-invite-owner")
     member_token = create_user_and_token(client, "expired-invite-member")
@@ -376,7 +486,8 @@ def test_league_creation_and_settings_update_create_settings_versions(client, db
         .all()
     )
     assert [version.version for version in initial_versions] == [1]
-    assert initial_versions[0].settings_json["scoring_json"] == {"ppr": 1}
+    assert initial_versions[0].settings_json["scoring_json"]["offense"]["receptions"] == 1
+    assert initial_versions[0].settings_json["scoring_json"]["offense"]["pass_tds"] == 4
 
     payload = {
         "scoring_json": {"ppr": 1, "pass_td": 6},
@@ -399,7 +510,8 @@ def test_league_creation_and_settings_update_create_settings_versions(client, db
         .all()
     )
     assert [version.version for version in versions] == [1, 2]
-    assert versions[1].settings_json["scoring_json"] == {"ppr": 1, "pass_td": 6}
+    assert versions[1].settings_json["scoring_json"]["offense"]["receptions"] == 1
+    assert versions[1].settings_json["scoring_json"]["offense"]["pass_tds"] == 6
 
 
 def test_roster_size_change_is_rejected_after_draft_has_picks(client, db_session):

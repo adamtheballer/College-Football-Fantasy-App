@@ -358,7 +358,23 @@ def list_league_members(
 ) -> LeagueMembersList:
     require_league_member(db, league_id, current_user)
     members = db.query(LeagueMember).filter(LeagueMember.league_id == league_id).all()
-    return LeagueMembersList(data=[LeagueMemberRead.model_validate(m) for m in members], total=len(members))
+    member_user_ids = {member.user_id for member in members}
+    users = db.query(User).filter(User.id.in_(member_user_ids)).all() if member_user_ids else []
+    user_by_id = {user.id: user for user in users}
+    return LeagueMembersList(
+        data=[
+            LeagueMemberRead(
+                id=member.id,
+                user_id=member.user_id,
+                role=member.role,
+                joined_at=member.joined_at,
+                first_name=user_by_id[member.user_id].first_name if member.user_id in user_by_id else None,
+                display_name=user_by_id[member.user_id].first_name if member.user_id in user_by_id else None,
+            )
+            for member in members
+        ],
+        total=len(members),
+    )
 
 
 @router.post("/join-by-code", response_model=LeaguePreview)

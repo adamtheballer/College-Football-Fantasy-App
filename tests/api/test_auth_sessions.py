@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.security import (
@@ -80,6 +80,48 @@ def test_email_verification_token_is_single_use(client, db_session):
 
     second_response = client.post("/auth/verify-email", json={"token": raw_token})
     assert second_response.status_code == 400
+
+
+def test_expired_verification_token_can_be_resent(client, db_session):
+    signup_user(client, "verify-resend-expired")
+    from collegefootballfantasy_api.app.services.auth_security import EMAIL_VERIFICATION_TOKEN, create_auth_action_token
+
+    user = db_session.query(User).filter(User.email == "coach-verify-resend-expired@example.com").one()
+    raw_token = create_auth_action_token(
+        db_session,
+        user=user,
+        token_type=EMAIL_VERIFICATION_TOKEN,
+        ttl=timedelta(hours=24),
+        request=type("Req", (), {"headers": {}, "client": None})(),
+    )
+    db_session.commit()
+    token = (
+        db_session.query(AuthActionToken)
+        .filter_by(user_id=user.id, token_type="email_verification", consumed_at=None)
+        .one()
+    )
+    token.expires_at = token.created_at.replace(tzinfo=timezone.utc) - timedelta(minutes=1)
+    db_session.add(token)
+    db_session.commit()
+
+    expired_response = client.post("/auth/verify-email", json={"token": raw_token})
+    assert expired_response.status_code == 400
+
+    resend_response = client.post(
+        "/auth/resend-verification",
+        json={"email": "coach-verify-resend-expired@example.com"},
+    )
+    assert resend_response.status_code == 200
+    assert resend_response.json()["message"] == "if an account needs verification, a new email was sent"
+
+    active_tokens = (
+        db_session.query(AuthActionToken)
+        .filter_by(user_id=user.id, token_type="email_verification", consumed_at=None)
+        .all()
+    )
+    assert len(active_tokens) == 1
+    assert active_tokens[0].id != token.id
+    assert active_tokens[0].expires_at > token.expires_at
 
 
 def test_signup_normalizes_and_returns_username(client):

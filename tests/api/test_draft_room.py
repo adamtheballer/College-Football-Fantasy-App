@@ -783,6 +783,24 @@ def test_commissioner_can_revisit_invite_code_and_link_from_settings(client):
     assert member_payload["invite_link"] is None
     assert "regenerate_invite" not in member_payload["commissioner_controls"]
 
+    with TestingSessionLocal() as session:
+        draft = session.query(Draft).filter(Draft.league_id == league["id"]).one()
+        draft.status = "completed"
+        league_row = session.get(League, league["id"])
+        assert league_row is not None
+        league_row.status = "post_draft"
+        session.commit()
+
+    completed_response = client.get(
+        f"/leagues/{league['id']}/settings-view",
+        headers=auth_headers(owner_token),
+    )
+    assert completed_response.status_code == 200
+    completed_payload = completed_response.json()
+    assert completed_payload["invite_code"] is None
+    assert completed_payload["invite_link"] is None
+    assert "regenerate_invite" not in completed_payload["commissioner_controls"]
+
 
 def test_waiver_available_players_are_scoped_to_current_league(client):
     first_owner_token = create_user_and_token(client, "waiver-owner-a")
@@ -817,7 +835,7 @@ def test_waiver_available_players_are_scoped_to_current_league(client):
     assert owned_player_id in second_available_ids
 
 
-def test_roster_endpoint_returns_zero_projection_and_ir_capacity(client):
+def test_roster_endpoint_returns_zero_projection_and_ir_capacity(client, db_session):
     owner_token = create_user_and_token(client, "roster-view-owner")
     league = create_league(client, owner_token, max_teams=2)
     player_id = create_player(client, "Projection Missing QB", "QB")
@@ -826,6 +844,10 @@ def test_roster_endpoint_returns_zero_projection_and_ir_capacity(client):
         json={"player_id": player_id},
         headers=auth_headers(owner_token),
     ).status_code == 201
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    draft.status = "completed"
+    db_session.add(draft)
+    db_session.commit()
 
     response = client.get(f"/leagues/{league['id']}/roster", headers=auth_headers(owner_token))
     assert response.status_code == 200
@@ -833,6 +855,25 @@ def test_roster_endpoint_returns_zero_projection_and_ir_capacity(client):
     assert payload["ir_slots"] == 1
     assert payload["roster"][0]["projected_points"] == 0.0
     assert payload["roster"][0]["is_ir"] is False
+
+
+def test_roster_endpoint_hides_entries_until_draft_completed(client):
+    owner_token = create_user_and_token(client, "pre-draft-roster-view-owner")
+    league = create_league(client, owner_token, max_teams=2)
+    player_id = create_player(client, "Pre Draft Hidden QB", "QB")
+    assert client.post(
+        f"/leagues/{league['id']}/draft-picks",
+        json={"player_id": player_id},
+        headers=auth_headers(owner_token),
+    ).status_code == 201
+
+    response = client.get(f"/leagues/{league['id']}/roster", headers=auth_headers(owner_token))
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["roster"] == []
+    assert payload["data"] == []
+    assert payload["message"] == "No players on this roster yet. Complete the draft to populate your roster."
 
 
 def test_matchup_probability_helper_behaves_safely():

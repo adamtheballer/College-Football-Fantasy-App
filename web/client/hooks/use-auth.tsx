@@ -305,21 +305,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({
-      user,
-      login,
-      signup,
-      logout,
-      resendVerification,
-      verifyEmail,
-      requestPasswordReset,
-      confirmPasswordReset,
-      listSessions,
-      revokeSession,
-      logoutAll,
-      isLoggedIn: !!user,
-      isBootstrapping,
-    }),
+    () => {
+      const hasAccessToken = Boolean(getStoredAccessToken());
+      return {
+        user,
+        login,
+        signup,
+        logout,
+        resendVerification,
+        verifyEmail,
+        requestPasswordReset,
+        confirmPasswordReset,
+        listSessions,
+        revokeSession,
+        logoutAll,
+        isLoggedIn: Boolean(user && hasAccessToken),
+        isBootstrapping,
+      };
+    },
     [
       confirmPasswordReset,
       isBootstrapping,

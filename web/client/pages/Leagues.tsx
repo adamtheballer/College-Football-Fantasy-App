@@ -221,7 +221,7 @@ export default function Leagues() {
               <PageEmptyState
                 eyebrow="Demo Mode"
                 title="Placeholder league loaded"
-                description="Open Alpha Demo League to inspect the 10-manager Roster, Matchup, Available Players, and Settings flow."
+                description="Open Alpha Demo League to inspect the 10-manager Roster, Matchup, Draft Room, and Settings flow."
                 className="border-0 bg-transparent p-0 shadow-none"
               />
 
@@ -245,7 +245,7 @@ export default function Leagues() {
                   <div className="space-y-2">
                     <h4 className="text-sm font-black uppercase tracking-[0.14em] text-foreground">Invite Your League</h4>
                     <p className="text-xs font-medium leading-6 text-muted-foreground/75">
-                      Available Players is league-specific and only appears once a league is opened.
+                      Draft Room is league-specific and only appears once a league is opened.
                     </p>
                   </div>
                 </div>

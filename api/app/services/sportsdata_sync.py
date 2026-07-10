@@ -28,6 +28,11 @@ from collegefootballfantasy_api.app.services.power4 import (
     list_power4_teams,
     resolve_power4_school,
 )
+from collegefootballfantasy_api.app.services.provider_identity_audit import (
+    provider_player_index,
+    upsert_player_provider_id,
+)
+from collegefootballfantasy_api.app.services.team_provider_mapping import upsert_team_provider_id
 
 _OFFENSE_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 
@@ -74,6 +79,7 @@ def sync_power4_players_from_sportsdata(db: Session) -> dict[str, int]:
         raise RuntimeError("SPORTSDATA_ENABLED is false")
     client = SportsDataClient()
     rows = client.get_players()
+    players_by_provider_id = provider_player_index(db, "sportsdata")
 
     created = 0
     updated = 0
@@ -92,6 +98,8 @@ def sync_power4_players_from_sportsdata(db: Session) -> dict[str, int]:
 
         existing: Player | None = None
         if external_id:
+            existing = players_by_provider_id.get(external_id)
+        if not existing and external_id:
             existing = db.scalar(select(Player).where(Player.external_id == external_id))
         if not existing:
             existing = db.scalar(
@@ -110,18 +118,35 @@ def sync_power4_players_from_sportsdata(db: Session) -> dict[str, int]:
             existing.position = position
             if external_id:
                 existing.external_id = external_id
+                upsert_player_provider_id(
+                    db,
+                    player_id=existing.id,
+                    provider="sportsdata",
+                    provider_player_id=external_id,
+                    provider_team_id=_pick_str(row, "TeamID", "TeamId", "TeamKey", "Team"),
+                    match_confidence=100,
+                )
             db.add(existing)
             updated += 1
             continue
 
-        db.add(
-            Player(
-                external_id=external_id,
-                name=name,
-                school=canonical_team,
-                position=position,
-            )
+        player = Player(
+            external_id=external_id,
+            name=name,
+            school=canonical_team,
+            position=position,
         )
+        db.add(player)
+        db.flush()
+        if external_id:
+            upsert_player_provider_id(
+                db,
+                player_id=player.id,
+                provider="sportsdata",
+                provider_player_id=external_id,
+                provider_team_id=_pick_str(row, "TeamID", "TeamId", "TeamKey", "Team"),
+                match_confidence=100,
+            )
         created += 1
 
     db.flush()
@@ -151,6 +176,10 @@ def sync_power4_schedule_from_sportsdata(db: Session, season: int) -> dict[str, 
         if not home_team or not away_team:
             skipped += 1
             continue
+        home_provider_team_id = _pick_str(row, "HomeTeamID", "HomeTeamId", "HomeTeamKey", "HomeTeam")
+        away_provider_team_id = _pick_str(row, "AwayTeamID", "AwayTeamId", "AwayTeamKey", "AwayTeam")
+        home_abbreviation = _pick_str(row, "HomeTeam", "HomeTeamKey", "HomeTeamAbbreviation")
+        away_abbreviation = _pick_str(row, "AwayTeam", "AwayTeamKey", "AwayTeamAbbreviation")
 
         external_id = _pick_str(row, "GameID", "GameId", "GlobalGameID")
         if not external_id:
@@ -171,14 +200,35 @@ def sync_power4_schedule_from_sportsdata(db: Session, season: int) -> dict[str, 
         season_type = "postseason" if "post" in season_type_raw else "regular"
         game.season = season
         game.week = week_value
+        game.provider = "sportsdata"
         game.season_type = season_type
         game.start_date = _parse_datetime(_pick_str(row, "DateTime", "Day", "Date"))
         game.home_team = home_team
         game.away_team = away_team
+        game.home_provider_team_id = home_provider_team_id
+        game.away_provider_team_id = away_provider_team_id
         game.home_points = _pick_int(row, "HomeScore", "HomePoints")
         game.away_points = _pick_int(row, "AwayScore", "AwayPoints")
         game.neutral_site = (_pick_int(row, "NeutralVenue", "NeutralSite") or 0) == 1
         db.add(game)
+        if home_provider_team_id:
+            upsert_team_provider_id(
+                db,
+                canonical_school=home_team,
+                provider="sportsdata",
+                provider_team_id=home_provider_team_id,
+                provider_team_name=home_raw,
+                provider_abbreviation=home_abbreviation,
+            )
+        if away_provider_team_id:
+            upsert_team_provider_id(
+                db,
+                canonical_school=away_team,
+                provider="sportsdata",
+                provider_team_id=away_provider_team_id,
+                provider_team_name=away_raw,
+                provider_abbreviation=away_abbreviation,
+            )
 
     db.flush()
     return {"created": created, "updated": updated, "skipped": skipped}
@@ -393,6 +443,7 @@ def _upsert_power4_injuries(
     cleared = 0
     notifications = 0
     now = datetime.now(timezone.utc)
+    sportsdata_player_index = provider_player_index(db, "sportsdata")
 
     for row in rows:
         conference_name = conference_for_school(row["team_name"] or "")
@@ -404,6 +455,8 @@ def _upsert_power4_injuries(
         player = None
         external_id = row.get("external_id")
         if external_id:
+            player = sportsdata_player_index.get(str(external_id))
+        if not player and external_id:
             player = db.scalar(select(Player).where(Player.external_id == external_id))
         if not player:
             player = db.scalar(
@@ -423,6 +476,16 @@ def _upsert_power4_injuries(
             )
             db.add(player)
             db.flush()
+            if external_id:
+                upsert_player_provider_id(
+                    db,
+                    player_id=player.id,
+                    provider="sportsdata",
+                    provider_player_id=str(external_id),
+                    provider_team_id=row.get("team_name"),
+                    match_confidence=90,
+                )
+                sportsdata_player_index[str(external_id)] = player
         else:
             if row["position"] and player.position != row["position"]:
                 player.position = row["position"] or player.position
@@ -430,6 +493,15 @@ def _upsert_power4_injuries(
                 player.school = row["team_name"] or player.school
             if external_id and not player.external_id:
                 player.external_id = external_id
+            if external_id:
+                upsert_player_provider_id(
+                    db,
+                    player_id=player.id,
+                    provider="sportsdata",
+                    provider_player_id=str(external_id),
+                    provider_team_id=row.get("team_name"),
+                    match_confidence=90,
+                )
             db.add(player)
 
         seen_player_ids.add(player.id)

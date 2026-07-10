@@ -17,6 +17,7 @@ class ScoringCorrectionAudit(TimestampMixin, Base):
     week: Mapped[int] = mapped_column(Integer, nullable=False)
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"))
     source_stat_id: Mapped[int | None] = mapped_column(ForeignKey("player_stats.id", ondelete="SET NULL"), nullable=True)
+    affected_league_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
     old_raw_json: Mapped[dict] = mapped_column(JSON, default={})
     new_raw_json: Mapped[dict] = mapped_column(JSON, default={})
     old_fantasy_points: Mapped[float] = mapped_column(Float, default=0.0)

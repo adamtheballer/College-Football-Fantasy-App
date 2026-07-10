@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
@@ -10,14 +9,11 @@ from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.services.team_provider_mapping import games_for_player_school
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _identity(value: str | None) -> str:
-    return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
 
 
 def player_is_locked_for_week(
@@ -28,22 +24,8 @@ def player_is_locked_for_week(
     week: int,
     now: datetime,
 ) -> bool:
-    school_key = _identity(player.school)
-    if not school_key:
-        return False
-    games = (
-        db.query(Game)
-        .filter(
-            Game.season == season,
-            Game.week == week,
-            Game.start_date.isnot(None),
-        )
-        .order_by(Game.start_date.asc())
-        .all()
-    )
+    games = games_for_player_school(db, player=player, season=season, week=week)
     for game in games:
-        if _identity(game.home_team) != school_key and _identity(game.away_team) != school_key:
-            continue
         start_date = game.start_date
         if start_date is None:
             continue

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
@@ -11,30 +11,16 @@ import {
   createDemoLeagueRosterResponse,
 } from "@/lib/leaguePreviewData";
 import { isPreDraftLeague } from "@/lib/leagueState";
+import {
+  createEmptyRosterSlotRows,
+  isRealRosterPlayer,
+  rosterProjectionTotal,
+  shouldBlankRoster,
+} from "@/lib/rosterDisplay";
 
 const starterSlot = (slot?: string | null) => {
   const normalized = (slot || "").toUpperCase();
   return normalized !== "BENCH" && normalized !== "IR";
-};
-
-const projectionValue = (player: { projected_points?: number | null; weekly_projected_fantasy_points?: number | null }) => {
-  const value = player.projected_points ?? player.weekly_projected_fantasy_points;
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-};
-
-const isPlaceholderRosterPlayer = (player: {
-  acquisition_type?: string | null;
-  player_name?: string | null;
-  status?: string | null;
-}) => {
-  const status = (player.status ?? "").toUpperCase();
-  const acquisitionType = (player.acquisition_type ?? "").toUpperCase();
-  const name = player.player_name ?? "";
-  return (
-    status === "EMPTY_SLOT" ||
-    acquisitionType === "EMPTY_SLOT" ||
-    /\b(starter preview|week\s+\d+\s+preview)\b/i.test(name)
-  );
 };
 
 export default function LeagueRoster() {
@@ -47,41 +33,56 @@ export default function LeagueRoster() {
   const rosterQuery = useLeagueRosterTab(
     parsedLeagueId,
     selectedWeek ?? undefined,
-    !isDemoLeague && !isPreDraft
+    !isDemoLeague
   );
   const demoData = isDemoLeague ? createDemoLeagueRosterResponse() : null;
   const rosterData = demoData ?? rosterQuery.data;
   const fetchedRoster = rosterData?.roster ?? rosterData?.data ?? [];
   const previewTeamName = rosterData?.owned_team?.name ?? rosterData?.fantasy_team_name ?? "Your Team";
   const roster = fetchedRoster;
-  const realRosterPlayers = roster.filter((player) => !isPlaceholderRosterPlayer(player));
+  const realRosterPlayers = roster.filter(isRealRosterPlayer);
   const hasRealRosterPlayers = realRosterPlayers.length > 0;
+  const forceBlankRoster = shouldBlankRoster(roster, {
+    isDemoLeague,
+    isPreDraft,
+    message: rosterData?.message,
+  });
+  const emptyRosterSlots = useMemo(
+    () =>
+      createEmptyRosterSlotRows({
+        rosterSlotLimits: rosterData?.roster_slot_limits,
+        fantasyTeamId: rosterData?.fantasy_team_id ?? rosterData?.owned_team?.id ?? null,
+        fantasyTeamName: previewTeamName,
+        leagueId: rosterData?.league_id ?? parsedLeagueId,
+      }),
+    [
+      parsedLeagueId,
+      previewTeamName,
+      rosterData?.fantasy_team_id,
+      rosterData?.league_id,
+      rosterData?.owned_team?.id,
+      rosterData?.roster_slot_limits,
+    ]
+  );
+  const displayRoster = forceBlankRoster ? emptyRosterSlots : realRosterPlayers;
   const isEmptyRealRoster = !isDemoLeague && !rosterQuery.isLoading && !hasRealRosterPlayers;
-  const starters = useMemo(
-    () => roster.filter((player) => starterSlot(player.slot ?? player.roster_slot)),
-    [roster]
+  const rawStarters = useMemo(
+    () => displayRoster.filter((player) => starterSlot(player.slot ?? player.roster_slot)),
+    [displayRoster]
   );
-  const bench = useMemo(
-    () => roster.filter((player) => (player.slot ?? player.roster_slot ?? "").toUpperCase() === "BENCH"),
-    [roster]
+  const rawBench = useMemo(
+    () => displayRoster.filter((player) => (player.slot ?? player.roster_slot ?? "").toUpperCase() === "BENCH"),
+    [displayRoster]
   );
-  const ir = useMemo(
-    () => roster.filter((player) => (player.slot ?? player.roster_slot ?? "").toUpperCase() === "IR"),
-    [roster]
+  const rawIr = useMemo(
+    () => displayRoster.filter((player) => (player.slot ?? player.roster_slot ?? "").toUpperCase() === "IR"),
+    [displayRoster]
   );
-  const starterTotal = isEmptyRealRoster
-    ? null
-    : starters.reduce(
-        (total, player) => total + (isPlaceholderRosterPlayer(player) ? 0 : projectionValue(player) ?? 0),
-        0
-      );
-
-  const benchTotal = isEmptyRealRoster
-    ? null
-    : bench.reduce(
-        (total, player) => total + (isPlaceholderRosterPlayer(player) ? 0 : projectionValue(player) ?? 0),
-        0
-      );
+  const starters = rawStarters;
+  const bench = rawBench;
+  const ir = rawIr;
+  const starterTotal = rosterProjectionTotal(starters, forceBlankRoster);
+  const benchTotal = rosterProjectionTotal(bench, forceBlankRoster);
 
   if (settingsQuery.isLoading && !settingsQuery.isError && !isDemoLeague) {
     return <PageLoadingState title="Loading league state" description="Checking whether this league has completed the draft." />;
@@ -100,10 +101,6 @@ export default function LeagueRoster() {
         />
       </main>
     );
-  }
-
-  if (isPreDraft) {
-    return <Navigate to={`/league/${parsedLeagueId}/waivers`} replace />;
   }
 
   return (
@@ -132,7 +129,7 @@ export default function LeagueRoster() {
       {isEmptyRealRoster ? (
         <section className="rounded-[1.25rem] border border-sky-300/25 bg-sky-400/[0.08] px-5 py-4 shadow-[0_0_36px_rgba(56,189,248,0.12)]">
           <p className="text-sm font-bold text-sky-100">
-            No roster has been drafted yet. Player rows and projections will appear after the draft completes.
+            No players on this roster yet. Complete the draft to populate your roster.
           </p>
         </section>
       ) : null}
@@ -165,13 +162,14 @@ export default function LeagueRoster() {
         </div>
       </section>
 
-      <RosterSlotTable title="Starters" players={starters} emptyText="No starters set yet." leagueId={parsedLeagueId} />
-      <RosterSlotTable title="Bench" players={bench} emptyText="Bench is empty." leagueId={parsedLeagueId} />
+      <RosterSlotTable title="Starters" players={starters} emptyText="No players on this roster yet. Complete the draft to populate your roster." leagueId={parsedLeagueId} forceBlank={forceBlankRoster} />
+      <RosterSlotTable title="Bench" players={bench} emptyText="No players on this roster yet. Complete the draft to populate your roster." leagueId={parsedLeagueId} forceBlank={forceBlankRoster} />
       <RosterSlotTable
         title={`IR (${rosterData?.ir_slots ?? 0})`}
         players={ir}
         emptyText="IR spot empty."
         leagueId={parsedLeagueId}
+        forceBlank={forceBlankRoster}
       />
     </main>
   );

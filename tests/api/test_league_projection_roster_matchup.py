@@ -1,3 +1,7 @@
+from datetime import datetime, timezone
+
+from collegefootballfantasy_api.app.models.draft import Draft
+from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.matchup import Matchup
@@ -7,6 +11,7 @@ from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.services.league_roster_matchup import (
+    build_settings_view,
     build_matchup_tab_view,
     build_roster_tab_view,
 )
@@ -154,6 +159,62 @@ def test_roster_projected_points_use_league_scoring_for_ppr_and_standard(client,
     assert standard_roster.roster[0].weekly_projected_fantasy_points == 13.5
     assert ppr_roster.roster[0].floor != standard_roster.roster[0].floor
     assert ppr_roster.roster[0].ceiling != standard_roster.roster[0].ceiling
+
+
+def test_pre_draft_roster_view_hides_stale_roster_entries(client, db_session):
+    user = _user(db_session, "pre-draft-owner")
+    receiver, _opponent = _players_and_projections(db_session)
+    league = League(name="Pre Draft League", season_year=2026, max_teams=2, status="active", commissioner_user_id=user.id)
+    db_session.add(league)
+    db_session.flush()
+    settings = LeagueSettings(
+        league_id=league.id,
+        scoring_json={"ppr": 1},
+        roster_slots_json={"WR": 1, "BENCH": 1, "IR": 1},
+        playoff_teams=2,
+        waiver_type="faab",
+        trade_review_type="commissioner",
+    )
+    team = Team(league_id=league.id, name="Pre Draft User", owner_user_id=user.id, owner_name=user.first_name)
+    db_session.add_all([settings, team])
+    db_session.flush()
+    draft = Draft(
+        league_id=league.id,
+        draft_datetime_utc=datetime(2026, 8, 1, tzinfo=timezone.utc),
+        timezone="UTC",
+        draft_type="snake",
+        pick_timer_seconds=90,
+        status="scheduled",
+    )
+    stale_entry = RosterEntry(
+        league_id=league.id,
+        team_id=team.id,
+        player_id=receiver.id,
+        slot="WR",
+        status="active",
+    )
+    db_session.add_all([draft, stale_entry])
+    db_session.flush()
+    db_session.add(
+        DraftPick(
+            draft_id=draft.id,
+            team_id=team.id,
+            player_id=receiver.id,
+            overall_pick=1,
+            round_number=1,
+            round_pick=1,
+        )
+    )
+    db_session.commit()
+
+    roster_view = build_roster_tab_view(db_session, league, user, selected_week=1)
+    settings_view = build_settings_view(db_session, league, user)
+
+    assert roster_view.roster == []
+    assert roster_view.data == []
+    assert roster_view.message == "No players on this roster yet. Complete the draft to populate your roster."
+    assert settings_view.rosters == []
+    assert settings_view.draft_results == []
 
 
 def test_matchup_projected_totals_and_win_probability_use_league_scoring(client, db_session):

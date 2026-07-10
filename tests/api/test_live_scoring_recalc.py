@@ -19,12 +19,10 @@ def test_recalculate_league_week_scores_is_idempotent_and_sums_starters_only(cli
     second = recalculate_league_week_scores(db_session, league.id, 2026, 1)
     db_session.commit()
 
-    assert first.players_scored == second.players_scored == 7
+    assert first.players_scored == second.players_scored == 6
     assert db_session.query(LineupWeekSnapshot).filter_by(league_id=league.id, season=2026, week=1).count() == 6
-    available_score = db_session.query(PlayerWeekScore).filter_by(league_id=league.id, player_id=players["available"].id, season=2026, week=1).one()
-    assert available_score.fantasy_points == 0.0
-    assert available_score.stat_version == 1
-    assert available_score.calculation_version == "2026.1"
+    available_score = db_session.query(PlayerWeekScore).filter_by(league_id=league.id, player_id=players["available"].id, season=2026, week=1).one_or_none()
+    assert available_score is None
 
     qb_score = db_session.query(PlayerWeekScore).filter_by(league_id=league.id, player_id=players["qb"].id, season=2026, week=1).one()
     assert qb_score.stat_version == 1
@@ -37,6 +35,43 @@ def test_recalculate_league_week_scores_is_idempotent_and_sums_starters_only(cli
     assert home_score.bench_points == 32.0
     assert home_score.total_points == 56.0
     assert any(row["player_id"] == players["bench"].id for row in home_score.breakdown_json["players"])
+
+
+def test_recalculate_league_week_scores_skips_unrelated_players_without_stats(client, db_session):
+    league, _home, _away, players, _matchup = create_scoring_fixture(db_session)
+
+    summary = recalculate_league_week_scores(db_session, league.id, 2026, 1)
+    db_session.commit()
+
+    assert summary.players_scored == 6
+    assert db_session.query(PlayerWeekScore).filter_by(league_id=league.id, season=2026, week=1).count() == 6
+    assert (
+        db_session.query(PlayerWeekScore)
+        .filter_by(league_id=league.id, player_id=players["available"].id, season=2026, week=1)
+        .one_or_none()
+        is None
+    )
+
+
+def test_recalculate_league_week_scores_includes_free_agents_with_provider_stats(client, db_session):
+    league, _home, _away, players, _matchup = create_scoring_fixture(db_session)
+    db_session.add(
+        PlayerStat(
+            player_id=players["available"].id,
+            season=2026,
+            week=1,
+            source="sportsdata",
+            stats={"Receptions": 2, "ReceivingYards": 30},
+        )
+    )
+    db_session.commit()
+
+    summary = recalculate_league_week_scores(db_session, league.id, 2026, 1)
+    db_session.commit()
+
+    assert summary.players_scored == 7
+    available_score = db_session.query(PlayerWeekScore).filter_by(league_id=league.id, player_id=players["available"].id, season=2026, week=1).one()
+    assert available_score.fantasy_points == 5.0
 
 
 def test_stat_correction_changes_scores_without_incrementing(client, db_session):
@@ -66,9 +101,9 @@ def test_scoring_run_records_success_and_failure(client, db_session):
     league, *_ = create_scoring_fixture(db_session)
     summary = run_league_scoring_recalculation(db_session, league.id, 2026, 1)
 
-    assert summary.players_scored == 7
+    assert summary.players_scored == 6
     success_run = db_session.query(ScoringRun).filter_by(league_id=league.id, status="success").one()
-    assert success_run.players_updated == 7
+    assert success_run.players_updated == 6
 
     with pytest.raises(Exception):
         run_league_scoring_recalculation(db_session, league.id + 999, 2026, 1)

@@ -77,6 +77,48 @@ def _source_event_id(stat_row: PlayerStat | None) -> str | None:
     return None
 
 
+def _scoring_player_ids(db: Session, league_id: int, season: int, week: int) -> set[int]:
+    rostered_ids = {
+        row[0]
+        for row in db.query(RosterEntry.player_id)
+        .filter(RosterEntry.league_id == league_id)
+        .distinct()
+        .all()
+    }
+    matchup_team_ids: set[int] = set()
+    for home_team_id, away_team_id in (
+        db.query(Matchup.home_team_id, Matchup.away_team_id)
+        .filter(
+            Matchup.league_id == league_id,
+            Matchup.season == season,
+            Matchup.week == week,
+        )
+        .all()
+    ):
+        if home_team_id is not None:
+            matchup_team_ids.add(home_team_id)
+        if away_team_id is not None:
+            matchup_team_ids.add(away_team_id)
+    active_matchup_ids = {
+        row[0]
+        for row in db.query(RosterEntry.player_id)
+        .filter(
+            RosterEntry.league_id == league_id,
+            RosterEntry.team_id.in_(matchup_team_ids or {0}),
+        )
+        .distinct()
+        .all()
+    }
+    stat_ids = {
+        row[0]
+        for row in db.query(PlayerStat.player_id)
+        .filter(PlayerStat.season == season, PlayerStat.week == week)
+        .distinct()
+        .all()
+    }
+    return rostered_ids | active_matchup_ids | stat_ids
+
+
 def _score_payload_changed(
     score: PlayerWeekScore,
     *,
@@ -98,7 +140,10 @@ def _score_payload_changed(
 def recalculate_player_week_scores(db: Session, league_id: int, season: int, week: int) -> int:
     settings = _league_settings(db, league_id)
     scoring_rules = settings.scoring_json if settings else {}
-    players = db.query(Player).order_by(Player.id.asc()).all()
+    player_ids = _scoring_player_ids(db, league_id, season, week)
+    if not player_ids:
+        return 0
+    players = db.query(Player).filter(Player.id.in_(player_ids)).order_by(Player.id.asc()).all()
     player_ids = {player.id for player in players}
     stat_by_player = _stat_map(db, season, week, player_ids)
     calculated_at = _now()
@@ -392,6 +437,7 @@ def apply_stat_correction(
         week=week,
         player_id=player_id,
         source_stat_id=stat.id,
+        affected_league_ids=sorted(affected_league_ids),
         old_raw_json=old_raw,
         new_raw_json=corrected_stats,
         old_fantasy_points=old_points,

@@ -19,6 +19,7 @@ const Leagues = lazy(() => import("./pages/Leagues"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
 const PasswordResetRequest = lazy(() => import("./pages/PasswordResetRequest"));
 const PasswordResetConfirm = lazy(() => import("./pages/PasswordResetConfirm"));
 const CreateLeague = lazy(() => import("./pages/CreateLeague"));
@@ -26,8 +27,8 @@ const JoinLeague = lazy(() => import("./pages/JoinLeague"));
 const LeagueMatchup = lazy(() => import("./pages/LeagueMatchup"));
 const LeagueRoster = lazy(() => import("./pages/LeagueRoster"));
 const LeagueSettings = lazy(() => import("./pages/LeagueSettings"));
-const LeagueWaivers = lazy(() => import("./pages/LeagueWaivers"));
 const LeagueWatchlist = lazy(() => import("./pages/LeagueWatchlist"));
+const LeagueWaivers = lazy(() => import("./pages/LeagueWaivers"));
 const LeagueInviteMembers = lazy(() => import("./pages/LeagueInviteMembers"));
 const DraftHome = lazy(() => import("./pages/DraftHome"));
 const DraftLobby = lazy(() => import("./pages/DraftLobby"));
@@ -196,12 +197,14 @@ const App = () => (
                 <Route path="/injury-center" element={<ProtectedRoute><InjuryCenter /></ProtectedRoute>} />
                 <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
                 <Route path="/trade" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
+                <Route path="/trade/:leagueId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
                 <Route path="/trade/:leagueId/:playerId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
                 <Route path="/admin/scoring" element={<ProtectedRoute><AdminScoring /></ProtectedRoute>} />
                 <Route path="/stats" element={<Stats />} />
                 <Route path="/stats/players" element={<Stats />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/password-reset" element={<PasswordResetRequest />} />
                 <Route path="/password-reset/confirm" element={<PasswordResetConfirm />} />
                 <Route path="*" element={<NotFound />} />

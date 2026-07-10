@@ -9,10 +9,9 @@ from collegefootballfantasy_api.app.domain.provider_payload_validation import (
     ProviderPayloadValidationError,
     SportsDataPlayerGameStatPayload,
 )
-from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.services.espn_stats_sync import upsert_espn_weekly_player_stats
-from collegefootballfantasy_api.app.services.provider_identity_audit import record_unmatched_provider_row
+from collegefootballfantasy_api.app.services.provider_identity_audit import provider_player_index, record_unmatched_provider_row
 from collegefootballfantasy_api.app.services.provider_sync_jobs import run_provider_sync_job
 
 
@@ -58,10 +57,7 @@ def upsert_sportsdata_weekly_player_stats(
 
     sportsdata = client or SportsDataClient()
     rows = sportsdata.get_weekly_player_stats(season, week)
-    players_by_external_id = {
-        str(external_id): player
-        for external_id, player in db.query(Player.external_id, Player).filter(Player.external_id.isnot(None)).all()
-    }
+    players_by_provider_id = provider_player_index(db, "sportsdata")
     inserted = 0
     updated = 0
     skipped = 0
@@ -91,7 +87,7 @@ def upsert_sportsdata_weekly_player_stats(
             )
             skipped += 1
             continue
-        player = players_by_external_id.get(external_id)
+        player = players_by_provider_id.get(external_id)
         if not player:
             record_unmatched_provider_row(
                 db,

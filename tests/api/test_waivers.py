@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from conftest import TestingSessionLocal
 
 from collegefootballfantasy_api.app.core.config import settings
+from collegefootballfantasy_api.app.models.audit_event import AuditEvent
 from collegefootballfantasy_api.app.models.notification import NotificationLog
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
@@ -107,11 +108,23 @@ def test_waiver_claim_submit_list_cancel(client, db_session):
 
     tab_response = client.get(f"/leagues/{league['id']}/waivers", headers=auth_headers(token))
     assert tab_response.status_code == 200
-    assert tab_response.json()["claims"][0]["id"] == claim["id"]
+    tab_body = tab_response.json()
+    assert tab_body["claims"][0]["id"] == claim["id"]
+    assert tab_body["claims"][0]["add_player_name"] == add_player.name
+    assert tab_body["claims"][0]["drop_player_name"] == drop_player.name
+    assert tab_body["claims"][0]["bid_amount"] == 7
+    assert tab_body["waiver_rules"]["waiver_type"] == "faab"
+    assert tab_body["faab_remaining"] == 100
 
     cancel_response = client.delete(f"/waivers/claims/{claim['id']}", headers=auth_headers(token))
     assert cancel_response.status_code == 200
     assert cancel_response.json()["status"] == "cancelled"
+    assert (
+        db_session.query(AuditEvent)
+        .filter(AuditEvent.action.in_(["waiver.claim.submit", "waiver.claim.cancel"]))
+        .count()
+        == 2
+    )
 
 
 def test_admin_processes_faab_claims_by_bid_and_records_failure(client, db_session):

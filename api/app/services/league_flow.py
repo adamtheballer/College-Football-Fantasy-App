@@ -109,6 +109,23 @@ def generate_unique_invite(db: Session) -> str:
     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="unable to generate invite code")
 
 
+def _available_team_name(db: Session, league_id: int, owner_name: str) -> str:
+    base_name = f"{owner_name}'s Team"
+    existing_names = {
+        name
+        for (name,) in db.query(Team.name)
+        .filter(Team.league_id == league_id, Team.name.like(f"{base_name}%"))
+        .all()
+    }
+    if base_name not in existing_names:
+        return base_name
+
+    suffix = 2
+    while f"{base_name} {suffix}" in existing_names:
+        suffix += 1
+    return f"{base_name} {suffix}"
+
+
 def _current_draft(db: Session, league_id: int) -> Draft | None:
     return db.query(Draft).filter(Draft.league_id == league_id).first()
 
@@ -255,7 +272,7 @@ def create_league(
 
     team = Team(
         league_id=league.id,
-        name=f"{current_user.first_name}'s Team",
+        name=_available_team_name(db, league.id, current_user.first_name),
         owner_name=current_user.first_name,
         owner_user_id=current_user.id,
     )
@@ -330,7 +347,7 @@ def join_league(db: Session, league: League, current_user: User) -> LeagueDetail
     db.add(LeagueMember(league_id=league.id, user_id=current_user.id, role="member"))
     team = Team(
         league_id=league.id,
-        name=f"{current_user.first_name}'s Team",
+        name=_available_team_name(db, league.id, current_user.first_name),
         owner_name=current_user.first_name,
         owner_user_id=current_user.id,
     )

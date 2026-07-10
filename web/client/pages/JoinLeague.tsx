@@ -5,14 +5,14 @@ import { Copy, Search, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { apiPost } from "@/lib/api";
+import { ApiError, apiPost, getStoredAccessToken } from "@/lib/api";
 import { LeaguePreview } from "@/types/league";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function JoinLeague() {
   const { inviteCode } = useParams();
   const queryClient = useQueryClient();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, logout } = useAuth();
   const navigate = useNavigate();
   const [code, setCode] = useState(inviteCode || "");
   const [preview, setPreview] = useState<LeaguePreview | null>(null);
@@ -52,6 +52,14 @@ export default function JoinLeague() {
       setError("League is already full.");
       return;
     }
+    if (!getStoredAccessToken()) {
+      logout();
+      navigate("/login", {
+        replace: true,
+        state: { from: inviteCode ? `/join/${code.trim().toUpperCase()}` : "/leagues/join" },
+      });
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -60,6 +68,14 @@ export default function JoinLeague() {
       queryClient.setQueryData(["league", preview.id], joinedLeague);
       navigate(`/league/${preview.id}`);
     } catch (err: any) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        navigate("/login", {
+          replace: true,
+          state: { from: inviteCode ? `/join/${code.trim().toUpperCase()}` : "/leagues/join" },
+        });
+        return;
+      }
       setError(err.message || "Unable to join league.");
     } finally {
       setLoading(false);

@@ -11,6 +11,7 @@ import {
   advanceSinglePlayerMockDraft,
   buildMockRoster,
   createSinglePlayerMockDraft,
+  createLocalMockDraftPlayerPool,
   getCenteredDraftCarouselScrollLeft,
   getCurrentTeam,
   getDraftablePlayersForTeam,
@@ -144,13 +145,17 @@ export default function SinglePlayerMockDraftRoom() {
     pages: 5,
     sort: "draft_rank",
   });
+  const localMockDraftPlayers = useMemo(() => createLocalMockDraftPlayerPool(), []);
+  const backendDraftPlayers = playersPayload?.data ?? [];
+  const useLocalMockPlayerPool = !isLoading && (isError || backendDraftPlayers.length === 0);
+  const draftPlayerPool = useLocalMockPlayerPool ? localMockDraftPlayers : backendDraftPlayers;
   const mockSettings = getMockDraftSettings(draftState);
   const teamCount = getMockTeamCount(draftState);
   const totalPicks = getMockTotalPicks(draftState);
 
   const draftBoard = useMemo(
     () =>
-      buildDraftBoard(playersPayload?.data ?? [], {
+      buildDraftBoard(draftPlayerPool, {
         leagueSize: mockSettings.leagueSize,
         rosterSlots: {
           QB: 1,
@@ -162,7 +167,7 @@ export default function SinglePlayerMockDraftRoom() {
           IR: 0,
         },
       }),
-    [mockSettings.leagueSize, playersPayload?.data]
+    [draftPlayerPool, mockSettings.leagueSize]
   );
 
   const selectedBoardPlayer = useMemo(
@@ -368,6 +373,11 @@ export default function SinglePlayerMockDraftRoom() {
             <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100/80">
               Your legal positions: {userLegalPositions.length ? userLegalPositions.join(", ") : "None"}
             </p>
+            {useLocalMockPlayerPool ? (
+              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-200/85">
+                Backend player pool unavailable. Using local mock draft board.
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="relative w-full lg:w-[480px]">
@@ -408,12 +418,12 @@ export default function SinglePlayerMockDraftRoom() {
         <span className="text-right">Action</span>
       </div>
 
-      <div className="max-h-[690px] overflow-y-auto">
+      <div className="max-h-[690px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {isLoading ? (
           <div className="flex min-h-40 items-center justify-center gap-3 px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" /> Loading draft board...
           </div>
-        ) : isError ? (
+        ) : isError && !useLocalMockPlayerPool ? (
           <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-red-300">
             Unable to load players. Start the backend API and try again.
           </div>
@@ -532,7 +542,7 @@ export default function SinglePlayerMockDraftRoom() {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <section className="rounded-3xl border border-cyan-200/12 bg-white/[0.035] p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">Projected 2026</p>
             <div className="mt-4 grid grid-cols-2 gap-3">
@@ -898,7 +908,7 @@ export default function SinglePlayerMockDraftRoom() {
               <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">{totalPicks - draftedCount} Unlocked</p>
             </div>
           </div>
-          <div ref={carouselRef} className="flex gap-4 overflow-x-auto px-5 py-5 scroll-smooth">
+          <div ref={carouselRef} className="flex gap-4 overflow-x-auto px-5 py-5 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {draftOrderPicks.map((slot) => {
               const isCurrent = draftState.status !== "complete" && slot.overallPick === draftState.currentPick;
               const isUser = slot.teamId === draftState.userTeamId;

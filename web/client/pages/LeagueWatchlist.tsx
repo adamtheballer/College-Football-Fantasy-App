@@ -402,7 +402,7 @@ export default function LeagueWatchlist() {
           <div className="px-5 py-12 text-center">
             <Search className="mx-auto h-10 w-10 text-sky-300/70" />
             <p className="mt-4 text-sm font-bold text-slate-300">No watched players yet.</p>
-            <p className="mt-2 text-xs font-semibold text-slate-500">Open Available Players and press Watch on any available player.</p>
+            <p className="mt-2 text-xs font-semibold text-slate-500">Open Draft Room and press Watch on any draftable player.</p>
           </div>
         ) : filteredRows.length === 0 ? (
           <div className="px-5 py-12 text-center">

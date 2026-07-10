@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, apiPatch, ApiError } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import type {
   DraftInfo,
   LeagueDetail,
   LeagueListResponse,
+  LeagueWaiverClaim,
   LeagueMatchupTabResponse,
   LeagueNewsResponse,
   LeaguePowerRankingResponse,
@@ -22,6 +23,11 @@ export type DraftUpdatePayload = {
   pick_timer_seconds: number;
   status?: string;
 };
+
+export const mergeDraftIntoLeagueDetail = (
+  current: LeagueDetail | undefined,
+  updatedDraft: DraftInfo
+) => (current ? { ...current, draft: updatedDraft } : current);
 
 export function useLeagues(limit = 20, enabled = true) {
   return useQuery({
@@ -56,7 +62,10 @@ export function useRescheduleDraft(leagueId?: number) {
       }
       return apiPatch<DraftInfo>(`/leagues/${leagueId}/draft`, payload);
     },
-    onSuccess: () => {
+    onSuccess: (updatedDraft) => {
+      queryClient.setQueryData<LeagueDetail | undefined>(["league", leagueId], (current) =>
+        mergeDraftIntoLeagueDetail(current, updatedDraft)
+      );
       queryClient.invalidateQueries({ queryKey: ["league", leagueId] });
       queryClient.invalidateQueries({ queryKey: ["leagues"] });
       queryClient.invalidateQueries({ queryKey: ["league", leagueId, "draft-room"] });
@@ -166,6 +175,46 @@ export function useLeagueWaiverTab(
         limit,
         offset,
       }),
+  });
+}
+
+export type WaiverClaimPayload = {
+  team_id: number;
+  add_player_id: number;
+  drop_player_id?: number | null;
+  bid_amount?: number | null;
+};
+
+export function useSubmitWaiverClaim(leagueId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: WaiverClaimPayload) => {
+      if (typeof leagueId !== "number" || Number.isNaN(leagueId)) {
+        throw new ApiError(400, "Invalid league ID.");
+      }
+      return apiPost<LeagueWaiverClaim>(`/leagues/${leagueId}/waivers/claims`, payload);
+    },
+    onSuccess: () => {
+      if (typeof leagueId === "number") {
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "waivers"] });
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "roster"] });
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "transactions"] });
+        queryClient.invalidateQueries({ queryKey: ["players"] });
+      }
+    },
+  });
+}
+
+export function useCancelWaiverClaim(leagueId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (claimId: number) => apiDelete<LeagueWaiverClaim>(`/waivers/claims/${claimId}`),
+    onSuccess: () => {
+      if (typeof leagueId === "number") {
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "waivers"] });
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "transactions"] });
+      }
+    },
   });
 }
 

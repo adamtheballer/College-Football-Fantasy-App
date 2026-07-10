@@ -27,6 +27,7 @@ from collegefootballfantasy_api.app.schemas.player_stat import PlayerStatRespons
 from collegefootballfantasy_api.app.services.player_profile import build_player_profile
 from collegefootballfantasy_api.app.services.player_search import list_player_pool
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
+from collegefootballfantasy_api.app.services.provider_identity_audit import provider_id_for_player
 
 router = APIRouter()
 
@@ -68,11 +69,16 @@ def _birthplace(athlete: dict) -> str | None:
     return ", ".join(part for part in parts if part) or None
 
 
-def _map_espn_about(player: PlayerRead, payload: dict | None, message: str | None = None) -> PlayerCardAboutRead:
+def _map_espn_about(
+    player: PlayerRead,
+    payload: dict | None,
+    message: str | None = None,
+    espn_player_id: str | None = None,
+) -> PlayerCardAboutRead:
     athlete = payload.get("athlete") if isinstance(payload, dict) else None
     if not isinstance(athlete, dict):
         return PlayerCardAboutRead(
-            espn_player_id=_espn_player_id(player.external_id),
+            espn_player_id=espn_player_id or _espn_player_id(player.external_id),
             player_class=player.player_class,
             position=player.position,
             team=player.school,
@@ -84,7 +90,7 @@ def _map_espn_about(player: PlayerRead, payload: dict | None, message: str | Non
     team = athlete.get("team") if isinstance(athlete.get("team"), dict) else {}
     headshot = athlete.get("headshot") if isinstance(athlete.get("headshot"), dict) else {}
     return PlayerCardAboutRead(
-        espn_player_id=_profile_text(athlete.get("id")) or _espn_player_id(player.external_id),
+        espn_player_id=_profile_text(athlete.get("id")) or espn_player_id or _espn_player_id(player.external_id),
         height=_profile_text(athlete.get("displayHeight")),
         weight=_profile_text(athlete.get("displayWeight")),
         player_class=player.player_class,
@@ -112,6 +118,10 @@ def _optional_user_from_header(db: Session, authorization: str | None):
     if not authorization:
         return None
     return get_current_user(db, authorization)
+
+
+def _sportsdata_player_id(player) -> str | None:
+    return provider_id_for_player(player, "sportsdata")
 
 
 @router.post("", response_model=list[PlayerRead], status_code=status.HTTP_201_CREATED)
@@ -239,7 +249,7 @@ def get_player_card_endpoint(
 
     profile_payload: dict | None = None
     profile_message: str | None = None
-    espn_id = _espn_player_id(player.external_id)
+    espn_id = provider_id_for_player(player, "espn")
     if espn_id:
         try:
             profile_payload = ESPNClient().get_athlete_profile(espn_id)
@@ -262,7 +272,7 @@ def get_player_card_endpoint(
     )
     return PlayerCardRead(
         player=player,
-        about=_map_espn_about(player, profile_payload, profile_message),
+        about=_map_espn_about(player, profile_payload, profile_message, espn_player_id=espn_id),
         injuries=[
             PlayerCardInjuryRead(
                 id=row.id,
@@ -329,7 +339,9 @@ def get_player_season_stats_endpoint(
             message="SPORTSDATA_API_KEY is not configured.",
         )
 
-    if not player.external_id and not existing:
+    sportsdata_player_id = _sportsdata_player_id(player)
+
+    if not sportsdata_player_id and not existing:
         return PlayerStatResponse(
             player_id=player_id,
             season=season,
@@ -337,16 +349,16 @@ def get_player_season_stats_endpoint(
             source="sportsdata",
             cached=False,
             stats=None,
-            message="Player external_id is not set for SportsData lookup.",
+            message="Player SportsData provider ID is not set.",
         )
 
     def _refresh_from_provider() -> None:
         if not settings.sportsdata_api_key:
             raise RuntimeError("SPORTSDATA_API_KEY is not configured.")
-        if not player.external_id:
-            raise RuntimeError("Player external_id is not set for SportsData lookup.")
+        if not sportsdata_player_id:
+            raise RuntimeError("Player SportsData provider ID is not set.")
         client = SportsDataClient()
-        stats = client.get_player_stats(player.external_id)
+        stats = client.get_player_stats(sportsdata_player_id)
         if not stats:
             raise RuntimeError("No season stats returned from SportsData.")
         upsert_player_stat(db, player_id, season, week_value, stats=stats, source="sportsdata")
@@ -361,7 +373,7 @@ def get_player_season_stats_endpoint(
                 feed="player_season_stats",
                 scope={
                     "player_id": player.id,
-                    "external_id": player.external_id,
+                    "provider_player_id": sportsdata_player_id,
                     "season": season,
                     "week": week_value,
                 },
@@ -435,7 +447,9 @@ def get_player_stats_endpoint(
             stats=existing.stats,
         )
 
-    if not player.external_id and not existing:
+    sportsdata_player_id = _sportsdata_player_id(player)
+
+    if not sportsdata_player_id and not existing:
         return PlayerStatResponse(
             player_id=player_id,
             season=season_value,
@@ -443,14 +457,14 @@ def get_player_stats_endpoint(
             source="sportsdata",
             cached=False,
             stats=None,
-            message="Player external_id is not set for SportsData lookup.",
+            message="Player SportsData provider ID is not set.",
         )
 
     def _refresh_from_provider() -> None:
-        if not player.external_id:
-            raise RuntimeError("Player external_id is not set for SportsData lookup.")
+        if not sportsdata_player_id:
+            raise RuntimeError("Player SportsData provider ID is not set.")
         client = SportsDataClient()
-        stats = client.get_player_stats(player.external_id, season=season_value, week=week_value)
+        stats = client.get_player_stats(sportsdata_player_id, season=season_value, week=week_value)
         if not stats:
             raise RuntimeError("No stats returned from SportsData.")
         upsert_player_stat(db, player_id, season_value, week_value, stats=stats, source="sportsdata")
@@ -465,7 +479,7 @@ def get_player_stats_endpoint(
                 feed="player_game_stats_week",
                 scope={
                     "player_id": player.id,
-                    "external_id": player.external_id,
+                    "provider_player_id": sportsdata_player_id,
                     "season": season_value,
                     "week": week_value,
                 },

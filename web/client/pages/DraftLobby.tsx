@@ -8,6 +8,17 @@ import { ApiError } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagueDetail, useRescheduleDraft } from "@/hooks/use-leagues";
 
+const DRAFT_STARTED_DRAFT_STATUSES = new Set(["live", "paused", "completed", "complete"]);
+const DRAFT_STARTED_LEAGUE_STATUSES = new Set([
+  "draft_live",
+  "post_draft",
+  "playoffs",
+  "completed",
+  "archived",
+]);
+
+const normalizeStatus = (status: string | undefined | null) => status?.trim().toLowerCase() ?? "";
+
 const toDateTimeLocalValue = (date: Date | null) => {
   if (!date || Number.isNaN(date.getTime())) return "";
   const offsetMs = date.getTimezoneOffset() * 60_000;
@@ -18,6 +29,15 @@ const getErrorMessage = (error: unknown) => {
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
   return "Unable to reschedule draft.";
+};
+
+const getMemberDisplayName = (member: {
+  user_id: number;
+  first_name?: string | null;
+  display_name?: string | null;
+}) => {
+  const displayName = member.display_name?.trim() || member.first_name?.trim();
+  return displayName || `Manager ${member.user_id}`;
 };
 
 export default function DraftLobby() {
@@ -32,6 +52,7 @@ export default function DraftLobby() {
   const [showReschedule, setShowReschedule] = useState(false);
   const [draftDateTime, setDraftDateTime] = useState("");
   const [rescheduleError, setRescheduleError] = useState<string | null>(null);
+  const [rescheduleSuccess, setRescheduleSuccess] = useState<string | null>(null);
 
   const draftTime = league?.draft?.draft_datetime_utc ? new Date(league.draft.draft_datetime_utc) : null;
 
@@ -61,6 +82,12 @@ export default function DraftLobby() {
   const isFull = league ? league.members.length >= league.max_teams : false;
   const missingManagers = league ? Math.max(0, league.max_teams - league.members.length) : 0;
   const isCommissioner = Boolean(league && user?.id === league.commissioner_user_id);
+  const draftStatus = normalizeStatus(league?.draft?.status);
+  const leagueStatus = normalizeStatus(league?.status);
+  const draftHasStarted =
+    DRAFT_STARTED_DRAFT_STATUSES.has(draftStatus) ||
+    (!draftStatus && DRAFT_STARTED_LEAGUE_STATUSES.has(leagueStatus));
+  const canRescheduleDraft = isCommissioner && !draftHasStarted;
 
   if (!parsedLeagueId) {
     return (
@@ -98,23 +125,36 @@ export default function DraftLobby() {
   const handleRescheduleDraft = async () => {
     if (rescheduleDraft.isPending) return;
 
+    if (!canRescheduleDraft) {
+      setRescheduleSuccess(null);
+      setRescheduleError("Draft time can only be changed by the commissioner before the draft starts.");
+      return;
+    }
+
     const nextDraftTime = draftDateTime ? new Date(draftDateTime) : null;
     if (!nextDraftTime || Number.isNaN(nextDraftTime.getTime())) {
+      setRescheduleSuccess(null);
       setRescheduleError("Choose a valid draft date and time.");
       return;
     }
 
     setRescheduleError(null);
+    setRescheduleSuccess(null);
     try {
-      await rescheduleDraft.mutateAsync({
+      const updatedDraft = await rescheduleDraft.mutateAsync({
         draft_datetime_utc: nextDraftTime.toISOString(),
         timezone: league.draft?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
         draft_type: league.draft?.draft_type || "snake",
         pick_timer_seconds: league.draft?.pick_timer_seconds || 90,
         status: "scheduled",
       });
+      const updatedDraftTime = new Date(updatedDraft.draft_datetime_utc);
+      setDraftDateTime(toDateTimeLocalValue(updatedDraftTime));
+      setNow(Date.now());
+      setRescheduleSuccess(`Draft time updated to ${updatedDraftTime.toLocaleString()}.`);
       setShowReschedule(false);
     } catch (error) {
+      setRescheduleSuccess(null);
       setRescheduleError(getErrorMessage(error));
     }
   };
@@ -190,20 +230,36 @@ export default function DraftLobby() {
                     </p>
                   </div>
                 </div>
-                {isCommissioner ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-11 shrink-0 rounded-2xl border-amber-200/25 bg-amber-300/10 px-5 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100 hover:bg-amber-300/15"
-                    onClick={() => setShowReschedule((current) => !current)}
-                  >
-                    <CalendarClock className="mr-2 h-4 w-4" />
-                    Reschedule Draft
-                  </Button>
-                ) : null}
+              </div>
+            </div>
+          )}
+          {canRescheduleDraft ? (
+            <div className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">
+                    Commissioner draft controls
+                  </p>
+                  <p className="text-sm font-bold leading-6 text-muted-foreground">
+                    Change the scheduled draft time before the draft starts.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 shrink-0 rounded-2xl border-amber-200/25 bg-amber-300/10 px-5 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100 hover:bg-amber-300/15"
+                  onClick={() => {
+                    setShowReschedule((current) => !current);
+                    setRescheduleError(null);
+                    setRescheduleSuccess(null);
+                  }}
+                >
+                  <CalendarClock className="mr-2 h-4 w-4" />
+                  Reschedule Draft
+                </Button>
               </div>
 
-              {showReschedule && isCommissioner ? (
+              {showReschedule ? (
                 <form
                   className="mt-5 grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"
                   onSubmit={handleRescheduleSubmit}
@@ -215,11 +271,15 @@ export default function DraftLobby() {
                     <Input
                       type="datetime-local"
                       value={draftDateTime}
-                      onChange={(event) => setDraftDateTime(event.target.value)}
+                      onChange={(event) => {
+                        setDraftDateTime(event.target.value);
+                        setRescheduleError(null);
+                        setRescheduleSuccess(null);
+                      }}
                       onKeyDown={(event) => {
                         if (event.key === "Enter") {
                           event.preventDefault();
-                          void handleRescheduleDraft();
+                          event.currentTarget.form?.requestSubmit();
                         }
                       }}
                       className="h-12 rounded-2xl border-white/10 bg-white/5 text-sm font-bold"
@@ -229,10 +289,6 @@ export default function DraftLobby() {
                     type="submit"
                     className="h-12 rounded-2xl bg-primary px-6 text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground"
                     disabled={rescheduleDraft.isPending}
-                    onPointerDown={(event) => {
-                      event.preventDefault();
-                      void handleRescheduleDraft();
-                    }}
                   >
                     {rescheduleDraft.isPending ? "Saving..." : "Save New Time"}
                   </Button>
@@ -241,11 +297,16 @@ export default function DraftLobby() {
                   ) : null}
                 </form>
               ) : null}
+              {rescheduleSuccess ? (
+                <p className="mt-3 text-[11px] font-bold text-emerald-200">{rescheduleSuccess}</p>
+              ) : null}
             </div>
-          )}
+          ) : null}
           {league.members.map((member) => (
             <div key={member.id} className="flex items-center justify-between px-6 py-4 rounded-2xl bg-white/5 border border-white/10">
-              <span className="text-sm font-black uppercase tracking-[0.2em] text-foreground">User {member.user_id}</span>
+              <span className="text-sm font-black uppercase tracking-[0.2em] text-foreground">
+                {getMemberDisplayName(member)}
+              </span>
               <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{member.role}</span>
             </div>
           ))}
@@ -254,7 +315,7 @@ export default function DraftLobby() {
 
       {(!isFull || !canEnterDraft) && (
         <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground/70">
-          Draft room is available in preview mode. Picks unlock only when the league is full and the scheduled draft window opens.
+          Use Open Draft Preview to view the full draft board. Picks unlock only when the league is full and the scheduled draft window opens.
         </p>
       )}
 

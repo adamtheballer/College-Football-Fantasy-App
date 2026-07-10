@@ -232,7 +232,7 @@ def test_temporary_provider_failure_retries_and_records_telemetry(client, db_ses
     assert run.rows_unmatched == 1
     assert run.provider_events_seen == 4
     assert run.data_age_seconds == 12
-    assert run.players_updated == 7
+    assert run.players_updated == 6
     assert lock.status == "released"
 
 

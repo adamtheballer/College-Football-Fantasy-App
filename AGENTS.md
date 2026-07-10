@@ -9,3 +9,8 @@
 ## Frontend Direction
 - `web/` React is the canonical frontend for this project.
 - `ui/` Streamlit is not the primary product surface and should not be used for new feature planning unless explicitly requested.
+
+## UI Verification
+- Follow `llm.txt` for frontend/browser verification rules.
+- For any React/Vite UI change, run browser-based verification with `$ui-browser-verification` or equivalent Chrome/Playwright automation before calling the work complete.
+- If Codex hooks are available, enable this as an automatic post-frontend-change hook.

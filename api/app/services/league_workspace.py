@@ -30,6 +30,19 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
 )
 
 
+def _member_read(member: LeagueMember, user_by_id: dict[int, User]) -> LeagueMemberRead:
+    user = user_by_id.get(member.user_id)
+    first_name = user.first_name if user else None
+    return LeagueMemberRead(
+        id=member.id,
+        user_id=member.user_id,
+        role=member.role,
+        joined_at=member.joined_at,
+        first_name=first_name,
+        display_name=first_name,
+    )
+
+
 def get_league_detail(db: Session, league: League) -> LeagueDetailRead:
     settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
     if not settings_row:
@@ -37,6 +50,9 @@ def get_league_detail(db: Session, league: League) -> LeagueDetailRead:
 
     draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
     members_rows = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).all()
+    member_user_ids = {member.user_id for member in members_rows}
+    users = db.query(User).filter(User.id.in_(member_user_ids)).all() if member_user_ids else []
+    user_by_id = {user.id: user for user in users}
 
     return LeagueDetailRead(
         id=league.id,
@@ -53,7 +69,7 @@ def get_league_detail(db: Session, league: League) -> LeagueDetailRead:
         updated_at=league.updated_at,
         settings=LeagueSettingsRead.model_validate(settings_row),
         draft=DraftRead.model_validate(draft_row) if draft_row else None,
-        members=[LeagueMemberRead.model_validate(m) for m in members_rows],
+        members=[_member_read(member, user_by_id) for member in members_rows],
     )
 
 

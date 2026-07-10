@@ -16,6 +16,7 @@ import type { DraftRoomTeam } from "@/types/draft";
 
 const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K"];
 const DRAFT_PLAYER_PAGE_SIZE = 200;
+const DRAFT_PLAYER_PAGE_COUNT = 25;
 const DRAFT_SLOT_KEYS = ["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "BENCH"] as const;
 const PLAYER_CARD_TABS = ["about", "injuries", "stats", "projections"] as const;
 
@@ -186,11 +187,32 @@ export default function Draft() {
   const maxTeams = league?.max_teams ?? draftRoom?.teams.length ?? 0;
   const isLeagueFull = Boolean(maxTeams > 0 && memberCount >= maxTeams);
   const hasDraftTimePassed = Boolean(draftStartsAt && draftStartsAt.getTime() <= now);
+  const draftRoomStatus = (draftRoom?.status ?? "").toLowerCase();
+  const leagueStatus = (league?.status ?? "").toLowerCase();
+  const configuredDraftStatus = (league?.draft?.status ?? "").toLowerCase();
+  const isDraftComplete =
+    draftRoomStatus === "complete" ||
+    draftRoomStatus === "completed" ||
+    configuredDraftStatus === "complete" ||
+    configuredDraftStatus === "completed";
+  const isDraftLive =
+    draftRoomStatus === "live" ||
+    configuredDraftStatus === "live" ||
+    leagueStatus === "draft_live";
+  const isPreDraftLocked = Boolean(
+    !isDraftComplete &&
+      !isDraftLive &&
+      (!isLeagueFull ||
+        !hasDraftTimePassed ||
+        draftRoomStatus === "scheduled" ||
+        configuredDraftStatus === "scheduled" ||
+        leagueStatus === "draft_scheduled")
+  );
   const isScheduledPreview = Boolean(
-    draftRoom?.status === "scheduled" && (!hasDraftTimePassed || !isLeagueFull)
+    isPreDraftLocked
   );
   const isDraftActive = Boolean(
-    isLeagueFull && (draftRoom?.status === "live" || (draftRoom?.status === "scheduled" && hasDraftTimePassed))
+    isLeagueFull && (isDraftLive || (draftRoomStatus === "scheduled" && hasDraftTimePassed))
   );
   const leagueSize = Math.max(league?.max_teams ?? draftRoom?.teams.length ?? 12, draftRoom?.teams.length ?? 0, 1);
 
@@ -231,7 +253,7 @@ export default function Draft() {
     [viewerTeamRoster, draftRoom, superflexEnabled]
   );
 
-  const showMasterBoardPreview = isScheduledPreview && !isDraftActive;
+  const showMasterBoardPreview = isPreDraftLocked && !isDraftActive;
   const serverPositionFilter =
     position === "ALL"
       ? showMasterBoardPreview
@@ -248,7 +270,7 @@ export default function Draft() {
     available_only: Boolean(parsedLeagueId) && !showMasterBoardPreview,
     limit: DRAFT_PLAYER_PAGE_SIZE,
     offset: 0,
-    pages: showMasterBoardPreview ? 10 : 5,
+    pages: showMasterBoardPreview ? DRAFT_PLAYER_PAGE_COUNT : 5,
     sort: "draft_rank",
   });
 
@@ -418,7 +440,7 @@ export default function Draft() {
   const currentPick = draftRoom.current_pick;
   const canPick = isDraftActive && draftRoom.can_make_pick && !pickMutation.isPending;
   const actionLabel = isScheduledPreview ? "Locked" : draftRoom.can_make_pick ? "Draft" : "Wait";
-  const completed = draftRoom.current_team_id === null || draftRoom.status === "complete";
+  const completed = draftRoom.current_team_id === null || isDraftComplete;
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(135deg,#020713_0%,#06172a_42%,#0a102c_68%,#120a29_100%)] text-foreground">
@@ -531,7 +553,7 @@ export default function Draft() {
               </p>
             </div>
           </div>
-          <div ref={carouselRef} className="flex gap-4 overflow-x-auto px-5 py-5 scroll-smooth">
+          <div ref={carouselRef} className="flex gap-4 overflow-x-auto px-5 py-5 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {draftOrderPicks.map((slot) => {
               const isCurrent = !completed && slot.overallPick === currentPick;
               const isUser = slot.team?.id === draftRoom.user_team_id;
@@ -591,10 +613,12 @@ export default function Draft() {
           <div className="border-b border-cyan-100/10 p-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-200 drop-shadow-[0_0_14px_rgba(103,232,249,0.28)]">Available Players</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-200 drop-shadow-[0_0_14px_rgba(103,232,249,0.28)]">
+                  {showMasterBoardPreview ? "Locked Draft Board" : "Available Players"}
+                </p>
                 <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
                   {showMasterBoardPreview
-                    ? "Master draft board preview. Picks are locked."
+                    ? "All ranked players are visible. Picks are locked."
                     : `Showing your roster needs: ${viewerDraftBoardTeamName}`}
                 </p>
                 <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100/80">
@@ -642,7 +666,7 @@ export default function Draft() {
             <span className="text-right">Action</span>
           </div>
 
-          <div className="max-h-[690px] overflow-y-auto">
+          <div className="max-h-[690px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {playersLoading ? (
               <div className="flex min-h-40 items-center justify-center gap-3 px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" /> Loading real player board...
@@ -785,7 +809,7 @@ export default function Draft() {
               })}
             </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <div className="min-h-0 flex-1 overflow-y-auto p-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {playerCardLoading ? (
               <div className="flex min-h-40 items-center justify-center gap-3 rounded-3xl border border-cyan-200/12 bg-white/[0.035] p-4 text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading player card...

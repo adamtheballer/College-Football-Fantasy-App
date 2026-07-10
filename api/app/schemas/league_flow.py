@@ -10,10 +10,10 @@ from collegefootballfantasy_api.app.domain.scoring_engine import (
 
 def _validate_scoring_json(value: dict) -> dict:
     try:
-        validate_scoring_rules(value)
+        validated = validate_scoring_rules(value)
     except ScoringRulesValidationError as exc:
         raise ValueError(str(exc)) from exc
-    return value
+    return validated.as_dict()
 
 
 class LeagueBasics(BaseModel):
@@ -67,6 +67,8 @@ class LeagueMemberRead(BaseModel):
     user_id: int
     role: str
     joined_at: datetime
+    first_name: str | None = None
+    display_name: str | None = None
 
 
 class DraftRead(BaseModel):
@@ -357,6 +359,9 @@ class LeagueWaiversRead(BaseModel):
     fantasy_team_id: int | None = None
     available_players: list[LeagueWaiverPlayerRead]
     claims: list[dict] = []
+    waiver_rules: dict = {}
+    waiver_priority: int | None = None
+    faab_remaining: int | None = None
     total_available: int
     message: str | None = None
 

@@ -91,7 +91,7 @@ def test_recalculate_endpoint_requires_commissioner(client, db_session):
         "league_id": league.id,
         "season": 2026,
         "week": 1,
-        "players_scored": 7,
+        "players_scored": 6,
         "teams_scored": 2,
         "matchups_updated": 1,
         "standings_updated": 2,

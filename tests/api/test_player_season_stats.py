@@ -2,6 +2,7 @@ from collegefootballfantasy_api.app.api.routes import players as players_route
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_provider_id import PlayerProviderId
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 
 
@@ -77,7 +78,42 @@ def test_player_season_stats_missing_external_id_returns_nullable_response(
     body = response.json()
     assert body["stats"] is None
     assert body["cached"] is False
-    assert "external_id" in body["message"]
+    assert "SportsData provider ID" in body["message"]
+
+
+def test_player_season_stats_uses_sportsdata_provider_id_mapping(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "sportsdata_api_key", "fake-key")
+
+    class FakeSportsDataClient:
+        def get_player_stats(self, external_id):
+            assert external_id == "sd-404"
+            return {"RushingYards": 600}
+
+    monkeypatch.setattr(players_route, "SportsDataClient", FakeSportsDataClient)
+    player = Player(
+        name="Mapped Provider Runner",
+        position="RB",
+        school="Georgia",
+        external_id="espn:999",
+    )
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        PlayerProviderId(
+            player_id=player.id,
+            provider="sportsdata",
+            provider_player_id="sd-404",
+            match_confidence=100,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/players/{player.id}/season-stats", params={"season": 2025, "refresh": True})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["stats"]["RushingYards"] == 600
+    assert body["source"] == "sportsdata"
 
 
 def test_player_season_stats_missing_provider_data_returns_nullable_response(

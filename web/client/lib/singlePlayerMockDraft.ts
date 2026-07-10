@@ -7,6 +7,7 @@ import {
   type RosterPlayer,
   type RosterSlotLimits,
 } from "@/lib/rosterLegality";
+import type { Player } from "@/types/player";
 
 export const MOCK_TEAM_COUNT = 12;
 export const MOCK_USER_TEAM_ID = 6;
@@ -112,6 +113,79 @@ export const DEFAULT_MOCK_DRAFT_SETTINGS: MockDraftSettings = {
   leagueSize: MOCK_TEAM_COUNT,
   rounds: MOCK_ROUNDS,
   pickTimerSeconds: MOCK_PICK_TIMER_SECONDS,
+};
+
+const LOCAL_MOCK_POSITION_COUNTS: Record<PlayerPosition, number> = {
+  QB: 42,
+  RB: 70,
+  WR: 82,
+  TE: 40,
+  K: 30,
+};
+
+const LOCAL_MOCK_POSITION_BASE_PROJECTION: Record<PlayerPosition, number> = {
+  QB: 330,
+  RB: 315,
+  WR: 305,
+  TE: 245,
+  K: 155,
+};
+
+export const createLocalMockDraftPlayerPool = (): Player[] => {
+  const rows: Player[] = [];
+  let id = 900_001;
+  let rank = 1;
+
+  for (const position of ["QB", "RB", "WR", "TE", "K"] as PlayerPosition[]) {
+    const count = LOCAL_MOCK_POSITION_COUNTS[position];
+    const baseProjection = LOCAL_MOCK_POSITION_BASE_PROJECTION[position];
+    for (let index = 0; index < count; index += 1) {
+      const positionRank = index + 1;
+      const projectedPoints = Math.max(
+        position === "K" ? 70 : 35,
+        baseProjection - index * (position === "K" ? 2.1 : 3.2)
+      );
+      rows.push({
+        id,
+        name: `Mock ${position} ${String(positionRank).padStart(2, "0")}`,
+        school: `Mock ${position} State`,
+        pos: position,
+        conf: "MOCK",
+        rank,
+        boardRank: rank,
+        adp: rank,
+        posRank: positionRank,
+        rostered: 0,
+        status: "HEALTHY",
+        projection: {
+          fpts: Number(projectedPoints.toFixed(1)),
+          passingYards: position === "QB" ? Math.round(projectedPoints * 9) : 0,
+          passingTds: position === "QB" ? Math.round(projectedPoints / 16) : 0,
+          ints: position === "QB" ? Math.max(0, Math.round(positionRank / 6)) : 0,
+          rushingYards: position === "QB" || position === "RB" ? Math.round(projectedPoints * 2.2) : 0,
+          rushingTds: position === "QB" || position === "RB" ? Math.round(projectedPoints / 38) : 0,
+          receptions: position === "RB" || position === "WR" || position === "TE" ? Math.round(projectedPoints / 8) : 0,
+          receivingYards: position === "RB" || position === "WR" || position === "TE" ? Math.round(projectedPoints * 3.4) : 0,
+          receivingTds: position === "RB" || position === "WR" || position === "TE" ? Math.round(projectedPoints / 42) : 0,
+          floor: Number((projectedPoints * 0.72).toFixed(1)),
+          ceiling: Number((projectedPoints * 1.28).toFixed(1)),
+          boomProb: 0.18,
+          bustProb: 0.16,
+          expectedPlays: position === "K" ? 0 : Math.round(420 - positionRank * 3),
+          expectedRushPerPlay: 0,
+          expectedTdPerPlay: 0,
+        },
+        history: [],
+        analysis: "Local fallback mock draft player used when the backend player pool is unavailable.",
+        sheetAdp: rank,
+        sheetProjectedSeasonPoints: Number(projectedPoints.toFixed(1)),
+      });
+      id += 1;
+      rank += 1;
+    }
+  }
+
+  return rows;
 };
 
 const clampNumber = (value: number, min: number, max: number, fallback: number) => {

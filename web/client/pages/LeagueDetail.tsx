@@ -24,6 +24,7 @@ import {
   useLeagueSettingsTab,
   useLeagueWaiverTab,
 } from "@/hooks/use-leagues";
+import { createBlankRosterRows, isPlaceholderRosterPlayer } from "@/lib/rosterDisplay";
 import { cn } from "@/lib/utils";
 import type {
   LeagueMatchupTabResponse,
@@ -39,11 +40,13 @@ type LeagueTab = "roster" | "matchup" | "waivers" | "settings";
 const tabs: Array<{ id: LeagueTab; label: string; icon: ComponentType<{ className?: string }> }> = [
   { id: "roster", label: "Roster", icon: ClipboardList },
   { id: "matchup", label: "Matchup", icon: Trophy },
-  { id: "waivers", label: "Available Players", icon: ShieldCheck },
+  { id: "waivers", label: "Waivers", icon: ShieldCheck },
   { id: "settings", label: "Settings", icon: Settings2 },
 ];
 
 const slotOrder = ["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "BENCH", "IR"];
+const POST_DRAFT_LEAGUE_STATUSES = new Set(["post_draft", "active", "playoffs", "completed", "archived"]);
+const POST_DRAFT_DRAFT_STATUSES = new Set(["completed", "complete"]);
 
 const formatNumber = (value: number | null | undefined, digits = 1) =>
   Number.isFinite(value) ? Number(value).toFixed(digits) : "0.0";
@@ -55,6 +58,13 @@ const slotRank = (slot: string) => {
   const index = slotOrder.indexOf(slot.toUpperCase());
   return index === -1 ? slotOrder.length : index;
 };
+
+const normalizeStatus = (value: unknown) => String(value ?? "").trim().toLowerCase();
+
+const isPostDraftState = (leagueStatus?: string | null, draftStatus?: string | null) =>
+  normalizeStatus(draftStatus)
+    ? POST_DRAFT_DRAFT_STATUSES.has(normalizeStatus(draftStatus))
+    : POST_DRAFT_LEAGUE_STATUSES.has(normalizeStatus(leagueStatus));
 
 function SummaryCard({
   label,
@@ -96,18 +106,21 @@ function EmptyState({ title, detail }: { title: string; detail: string }) {
 function RosterTable({
   players,
   emptyDetail,
+  forceBlank = false,
 }: {
   players: LeagueRosterPlayer[];
   emptyDetail: string;
+  forceBlank?: boolean;
 }) {
   const sortedPlayers = useMemo(
     () =>
       [...players].sort((left, right) => {
         const slotDelta = slotRank(left.roster_slot) - slotRank(right.roster_slot);
         if (slotDelta !== 0) return slotDelta;
+        if (forceBlank || isPlaceholderRosterPlayer(left) || isPlaceholderRosterPlayer(right)) return 0;
         return left.player_name.localeCompare(right.player_name);
       }),
-    [players]
+    [forceBlank, players]
   );
 
   if (sortedPlayers.length === 0) {
@@ -125,30 +138,39 @@ function RosterTable({
         <span className="text-right">Proj</span>
       </div>
       <div className="divide-y divide-white/10">
-        {sortedPlayers.map((player) => (
-          <div
-            key={`${player.fantasy_team_id}-${player.player_id}-${player.roster_slot}`}
-            className="grid grid-cols-1 gap-3 px-5 py-4 text-sm text-slate-200 lg:grid-cols-[1.2fr_0.7fr_0.6fr_0.7fr_0.8fr_0.7fr] lg:items-center"
-          >
-            <div>
-              <p className="font-black text-slate-50">{player.player_name}</p>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 lg:hidden">
-                {player.school} · {player.position} · {player.roster_slot}
-              </p>
-            </div>
-            <span className="hidden text-slate-400 lg:inline">{player.school || "-"}</span>
-            <span className="hidden lg:inline">
-              <span className="rounded-full border border-sky-300/25 bg-sky-400/10 px-3 py-1 text-[10px] font-black text-sky-200">
-                {player.position || "-"}
+        {sortedPlayers.map((player) => {
+          const isPlaceholder = forceBlank || isPlaceholderRosterPlayer(player);
+          const displayName = isPlaceholder ? "N/A" : player.player_name;
+          const displaySchool = isPlaceholder ? "N/A" : player.school || "N/A";
+          const displayPosition = player.position || player.player_position || player.roster_slot || "N/A";
+          const displayOpponent = isPlaceholder ? "N/A" : player.opponent || "N/A";
+          const displayProjection = isPlaceholder ? "-" : formatNumber(player.weekly_projected_fantasy_points);
+
+          return (
+            <div
+              key={`${player.id}-${player.fantasy_team_id}-${player.player_id ?? "empty"}-${player.roster_slot}`}
+              className="grid grid-cols-1 gap-3 px-5 py-4 text-sm text-slate-200 lg:grid-cols-[1.2fr_0.7fr_0.6fr_0.7fr_0.8fr_0.7fr] lg:items-center"
+            >
+              <div>
+                <p className="font-black text-slate-50">{displayName}</p>
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 lg:hidden">
+                  {displaySchool} · {displayPosition} · {player.roster_slot || "BENCH"}
+                </p>
+              </div>
+              <span className="hidden text-slate-400 lg:inline">{displaySchool}</span>
+              <span className="hidden lg:inline">
+                <span className="rounded-full border border-sky-300/25 bg-sky-400/10 px-3 py-1 text-[10px] font-black text-sky-200">
+                  {displayPosition}
+                </span>
               </span>
-            </span>
-            <span className="hidden text-slate-300 lg:inline">{player.roster_slot || "BENCH"}</span>
-            <span className="hidden text-slate-400 lg:inline">{player.opponent || "-"}</span>
-            <span className="font-black text-sky-200 lg:text-right">
-              {formatNumber(player.weekly_projected_fantasy_points)}
-            </span>
-          </div>
-        ))}
+              <span className="hidden text-slate-300 lg:inline">{player.roster_slot || "BENCH"}</span>
+              <span className="hidden text-slate-400 lg:inline">{displayOpponent}</span>
+              <span className="font-black text-sky-200 lg:text-right">
+                {displayProjection}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -252,10 +274,26 @@ function MatchupTeamPanel({
 function RosterTab({
   data,
   isLoading,
+  forceBlank = false,
 }: {
   data?: LeagueRosterTabResponse;
   isLoading: boolean;
+  forceBlank?: boolean;
 }) {
+  const rosterRows = useMemo(
+    () =>
+      forceBlank
+        ? createBlankRosterRows({
+            players: data?.data,
+            rosterSlotLimits: data?.roster_slot_limits,
+            fantasyTeamId: data?.fantasy_team_id ?? data?.owned_team?.id ?? null,
+            fantasyTeamName: data?.fantasy_team_name ?? data?.owned_team?.name ?? "Your Team",
+            leagueId: data?.league_id ?? null,
+          })
+        : data?.data ?? [],
+    [data, forceBlank]
+  );
+
   return (
     <Card className="rounded-[2rem] border-white/10 bg-[#0d1727]/90">
       <CardHeader className="border-b border-white/10">
@@ -273,8 +311,9 @@ function RosterTab({
           <EmptyState title="Loading roster" detail="Fetching your league-scoped roster." />
         ) : (
           <RosterTable
-            players={data?.data ?? []}
+            players={rosterRows}
             emptyDetail="Your team roster will populate after the league draft is completed."
+            forceBlank={forceBlank}
           />
         )}
       </CardContent>
@@ -384,7 +423,7 @@ function WaiverTab({
       <CardHeader className="border-b border-white/10">
         <CardTitle className="flex items-center justify-between gap-4">
           <span className="text-[11px] font-black uppercase tracking-[0.24em] text-sky-300">
-            Available Players
+            Waiver Claims
           </span>
           <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
             {data?.total_available ?? 0} available
@@ -429,12 +468,12 @@ function WaiverTab({
 
         <div>
           <p className="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-            Claims Not Enabled
+            Waiver Claims
           </p>
           {(data?.claims ?? []).length === 0 ? (
             <EmptyState
-              title="Claims disabled"
-              detail="Backend claims are not enabled yet. Use this page to find available players and watch targets."
+              title="No claims yet"
+              detail="Submit add/drop claims from the league Waivers page. Pending claims can be cancelled until processing."
             />
           ) : (
             <div className="space-y-3">
@@ -513,10 +552,10 @@ function SettingsTab({
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-              Future Claims Policy
+              Claims Policy
             </p>
             <p className="mt-2 text-sm font-black uppercase tracking-[0.12em] text-slate-100">
-              Claims not enabled · {String(data?.waiver_rules.waiver_type ?? "policy pending")}
+              Active policy · {String(data?.waiver_rules.waiver_type ?? "policy pending")}
             </p>
           </div>
           <div>
@@ -721,6 +760,7 @@ export default function LeagueDetail() {
   const membership = league.members.find((member) => member.user_id === user?.id) || null;
   const isCommissioner = league.commissioner_user_id === user?.id;
   const draftDate = formatDate(league.draft?.draft_datetime_utc);
+  const forceBlankRoster = !isPostDraftState(league.status, league.draft?.status);
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-16 pt-10 animate-in fade-in duration-700">
@@ -805,7 +845,7 @@ export default function LeagueDetail() {
       </Card>
 
       {activeTab === "roster" && (
-        <RosterTab data={rosterQuery.data} isLoading={rosterQuery.isLoading} />
+        <RosterTab data={rosterQuery.data} isLoading={rosterQuery.isLoading} forceBlank={forceBlankRoster} />
       )}
       {activeTab === "matchup" && (
         <MatchupTab data={matchupQuery.data} isLoading={matchupQuery.isLoading} />

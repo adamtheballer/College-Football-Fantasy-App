@@ -42,7 +42,7 @@ export function FloatingQuickActions() {
     [navigate]
   );
 
-  const hiddenRoutes = ["/login", "/signup", "/leagues/create", "/leagues/join"];
+  const hiddenRoutes = ["/login", "/signup", "/verify-email", "/leagues/create", "/leagues/join"];
   if (!isLoggedIn || hiddenRoutes.includes(location.pathname)) {
     return null;
   }
