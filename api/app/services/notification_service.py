@@ -146,6 +146,20 @@ def _league_pref_allows(alert_type: str, pref: NotificationLeaguePreference | No
     return True
 
 
+def _is_trade_alert_for_member(db: Session, alert_type: str, payload: dict, current_user_id: int) -> bool:
+    if not alert_type.startswith("TRADE_"):
+        return False
+    league_id = payload.get("league_id")
+    if not isinstance(league_id, int):
+        return False
+    return (
+        db.query(LeagueMember.id)
+        .filter(LeagueMember.league_id == league_id, LeagueMember.user_id == current_user_id)
+        .first()
+        is not None
+    )
+
+
 def list_user_alerts(db: Session, current_user_id: int, limit: int = 50) -> NotificationList:
     global_prefs = db.query(NotificationPreference).filter(NotificationPreference.user_id == current_user_id).first()
     rostered_player_rows = (
@@ -177,6 +191,25 @@ def list_user_alerts(db: Session, current_user_id: int, limit: int = 50) -> Noti
         if not _global_pref_allows(row.alert_type, global_prefs):
             continue
         payload = row.payload or {}
+        if _is_trade_alert_for_member(db, row.alert_type, payload, current_user_id):
+            payload_league_id = payload.get("league_id")
+            if isinstance(payload_league_id, int) and _league_pref_allows(
+                row.alert_type,
+                league_pref_by_id.get(payload_league_id),
+            ):
+                data.append(
+                    NotificationRead(
+                        id=row.id,
+                        alert_type=row.alert_type,
+                        title=row.title,
+                        body=row.body,
+                        payload=row.payload,
+                        sent_at=row.sent_at,
+                    )
+                )
+                if len(data) >= limit:
+                    break
+            continue
         player_id = payload.get("player_id")
         if not isinstance(player_id, int) or player_id not in rostered_player_ids:
             continue
@@ -452,4 +485,3 @@ def refresh_scheduled_notification_state(db: Session, scheduled_notification_id:
     if delivered_times:
         scheduled.sent_at = max(ts for ts in delivered_times if ts is not None)
     db.add(scheduled)
-

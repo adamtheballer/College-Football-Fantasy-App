@@ -1,8 +1,9 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from conftest import TestingSessionLocal
 import pytest
 from collegefootballfantasy_api.app.models.injury import Injury
+from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
@@ -588,3 +589,70 @@ def test_league_hub_endpoints_require_membership(client):
         response = client.get(f"/leagues/{league['id']}/{path}", headers=auth_headers(outsider_token))
         assert response.status_code == 403
         assert response.json()["detail"] == "league membership required"
+
+
+def test_commissioner_can_reschedule_future_draft(client):
+    token = create_user_and_token(client, "reschedule-commissioner")
+    league = create_league(client, token, "Commissioner Reschedule")
+    next_time = (datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=3)).isoformat()
+
+    response = client.patch(
+        f"/leagues/{league['id']}/draft",
+        json={
+            "draft_datetime_utc": next_time,
+            "timezone": "America/New_York",
+            "draft_type": "snake",
+            "pick_timer_seconds": 120,
+            "status": "scheduled",
+        },
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["pick_timer_seconds"] == 120
+    assert response.json()["draft_datetime_utc"].startswith(next_time[:19])
+
+
+def test_non_commissioner_cannot_reschedule_draft(client):
+    commissioner_token = create_user_and_token(client, "reschedule-owner")
+    member_token = create_user_and_token(client, "reschedule-member")
+    league = create_league(client, commissioner_token, "Member Reschedule", max_teams=2)
+    join_response = client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token))
+    assert join_response.status_code == 200
+
+    response = client.patch(
+        f"/leagues/{league['id']}/draft",
+        json={
+            "draft_datetime_utc": (datetime.now(timezone.utc) + timedelta(days=4)).isoformat(),
+            "timezone": "America/New_York",
+            "draft_type": "snake",
+            "pick_timer_seconds": 120,
+            "status": "scheduled",
+        },
+        headers=auth_headers(member_token),
+    )
+
+    assert response.status_code == 403
+
+
+def test_started_draft_cannot_be_rescheduled(client, db_session):
+    token = create_user_and_token(client, "reschedule-started")
+    league = create_league(client, token, "Started Reschedule")
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    draft.status = "in_progress"
+    db_session.commit()
+
+    response = client.patch(
+        f"/leagues/{league['id']}/draft",
+        json={
+            "draft_datetime_utc": (datetime.now(timezone.utc) + timedelta(days=4)).isoformat(),
+            "timezone": "America/New_York",
+            "draft_type": "snake",
+            "pick_timer_seconds": 120,
+            "status": "scheduled",
+        },
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 409
+    assert "cannot be rescheduled" in response.json()["detail"]

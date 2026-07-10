@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -49,6 +50,11 @@ ROSTER_SLOT_BOUNDS = {
     "BENCH": (0, 10),
     "IR": (0, 4),
 }
+
+DRAFT_FINAL_STATUSES = {"started", "in_progress", "completed", "complete", "final", "closed"}
+DRAFT_TYPES = {"snake"}
+MIN_PICK_TIMER_SECONDS = 15
+MAX_PICK_TIMER_SECONDS = 600
 
 def _coerce_slot_count(value, minimum: int, maximum: int) -> int:
     try:
@@ -256,11 +262,47 @@ def reschedule_draft(
     if not draft_row:
         draft_row = Draft(league_id=league.id)
 
-    draft_row.draft_datetime_utc = payload.draft_datetime_utc
+    if league.status not in {"pre_draft", "scheduled"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="draft can only be rescheduled before the draft starts",
+        )
+    if (draft_row.status or "").lower() in DRAFT_FINAL_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="started or completed drafts cannot be rescheduled",
+        )
+
+    try:
+        ZoneInfo(payload.timezone)
+    except ZoneInfoNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid draft timezone") from exc
+
+    draft_type = payload.draft_type.strip().lower()
+    if draft_type not in DRAFT_TYPES:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid draft type")
+
+    if not MIN_PICK_TIMER_SECONDS <= payload.pick_timer_seconds <= MAX_PICK_TIMER_SECONDS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"pick timer must be between {MIN_PICK_TIMER_SECONDS} and {MAX_PICK_TIMER_SECONDS} seconds",
+        )
+
+    next_draft_time = payload.draft_datetime_utc
+    if next_draft_time.tzinfo is None:
+        next_draft_time = next_draft_time.replace(tzinfo=timezone.utc)
+    next_draft_time = next_draft_time.astimezone(timezone.utc)
+    if next_draft_time <= datetime.now(timezone.utc) + timedelta(minutes=5):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="draft time must be at least 5 minutes in the future",
+        )
+
+    draft_row.draft_datetime_utc = next_draft_time
     draft_row.timezone = payload.timezone
-    draft_row.draft_type = payload.draft_type
+    draft_row.draft_type = draft_type
     draft_row.pick_timer_seconds = payload.pick_timer_seconds
-    draft_row.status = payload.status
+    draft_row.status = "scheduled"
     db.add(draft_row)
 
     cancel_scheduled_notifications(db, league.id, reason="draft rescheduled")

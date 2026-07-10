@@ -197,7 +197,13 @@ export default function DraftLobby() {
               </div>
 
               {showReschedule && isCommissioner ? (
-                <div className="mt-5 grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                <form
+                  className="mt-5 grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void handleRescheduleDraft();
+                  }}
+                >
                   <label className="grid gap-2">
                     <span className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
                       New Draft Time
@@ -210,17 +216,16 @@ export default function DraftLobby() {
                     />
                   </label>
                   <Button
-                    type="button"
+                    type="submit"
                     className="h-12 rounded-2xl bg-primary px-6 text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground"
                     disabled={rescheduleDraft.isPending}
-                    onClick={handleRescheduleDraft}
                   >
                     {rescheduleDraft.isPending ? "Saving..." : "Save New Time"}
                   </Button>
                   {rescheduleError ? (
-                    <p className="text-[11px] font-bold text-red-300 md:col-span-2">{rescheduleError}</p>
+                      <p className="text-[11px] font-bold text-red-300 md:col-span-2">{rescheduleError}</p>
                   ) : null}
-                </div>
+                </form>
               ) : null}
             </div>
           )}

@@ -59,7 +59,10 @@ export function useRescheduleDraft(leagueId?: number) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["league", leagueId] });
       queryClient.invalidateQueries({ queryKey: ["leagues"] });
+      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
+      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "settings-view"] });
       queryClient.invalidateQueries({ queryKey: ["league", leagueId, "draft-room"] });
+      queryClient.invalidateQueries({ queryKey: ["draft-room", leagueId] });
     },
   });
 }

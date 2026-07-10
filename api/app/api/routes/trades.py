@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from collegefootballfantasy_api.app.api.deps import get_current_user
+from collegefootballfantasy_api.app.api.deps import get_current_user, require_verified_user
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.defense_rating import DefenseRating
 from collegefootballfantasy_api.app.models.defense_vs_position import DefenseVsPosition
@@ -11,8 +11,25 @@ from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
-from collegefootballfantasy_api.app.schemas.trade import TradeAnalyzeRequest, TradeAnalyzeResponse
+from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.schemas.trade import (
+    TradeActionRequest,
+    TradeAnalyzeRequest,
+    TradeAnalyzeResponse,
+    TradeOfferCreate,
+    TradeOfferList,
+    TradeOfferRead,
+)
 from collegefootballfantasy_api.app.services.matchup_grades import build_matchup_row
+from collegefootballfantasy_api.app.services.trade_service import (
+    accept_trade_offer,
+    cancel_trade_offer,
+    commissioner_approve_trade,
+    commissioner_veto_trade,
+    create_trade_offer,
+    list_trade_offers,
+    reject_trade_offer,
+)
 
 router = APIRouter()
 
@@ -241,3 +258,90 @@ def analyze_trade(
         delta=round(delta, 2),
         verdict=verdict,
     )
+
+
+def _league_or_404(db: Session, league_id: int) -> League:
+    league = db.get(League, league_id)
+    if not league:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
+    return league
+
+
+@router.get("/leagues/{league_id}/trades", response_model=TradeOfferList)
+def list_league_trades(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> TradeOfferList:
+    return list_trade_offers(db, _league_or_404(db, league_id), current_user)
+
+
+@router.post("/leagues/{league_id}/trades", response_model=TradeOfferRead, status_code=status.HTTP_201_CREATED)
+def create_league_trade(
+    league_id: int,
+    payload: TradeOfferCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> TradeOfferRead:
+    return create_trade_offer(db, _league_or_404(db, league_id), current_user, payload)
+
+
+@router.post("/leagues/{league_id}/trades/{trade_id}/accept", response_model=TradeOfferRead)
+def accept_league_trade(
+    league_id: int,
+    trade_id: int,
+    payload: TradeActionRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> TradeOfferRead:
+    return accept_trade_offer(db, _league_or_404(db, league_id), trade_id, current_user, payload or TradeActionRequest())
+
+
+@router.post("/leagues/{league_id}/trades/{trade_id}/reject", response_model=TradeOfferRead)
+def reject_league_trade(
+    league_id: int,
+    trade_id: int,
+    payload: TradeActionRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> TradeOfferRead:
+    return reject_trade_offer(db, _league_or_404(db, league_id), trade_id, current_user, payload or TradeActionRequest())
+
+
+@router.post("/leagues/{league_id}/trades/{trade_id}/cancel", response_model=TradeOfferRead)
+def cancel_league_trade(
+    league_id: int,
+    trade_id: int,
+    payload: TradeActionRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> TradeOfferRead:
+    return cancel_trade_offer(db, _league_or_404(db, league_id), trade_id, current_user, payload or TradeActionRequest())
+
+
+@router.post("/leagues/{league_id}/trades/{trade_id}/commissioner/approve", response_model=TradeOfferRead)
+def approve_league_trade(
+    league_id: int,
+    trade_id: int,
+    payload: TradeActionRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> TradeOfferRead:
+    return commissioner_approve_trade(
+        db,
+        _league_or_404(db, league_id),
+        trade_id,
+        current_user,
+        payload or TradeActionRequest(),
+    )
+
+
+@router.post("/leagues/{league_id}/trades/{trade_id}/commissioner/veto", response_model=TradeOfferRead)
+def veto_league_trade(
+    league_id: int,
+    trade_id: int,
+    payload: TradeActionRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> TradeOfferRead:
+    return commissioner_veto_trade(db, _league_or_404(db, league_id), trade_id, current_user, payload or TradeActionRequest())
