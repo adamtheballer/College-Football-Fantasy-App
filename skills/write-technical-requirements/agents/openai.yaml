@@ -1,4 +1,4 @@
 interface:
   display_name: "Technical Requirements Writer"
-  short_description: "Feature and epic requirements authoring"
-  default_prompt: "Use $write-technical-requirements to draft or refine a repo-style feature or epic requirements document."
+  short_description: "Author source-of-truth requirements and tracking"
+  default_prompt: "Use $write-technical-requirements to draft or refine source-of-truth requirements, then publish matching GitHub issues that link to the file and split multiple implementation stories into separate issues; report any publication blocker."

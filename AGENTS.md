@@ -9,3 +9,8 @@
 ## Frontend Direction
 - `web/` React is the canonical frontend for this project.
 - `ui/` Streamlit is not the primary product surface and should not be used for new feature planning unless explicitly requested.
+
+## Project Skills
+- Project-specific skill sources live under `skills/`.
+- When a task clearly matches a skill description, read that skill's `SKILL.md` before editing.
+- Use `skills/cross-stack-contract-parity/SKILL.md` when an implemented change touches both a FastAPI contract and a React consumer.

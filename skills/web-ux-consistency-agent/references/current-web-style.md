@@ -8,7 +8,7 @@ The app uses a premium dark sports-dashboard aesthetic with a cinematic, slightl
 
 Short description:
 
-`Dark, high-contrast, premium sports command-center UI with electric blue accents, oversized rounded glass panels, uppercase editorial typography, and motion-rich dashboard layouts.`
+`Dark, high-contrast, premium sports command-center UI with electric blue accents, oversized rounded glass panels, uppercase editorial typography, and controlled, purposeful motion.`
 
 ## Core Files
 
@@ -66,7 +66,7 @@ Short description:
 
 ### App shell
 
-- Standard pages use a fixed left sidebar and sticky top header.
+- Standard pages use a persistent full-height left sidebar and sticky top header.
 - Main content scrolls independently.
 - Containers are centered with `max-w-*` constraints and generous internal spacing.
 

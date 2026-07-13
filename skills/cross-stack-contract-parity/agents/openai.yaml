@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cross-Stack Contract Parity"
+  short_description: "Verify React and FastAPI contract alignment"
+  default_prompt: "Use $cross-stack-contract-parity to verify that React consumers and FastAPI contracts agree across payloads, errors, and edge cases."

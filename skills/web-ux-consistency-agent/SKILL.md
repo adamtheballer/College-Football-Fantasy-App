@@ -1,6 +1,6 @@
 ---
 name: web-ux-consistency-agent
-description: Design and review UX for the React web app while preserving the current visual language, layout patterns, and component styling. Use when creating or refining pages in `web/client`, reviewing UI consistency, or evolving interactions without drifting from the established site paradigm.
+description: Design, implement, and review UX for the React web app while preserving its visual language and interaction patterns. Use for meaningful page or component work in `web/client`, responsive behavior, accessibility, loading or error states, and browser-based functional or visual verification.
 ---
 
 # Web UX Consistency Agent
@@ -15,11 +15,11 @@ description: Design and review UX for the React web app while preserving the cur
 
 - Primary target: `web/client`
 - Supporting files: `web/client/global.css`, `web/client/components`, `web/client/pages`, `web/components.json`
-- Do not apply this skill to the Streamlit app in `ui/` unless the user explicitly wants cross-surface alignment.
+- Do not apply this skill to the deprecated Streamlit remnants under `ui/`.
 
 ## First Step
 
-Before proposing UI changes, inspect the relevant existing page and then read:
+Before proposing UI changes, inspect the relevant live route and neighboring pages, then read:
 
 - `references/current-web-style.md`
 
@@ -69,16 +69,28 @@ Prefer the centralized branded utilities and primitives when they fit:
 ### Preserve interaction patterns
 
 - Include clear hover, focus, loading, empty, and error states.
+- Keep destructive actions explicit and confirm irreversible operations.
+- Preserve keyboard navigation, labels, focus visibility, and usable touch targets.
 - Use subtle motion that reinforces hierarchy: fade-in, scale, border/glow intensification, and directional movement.
 - Keep motion restrained and purposeful; do not add noisy animation.
 
+## Browser Verification
+
+- Exercise the changed flow through normal user controls in a real browser after implementation.
+- Verify functional states separately from visual quality: loading, success, empty, error, validation, and disabled states as applicable.
+- Check the primary desktop viewport and a realistic narrow viewport for clipping, overflow, hidden actions, and unreadable density.
+- Capture screenshots or traces when they materially support the review; do not substitute snapshots for interaction testing.
+- Use `$playwright` for repeatable terminal-based browser inspection when available.
+
 ## Review Checklist
 
-- Does the new UI look like it belongs next to `Index`, `Leagues`, `LeagueDetail`, `Login`, and `Stats`?
+- Does the new UI look like it belongs next to `Index`, `Leagues`, `LeagueRoster`, `LeagueMatchup`, `Login`, `Trade`, and `Stats`?
 - Does it reuse existing shell, spacing cadence, and card construction?
 - Are token colors and semantic accents pulled from the current palette?
 - Are CTA buttons, headings, labels, and empty states styled in the same voice?
 - Did the change accidentally fall back to unbranded default component styling?
+- Does the changed flow remain understandable when the API is slow, empty, or returns an error?
+- Can keyboard and touch users reach and understand the primary actions?
 
 ## When to Push Back
 
@@ -97,4 +109,5 @@ Prefer the centralized branded utilities and primitives when they fit:
 
 - For design guidance: describe the intended page structure, hierarchy, and interaction model in terms of the current paradigm.
 - For implementation work: keep the styling anchored to the patterns in `references/current-web-style.md`.
-- For review work: identify where a screen breaks the established visual system and propose the smallest fix that restores consistency.
+- For implementation work: report the browser states and viewports verified.
+- For review work: identify where a screen breaks the established visual or interaction system and propose the smallest credible fix.

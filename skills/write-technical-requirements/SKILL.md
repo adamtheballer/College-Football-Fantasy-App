@@ -30,6 +30,7 @@ description: Write or refine technical requirements for this repo, including fea
 ## Writing Rules
 
 - Match the concise repo pattern used in `requirements/*.md`.
+- Treat the requirements markdown as the source of truth; GitHub issues should link back to it rather than replace implementation detail.
 - Prefer specific nouns and endpoint names over generic intent language.
 - Write acceptance criteria as observable outcomes, not implementation steps.
 - Separate current state assumptions from required changes.
@@ -37,7 +38,7 @@ description: Write or refine technical requirements for this repo, including fea
 
 ## Cross-Layer Alignment Checklist
 
-- Name the frontend surface correctly: `web/` React or `ui/` Streamlit.
+- Name `web/` React as the canonical frontend. Do not plan new product work for `ui/` Streamlit unless explicitly requested.
 - Keep endpoint names and payload fields aligned with likely schema names.
 - Note when a database change implies a migration or backfill.
 - Call out when caching, notifications, background jobs, or scheduled scripts are part of the flow.
@@ -50,5 +51,13 @@ description: Write or refine technical requirements for this repo, including fea
 ## Related Skills
 
 - Use `$feature-contracts-specs` when the requirements need exact request and response shapes.
+- Use `$cross-stack-contract-parity` when reviewing an implemented contract against the requirements.
 - Use `$senior-software-engineer-agent` when the task needs architecture tradeoffs, phasing, or cross-layer planning in addition to document writing.
 - Use `$ux-requirements` when the task is primarily UX-facing rather than engineering-facing.
+
+## GitHub Tracking
+
+- Publish each new epic, feature, or story as a matching GitHub issue when the task includes requirements authoring and GitHub access is available.
+- Reference the requirements file from every matching issue.
+- Split a requirements document containing multiple implementation stories into separate tracking issues.
+- If publishing is blocked, leave issue-ready titles and bodies and state that GitHub synchronization remains incomplete.
