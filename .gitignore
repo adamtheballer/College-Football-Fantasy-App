@@ -45,3 +45,9 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Generated local reports and rendering workspaces
+/docs/application-architecture-guide.html
+/docs/architecture-audit-*.md
+/output/
+/tmp/
