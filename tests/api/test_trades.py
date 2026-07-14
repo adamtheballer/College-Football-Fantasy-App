@@ -8,6 +8,7 @@ from collegefootballfantasy_api.app.api.routes.trades import (
 from conftest import TestingSessionLocal
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league_message import LeagueMessage
+from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.notification import NotificationLog
 from collegefootballfantasy_api.app.models.player import Player
@@ -15,6 +16,7 @@ from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.trade_offer import TradeOffer
 from collegefootballfantasy_api.app.models.trade_review import TradeReview
+from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.trade import TradeOfferCreate, TradeOfferRead
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services import trade_service
@@ -177,6 +179,55 @@ def test_trade_analyze_allows_authenticated_user(client):
     )
 
     assert response.status_code == 200
+
+
+def test_trade_analyze_uses_league_scoring_rules_for_projection_value(client, db_session):
+    token = create_user_and_token(client, "analyze-scoring")
+    league = create_league(client, token, "analyze-scoring", review_type="none")
+    settings = db_session.query(LeagueSettings).filter_by(league_id=league["id"]).one()
+    settings.scoring_json = {"ppr": 0}
+    receive_player = Player(name="Reception Merchant", position="WR", school="Alpha")
+    give_player = Player(name="Empty Projection", position="WR", school="Bravo")
+    db_session.add_all([receive_player, give_player])
+    db_session.flush()
+    db_session.add_all(
+        [
+            WeeklyProjection(
+                player_id=receive_player.id,
+                season=2026,
+                week=1,
+                receptions=10,
+                fantasy_points=10,
+            ),
+            WeeklyProjection(
+                player_id=give_player.id,
+                season=2026,
+                week=1,
+                fantasy_points=0,
+            ),
+        ]
+    )
+    db_session.commit()
+    payload = {
+        "receive_ids": [receive_player.id],
+        "give_ids": [give_player.id],
+        "season": 2026,
+        "week": 1,
+        "league_size": 2,
+        "roster_slots": {"WR": 1, "BE": 0, "IR": 0},
+    }
+
+    global_response = client.post("/trade/analyze", json=payload, headers=auth_headers(token))
+    league_response = client.post(
+        "/trade/analyze",
+        json={**payload, "league_id": league["id"]},
+        headers=auth_headers(token),
+    )
+
+    assert global_response.status_code == 200
+    assert global_response.json()["receive_value"] == 15.0
+    assert league_response.status_code == 200
+    assert league_response.json()["receive_value"] == 0.0
 
 
 def test_normalize_roster_slots_uses_payload_values():

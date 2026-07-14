@@ -34,6 +34,7 @@ type TradeAnalyzePayload = {
   give_ids: number[];
   season: number;
   week: number;
+  league_id?: number;
   league_size: number;
   roster_slots: Record<string, number>;
 };
@@ -551,6 +552,7 @@ export default function Trade() {
       give_ids: giveIds,
       season: league.season_year,
       week: Number(workspace.matchup_summary?.week ?? 1),
+      league_id: league.id,
       league_size: league.max_teams,
       roster_slots: toTradeRosterSlots(league.settings?.roster_slots_json),
     };

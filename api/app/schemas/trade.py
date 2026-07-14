@@ -8,6 +8,7 @@ class TradeAnalyzeRequest(BaseModel):
     give_ids: list[int]
     season: int
     week: int
+    league_id: int | None = None
     league_size: int = 12
     roster_slots: dict[str, int] | None = None
 

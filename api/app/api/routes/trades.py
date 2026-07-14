@@ -9,6 +9,8 @@ from collegefootballfantasy_api.app.models.defense_vs_position import DefenseVsP
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.league_member import LeagueMember
+from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.models.league import League
@@ -21,6 +23,7 @@ from collegefootballfantasy_api.app.schemas.trade import (
     TradeOfferRead,
 )
 from collegefootballfantasy_api.app.services.matchup_grades import build_matchup_row
+from collegefootballfantasy_api.app.services.scoring_service import calculate_player_fantasy_points
 from collegefootballfantasy_api.app.services.trade_service import (
     accept_trade_offer,
     cancel_trade_offer,
@@ -89,7 +92,12 @@ def _replacement_index(pos: str, league_size: int, roster_slots: dict[str, int])
 
 
 def _build_replacement_by_pos(
-    db: Session, season: int, week: int, league_size: int, roster_slots: dict[str, int]
+    db: Session,
+    season: int,
+    week: int,
+    league_size: int,
+    roster_slots: dict[str, int],
+    scoring_rules: dict | None = None,
 ) -> dict[str, float]:
     rows = (
         db.query(WeeklyProjection, Player)
@@ -102,7 +110,7 @@ def _build_replacement_by_pos(
         pos = player.position.upper()
         if pos not in {"QB", "RB", "WR", "TE", "K"}:
             continue
-        points_by_pos.setdefault(pos, []).append(projection.fantasy_points or 0.0)
+        points_by_pos.setdefault(pos, []).append(_projection_points(player, projection, scoring_rules))
 
     replacement_by_pos: dict[str, float] = {}
     for pos, values in points_by_pos.items():
@@ -111,6 +119,56 @@ def _build_replacement_by_pos(
         index = max(0, min(index, len(values_sorted) - 1))
         replacement_by_pos[pos] = values_sorted[index] if values_sorted else 0.0
     return replacement_by_pos
+
+
+def _projection_stats(projection: WeeklyProjection) -> dict[str, float]:
+    return {
+        "pass_yards": float(projection.pass_yards or 0.0),
+        "pass_tds": float(projection.pass_tds or 0.0),
+        "interceptions": float(projection.interceptions or 0.0),
+        "rush_yards": float(projection.rush_yards or 0.0),
+        "rush_tds": float(projection.rush_tds or 0.0),
+        "receptions": float(projection.receptions or 0.0),
+        "rec_yards": float(projection.rec_yards or 0.0),
+        "rec_tds": float(projection.rec_tds or 0.0),
+    }
+
+
+def _projection_points(player: Player, projection: WeeklyProjection | None, scoring_rules: dict | None = None) -> float:
+    if projection is None:
+        return 0.0
+    if not scoring_rules:
+        return float(projection.fantasy_points or 0.0)
+    stats = _projection_stats(projection)
+    if not any(stats.values()):
+        return float(projection.fantasy_points or 0.0)
+    points, _breakdown = calculate_player_fantasy_points(stats, scoring_rules)
+    return points
+
+
+def _league_analyzer_context(
+    db: Session,
+    league_id: int | None,
+    current_user: User,
+) -> tuple[int | None, dict[str, int] | None, dict | None]:
+    if league_id is None:
+        return None, None, None
+    league = db.get(League, league_id)
+    if not league:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
+    membership = (
+        db.query(LeagueMember.id)
+        .filter(LeagueMember.league_id == league_id, LeagueMember.user_id == current_user.id)
+        .first()
+    )
+    if league.commissioner_user_id != current_user.id and membership is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="league membership required")
+    settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league_id).first()
+    return (
+        league.max_teams,
+        settings.roster_slots_json if settings and settings.roster_slots_json else None,
+        settings.scoring_json if settings and settings.scoring_json else None,
+    )
 
 
 def _injury_multiplier(status: str | None) -> float:
@@ -171,8 +229,9 @@ def _player_value(
     replacement_by_pos: dict[str, float],
     injury_status: str | None,
     schedule_mult: float,
+    scoring_rules: dict | None = None,
 ) -> float:
-    points = projection.fantasy_points if projection else 0.0
+    points = _projection_points(player, projection, scoring_rules)
     replacement = replacement_by_pos.get(player.position.upper(), 0.0)
     points_above = points - replacement
     scarcity_bonus = max(0.0, points_above) * 0.5
@@ -209,9 +268,15 @@ def analyze_trade(
     )
     injury_by_id = {inj.player_id: inj for inj in injuries}
 
-    roster_slots = _normalize_roster_slots(payload.roster_slots)
+    league_size, league_roster_slots, scoring_rules = _league_analyzer_context(db, payload.league_id, current_user)
+    roster_slots = _normalize_roster_slots(league_roster_slots or payload.roster_slots)
     replacement_by_pos = _build_replacement_by_pos(
-        db, payload.season, payload.week, payload.league_size, roster_slots
+        db,
+        payload.season,
+        payload.week,
+        league_size or payload.league_size,
+        roster_slots,
+        scoring_rules,
     )
 
     receive_value = 0.0
@@ -226,6 +291,7 @@ def analyze_trade(
                 replacement_by_pos,
                 injury_status,
                 schedule_mult,
+                scoring_rules,
             )
 
     give_value = 0.0
@@ -240,6 +306,7 @@ def analyze_trade(
                 replacement_by_pos,
                 injury_status,
                 schedule_mult,
+                scoring_rules,
             )
 
     delta = receive_value - give_value
