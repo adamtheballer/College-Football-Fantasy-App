@@ -38,6 +38,24 @@ where lower(email) = lower('emmab1167@icloud.com');
 "
 ```
 
+## Repair a local account password
+
+If the row exists, is active, is verified, is not locked, and login still returns `401`, the stored password hash does not match the password being entered. Do not add a login bypass. Repair the local row explicitly:
+
+```bash
+PYTHONPATH=. uv run python scripts/repair_local_auth_account.py --email emmab1167@icloud.com --first-name Emma
+```
+
+The command prompts for the password without echoing it, then:
+
+- creates the user if this local database lost the row;
+- marks the email verified;
+- clears failed login and lockout state;
+- stores a fresh Argon2 hash for the entered password;
+- never prints or logs the password.
+
+For Postgres.app local databases, make sure `DATABASE_URL` points at that database before running the command.
+
 ## Avoid accidental user deletion
 
 Do not run `docker compose down -v` against the main local stack unless you intentionally want to delete all local users and league data.
