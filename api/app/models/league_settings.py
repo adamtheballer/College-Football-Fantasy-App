@@ -22,3 +22,11 @@ class LeagueSettings(TimestampMixin, Base):
     superflex_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     kicker_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     defense_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    @property
+    def waiver_mode(self) -> str:
+        return self.waiver_type
+
+    @property
+    def allow_zero_dollar_bids(self) -> bool:
+        return True

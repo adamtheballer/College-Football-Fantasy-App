@@ -174,7 +174,7 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
-                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="/settings" element={<Settings />} />
                 <Route path="/rosters" element={<ProtectedRoute><Rosters /></ProtectedRoute>} />
                 <Route path="/chats" element={<ProtectedRoute><Chats /></ProtectedRoute>} />
                 <Route path="/waivers" element={<ProtectedRoute><Navigate to="/leagues" replace /></ProtectedRoute>} />
@@ -183,6 +183,7 @@ const App = () => (
                 <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
                 <Route path="/trade" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
                 <Route path="/trade/:leagueId/:playerId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
+                <Route path="/leagues/:leagueId/trades/:tradeId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
                 <Route path="/admin/scoring" element={<ProtectedRoute><AdminScoring /></ProtectedRoute>} />
                 <Route path="/player-compare" element={<PlayerCompare />} />
                 <Route path="/stats" element={<Navigate to="/player-compare" replace />} />

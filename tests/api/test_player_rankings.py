@@ -6,6 +6,7 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.services.cfb27_player_sync import load_cfb27_ratings, sync_cfb27_players
 
 
 def test_players_expose_and_sort_by_sheet_board_rank(client, db_session):
@@ -26,6 +27,79 @@ def test_players_expose_and_sort_by_sheet_board_rank(client, db_session):
     assert rows[0]["board_rank"] == 1
     assert rows[0]["sheet_adp"] == 1.0
     assert rows[1]["board_rank"] == 22
+
+
+def test_cfb27_source_contains_critical_compare_players():
+    ratings = {
+        (rating.name, rating.school, rating.position): rating
+        for rating in load_cfb27_ratings()
+    }
+
+    jeremiah = ratings[("Jeremiah Smith", "Ohio State", "WR")]
+    ahmad = ratings[("Ahmad Hardy", "Missouri", "RB")]
+    assert jeremiah.overall == 99
+    assert ahmad.overall == 96
+
+
+def test_cfb27_sync_creates_missing_compare_players(client, db_session):
+    result = sync_cfb27_players(db_session)
+
+    assert result["total"] == 250
+    assert result["created"] == 250
+    assert result["missing"] == 250
+    ahmad = db_session.query(Player).filter_by(name="Ahmad Hardy", school="Missouri", position="RB").one()
+    jeremiah = db_session.query(Player).filter_by(name="Jeremiah Smith", school="Ohio State", position="WR").one()
+    assert ahmad.sheet_adp == 1.0
+    assert jeremiah.sheet_adp == 1.0
+    assert ahmad.external_id.startswith("cfb27:")
+    assert jeremiah.external_id.startswith("cfb27:")
+
+
+def test_cfb27_sync_is_idempotent(client, db_session):
+    first = sync_cfb27_players(db_session)
+    second = sync_cfb27_players(db_session)
+
+    assert first["created"] == 250
+    assert second["created"] == 0
+    assert second["updated"] == 0
+    assert second["already_present"] == 250
+    assert db_session.query(Player).filter_by(name="Jeremiah Smith", school="Ohio State", position="WR").count() == 1
+
+
+def test_cfb27_sync_preserves_duplicates_but_updates_ranked_canonical_row(client, db_session):
+    unranked = Player(name="Ahmad Hardy", position="RB", school="Missouri", sheet_adp=None)
+    ranked = Player(name="AHMAD HARDY", position="RB", school="MISSOURI", sheet_adp=12.0)
+    db_session.add_all([unranked, ranked])
+    db_session.commit()
+
+    sync_cfb27_players(db_session)
+
+    rows = db_session.query(Player).filter(Player.name.ilike("ahmad hardy")).order_by(Player.id.asc()).all()
+    assert len(rows) == 2
+    db_session.refresh(ranked)
+    assert ranked.name == "Ahmad Hardy"
+    assert ranked.school == "Missouri"
+    assert ranked.sheet_adp == 12.0
+
+
+def test_players_rank_sort_syncs_cfb27_compare_board(client):
+    response = client.get("/players", params={"sort": "rank", "limit": 100})
+
+    assert response.status_code == 200
+    rows = response.json()["data"]
+    names = {row["name"] for row in rows}
+    assert "Ahmad Hardy" in names
+    assert "Jeremiah Smith" in names
+
+
+def test_players_search_syncs_cfb27_compare_board(client):
+    jeremiah_response = client.get("/players", params={"search": "Jeremiah Smith", "limit": 10})
+    ahmad_response = client.get("/players", params={"search": "Ahmad Hardy", "limit": 10})
+
+    assert jeremiah_response.status_code == 200
+    assert ahmad_response.status_code == 200
+    assert any(row["name"] == "Jeremiah Smith" for row in jeremiah_response.json()["data"])
+    assert any(row["name"] == "Ahmad Hardy" for row in ahmad_response.json()["data"])
 
 
 def test_players_draft_pool_filters_availability_and_position_set_server_side(client, db_session):

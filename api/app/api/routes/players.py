@@ -25,7 +25,11 @@ from collegefootballfantasy_api.app.schemas.player import (
 )
 from collegefootballfantasy_api.app.schemas.historical_stats import PlayerHistoricalStatsResponse
 from collegefootballfantasy_api.app.schemas.player_stat import PlayerStatResponse
-from collegefootballfantasy_api.app.services.historical_stats import get_player_historical_stats_response
+from collegefootballfantasy_api.app.services.espn_player_lookup import resolve_espn_player_by_name
+from collegefootballfantasy_api.app.services.historical_stats import (
+    fetch_and_store_player_history,
+    get_player_historical_stats_response,
+)
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
 
 router = APIRouter()
@@ -80,11 +84,16 @@ def _birthplace(athlete: dict) -> str | None:
     return ", ".join(part for part in parts if part) or None
 
 
-def _map_espn_about(player: PlayerRead, payload: dict | None, message: str | None = None) -> PlayerCardAboutRead:
+def _map_espn_about(
+    player: PlayerRead,
+    payload: dict | None,
+    message: str | None = None,
+    espn_player_id: str | None = None,
+) -> PlayerCardAboutRead:
     athlete = payload.get("athlete") if isinstance(payload, dict) else None
     if not isinstance(athlete, dict):
         return PlayerCardAboutRead(
-            espn_player_id=_espn_player_id(player.external_id),
+            espn_player_id=espn_player_id or _espn_player_id(player.external_id),
             player_class=player.player_class,
             position=player.position,
             team=player.school,
@@ -96,7 +105,7 @@ def _map_espn_about(player: PlayerRead, payload: dict | None, message: str | Non
     team = athlete.get("team") if isinstance(athlete.get("team"), dict) else {}
     headshot = athlete.get("headshot") if isinstance(athlete.get("headshot"), dict) else {}
     return PlayerCardAboutRead(
-        espn_player_id=_profile_text(athlete.get("id")) or _espn_player_id(player.external_id),
+        espn_player_id=_profile_text(athlete.get("id")) or espn_player_id or _espn_player_id(player.external_id),
         height=_profile_text(athlete.get("displayHeight")),
         weight=_profile_text(athlete.get("displayWeight")),
         player_class=player.player_class,
@@ -209,14 +218,25 @@ def get_player_card_endpoint(
 
     profile_payload: dict | None = None
     profile_message: str | None = None
+    espn_client = ESPNClient()
     espn_id = _resolved_espn_player_id(db, player.id, player.external_id)
-    if espn_id:
+    if not espn_id and settings.espn_historical_stats_enabled:
         try:
-            profile_payload = ESPNClient().get_athlete_profile(espn_id)
+            resolved = resolve_espn_player_by_name(db, player, client=espn_client)
+            if resolved:
+                espn_id = resolved.provider_player_id
+                profile_payload = resolved.profile_payload
         except Exception as exc:
-            profile_message = f"ESPN profile unavailable: {exc}"
+            profile_message = f"ESPN profile lookup unavailable: {exc}"
+
+    if espn_id:
+        if profile_payload is None:
+            try:
+                profile_payload = espn_client.get_athlete_profile(espn_id)
+            except Exception as exc:
+                profile_message = f"ESPN profile unavailable: {exc}"
     else:
-        profile_message = "No ESPN player ID is set for this player."
+        profile_message = profile_message or "No trusted ESPN player match is linked to this player."
 
     injury_rows = (
         db.query(Injury)
@@ -230,10 +250,25 @@ def get_player_card_endpoint(
         .order_by(PlayerStat.season.desc(), PlayerStat.week.desc(), PlayerStat.updated_at.desc())
         .all()
     )
+    historical_stats = get_player_historical_stats_response(db, player)
+    should_import_history = (
+        settings.espn_historical_stats_enabled
+        and espn_id is not None
+        and (refresh or historical_stats.status == "not_available")
+    )
+    if should_import_history:
+        try:
+            historical_stats = fetch_and_store_player_history(db, player)
+        except Exception as exc:
+            db.rollback()
+            if not settings.espn_historical_stats_fail_open:
+                raise
+            historical_stats.message = f"{historical_stats.message or 'ESPN historical stats unavailable.'} {exc}"
+
     card_player = _player_card_player_with_sheet_projection_fallback(db, player)
     return PlayerCardRead(
         player=card_player,
-        about=_map_espn_about(card_player, profile_payload, profile_message),
+        about=_map_espn_about(card_player, profile_payload, profile_message, espn_player_id=espn_id),
         injuries=[
             PlayerCardInjuryRead(
                 id=row.id,
@@ -260,7 +295,7 @@ def get_player_card_endpoint(
             )
             for row in stat_rows
         ],
-        historical_stats=get_player_historical_stats_response(db, player),
+        historical_stats=historical_stats,
     )
 
 

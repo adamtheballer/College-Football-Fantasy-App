@@ -4,6 +4,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class WaiverClaimCreate(BaseModel):
+    team_id: int | None = Field(default=None, gt=0)
+    fantasy_team_id: int | None = Field(default=None, gt=0)
     add_player_id: int = Field(gt=0)
     drop_roster_entry_id: int | None = Field(default=None, gt=0)
     faab_bid: int = Field(default=0, ge=0)
@@ -19,15 +21,18 @@ class WaiverClaimRead(BaseModel):
 
     id: int
     league_id: int
+    team_id: int
     fantasy_team_id: int
     add_player_id: int
     add_player_name: str
+    drop_roster_entry_id: int | None = None
     drop_player_id: int | None = None
     drop_player_name: str | None = None
     priority: int | None = None
     faab_bid: int = 0
     status: str
     failure_reason: str | None = None
+    process_after: datetime | None = None
     created_at: datetime
     processed_at: datetime | None = None
 

@@ -268,14 +268,29 @@ export interface LeagueWaiverPlayer {
 export interface LeagueWaiverClaim {
   id: number;
   league_id: number;
+  team_id: number;
   fantasy_team_id: number;
   add_player_id: number;
   add_player_name: string;
+  drop_roster_entry_id: number | null;
   drop_player_id: number | null;
   drop_player_name: string | null;
   priority: number | null;
+  faab_bid: number;
   status: string;
+  failure_reason: string | null;
+  process_after: string | null;
   created_at: string;
+  processed_at: string | null;
+}
+
+export interface LeagueWaiverDropCandidate {
+  roster_entry_id: number;
+  player_id: number;
+  player_name: string;
+  position: string | null;
+  school: string | null;
+  slot: string;
 }
 
 export interface LeagueWaiverTabResponse {
@@ -283,7 +298,10 @@ export interface LeagueWaiverTabResponse {
   fantasy_team_id: number | null;
   available_players: LeagueWaiverPlayer[];
   claims: LeagueWaiverClaim[];
+  roster: LeagueWaiverDropCandidate[];
+  waiver_rules: Record<string, string | number | boolean>;
   total_available: number;
+  message: string | null;
 }
 
 export interface LeagueSettingsTabResponse {

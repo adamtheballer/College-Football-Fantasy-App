@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { statValue } from "@/lib/playerProjectionStats";
 
-import { formatPlayerCardValue, getPlayerCardPalette, resolvePlayerCardProjectionStats } from "./PlayerCardModal";
+import {
+  buildHistoricalStatsTableRows,
+  formatPlayerCardValue,
+  getPlayerCardPalette,
+  resolvePlayerCardProjectionStats,
+  visiblePlayerCardAboutMessage,
+} from "./PlayerCardModal";
 
 describe("PlayerCardModal helpers", () => {
   it("formats empty player-card fields with an em dash fallback", () => {
@@ -19,6 +25,14 @@ describe("PlayerCardModal helpers", () => {
   it("uses a position-specific palette when available and a default otherwise", () => {
     expect(getPlayerCardPalette("RB").pill).toContain("emerald");
     expect(getPlayerCardPalette("UNKNOWN").pill).toContain("cyan");
+  });
+
+  it("suppresses provider-ID placeholder messages but keeps meaningful notes", () => {
+    expect(visiblePlayerCardAboutMessage("No ESPN player ID is set for this player.")).toBeNull();
+    expect(visiblePlayerCardAboutMessage("No trusted ESPN player match is linked to this player.")).toBeNull();
+    expect(visiblePlayerCardAboutMessage("Imported provider stats are still refreshing.")).toBe(
+      "Imported provider stats are still refreshing."
+    );
   });
 
   it("uses sheet projection stats from the loaded card when the selected row has none", () => {
@@ -77,5 +91,36 @@ describe("PlayerCardModal helpers", () => {
     expect(statValue(projectedStats, ["ceiling"])).toBe(34.8);
     expect(statValue(projectedStats, ["boomProb"])).toBe(0.31);
     expect(statValue(projectedStats, ["bustProb"])).toBe(0.16);
+  });
+
+  it("flattens ESPN historical categories into organized table rows", () => {
+    const rows = buildHistoricalStatsTableRows({
+      season: 2025,
+      season_type: "regular",
+      summary: [],
+      categories: [
+        {
+          key: "rushing",
+          label: "Rushing",
+          stats: [
+            { label: "Attempts", value: 173 },
+            { label: "Yards", value: 947 },
+          ],
+        },
+        {
+          key: "receiving",
+          label: "Receiving",
+          stats: [{ label: "Receptions", value: 16 }],
+        },
+      ],
+      freshness: { provider: "espn", is_final: false },
+      scoring_context: {},
+    });
+
+    expect(rows).toEqual([
+      { category: "Rushing", label: "Attempts", value: 173 },
+      { category: "Rushing", label: "Yards", value: 947 },
+      { category: "Receiving", label: "Receptions", value: 16 },
+    ]);
   });
 });

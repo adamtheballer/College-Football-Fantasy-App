@@ -28,6 +28,11 @@ type PlayerCardAction = {
 };
 
 type HistoricalSeason = NonNullable<PlayerCardResponse["historical_stats"]>["seasons"][number];
+type HistoricalStatTableRow = {
+  category: string;
+  label: string;
+  value: number | string | null;
+};
 
 const tabConfig: Array<{ id: PlayerCardTab; label: string; icon: typeof Info }> = [
   { id: "summary", label: "Summary", icon: Info },
@@ -174,9 +179,31 @@ export const resolvePlayerCardProjectionStats = (
   );
 };
 
+export const buildHistoricalStatsTableRows = (season: HistoricalSeason | null): HistoricalStatTableRow[] =>
+  season?.categories.flatMap((category) =>
+    category.stats.map((stat) => ({
+      category: category.label,
+      label: stat.label,
+      value: stat.value,
+    }))
+  ) ?? [];
+
 const sourceLabel = (source?: string | null) => {
   if (!source) return "Local";
   return source.toUpperCase();
+};
+
+export const visiblePlayerCardAboutMessage = (message?: string | null) => {
+  const trimmed = message?.trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.toLowerCase();
+  if (
+    normalized.includes("no espn player id") ||
+    normalized.includes("no trusted espn player match")
+  ) {
+    return null;
+  }
+  return trimmed;
 };
 
 export function PlayerCardModal({
@@ -208,6 +235,7 @@ export function PlayerCardModal({
     null;
   const latestStats = useMemo(() => getLatestStats(card ?? undefined), [card]);
   const projectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
+  const aboutMessage = visiblePlayerCardAboutMessage(card?.about.message);
   const projectionHighlights: Array<[string, unknown]> = [
     ["Fantasy", projectionStats?.fpts ?? player.projectedPoints],
     ["Floor", projectionStats?.floor],
@@ -226,8 +254,9 @@ export function PlayerCardModal({
   const projectionDetailRows = projectionStats
     ? projectionRows
         .map((row) => [row.label, statValue(projectionStats, row.projectionKeys)] as const)
-        .filter(([, value]) => value !== null)
+    .filter(([, value]) => value !== null)
     : [];
+  const historicalTableRows = buildHistoricalStatsTableRows(activeHistoricalSeason);
   const primaryStats = statDisplayKeys
     .map(([label, keys]) => [label, getStatValue(latestStats, keys)] as const)
     .filter(([, value]) => value !== null)
@@ -278,23 +307,26 @@ export function PlayerCardModal({
           type="button"
           aria-label="Close player card"
           onClick={onClose}
-          className="absolute right-4 top-4 z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/20 text-white/75 backdrop-blur transition hover:bg-white/10 hover:text-white"
+          className="absolute right-4 top-4 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/25 text-white/75 backdrop-blur transition hover:bg-white/10 hover:text-white"
         >
           <X className="h-5 w-5" />
         </button>
 
-        <header className={cn("relative overflow-hidden px-5 py-6 sm:px-8", palette.headerBase)}>
-          <div className="absolute inset-0 opacity-95 mix-blend-screen" style={headerStreakStyle} />
-          <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent_0_28px,rgba(255,255,255,0.08)_29px,transparent_31px_58px)] opacity-45" />
-          <div className="pointer-events-none absolute inset-0 text-white/30" aria-hidden="true">
-            <div className="absolute left-[57%] top-11 h-px w-36 rotate-[14deg] bg-white/35" />
-            <div className="absolute left-[67%] top-[4.25rem] h-px w-32 -rotate-[18deg] bg-white/25" />
-            <div className="absolute left-[74%] top-10 h-px w-28 rotate-[25deg] bg-white/20" />
+        <header className={cn("relative overflow-hidden px-5 py-6 pr-20 sm:px-8 sm:pr-24", palette.headerBase)}>
+          <div className="absolute inset-0 opacity-75 mix-blend-screen" style={headerStreakStyle} />
+          <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent_0_28px,rgba(255,255,255,0.07)_29px,transparent_31px_58px)] opacity-30" />
+          <div
+            className="pointer-events-none absolute inset-0 hidden text-white/20 [mask-image:linear-gradient(to_right,black_0%,black_58%,transparent_74%)] lg:block"
+            aria-hidden="true"
+          >
+            <div className="absolute left-[40%] top-11 h-px w-36 rotate-[14deg] bg-white/25" />
+            <div className="absolute left-[49%] top-[4.25rem] h-px w-32 -rotate-[18deg] bg-white/20" />
+            <div className="absolute left-[55%] top-10 h-px w-28 rotate-[25deg] bg-white/15" />
             {playbookMarks.map((mark) => (
               <span
                 key={`${mark.label}-${mark.className}`}
                 className={cn(
-                  "absolute font-black italic leading-none tracking-normal text-white/35",
+                  "absolute -translate-x-[18%] font-black italic leading-none tracking-normal text-white/25",
                   mark.label.length > 1 ? "text-base" : "text-3xl",
                   mark.className
                 )}
@@ -303,10 +335,10 @@ export function PlayerCardModal({
               </span>
             ))}
           </div>
-          <div className="relative z-10 grid gap-5 pr-10 lg:grid-cols-[1fr_auto] lg:items-end">
-            <div>
+          <div className="relative z-10 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,440px)] xl:items-start">
+            <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/70">{title}</p>
-              <div className="mt-4 flex items-center gap-4">
+              <div className="mt-4 flex min-w-0 items-center gap-4">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/25 bg-white/10 shadow-[0_16px_34px_rgba(2,6,23,0.28)] sm:h-20 sm:w-20">
                   {card?.about.headshot_url ? (
                     <img src={card.about.headshot_url} alt={player.name} className="h-full w-full object-cover" />
@@ -317,10 +349,10 @@ export function PlayerCardModal({
                   )}
                 </div>
                 <div className="min-w-0">
-                  <h2 className="max-w-2xl text-4xl font-black italic leading-none tracking-tight text-white sm:text-5xl">
+                  <h2 className="max-w-2xl break-words text-3xl font-black italic leading-[0.9] tracking-tight text-white sm:text-5xl">
                     {player.name}
                   </h2>
-                  <p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-white/75">
+                  <p className="mt-3 truncate text-xs font-black uppercase tracking-[0.18em] text-white/75">
                     {[card?.about.jersey ? `#${card.about.jersey}` : null, position || player.position, card?.about.team ?? player.school]
                       .filter(Boolean)
                       .join(" • ")}
@@ -341,9 +373,9 @@ export function PlayerCardModal({
                 ) : null}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:w-[430px]">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-2 xl:pt-24 2xl:grid-cols-4">
               {metricCards.map(([label, value]) => (
-                <div key={label} className="rounded-2xl border border-white/15 bg-black/20 p-3 backdrop-blur">
+                <div key={label} className="min-w-0 rounded-2xl border border-white/15 bg-black/25 p-3 backdrop-blur">
                   <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/55">{label}</p>
                   <p className="mt-2 truncate text-xl font-black tabular-nums text-white">{value}</p>
                 </div>
@@ -399,9 +431,9 @@ export function PlayerCardModal({
                     </div>
                   ))}
                 </div>
-                {card?.about.message ? (
+                {aboutMessage ? (
                   <p className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 text-xs font-bold leading-5 text-amber-100">
-                    {card.about.message}
+                    {aboutMessage}
                   </p>
                 ) : null}
                 {note ? (
@@ -447,7 +479,7 @@ export function PlayerCardModal({
                     Historical Season Stats
                   </p>
                   <p className="mt-2 text-sm font-bold leading-6 text-white/55">
-                    Imported provider stats are mapped to this player through trusted ESPN identity data.
+                    ESPN stats are resolved by exact player identity and imported into a clean season table.
                   </p>
                 </div>
                 {historicalSeasons.length > 1 ? (
@@ -498,26 +530,29 @@ export function PlayerCardModal({
                     </div>
                   </div>
 
-                  <div className="grid gap-4 lg:grid-cols-2">
-                    {activeHistoricalSeason.categories.map((category) => (
-                      <div key={category.key} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">
-                          {category.label}
-                        </p>
-                        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                          {category.stats.map((item) => (
-                            <div key={`${category.key}-${item.label}`} className="rounded-xl bg-white/[0.05] p-2">
-                              <p className="text-[8px] font-black uppercase tracking-[0.14em] text-white/40">
-                                {item.label}
-                              </p>
-                              <p className="mt-1 text-sm font-black tabular-nums text-white">
-                                {formatPlayerCardValue(item.value)}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                  <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/20">
+                    <table className="w-full border-collapse text-left">
+                      <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
+                        <tr>
+                          <th className="px-4 py-3">Category</th>
+                          <th className="px-4 py-3">Stat</th>
+                          <th className="px-4 py-3 text-right">Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
+                        {historicalTableRows.map((item) => (
+                          <tr key={`${item.category}-${item.label}`} className="text-sm font-bold text-white/75">
+                            <td className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
+                              {item.category}
+                            </td>
+                            <td className="px-4 py-3">{item.label}</td>
+                            <td className="px-4 py-3 text-right font-black tabular-nums text-white">
+                              {formatPlayerCardValue(item.value)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
 
                   <p className="rounded-2xl border border-white/10 bg-white/[0.035] p-3 text-xs font-bold leading-5 text-white/45">

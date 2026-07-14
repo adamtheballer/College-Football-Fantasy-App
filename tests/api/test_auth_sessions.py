@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
+
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.security import (
     PASSWORD_HASH_ALGORITHM,
@@ -180,6 +182,98 @@ def test_login_succeeds_only_with_exact_password(client):
     assert bad.json()["detail"] == "invalid credentials"
 
 
+def test_login_with_missing_user_returns_invalid_credentials(client):
+    response = client.post(
+        "/auth/login",
+        json={"email": "missing@example.com", "password": STRONG_PASSWORD},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "invalid credentials"
+
+
+def test_wrong_password_increments_failed_attempts(client, db_session):
+    signup_user(client, "wrong-password")
+
+    response = client.post(
+        "/auth/login",
+        json={"email": "coach-wrong-password@example.com", "password": "WrongPass123!"},
+    )
+
+    assert response.status_code == 401
+    db_session.expire_all()
+    user = db_session.query(User).filter(User.email == "coach-wrong-password@example.com").one()
+    assert user.failed_login_attempts == 1
+    assert user.last_failed_login_at is not None
+
+
+def test_failed_login_limit_locks_account(client, db_session):
+    signup_user(client, "lock-limit")
+
+    for _ in range(settings.auth_failed_login_limit - 1):
+        response = client.post(
+            "/auth/login",
+            json={"email": "coach-lock-limit@example.com", "password": "WrongPass123!"},
+        )
+        assert response.status_code == 401
+
+    locked_response = client.post(
+        "/auth/login",
+        json={"email": "coach-lock-limit@example.com", "password": "WrongPass123!"},
+    )
+
+    assert locked_response.status_code == 423
+    assert locked_response.json()["detail"] == "account temporarily locked"
+    db_session.expire_all()
+    user = db_session.query(User).filter(User.email == "coach-lock-limit@example.com").one()
+    assert user.failed_login_attempts == settings.auth_failed_login_limit
+    assert user.locked_until is not None
+
+
+def test_locked_account_returns_locked_even_with_correct_password(client, db_session):
+    user = User(
+        first_name="Locked",
+        email="locked@example.com",
+        username="locked",
+        password_hash=hash_password(STRONG_PASSWORD),
+        api_token=generate_token(32),
+        failed_login_attempts=settings.auth_failed_login_limit,
+        locked_until=datetime.now(timezone.utc) + timedelta(minutes=10),
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/auth/login",
+        json={"email": "locked@example.com", "password": STRONG_PASSWORD},
+    )
+
+    assert response.status_code == 423
+    assert response.json()["detail"] == "account temporarily locked"
+
+
+def test_login_rate_limit_returns_too_many_requests(client):
+    original_limit = settings.auth_login_rate_limit
+    try:
+        settings.auth_login_rate_limit = 2
+        for _ in range(settings.auth_login_rate_limit):
+            response = client.post(
+                "/auth/login",
+                json={"email": "rate-limit@example.com", "password": STRONG_PASSWORD},
+            )
+            assert response.status_code == 401
+
+        blocked = client.post(
+            "/auth/login",
+            json={"email": "rate-limit@example.com", "password": STRONG_PASSWORD},
+        )
+
+        assert blocked.status_code == 429
+        assert blocked.json()["detail"] == "too many requests"
+    finally:
+        settings.auth_login_rate_limit = original_limit
+
+
 def test_password_hashes_are_versioned_and_constant_time_verifiable():
     stored = hash_password(STRONG_PASSWORD)
     assert stored.startswith(f"{PASSWORD_HASH_ALGORITHM}$")
@@ -191,6 +285,13 @@ def test_password_hashes_are_versioned_and_constant_time_verifiable():
 def test_legacy_password_hashes_verify_but_require_rehash():
     legacy = "YWFhYWFhYWFhYWFhYWFhYQ==$LrogHhynYTZ+hDQlQR3OlxFU/vcPWPRb0AnWTRxIVRA="
     assert verify_password(LEGACY_PASSWORD, legacy) is True
+    assert needs_password_rehash(legacy) is True
+
+
+def test_legacy_bcrypt_hashes_verify_but_require_rehash():
+    legacy = bcrypt.hashpw(LEGACY_PASSWORD.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    assert verify_password(LEGACY_PASSWORD, legacy) is True
+    assert verify_password("wrong", legacy) is False
     assert needs_password_rehash(legacy) is True
 
 
@@ -218,6 +319,59 @@ def test_legacy_pbkdf2_hash_rehashes_to_argon2_on_login(client, db_session):
     assert refreshed_user.password_hash.startswith(f"{PASSWORD_HASH_ALGORITHM}$")
     assert verify_password(LEGACY_PASSWORD, refreshed_user.password_hash) is True
     assert needs_password_rehash(refreshed_user.password_hash) is False
+
+
+def test_legacy_bcrypt_hash_rehashes_to_argon2_on_login(client, db_session):
+    legacy_hash = bcrypt.hashpw(LEGACY_PASSWORD.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    user = User(
+        first_name="Bcrypt",
+        email="bcrypt@example.com",
+        username="bcrypt",
+        password_hash=legacy_hash,
+        api_token=generate_token(32),
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/auth/login",
+        json={"email": " BCRYPT@example.com ", "password": LEGACY_PASSWORD},
+    )
+    assert response.status_code == 200
+
+    db_session.expire_all()
+    refreshed_user = db_session.query(User).filter(User.email == "bcrypt@example.com").one()
+    assert refreshed_user.password_hash != legacy_hash
+    assert refreshed_user.password_hash.startswith(f"{PASSWORD_HASH_ALGORITHM}$")
+    assert verify_password(LEGACY_PASSWORD, refreshed_user.password_hash) is True
+    assert needs_password_rehash(refreshed_user.password_hash) is False
+
+
+def test_successful_login_resets_failed_attempts_and_expired_lockout(client, db_session):
+    user = User(
+        first_name="Returning",
+        email="returning@example.com",
+        username="returning",
+        password_hash=hash_password(STRONG_PASSWORD),
+        api_token=generate_token(32),
+        failed_login_attempts=settings.auth_failed_login_limit,
+        locked_until=datetime.now(timezone.utc) - timedelta(minutes=1),
+        last_login=datetime.now(timezone.utc) - timedelta(days=1),
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/auth/login",
+        json={"email": "returning@example.com", "password": STRONG_PASSWORD},
+    )
+
+    assert response.status_code == 200
+    db_session.expire_all()
+    refreshed_user = db_session.query(User).filter(User.email == "returning@example.com").one()
+    assert refreshed_user.failed_login_attempts == 0
+    assert refreshed_user.locked_until is None
+    assert refreshed_user.last_login is not None
 
 
 def test_auth_me_returns_current_authenticated_user(client):

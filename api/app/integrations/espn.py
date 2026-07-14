@@ -11,6 +11,7 @@ class ESPNClient:
     BASE_URL = "https://site.api.espn.com/apis/v2/sports/football/college-football"
     SITE_BASE_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football"
     WEB_BASE_URL = "https://site.web.api.espn.com/apis/common/v3/sports/football/college-football"
+    SEARCH_BASE_URL = "https://site.web.api.espn.com/apis/common/v3"
     WEB_STANDINGS_URL = "https://www.espn.com/college-football/standings/_/group/{group}"
     FBS_GROUP = 80
     CONFERENCE_GROUPS: dict[str, int] = {
@@ -63,6 +64,24 @@ class ESPNClient:
 
     def get_athlete_profile(self, espn_player_id: str | int) -> dict[str, Any]:
         return self._request(f"athletes/{espn_player_id}", params={}, base_url=self.WEB_BASE_URL)
+
+    def search_players(self, query: str, *, limit: int = 10) -> list[dict[str, Any]]:
+        payload = self._request(
+            "search",
+            params={
+                "query": query,
+                "type": "player",
+                "limit": limit,
+                "region": "us",
+                "lang": "en",
+                "contentorigin": "espn",
+            },
+            base_url=self.SEARCH_BASE_URL,
+        )
+        items = payload.get("items")
+        if not isinstance(items, list):
+            return []
+        return [item for item in items if isinstance(item, dict)]
 
     def get_weekly_boxscore_summaries(self, season: int, week: int, *, seasontype: int = 2) -> list[dict[str, Any]]:
         summaries: list[dict[str, Any]] = []

@@ -476,12 +476,12 @@ export default function Trade() {
   const offersQuery = useQuery({
     queryKey: ["league", leagueId, "trade-offers"],
     enabled: Boolean(leagueId),
-    queryFn: () => apiGet<TradeOfferListResponse>(`/trade/leagues/${leagueId}/trades`),
+    queryFn: () => apiGet<TradeOfferListResponse>(`/leagues/${leagueId}/trades`),
   });
 
   const createOfferMutation = useMutation({
     mutationFn: () =>
-      apiPost<TradeOffer>(`/trade/leagues/${leagueId}/trades`, {
+      apiPost<TradeOffer>(`/leagues/${leagueId}/trades`, {
         proposing_team_id: ownedTeamId,
         receiving_team_id: opponentTeamId,
         give_items: selectedGiveRows.map((row) => ({ team_id: row.teamId, player_id: row.playerId })),
@@ -503,7 +503,7 @@ export default function Trade() {
 
   const tradeActionMutation = useMutation({
     mutationFn: ({ tradeId, action }: { tradeId: number; action: "accept" | "reject" | "cancel" }) =>
-      apiPost<TradeOffer>(`/trade/leagues/${leagueId}/trades/${tradeId}/${action}`, {}),
+      apiPost<TradeOffer>(`/leagues/${leagueId}/trades/${tradeId}/${action}`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["league", leagueId, "trade-offers"] });
       queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });

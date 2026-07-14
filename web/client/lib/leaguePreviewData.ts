@@ -342,6 +342,12 @@ export function createDemoLeagueWaiverResponse(): LeagueWaiverTabResponse {
     fantasy_team_id: DEMO_LEAGUE_ID - 100,
     total_available: availablePlayers.length,
     claims: [],
+    roster: [],
+    waiver_rules: {
+      waiver_type: "faab",
+      faab_budget: 100,
+    },
+    message: null,
     available_players: availablePlayers,
   };
 }

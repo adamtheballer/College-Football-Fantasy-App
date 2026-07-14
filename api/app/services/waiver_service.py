@@ -11,6 +11,7 @@ from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
+from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.notification import NotificationLog
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
@@ -21,6 +22,7 @@ from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.waiver_claim_audit import WaiverClaimAudit
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.schemas.waiver import WaiverClaimCreate, WaiverClaimRead
+from collegefootballfantasy_api.app.services.league_weeks import current_cfb_week_state
 from collegefootballfantasy_api.app.services.roster_legality import assign_best_roster_slot_for_position
 
 WAIVER_STATUS_PENDING = "pending"
@@ -41,9 +43,13 @@ def _as_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-def _league_timezone(db: Session, league: League) -> ZoneInfo:
+def _league_timezone_name(db: Session, league: League) -> str:
     draft = db.query(Draft).filter(Draft.league_id == league.id).first()
-    timezone_name = draft.timezone if draft and draft.timezone else "America/New_York"
+    return draft.timezone if draft and draft.timezone else "America/New_York"
+
+
+def _league_timezone(db: Session, league: League) -> ZoneInfo:
+    timezone_name = _league_timezone_name(db, league)
     try:
         return ZoneInfo(timezone_name)
     except ZoneInfoNotFoundError:
@@ -74,15 +80,18 @@ def _serialize_claim(db: Session, claim: WaiverClaim) -> WaiverClaimRead:
     return WaiverClaimRead(
         id=claim.id,
         league_id=claim.league_id,
+        team_id=claim.team_id,
         fantasy_team_id=claim.team_id,
         add_player_id=claim.add_player_id,
         add_player_name=add_player.name if add_player else "Unknown Player",
+        drop_roster_entry_id=claim.drop_roster_entry_id,
         drop_player_id=claim.drop_player_id,
         drop_player_name=drop_player.name if drop_player else None,
         priority=claim.priority_snapshot,
         faab_bid=claim.faab_bid,
         status=claim.status,
         failure_reason=claim.failure_reason,
+        process_after=claim.process_after,
         created_at=claim.created_at,
         processed_at=claim.processed_at,
     )
@@ -98,10 +107,12 @@ def _claim_state(claim: WaiverClaim) -> dict:
         "league_id": claim.league_id,
         "team_id": claim.team_id,
         "add_player_id": claim.add_player_id,
+        "drop_roster_entry_id": claim.drop_roster_entry_id,
         "drop_player_id": claim.drop_player_id,
         "status": claim.status,
         "priority_snapshot": claim.priority_snapshot,
         "faab_bid": claim.faab_bid,
+        "process_after": claim.process_after.isoformat() if claim.process_after else None,
         "failure_reason": claim.failure_reason,
         "processed_at": claim.processed_at.isoformat() if claim.processed_at else None,
     }
@@ -178,7 +189,7 @@ def _ensure_priorities_for_league(db: Session, league_id: int) -> dict[int, Waiv
 
 
 def _remaining_faab(priority: WaiverPriority) -> int:
-    return max(0, int(priority.faab_budget or 0) - int(priority.faab_spent or 0))
+    return priority.faab_remaining
 
 
 def _ensure_player_available(db: Session, league_id: int, player_id: int) -> None:
@@ -228,6 +239,34 @@ def _validate_no_gameday_for_players(
         )
 
 
+def _validate_drop_player_unlocked(
+    db: Session,
+    league: League,
+    player_id: int | None,
+    *,
+    now: datetime,
+) -> None:
+    if player_id is None:
+        return
+    week_state = current_cfb_week_state(
+        league.season_year,
+        now=now,
+        timezone_name=_league_timezone_name(db, league),
+    )
+    snapshot = (
+        db.query(LineupWeekSnapshot.id)
+        .filter(
+            LineupWeekSnapshot.league_id == league.id,
+            LineupWeekSnapshot.player_id == player_id,
+            LineupWeekSnapshot.season == league.season_year,
+            LineupWeekSnapshot.week == week_state.week,
+        )
+        .first()
+    )
+    if snapshot:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="locked drop player cannot be waived")
+
+
 def _drop_entry_for_payload(db: Session, team: Team, drop_roster_entry_id: int | None) -> RosterEntry | None:
     if drop_roster_entry_id is None:
         return None
@@ -235,6 +274,12 @@ def _drop_entry_for_payload(db: Session, team: Team, drop_roster_entry_id: int |
     if not entry or entry.team_id != team.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="roster entry not found")
     return entry
+
+
+def _validate_payload_team(payload: WaiverClaimCreate, team: Team) -> None:
+    requested_team_id = payload.team_id or payload.fantasy_team_id
+    if requested_team_id is not None and requested_team_id != team.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="waiver claim team does not match owned team")
 
 
 def _best_slot_after_drop(
@@ -269,6 +314,7 @@ def submit_waiver_claim(
 ) -> WaiverClaimRead:
     settings = _league_settings(db, league.id)
     team = _owned_team(db, league.id, current_user.id)
+    _validate_payload_team(payload, team)
     add_player = db.get(Player, payload.add_player_id)
     if not add_player:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
@@ -294,7 +340,7 @@ def submit_waiver_claim(
             WaiverClaim.league_id == league.id,
             WaiverClaim.team_id == team.id,
             WaiverClaim.add_player_id == add_player.id,
-            WaiverClaim.drop_player_id == (drop_entry.player_id if drop_entry else None),
+            WaiverClaim.drop_roster_entry_id == (drop_entry.id if drop_entry else None),
             WaiverClaim.status == WAIVER_STATUS_PENDING,
         )
         .first()
@@ -311,11 +357,13 @@ def submit_waiver_claim(
         league_id=league.id,
         team_id=team.id,
         add_player_id=add_player.id,
+        drop_roster_entry_id=drop_entry.id if drop_entry else None,
         drop_player_id=drop_entry.player_id if drop_entry else None,
         created_by_user_id=current_user.id,
         status=WAIVER_STATUS_PENDING,
         priority_snapshot=priority.priority,
         faab_bid=payload.faab_bid if _waiver_type(settings) == "faab" else 0,
+        process_after=_now(),
     )
     db.add(claim)
     db.flush()
@@ -416,7 +464,13 @@ def _process_single_claim(
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="claim player no longer exists")
         _ensure_player_available(db, league.id, claim.add_player_id)
         drop_entry = None
-        if claim.drop_player_id is not None:
+        if claim.drop_roster_entry_id is not None:
+            drop_entry = db.get(RosterEntry, claim.drop_roster_entry_id)
+            if not drop_entry or drop_entry.league_id != league.id or drop_entry.team_id != team.id:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="drop roster entry no longer on roster")
+            if claim.drop_player_id is not None and drop_entry.player_id != claim.drop_player_id:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="drop roster entry player changed")
+        elif claim.drop_player_id is not None:
             drop_entry = (
                 db.query(RosterEntry)
                 .filter(
@@ -436,6 +490,12 @@ def _process_single_claim(
         )
         if _waiver_type(settings) == "faab" and claim.faab_bid > _remaining_faab(priority):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="insufficient FAAB budget")
+        _validate_drop_player_unlocked(
+            db,
+            league,
+            drop_entry.player_id if drop_entry else claim.drop_player_id,
+            now=now,
+        )
         new_slot = _best_slot_after_drop(
             db,
             team,
@@ -519,6 +579,7 @@ def process_waiver_claims_once(
         pending = (
             db.query(WaiverClaim)
             .filter(WaiverClaim.league_id == league.id, WaiverClaim.status == WAIVER_STATUS_PENDING)
+            .filter(or_(WaiverClaim.process_after.is_(None), WaiverClaim.process_after <= processed_at))
             .all()
         )
         if not pending:

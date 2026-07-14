@@ -239,7 +239,7 @@ export default function LeagueWaivers() {
           <div>
             <h1 className="text-4xl font-black italic text-slate-50">Available Players</h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              League-scoped available players only. Claims are not enabled yet, so this page is for finding and watching free agents.
+              League-scoped available players only. Review the waiver pool, current claims, and roster drop candidates from the live league API.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3 sm:min-w-[430px]">
@@ -253,7 +253,7 @@ export default function LeagueWaivers() {
             </div>
             <div className="rounded-[1.25rem] border border-violet-300/20 bg-violet-400/10 p-4 shadow-[0_0_34px_rgba(167,139,250,0.10)]">
               <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Claims</p>
-              <p className="mt-1 text-sm font-black uppercase tracking-[0.14em] text-violet-100">Not Enabled</p>
+              <p className="mt-1 text-2xl font-black text-violet-100">{waiverData?.claims.length ?? 0}</p>
             </div>
           </div>
         </div>
@@ -268,7 +268,7 @@ export default function LeagueWaivers() {
                 Available Players
               </h2>
               <p className="mt-2 text-xs font-semibold text-slate-500">
-                Only players not selected in this league draft appear here. Watch targets for now; claims and add/drop are not enabled yet.
+                Only players not owned on league rosters appear here. Claims are processed by the backend waiver lifecycle.
               </p>
             </div>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -405,7 +405,7 @@ export default function LeagueWaivers() {
                             className="h-10 rounded-xl bg-sky-300/75 px-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-950 shadow-none"
                           >
                             <UserPlus className="mr-2 h-3.5 w-3.5" />
-                            Claims Off
+                            Claim API
                           </Button>
                         </div>
                       </td>
@@ -417,6 +417,75 @@ export default function LeagueWaivers() {
           </div>
         )}
       </section>
+
+      {!isDemoLeague ? (
+        <section className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-300">
+                Waiver Claims
+              </p>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                {String(waiverData?.waiver_rules.waiver_type ?? "waivers")}
+              </p>
+            </div>
+            {(waiverData?.claims ?? []).length === 0 ? (
+              <p className="mt-4 text-sm font-semibold text-slate-500">
+                No active or recent waiver claims for your team.
+              </p>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {waiverData?.claims.map((claim) => (
+                  <div key={claim.id} className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-slate-50">{claim.add_player_name}</p>
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                          {claim.drop_player_name ? `Drop ${claim.drop_player_name}` : "No drop selected"}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-sky-200">
+                          {claim.status}
+                        </p>
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                          FAAB {claim.faab_bid}
+                        </p>
+                      </div>
+                    </div>
+                    {claim.failure_reason ? (
+                      <p className="mt-3 rounded-xl border border-red-300/20 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-100">
+                        {claim.failure_reason}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-5">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">
+              Drop Candidates
+            </p>
+            {(waiverData?.roster ?? []).length === 0 ? (
+              <p className="mt-4 text-sm font-semibold text-slate-500">
+                No roster entries loaded for your team.
+              </p>
+            ) : (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {waiverData?.roster.map((entry) => (
+                  <div key={entry.roster_entry_id} className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                    <p className="truncate text-sm font-black text-slate-50">{entry.player_name}</p>
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                      {entry.position ?? "-"} · {entry.school ?? "-"} · {entry.slot}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-5">
         {positions

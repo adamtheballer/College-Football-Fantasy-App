@@ -18,3 +18,6 @@ class WaiverPriority(TimestampMixin, Base):
     faab_budget: Mapped[int] = mapped_column(Integer, default=100)
     faab_spent: Mapped[int] = mapped_column(Integer, default=0)
 
+    @property
+    def faab_remaining(self) -> int:
+        return max(0, int(self.faab_budget or 0) - int(self.faab_spent or 0))

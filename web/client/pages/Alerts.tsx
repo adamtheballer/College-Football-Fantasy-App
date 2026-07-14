@@ -47,7 +47,7 @@ export default function Alerts() {
   );
 
   const resolveAlertPath = (alertType: string, payload: Record<string, unknown> | null) => {
-    const rawPath = payload?.path;
+    const rawPath = payload?.deep_link ?? payload?.path;
     if (typeof rawPath === "string" && rawPath.trim()) {
       return rawPath;
     }

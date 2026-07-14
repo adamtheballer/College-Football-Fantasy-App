@@ -1,7 +1,7 @@
 """historical player stats
 
 Revision ID: 0028_historical_player_stats
-Revises: 0040_trade_offer_proposed_status
+Revises: 0027_scoring_admin_audits
 Create Date: 2026-07-12 00:00:00.000000
 """
 
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0028_historical_player_stats"
-down_revision: str | None = "0040_trade_offer_proposed_status"
+down_revision: str | None = "0027_scoring_admin_audits"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

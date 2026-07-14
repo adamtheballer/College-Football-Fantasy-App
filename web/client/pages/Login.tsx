@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   CalendarClock,
+  Eye,
+  EyeOff,
   Lock,
   Mail,
   ShieldCheck,
@@ -39,6 +41,35 @@ const featureCards = [
   },
 ] as const;
 
+export const loginErrorMessage = (error: unknown): string => {
+  if (error instanceof ApiError) {
+    if (error.status === 0) {
+      return "Unable to reach the backend API. Start FastAPI on port 8000 and try again.";
+    }
+    if (error.status === 401) {
+      return "Email or password is incorrect.";
+    }
+    if (error.status === 423) {
+      return "This account is temporarily locked after too many failed attempts. Try again later or reset your password.";
+    }
+    if (error.status === 429) {
+      return "Too many sign-in attempts. Wait a few minutes and try again.";
+    }
+    if (error.status === 422) {
+      return error.message;
+    }
+    if (error.status >= 500) {
+      return "The sign-in service hit an error. Try again or contact support.";
+    }
+  }
+
+  if (error instanceof Error && error.message.includes("Failed to fetch")) {
+    return "Cannot reach the server. Make sure backend is running on port 8000.";
+  }
+
+  return "Sign in failed. Try again or contact support.";
+};
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -59,6 +90,7 @@ export default function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recoveryNotice, setRecoveryNotice] = useState<string | null>(null);
@@ -101,16 +133,7 @@ export default function Login() {
       }
       navigate(redirectTarget, { replace: true });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "";
-      if (err instanceof ApiError && err.status === 0) {
-        setError("Unable to reach the backend API. Start FastAPI on port 8000 and try again.");
-      } else if (message.includes("invalid credentials")) {
-        setError("Sign in failed. Check email/password and try again.");
-      } else if (message.includes("Failed to fetch")) {
-        setError("Cannot reach the server. Make sure backend is running on port 8000.");
-      } else {
-        setError("Sign in failed. Check email/password and try again.");
-      }
+      setError(loginErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -234,13 +257,26 @@ export default function Login() {
                   <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted transition-colors group-focus-within:text-cfb-cyan" />
                   <Input
                     id="login-password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
-                    className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-sm font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25"
+                    className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 pr-12 text-sm font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                   />
+                  <button
+                    type="button"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
+                    onClick={() => setShowPassword((value) => !value)}
+                    className="absolute right-4 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-cfb-text-muted transition hover:bg-white/10 hover:text-cfb-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-cyan/60"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <Eye className="h-4 w-4" aria-hidden="true" />
+                    )}
+                  </button>
                 </span>
               </div>
 

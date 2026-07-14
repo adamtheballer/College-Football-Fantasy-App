@@ -22,6 +22,48 @@ const average = (values: number[]) =>
 export const toProjectedPoints = (player: Player) =>
   player.sheetProjectedSeasonPoints ?? player.projection?.fpts ?? 0;
 
+const normalizeCompareIdentityText = (value: string | null | undefined) =>
+  (value ?? "")
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/\b(jr|jr\.|iii|ii|iv)\b/g, "")
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+
+const compareIdentityKey = (player: Player) =>
+  [
+    normalizeCompareIdentityText(player.name),
+    normalizeCompareIdentityText(player.school),
+    player.pos.toUpperCase(),
+  ].join("|");
+
+const hasRank = (player: Player) => {
+  const rank = player.boardRank ?? player.rank ?? player.adp;
+  return typeof rank === "number" && Number.isFinite(rank) && rank > 0;
+};
+
+const canonicalComparePlayer = (left: Player, right: Player) => {
+  const leftHasRank = hasRank(left);
+  const rightHasRank = hasRank(right);
+  if (leftHasRank !== rightHasRank) return leftHasRank ? left : right;
+
+  const leftRank = left.boardRank ?? left.rank ?? left.adp ?? Number.POSITIVE_INFINITY;
+  const rightRank = right.boardRank ?? right.rank ?? right.adp ?? Number.POSITIVE_INFINITY;
+  if (leftRank !== rightRank) return leftRank < rightRank ? left : right;
+
+  return left.id <= right.id ? left : right;
+};
+
+export const dedupePlayerCompareRows = (players: Player[]) => {
+  const byIdentity = new Map<string, Player>();
+  for (const player of players) {
+    const key = compareIdentityKey(player);
+    const existing = byIdentity.get(key);
+    byIdentity.set(key, existing ? canonicalComparePlayer(existing, player) : player);
+  }
+  return [...byIdentity.values()];
+};
+
 const getPerformanceAverage = (player: Player) => {
   const fantasyPoints = (player.history ?? [])
     .map((entry) => entry.stats?.fpts)
@@ -87,18 +129,19 @@ export const buildPlayerCompareRows = (
   players: Player[],
   { week = VALUE_MODEL_WEEK }: { week?: number } = {}
 ): CompareRow[] => {
+  const canonicalPlayers = dedupePlayerCompareRows(players);
   const performanceByPlayerId = new Map(
-    players.map((player) => [player.id, getPerformanceAverage(player)])
+    canonicalPlayers.map((player) => [player.id, getPerformanceAverage(player)])
   );
   const performanceValues = [...performanceByPlayerId.values()].filter(isFiniteNumber);
-  const performanceByPosition = players.reduce((map, player) => {
+  const performanceByPosition = canonicalPlayers.reduce((map, player) => {
     const value = performanceByPlayerId.get(player.id);
     if (!isFiniteNumber(value)) return map;
     map.set(player.pos, [...(map.get(player.pos) ?? []), value]);
     return map;
   }, new Map<string, number[]>());
 
-  return players
+  return canonicalPlayers
     .map((player) => {
       const cfb27Rating = findCfb27Rating({
         name: player.name,

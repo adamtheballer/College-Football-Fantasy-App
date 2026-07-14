@@ -429,12 +429,12 @@ function WaiverTab({
 
         <div>
           <p className="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-            Claims Not Enabled
+            Waiver Claims
           </p>
           {(data?.claims ?? []).length === 0 ? (
             <EmptyState
-              title="Claims disabled"
-              detail="Backend claims are not enabled yet. Use this page to find available players and watch targets."
+              title="No waiver claims"
+              detail="Submitted claims for your team appear here with pending, processed, cancelled, or failed status."
             />
           ) : (
             <div className="space-y-3">
@@ -513,10 +513,10 @@ function SettingsTab({
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-              Future Claims Policy
+              Waiver Policy
             </p>
             <p className="mt-2 text-sm font-black uppercase tracking-[0.12em] text-slate-100">
-              Claims not enabled · {String(data?.waiver_rules.waiver_type ?? "policy pending")}
+              Claims enabled · {String(data?.waiver_rules.waiver_type ?? "policy pending")}
             </p>
           </div>
           <div>

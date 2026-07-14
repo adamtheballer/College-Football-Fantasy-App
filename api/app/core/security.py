@@ -8,6 +8,7 @@ from base64 import b64decode, b64encode
 from binascii import Error as Base64DecodeError
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
@@ -18,6 +19,7 @@ ARGON2_HASH_PREFIX = f"{PASSWORD_HASH_ALGORITHM}$"
 ARGON2_HASHER = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4, hash_len=32, salt_len=16)
 PBKDF2_PASSWORD_HASH_ALGORITHM = "pbkdf2_sha256"
 LEGACY_PASSWORD_HASH_ITERATIONS = 100_000
+BCRYPT_HASH_PREFIXES = ("$2a$", "$2b$", "$2y$")
 
 
 def generate_token(length: int = 32) -> str:
@@ -39,6 +41,9 @@ def verify_password(password: str, stored: str) -> bool:
         if stored.startswith(ARGON2_HASH_PREFIX):
             encoded_hash = stored[len(ARGON2_HASH_PREFIX) :]
             return ARGON2_HASHER.verify(encoded_hash, password)
+
+        if stored.startswith(BCRYPT_HASH_PREFIXES):
+            return bcrypt.checkpw(password.encode("utf-8"), stored.encode("utf-8"))
 
         parts = stored.split("$")
         if len(parts) == 4 and parts[0] == PBKDF2_PASSWORD_HASH_ALGORITHM:

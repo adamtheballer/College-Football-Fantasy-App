@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import logging
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -54,6 +55,7 @@ from collegefootballfantasy_api.app.services.auth_security import (
 from collegefootballfantasy_api.app.services.email_service import get_email_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _normalize_username(value: str | None, *, fallback: str) -> str:
@@ -155,6 +157,17 @@ def _send_password_reset_email(db: Session, *, user: User, request: Request) -> 
     get_email_service().send_password_reset(user.email, token)
 
 
+def _log_login_failure(request: Request, *, email: str, reason: str) -> None:
+    logger.info(
+        "auth_login_failed",
+        extra={
+            "normalized_email": email,
+            "failure_reason": reason,
+            "request_ip": request_ip(request),
+        },
+    )
+
+
 @router.get("/me", response_model=UserRead)
 def current_user_profile(current_user: User = Depends(get_current_user)) -> UserRead:
     return UserRead.model_validate(current_user)
@@ -207,25 +220,38 @@ def signup(payload: UserCreate, response: Response, request: Request, db: Sessio
 
 @router.post("/login", response_model=AuthResponse)
 def login(payload: UserLogin, response: Response, request: Request, db: Session = Depends(get_db)) -> AuthResponse:
-    enforce_auth_rate_limit(
-        db,
-        action="login",
-        identifier=payload.email,
-        request=request,
-        limit=settings.auth_login_rate_limit,
-    )
-    user = db.query(User).filter(func.lower(User.email) == payload.email).first()
+    normalized_email = payload.email.strip().lower()
+    try:
+        enforce_auth_rate_limit(
+            db,
+            action="login",
+            identifier=normalized_email,
+            request=request,
+            limit=settings.auth_login_rate_limit,
+        )
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+            _log_login_failure(request, email=normalized_email, reason="rate_limited")
+        raise
+
+    user = db.query(User).filter(func.lower(User.email) == normalized_email).first()
     if not user:
+        _log_login_failure(request, email=normalized_email, reason="user_missing")
         db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
 
     if is_account_locked(user):
+        _log_login_failure(request, email=normalized_email, reason="locked")
         db.commit()
         raise HTTPException(status_code=423, detail="account temporarily locked")
 
     if not verify_password(payload.password, user.password_hash):
         register_failed_login(db, user)
+        reason = "locked" if is_account_locked(user) else "bad_password"
+        _log_login_failure(request, email=normalized_email, reason=reason)
         db.commit()
+        if reason == "locked":
+            raise HTTPException(status_code=423, detail="account temporarily locked")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
 
     now = utcnow()

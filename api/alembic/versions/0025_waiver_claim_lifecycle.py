@@ -23,11 +23,13 @@ def upgrade() -> None:
         sa.Column("league_id", sa.Integer(), nullable=False),
         sa.Column("team_id", sa.Integer(), nullable=False),
         sa.Column("add_player_id", sa.Integer(), nullable=False),
+        sa.Column("drop_roster_entry_id", sa.Integer(), nullable=True),
         sa.Column("drop_player_id", sa.Integer(), nullable=True),
         sa.Column("created_by_user_id", sa.Integer(), nullable=True),
         sa.Column("status", sa.String(length=30), nullable=False, server_default="pending"),
         sa.Column("priority_snapshot", sa.Integer(), nullable=True),
         sa.Column("faab_bid", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("process_after", sa.DateTime(timezone=True), nullable=True),
         sa.Column("processed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("failure_reason", sa.String(length=500), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
@@ -41,6 +43,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_waiver_claims_add_player", "waiver_claims", ["league_id", "add_player_id"])
     op.create_index("ix_waiver_claims_league_status", "waiver_claims", ["league_id", "status"])
+    op.create_index("ix_waiver_claims_process_after", "waiver_claims", ["process_after"])
     op.create_index("ix_waiver_claims_team_status", "waiver_claims", ["team_id", "status"])
 
     op.create_table(
@@ -90,6 +93,7 @@ def downgrade() -> None:
     op.drop_index("ix_waiver_priorities_league_priority", table_name="waiver_priorities")
     op.drop_table("waiver_priorities")
     op.drop_index("ix_waiver_claims_team_status", table_name="waiver_claims")
+    op.drop_index("ix_waiver_claims_process_after", table_name="waiver_claims")
     op.drop_index("ix_waiver_claims_league_status", table_name="waiver_claims")
     op.drop_index("ix_waiver_claims_add_player", table_name="waiver_claims")
     op.drop_table("waiver_claims")

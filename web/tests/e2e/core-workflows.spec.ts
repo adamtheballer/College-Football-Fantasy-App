@@ -1087,7 +1087,7 @@ test.describe("critical browser workflows", () => {
         body: JSON.stringify({ give_value: 24.0, receive_value: 18.0, delta: -6.0, verdict: "Strong Loss" }),
       });
     });
-    await page.route("**/trade/leagues/1/trades**", async (route) => {
+    await page.route("**/leagues/1/trades**", async (route) => {
       if (route.request().method() === "GET") {
         await route.fulfill({
           status: 200,

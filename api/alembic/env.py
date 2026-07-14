@@ -6,6 +6,8 @@ from sqlalchemy import engine_from_config, pool
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.base import Base
 from collegefootballfantasy_api.app.models import (
+    auth_action_token,
+    auth_rate_limit_event,
     cfb_standing_snapshot,
     college_team,
     defense_rating,
@@ -47,6 +49,7 @@ from collegefootballfantasy_api.app.models import (
     team_stats_snapshot,
     team_game_stat,
     team_week_score,
+    transaction,
     trade_offer,
     trade_offer_item,
     trade_review,
@@ -55,6 +58,7 @@ from collegefootballfantasy_api.app.models import (
     waiver_claim,
     waiver_claim_audit,
     waiver_priority,
+    watchlist,
     weekly_projection,
 )
 
