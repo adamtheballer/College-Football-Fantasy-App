@@ -460,6 +460,7 @@ def build_waivers_view(
         roster=roster,
         waiver_rules={
             "waiver_type": settings.waiver_type if settings else "FAAB",
+            "waiver_period_hours": settings.waiver_period_hours if settings else 24,
             "faab_budget": 100,
         },
         total_available=total,
@@ -573,6 +574,7 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
         roster_settings=settings.roster_slots_json if settings and settings.roster_slots_json else DEFAULT_ROSTER_SLOTS.copy(),
         waiver_rules={
             "waiver_type": settings.waiver_type if settings else "FAAB",
+            "waiver_period_hours": settings.waiver_period_hours if settings else 24,
             "trade_review_type": settings.trade_review_type if settings else "commissioner",
         },
         standings=standings,

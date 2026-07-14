@@ -90,6 +90,7 @@ export const DEMO_LEAGUE_DETAIL: LeagueDetail = {
     },
     playoff_teams: 4,
     waiver_type: "faab",
+    waiver_period_hours: 24,
     trade_review_type: "commissioner",
     superflex_enabled: false,
     kicker_enabled: true,
@@ -345,6 +346,7 @@ export function createDemoLeagueWaiverResponse(): LeagueWaiverTabResponse {
     roster: [],
     waiver_rules: {
       waiver_type: "faab",
+      waiver_period_hours: 24,
       faab_budget: 100,
     },
     message: null,
@@ -403,6 +405,7 @@ export function createDemoLeagueSettingsResponse(): LeagueSettingsTabResponse {
     roster_settings: DEMO_LEAGUE_DETAIL.settings.roster_slots_json,
     waiver_rules: {
       waiver_type: "FAAB",
+      waiver_period_hours: 24,
       budget: 100,
       league_scoped: true,
     },

@@ -311,6 +311,7 @@ function CreateLeagueForm() {
   const [settings, setSettings] = useState({
     playoff_teams: 4,
     waiver_type: "faab",
+    waiver_period_hours: 24,
     trade_review_type: "commissioner",
   });
 
@@ -431,6 +432,7 @@ function CreateLeagueForm() {
           roster_slots_json: effectiveRosterSlots,
           playoff_teams: settings.playoff_teams,
           waiver_type: settings.waiver_type,
+          waiver_period_hours: settings.waiver_period_hours,
           trade_review_type: settings.trade_review_type,
           superflex_enabled: false,
           kicker_enabled: true,

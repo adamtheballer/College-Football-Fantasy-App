@@ -26,10 +26,18 @@ class LeagueSettingsInput(BaseModel):
     roster_slots_json: dict
     playoff_teams: int
     waiver_type: str
+    waiver_period_hours: int = 24
     trade_review_type: str
     superflex_enabled: bool
     kicker_enabled: bool
     defense_enabled: bool
+
+    @field_validator("waiver_period_hours")
+    @classmethod
+    def validate_waiver_period_hours(cls, value: int) -> int:
+        if value < 1 or value > 168:
+            raise ValueError("waiver_period_hours must be between 1 and 168")
+        return value
 
 
 class DraftScheduleInput(BaseModel):
@@ -72,6 +80,7 @@ class LeagueSettingsRead(BaseModel):
     roster_slots_json: dict
     playoff_teams: int
     waiver_type: str
+    waiver_period_hours: int
     trade_review_type: str
     superflex_enabled: bool
     kicker_enabled: bool
@@ -83,10 +92,20 @@ class LeagueSettingsUpdate(BaseModel):
     roster_slots_json: dict
     playoff_teams: int
     waiver_type: str
+    waiver_period_hours: int | None = None
     trade_review_type: str
     superflex_enabled: bool
     kicker_enabled: bool
     defense_enabled: bool
+
+    @field_validator("waiver_period_hours")
+    @classmethod
+    def validate_waiver_period_hours(cls, value: int | None) -> int | None:
+        if value is None:
+            return value
+        if value < 1 or value > 168:
+            raise ValueError("waiver_period_hours must be between 1 and 168")
+        return value
 
 
 class DraftUpdate(BaseModel):

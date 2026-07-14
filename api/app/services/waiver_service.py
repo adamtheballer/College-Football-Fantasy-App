@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException, status
@@ -31,6 +31,7 @@ WAIVER_STATUS_PROCESSED = "processed"
 WAIVER_STATUS_FAILED = "failed"
 TERMINAL_WAIVER_STATUSES = {WAIVER_STATUS_CANCELLED, WAIVER_STATUS_PROCESSED, WAIVER_STATUS_FAILED}
 DEFAULT_FAAB_BUDGET = 100
+DEFAULT_WAIVER_PERIOD_HOURS = 24
 
 
 def _now() -> datetime:
@@ -65,6 +66,18 @@ def _league_settings(db: Session, league_id: int) -> LeagueSettings:
 
 def _waiver_type(settings: LeagueSettings) -> str:
     return (settings.waiver_type or "faab").strip().lower()
+
+
+def _waiver_period_hours(settings: LeagueSettings) -> int:
+    value = settings.waiver_period_hours
+    if value is None:
+        return DEFAULT_WAIVER_PERIOD_HOURS
+    return max(1, min(int(value), 168))
+
+
+def _next_waiver_process_time(settings: LeagueSettings, *, now: datetime | None = None) -> datetime:
+    current = _as_utc(now or _now())
+    return current + timedelta(hours=_waiver_period_hours(settings))
 
 
 def _owned_team(db: Session, league_id: int, user_id: int) -> Team:
@@ -312,6 +325,7 @@ def submit_waiver_claim(
     current_user: User,
     payload: WaiverClaimCreate,
 ) -> WaiverClaimRead:
+    now = _now()
     settings = _league_settings(db, league.id)
     team = _owned_team(db, league.id, current_user.id)
     _validate_payload_team(payload, team)
@@ -363,7 +377,7 @@ def submit_waiver_claim(
         status=WAIVER_STATUS_PENDING,
         priority_snapshot=priority.priority,
         faab_bid=payload.faab_bid if _waiver_type(settings) == "faab" else 0,
-        process_after=_now(),
+        process_after=_next_waiver_process_time(settings, now=now),
     )
     db.add(claim)
     db.flush()

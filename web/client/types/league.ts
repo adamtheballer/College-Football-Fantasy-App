@@ -5,6 +5,7 @@ export interface LeagueSettings {
   roster_slots_json: Record<string, number>;
   playoff_teams: number;
   waiver_type: string;
+  waiver_period_hours: number;
   trade_review_type: string;
   superflex_enabled: boolean;
   kicker_enabled: boolean;

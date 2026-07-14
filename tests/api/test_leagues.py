@@ -498,6 +498,7 @@ def test_update_league_settings_persists_custom_roster_format_and_flags(client):
         "IR": 3,
     }
     assert settings["superflex_enabled"] is False
+    assert settings["waiver_period_hours"] == 24
     assert settings["kicker_enabled"] is True
     assert settings["defense_enabled"] is False
     assert settings["playoff_teams"] == 8

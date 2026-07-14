@@ -230,6 +230,7 @@ def create_league(
             roster_slots_json=payload.settings.roster_slots_json,
             playoff_teams=payload.settings.playoff_teams,
             waiver_type=payload.settings.waiver_type,
+            waiver_period_hours=payload.settings.waiver_period_hours,
             trade_review_type=payload.settings.trade_review_type,
             superflex_enabled=payload.settings.superflex_enabled,
             kicker_enabled=payload.settings.kicker_enabled,
@@ -341,6 +342,8 @@ def update_league_settings(
     settings_row.roster_slots_json = payload.roster_slots_json
     settings_row.playoff_teams = payload.playoff_teams
     settings_row.waiver_type = payload.waiver_type
+    if payload.waiver_period_hours is not None:
+        settings_row.waiver_period_hours = payload.waiver_period_hours
     settings_row.trade_review_type = payload.trade_review_type
     settings_row.superflex_enabled = payload.superflex_enabled
     settings_row.kicker_enabled = payload.kicker_enabled

@@ -17,6 +17,7 @@ class LeagueSettings(TimestampMixin, Base):
     roster_slots_json: Mapped[dict] = mapped_column(JSON, default={})
     playoff_teams: Mapped[int] = mapped_column(Integer, default=4)
     waiver_type: Mapped[str] = mapped_column(String(50), default="FAAB")
+    waiver_period_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24)
     trade_review_type: Mapped[str] = mapped_column(String(50), default="commissioner")
 
     superflex_enabled: Mapped[bool] = mapped_column(Boolean, default=False)

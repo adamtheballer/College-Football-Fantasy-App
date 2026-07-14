@@ -34,7 +34,11 @@ def create_user_and_token(client, suffix: str = "one") -> str:
     return response.json()["access_token"]
 
 
-def create_league(client, token: str, waiver_type: str = "faab") -> dict:
+def parse_api_datetime(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def create_league(client, token: str, waiver_type: str = "faab", waiver_period_hours: int = 24) -> dict:
     payload = {
         "basics": {
             "name": "Roster League",
@@ -49,6 +53,7 @@ def create_league(client, token: str, waiver_type: str = "faab") -> dict:
             "roster_slots_json": {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 1, "BENCH": 4, "IR": 1},
             "playoff_teams": 4,
             "waiver_type": waiver_type,
+            "waiver_period_hours": waiver_period_hours,
             "trade_review_type": "commissioner",
             "superflex_enabled": False,
             "kicker_enabled": True,
@@ -201,6 +206,7 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
     assert roster_response.status_code == 201
     drop_entry_id = roster_response.json()["id"]
 
+    submitted_at = datetime.now(timezone.utc)
     submit_response = client.post(
         f"/leagues/{league['id']}/waivers/claims",
         json={
@@ -222,10 +228,18 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
     assert body["drop_player_id"] == drop_player_id
     assert body["faab_bid"] == 7
     assert body["process_after"] is not None
+    process_after = parse_api_datetime(body["process_after"])
+    assert submitted_at + timedelta(hours=23, minutes=55) <= process_after
+    assert process_after <= submitted_at + timedelta(hours=24, minutes=5)
 
     list_response = client.get(f"/leagues/{league['id']}/waivers", headers=auth_headers(token))
     assert list_response.status_code == 200
     assert any(claim["id"] == body["id"] for claim in list_response.json()["claims"])
+
+    immediate_process_response = client.post(f"/leagues/{league['id']}/waivers/process", headers=auth_headers(token))
+    assert immediate_process_response.status_code == 200
+    assert immediate_process_response.json() == {"processed": 0, "failed": 0, "pending": 1}
+    assert db_session.query(RosterEntry).filter_by(id=drop_entry_id, player_id=drop_player_id).one()
 
     claim = db_session.get(WaiverClaim, body["id"])
     claim.process_after = datetime.now(timezone.utc) + timedelta(days=1)
@@ -246,6 +260,29 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
     assert db_session.query(RosterEntry).filter_by(team_id=team.id, player_id=drop_player_id).first() is None
     assert db_session.query(RosterEntry).filter_by(team_id=team.id, player_id=add_player_id).one()
     assert db_session.get(WaiverClaim, body["id"]).status == "processed"
+
+
+def test_waiver_claim_uses_configured_waiver_period_hours(client, db_session):
+    token = create_user_and_token(client, "waiver-window")
+    league = create_league(client, token, waiver_period_hours=48)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    _drop_player_id, add_player_id = create_players(client)
+
+    submitted_at = datetime.now(timezone.utc)
+    submit_response = client.post(
+        f"/leagues/{league['id']}/waivers/claims",
+        json={"team_id": team.id, "add_player_id": add_player_id, "faab_bid": 0},
+        headers=auth_headers(token),
+    )
+
+    assert submit_response.status_code == 201
+    process_after = parse_api_datetime(submit_response.json()["process_after"])
+    assert submitted_at + timedelta(hours=47, minutes=55) <= process_after
+    assert process_after <= submitted_at + timedelta(hours=48, minutes=5)
+
+    process_response = client.post(f"/leagues/{league['id']}/waivers/process", headers=auth_headers(token))
+    assert process_response.status_code == 200
+    assert process_response.json() == {"processed": 0, "failed": 0, "pending": 1}
 
 
 def test_waiver_claim_cancel_endpoint_marks_pending_claim_cancelled(client, db_session):
