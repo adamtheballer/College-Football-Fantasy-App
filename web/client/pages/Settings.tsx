@@ -30,6 +30,11 @@ type LeagueNotificationPreference = {
   projection_alerts: boolean;
 };
 
+const supportEmail = import.meta.env.VITE_SUPPORT_EMAIL as string | undefined;
+const privacyPolicyUrl = import.meta.env.VITE_PRIVACY_POLICY_URL as string | undefined;
+const termsUrl = import.meta.env.VITE_TERMS_URL as string | undefined;
+const providerDisclosureUrl = import.meta.env.VITE_PROVIDER_DISCLOSURE_URL as string | undefined;
+
 const SettingsSection = ({ title, description, children, icon: Icon }: any) => (
   <Card className="bg-card/40 backdrop-blur-md border-border/60 rounded-[2.5rem] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] group hover:border-primary/20 transition-all duration-700 relative">
     <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-primary/10 transition-colors" />
@@ -479,6 +484,47 @@ export default function Settings() {
           icon={Shield}
         >
           <div className="space-y-8">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {privacyPolicyUrl ? (
+                <a
+                  href={privacyPolicyUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
+                >
+                  Privacy Policy
+                </a>
+              ) : null}
+              {termsUrl ? (
+                <a
+                  href={termsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
+                >
+                  Terms
+                </a>
+              ) : null}
+              {providerDisclosureUrl ? (
+                <a
+                  href={providerDisclosureUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
+                >
+                  Provider Disclosure
+                </a>
+              ) : null}
+              {supportEmail ? (
+                <a
+                  href={`mailto:${supportEmail}`}
+                  className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
+                >
+                  Contact Support
+                </a>
+              ) : null}
+            </div>
+
             <div className="flex items-center justify-between p-6 rounded-3xl bg-red-500/5 border border-red-500/10">
               <div className="space-y-1">
                 <h4 className="text-sm font-black italic uppercase tracking-tight text-foreground">Danger Zone</h4>

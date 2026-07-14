@@ -1,4 +1,4 @@
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, case, func, select
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.models.draft import Draft
@@ -8,15 +8,6 @@ from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.schemas.player import PlayerCreate
 from collegefootballfantasy_api.app.services.player_pool_filters import generated_test_player_filter
-
-
-def _player_board_sort_tuple(player: Player) -> tuple:
-    return (
-        player.sheet_adp is None,
-        float(player.sheet_adp) if player.sheet_adp is not None and player.sheet_adp > 0 else 9_999_999.0,
-        player.name.lower(),
-        player.id,
-    )
 
 
 def create_players(db: Session, players_in: list[PlayerCreate]) -> list[Player]:
@@ -65,12 +56,18 @@ def list_players(
         stmt = stmt.where(Player.id.not_in(rostered_players), Player.id.not_in(draft_picked_players))
 
     if sort in {"adp", "draft_rank", "rank"}:
-        count_stmt = select(func.count()).select_from(stmt.subquery())
-        total = db.scalar(count_stmt)
-        players = db.scalars(stmt).all()
-        players.sort(key=_player_board_sort_tuple)
-        return players[offset : offset + limit], total or 0
-    if sort == "school":
+        invalid_adp_sort_bucket = case(
+            (Player.sheet_adp.is_(None), 1),
+            (Player.sheet_adp <= 0, 1),
+            else_=0,
+        )
+        stmt = stmt.order_by(
+            invalid_adp_sort_bucket.asc(),
+            Player.sheet_adp.asc(),
+            func.lower(Player.name).asc(),
+            Player.id.asc(),
+        )
+    elif sort == "school":
         stmt = stmt.order_by(Player.school.asc(), Player.name.asc())
     elif sort == "position":
         stmt = stmt.order_by(Player.position.asc(), Player.name.asc())

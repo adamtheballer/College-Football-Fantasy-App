@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Activity, ArrowRightLeft, BarChart3, Newspaper, X } from "lucide-react";
 
+import { PlayerCardModal } from "@/components/player/PlayerCardModal";
+import { usePlayerCard } from "@/hooks/use-players";
 import type { LeagueRosterPlayer } from "@/types/league";
 import { cn } from "@/lib/utils";
 
@@ -96,50 +97,6 @@ const positionStyles: Record<
 const getPositionStyle = (position?: string | null) =>
   positionStyles[(position || "").toUpperCase()] ?? positionStyles.FLEX;
 
-const formatPoints = (value?: number | null) =>
-  typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "-";
-
-const formatPercent = (value?: number | null) => {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "-";
-  return `${Math.round(value * 100)}%`;
-};
-
-const readText = (player: LeagueRosterPlayer, keys: string[]) => {
-  const record = player as unknown as Record<string, unknown>;
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim()) return value;
-  }
-  return null;
-};
-
-const readStats = (player: LeagueRosterPlayer) => {
-  const record = player as unknown as Record<string, unknown>;
-  const raw =
-    record.previous_season_stats ??
-    record.stats_2025 ??
-    record.season_stats ??
-    record.previousStats;
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-  return raw as Record<string, string | number | null | undefined>;
-};
-
-const buildOutlook = (player: LeagueRosterPlayer) => {
-  const position = positionLabel(player);
-  const school = player.school ?? player.player_school ?? "school not listed";
-  const projection = player.projected_points ?? player.weekly_projected_fantasy_points ?? 0;
-  const floor = player.floor;
-  const ceiling = player.ceiling;
-  const range =
-    typeof floor === "number" && typeof ceiling === "number"
-      ? ` Projection range: ${floor.toFixed(1)}-${ceiling.toFixed(1)}.`
-      : "";
-
-  return `${player.player_name} is listed as a ${position} from ${school} with a Week 1 projection of ${projection.toFixed(
-    1
-  )} fantasy points.${range} This outlook uses roster slot, opponent, and projection data currently loaded for this league.`;
-};
-
 type RosterSlotTableTone = "default" | "bench";
 
 export function RosterSlotTable({
@@ -167,14 +124,12 @@ export function RosterSlotTable({
   });
 
   const selectedPosition = selectedPlayer ? positionLabel(selectedPlayer) : null;
-  const selectedStyle = getPositionStyle(selectedPosition);
   const selectedProjection =
     selectedPlayer?.projected_points ?? selectedPlayer?.weekly_projected_fantasy_points ?? 0;
-  const selectedNews =
-    selectedPlayer
-      ? readText(selectedPlayer, ["news", "player_news", "latest_news", "headline"])
-      : null;
-  const selectedStats = selectedPlayer ? readStats(selectedPlayer) : null;
+  const { data: selectedPlayerCard, isLoading: selectedPlayerCardLoading } = usePlayerCard(
+    selectedPlayer?.player_id,
+    Boolean(selectedPlayer?.player_id)
+  );
   const tableColumns = showPositionColumn
     ? "md:grid-cols-[0.55fr_1.45fr_0.75fr_0.45fr_0.55fr_0.5fr]"
     : "md:grid-cols-[0.55fr_1.6fr_0.9fr_0.65fr_0.5fr]";
@@ -231,16 +186,29 @@ export function RosterSlotTable({
           {sorted.map((player) => {
             const position = positionLabel(player);
             const style = getPositionStyle(position);
-            const projection = player.projected_points ?? player.weekly_projected_fantasy_points ?? 0;
+            const isRealPlayer = Boolean(
+              player.player_id !== null &&
+                player.player_id !== undefined &&
+                !player.is_placeholder &&
+                !/\bpreview\b/i.test(player.player_name ?? "")
+            );
+            const projection = isRealPlayer
+              ? player.projected_points ?? player.weekly_projected_fantasy_points ?? null
+              : null;
             return (
               <button
                 key={`${player.team_id ?? player.fantasy_team_id}-${player.player_id}-${player.slot ?? player.roster_slot}`}
                 type="button"
-                onClick={() => setSelectedPlayer(player)}
+                onClick={() => {
+                  if (!isRealPlayer) return;
+                  setSelectedPlayer(player);
+                }}
+                disabled={!isRealPlayer}
+                aria-disabled={!isRealPlayer}
                 className={cn(
-                  "grid w-full gap-3 px-5 py-4 text-left text-sm text-slate-200 transition focus:outline-none focus-visible:bg-sky-300/[0.06] focus-visible:ring-2 focus-visible:ring-sky-300/50 md:items-center",
+                  "grid w-full gap-3 px-5 py-4 text-left text-sm text-cfb-text-secondary transition focus:outline-none focus-visible:bg-cfb-brand/[0.08] focus-visible:ring-2 focus-visible:ring-cfb-brand/50 md:items-center",
                   tableColumns,
-                  style.row
+                  isRealPlayer ? style.row : "cursor-not-allowed opacity-75"
                 )}
               >
                 <span className="flex items-center gap-2">
@@ -255,7 +223,7 @@ export function RosterSlotTable({
                   <span className={cn("h-2.5 w-2.5 rounded-full", style.dot)} />
                 </span>
                 <span className="flex flex-col gap-1">
-                  <span className="font-black text-slate-50">{player.player_name}</span>
+                  <span className="font-black text-cfb-text-primary">{isRealPlayer ? player.player_name : "N/A"}</span>
                   <span
                     className={cn(
                       "inline-flex w-fit shrink-0 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em]",
@@ -265,13 +233,13 @@ export function RosterSlotTable({
                     {position}
                   </span>
                 </span>
-                <span className="text-slate-400">{player.school ?? player.player_school ?? "-"}</span>
+                <span className="text-cfb-text-muted">{isRealPlayer ? player.school ?? player.player_school ?? "N/A" : "N/A"}</span>
                 {showPositionColumn ? (
                   <span className={cn("font-black", style.text)}>{position}</span>
                 ) : null}
-                <span className="text-slate-400">{player.opponent ?? "TBD"}</span>
+                <span className="text-cfb-text-muted">{isRealPlayer ? player.opponent ?? "TBD" : "N/A"}</span>
                 <span className={cn("text-right font-black", style.text)}>
-                  {projection.toFixed(1)}
+                  {typeof projection === "number" && Number.isFinite(projection) ? projection.toFixed(1) : "-"}
                 </span>
               </button>
             );
@@ -279,127 +247,39 @@ export function RosterSlotTable({
         </div>
       )}
       {selectedPlayer ? (
-        <div
-          className="fixed inset-0 z-[120] flex justify-end bg-slate-950/70 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${selectedPlayer.player_name} player card`}
-          onClick={() => setSelectedPlayer(null)}
-        >
-          <div
-            className={cn(
-              "relative flex h-full w-full max-w-[460px] flex-col overflow-hidden rounded-[1.75rem] border bg-[linear-gradient(145deg,var(--tw-gradient-stops))] p-5 shadow-[0_30px_90px_rgba(2,8,23,0.7)]",
-              selectedStyle.border,
-              selectedStyle.panel,
-              "via-[#0b1424] to-[#050914]"
-            )}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => setSelectedPlayer(null)}
-              className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white"
-              aria-label="Close player card"
-            >
-              <X className="h-5 w-5" />
-            </button>
-
-            <div className="pr-12">
-              <div className={cn("mb-4 inline-flex whitespace-nowrap rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em]", selectedStyle.pill)}>
-                {selectedPosition} · {slotLabel(selectedPlayer.slot ?? selectedPlayer.roster_slot)}
-              </div>
-              <h3 className="text-3xl font-black italic leading-none text-slate-50">
-                {selectedPlayer.player_name}
-              </h3>
-              <p className="mt-2 text-sm font-bold uppercase tracking-[0.16em] text-slate-400">
-                {selectedPlayer.school ?? selectedPlayer.player_school ?? "-"} · Opp {selectedPlayer.opponent ?? "TBD"}
-              </p>
-              {leagueId ? (
-                <button
-                  type="button"
-                  onClick={openTradeBuilder}
-                  className={cn(
-                    "mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-[10px] font-black uppercase tracking-[0.18em] transition hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/50",
-                    selectedStyle.border,
-                    "bg-sky-400/15 text-sky-100 shadow-[0_0_34px_rgba(56,189,248,0.16)] hover:bg-sky-300/20"
-                  )}
-                >
-                  <ArrowRightLeft className="h-4 w-4" />
-                  Trade Player
-                </button>
-              ) : null}
-            </div>
-
-            <div className="mt-6 grid grid-cols-3 gap-3">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Proj</p>
-                <p className={cn("mt-1 text-2xl font-black", selectedStyle.text)}>
-                  {formatPoints(selectedProjection)}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Floor</p>
-                <p className="mt-1 text-2xl font-black text-slate-100">{formatPoints(selectedPlayer.floor)}</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Ceiling</p>
-                <p className="mt-1 text-2xl font-black text-slate-100">{formatPoints(selectedPlayer.ceiling)}</p>
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Boom</p>
-                <p className="mt-1 text-xl font-black text-emerald-200">{formatPercent(selectedPlayer.boom_prob)}</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Bust</p>
-                <p className="mt-1 text-xl font-black text-rose-200">{formatPercent(selectedPlayer.bust_prob)}</p>
-              </div>
-            </div>
-
-            <div className="mt-5 space-y-4 overflow-y-auto pr-1">
-              <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                <div className="mb-3 flex items-center gap-2 text-sky-200">
-                  <Newspaper className="h-4 w-4" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em]">News</p>
-                </div>
-                <p className="text-sm font-semibold leading-6 text-slate-300">
-                  {selectedNews ?? "No verified player news is loaded for this league response yet."}
-                </p>
-              </section>
-
-              <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                <div className="mb-3 flex items-center gap-2 text-sky-200">
-                  <BarChart3 className="h-4 w-4" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em]">Previous Stats</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  {["games", "pass_yards", "rush_yards", "receiving_yards", "receptions", "touchdowns"].map((stat) => (
-                    <div key={stat} className="rounded-xl border border-white/10 bg-slate-950/25 px-3 py-2">
-                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
-                        {stat.replace(/_/g, " ")}
-                      </p>
-                      <p className="mt-1 font-black text-slate-100">
-                        {selectedStats?.[stat] ?? "-"}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                <div className="mb-3 flex items-center gap-2 text-sky-200">
-                  <Activity className="h-4 w-4" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em]">Outlook</p>
-                </div>
-                <p className="text-sm font-semibold leading-6 text-slate-300">
-                  {buildOutlook(selectedPlayer)}
-                </p>
-              </section>
-            </div>
-          </div>
-        </div>
+        <PlayerCardModal
+          action={
+            leagueId && selectedPlayer.player_id
+              ? {
+                  label: "Trade Player",
+                  onClick: openTradeBuilder,
+                }
+              : null
+          }
+          card={selectedPlayerCard}
+          loading={selectedPlayerCardLoading}
+          onClose={() => setSelectedPlayer(null)}
+          player={{
+            id: selectedPlayer.player_id,
+            name: selectedPlayer.player_name,
+            school: selectedPlayer.school ?? selectedPlayer.player_school,
+            position: selectedPosition,
+            rankLabel: `${selectedPosition ?? "N/A"} • ${slotLabel(selectedPlayer.slot ?? selectedPlayer.roster_slot)}`,
+            projectedPoints: selectedProjection,
+            opponent: selectedPlayer.opponent,
+            playerClass: null,
+            status: selectedPlayer.status,
+            projection: {
+              fpts: selectedProjection,
+              floor: selectedPlayer.floor ?? undefined,
+              ceiling: selectedPlayer.ceiling ?? undefined,
+              boomProb: selectedPlayer.boom_prob ?? undefined,
+              bustProb: selectedPlayer.bust_prob ?? undefined,
+            },
+          }}
+          title="Roster Player Card"
+          note="Roster cards use the linked ESPN profile when available and show cached historical stat rows already attached to this player."
+        />
       ) : null}
     </section>
   );

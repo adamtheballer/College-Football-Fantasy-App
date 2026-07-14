@@ -8,12 +8,24 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api";
 
-type VerificationState = "missing-token" | "verifying" | "verified" | "failed";
+const RESEND_COOLDOWN_SECONDS = 60;
+
+type VerificationState = "missing-token" | "verifying" | "verified" | "already-verified" | "failed";
 
 export const verificationErrorMessage = (error: unknown) => {
   if (error instanceof ApiError) {
     if (error.status === 400) {
-      return "This verification link is invalid or expired. Request a new verification email below.";
+      const message = error.message.toLowerCase();
+      if (message.includes("expired")) {
+        return "This verification link is expired. Request a new verification email below.";
+      }
+      if (message.includes("used")) {
+        return "This verification link was already used. Sign in or request a new verification email below.";
+      }
+      return "This verification link is invalid. Request a new verification email below.";
+    }
+    if (error.status === 429) {
+      return "Too many verification attempts. Wait a few minutes before trying again.";
     }
     if (error.status === 0) {
       return "Unable to reach the backend API. Start FastAPI and try again.";
@@ -30,14 +42,21 @@ export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token")?.trim() ?? "";
   const { user, verifyEmail, resendVerification } = useAuth();
-  const [state, setState] = useState<VerificationState>(token ? "verifying" : "missing-token");
+  const initialState: VerificationState = token ? "verifying" : user?.emailVerifiedAt ? "already-verified" : "missing-token";
+  const [state, setState] = useState<VerificationState>(initialState);
   const [message, setMessage] = useState<string | null>(null);
   const [email, setEmail] = useState(user?.email ?? "");
   const [isResending, setIsResending] = useState(false);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
+  const [resendAvailableAt, setResendAvailableAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const resendCooldownSeconds = resendAvailableAt
+    ? Math.max(0, Math.ceil((resendAvailableAt - now) / 1000))
+    : 0;
 
   const title = useMemo(() => {
     if (state === "verified") return "Email Verified";
+    if (state === "already-verified") return "Email Already Verified";
     if (state === "verifying") return "Verifying Email";
     return "Verify Your Email";
   }, [state]);
@@ -47,9 +66,20 @@ export default function VerifyEmail() {
   }, [user?.email]);
 
   useEffect(() => {
+    if (!resendAvailableAt) return;
+    const interval = window.setInterval(() => setNow(Date.now()), 500);
+    return () => window.clearInterval(interval);
+  }, [resendAvailableAt]);
+
+  useEffect(() => {
     if (!token) {
-      setState("missing-token");
-      setMessage("The verification link is missing a token.");
+      if (user?.emailVerifiedAt) {
+        setState("already-verified");
+        setMessage("Your account email is already verified. You can continue to the app.");
+      } else {
+        setState("missing-token");
+        setMessage("The verification link is missing a token.");
+      }
       return;
     }
 
@@ -57,13 +87,20 @@ export default function VerifyEmail() {
     setState("verifying");
     setMessage(null);
     verifyEmail(token)
-      .then(() => {
+      .then((status) => {
         if (cancelled) return;
-        setState("verified");
-        setMessage("Your account email is verified. You can now create and join leagues.");
+        window.history.replaceState(null, "", "/verify-email");
+        if (status === "already_verified") {
+          setState("already-verified");
+          setMessage("Your account email was already verified. You can continue to the app.");
+        } else {
+          setState("verified");
+          setMessage("Your account email is verified. You can now create and join leagues.");
+        }
       })
       .catch((error) => {
         if (cancelled) return;
+        window.history.replaceState(null, "", "/verify-email");
         setState("failed");
         setMessage(verificationErrorMessage(error));
       });
@@ -71,11 +108,15 @@ export default function VerifyEmail() {
     return () => {
       cancelled = true;
     };
-  }, [token, verifyEmail]);
+  }, [token, verifyEmail, user?.emailVerifiedAt]);
 
   const handleResend = async (event: FormEvent) => {
     event.preventDefault();
     setResendNotice(null);
+    if (resendCooldownSeconds > 0) {
+      setResendNotice(`Wait ${resendCooldownSeconds} seconds before requesting another verification email.`);
+      return;
+    }
     const normalizedEmail = email.trim();
     if (!normalizedEmail) {
       setResendNotice("Enter the email address for the account you need to verify.");
@@ -84,9 +125,16 @@ export default function VerifyEmail() {
     setIsResending(true);
     try {
       await resendVerification(normalizedEmail);
+      const nextAvailableAt = Date.now() + RESEND_COOLDOWN_SECONDS * 1000;
+      setNow(Date.now());
+      setResendAvailableAt(nextAvailableAt);
       setResendNotice("If that account still needs verification, a new email was sent.");
     } catch (error) {
-      setResendNotice(error instanceof Error ? error.message : "Unable to resend verification email.");
+      if (error instanceof ApiError && error.status === 429) {
+        setResendNotice("Too many requests. Wait a few minutes before trying again.");
+      } else {
+        setResendNotice(error instanceof Error ? error.message : "Unable to resend verification email.");
+      }
     } finally {
       setIsResending(false);
     }
@@ -120,7 +168,7 @@ export default function VerifyEmail() {
             </p>
           </div>
 
-          {state === "verified" ? (
+          {state === "verified" || state === "already-verified" ? (
             <div className="flex flex-col justify-center gap-3 sm:flex-row">
               <Button asChild className="h-12 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]">
                 <Link to="/">Go To Dashboard</Link>
@@ -153,10 +201,14 @@ export default function VerifyEmail() {
               ) : null}
               <Button
                 type="submit"
-                disabled={isResending}
+                disabled={isResending || resendCooldownSeconds > 0}
                 className="h-12 w-full rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
               >
-                {isResending ? "Sending..." : "Resend Verification"}
+                {isResending
+                  ? "Sending..."
+                  : resendCooldownSeconds > 0
+                    ? `Resend Available In ${resendCooldownSeconds}s`
+                    : "Resend Verification"}
               </Button>
             </form>
           )}

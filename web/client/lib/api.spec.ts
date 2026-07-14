@@ -1,15 +1,33 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { apiGet } from "./api";
+import { apiGet, clearAccessTokenSession } from "./api";
 
 const originalFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("api client", () => {
+  it("notifies the auth provider when the access token session is cleared", () => {
+    const dispatchEvent = vi.fn();
+    const removeItem = vi.fn();
+    vi.stubGlobal("window", { dispatchEvent });
+    vi.stubGlobal("localStorage", {
+      getItem: vi.fn(),
+      setItem: vi.fn(),
+      removeItem,
+    });
+
+    clearAccessTokenSession();
+
+    expect(removeItem).toHaveBeenCalledWith("cfb_access_token");
+    expect(removeItem).toHaveBeenCalledWith("cfb_access_token_expires_at");
+    expect(dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "cfb-auth-changed" }));
+  });
+
   it("wraps browser network failures in an actionable ApiError", async () => {
     globalThis.fetch = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
 

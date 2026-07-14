@@ -1,31 +1,48 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  ArrowRight,
+  CalendarClock,
+  Lock,
+  Mail,
+  ShieldCheck,
+  Trophy,
+  Users,
+  Zap,
+} from "lucide-react";
+
+import { PlaybookDecor, SurfaceCard } from "@/components/fantasy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
-import { setPendingGuide } from "@/lib/onboarding";
 import { ApiError } from "@/lib/api";
-import {
-  Trophy,
-  Mail,
-  Lock,
-  ArrowRight,
-  Github,
-  Chrome,
-  Apple,
-  Zap,
-  ShieldCheck,
-  Sparkles,
-  Users,
-  Radio,
-  Star
-} from "lucide-react";
+import { setPendingGuide } from "@/lib/onboarding";
+
+const featureCards = [
+  {
+    title: "Draft board",
+    body: "Enter league drafts and mock draft rooms from the same product shell.",
+    icon: Trophy,
+    tone: "text-cfb-gold border-cfb-gold/30 bg-cfb-gold/[0.08]",
+  },
+  {
+    title: "Roster control",
+    body: "Review lineups, locks, alerts, and roster status before kickoff.",
+    icon: ShieldCheck,
+    tone: "text-cfb-success border-cfb-success/30 bg-cfb-success/[0.08]",
+  },
+  {
+    title: "League hub",
+    body: "Manage standings, members, settings, watchlists, and matchup context.",
+    icon: Users,
+    tone: "text-cfb-cyan border-cfb-cyan/30 bg-cfb-cyan/[0.08]",
+  },
+] as const;
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isLoggedIn } = useAuth();
+  const { login, isLoggedIn, requestPasswordReset } = useAuth();
   const redirectTarget =
     typeof location.state === "object" &&
     location.state &&
@@ -45,10 +62,31 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recoveryNotice, setRecoveryNotice] = useState<string | null>(null);
+  const [isRequestingReset, setIsRequestingReset] = useState(false);
 
-  const handleForgotPassword = () => {
+  const handleForgotPassword = async () => {
     setError(null);
-    setRecoveryNotice("Password reset emails are not configured yet. For now, contact support or try signing in again.");
+    setRecoveryNotice(null);
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setRecoveryNotice("Enter your email address first, then request a password reset link.");
+      return;
+    }
+    setIsRequestingReset(true);
+    try {
+      await requestPasswordReset(normalizedEmail);
+      setRecoveryNotice("If an account exists for that email, a password reset link has been sent.");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 429) {
+        setRecoveryNotice("Too many reset requests. Wait a few minutes and try again.");
+      } else if (err instanceof ApiError && err.status === 0) {
+        setRecoveryNotice("Unable to reach the backend API. Start FastAPI and try again.");
+      } else {
+        setRecoveryNotice("Unable to request a password reset right now. Try again or contact support.");
+      }
+    } finally {
+      setIsRequestingReset(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -79,200 +117,180 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-8rem)] overflow-hidden rounded-[2.25rem] border border-white/10 bg-[#06111f] p-4 shadow-[0_0_80px_rgba(14,165,233,0.18)] sm:p-6 lg:p-8">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(34,211,238,0.34),transparent_34%),radial-gradient(circle_at_84%_18%,rgba(251,191,36,0.24),transparent_28%),radial-gradient(circle_at_70%_82%,rgba(244,63,94,0.22),transparent_30%),linear-gradient(135deg,rgba(15,23,42,0.15),rgba(2,6,23,0.88))]" />
-      <div className="absolute inset-0 opacity-[0.16] [background-image:linear-gradient(rgba(255,255,255,0.16)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.16)_1px,transparent_1px)] [background-size:48px_48px]" />
-      <div className="absolute left-8 right-8 top-1/2 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
-      <div className="absolute bottom-8 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full border-2 border-white/10" />
+    <main className="relative mx-auto grid min-h-[calc(100vh-8rem)] w-full max-w-7xl items-center gap-6 overflow-hidden px-4 py-8 sm:px-6 lg:grid-cols-[1.02fr_0.98fr] lg:px-8">
+      <div aria-hidden="true" className="pointer-events-none absolute -left-20 top-10 h-32 w-96 rotate-[-18deg] rounded-full bg-gradient-to-r from-cfb-pink/35 via-cfb-brand/30 to-transparent blur-2xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute -right-24 top-24 h-32 w-[30rem] rotate-[-16deg] rounded-full bg-gradient-to-r from-transparent via-cfb-cyan/30 to-cfb-gold/24 blur-2xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute bottom-8 left-20 h-24 w-[26rem] rotate-[-10deg] rounded-full bg-gradient-to-r from-cfb-gold/24 via-cfb-brand/18 to-transparent blur-2xl" />
 
-      <div className="relative grid min-h-[calc(100vh-12rem)] items-center gap-8 lg:grid-cols-[minmax(0,1fr)_480px]">
-        <section className="hidden space-y-7 pl-2 lg:block xl:pl-8">
-          <Link
-            to="/"
-            aria-label="Back to home"
-            className="group inline-flex items-center gap-3 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.18)] transition-all hover:border-cyan-200/50 hover:bg-cyan-300/15"
-          >
-            <Trophy className="h-4 w-4 text-amber-200 transition-transform group-hover:rotate-[-8deg] group-hover:scale-110" />
-            CFB Fantasy
-          </Link>
+      <section className="relative hidden lg:block">
+        <SurfaceCard variant="scoreboard" padding="spacious" className="cfb-playbook-pattern min-h-[560px]">
+          <div className="relative flex h-full flex-col justify-between gap-10">
+            <div className="space-y-7">
+              <Link
+                to="/"
+                className="inline-flex items-center gap-2 rounded-full border border-cfb-brand/35 bg-cfb-brand/[0.12] px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-blue-100 transition hover:border-cfb-brand/55 hover:bg-cfb-brand/20"
+              >
+                <Trophy className="h-4 w-4 text-cfb-gold" aria-hidden="true" />
+                CFB Fantasy
+              </Link>
 
-          <div className="max-w-3xl space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber-200/25 bg-amber-300/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] text-amber-100">
-              <Sparkles className="h-3.5 w-3.5" />
-              Saturday night is live
+              <div className="max-w-2xl space-y-4">
+                <p className="inline-flex items-center gap-2 rounded-full border border-cfb-gold/30 bg-cfb-gold/[0.10] px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-yellow-100">
+                  <Zap className="h-3.5 w-3.5" aria-hidden="true" />
+                  Game week starts here
+                </p>
+                <h1 className="cfb-display-title text-6xl leading-[0.92] xl:text-7xl">
+                  Lock in your
+                  <span className="block bg-gradient-to-r from-cfb-cyan via-cfb-brand to-cfb-gold bg-clip-text text-transparent">
+                    title chase
+                  </span>
+                </h1>
+                <p className="max-w-xl text-base font-semibold leading-7 text-cfb-text-secondary">
+                  Sign in to manage your leagues, draft rooms, rosters, alerts, and matchup decisions
+                  from one college football command center.
+                </p>
+              </div>
             </div>
-            <h1 className="text-6xl font-black uppercase italic leading-[0.9] tracking-tight text-white xl:text-7xl">
-              Build your
-              <span className="block bg-gradient-to-r from-cyan-200 via-sky-300 to-amber-200 bg-clip-text text-transparent">
-                title team
-              </span>
-            </h1>
-            <p className="max-w-xl text-sm font-bold uppercase tracking-[0.16em] text-slate-200/70">
-              Draft boards, live scoring, available-player tracking, and league bragging rights in one electric college football command center.
+
+            <div className="grid gap-3">
+              {featureCards.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.title} className={`rounded-2xl border p-4 ${item.tone}`}>
+                    <div className="flex items-start gap-3">
+                      <Icon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+                      <div>
+                        <p className="text-sm font-black uppercase tracking-[0.12em] text-cfb-text-primary">
+                          {item.title}
+                        </p>
+                        <p className="mt-1 text-sm font-medium leading-6 text-cfb-text-secondary">
+                          {item.body}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </SurfaceCard>
+      </section>
+
+      <section className="relative mx-auto w-full max-w-[520px]">
+        <SurfaceCard variant="raised" padding="none" className="relative overflow-hidden">
+          <PlaybookDecor className="opacity-25" />
+          <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-cfb-cyan via-cfb-gold to-cfb-pink" />
+
+          <div className="relative space-y-8 p-6 sm:p-8">
+            <div className="space-y-4 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-cfb-gold via-cfb-cyan to-cfb-brand shadow-[0_0_38px_hsl(var(--brand-primary)/0.28)]">
+                <Trophy className="h-7 w-7 text-slate-950" aria-hidden="true" />
+              </div>
+              <div>
+                <p className="cfb-micro-label text-cfb-brand">Welcome back</p>
+                <h2 className="mt-2 text-4xl font-black uppercase italic tracking-[-0.04em] text-cfb-text-primary">
+                  Sign in
+                </h2>
+                <p className="mt-2 text-sm font-semibold text-cfb-text-secondary">
+                  Continue to your leagues, draft rooms, and matchup dashboard.
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="space-y-2">
+                <label htmlFor="login-email" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">
+                  Email address
+                </label>
+                <span className="group relative block">
+                  <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted transition-colors group-focus-within:text-cfb-cyan" />
+                  <Input
+                    id="login-email"
+                    type="email"
+                    placeholder="coach@saturday.com"
+                    className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-sm font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <span className="flex items-center justify-between px-3">
+                  <label htmlFor="login-password" className="text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    disabled={isRequestingReset}
+                    className="text-[9px] font-black uppercase tracking-widest text-cfb-gold transition hover:text-yellow-100 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {isRequestingReset ? "Sending..." : "Forgot password?"}
+                  </button>
+                </span>
+                <span className="group relative block">
+                  <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted transition-colors group-focus-within:text-cfb-cyan" />
+                  <Input
+                    id="login-password"
+                    type="password"
+                    placeholder="••••••••"
+                    className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-sm font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </span>
+              </div>
+
+              {recoveryNotice ? (
+                <div className="rounded-2xl border border-cfb-gold/35 bg-cfb-gold/[0.12] px-4 py-3 text-xs font-bold text-yellow-100">
+                  {recoveryNotice}
+                </div>
+              ) : null}
+
+              {error ? (
+                <div className="rounded-2xl border border-cfb-danger/35 bg-cfb-danger/[0.14] px-4 py-3 text-xs font-bold text-red-100">
+                  {error}
+                </div>
+              ) : null}
+
+              <Button
+                type="submit"
+                className="group h-14 w-full rounded-2xl bg-gradient-to-r from-cfb-cyan to-cfb-brand text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-[0_18px_42px_hsl(var(--brand-primary)/0.26)] hover:brightness-110"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <span className="h-5 w-5 rounded-full border-2 border-slate-950/30 border-t-slate-950 animate-spin" />
+                ) : (
+                  <span className="flex items-center gap-2 transition-all group-hover:gap-4">
+                    Sign in to dashboard <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                )}
+              </Button>
+            </form>
+
+            <div className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface/60 p-4">
+              <div className="flex items-center gap-3">
+                <CalendarClock className="h-5 w-5 text-cfb-gold" aria-hidden="true" />
+                <p className="text-sm font-semibold text-cfb-text-secondary">
+                  New commissioner? Create an account, verify your email, then start a league.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative border-t border-cfb-border-subtle bg-cfb-surface/70 px-6 py-5 text-center">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-cfb-text-secondary">
+              Don&apos;t have an account?
+              <Link to="/signup" className="ml-1 font-black text-cfb-gold hover:text-yellow-100">
+                Create one
+              </Link>
             </p>
           </div>
-
-          <div className="grid max-w-2xl grid-cols-3 gap-3">
-            {[
-              { label: "Live Drafts", value: "90s", icon: Radio, tone: "from-cyan-400/25 to-blue-500/15 text-cyan-100" },
-              { label: "Managers", value: "12", icon: Users, tone: "from-emerald-400/25 to-teal-500/15 text-emerald-100" },
-              { label: "Power Plays", value: "24/7", icon: Star, tone: "from-amber-300/25 to-orange-500/15 text-amber-100" },
-            ].map((item) => (
-              <div key={item.label} className={`rounded-2xl border border-white/10 bg-gradient-to-br ${item.tone} p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]`}>
-                <item.icon className="mb-4 h-5 w-5" />
-                <p className="text-2xl font-black italic leading-none text-white">{item.value}</p>
-                <p className="mt-2 text-[9px] font-black uppercase tracking-[0.18em] opacity-75">{item.label}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex max-w-xl flex-wrap gap-3">
-            {["CFB rankings", "Rivalry week", "Available players", "Draft room"].map((label) => (
-              <span key={label} className="rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/75">
-                {label}
-              </span>
-            ))}
-          </div>
-        </section>
-
-        <div className="mx-auto w-full max-w-[480px] animate-in fade-in slide-in-from-bottom-8 duration-700">
-          <div className="mb-5 flex flex-col items-center text-center lg:hidden">
-            <Link
-              to="/"
-              aria-label="Back to home"
-              className="mb-4 rounded-2xl bg-gradient-to-br from-cyan-300 to-blue-500 p-3 shadow-[0_0_30px_rgba(34,211,238,0.35)]"
-            >
-              <Trophy className="h-6 w-6 text-slate-950" />
-            </Link>
-            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan-100/80">College Football Fantasy</p>
-          </div>
-
-          <Card className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/72 shadow-[0_28px_80px_rgba(0,0,0,0.42)] backdrop-blur-2xl">
-            <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-cyan-300 via-amber-200 to-rose-400" />
-            <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-cyan-400/18 blur-3xl" />
-            <div className="absolute -bottom-20 left-8 h-44 w-44 rounded-full bg-rose-400/14 blur-3xl" />
-
-            <CardContent className="relative space-y-8 p-7 sm:p-9">
-              <div className="space-y-3 text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-200 via-cyan-300 to-blue-500 shadow-[0_0_38px_rgba(34,211,238,0.34)]">
-                  <Trophy className="h-7 w-7 text-slate-950" />
-                </div>
-                <div>
-                  <h2 className="text-4xl font-black uppercase italic tracking-tight text-white">
-                    Welcome Back
-                  </h2>
-                  <p className="mt-2 text-[10px] font-black uppercase tracking-[0.28em] text-cyan-100/60">
-                    Lock in and run your league
-                  </p>
-                </div>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="ml-3 text-[10px] font-black uppercase tracking-widest text-cyan-100/70">Email Address</label>
-                    <div className="group relative">
-                      <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-100/45 transition-colors group-focus-within:text-cyan-200" />
-                      <Input
-                        type="email"
-                        placeholder="coach@saturday.com"
-                        className="h-14 rounded-2xl border-cyan-200/10 bg-white/10 pl-12 text-sm font-bold text-white placeholder:text-slate-300/40 transition-all focus:border-cyan-200/50 focus:ring-cyan-300/25"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between px-3">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-cyan-100/70">Password</label>
-                      <button
-                        type="button"
-                        onClick={handleForgotPassword}
-                        className="text-[9px] font-black uppercase tracking-widest text-amber-200/80 transition-colors hover:text-amber-100"
-                      >
-                        Forgot Password?
-                      </button>
-                    </div>
-                    <div className="group relative">
-                      <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-100/45 transition-colors group-focus-within:text-cyan-200" />
-                      <Input
-                        type="password"
-                        placeholder="••••••••"
-                        className="h-14 rounded-2xl border-cyan-200/10 bg-white/10 pl-12 text-sm font-bold text-white placeholder:text-slate-300/40 transition-all focus:border-cyan-200/50 focus:ring-cyan-300/25"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {recoveryNotice && (
-                  <div className="rounded-2xl border border-amber-200/35 bg-amber-300/12 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-100">
-                    {recoveryNotice}
-                  </div>
-                )}
-
-                {error && (
-                  <div className="rounded-2xl border border-red-300/35 bg-red-500/15 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-red-100">
-                    {error}
-                  </div>
-                )}
-
-                <Button
-                  type="submit"
-                  className="group h-14 w-full overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-500 text-[11px] font-black uppercase tracking-[0.22em] text-slate-950 shadow-[0_18px_42px_rgba(14,165,233,0.32)] transition-all hover:brightness-110"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <div className="h-5 w-5 rounded-full border-2 border-slate-950/30 border-t-slate-950 animate-spin" />
-                  ) : (
-                    <span className="flex items-center gap-2 transition-all group-hover:gap-4">
-                      Sign In to Dashboard <ArrowRight className="h-4 w-4" />
-                    </span>
-                  )}
-                </Button>
-              </form>
-
-              <div className="relative flex items-center justify-center">
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/20 to-white/10" />
-                <span className="px-4 text-[9px] font-black uppercase tracking-widest text-slate-300/50">Or continue with</span>
-                <div className="h-px flex-1 bg-gradient-to-l from-transparent via-white/20 to-white/10" />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <Button variant="outline" className="h-14 rounded-2xl border-white/10 bg-white/10 text-white hover:border-cyan-200/35 hover:bg-cyan-300/15">
-                  <Chrome className="h-5 w-5" />
-                </Button>
-                <Button variant="outline" className="h-14 rounded-2xl border-white/10 bg-white/10 text-white hover:border-amber-200/35 hover:bg-amber-300/15">
-                  <Apple className="h-5 w-5" />
-                </Button>
-                <Button variant="outline" className="h-14 rounded-2xl border-white/10 bg-white/10 text-white hover:border-rose-200/35 hover:bg-rose-300/15">
-                  <Github className="h-5 w-5" />
-                </Button>
-              </div>
-            </CardContent>
-
-            <div className="relative border-t border-white/10 bg-white/[0.06] px-7 py-5 text-center">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-300/70">
-                Don't have an account? <Link to="/signup" className="ml-1 font-black text-amber-200 hover:text-amber-100">Create One</Link>
-              </p>
-            </div>
-          </Card>
-
-          <div className="mt-5 flex items-center justify-center gap-5 text-slate-200/55">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-200" />
-              <span className="text-[8px] font-black uppercase tracking-widest">Secure SSL</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Zap className="h-3.5 w-3.5 text-amber-200" />
-              <span className="text-[8px] font-black uppercase tracking-widest">Live Scoring</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+        </SurfaceCard>
+      </section>
+    </main>
   );
 }

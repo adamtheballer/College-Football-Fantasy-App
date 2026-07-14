@@ -1,6 +1,7 @@
 from collegefootballfantasy_api.app.integrations.espn import extract_player_box_score_stats
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
+from collegefootballfantasy_api.app.models.provider_identity import UnmatchedProviderRow
 from collegefootballfantasy_api.app.services.espn_stats_sync import upsert_espn_weekly_player_stats
 from collegefootballfantasy_api.app.services.scoring_service import calculate_player_fantasy_points, normalize_player_stats
 
@@ -144,8 +145,13 @@ def test_upsert_espn_weekly_player_stats_matches_players_by_id_and_name_school(c
     assert result["rows_seen"] == 3
     assert result["upserted"] == 2
     assert result["skipped"] == 1
+    assert result["unmatched_rows"] == 1
+    assert result["unmatched_rate"] == 0.3333
     arch_stat = db_session.query(PlayerStat).filter_by(player_id=by_external_id.id, season=2026, week=1).one()
     wingo_stat = db_session.query(PlayerStat).filter_by(player_id=by_name_school.id, season=2026, week=1).one()
+    unmatched = db_session.query(UnmatchedProviderRow).filter_by(provider="espn", status="open").one()
+    assert unmatched.player_name == "Bert Auburn"
+    assert unmatched.feed == "weekly_boxscore_player_stats"
     assert arch_stat.source == "espn"
     assert arch_stat.stats["pass_yards"] == 275.0
     assert wingo_stat.source == "espn"

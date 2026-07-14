@@ -44,7 +44,7 @@ class EmailService:
 
 class ConsoleEmailService(EmailService):
     def send(self, payload: EmailPayload) -> None:
-        logger.info("Auth email to %s: %s\n%s", payload.to_email, payload.subject, payload.body)
+        logger.info("Auth email queued to %s: %s", payload.to_email, payload.subject)
 
 
 class SmtpEmailService(EmailService):

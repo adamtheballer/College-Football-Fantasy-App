@@ -3,7 +3,9 @@ import { useParams } from "react-router-dom";
 import {
   CalendarDays,
   ClipboardList,
+  Copy,
   History,
+  Link2,
   Medal,
   Settings2,
   ShieldCheck,
@@ -17,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useLeagueSettingsTab } from "@/hooks/use-leagues";
 import { useLeagueTransactions } from "@/hooks/use-roster-actions";
 import { DEMO_LEAGUE_ID, createDemoLeagueSettingsResponse } from "@/lib/leaguePreviewData";
-import type { LeagueRosterPlayer } from "@/types/league";
+import type { LeagueRosterPlayer, LeagueSettingsTabResponse } from "@/types/league";
 
 type SettingsPanel = "standings" | "scoring" | "schedule" | "rosters" | "trades" | "draft";
 
@@ -90,6 +92,7 @@ export default function LeagueSettings() {
   const [activePanel, setActivePanel] = useState<SettingsPanel>("standings");
   const [selectedRosterTeam, setSelectedRosterTeam] = useState<string>("");
   const [selectedScheduleWeek, setSelectedScheduleWeek] = useState<number | null>(null);
+  const [copiedInviteField, setCopiedInviteField] = useState<"code" | "link" | null>(null);
   const settingsQuery = useLeagueSettingsTab(parsedLeagueId, !isDemoLeague);
   const transactionsQuery = useLeagueTransactions(parsedLeagueId, !isDemoLeague);
   const data = isDemoLeague ? createDemoLeagueSettingsResponse() : settingsQuery.data;
@@ -135,6 +138,13 @@ export default function LeagueSettings() {
   );
   const leagueInfo = data?.league_info ?? {};
 
+  const copyInviteValue = async (field: "code" | "link", value?: string | null) => {
+    if (!value) return;
+    await navigator.clipboard.writeText(value);
+    setCopiedInviteField(field);
+    window.setTimeout(() => setCopiedInviteField(null), 1800);
+  };
+
   return (
     <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[460px] rounded-[3rem] bg-[radial-gradient(circle_at_18%_8%,rgba(56,189,248,0.2),transparent_34%),radial-gradient(circle_at_76%_0%,rgba(99,102,241,0.18),transparent_38%)] blur-2xl" />
@@ -170,6 +180,14 @@ export default function LeagueSettings() {
         </div>
         <LeagueTabs leagueId={parsedLeagueId} />
       </div>
+
+      {data?.invite ? (
+        <InviteSettingsCard
+          data={data}
+          copiedField={copiedInviteField}
+          onCopy={copyInviteValue}
+        />
+      ) : null}
 
       <section className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(13,23,39,0.96),rgba(16,30,52,0.9)_48%,rgba(15,23,42,0.96))] p-3 shadow-[0_24px_90px_rgba(14,165,233,0.12)]">
         <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
@@ -434,5 +452,73 @@ function EmptyState({ message }: { message: string }) {
         {message}
       </div>
     </div>
+  );
+}
+
+function InviteSettingsCard({
+  data,
+  copiedField,
+  onCopy,
+}: {
+  data: LeagueSettingsTabResponse;
+  copiedField: "code" | "link" | null;
+  onCopy: (field: "code" | "link", value?: string | null) => void;
+}) {
+  const invite = data.invite;
+  if (!invite) return null;
+
+  return (
+    <section className="overflow-hidden rounded-[2rem] border border-amber-300/25 bg-[linear-gradient(135deg,rgba(30,41,59,0.96),rgba(15,23,42,0.94)_45%,rgba(67,56,202,0.16))] shadow-[0_22px_80px_rgba(251,191,36,0.12)]">
+      <div className="grid gap-5 p-5 lg:grid-cols-[1fr_1.1fr] lg:items-center">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-300/35 bg-amber-300/15 text-amber-100">
+              <Link2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-200">
+                Commissioner Invite
+              </p>
+              <h2 className="mt-1 text-xl font-black text-slate-50">Invite code saved in league settings</h2>
+            </div>
+          </div>
+          <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-slate-400">
+            This code and link stay visible here until the draft is completed, so the commissioner can always copy them again before the league locks.
+          </p>
+        </div>
+
+        <div className="grid gap-3">
+          <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/[0.045] p-4 md:grid-cols-[1fr_auto] md:items-center">
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Invite Code</p>
+              <p className="mt-1 break-all font-mono text-lg font-black text-slate-50">{invite.code}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onCopy("code", invite.code)}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-amber-300/25 bg-amber-300/12 px-4 text-[10px] font-black uppercase tracking-[0.16em] text-amber-100 transition hover:border-amber-200/60 hover:bg-amber-300/18"
+            >
+              <Copy className="h-4 w-4" />
+              {copiedField === "code" ? "Copied" : "Copy Code"}
+            </button>
+          </div>
+
+          <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/[0.045] p-4 md:grid-cols-[1fr_auto] md:items-center">
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Invite Link</p>
+              <p className="mt-1 break-all font-mono text-xs font-bold text-slate-300">{invite.link}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onCopy("link", invite.link)}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sky-300/25 bg-sky-300/12 px-4 text-[10px] font-black uppercase tracking-[0.16em] text-sky-100 transition hover:border-sky-200/60 hover:bg-sky-300/18"
+            >
+              <Copy className="h-4 w-4" />
+              {copiedField === "link" ? "Copied" : "Copy Link"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }

@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "vitest --run --exclude tests/e2e/** --maxWorkers=1",
+    "test": "vitest --run --exclude '**/tests/e2e/**' --maxWorkers=1",
     "test:e2e": "playwright test",
     "format.fix": "prettier --write .",
     "typecheck": "tsc"

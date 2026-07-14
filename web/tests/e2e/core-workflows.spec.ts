@@ -98,6 +98,124 @@ test.describe("critical browser workflows", () => {
     expect(user).toContain("coach@example.com");
   });
 
+  test("signup verifies email link then logs in and opens league access", async ({ page }) => {
+    const unverifiedPayload = {
+      ...mockAuthPayload,
+      access_token: "signup-access-token",
+      user: {
+        ...mockAuthPayload.user,
+        first_name: "Adam",
+        email: "adam@example.com",
+        email_verified_at: null,
+      },
+    };
+    const verifiedUser = {
+      ...unverifiedPayload.user,
+      email_verified_at: "2026-07-10T20:00:00Z",
+    };
+    const verifiedPayload = {
+      ...mockAuthPayload,
+      access_token: "verified-access-token",
+      user: verifiedUser,
+    };
+    let verifyPayload: unknown = null;
+
+    await page.route("**/auth/signup", async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify(unverifiedPayload),
+      });
+    });
+    await page.route("**/auth/verify-email", async (route) => {
+      verifyPayload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          status: "verified",
+          message: "email verified",
+        }),
+      });
+    });
+    await page.route("**/auth/login", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(verifiedPayload),
+      });
+    });
+    await page.route("**/auth/me", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(verifiedUser),
+      });
+    });
+    await page.route("**/notifications/preferences**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          push_enabled: true,
+          email_enabled: true,
+          draft_alerts: true,
+          injury_alerts: true,
+          touchdown_alerts: false,
+          usage_alerts: true,
+          waiver_alerts: true,
+          projection_alerts: true,
+          lineup_reminders: true,
+          quiet_hours_start: null,
+          quiet_hours_end: null,
+        }),
+      });
+    });
+    await page.route("**/leagues?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [], total: 0, limit: 20, offset: 0 }),
+      });
+    });
+
+    await page.goto("/signup");
+    await page.getByPlaceholder("Enter your first name").fill("Adam");
+    await page.getByPlaceholder("coach@saturday.com").fill("adam@example.com");
+    await page.getByPlaceholder("••••••••").fill("StrongPass123!");
+    await page.getByRole("button", { name: /Create Account/i }).click();
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem("cfb_access_token")))
+      .toBe("signup-access-token");
+
+    await page.goto("/verify-email?token=public-token-123");
+    await expect(page.getByRole("heading", { name: /Email Verified/i })).toBeVisible();
+    await expect(page.getByText(/verified\. You can now create and join leagues/i)).toBeVisible();
+    expect(page.url()).not.toContain("public-token-123");
+    expect(verifyPayload).toEqual({ token: "public-token-123" });
+
+    await page.getByRole("button", { name: /SIGN OUT/i }).click();
+    await page.goto("/login");
+    await page.getByPlaceholder("coach@saturday.com").fill("adam@example.com");
+    await page.getByPlaceholder("••••••••").fill("StrongPass123!");
+    await page.getByRole("button", { name: /Sign In to Dashboard/i }).click();
+    await page.waitForURL("**/");
+    const endGuideButton = page.getByRole("button", { name: /End Guide/i });
+    if (await endGuideButton.isVisible().catch(() => false)) {
+      await endGuideButton.click();
+    }
+    await page.evaluate((userId) => {
+      window.localStorage.setItem(`cfb_completed_guide_${userId}`, "true");
+      window.localStorage.removeItem(`cfb_pending_guide_${userId}`);
+    }, verifiedUser.id);
+
+    await page.goto("/leagues");
+    await expect(page.getByRole("heading", { name: /^Leagues$/i })).toBeVisible();
+    const storedUser = await page.evaluate(() => window.localStorage.getItem("cfb_user"));
+    expect(storedUser).toContain("2026-07-10T20:00:00Z");
+  });
+
   test("leagues page renders backend response for authenticated session", async ({ page }) => {
     await seedAuthenticatedSession(page);
 
@@ -765,7 +883,11 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByRole("heading", { name: /^Matchup$/i })).toBeVisible();
     await expect(page.getByText("Codex Team").first()).toBeVisible();
     await expect(page.getByText("Rival Team").first()).toBeVisible();
-    await expect(page.getByText("24.0 - 18.2")).toBeVisible();
+    await expect(page.getByText("24.0 - 18.2")).toHaveCount(0);
+    await expect(page.getByText("My Projection")).toBeVisible();
+    await expect(page.getByText("Their Projection")).toBeVisible();
+    await expect(page.getByText("24.0").first()).toBeVisible();
+    await expect(page.getByText("18.2").first()).toBeVisible();
     await expect(page.getByText("57.3% / 42.7%")).toBeVisible();
     await expect(page.getByText("Arch Manning")).toBeVisible();
     await expect(page.getByText("Rival QB")).toBeVisible();
@@ -777,7 +899,7 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("Rival Team")).toHaveCount(0);
   });
 
-  test("trade builder analyzes selected players but remains preview-only", async ({ page }) => {
+  test("trade builder requires fresh analysis before sending an offer", async ({ page }) => {
     await seedAuthenticatedSession(page);
     await page.addInitScript(() => {
       window.localStorage.setItem("cfb_active_league_id", "1");
@@ -885,7 +1007,7 @@ test.describe("critical browser workflows", () => {
       projected_points: projectedPoints,
       weekly_projected_fantasy_points: projectedPoints,
     });
-    const proposalCalls: string[] = [];
+    let proposalPayload: unknown = null;
     let analyzePayload: unknown = null;
 
     await page.route("**/leagues?**", async (route) => {
@@ -965,22 +1087,49 @@ test.describe("critical browser workflows", () => {
         body: JSON.stringify({ give_value: 24.0, receive_value: 18.0, delta: -6.0, verdict: "Strong Loss" }),
       });
     });
-    await page.route("**/trade/proposals**", async (route) => {
-      proposalCalls.push(route.request().url());
-      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "proposal endpoint should not be called" }) });
-    });
-    await page.route("**/leagues/**/trades**", async (route) => {
-      proposalCalls.push(route.request().url());
-      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "proposal endpoint should not be called" }) });
+    await page.route("**/trade/leagues/1/trades**", async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ data: [], total: 0 }),
+        });
+        return;
+      }
+      proposalPayload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 700,
+          league_id: 1,
+          proposing_team_id: 11,
+          receiving_team_id: 12,
+          created_by_user_id: 42,
+          status: "proposed",
+          message: null,
+          accepted_at: null,
+          process_after: null,
+          processed_at: null,
+          expires_at: null,
+          failure_reason: null,
+          created_at: "2026-07-10T20:00:00Z",
+          updated_at: "2026-07-10T20:00:00Z",
+          items: [],
+          reviews: [],
+        }),
+      });
     });
 
     await page.goto("/trade");
     await expect(page.getByRole("heading", { name: /Trade Builder/i })).toBeVisible();
     await expect(page.getByText("Codex Team").first()).toBeVisible();
     await expect(page.getByText("Rival Team").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /Send Trade Offer/i })).toBeDisabled();
 
     await page.getByRole("button", { name: /Arch Manning/i }).click();
     await page.getByRole("button", { name: /Rival QB/i }).click();
+    await expect(page.getByRole("button", { name: /Send Trade Offer/i })).toBeDisabled();
     await page.getByRole("button", { name: /Analyze Trade/i }).click();
 
     await expect(page.getByText("Strong Loss")).toBeVisible();
@@ -993,10 +1142,15 @@ test.describe("critical browser workflows", () => {
       league_size: 2,
     });
 
-    await expect(page.getByText(/Preview only\. Sending requires the backend proposal workflow/i)).toBeVisible();
-    await expect(page.getByRole("button", { name: /^Preview Only$/i })).toBeDisabled();
-    await expect(page.getByRole("button", { name: /Send Trade/i })).toHaveCount(0);
-    expect(proposalCalls).toEqual([]);
+    await expect(page.getByText(/Sending is locked until the current offer has a fresh analysis/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /Send Trade Offer/i })).toBeEnabled();
+    await page.getByRole("button", { name: /Send Trade Offer/i }).click();
+    expect(proposalPayload).toMatchObject({
+      proposing_team_id: 11,
+      receiving_team_id: 12,
+      give_items: [{ team_id: 11, player_id: 201 }],
+      receive_items: [{ team_id: 12, player_id: 301 }],
+    });
   });
 
   test("single-player mock draft stays local and resets without real roster mutation", async ({ page }) => {
@@ -1009,7 +1163,7 @@ test.describe("critical browser workflows", () => {
       const position = positions[index % positions.length];
       return {
         id: rank,
-        name: `Mock ${position} ${String(rank).padStart(3, "0")}`,
+        name: rank === 122 ? "Jeremiah Smith" : `Mock ${position} ${String(rank).padStart(3, "0")}`,
         position,
         school: `Mock School ${rank}`,
         image_url: null,
@@ -1018,6 +1172,7 @@ test.describe("critical browser workflows", () => {
         sheet_projected_season_points: 300 - rank,
       };
     });
+    const playerRequests: Array<{ limit: number; offset: number }> = [];
 
     await page.route("**/leagues/**/draft-picks", async (route) => {
       blockedMutations.push(route.request().url());
@@ -1047,6 +1202,15 @@ test.describe("critical browser workflows", () => {
       const url = new URL(route.request().url());
       const offset = Number(url.searchParams.get("offset") ?? 0);
       const limit = Number(url.searchParams.get("limit") ?? 100);
+      playerRequests.push({ limit, offset });
+      if (limit > 100) {
+        await route.fulfill({
+          status: 422,
+          contentType: "application/json",
+          body: JSON.stringify({ detail: "limit must be less than or equal to 100" }),
+        });
+        return;
+      }
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -1061,6 +1225,15 @@ test.describe("critical browser workflows", () => {
 
     await page.goto("/draft/mock/single-player?new=1&teams=8&timer=15");
     await expect(page.getByText(/Draft is about to begin/i)).toBeVisible();
+    await expect(page.getByText(/Unable to load players/i)).toHaveCount(0);
+    await expect(page.getByText("Jeremiah Smith")).toBeVisible();
+    expect(playerRequests.some((request) => request.limit > 100)).toBe(false);
+    expect(playerRequests).toEqual(
+      expect.arrayContaining([
+        { limit: 100, offset: 0 },
+        { limit: 100, offset: 100 },
+      ])
+    );
 
     await expect
       .poll(

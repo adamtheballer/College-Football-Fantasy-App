@@ -123,11 +123,16 @@ const toTradeRowsFromLeagueRoster = (entries: LeagueRosterPlayer[] | undefined):
   return entries
     .filter((entry) => {
       const position = (entry.player_position ?? entry.position ?? "").toUpperCase();
-      return OFFENSE_POSITIONS.has(position);
+      return (
+        entry.player_id !== null &&
+        entry.player_id !== undefined &&
+        !entry.is_placeholder &&
+        OFFENSE_POSITIONS.has(position)
+      );
     })
     .map((entry) => ({
       rosterEntryId: entry.id,
-      playerId: entry.player_id,
+      playerId: entry.player_id as number,
       teamId: entry.fantasy_team_id ?? entry.team_id ?? 0,
       teamName: entry.fantasy_team_name,
       name: entry.player_name,
@@ -430,6 +435,18 @@ export default function Trade() {
     const parsedPlayerId =
       playerIdParam && /^\d+$/.test(playerIdParam) ? Number(playerIdParam) : null;
     if (!parsedPlayerId) return;
+    const leagueRosterTarget = allLeagueRosterRows.find((row) => row.playerId === parsedPlayerId);
+    if (
+      leagueRosterTarget &&
+      leagueRosterTarget.teamId !== ownedTeamId &&
+      opponentTeams.some((team) => team.id === leagueRosterTarget.teamId)
+    ) {
+      setOpponentTeamId(leagueRosterTarget.teamId);
+      setReceiveIds((current) =>
+        current.includes(parsedPlayerId) ? current : [...current, parsedPlayerId]
+      );
+      return;
+    }
     if (targetTeamId && targetTeamId === ownedTeamId && resolvedMyRows.some((row) => row.playerId === parsedPlayerId)) {
       setGiveIds((current) =>
         current.includes(parsedPlayerId) ? current : [...current, parsedPlayerId]
@@ -447,7 +464,7 @@ export default function Trade() {
         current.includes(parsedPlayerId) ? current : [...current, parsedPlayerId]
       );
     }
-  }, [resolvedMyRows, ownedTeamId, playerIdParam, targetTeamId, theirRows]);
+  }, [allLeagueRosterRows, opponentTeams, resolvedMyRows, ownedTeamId, playerIdParam, targetTeamId, theirRows]);
 
   useEffect(() => {
     setAnalysis(null);

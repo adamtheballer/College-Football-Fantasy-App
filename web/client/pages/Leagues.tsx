@@ -1,3 +1,4 @@
+import { type MouseEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Trophy,
@@ -8,6 +9,8 @@ import {
   Lock,
   Globe2,
   Users,
+  Copy,
+  Link2,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -26,6 +29,7 @@ const LeagueCard = ({
   draftLabel,
   isPrivate,
   draftStatus,
+  inviteCode,
   onOpen,
   onOpenDraft,
 }: {
@@ -37,10 +41,35 @@ const LeagueCard = ({
   draftLabel: string;
   isPrivate: boolean;
   draftStatus: string;
+  inviteCode?: string | null;
   onOpen: (leagueId: number) => void;
   onOpenDraft: (leagueId: number, draftStatus: string) => void;
 }) => {
+  const [copiedInviteField, setCopiedInviteField] = useState<"code" | "link" | null>(null);
   const openLeague = () => onOpen(id);
+  const normalizedDraftStatus = (draftStatus || "").toLowerCase();
+  const normalizedLeagueStatus = (status || "").toLowerCase();
+  const completeStatuses = ["completed", "complete", "draft_completed", "final", "closed", "post_draft"];
+  const inviteShouldBeVisible =
+    Boolean(inviteCode) &&
+    !completeStatuses.includes(normalizedDraftStatus) &&
+    !completeStatuses.includes(normalizedLeagueStatus);
+  const inviteLink =
+    inviteCode && typeof window !== "undefined"
+      ? `${window.location.origin}/join/${inviteCode}`
+      : null;
+
+  const copyInviteValue = async (
+    event: MouseEvent<HTMLButtonElement>,
+    field: "code" | "link",
+    value?: string | null
+  ) => {
+    event.stopPropagation();
+    if (!value) return;
+    await navigator.clipboard.writeText(value);
+    setCopiedInviteField(field);
+    window.setTimeout(() => setCopiedInviteField(null), 1600);
+  };
 
   return (
     <Card
@@ -73,15 +102,48 @@ const LeagueCard = ({
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/70">
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
-              <Users className="w-3 h-3 text-primary" />
-              {memberCount}/{teams} members
-            </span>
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
-              {isPrivate ? <Lock className="w-3 h-3 text-primary" /> : <Globe2 className="w-3 h-3 text-primary" />}
-              {isPrivate ? "Private" : "Public"}
-            </span>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/70">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
+                <Users className="w-3 h-3 text-primary" />
+                {memberCount}/{teams} members
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
+                {isPrivate ? <Lock className="w-3 h-3 text-primary" /> : <Globe2 className="w-3 h-3 text-primary" />}
+                {isPrivate ? "Private" : "Public"}
+              </span>
+            </div>
+            {inviteShouldBeVisible ? (
+              <div
+                className="max-w-md rounded-2xl border border-sky-300/20 bg-sky-300/10 p-3"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-sky-200/80">
+                  Invite stays here until the draft is complete
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs font-black tracking-[0.08em] text-slate-50">
+                    {inviteCode}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(event) => copyInviteValue(event, "code", inviteCode)}
+                    className="inline-flex h-9 items-center gap-2 rounded-xl border border-sky-300/25 bg-sky-300/15 px-3 text-[9px] font-black uppercase tracking-[0.14em] text-sky-100 transition hover:border-sky-200/60 hover:bg-sky-300/20"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {copiedInviteField === "code" ? "Copied" : "Code"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => copyInviteValue(event, "link", inviteLink)}
+                    className="inline-flex h-9 items-center gap-2 rounded-xl border border-emerald-300/25 bg-emerald-300/12 px-3 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-300/18"
+                  >
+                    <Link2 className="h-3.5 w-3.5" />
+                    {copiedInviteField === "link" ? "Copied" : "Link"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -144,10 +206,10 @@ export default function Leagues() {
       : leagueRows;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-1000 relative z-10 pb-20">
-      <div className="space-y-6 pt-12 relative">
+    <div className="relative z-10 mx-auto max-w-6xl space-y-12 pb-20 pt-1 animate-in fade-in duration-1000">
+      <div className="relative space-y-6 pt-10">
         <div className="flex items-center justify-between">
-          <h1 className="text-6xl font-black tracking-tight text-foreground uppercase italic bg-gradient-to-br from-white via-white to-primary/40 bg-clip-text text-transparent">
+          <h1 className="py-1 font-display text-6xl font-black uppercase italic leading-[1.08] tracking-[-0.045em] text-foreground bg-gradient-to-br from-white via-white to-primary/40 bg-clip-text text-transparent">
             Leagues
           </h1>
           {isLoggedIn && (
@@ -208,6 +270,7 @@ export default function Leagues() {
               }
               isPrivate={league.is_private}
               draftStatus={league.draft?.status || "none"}
+              inviteCode={league.invite_code}
               onOpen={(leagueId) => {
                 setActiveLeagueId(leagueId);
                 navigate(`/league/${leagueId}/roster`);

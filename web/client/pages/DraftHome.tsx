@@ -32,10 +32,10 @@ const OptionButton = ({
     onClick={onClick}
     className={cn(
       "h-12 rounded-2xl border px-5 text-[11px] font-black uppercase tracking-[0.18em] transition",
-      "hover:-translate-y-0.5 hover:border-cyan-200/45 hover:bg-cyan-300/10 hover:shadow-[0_0_26px_rgba(56,189,248,0.16)]",
+      "hover:-translate-y-0.5 hover:border-cfb-brand/45 hover:bg-cfb-brand/10 hover:shadow-[0_0_26px_hsl(var(--brand-primary)/0.16)]",
       active
-        ? "border-cyan-200/70 bg-cyan-300/18 text-cyan-50 shadow-[0_0_34px_rgba(56,189,248,0.22)]"
-        : "border-white/10 bg-white/[0.045] text-slate-300"
+        ? "border-cfb-brand/70 bg-cfb-brand/20 text-blue-50 shadow-[0_0_34px_hsl(var(--brand-primary)/0.22)]"
+        : "border-cfb-border-subtle bg-cfb-surface/70 text-cfb-text-secondary"
     )}
   >
     {children}
@@ -67,19 +67,19 @@ export default function DraftHome() {
 
       <header className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-3">
-          <p className="text-[11px] font-black uppercase tracking-[0.32em] text-cyan-200">
+          <p className="cfb-micro-label text-cfb-brand">
             Draft Center
           </p>
-          <h1 className="text-5xl font-black italic tracking-[-0.045em] text-white md:text-7xl">
+          <h1 className="cfb-display-title text-5xl md:text-7xl">
             Draft
           </h1>
-          <p className="max-w-3xl text-base font-semibold leading-7 text-slate-300">
+          <p className="max-w-3xl text-base font-semibold leading-7 text-cfb-text-secondary">
             Practice in a local-only single-player mock, preview league drafts, and enter the real draft room only when a league draft is ready.
           </p>
         </div>
         <Button
           asChild
-          className="h-14 w-fit rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 px-7 text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-[0_18px_42px_rgba(56,189,248,0.22)] hover:from-cyan-200 hover:to-blue-400"
+          className="h-14 w-fit rounded-2xl bg-gradient-to-r from-cfb-cyan to-cfb-brand px-7 text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-[0_18px_42px_hsl(var(--brand-primary)/0.22)] hover:brightness-110"
         >
           <Link to={mockDraftUrl}>
             <Bot className="mr-3 h-5 w-5" />
@@ -89,23 +89,23 @@ export default function DraftHome() {
       </header>
 
       <div className="relative grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card className="overflow-hidden rounded-[2rem] border border-cyan-200/16 bg-[linear-gradient(135deg,rgba(15,23,42,0.88),rgba(8,47,73,0.42),rgba(15,23,42,0.9))] shadow-[0_0_70px_rgba(14,165,233,0.12)]">
+        <Card className="cfb-playbook-pattern overflow-hidden rounded-[2rem] border border-cfb-border-subtle bg-cfb-surface-raised/90 shadow-[0_0_70px_hsl(var(--brand-primary)/0.12)]">
           <CardContent className="space-y-7 p-6 md:p-8">
             <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-cyan-200/25 bg-cyan-300/12 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.16)]">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-cfb-brand/30 bg-cfb-brand/15 text-blue-100 shadow-[0_0_24px_hsl(var(--brand-primary)/0.16)]">
                 <Trophy className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-200">Mock Draft Setup</p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-white">Tune the room before you enter</h2>
-                <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-300">
+                <p className="cfb-micro-label text-cfb-brand">Mock Draft Setup</p>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-cfb-text-primary">Tune the room before you enter</h2>
+                <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-cfb-text-secondary">
                   These settings apply to the next new single-player mock. Mock drafts run in this browser only and are not saved to the backend.
                 </p>
               </div>
             </div>
 
             <div className="grid gap-5">
-              <section className="rounded-[1.5rem] border border-white/10 bg-slate-950/40 p-5">
+              <section className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface/70 p-5">
                 <div className="mb-4 flex items-center gap-3">
                   <Users className="h-4 w-4 text-cyan-200" />
                   <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-300">League Size</p>
@@ -119,7 +119,7 @@ export default function DraftHome() {
                 </div>
               </section>
 
-              <section className="rounded-[1.5rem] border border-white/10 bg-slate-950/40 p-5">
+              <section className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface/70 p-5">
                 <div className="mb-4 flex items-center gap-3">
                   <Clock3 className="h-4 w-4 text-cyan-200" />
                   <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-300">Pick Time Limit</p>
@@ -133,7 +133,7 @@ export default function DraftHome() {
                 </div>
               </section>
 
-              <section className="rounded-[1.5rem] border border-cyan-200/16 bg-cyan-300/[0.055] p-5">
+              <section className="rounded-[1.5rem] border border-cfb-brand/25 bg-cfb-brand/[0.07] p-5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200">Roster-Fill Rounds</p>
@@ -151,7 +151,7 @@ export default function DraftHome() {
         </Card>
 
         <div className="space-y-6">
-          <Card className="overflow-hidden rounded-[2rem] border border-sky-300/16 bg-card/55 shadow-[0_30px_70px_rgba(14,165,233,0.08)]">
+          <Card className="overflow-hidden rounded-[2rem] border border-cfb-border-subtle bg-cfb-surface-raised/85 shadow-[0_30px_70px_rgba(2,6,23,0.22)]">
             <CardContent className="space-y-5 p-6 md:p-8">
               <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.32em] text-cyan-200">
                 <ShieldCheck className="h-4 w-4" />
@@ -166,7 +166,7 @@ export default function DraftHome() {
             </CardContent>
           </Card>
 
-          <Card className="overflow-hidden rounded-[2rem] border border-sky-300/16 bg-card/55 shadow-[0_30px_70px_rgba(14,165,233,0.08)]">
+          <Card className="overflow-hidden rounded-[2rem] border border-cfb-border-subtle bg-cfb-surface-raised/85 shadow-[0_30px_70px_rgba(2,6,23,0.22)]">
             <CardContent className="space-y-5 p-6 md:p-8">
               <div className="flex items-center justify-between gap-4">
                 <p className="text-[10px] font-black uppercase tracking-[0.32em] text-cyan-200">

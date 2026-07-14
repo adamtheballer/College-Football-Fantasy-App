@@ -7,12 +7,14 @@ from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.base import Base
 from collegefootballfantasy_api.app.models import (
     cfb_standing_snapshot,
+    college_team,
     defense_rating,
     defense_vs_position,
     draft,
     draft_pick,
     game,
     game_odds,
+    historical_stats,
     injury,
     injury_impact,
     league,
@@ -31,11 +33,13 @@ from collegefootballfantasy_api.app.models import (
     player_week_score,
     preseason_prior,
     provider_sync_state,
+    provider_identity,
     projection_explanation,
     projection_input_audit,
     refresh_session,
     roster,
     scheduled_notification,
+    scoring_admin_audit,
     scoring_run,
     standing,
     team,
@@ -48,6 +52,9 @@ from collegefootballfantasy_api.app.models import (
     trade_review,
     user,
     usage_share,
+    waiver_claim,
+    waiver_claim_audit,
+    waiver_priority,
     weekly_projection,
 )
 

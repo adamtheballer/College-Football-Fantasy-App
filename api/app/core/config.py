@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     sportsdata_api_key: str | None = None
     sportsdata_base_url: str = "https://api.sportsdata.io/v3/cfb"
     sportsdataio_api_key: str | None = None
+    scoring_provider: str = "sportsdata"
+    scoring_allow_unofficial_providers: bool = False
+    scoring_worker_interval_live_seconds: int = 60
+    scoring_worker_interval_postgame_seconds: int = 900
+    scoring_worker_interval_correction_seconds: int = 3600
+    scoring_worker_retry_max_attempts: int = 3
+    scoring_worker_retry_base_seconds: int = 5
+    scoring_dead_letter_after_failures: int = 3
+    provider_unmatched_failure_threshold_percent: float = 10.0
     projection_provider: str = "sportsdataio"
     sportsdata_enabled: bool = True
     sportsdata_player_stats_path: str = "stats/json/Player/{external_id}"
@@ -48,6 +57,19 @@ class Settings(BaseSettings):
     sportsdata_standings_ttl_days: int = 30
     sportsdata_injury_ttl_days: int = 30
     provider_default_cache_ttl_days: int = 30
+    historical_stats_provider: str = "espn"
+    espn_historical_stats_enabled: bool = False
+    espn_historical_stats_base_url: str = (
+        "https://site.web.api.espn.com/apis/common/v3/sports/football/college-football"
+    )
+    espn_historical_stats_timeout_seconds: int = 10
+    espn_historical_stats_max_retries: int = 3
+    espn_historical_stats_requests_per_second: float = 1.0
+    espn_historical_stats_cache_ttl_days: int = 30
+    espn_historical_stats_seasons_back: int = 4
+    espn_historical_stats_user_agent: str = "CollegeFootballFantasy/0.1 historical-stats"
+    espn_historical_stats_fail_open: bool = True
+    player_card_historical_stats_enabled: bool = True
     fantasy_scoring_rules_json: str | None = None
     jwt_secret_key: str = DEFAULT_JWT_SECRET_KEY
     jwt_access_token_ttl_minutes: int = 15
@@ -75,6 +97,11 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_from_email: str | None = None
     smtp_use_tls: bool = True
+    support_email: str | None = None
+    privacy_policy_url: str | None = None
+    terms_url: str | None = None
+    provider_disclosure_url: str | None = None
+    security_headers_enabled: bool = True
 
     model_config = SettingsConfigDict(
         env_file=(str(PROJECT_ROOT / ".env"), ".env"),
@@ -131,10 +158,31 @@ class Settings(BaseSettings):
         if not self.refresh_cookie_secure:
             raise ValueError("REFRESH_COOKIE_SECURE must be true when ENVIRONMENT=production")
 
+        if self.email_delivery_mode.strip().lower() == "console":
+            raise ValueError("EMAIL_DELIVERY_MODE cannot be console when ENVIRONMENT=production")
+
         if self.email_delivery_mode.strip().lower() == "smtp" and (
             not self.smtp_host or not self.smtp_from_email
         ):
             raise ValueError("SMTP_HOST and SMTP_FROM_EMAIL are required when ENVIRONMENT=production")
+
+        if not self.support_email:
+            raise ValueError("SUPPORT_EMAIL is required when ENVIRONMENT=production")
+
+        if not self.privacy_policy_url:
+            raise ValueError("PRIVACY_POLICY_URL is required when ENVIRONMENT=production")
+
+        if not self.terms_url:
+            raise ValueError("TERMS_URL is required when ENVIRONMENT=production")
+
+        if not self.provider_disclosure_url:
+            raise ValueError("PROVIDER_DISCLOSURE_URL is required when ENVIRONMENT=production")
+
+        if self.scoring_provider.strip().lower() in {"espn", "cache", "mock"} and not self.scoring_allow_unofficial_providers:
+            raise ValueError("Unofficial SCORING_PROVIDER requires SCORING_ALLOW_UNOFFICIAL_PROVIDERS=true")
+
+        if self.scoring_worker_interval_live_seconds < 30:
+            raise ValueError("SCORING_WORKER_INTERVAL_LIVE_SECONDS must be at least 30 in production")
 
         return self
 

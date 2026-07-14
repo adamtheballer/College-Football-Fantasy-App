@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api";
 import type { Player } from "@/types/player";
 
+export const PLAYER_API_MAX_LIMIT = 100;
+
 type BackendPlayerRead = {
   id: number;
   name: string;
@@ -114,6 +116,43 @@ export type PlayerCardResponse = {
     stats: Record<string, unknown>;
     updated_at: string;
   }>;
+  historical_stats?: {
+    player_id: number;
+    provider: string;
+    status: "available" | "not_available" | "disabled" | "no_provider_mapping" | "provider_unavailable";
+    message?: string | null;
+    selected_season?: number | null;
+    available_seasons: number[];
+    seasons: Array<{
+      season: number;
+      season_type: string;
+      team_name?: string | null;
+      position?: string | null;
+      games_played?: number | null;
+      games_started?: number | null;
+      summary: Array<{ label: string; value: number | string | null }>;
+      categories: Array<{
+        key: string;
+        label: string;
+        stats: Array<{ label: string; value: number | string | null }>;
+      }>;
+      freshness: {
+        provider: string;
+        provider_player_id?: string | null;
+        imported_at?: string | null;
+        provider_updated_at?: string | null;
+        parser_version?: string | null;
+        source_response_hash?: string | null;
+        is_final: boolean;
+      };
+      scoring_context: {
+        scoring_rules_version?: string | null;
+        fantasy_points?: number | null;
+        fantasy_points_per_game?: number | null;
+      };
+      unknown_labels?: Record<string, unknown> | null;
+    }>;
+  } | null;
 };
 
 const VALID_STATUSES = new Set(["HEALTHY", "OUT", "QUESTIONABLE", "DOUBTFUL", "IR"]);
@@ -315,6 +354,9 @@ export function useDraftPlayerPool(
     limit?: number;
     offset?: number;
     pages?: number;
+    fetchAll?: boolean;
+    maxPages?: number;
+    enabled?: boolean;
   } = {}
 ) {
   const {
@@ -327,7 +369,12 @@ export function useDraftPlayerPool(
     limit = 100,
     offset = 0,
     pages = 1,
+    fetchAll = false,
+    maxPages = 50,
+    enabled = true,
   } = params;
+
+  const backendLimit = getDraftPlayerPoolBackendLimit(limit);
 
   return useQuery({
     queryKey: [
@@ -342,8 +389,12 @@ export function useDraftPlayerPool(
         limit,
         offset,
         pages,
+        fetchAll: fetchAll ? "true" : "false",
+        maxPages,
+        enabled: enabled ? "true" : "false",
       },
     ],
+    enabled,
     staleTime: 15_000,
     queryFn: async () => {
       const fetchPage = (pageOffset: number) =>
@@ -354,7 +405,7 @@ export function useDraftPlayerPool(
           league_id,
           available_only,
           sort,
-          limit,
+          limit: backendLimit,
           offset: pageOffset,
         });
 
@@ -369,8 +420,16 @@ export function useDraftPlayerPool(
           })
         ),
       ]);
-      const pageCount = Math.max(1, pages);
-      const remainingOffsets = Array.from({ length: pageCount - 1 }, (_, index) => offset + limit * (index + 1));
+      const pageOffsets = getDraftPlayerPoolPageOffsets({
+        fetchAll,
+        limit: backendLimit,
+        maxPages,
+        offset,
+        pages,
+        total: firstPayload.total,
+      });
+      const pageCount = pageOffsets.length;
+      const remainingOffsets = pageOffsets.slice(1);
       const remainingPayloads = remainingOffsets.length
         ? await Promise.all(remainingOffsets.map((pageOffset) => fetchPage(pageOffset)))
         : [];
@@ -381,7 +440,7 @@ export function useDraftPlayerPool(
 
       return {
         ...firstPayload,
-        limit: limit * pageCount,
+        limit: backendLimit * pageCount,
         data: rows.map((player) =>
           normalizePlayer(player, {
             conference: conferenceBySchool.get(player.school.toUpperCase()) ?? "N/A",
@@ -393,6 +452,42 @@ export function useDraftPlayerPool(
       };
     },
   });
+}
+
+export function getDraftPlayerPoolBackendLimit(limit: number) {
+  const safeLimit = Math.max(1, Math.floor(limit));
+  return Math.min(PLAYER_API_MAX_LIMIT, safeLimit);
+}
+
+export function getDraftPlayerPoolPageOffsets({
+  fetchAll = false,
+  limit,
+  maxPages = 50,
+  offset = 0,
+  pages = 1,
+  total,
+}: {
+  fetchAll?: boolean;
+  limit: number;
+  maxPages?: number;
+  offset?: number;
+  pages?: number;
+  total?: number;
+}) {
+  const safeLimit = Math.max(1, Math.floor(limit));
+  const safeOffset = Math.max(0, Math.floor(offset));
+  const safeMaxPages = Math.max(1, Math.floor(maxPages));
+  const requestedPages = Math.max(1, Math.floor(pages));
+  const totalRows =
+    typeof total === "number" && Number.isFinite(total) && total > safeOffset
+      ? Math.floor(total)
+      : safeOffset + safeLimit;
+  const rowsAfterOffset = Math.max(1, totalRows - safeOffset);
+  const pageCount = fetchAll
+    ? Math.min(safeMaxPages, Math.ceil(rowsAfterOffset / safeLimit))
+    : requestedPages;
+
+  return Array.from({ length: pageCount }, (_, index) => safeOffset + safeLimit * index);
 }
 
 export function usePlayerDetail(playerId?: number | null, enabled = true) {

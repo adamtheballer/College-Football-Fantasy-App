@@ -18,6 +18,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const PasswordResetConfirm = lazy(() => import("./pages/PasswordResetConfirm"));
 const CreateLeague = lazy(() => import("./pages/CreateLeague"));
 const JoinLeague = lazy(() => import("./pages/JoinLeague"));
 const LeagueMatchup = lazy(() => import("./pages/LeagueMatchup"));
@@ -31,10 +32,11 @@ const Draft = lazy(() => import("./pages/Draft"));
 const SinglePlayerMockDraftRoom = lazy(() => import("./pages/SinglePlayerMockDraftRoom"));
 const Rosters = lazy(() => import("./pages/Rosters"));
 const Alerts = lazy(() => import("./pages/Alerts"));
-const Stats = lazy(() => import("./pages/Stats"));
+const PlayerCompare = lazy(() => import("./pages/PlayerCompare"));
 const Chats = lazy(() => import("./pages/Chats"));
 const InjuryCenter = lazy(() => import("./pages/InjuryCenter"));
 const Trade = lazy(() => import("./pages/Trade"));
+const AdminScoring = lazy(() => import("./pages/AdminScoring"));
 
 const NON_RETRYABLE_STATUSES = new Set([401, 403, 404]);
 
@@ -102,19 +104,11 @@ const App = () => (
                 />
                 <Route
                   path="/draft"
-                  element={
-                    <ProtectedRoute>
-                      <DraftHome />
-                    </ProtectedRoute>
-                  }
+                  element={<DraftHome />}
                 />
                 <Route
                   path="/draft/mock/single-player"
-                  element={
-                    <ProtectedRoute>
-                      <SinglePlayerMockDraftRoom />
-                    </ProtectedRoute>
-                  }
+                  element={<SinglePlayerMockDraftRoom />}
                 />
                 <Route
                   path="/league/:leagueId"
@@ -189,11 +183,14 @@ const App = () => (
                 <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
                 <Route path="/trade" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
                 <Route path="/trade/:leagueId/:playerId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
-                <Route path="/stats" element={<Stats />} />
-                <Route path="/stats/players" element={<Stats />} />
+                <Route path="/admin/scoring" element={<ProtectedRoute><AdminScoring /></ProtectedRoute>} />
+                <Route path="/player-compare" element={<PlayerCompare />} />
+                <Route path="/stats" element={<Navigate to="/player-compare" replace />} />
+                <Route path="/stats/players" element={<Navigate to="/player-compare" replace />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/password-reset/confirm" element={<PasswordResetConfirm />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

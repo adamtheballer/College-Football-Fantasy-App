@@ -125,13 +125,12 @@ def consume_auth_action_token(db: Session, *, token_type: str, token: str) -> Au
         .filter(AuthActionToken.token_type == token_type, AuthActionToken.token_hash == hash_token(token))
         .first()
     )
-    if (
-        not token_row
-        or token_row.consumed_at is not None
-        or ensure_aware(token_row.expires_at) is None
-        or ensure_aware(token_row.expires_at) <= now
-    ):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid or expired token")
+    if not token_row:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid token")
+    if token_row.consumed_at is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="token already used")
+    if ensure_aware(token_row.expires_at) is None or ensure_aware(token_row.expires_at) <= now:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="expired token")
     token_row.consumed_at = now
     db.add(token_row)
     db.flush()

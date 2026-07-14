@@ -5,6 +5,7 @@ import pytest
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
@@ -13,6 +14,7 @@ from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.league_schedule import ensure_league_schedule
+from collegefootballfantasy_api.app.services.scoring_service import normalize_scoring_rules
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -87,6 +89,36 @@ def test_create_and_list_leagues(client):
     assert data["data"][0]["draft"]["draft_type"] == "snake"
 
 
+def test_scoring_rules_normalize_create_form_aliases():
+    rules = normalize_scoring_rules(
+        {
+            "ppr": 1,
+            "pass_td": 4,
+            "pass_yds_per_pt": 25,
+            "rush_yds_per_pt": 10,
+            "rec_yds_per_pt": 10,
+            "rush_td": 6,
+            "rec_td": 6,
+            "int": -2,
+            "fumble_lost": -2,
+            "fg": 3,
+            "xp": 1,
+        }
+    )
+
+    assert rules["receptions"] == 1
+    assert rules["pass_tds"] == 4
+    assert rules["pass_yards"] == pytest.approx(0.04)
+    assert rules["rush_yards"] == pytest.approx(0.1)
+    assert rules["rec_yards"] == pytest.approx(0.1)
+    assert rules["rush_tds"] == 6
+    assert rules["rec_tds"] == 6
+    assert rules["interceptions"] == -2
+    assert rules["fumbles_lost"] == -2
+    assert rules["fg_made_0_39"] == 3
+    assert rules["xp_made"] == 1
+
+
 def test_create_league_persists_custom_roster_format_and_flags(client):
     token = create_user_and_token(client, "custom-format")
     payload = {
@@ -147,6 +179,103 @@ def test_create_league_persists_custom_roster_format_and_flags(client):
     assert settings["playoff_teams"] == 6
     assert settings["waiver_type"] == "rolling"
     assert settings["trade_review_type"] == "league_vote"
+
+
+def test_create_league_accepts_create_form_scoring_keys(client):
+    token = create_user_and_token(client, "create-form-scoring")
+    payload = {
+        "basics": {
+            "name": "Create Form Scoring League",
+            "season_year": 2026,
+            "max_teams": 4,
+            "is_private": True,
+            "description": None,
+            "icon_url": None,
+        },
+        "settings": {
+            "scoring_json": {
+                "ppr": 1,
+                "pass_td": 4,
+                "pass_yds_per_pt": 25,
+                "rush_yds_per_pt": 10,
+                "rec_yds_per_pt": 10,
+                "rush_td": 6,
+                "rec_td": 6,
+                "int": -2,
+                "fumble_lost": -2,
+                "fg": 3,
+                "xp": 1,
+            },
+            "roster_slots_json": {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 1, "K": 1, "BENCH": 5},
+            "playoff_teams": 4,
+            "waiver_type": "faab",
+            "trade_review_type": "commissioner",
+            "superflex_enabled": False,
+            "kicker_enabled": True,
+            "defense_enabled": False,
+        },
+        "draft": {
+            "draft_datetime_utc": "2026-08-19T18:00:00Z",
+            "timezone": "America/New_York",
+            "draft_type": "snake",
+            "pick_timer_seconds": 90,
+        },
+    }
+
+    response = client.post("/leagues", json=payload, headers=auth_headers(token))
+
+    assert response.status_code == 201
+    scoring = response.json()["league"]["settings"]["scoring_json"]
+    assert scoring["receptions"] == 1
+    assert scoring["pass_tds"] == 4
+    assert scoring["pass_yards"] == pytest.approx(0.04)
+    assert scoring["rush_yards"] == pytest.approx(0.1)
+    assert scoring["rec_yards"] == pytest.approx(0.1)
+    assert scoring["rush_tds"] == 6
+    assert scoring["rec_tds"] == 6
+    assert scoring["interceptions"] == -2
+    assert scoring["fumbles_lost"] == -2
+    assert scoring["fg_made_0_39"] == 3
+    assert scoring["xp_made"] == 1
+    assert "pass_yds_per_pt" not in scoring
+    assert "rush_yds_per_pt" not in scoring
+    assert "rec_yds_per_pt" not in scoring
+
+
+def test_create_league_rejects_unknown_scoring_keys(client):
+    token = create_user_and_token(client, "bad-scoring")
+    payload = {
+        "basics": {
+            "name": "Bad Scoring League",
+            "season_year": 2026,
+            "max_teams": 4,
+            "is_private": True,
+            "description": None,
+            "icon_url": None,
+        },
+        "settings": {
+            "scoring_json": {"ppr": 1, "passing_bonus": 3},
+            "roster_slots_json": {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 1, "K": 1, "BENCH": 5},
+            "playoff_teams": 4,
+            "waiver_type": "faab",
+            "trade_review_type": "commissioner",
+            "superflex_enabled": False,
+            "kicker_enabled": True,
+            "defense_enabled": False,
+        },
+        "draft": {
+            "draft_datetime_utc": "2026-08-19T18:00:00Z",
+            "timezone": "America/New_York",
+            "draft_type": "snake",
+            "pick_timer_seconds": 90,
+        },
+    }
+
+    response = client.post("/leagues", json=payload, headers=auth_headers(token))
+
+    assert response.status_code == 422
+    assert "unknown scoring keys" in response.json()["detail"]
+    assert "passing_bonus" in response.json()["detail"]
 
 
 def test_create_league_rejects_odd_manager_count(client):
@@ -276,6 +405,57 @@ def test_create_invite_join_assigns_one_team_per_user_and_enforces_max_teams(cli
     assert db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id == owner.id).count() == 1
     assert db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id == member.id).count() == 1
     assert db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id == third.id).count() == 0
+
+
+def test_commissioner_settings_show_active_invite_until_draft_completion(client, db_session):
+    owner_token = create_user_and_token(client, "settings-invite-owner")
+    create_response = client.post(
+        "/leagues",
+        json={
+            "basics": {
+                "name": "Settings Invite League",
+                "season_year": 2026,
+                "max_teams": 4,
+                "is_private": True,
+                "description": "Invite settings league",
+                "icon_url": None,
+            },
+            "settings": {
+                "scoring_json": {"ppr": 1},
+                "roster_slots_json": {"QB": 1},
+                "playoff_teams": 2,
+                "waiver_type": "faab",
+                "trade_review_type": "commissioner",
+                "superflex_enabled": False,
+                "kicker_enabled": True,
+                "defense_enabled": False,
+            },
+            "draft": {
+                "draft_datetime_utc": "2026-08-19T18:00:00Z",
+                "timezone": "America/New_York",
+                "draft_type": "snake",
+                "pick_timer_seconds": 90,
+            },
+        },
+        headers=auth_headers(owner_token),
+    )
+    assert create_response.status_code == 201
+    created = create_response.json()
+    league_id = created["league"]["id"]
+    invite_code = created["invite_code"]
+
+    league_row = db_session.get(League, league_id)
+    assert league_row is not None
+    league_row.invite_code = None
+    db_session.commit()
+    assert db_session.query(LeagueInvite).filter(LeagueInvite.league_id == league_id, LeagueInvite.code == invite_code).count() == 1
+
+    settings_response = client.get(f"/leagues/{league_id}/settings-view", headers=auth_headers(owner_token))
+    assert settings_response.status_code == 200
+    invite = settings_response.json()["invite"]
+    assert invite["code"] == invite_code
+    assert invite["link"].endswith(f"/join/{invite_code}")
+    assert invite["visible_until_draft_complete"] is True
 
 
 def test_update_league_settings_persists_custom_roster_format_and_flags(client):

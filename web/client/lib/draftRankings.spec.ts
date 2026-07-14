@@ -124,6 +124,31 @@ describe("buildDraftBoard", () => {
     expect(board.map((player) => player.masterDraftRank)).toEqual([1, 2]);
   });
 
+  it("keeps valid draft players even when conference mapping is missing", () => {
+    const board = buildDraftBoard(
+      [
+        makePlayer(1, "WR", 300, {
+          name: "Jeremiah Smith",
+          school: "Ohio State",
+          conf: "N/A",
+          rank: 1,
+          adp: 1,
+        }),
+        makePlayer(2, "QB", 260, {
+          name: "Unmapped Quarterback",
+          school: "Unknown School",
+          conf: "N/A",
+          rank: 2,
+          adp: 2,
+        }),
+      ],
+      config
+    );
+
+    expect(board.map((player) => player.name)).toContain("Jeremiah Smith");
+    expect(board.map((player) => player.name)).toContain("Unmapped Quarterback");
+  });
+
   it("applies position tuning: WR up slightly, QB down slightly, TE down multiple rounds", () => {
     const players: Player[] = Array.from({ length: 60 }, (_, index) => {
       const rank = index + 1;
@@ -302,5 +327,33 @@ describe("buildDraftBoard", () => {
     expect(lowerRated?.cfb27Overall).toBe(86);
     expect(highRated?.finalDraftScore ?? 0).toBeGreaterThan(lowerRated?.finalDraftScore ?? 0);
     expect(highRated?.masterDraftRank ?? 0).toBeLessThan(lowerRated?.masterDraftRank ?? 0);
+  });
+
+  it("keeps high-rated CFB27 players that arrive beyond the old first 500 fetched rows", () => {
+    const players: Player[] = [
+      ...Array.from({ length: 520 }, (_, index) =>
+        makePlayer(index + 1, index % 2 === 0 ? "RB" : "WR", 250 - index * 0.1, {
+          name: `Paged Player ${index + 1}`,
+          rank: index + 1,
+          adp: index + 1,
+        })
+      ),
+      makePlayer(9001, "WR", 285, {
+        name: "Jeremiah Smith",
+        school: "Ohio State",
+        conf: "Big Ten",
+        rank: 650,
+        adp: 650,
+        posRank: 40,
+      }),
+    ];
+
+    const board = buildDraftBoard(players, config);
+    const jeremiah = board.find((player) => player.name === "Jeremiah Smith");
+
+    expect(players.findIndex((player) => player.name === "Jeremiah Smith")).toBeGreaterThan(500);
+    expect(jeremiah).toBeDefined();
+    expect(jeremiah?.cfb27Overall).toBe(99);
+    expect(jeremiah?.projectedPoints).toBe(285);
   });
 });

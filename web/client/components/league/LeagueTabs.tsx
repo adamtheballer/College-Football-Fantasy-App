@@ -14,7 +14,7 @@ export function LeagueTabs({ leagueId }: { leagueId: number }) {
 
   return (
     <div
-      className="w-full max-w-none gap-2 rounded-[1.25rem] border border-sky-300/15 bg-[linear-gradient(135deg,rgba(7,20,38,0.92),rgba(12,29,54,0.78))] p-2 shadow-[inset_0_1px_0_rgba(125,211,252,0.10),0_18px_50px_rgba(14,165,233,0.08)]"
+      className="w-full max-w-none gap-2 rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised/85 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_44px_rgba(2,6,23,0.26)]"
       style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}
     >
       {tabs.map((tab) => {
@@ -29,8 +29,8 @@ export function LeagueTabs({ leagueId }: { leagueId: number }) {
               className={[
                 "h-full items-center justify-center gap-2 rounded-xl border px-3 py-3 text-center text-[11px] font-extrabold uppercase tracking-[0.08em] transition sm:px-5",
                 active
-                  ? "border-sky-300/55 bg-sky-300/20 text-sky-50 shadow-[0_0_28px_rgba(56,189,248,0.24)]"
-                  : "border-white/10 bg-white/5 text-slate-400 hover:border-sky-300/20 hover:bg-sky-300/[0.06] hover:text-slate-50",
+                  ? "border-cfb-brand/60 bg-cfb-brand/20 text-blue-50 shadow-[0_0_28px_hsl(var(--brand-primary)/0.22)]"
+                  : "border-cfb-border-subtle bg-cfb-surface/70 text-cfb-text-secondary hover:border-cfb-brand/30 hover:bg-cfb-brand/[0.08] hover:text-cfb-text-primary",
               ].join(" ")}
             >
               <Icon className="h-3.5 w-3.5 shrink-0" />

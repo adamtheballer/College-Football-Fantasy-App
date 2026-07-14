@@ -109,6 +109,18 @@ See `.env.example` for the full list.
 - `SMTP_PASSWORD`
 - `SMTP_FROM_EMAIL`
 - `SMTP_USE_TLS`
+- `SCORING_PROVIDER`
+- `SCORING_ALLOW_UNOFFICIAL_PROVIDERS`
+- `SCORING_WORKER_INTERVAL_LIVE_SECONDS`
+- `SCORING_WORKER_INTERVAL_POSTGAME_SECONDS`
+- `SCORING_WORKER_INTERVAL_CORRECTION_SECONDS`
+- `SCORING_WORKER_RETRY_MAX_ATTEMPTS`
+- `SCORING_WORKER_RETRY_BASE_SECONDS`
+- `SUPPORT_EMAIL`
+- `PRIVACY_POLICY_URL`
+- `TERMS_URL`
+- `PROVIDER_DISCLOSURE_URL`
+- `SECURITY_HEADERS_ENABLED`
 
 `UI_BASE_URL` should match your local web origin (`http://localhost:5173` for Vite dev).
 
@@ -122,9 +134,12 @@ Production must use:
 - `REFRESH_COOKIE_SAMESITE=lax` or stricter unless the deployment requires cross-site cookies
 - `EMAIL_DELIVERY_MODE=smtp` or another production mail adapter
 - valid SMTP sender configuration so `/verify-email?token=...` links are deliverable
+- `SCORING_PROVIDER=sportsdata` or another licensed provider integration approved for production use
+- `SUPPORT_EMAIL`, `PRIVACY_POLICY_URL`, `TERMS_URL`, and `PROVIDER_DISCLOSURE_URL` set to public support/legal pages
 
 The API refuses to start in production with the `.env.example` JWT placeholder, default localhost CORS origins, wildcard CORS origins, or the default localhost CORS regex.
 When SMTP delivery is enabled, production startup also requires `SMTP_HOST` and `SMTP_FROM_EMAIL`.
+Production startup also rejects unofficial scoring providers such as ESPN/cache/mock unless `SCORING_ALLOW_UNOFFICIAL_PROVIDERS=true` is explicitly set for a non-public/staging deployment.
 
 Sports provider/cache variables:
 
@@ -256,3 +271,15 @@ Required GitHub secrets for the staging workflow:
 - `STAGING_API_BASE_URL`
 
 Production deployment must use a protected deployment job or provider hook that sets `DATABASE_URL` from `PRODUCTION_DATABASE_URL`, runs migrations, runs `scripts/check_alembic_head.py`, promotes the API, and confirms `/health/ready` before traffic is sent to the new release.
+
+## Production operations
+
+The public-beta operating model is documented in `docs/operations/production-operations.md`.
+
+Production should run at least three separate processes:
+
+- API process: `uvicorn collegefootballfantasy_api.app.main:app`
+- Static web process/host: built Vite output from `web/dist/spa`
+- Scoring worker process: `PYTHONPATH=. uv run python scripts/run_scoring_worker.py --season <year> --week <week> --mode live`
+
+Use `--mode postgame` for 10–30 minute postgame reconciliation and `--mode correction` for next-day correction sweeps.

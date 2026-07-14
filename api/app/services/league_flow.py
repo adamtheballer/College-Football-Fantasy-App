@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException, status
@@ -56,6 +57,46 @@ DRAFT_TYPES = {"snake"}
 MIN_PICK_TIMER_SECONDS = 15
 MAX_PICK_TIMER_SECONDS = 600
 
+CANONICAL_SCORING_KEYS = {
+    "pass_yards",
+    "pass_tds",
+    "interceptions",
+    "rush_yards",
+    "rush_tds",
+    "receptions",
+    "rec_yards",
+    "rec_tds",
+    "fumbles_lost",
+    "fg_made_0_39",
+    "fg_made_40_49",
+    "fg_made_50_plus",
+    "xp_made",
+}
+
+SCORING_KEY_ALIASES = {
+    "ppr": "receptions",
+    "pass_td": "pass_tds",
+    "passing_td": "pass_tds",
+    "passing_tds": "pass_tds",
+    "rush_td": "rush_tds",
+    "rushing_td": "rush_tds",
+    "rushing_tds": "rush_tds",
+    "rec_td": "rec_tds",
+    "receiving_td": "rec_tds",
+    "receiving_tds": "rec_tds",
+    "interception": "interceptions",
+    "int": "interceptions",
+    "fumble_lost": "fumbles_lost",
+    "fg": "fg_made_0_39",
+    "xp": "xp_made",
+}
+
+YARDS_PER_POINT_SCORING_KEYS = {
+    "pass_yds_per_pt": "pass_yards",
+    "rush_yds_per_pt": "rush_yards",
+    "rec_yds_per_pt": "rec_yards",
+}
+
 def _coerce_slot_count(value, minimum: int, maximum: int) -> int:
     try:
         count = int(value)
@@ -64,7 +105,63 @@ def _coerce_slot_count(value, minimum: int, maximum: int) -> int:
     return max(minimum, min(maximum, count))
 
 
+def _coerce_float(value: Any) -> float | None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed != parsed:
+        return None
+    return parsed
+
+
+def _yards_per_point_to_multiplier(value: Any) -> float | None:
+    yards_per_point = _coerce_float(value)
+    if yards_per_point is None or yards_per_point <= 0:
+        return None
+    return round(1 / yards_per_point, 6)
+
+
+def normalize_scoring_settings(scoring_json: dict | None) -> dict:
+    normalized: dict[str, float] = {}
+    unknown_keys: list[str] = []
+    invalid_keys: list[str] = []
+    for raw_key, raw_value in (scoring_json or {}).items():
+        key = str(raw_key).strip()
+        if not key:
+            continue
+        if key in YARDS_PER_POINT_SCORING_KEYS:
+            value = _yards_per_point_to_multiplier(raw_value)
+            if value is None:
+                invalid_keys.append(key)
+            else:
+                normalized[YARDS_PER_POINT_SCORING_KEYS[key]] = value
+            continue
+
+        canonical_key = SCORING_KEY_ALIASES.get(key, key)
+        if canonical_key not in CANONICAL_SCORING_KEYS:
+            unknown_keys.append(key)
+            continue
+        value = _coerce_float(raw_value)
+        if value is None:
+            invalid_keys.append(key)
+        else:
+            normalized[canonical_key] = value
+    if unknown_keys:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"unknown scoring keys: {', '.join(sorted(unknown_keys))}",
+        )
+    if invalid_keys:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"invalid scoring values: {', '.join(sorted(invalid_keys))}",
+        )
+    return normalized
+
+
 def normalize_roster_settings(payload_settings):
+    payload_settings.scoring_json = normalize_scoring_settings(payload_settings.scoring_json)
     raw_slots = payload_settings.roster_slots_json or FIXED_ROSTER_SLOTS
     normalized_slots: dict[str, int] = {}
 

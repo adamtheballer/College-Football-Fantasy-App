@@ -28,7 +28,7 @@ services:
       UV_PROJECT_ENVIRONMENT: /tmp/cff-api-venv
       PYTHONPATH: /app
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -41,7 +41,7 @@ services:
       - ./:/app
       - /app/web/node_modules
     ports:
-      - "8080:8080"
+      - "${WEB_PORT:-8080}:8080"
     depends_on:
       - api
     command: >-

@@ -3,8 +3,10 @@ import { useParams } from "react-router-dom";
 import { Bookmark, Search, X } from "lucide-react";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
+import { ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { useToggleWatchlistPlayer, useWatchlists } from "@/hooks/use-watchlists";
+import { ApiError } from "@/lib/api";
 import { DEMO_LEAGUE_ID } from "@/lib/leaguePreviewData";
 import type { Player } from "@/types/player";
 
@@ -35,6 +37,12 @@ export default function LeagueWatchlist() {
   );
   const toggleWatchlistPlayer = useToggleWatchlistPlayer();
   const watchlists = watchlistsQuery.data?.data ?? [];
+  const watchlistErrorMessage =
+    watchlistsQuery.error instanceof ApiError
+      ? watchlistsQuery.error.message
+      : watchlistsQuery.error instanceof Error
+        ? watchlistsQuery.error.message
+        : "Unable to load your saved watchlist.";
 
   const watchedPlayers = useMemo(() => {
     const playerById = new Map<number, { player: Player; watchlistId: number }>();
@@ -90,6 +98,15 @@ export default function LeagueWatchlist() {
         ) : watchlistsQuery.isLoading ? (
           <div className="px-5 py-12 text-center text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
             Loading watchlist...
+          </div>
+        ) : watchlistsQuery.isError ? (
+          <div className="px-5 py-12">
+            <ErrorState
+              title="Unable to load watchlist"
+              message={watchlistErrorMessage}
+              retryLabel="Retry Watchlist"
+              onRetry={() => void watchlistsQuery.refetch()}
+            />
           </div>
         ) : watchedPlayers.length === 0 ? (
           <div className="px-5 py-12 text-center">

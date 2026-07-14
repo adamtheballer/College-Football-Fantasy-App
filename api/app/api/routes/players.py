@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.core.config import settings
@@ -10,7 +11,9 @@ from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.integrations.espn import ESPNClient
 from collegefootballfantasy_api.app.integrations.sportsdata import SportsDataClient
 from collegefootballfantasy_api.app.models.injury import Injury
+from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
+from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.schemas.player import (
     PlayerCardAboutRead,
     PlayerCardInjuryRead,
@@ -20,7 +23,9 @@ from collegefootballfantasy_api.app.schemas.player import (
     PlayerList,
     PlayerRead,
 )
+from collegefootballfantasy_api.app.schemas.historical_stats import PlayerHistoricalStatsResponse
 from collegefootballfantasy_api.app.schemas.player_stat import PlayerStatResponse
+from collegefootballfantasy_api.app.services.historical_stats import get_player_historical_stats_response
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
 
 router = APIRouter()
@@ -35,6 +40,18 @@ def _espn_player_id(external_id: str | None) -> str | None:
     if normalized.lower().startswith("espn:"):
         normalized = normalized.split(":", 1)[1].strip()
     return normalized or None
+
+
+def _resolved_espn_player_id(db: Session, player_id: int, external_id: str | None) -> str | None:
+    provider_row = (
+        db.query(PlayerProviderId)
+        .filter(PlayerProviderId.player_id == player_id, PlayerProviderId.provider == "espn")
+        .order_by(PlayerProviderId.verified_at.desc().nullslast(), PlayerProviderId.updated_at.desc())
+        .first()
+    )
+    if provider_row and provider_row.provider_player_id:
+        return _profile_text(provider_row.provider_player_id)
+    return _espn_player_id(external_id)
 
 
 def _profile_text(value: object) -> str | None:
@@ -103,6 +120,42 @@ def _is_stale(updated_at: datetime | None, ttl_days: int) -> bool:
     return updated_at <= now - timedelta(days=max(1, ttl_days))
 
 
+def _player_card_player_with_sheet_projection_fallback(db: Session, player: Player) -> PlayerRead:
+    player_read = PlayerRead.model_validate(player)
+    if player_read.sheet_projection_stats and player_read.sheet_projected_season_points is not None:
+        return player_read
+
+    sheet_player = (
+        db.query(Player)
+        .filter(
+            Player.id != player.id,
+            func.lower(Player.name) == player.name.lower(),
+            func.lower(Player.school) == player.school.lower(),
+            func.upper(Player.position) == player.position.upper(),
+            Player.sheet_projection_stats.isnot(None),
+        )
+        .order_by(Player.sheet_synced_at.desc().nullslast(), Player.updated_at.desc())
+        .first()
+    )
+    if not sheet_player:
+        return player_read
+
+    fallback = player_read.model_copy(
+        update={
+            "sheet_adp": player_read.sheet_adp if player_read.sheet_adp is not None else sheet_player.sheet_adp,
+            "sheet_projected_season_points": (
+                player_read.sheet_projected_season_points
+                if player_read.sheet_projected_season_points is not None
+                else sheet_player.sheet_projected_season_points
+            ),
+            "sheet_projection_stats": player_read.sheet_projection_stats or sheet_player.sheet_projection_stats,
+            "sheet_source_sheet_id": player_read.sheet_source_sheet_id or sheet_player.sheet_source_sheet_id,
+            "sheet_synced_at": player_read.sheet_synced_at or sheet_player.sheet_synced_at,
+        }
+    )
+    return fallback
+
+
 @router.post("", response_model=list[PlayerRead], status_code=status.HTTP_201_CREATED)
 def create_players_endpoint(
     players_in: list[PlayerCreate], db: Session = Depends(get_db)
@@ -156,7 +209,7 @@ def get_player_card_endpoint(
 
     profile_payload: dict | None = None
     profile_message: str | None = None
-    espn_id = _espn_player_id(player.external_id)
+    espn_id = _resolved_espn_player_id(db, player.id, player.external_id)
     if espn_id:
         try:
             profile_payload = ESPNClient().get_athlete_profile(espn_id)
@@ -177,9 +230,10 @@ def get_player_card_endpoint(
         .order_by(PlayerStat.season.desc(), PlayerStat.week.desc(), PlayerStat.updated_at.desc())
         .all()
     )
+    card_player = _player_card_player_with_sheet_projection_fallback(db, player)
     return PlayerCardRead(
-        player=player,
-        about=_map_espn_about(player, profile_payload, profile_message),
+        player=card_player,
+        about=_map_espn_about(card_player, profile_payload, profile_message),
         injuries=[
             PlayerCardInjuryRead(
                 id=row.id,
@@ -206,7 +260,21 @@ def get_player_card_endpoint(
             )
             for row in stat_rows
         ],
+        historical_stats=get_player_historical_stats_response(db, player),
     )
+
+
+@router.get("/{player_id}/historical-stats", response_model=PlayerHistoricalStatsResponse)
+def get_player_historical_stats_endpoint(
+    player_id: int,
+    season: int | None = None,
+    league_id: int | None = None,
+    db: Session = Depends(get_db),
+) -> PlayerHistoricalStatsResponse:
+    player = get_player(db, player_id)
+    if not player:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
+    return get_player_historical_stats_response(db, player, season=season, league_id=league_id)
 
 
 @router.get("/{player_id}/season-stats", response_model=PlayerStatResponse)

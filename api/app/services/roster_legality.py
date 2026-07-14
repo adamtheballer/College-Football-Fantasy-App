@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 
 PLAYER_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
-ROSTER_SLOT_KEYS = {"QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "BENCH"}
+ROSTER_SLOT_KEYS = {"QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "BENCH", "IR"}
 
 
 def normalize_position(position: str | None) -> str | None:

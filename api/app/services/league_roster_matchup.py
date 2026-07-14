@@ -1,9 +1,11 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.core.config import settings as app_settings
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.matchup import Matchup
@@ -13,9 +15,11 @@ from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
+from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueMatchupTabRead,
+    LeagueInviteSettingsRead,
     LeagueMemberRead,
     LeagueRosterTabRead,
     LeagueScheduleRowRead,
@@ -26,6 +30,7 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     RosterTabEntryRead,
     RosterTabTeamRead,
 )
+from collegefootballfantasy_api.app.schemas.waiver import WaiverDropCandidateRead
 from collegefootballfantasy_api.app.services.league_weeks import resolve_current_week
 from collegefootballfantasy_api.app.services.league_workspace import build_standings_summary
 from collegefootballfantasy_api.app.services.matchup_probability import (
@@ -33,6 +38,7 @@ from collegefootballfantasy_api.app.services.matchup_probability import (
     estimate_player_std_dev,
     is_starting_slot,
 )
+from collegefootballfantasy_api.app.services.waiver_service import serialize_claims
 
 DEFAULT_ROSTER_SLOTS = {
     "QB": 1,
@@ -408,6 +414,29 @@ def build_waivers_view(
         )
         .all()
     }
+    claims = []
+    roster = []
+    settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
+    if team:
+        claim_rows = (
+            db.query(WaiverClaim)
+            .filter(WaiverClaim.league_id == league.id, WaiverClaim.team_id == team.id)
+            .order_by(WaiverClaim.created_at.desc(), WaiverClaim.id.desc())
+            .limit(25)
+            .all()
+        )
+        claims = serialize_claims(db, claim_rows)
+        roster = [
+            WaiverDropCandidateRead(
+                roster_entry_id=entry.id,
+                player_id=entry.player_id,
+                player_name=entry.player.name if entry.player else "Unknown Player",
+                position=entry.player.position if entry.player else None,
+                school=entry.player.school if entry.player else None,
+                slot=entry.slot,
+            )
+            for entry in _roster_rows(db, team.id)
+        ]
     return LeagueWaiversRead(
         league_id=league.id,
         fantasy_team_id=team.id if team else None,
@@ -427,7 +456,12 @@ def build_waivers_view(
             )
             for player in players
         ],
-        claims=[],
+        claims=claims,
+        roster=roster,
+        waiver_rules={
+            "waiver_type": settings.waiver_type if settings else "FAAB",
+            "faab_budget": 100,
+        },
         total_available=total,
         message=None if team else "No team found for your user in this league.",
     )
@@ -481,6 +515,23 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
         for matchup, home_name, _home_id in schedule_rows
     ]
     draft = db.query(Draft).filter(Draft.league_id == league.id).first()
+    draft_status = (draft.status if draft else None) or league.status
+    draft_is_complete = (draft_status or "").lower() in {"completed", "complete", "final", "closed"} or league.status == "post_draft"
+    active_invite = (
+        db.query(LeagueInvite)
+        .filter(LeagueInvite.league_id == league.id, LeagueInvite.active.is_(True))
+        .order_by(LeagueInvite.created_at.desc(), LeagueInvite.id.desc())
+        .first()
+    )
+    invite_code = league.invite_code or (active_invite.code if active_invite else None)
+    invite = None
+    if league.commissioner_user_id == user.id and invite_code and not draft_is_complete:
+        invite = LeagueInviteSettingsRead(
+            code=invite_code,
+            link=f"{app_settings.ui_base_url.rstrip('/')}/join/{invite_code}",
+            draft_status=draft_status,
+            visible_until_draft_complete=True,
+        )
     draft_results: list[dict] = []
     if draft:
         pick_rows = (
@@ -516,6 +567,7 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
             "is_private": league.is_private,
             "commissioner_user_id": league.commissioner_user_id,
         },
+        invite=invite,
         members=[LeagueMemberRead.model_validate(member) for member in members],
         scoring_settings=settings.scoring_json if settings else {},
         roster_settings=settings.roster_slots_json if settings and settings.roster_slots_json else DEFAULT_ROSTER_SLOTS.copy(),

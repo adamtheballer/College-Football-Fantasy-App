@@ -24,6 +24,7 @@ export interface User {
   email: string;
   id: number;
   emailVerifiedAt: string | null;
+  isAdmin: boolean;
 }
 
 export type AuthSession = {
@@ -40,6 +41,7 @@ type AuthUserPayload = {
   id: number;
   first_name: string;
   email: string;
+  is_admin?: boolean;
   email_verified_at?: string | null;
 };
 
@@ -65,13 +67,21 @@ type SessionsPayload = {
   sessions: AuthSessionPayload[];
 };
 
+export type VerifyEmailStatus = "verified" | "already_verified";
+
+type VerifyEmailPayload = {
+  status: VerifyEmailStatus;
+  message: string;
+  success?: boolean;
+};
+
 type AuthContextValue = {
   user: User | null;
   login: (email: string, password: string) => Promise<User>;
   signup: (firstName: string, email: string, password: string) => Promise<User>;
   logout: () => void;
   resendVerification: (email?: string) => Promise<void>;
-  verifyEmail: (token: string) => Promise<void>;
+  verifyEmail: (token: string) => Promise<VerifyEmailStatus>;
   requestPasswordReset: (email: string) => Promise<void>;
   confirmPasswordReset: (token: string, newPassword: string) => Promise<void>;
   listSessions: () => Promise<AuthSession[]>;
@@ -122,6 +132,9 @@ const clearStoredAuth = () => {
 const loadStoredUser = (): User | null => {
   const savedUser = safeStorageGet(USER_STORAGE_KEY);
   const storedToken = getStoredAccessToken();
+  if (!savedUser && !storedToken) {
+    return null;
+  }
   if (!savedUser || !storedToken) {
     clearStoredAuth();
     return null;
@@ -133,7 +146,7 @@ const loadStoredUser = (): User | null => {
       clearStoredAuth();
       return null;
     }
-    return { ...parsedUser, emailVerifiedAt: parsedUser.emailVerifiedAt ?? null };
+    return { ...parsedUser, emailVerifiedAt: parsedUser.emailVerifiedAt ?? null, isAdmin: !!parsedUser.isAdmin };
   } catch {
     clearStoredAuth();
     return null;
@@ -150,6 +163,7 @@ const mapUserPayload = (payload: AuthUserPayload): User => ({
   firstName: payload.first_name,
   email: payload.email,
   emailVerifiedAt: payload.email_verified_at ?? null,
+  isAdmin: !!payload.is_admin,
 });
 
 const mapAuthPayload = (payload: AuthPayload): User => mapUserPayload(payload.user);
@@ -263,7 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?.email]);
 
   const verifyEmail = useCallback(async (token: string) => {
-    await apiPost("/auth/verify-email", { token });
+    const payload = await apiPost<VerifyEmailPayload>("/auth/verify-email", { token });
     const storedToken = getStoredAccessToken();
     if (storedToken) {
       try {
@@ -282,6 +296,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     dispatchAuthChanged();
+    return payload.status;
   }, [queryClient]);
 
   const requestPasswordReset = useCallback(async (email: string) => {
@@ -326,7 +341,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       listSessions,
       revokeSession,
       logoutAll,
-      isLoggedIn: !!user,
+      isLoggedIn: !!user && !!getStoredAccessToken(),
       isBootstrapping,
     }),
     [

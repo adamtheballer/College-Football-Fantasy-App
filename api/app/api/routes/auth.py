@@ -35,6 +35,7 @@ from collegefootballfantasy_api.app.schemas.auth import (
     UserLogin,
     UserRead,
     VerifyEmailRequest,
+    VerifyEmailResponse,
 )
 from collegefootballfantasy_api.app.services.auth_security import (
     EMAIL_VERIFICATION_TOKEN,
@@ -320,18 +321,21 @@ def logout(response: Response, request: Request, db: Session = Depends(get_db)) 
     return LogoutResponse(success=True)
 
 
-@router.post("/verify-email", response_model=AuthMessageResponse)
-def verify_email(payload: VerifyEmailRequest, db: Session = Depends(get_db)) -> AuthMessageResponse:
+@router.post("/verify-email", response_model=VerifyEmailResponse)
+def verify_email(payload: VerifyEmailRequest, db: Session = Depends(get_db)) -> VerifyEmailResponse:
     token_row = consume_auth_action_token(db, token_type=EMAIL_VERIFICATION_TOKEN, token=payload.token)
     user = db.get(User, token_row.user_id)
     if not user or not user.is_active:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid or expired token")
-    if user.email_verified_at is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid token")
+    if user.email_verified_at is not None:
+        db.commit()
+        return VerifyEmailResponse(status="already_verified", message="email already verified")
+    else:
         user.email_verified_at = utcnow()
-    db.add(user)
-    db.commit()
-    return AuthMessageResponse(message="email verified")
+        db.add(user)
+        db.commit()
+        return VerifyEmailResponse(status="verified", message="email verified")
 
 
 @router.post("/resend-verification", response_model=AuthMessageResponse)

@@ -41,6 +41,12 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueWorkspaceRead,
     JoinByCodeRequest,
 )
+from collegefootballfantasy_api.app.schemas.waiver import (
+    WaiverClaimCancel,
+    WaiverClaimCreate,
+    WaiverClaimRead,
+    WaiverProcessResponse,
+)
 from collegefootballfantasy_api.app.services.draft_service import (
     build_draft_room_state,
     create_real_draft_pick,
@@ -66,6 +72,11 @@ from collegefootballfantasy_api.app.services.league_roster_matchup import (
     build_waivers_view,
 )
 from collegefootballfantasy_api.app.services.scoring_service import run_league_scoring_recalculation
+from collegefootballfantasy_api.app.services.waiver_service import (
+    cancel_waiver_claim,
+    process_waiver_claims_once,
+    submit_waiver_claim,
+)
 
 router = APIRouter()
 @router.post("", response_model=LeagueCreateResponse, status_code=status.HTTP_201_CREATED)
@@ -185,6 +196,55 @@ def get_league_waiver_tab_endpoint(
         offset=max(0, offset),
         selected_week=week,
     )
+
+
+@router.post(
+    "/{league_id}/waivers/claims",
+    response_model=WaiverClaimRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def submit_waiver_claim_endpoint(
+    league_id: int,
+    payload: WaiverClaimCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> WaiverClaimRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return submit_waiver_claim(db, league=league, current_user=current_user, payload=payload)
+
+
+@router.post(
+    "/{league_id}/waivers/claims/{claim_id}/cancel",
+    response_model=WaiverClaimRead,
+)
+def cancel_waiver_claim_endpoint(
+    league_id: int,
+    claim_id: int,
+    payload: WaiverClaimCancel,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> WaiverClaimRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return cancel_waiver_claim(
+        db,
+        league=league,
+        current_user=current_user,
+        claim_id=claim_id,
+        reason=payload.reason,
+    )
+
+
+@router.post("/{league_id}/waivers/process", response_model=WaiverProcessResponse)
+def process_waiver_claims_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> WaiverProcessResponse:
+    league, _ = require_commissioner(db, league_id, current_user)
+    summary = process_waiver_claims_once(db, league_id=league.id)
+    return WaiverProcessResponse(**summary)
 
 
 @router.get("/{league_id}/matchups", response_model=LeagueScoreboardList)

@@ -1,17 +1,20 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.security import (
     PASSWORD_HASH_ALGORITHM,
     create_access_token,
     generate_token,
+    hash_token,
     hash_password,
     needs_password_rehash,
     verify_password,
 )
 from collegefootballfantasy_api.app.api.routes import auth as auth_routes
+from collegefootballfantasy_api.app.models.auth_action_token import AuthActionToken
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
 from collegefootballfantasy_api.app.models.user import User
+from collegefootballfantasy_api.app.services.email_service import ConsoleEmailService, EmailPayload
 
 
 STRONG_PASSWORD = "StrongPass123!"
@@ -262,17 +265,50 @@ def test_email_verification_token_marks_user_verified(client, db_session, monkey
     response = client.post("/auth/verify-email", json={"token": token})
 
     assert response.status_code == 200
+    assert response.json()["status"] == "verified"
     assert response.json()["message"] == "email verified"
     db_session.expire_all()
     user = db_session.get(User, signup_payload["user"]["id"])
     assert user.email_verified_at is not None
 
 
-def test_email_verification_rejects_invalid_or_expired_token(client):
+def test_email_verification_reports_already_verified_for_valid_token(client, db_session, monkeypatch):
+    capture = CaptureEmailService()
+    monkeypatch.setattr(auth_routes, "get_email_service", lambda: capture)
+    signup_payload = signup_user(client, "already-verified")
+    token = capture.verification_tokens[-1][1]
+
+    user = db_session.get(User, signup_payload["user"]["id"])
+    user.email_verified_at = datetime.now(timezone.utc)
+    db_session.commit()
+
+    response = client.post("/auth/verify-email", json={"token": token})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "already_verified"
+    assert response.json()["message"] == "email already verified"
+
+
+def test_email_verification_rejects_invalid_token(client):
     response = client.post("/auth/verify-email", json={"token": "not-a-real-token"})
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "invalid or expired token"
+    assert response.json()["detail"] == "invalid token"
+
+
+def test_email_verification_rejects_expired_token(client, db_session, monkeypatch):
+    capture = CaptureEmailService()
+    monkeypatch.setattr(auth_routes, "get_email_service", lambda: capture)
+    signup_user(client, "expired-verify")
+    token = capture.verification_tokens[-1][1]
+    token_row = db_session.query(AuthActionToken).filter(AuthActionToken.token_hash == hash_token(token)).one()
+    token_row.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    db_session.commit()
+
+    response = client.post("/auth/verify-email", json={"token": token})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "expired token"
 
 
 def test_resend_verification_sends_only_for_unverified_users(client, db_session, monkeypatch):
@@ -292,6 +328,35 @@ def test_resend_verification_sends_only_for_unverified_users(client, db_session,
     verified_resend_response = client.post("/auth/resend-verification", json={"email": "coach-resend@example.com"})
     assert verified_resend_response.status_code == 200
     assert len(capture.verification_tokens) == 2
+
+
+def test_resend_verification_rate_limited(client, monkeypatch):
+    capture = CaptureEmailService()
+    monkeypatch.setattr(auth_routes, "get_email_service", lambda: capture)
+    signup_user(client, "resend-limit")
+
+    for _ in range(settings.auth_resend_verification_rate_limit):
+        response = client.post("/auth/resend-verification", json={"email": "coach-resend-limit@example.com"})
+        assert response.status_code == 200
+
+    blocked = client.post("/auth/resend-verification", json={"email": "coach-resend-limit@example.com"})
+    assert blocked.status_code == 429
+    assert blocked.json()["detail"] == "too many requests"
+
+
+def test_console_email_service_does_not_log_verification_token(caplog):
+    service = ConsoleEmailService()
+    payload = EmailPayload(
+        to_email="coach@example.com",
+        subject="Verify",
+        body="Verify your account: http://localhost:8080/verify-email?token=sensitive-token",
+    )
+
+    service.send(payload)
+
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert "sensitive-token" not in logged
+    assert "coach@example.com" in logged
 
 
 def test_local_dev_cors_allows_dynamic_vite_port(client):

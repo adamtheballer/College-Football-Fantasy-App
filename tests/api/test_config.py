@@ -21,6 +21,18 @@ def make_settings(**overrides):
     return Settings(**defaults)
 
 
+def production_required_settings() -> dict[str, object]:
+    return {
+        "email_delivery_mode": "smtp",
+        "smtp_host": "smtp.example.com",
+        "smtp_from_email": "no-reply@example.com",
+        "support_email": "support@example.com",
+        "privacy_policy_url": "https://app.example.com/privacy",
+        "terms_url": "https://app.example.com/terms",
+        "provider_disclosure_url": "https://app.example.com/provider-disclosure",
+    }
+
+
 def test_development_allows_local_default_cors_and_jwt_secret():
     settings = make_settings()
 
@@ -83,6 +95,7 @@ def test_production_accepts_explicit_safe_cors_and_jwt_secret():
         cors_origins="https://app.example.com,https://www.example.com",
         cors_origin_regex=None,
         refresh_cookie_secure=True,
+        **production_required_settings(),
     )
 
     assert settings.is_production
@@ -96,6 +109,7 @@ def test_blank_cors_origin_regex_disables_regex_for_production():
         cors_origins="https://app.example.com",
         cors_origin_regex="",
         refresh_cookie_secure=True,
+        **production_required_settings(),
     )
 
     assert settings.allowed_cors_origin_regex is None
@@ -109,4 +123,63 @@ def test_production_rejects_insecure_refresh_cookie():
             cors_origins="https://app.example.com",
             cors_origin_regex=None,
             refresh_cookie_secure=False,
+            **production_required_settings(),
         )
+
+
+def test_production_rejects_missing_public_policy_urls():
+    with pytest.raises(ValidationError, match="SUPPORT_EMAIL is required"):
+        make_settings(
+            environment="production",
+            jwt_secret_key="safe-production-secret",
+            cors_origins="https://app.example.com",
+            cors_origin_regex=None,
+            refresh_cookie_secure=True,
+            email_delivery_mode="smtp",
+            smtp_host="smtp.example.com",
+            smtp_from_email="no-reply@example.com",
+        )
+
+
+def test_production_rejects_console_email_delivery():
+    with pytest.raises(ValidationError, match="EMAIL_DELIVERY_MODE cannot be console"):
+        make_settings(
+            environment="production",
+            jwt_secret_key="safe-production-secret",
+            cors_origins="https://app.example.com",
+            cors_origin_regex=None,
+            refresh_cookie_secure=True,
+            **{
+                key: value
+                for key, value in production_required_settings().items()
+                if key not in {"email_delivery_mode", "smtp_host", "smtp_from_email"}
+            },
+        )
+
+
+def test_production_rejects_unofficial_scoring_provider_without_override():
+    with pytest.raises(ValidationError, match="Unofficial SCORING_PROVIDER"):
+        make_settings(
+            environment="production",
+            jwt_secret_key="safe-production-secret",
+            cors_origins="https://app.example.com",
+            cors_origin_regex=None,
+            refresh_cookie_secure=True,
+            scoring_provider="espn",
+            **production_required_settings(),
+        )
+
+
+def test_production_allows_unofficial_scoring_provider_only_with_explicit_override():
+    settings = make_settings(
+        environment="production",
+        jwt_secret_key="safe-production-secret",
+        cors_origins="https://app.example.com",
+        cors_origin_regex=None,
+        refresh_cookie_secure=True,
+        scoring_provider="espn",
+        scoring_allow_unofficial_providers=True,
+        **production_required_settings(),
+    )
+
+    assert settings.scoring_provider == "espn"

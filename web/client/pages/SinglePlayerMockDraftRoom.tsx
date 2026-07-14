@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Bot, Loader2, RefreshCcw, Search, Trophy, User, X } from "lucide-react";
+import { ArrowLeft, Bot, ClipboardList, LocateFixed, Loader2, RefreshCcw, Search, Trophy, User } from "lucide-react";
 
+import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useDraftPlayerPool, usePlayerDetail, usePlayerSeasonStats } from "@/hooks/use-players";
+import { useDraftPlayerPool, usePlayerCard, usePlayerDetail } from "@/hooks/use-players";
 import { buildDraftBoard, type DraftPlayer } from "@/lib/draftRankings";
-import { buildProjectedStats, formatStat, statRowsForPosition, statValue } from "@/lib/playerProjectionStats";
+import { mergeMockDraftMasterBoardPlayers } from "@/lib/mockDraftMasterBoard";
 import {
   advanceSinglePlayerMockDraft,
   buildMockRoster,
@@ -43,6 +44,11 @@ const MOCK_TABS: Array<{ value: MockDraftTab; label: string }> = [
   { value: "roster", label: "Roster" },
   { value: "history", label: "History" },
 ];
+
+const formatPlayerPoolError = (error: unknown) => {
+  if (error instanceof Error && error.message) return error.message;
+  return "Unable to load players. Start the backend API and try again.";
+};
 
 const POSITION_STYLES: Record<string, string> = {
   QB: "border-blue-300/40 bg-blue-500/15 text-blue-100 shadow-[0_0_16px_rgba(96,165,250,0.18)]",
@@ -93,31 +99,6 @@ const groupPicksByRound = (picks: MockDraftPick[]) => {
   return [...rounds.entries()].sort(([left], [right]) => left - right);
 };
 
-const projectionStatsForPlayer = (player: DraftPlayer | null) => {
-  if (!player) return null;
-  return buildProjectedStats(player.projection, player.projectedPoints, player.sheetProjectionStats);
-};
-
-const buildPlayerSummary = (
-  player: DraftPlayer,
-  previousStats: Record<string, unknown> | null | undefined
-) => {
-  const rank = player.masterDraftRank ?? player.draftRank;
-  const hasPreviousStats = Boolean(previousStats && Object.keys(previousStats).length);
-  const role =
-    player.pos === "QB"
-      ? "passing and rushing profile"
-      : player.pos === "K"
-        ? "kicking volume profile"
-        : "touch and yardage profile";
-
-  return `${player.name} enters the 2026 projection board as ${player.school}'s ${player.pos} with a master mock rank of #${rank}. The sheet projects ${player.projectedPoints.toFixed(1)} fantasy points, so this card treats him as a ${role} rather than inventing outside context. ${
-    hasPreviousStats
-      ? "The 2025 section uses the cached SportsData feed where available."
-      : "No cached 2025 stat line is available yet, so missing fields are shown as dashes."
-  }`;
-};
-
 export default function SinglePlayerMockDraftRoom() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -137,20 +118,25 @@ export default function SinglePlayerMockDraftRoom() {
   const [error, setError] = useState<string | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [selectedRosterTeamId, setSelectedRosterTeamId] = useState<number | null>(null);
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const pickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
-  const { data: playersPayload, isLoading, isError } = useDraftPlayerPool({
-    limit: 100,
-    pages: 5,
+  const { data: playersPayload, isLoading, isError, error: playerPoolError } = useDraftPlayerPool({
+    limit: 200,
+    fetchAll: true,
     sort: "draft_rank",
   });
   const mockSettings = getMockDraftSettings(draftState);
   const teamCount = getMockTeamCount(draftState);
   const totalPicks = getMockTotalPicks(draftState);
+  const mockPlayerPool = useMemo(
+    () => mergeMockDraftMasterBoardPlayers(playersPayload?.data ?? []),
+    [playersPayload?.data]
+  );
 
   const draftBoard = useMemo(
     () =>
-      buildDraftBoard(playersPayload?.data ?? [], {
+      buildDraftBoard(mockPlayerPool, {
         leagueSize: mockSettings.leagueSize,
         rosterSlots: {
           QB: 1,
@@ -162,18 +148,18 @@ export default function SinglePlayerMockDraftRoom() {
           IR: 0,
         },
       }),
-    [mockSettings.leagueSize, playersPayload?.data]
+    [mockSettings.leagueSize, mockPlayerPool]
   );
 
   const selectedBoardPlayer = useMemo(
     () => draftBoard.find((player) => player.id === selectedPlayerId) ?? null,
     [draftBoard, selectedPlayerId]
   );
-  const { data: selectedPlayerDetail } = usePlayerDetail(selectedPlayerId, selectedPlayerId !== null);
-  const { data: selectedPlayerSeasonStats } = usePlayerSeasonStats(
+  const selectedPlayerHasBackendRecord =
+    typeof selectedPlayerId === "number" && selectedPlayerId > 0;
+  const { data: selectedPlayerDetail } = usePlayerDetail(
     selectedPlayerId,
-    2025,
-    selectedPlayerId !== null
+    selectedPlayerHasBackendRecord
   );
   const selectedPlayer = useMemo(() => {
     if (!selectedPlayerDetail && !selectedBoardPlayer) return null;
@@ -191,6 +177,10 @@ export default function SinglePlayerMockDraftRoom() {
       sourceBoardRank: selectedBoardPlayer?.sourceBoardRank ?? selectedPlayerDetail?.boardRank ?? null,
     } as DraftPlayer;
   }, [selectedBoardPlayer, selectedPlayerDetail]);
+  const { data: selectedPlayerCard, isLoading: selectedPlayerCardLoading } = usePlayerCard(
+    selectedPlayer?.id,
+    Boolean(selectedPlayer && selectedPlayer.id > 0)
+  );
 
   useEffect(() => {
     if (initialDraftResolution.shouldClearStoredDraft) {
@@ -206,6 +196,12 @@ export default function SinglePlayerMockDraftRoom() {
   }, [draftState]);
 
   useEffect(() => {
+    if (draftState.status === "complete") {
+      setShowCompleteDialog(true);
+    }
+  }, [draftState.status]);
+
+  useEffect(() => {
     const interval = window.setInterval(() => {
       const tickNow = Date.now();
       setNow(tickNow);
@@ -216,21 +212,32 @@ export default function SinglePlayerMockDraftRoom() {
     return () => window.clearInterval(interval);
   }, [draftBoard]);
 
-  useEffect(() => {
-    const container = carouselRef.current;
-    const activeCard = pickRefs.current.get(draftState.currentPick);
-    if (!container || !activeCard) return;
+  const centerDraftCarouselOnPick = useCallback(
+    (overallPick: number, behavior: ScrollBehavior = "smooth") => {
+      const container = carouselRef.current;
+      const activeCard = pickRefs.current.get(overallPick);
+      if (!container || !activeCard) return;
 
-    container.scrollTo({
-      left: getCenteredDraftCarouselScrollLeft({
-        overallPick: draftState.currentPick,
-        cardOffsetLeft: activeCard.offsetLeft,
-        cardWidth: activeCard.offsetWidth,
-        containerWidth: container.clientWidth,
-      }),
-      behavior: "smooth",
-    });
-  }, [draftState.currentPick, draftState.status]);
+      container.scrollTo({
+        left: getCenteredDraftCarouselScrollLeft({
+          overallPick,
+          cardOffsetLeft: activeCard.offsetLeft,
+          cardWidth: activeCard.offsetWidth,
+          containerWidth: container.clientWidth,
+        }),
+        behavior,
+      });
+    },
+    []
+  );
+
+  useEffect(() => {
+    centerDraftCarouselOnPick(draftState.currentPick);
+  }, [centerDraftCarouselOnPick, draftState.currentPick, draftState.status]);
+
+  const recenterDraftCarousel = () => {
+    centerDraftCarouselOnPick(draftState.currentPick);
+  };
 
   const currentTeam = getCurrentTeam(draftState);
   const userDraftBoardTeam = useMemo(
@@ -339,7 +346,14 @@ export default function SinglePlayerMockDraftRoom() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(freshDraft));
     setActiveTab("draft");
     setSelectedRosterTeamId(null);
+    setShowCompleteDialog(false);
     setError(null);
+  };
+
+  const viewDraftedRoster = () => {
+    setSelectedRosterTeamId(draftState.userTeamId);
+    setActiveTab("roster");
+    setShowCompleteDialog(false);
   };
 
   const draftPlayer = (playerId: number) => {
@@ -415,7 +429,7 @@ export default function SinglePlayerMockDraftRoom() {
           </div>
         ) : isError ? (
           <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-red-300">
-            Unable to load players. Start the backend API and try again.
+            {formatPlayerPoolError(playerPoolError)}
           </div>
         ) : availablePlayers.length === 0 ? (
           <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
@@ -492,100 +506,26 @@ export default function SinglePlayerMockDraftRoom() {
   const renderScoutingPanel = () => {
     if (!selectedPlayer) return null;
 
-    const projectionStats = projectionStatsForPlayer(selectedPlayer);
-    const previousStats = selectedPlayerSeasonStats?.stats ?? null;
-    const statRows = statRowsForPosition(selectedPlayer.pos);
-    const positionClass = POSITION_STYLES[selectedPlayer.pos] ?? "border-white/20 bg-white/10 text-foreground";
-    const visibleRank = selectedPlayer.masterDraftRank ?? selectedPlayer.draftRank;
-
     return (
-      <aside className="fixed bottom-0 right-0 top-0 z-[1300] flex w-full max-w-[420px] flex-col border-l border-cyan-200/15 bg-[#071225]/96 shadow-[-24px_0_80px_rgba(8,145,178,0.22)] backdrop-blur-2xl">
-        <div className="border-b border-cyan-100/10 p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200">Scouting Card</p>
-              <h2 className="mt-3 truncate text-2xl font-black tracking-tight text-white">{selectedPlayer.name}</h2>
-              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                {selectedPlayer.school} • Master Rank #{visibleRank}
-              </p>
-            </div>
-            <button
-              type="button"
-              aria-label="Close scouting card"
-              onClick={() => setSelectedPlayerId(null)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-muted-foreground transition hover:border-cyan-200/30 hover:text-white"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <span className={cn("rounded-full border px-4 py-2 text-xs font-black", positionClass)}>{selectedPlayer.pos}</span>
-            <span className="rounded-full border border-cyan-200/15 bg-cyan-300/10 px-4 py-2 text-xs font-black tabular-nums text-cyan-100">
-              {selectedPlayer.projectedPoints.toFixed(1)} PROJ
-            </span>
-            {selectedPlayer.sourceBoardRank ? (
-              <span className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-black tabular-nums text-muted-foreground">
-                Source #{selectedPlayer.sourceBoardRank}
-              </span>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          <section className="rounded-3xl border border-cyan-200/12 bg-white/[0.035] p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">Projected 2026</p>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              {statRows.map((row) => (
-                <div key={`projection-${row.label}`} className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">{row.label}</p>
-                  <p className="mt-2 text-lg font-black tabular-nums text-white">
-                    {formatStat(statValue(projectionStats, row.projectionKeys))}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="mt-4 rounded-3xl border border-cyan-200/12 bg-white/[0.035] p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">2025 Stats</p>
-                <p className="mt-1 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-                  {selectedPlayerSeasonStats?.source ?? "sportsdata"} {selectedPlayerSeasonStats?.cached ? "• cached" : ""}
-                </p>
-              </div>
-              {selectedPlayerSeasonStats?.message ? (
-                <span className="rounded-full border border-amber-200/20 bg-amber-300/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-amber-100">
-                  Limited
-                </span>
-              ) : null}
-            </div>
-            {selectedPlayerSeasonStats?.message ? (
-              <p className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3 text-xs font-bold leading-relaxed text-muted-foreground">
-                {selectedPlayerSeasonStats.message}
-              </p>
-            ) : null}
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              {statRows.map((row) => (
-                <div key={`previous-${row.label}`} className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">{row.label}</p>
-                  <p className="mt-2 text-lg font-black tabular-nums text-white">
-                    {formatStat(statValue(previousStats, row.previousKeys))}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="mt-4 rounded-3xl border border-cyan-200/12 bg-cyan-400/[0.055] p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">About the Player</p>
-            <p className="mt-3 text-sm font-semibold leading-6 text-slate-200">
-              {buildPlayerSummary(selectedPlayer, previousStats)}
-            </p>
-          </section>
-        </div>
-      </aside>
+      <PlayerCardModal
+        card={selectedPlayerCard}
+        loading={selectedPlayerCardLoading}
+        onClose={() => setSelectedPlayerId(null)}
+        player={{
+          id: selectedPlayer.id,
+          name: selectedPlayer.name,
+          school: selectedPlayer.school,
+          position: selectedPlayer.pos,
+          rankLabel: `Master Rank #${selectedPlayer.masterDraftRank ?? selectedPlayer.draftRank}`,
+          projectedPoints: selectedPlayer.projectedPoints,
+          playerClass: selectedPlayer.playerClass,
+          status: selectedPlayer.status,
+          projection: selectedPlayer.projection,
+          sheetProjectionStats: selectedPlayer.sheetProjectionStats,
+        }}
+        title="Scouting Card"
+        note="Mock draft cards use the same linked ESPN profile and cached stat endpoint as the real draft room when data is available."
+      />
     );
   };
 
@@ -893,9 +833,20 @@ export default function SinglePlayerMockDraftRoom() {
               <p className="text-[10px] font-black uppercase tracking-[0.26em] text-cyan-200 drop-shadow-[0_0_14px_rgba(103,232,249,0.32)]">Draft Order</p>
               <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">Scroll every pick left to right</p>
             </div>
-            <div className="text-right">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{totalPicks} Picks</p>
-              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">{totalPicks - draftedCount} Unlocked</p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={recenterDraftCarousel}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-200/20 bg-slate-950/60 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.14)] transition hover:border-cyan-200/50 hover:bg-cyan-300/12 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70"
+                aria-label="Center draft order on the current pick"
+                title="Center current pick"
+              >
+                <LocateFixed className="h-4 w-4" />
+              </button>
+              <div className="text-right">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{totalPicks} Picks</p>
+                <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">{totalPicks - draftedCount} Unlocked</p>
+              </div>
             </div>
           </div>
           <div ref={carouselRef} className="flex gap-4 overflow-x-auto px-5 py-5 scroll-smooth">
@@ -952,13 +903,13 @@ export default function SinglePlayerMockDraftRoom() {
 
       {renderScoutingPanel()}
 
-      {draftState.status === "complete" ? (
+      {draftState.status === "complete" && showCompleteDialog ? (
         <div className="fixed inset-0 z-[1450] flex items-center justify-center bg-slate-950/58 px-4 backdrop-blur-[7px]">
           <section
             role="dialog"
             aria-modal="true"
             aria-labelledby="mock-draft-complete-title"
-            className="w-full max-w-[560px] overflow-hidden rounded-[2rem] border border-cyan-200/25 bg-[#071225]/92 text-center shadow-[0_0_90px_rgba(34,211,238,0.22),inset_0_1px_0_rgba(255,255,255,0.08)]"
+            className="w-full max-w-[720px] overflow-hidden rounded-[2rem] border border-cyan-200/25 bg-[#071225]/92 text-center shadow-[0_0_90px_rgba(34,211,238,0.22),inset_0_1px_0_rgba(255,255,255,0.08)]"
           >
             <div className="border-b border-cyan-100/10 bg-gradient-to-br from-cyan-400/12 via-blue-500/8 to-violet-500/10 px-8 py-10">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-cyan-200/35 bg-cyan-300/12 text-cyan-100 shadow-[0_0_48px_rgba(103,232,249,0.34)]">
@@ -978,10 +929,19 @@ export default function SinglePlayerMockDraftRoom() {
                 rosters, standings, or transactions.
               </p>
             </div>
-            <div className="flex flex-col gap-3 px-8 py-6 sm:flex-row sm:justify-center">
+            <div className="grid gap-3 px-8 py-6 sm:grid-cols-3">
               <Button
                 type="button"
-                className="h-12 rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 px-8 text-[10px] font-black uppercase tracking-[0.18em] text-slate-950 shadow-[0_0_28px_rgba(103,232,249,0.24)]"
+                className="h-12 rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 px-6 text-[10px] font-black uppercase tracking-[0.16em] text-slate-950 shadow-[0_0_28px_rgba(103,232,249,0.24)]"
+                onClick={viewDraftedRoster}
+              >
+                <ClipboardList className="mr-2 h-4 w-4" />
+                View Your Roster
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12 rounded-2xl border-cyan-200/20 bg-white/[0.04] px-6 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100 hover:border-cyan-200/40 hover:bg-cyan-400/12 hover:text-white"
                 onClick={() => navigate("/draft")}
               >
                 Exit to Draft Center
@@ -989,7 +949,7 @@ export default function SinglePlayerMockDraftRoom() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-12 rounded-2xl border-cyan-200/20 bg-white/[0.04] px-8 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100 hover:border-cyan-200/40 hover:bg-cyan-400/12 hover:text-white"
+                className="h-12 rounded-2xl border-cyan-200/20 bg-white/[0.04] px-6 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100 hover:border-cyan-200/40 hover:bg-cyan-400/12 hover:text-white"
                 onClick={resetDraft}
               >
                 <RefreshCcw className="mr-2 h-4 w-4" />

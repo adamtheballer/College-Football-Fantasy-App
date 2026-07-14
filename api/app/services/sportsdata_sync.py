@@ -18,6 +18,10 @@ from collegefootballfantasy_api.app.services.power4 import (
     list_power4_teams,
     resolve_power4_school,
 )
+from collegefootballfantasy_api.app.services.provider_identity import (
+    upsert_player_provider_mapping,
+    upsert_team_provider_mapping,
+)
 
 _OFFENSE_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 
@@ -100,6 +104,8 @@ def sync_power4_players_from_sportsdata(db: Session) -> dict[str, int]:
             skipped += 1
             continue
 
+        provider_team_id = _pick_str(row, "TeamID", "TeamId", "Team", "TeamKey")
+
         existing: Player | None = None
         if external_id:
             existing = db.scalar(select(Player).where(Player.external_id == external_id))
@@ -121,17 +127,56 @@ def sync_power4_players_from_sportsdata(db: Session) -> dict[str, int]:
             if external_id:
                 existing.external_id = external_id
             db.add(existing)
+            db.flush()
+            if external_id:
+                upsert_player_provider_mapping(
+                    db,
+                    player_id=existing.id,
+                    provider="sportsdata",
+                    provider_player_id=external_id,
+                    provider_team_id=provider_team_id,
+                    match_confidence=1.0,
+                    verification_status="unverified",
+                    reason="sportsdata player sync",
+                )
+            if provider_team_id:
+                upsert_team_provider_mapping(
+                    db,
+                    team_name=canonical_team,
+                    provider="sportsdata",
+                    provider_team_id=provider_team_id,
+                    provider_team_name=team_candidate,
+                )
             updated += 1
             continue
 
-        db.add(
-            Player(
-                external_id=external_id,
-                name=name,
-                school=canonical_team,
-                position=position,
-            )
+        player = Player(
+            external_id=external_id,
+            name=name,
+            school=canonical_team,
+            position=position,
         )
+        db.add(player)
+        db.flush()
+        if external_id:
+            upsert_player_provider_mapping(
+                db,
+                player_id=player.id,
+                provider="sportsdata",
+                provider_player_id=external_id,
+                provider_team_id=provider_team_id,
+                match_confidence=1.0,
+                verification_status="unverified",
+                reason="sportsdata player sync",
+            )
+        if provider_team_id:
+            upsert_team_provider_mapping(
+                db,
+                team_name=canonical_team,
+                provider="sportsdata",
+                provider_team_id=provider_team_id,
+                provider_team_name=team_candidate,
+            )
         created += 1
 
     db.flush()

@@ -11,6 +11,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || resolveDefaultApiBase();
 
 const ACCESS_TOKEN_STORAGE_KEY = "cfb_access_token";
 const ACCESS_TOKEN_EXPIRES_AT_STORAGE_KEY = "cfb_access_token_expires_at";
+const AUTH_CHANGED_EVENT = "cfb-auth-changed";
 
 export class ApiError extends Error {
   status: number;
@@ -61,6 +62,15 @@ const safeStorageRemove = (key: string) => {
   }
 };
 
+const dispatchAuthChanged = () => {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+  } catch {
+    // Ignore event failures; storage cleanup should still complete.
+  }
+};
+
 export const getStoredAccessToken = (): string | null =>
   safeStorageGet(ACCESS_TOKEN_STORAGE_KEY);
 
@@ -78,6 +88,7 @@ export const storeAccessTokenSession = (
 export const clearAccessTokenSession = () => {
   safeStorageRemove(ACCESS_TOKEN_STORAGE_KEY);
   safeStorageRemove(ACCESS_TOKEN_EXPIRES_AT_STORAGE_KEY);
+  dispatchAuthChanged();
 };
 
 export const isStoredAccessTokenExpired = (bufferMs = 0): boolean => {

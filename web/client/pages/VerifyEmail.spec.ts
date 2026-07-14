@@ -5,11 +5,24 @@ import { verificationErrorMessage } from "./VerifyEmail";
 
 describe("verificationErrorMessage", () => {
   it("turns expired verification token errors into user-actionable copy", () => {
-    expect(verificationErrorMessage(new ApiError(400, "invalid or expired token"))).toContain(
-      "invalid or expired"
+    expect(verificationErrorMessage(new ApiError(400, "expired token"))).toContain(
+      "expired"
     );
-    expect(verificationErrorMessage(new ApiError(400, "invalid or expired token"))).toContain(
+    expect(verificationErrorMessage(new ApiError(400, "expired token"))).toContain(
       "Request a new verification email"
+    );
+  });
+
+  it("distinguishes invalid and already-used token states", () => {
+    expect(verificationErrorMessage(new ApiError(400, "invalid token"))).toContain("invalid");
+    expect(verificationErrorMessage(new ApiError(400, "token already used"))).toContain(
+      "already used"
+    );
+  });
+
+  it("keeps rate-limit failures actionable", () => {
+    expect(verificationErrorMessage(new ApiError(429, "too many requests"))).toContain(
+      "Too many verification attempts"
     );
   });
 

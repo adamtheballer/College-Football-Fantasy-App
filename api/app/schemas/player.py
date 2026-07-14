@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from collegefootballfantasy_api.app.schemas.historical_stats import PlayerHistoricalStatsResponse
+
 
 class PlayerBase(BaseModel):
     external_id: str | None = None
@@ -79,3 +81,4 @@ class PlayerCardRead(BaseModel):
     about: PlayerCardAboutRead
     injuries: list[PlayerCardInjuryRead]
     season_stats: list[PlayerCardStatRowRead]
+    historical_stats: PlayerHistoricalStatsResponse | None = None

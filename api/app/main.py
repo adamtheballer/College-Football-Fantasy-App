@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from collegefootballfantasy_api.app.api.routes import (
     auth,
+    admin_scoring,
     health,
     insights,
     injuries,
@@ -11,6 +12,7 @@ from collegefootballfantasy_api.app.api.routes import (
     notifications,
     players,
     projections,
+    provider_identity,
     rosters,
     schedule,
     stats,
@@ -20,10 +22,13 @@ from collegefootballfantasy_api.app.api.routes import (
 )
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.logging import configure_logging
+from collegefootballfantasy_api.app.core.middleware import request_context_middleware, security_headers_middleware
 
 configure_logging(settings.api_log_level)
 
 app = FastAPI(title="CollegeFootballFantasy API")
+app.middleware("http")(request_context_middleware)
+app.middleware("http")(security_headers_middleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,11 +41,13 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(admin_scoring.router, prefix="/admin/scoring", tags=["admin-scoring"])
 app.include_router(leagues.router, prefix="/leagues", tags=["leagues"])
 app.include_router(teams.router, tags=["teams"])
 app.include_router(players.router, prefix="/players", tags=["players"])
 app.include_router(rosters.router, tags=["rosters"])
 app.include_router(projections.router, prefix="/projections", tags=["projections"])
+app.include_router(provider_identity.router, prefix="/provider-identity", tags=["provider-identity"])
 app.include_router(injuries.router, prefix="/injuries", tags=["injuries"])
 app.include_router(matchups.router, prefix="/matchups", tags=["matchups"])
 app.include_router(schedule.router, prefix="/schedule", tags=["schedule"])

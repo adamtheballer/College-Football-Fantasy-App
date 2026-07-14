@@ -51,7 +51,7 @@ export default function Signup() {
     setIsLoading(true);
     try {
       const nextUser = await signup(firstName, email, password);
-      if (nextUser) {
+      if (nextUser?.emailVerifiedAt) {
         setPendingGuide(nextUser.id);
       }
       navigate("/verify-email", { replace: true });

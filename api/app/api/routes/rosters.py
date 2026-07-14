@@ -25,6 +25,10 @@ from collegefootballfantasy_api.app.schemas.roster import (
     RosterEntryRead,
 )
 from collegefootballfantasy_api.app.schemas.transaction import TransactionList, TransactionRead
+from collegefootballfantasy_api.app.services.roster_legality import (
+    eligible_slots_for_position,
+    normalize_slot,
+)
 
 router = APIRouter()
 
@@ -61,20 +65,43 @@ def _league_settings(db: Session, league_id: int) -> LeagueSettings:
 
 
 def _slot_limits(settings_row: LeagueSettings) -> dict[str, int]:
-    return settings_row.roster_slots_json or DEFAULT_ROSTER_SLOTS
+    raw_limits = settings_row.roster_slots_json or DEFAULT_ROSTER_SLOTS
+    normalized_limits: dict[str, int] = {}
+    for raw_slot, raw_count in raw_limits.items():
+        slot = normalize_slot(raw_slot)
+        if not slot:
+            continue
+        normalized_limits[slot] = int(raw_count or 0)
+    return normalized_limits
 
 
 def _validate_slot_counts(slot_limits: dict[str, int], slots: list[str]) -> None:
     counts: dict[str, int] = {}
     for slot in slots:
-        if slot not in slot_limits:
+        normalized_slot = normalize_slot(slot)
+        if normalized_slot is None or normalized_slot not in slot_limits:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"invalid roster slot: {slot}")
-        counts[slot] = counts.get(slot, 0) + 1
+        counts[normalized_slot] = counts.get(normalized_slot, 0) + 1
 
     for slot, count in counts.items():
         limit = int(slot_limits.get(slot, 0))
         if count > limit:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"lineup exceeds {slot} slots")
+
+
+def _validate_position_slot_eligibility(settings_row: LeagueSettings, entry: RosterEntry, slot: str) -> None:
+    normalized_slot = normalize_slot(slot)
+    if normalized_slot is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"invalid roster slot: {slot}")
+    if normalized_slot == "IR":
+        return
+    position = (entry.player.position if entry.player else "").upper()
+    eligible_slots = eligible_slots_for_position(position, superflex_enabled=bool(settings_row.superflex_enabled))
+    if normalized_slot not in eligible_slots:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"{position or 'player'} is not eligible for {normalized_slot}",
+        )
 
 
 def _ensure_player_exists(db: Session, player_id: int) -> Player:
@@ -134,7 +161,10 @@ def _best_available_slot(
     for entry in roster_entries:
         if exclude_entry_id is not None and entry.id == exclude_entry_id:
             continue
-        counts[entry.slot] = counts.get(entry.slot, 0) + 1
+        slot = normalize_slot(entry.slot)
+        if not slot:
+            continue
+        counts[slot] = counts.get(slot, 0) + 1
 
     primary_limit = int(slot_limits.get(player_position, 0))
     if primary_limit and counts.get(player_position, 0) < primary_limit:
@@ -159,13 +189,15 @@ def add_roster_entry_endpoint(
     current_user: User = Depends(require_verified_user),
 ) -> RosterEntryRead:
     team = require_team_owner(db, team_id, current_user)
-    _ensure_player_exists(db, entry_in.player_id)
+    player = _ensure_player_exists(db, entry_in.player_id)
     _ensure_player_available(db, team.league_id, entry_in.player_id)
 
     settings_row = _league_settings(db, team.league_id)
     slot_limits = _slot_limits(settings_row)
     slots = [entry.slot for entry in _load_roster_entry_rows(db, team.id)] + [entry_in.slot]
     _validate_slot_counts(slot_limits, slots)
+    candidate_entry = RosterEntry(player=player)
+    _validate_position_slot_eligibility(settings_row, candidate_entry, entry_in.slot)
 
     entry = RosterEntry(
         league_id=team.league_id,
@@ -259,6 +291,7 @@ def update_lineup_endpoint(
         next_slot = assignment.slot if assignment else entry.slot
         desired_slots.append(next_slot)
         if assignment and assignment.slot != entry.slot:
+            _validate_position_slot_eligibility(settings_row, entry, assignment.slot)
             changed_entries.append((entry, entry.slot))
 
     if any(entry_id not in roster_by_id for entry_id in requested_ids):

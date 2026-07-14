@@ -10,7 +10,6 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.matchup import Matchup
-from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.models.roster import RosterEntry
@@ -53,6 +52,16 @@ SCORING_RULE_ALIASES = {
     "rushing_yards": "rush_yards",
     "receiving_yards": "rec_yards",
     "interception": "interceptions",
+    "int": "interceptions",
+    "fumble_lost": "fumbles_lost",
+    "fg": "fg_made_0_39",
+    "xp": "xp_made",
+}
+
+SCORING_YARDS_PER_POINT_ALIASES = {
+    "pass_yds_per_pt": "pass_yards",
+    "rush_yds_per_pt": "rush_yards",
+    "rec_yds_per_pt": "rec_yards",
 }
 
 STAT_FIELD_ALIASES = {
@@ -74,6 +83,7 @@ STAT_FIELD_ALIASES = {
 BENCH_SLOTS = {"BE", "BENCH"}
 NON_SCORING_SLOTS = {"IR", "INJURED_RESERVE"}
 FINAL_MATCHUP_STATUSES = {"final", "stat_corrected"}
+DELAYED_SCORE_STATUSES = {"delayed", "unavailable", "stale"}
 
 
 @dataclass(frozen=True)
@@ -115,7 +125,13 @@ def normalize_player_stats(raw_stats: dict) -> dict:
 def normalize_scoring_rules(scoring_rules: dict | None) -> dict[str, float]:
     normalized = DEFAULT_SCORING_RULES.copy()
     for key, value in (scoring_rules or {}).items():
-        canonical_key = SCORING_RULE_ALIASES.get(str(key), str(key))
+        raw_key = str(key)
+        if raw_key in SCORING_YARDS_PER_POINT_ALIASES:
+            yards_per_point = _number(value)
+            if yards_per_point > 0:
+                normalized[SCORING_YARDS_PER_POINT_ALIASES[raw_key]] = round(1 / yards_per_point, 6)
+            continue
+        canonical_key = SCORING_RULE_ALIASES.get(raw_key, raw_key)
         if canonical_key in normalized:
             normalized[canonical_key] = _number(value)
     return normalized
@@ -209,30 +225,67 @@ def _stat_map(db: Session, season: int, week: int, player_ids: set[int]) -> dict
     return {row.player_id: row for row in rows}
 
 
+def _relevant_scoring_player_ids(db: Session, league_id: int, season: int, week: int) -> set[int]:
+    snapshot_ids = {
+        player_id
+        for (player_id,) in db.query(LineupWeekSnapshot.player_id)
+        .filter(
+            LineupWeekSnapshot.league_id == league_id,
+            LineupWeekSnapshot.season == season,
+            LineupWeekSnapshot.week == week,
+        )
+        .all()
+    }
+    existing_score_ids = {
+        player_id
+        for (player_id,) in db.query(PlayerWeekScore.player_id)
+        .filter(
+            PlayerWeekScore.league_id == league_id,
+            PlayerWeekScore.season == season,
+            PlayerWeekScore.week == week,
+        )
+        .all()
+    }
+    return snapshot_ids | existing_score_ids
+
+
 def recalculate_player_week_scores(db: Session, league_id: int, season: int, week: int) -> int:
     settings = _league_settings(db, league_id)
     scoring_rules = settings.scoring_json if settings else {}
-    player_ids = {
-        player_id
-        for (player_id,) in db.query(Player.id).order_by(Player.id.asc()).all()
-    }
+    player_ids = _relevant_scoring_player_ids(db, league_id, season, week)
     stat_by_player = _stat_map(db, season, week, player_ids)
+    if player_ids and not stat_by_player:
+        raise ValueError(
+            f"no provider stat rows found for league {league_id}, season {season}, week {week}; refusing to overwrite scores"
+        )
+    score_by_player = {
+        row.player_id: row
+        for row in db.query(PlayerWeekScore)
+        .filter(
+            PlayerWeekScore.league_id == league_id,
+            PlayerWeekScore.season == season,
+            PlayerWeekScore.week == week,
+            PlayerWeekScore.player_id.in_(player_ids or {0}),
+        )
+        .all()
+    }
     calculated_at = _now()
     scored = 0
     for player_id in sorted(player_ids):
         stat_row = stat_by_player.get(player_id)
-        normalized_stats = normalize_player_stats(stat_row.stats if stat_row else {})
+        score = score_by_player.get(player_id)
+        if not stat_row:
+            if score:
+                score.status = "stale"
+                score.breakdown_json = {
+                    **(score.breakdown_json or {}),
+                    "status": "stale",
+                    "message": "No provider stat row was available for this recalculation; previous score retained.",
+                }
+                score.calculated_at = calculated_at
+            continue
+        normalized_stats = normalize_player_stats(stat_row.stats)
         fantasy_points, breakdown = calculate_player_fantasy_points(normalized_stats, scoring_rules)
-        score = (
-            db.query(PlayerWeekScore)
-            .filter(
-                PlayerWeekScore.league_id == league_id,
-                PlayerWeekScore.player_id == player_id,
-                PlayerWeekScore.season == season,
-                PlayerWeekScore.week == week,
-            )
-            .first()
-        )
         if not score:
             score = PlayerWeekScore(
                 league_id=league_id,
@@ -241,7 +294,9 @@ def recalculate_player_week_scores(db: Session, league_id: int, season: int, wee
                 week=week,
             )
             db.add(score)
+            score_by_player[player_id] = score
         score.fantasy_points = fantasy_points
+        score.status = "live"
         score.breakdown_json = breakdown
         score.source_stat_id = stat_row.id if stat_row else None
         score.calculated_at = calculated_at
@@ -276,20 +331,28 @@ def recalculate_team_week_score(db: Session, league_id: int, team_id: int, seaso
     starter_points = 0.0
     bench_points = 0.0
     player_breakdown = []
+    missing_starter_scores = 0
+    missing_bench_scores = 0
     for snapshot in snapshots:
         score = score_by_player.get(snapshot.player_id)
         points = float(score.fantasy_points if score else 0.0)
         slot = (snapshot.slot or "").upper()
+        score_status = score.status if score else "unavailable"
         if snapshot.is_starter:
             starter_points += points
+            if not score or score_status in DELAYED_SCORE_STATUSES:
+                missing_starter_scores += 1
         elif slot not in NON_SCORING_SLOTS:
             bench_points += points
+            if not score or score_status in DELAYED_SCORE_STATUSES:
+                missing_bench_scores += 1
         player_breakdown.append(
             {
                 "player_id": snapshot.player_id,
                 "slot": slot,
                 "is_starter": snapshot.is_starter,
                 "points": round(points, 2),
+                "status": score_status,
             }
         )
     team_score = (
@@ -321,8 +384,15 @@ def recalculate_team_week_score(db: Session, league_id: int, team_id: int, seaso
         "starter_points": team_score.starter_points,
         "bench_points": team_score.bench_points,
         "total_points": team_score.total_points,
+        "missing_starter_scores": missing_starter_scores,
+        "missing_bench_scores": missing_bench_scores,
     }
-    team_score.status = "live"
+    if not snapshots:
+        team_score.status = "unavailable"
+    elif missing_starter_scores:
+        team_score.status = "delayed"
+    else:
+        team_score.status = "live"
     team_score.calculated_at = _now()
     db.flush()
     return team_score
@@ -368,7 +438,13 @@ def recalculate_matchup_scores(db: Session, league_id: int, season: int, week: i
         matchup.home_score = float(home_score.total_points if home_score else 0.0)
         matchup.away_score = float(away_score.total_points if away_score else 0.0)
         if (matchup.status or "").lower() not in FINAL_MATCHUP_STATUSES:
-            matchup.status = "live"
+            team_statuses = {home_score.status if home_score else "unavailable", away_score.status if away_score else "unavailable"}
+            if "unavailable" in team_statuses:
+                matchup.status = "unavailable"
+            elif team_statuses.intersection(DELAYED_SCORE_STATUSES):
+                matchup.status = "delayed"
+            else:
+                matchup.status = "live"
         updated += 1
     if updated:
         db.flush()
@@ -489,21 +565,22 @@ def run_league_scoring_recalculation(
     db.add(run)
     db.flush()
     try:
-        if league_id is not None:
-            if not db.get(League, league_id):
-                raise ValueError(f"league {league_id} not found")
-            summary = recalculate_league_week_scores(db, league_id, season, week)
-        else:
-            summary = ScoringSummary(0, 0, 0, 0)
-            leagues = db.query(League).filter(League.season_year == season).all()
-            for league in leagues:
-                current = recalculate_league_week_scores(db, league.id, season, week)
-                summary = ScoringSummary(
-                    players_scored=summary.players_scored + current.players_scored,
-                    teams_scored=summary.teams_scored + current.teams_scored,
-                    matchups_updated=summary.matchups_updated + current.matchups_updated,
-                    standings_updated=summary.standings_updated + current.standings_updated,
-                )
+        with db.begin_nested():
+            if league_id is not None:
+                if not db.get(League, league_id):
+                    raise ValueError(f"league {league_id} not found")
+                summary = recalculate_league_week_scores(db, league_id, season, week)
+            else:
+                summary = ScoringSummary(0, 0, 0, 0)
+                leagues = db.query(League).filter(League.season_year == season).all()
+                for league in leagues:
+                    current = recalculate_league_week_scores(db, league.id, season, week)
+                    summary = ScoringSummary(
+                        players_scored=summary.players_scored + current.players_scored,
+                        teams_scored=summary.teams_scored + current.teams_scored,
+                        matchups_updated=summary.matchups_updated + current.matchups_updated,
+                        standings_updated=summary.standings_updated + current.standings_updated,
+                    )
         run.status = "success"
         run.completed_at = _now()
         run.players_updated = summary.players_scored

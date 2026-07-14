@@ -35,7 +35,7 @@ export function FloatingQuickActions() {
       {
         label: "Player Compare",
         icon: UserRoundSearch,
-        onClick: () => navigate("/stats/players"),
+        onClick: () => navigate("/player-compare"),
         styleClass: "from-amber-500/90 to-orange-500/90",
       },
     ],

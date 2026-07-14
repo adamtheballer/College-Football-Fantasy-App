@@ -1,20 +1,49 @@
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Search, Sparkles, TrendingUp, UserPlus, Zap } from "lucide-react";
+import { Search, Sparkles, UserPlus, Zap } from "lucide-react";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
+import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import { useLeagueWaiverTab } from "@/hooks/use-leagues";
+import { useDraftPlayerPool, usePlayerCard } from "@/hooks/use-players";
 import {
   useCreateWatchlist,
   useToggleWatchlistPlayer,
   useWatchlists,
 } from "@/hooks/use-watchlists";
 import { DEMO_LEAGUE_ID, createDemoLeagueWaiverResponse } from "@/lib/leaguePreviewData";
+import { buildDraftBoard } from "@/lib/draftRankings";
+import type { PlayerStats } from "@/types/player";
 
 const positions = ["ALL", "QB", "RB", "WR", "TE", "K"] as const;
+const availablePlayersDraftConfig = {
+  leagueSize: 12,
+  rosterSlots: {
+    QB: 1,
+    RB: 2,
+    WR: 2,
+    TE: 1,
+    K: 1,
+    BE: 5,
+    IR: 0,
+  },
+};
+
+type AvailablePlayerRow = {
+  id: number;
+  name: string;
+  school: string | null;
+  position: string | null;
+  weekly_projected_fantasy_points: number;
+  rank: number;
+  playerClass?: string | null;
+  status?: string | null;
+  projection?: PlayerStats | null;
+  sheetProjectionStats?: Record<string, number | null | undefined> | null;
+};
 
 const positionTone = (position?: string | null) => {
   switch ((position ?? "").toUpperCase()) {
@@ -75,15 +104,54 @@ export default function LeagueWaivers() {
   const isDemoLeague = parsedLeagueId === DEMO_LEAGUE_ID;
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState<(typeof positions)[number]>("ALL");
+  const [selectedPlayer, setSelectedPlayer] = useState<AvailablePlayerRow | null>(null);
   const waiverQuery = useLeagueWaiverTab(parsedLeagueId, 50, 0, !isDemoLeague);
   const waiverData = isDemoLeague ? createDemoLeagueWaiverResponse() : waiverQuery.data;
+  const playerPoolQuery = useDraftPlayerPool({
+    league_id: parsedLeagueId,
+    available_only: !isDemoLeague && Number.isFinite(parsedLeagueId),
+    limit: 200,
+    offset: 0,
+    fetchAll: true,
+    sort: "draft_rank",
+    enabled: !isDemoLeague && Number.isFinite(parsedLeagueId),
+  });
   const watchlistsQuery = useWatchlists(
     parsedLeagueId,
     !isDemoLeague && typeof parsedLeagueId === "number" && !Number.isNaN(parsedLeagueId)
   );
   const createWatchlist = useCreateWatchlist();
   const toggleWatchlistPlayer = useToggleWatchlistPlayer();
-  const players = waiverData?.available_players ?? [];
+  const { data: selectedPlayerCard, isLoading: selectedPlayerCardLoading } = usePlayerCard(
+    selectedPlayer?.id,
+    Boolean(selectedPlayer?.id)
+  );
+  const players = useMemo<AvailablePlayerRow[]>(() => {
+    if (isDemoLeague) {
+      return (waiverData?.available_players ?? []).map((player, index) => ({
+        ...player,
+        rank: index + 1,
+      }));
+    }
+
+    return buildDraftBoard(playerPoolQuery.data?.data ?? [], availablePlayersDraftConfig)
+      .map((player) => ({
+        id: player.id,
+        name: player.name,
+        school: player.school,
+        position: player.pos,
+        weekly_projected_fantasy_points: player.projectedPoints,
+        rank: player.masterDraftRank ?? player.draftRank,
+        playerClass: player.playerClass,
+        status: player.status,
+        projection: player.projection,
+        sheetProjectionStats: player.sheetProjectionStats,
+      }))
+      .sort((left, right) => {
+        if (left.rank !== right.rank) return left.rank - right.rank;
+        return left.name.localeCompare(right.name);
+      });
+  }, [isDemoLeague, playerPoolQuery.data?.data, waiverData?.available_players]);
   const watchlists = watchlistsQuery.data?.data ?? [];
   const primaryWatchlist = watchlists[0] ?? null;
   const watchedPlayerIds = useMemo(
@@ -99,12 +167,7 @@ export default function LeagueWaivers() {
         return [player.name, player.school, player.position]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(query));
-      })
-      .sort(
-        (first, second) =>
-          Number(second.weekly_projected_fantasy_points ?? 0) -
-          Number(first.weekly_projected_fantasy_points ?? 0)
-      );
+      });
   }, [players, position, search]);
 
   const topProjection = players.reduce(
@@ -122,6 +185,18 @@ export default function LeagueWaivers() {
       toast({
         title: "Demo league watchlist",
         description: "Watchlists persist in real leagues after signing in.",
+      });
+      return;
+    }
+
+    if (watchlistsQuery.isError) {
+      toast({
+        title: "Unable to update watchlist",
+        description:
+          watchlistsQuery.error instanceof Error
+            ? watchlistsQuery.error.message
+            : "Reload the watchlist after the backend is reachable.",
+        variant: "destructive",
       });
       return;
     }
@@ -230,85 +305,115 @@ export default function LeagueWaivers() {
             </div>
           </div>
         </div>
-        {filteredPlayers.length === 0 ? (
+        {!isDemoLeague && playerPoolQuery.isLoading ? (
+          <p className="px-5 py-6 text-sm text-slate-400">
+            Loading the full master-board player pool…
+          </p>
+        ) : !isDemoLeague && playerPoolQuery.isError ? (
+          <p className="px-5 py-6 text-sm font-black uppercase tracking-[0.16em] text-red-300">
+            Unable to load the full available-player board
+            {playerPoolQuery.error instanceof Error ? `: ${playerPoolQuery.error.message}` : "."}
+          </p>
+        ) : filteredPlayers.length === 0 ? (
           <p className="px-5 py-6 text-sm text-slate-400">
             No league-scoped available players match the current filters.
           </p>
         ) : (
-          <div className="divide-y divide-sky-300/10">
-            {filteredPlayers.map((player, index) => {
-              const tone = positionTone(player.position);
-              const projected = Number(player.weekly_projected_fantasy_points ?? 0);
-              const share = topProjection > 0 ? Math.min(100, Math.max(8, (projected / topProjection) * 100)) : 0;
-              return (
-                <div
-                  key={player.id}
-                  className="group relative grid gap-4 px-5 py-4 text-sm text-slate-200 transition-all duration-200 hover:-translate-y-0.5 hover:bg-sky-300/[0.045] hover:shadow-[0_18px_50px_rgba(14,165,233,0.10)] xl:grid-cols-[64px_minmax(260px,1.25fr)_minmax(140px,0.55fr)_minmax(250px,0.75fr)_minmax(230px,auto)]"
-                >
-                  <div className="flex items-center">
-                    <span className="text-2xl font-black italic text-slate-600 transition-colors group-hover:text-sky-200">
-                      {index + 1}
-                    </span>
-                  </div>
-                  <div className="flex min-w-0 items-center gap-4">
-                    <div className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${tone.border} ${tone.bg} ${tone.glow}`}>
-                      <span className={`absolute -right-1 -top-1 h-3 w-3 rounded-full ${tone.dot} shadow-[0_0_18px_currentColor]`} />
-                      <span className={`text-[11px] font-black uppercase tracking-[0.12em] ${tone.text}`}>
-                        {player.position ?? "-"}
-                      </span>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-base font-black text-slate-50 transition-colors group-hover:text-sky-50">
-                        {player.name}
-                      </p>
-                      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                        Available player
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center text-sm font-bold text-slate-400">
-                    {player.school ?? "-"}
-                  </div>
-                  <div className="flex min-w-[220px] items-center">
-                    <div className="w-full">
-                      <div className="mb-2 flex items-center justify-between gap-3">
-                        <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
-                          <TrendingUp className="h-3 w-3 text-sky-300" />
-                          Week Proj
+          <div className="overflow-x-auto">
+            <table className="min-w-[920px] w-full table-fixed text-left">
+              <thead className="border-b border-sky-300/10 bg-slate-950/35">
+                <tr className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                  <th className="w-20 px-5 py-4">RK</th>
+                  <th className="px-4 py-4">Player</th>
+                  <th className="w-44 px-4 py-4">School</th>
+                  <th className="w-24 px-4 py-4">POS</th>
+                  <th className="w-32 px-4 py-4 text-right">Week 1 Proj</th>
+                  <th className="w-56 px-5 py-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-sky-300/10">
+                {filteredPlayers.map((player) => {
+                  const tone = positionTone(player.position);
+                  const projected = Number(player.weekly_projected_fantasy_points ?? 0);
+                  return (
+                    <tr
+                      key={player.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedPlayer(player)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setSelectedPlayer(player);
+                        }
+                      }}
+                      className="group cursor-pointer text-sm text-slate-200 transition-colors hover:bg-sky-300/[0.045] focus:outline-none focus-visible:bg-sky-300/[0.065]"
+                    >
+                      <td className="px-5 py-4 align-middle">
+                        <span className="text-xl font-black italic text-slate-500 transition-colors group-hover:text-sky-200">
+                          {player.rank}
                         </span>
-                        <span className="text-lg font-black text-sky-100">{projected.toFixed(1)}</span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-slate-950/80 ring-1 ring-sky-300/10">
-                        <div
-                          className="h-full rounded-full bg-[linear-gradient(90deg,rgba(125,211,252,0.95),rgba(186,230,253,0.9))] shadow-[0_0_18px_rgba(56,189,248,0.30)]"
-                          style={{ width: `${share}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex min-w-[220px] items-center justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => void handleWatchPlayer(player.id)}
-                      disabled={createWatchlist.isPending || toggleWatchlistPlayer.isPending}
-                      className="h-11 rounded-2xl border-sky-300/20 bg-sky-300/[0.06] px-4 text-[10px] font-black uppercase tracking-[0.16em] text-sky-100 transition-all hover:border-sky-200/45 hover:bg-sky-300/15 hover:shadow-[0_0_26px_rgba(56,189,248,0.16)]"
-                    >
-                      <Sparkles className="mr-2 h-3.5 w-3.5" />
-                      {watchedPlayerIds.has(player.id) ? "Watching" : "Watch"}
-                    </Button>
-                    <Button
-                      type="button"
-                      disabled
-                      className="h-11 rounded-2xl bg-sky-300 px-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-950 shadow-[0_10px_28px_rgba(14,165,233,0.18)] transition-all hover:bg-sky-200"
-                    >
-                      <UserPlus className="mr-2 h-3.5 w-3.5" />
-                      Claims Off
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
+                      </td>
+                      <td className="px-4 py-4 align-middle">
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-black text-slate-50 transition-colors group-hover:text-sky-50">
+                            {player.name}
+                          </p>
+                          <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                            Available player
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 align-middle text-sm font-bold uppercase tracking-[0.08em] text-slate-400">
+                        {player.school ?? "-"}
+                      </td>
+                      <td className="px-4 py-4 align-middle">
+                        <span
+                          className={`inline-flex min-w-14 items-center justify-center rounded-xl border px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] ${tone.border} ${tone.bg} ${tone.text}`}
+                        >
+                          {player.position ?? "-"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-right align-middle">
+                        <span className="text-lg font-black tabular-nums text-sky-100">
+                          {projected.toFixed(1)}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 align-middle">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleWatchPlayer(player.id);
+                            }}
+                            disabled={
+                              createWatchlist.isPending ||
+                              toggleWatchlistPlayer.isPending ||
+                              watchlistsQuery.isError
+                            }
+                            className="h-10 rounded-xl border-sky-300/20 bg-sky-300/[0.06] px-3 text-[10px] font-black uppercase tracking-[0.14em] text-sky-100 transition-all hover:border-sky-200/45 hover:bg-sky-300/15"
+                          >
+                            <Sparkles className="mr-2 h-3.5 w-3.5" />
+                            {watchedPlayerIds.has(player.id) ? "Watching" : "Watch"}
+                          </Button>
+                          <Button
+                            type="button"
+                            disabled
+                            onClick={(event) => event.stopPropagation()}
+                            className="h-10 rounded-xl bg-sky-300/75 px-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-950 shadow-none"
+                          >
+                            <UserPlus className="mr-2 h-3.5 w-3.5" />
+                            Claims Off
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </section>
@@ -337,6 +442,27 @@ export default function LeagueWaivers() {
             );
           })}
       </section>
+      {selectedPlayer ? (
+        <PlayerCardModal
+          card={selectedPlayerCard}
+          loading={selectedPlayerCardLoading}
+          onClose={() => setSelectedPlayer(null)}
+          player={{
+            id: selectedPlayer.id,
+            name: selectedPlayer.name,
+            school: selectedPlayer.school,
+            position: selectedPlayer.position,
+            rankLabel: `Master Rank #${selectedPlayer.rank}`,
+            projectedPoints: selectedPlayer.weekly_projected_fantasy_points,
+            playerClass: selectedPlayer.playerClass,
+            status: selectedPlayer.status,
+            projection: selectedPlayer.projection,
+            sheetProjectionStats: selectedPlayer.sheetProjectionStats,
+          }}
+          title="Available Player"
+          note="Week projection uses the app's current projection formula for the selected week. Schedule-strength adjustments should come from the league schedule data when available."
+        />
+      ) : null}
     </main>
   );
 }

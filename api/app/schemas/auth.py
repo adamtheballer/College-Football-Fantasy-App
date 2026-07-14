@@ -1,6 +1,6 @@
 from datetime import datetime
 import re
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -86,6 +86,7 @@ class UserRead(BaseModel):
     first_name: str
     email: str
     username: str | None = None
+    is_admin: bool = False
     created_at: datetime
     email_verified_at: datetime | None = None
 
@@ -110,6 +111,10 @@ class LogoutResponse(BaseModel):
 class AuthMessageResponse(BaseModel):
     success: bool = True
     message: str
+
+
+class VerifyEmailResponse(AuthMessageResponse):
+    status: Literal["verified", "already_verified"]
 
 
 class VerifyEmailRequest(BaseModel):

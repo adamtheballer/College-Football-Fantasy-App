@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { apiPost } from "@/lib/api";
+import { apiPost, getStoredAccessToken } from "@/lib/api";
+import { createLeagueScoringToApi } from "@/lib/scoringSettings";
 import { useAuth } from "@/hooks/use-auth";
 import { LeagueCreateResponse } from "@/types/league";
 
@@ -297,7 +298,6 @@ function CreateLeagueForm() {
 
   const [basics, setBasics] = useState({
     name: "Saturday League",
-    season_year: currentYear,
     max_teams: 12,
     is_private: true,
     description: "",
@@ -400,7 +400,11 @@ function CreateLeagueForm() {
   const handleBack = () => setStep((prev) => Math.max(prev - 1, 0));
 
   const handleCreate = async () => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn || !getStoredAccessToken()) {
+      setError("Your sign-in session expired. Sign in again before creating a league.");
+      navigate("/login", { replace: true, state: { from: "/leagues/create" } });
+      return;
+    }
     if (!draftDateTime || Number.isNaN(draftDateTime.getTime())) {
       setError("Choose a valid draft date and time before creating the league.");
       return;
@@ -416,14 +420,14 @@ function CreateLeagueForm() {
       const payload = {
         basics: {
           name: basics.name.trim(),
-          season_year: basics.season_year,
+          season_year: currentYear,
           max_teams: basics.max_teams,
           is_private: basics.is_private,
           description: basics.description || null,
           icon_url: basics.icon_url || null,
         },
         settings: {
-          scoring_json: scoring,
+          scoring_json: createLeagueScoringToApi(scoring),
           roster_slots_json: effectiveRosterSlots,
           playoff_teams: settings.playoff_teams,
           waiver_type: settings.waiver_type,
@@ -583,14 +587,6 @@ function CreateLeagueForm() {
                     <Input
                       value={basics.name}
                       onChange={(e) => setBasics((prev) => ({ ...prev, name: e.target.value }))}
-                      className={inputClass}
-                    />
-                  </Field>
-                  <Field label="Season year">
-                    <Input
-                      type="number"
-                      value={basics.season_year}
-                      onChange={(e) => setBasics((prev) => ({ ...prev, season_year: Number(e.target.value) }))}
                       className={inputClass}
                     />
                   </Field>

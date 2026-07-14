@@ -1,4 +1,5 @@
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
+import { SurfaceCard } from "@/components/fantasy";
 import type { LeagueMatchupTeam, LeagueRosterPlayer } from "@/types/league";
 
 const reserveSlots = new Set(["BENCH", "IR"]);
@@ -33,7 +34,7 @@ export function SideBySideMatchup({
     <div className="space-y-6">
       <section className="space-y-3">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-sky-300">
+          <p className="cfb-micro-label text-cfb-brand">
             Starting Matchup
           </p>
         </div>
@@ -55,10 +56,10 @@ export function SideBySideMatchup({
         </div>
       </section>
 
-      <section className="space-y-3 rounded-[1.75rem] border border-white/10 bg-slate-950/25 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <SurfaceCard variant="default" padding="compact" className="space-y-3">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">
+            <p className="cfb-micro-label text-cfb-text-muted">
               Bench Depth
             </p>
           </div>
@@ -81,7 +82,7 @@ export function SideBySideMatchup({
             leagueId={leagueId}
           />
         </div>
-      </section>
+      </SurfaceCard>
     </div>
   );
 }

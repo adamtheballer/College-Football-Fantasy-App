@@ -12,82 +12,134 @@
    * A different format will require also updating the theme in tailwind.config.ts.
   */
   :root {
-    --background: 224 68% 5%;
+    --background-canvas: 224 58% 8%;
+    --background-sidebar: 224 52% 7%;
+    --background-surface: 222 48% 12%;
+    --background-surface-raised: 221 44% 16%;
+    --background-surface-hover: 219 42% 20%;
+    --border-subtle: 216 34% 22%;
+    --border-strong: 211 58% 42%;
+    --text-primary: 213 31% 91%;
+    --text-secondary: 215 20% 68%;
+    --text-muted: 215 16% 52%;
+    --brand-primary: 218 100% 55%;
+    --brand-primary-hover: 214 100% 62%;
+    --accent-pink: 331 93% 56%;
+    --accent-gold: 44 96% 55%;
+    --accent-cyan: 190 96% 63%;
+    --success: 145 70% 45%;
+    --warning: 42 96% 58%;
+    --danger: 0 84% 63%;
+    --live: 145 70% 45%;
+    --projected: 218 100% 64%;
+    --final: 215 20% 68%;
+    --corrected: 267 86% 70%;
+    --delayed: 42 96% 58%;
+    --unavailable: 215 16% 52%;
+    --locked: 24 94% 58%;
+
+    --background: 224 58% 8%;
     --foreground: 213 31% 91%;
 
-    --card: 223 58% 8%;
+    --card: 222 48% 12%;
     --card-foreground: 213 31% 91%;
 
-    --popover: 224 60% 6%;
+    --popover: 223 50% 11%;
     --popover-foreground: 213 31% 91%;
 
     --primary: 210 100% 66%;
     --primary-foreground: 222 47% 11%;
 
-    --secondary: 221 48% 10%;
+    --secondary: 221 44% 16%;
     --secondary-foreground: 213 31% 91%;
 
-    --muted: 222 43% 11%;
+    --muted: 222 38% 15%;
     --muted-foreground: 215 16% 62%;
 
-    --accent: 216 42% 15%;
+    --accent: 216 42% 20%;
     --accent-foreground: 210 100% 66%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 216 36% 16%;
-    --input: 216 36% 16%;
+    --border: 216 34% 22%;
+    --input: 216 34% 22%;
     --ring: 210 100% 66%;
 
     --radius: 1rem;
 
-    --sidebar-background: 224 68% 4%;
+    --sidebar-background: 224 52% 7%;
     --sidebar-foreground: 213 31% 91%;
     --sidebar-primary: 210 100% 66%;
     --sidebar-primary-foreground: 222 47% 11%;
     --sidebar-accent: 216 42% 15%;
     --sidebar-accent-foreground: 210 100% 66%;
-    --sidebar-border: 216 36% 13%;
+    --sidebar-border: 216 34% 18%;
     --sidebar-ring: 217 91% 60%;
   }
 
   .dark {
-    --background: 224 68% 5%;
+    --background-canvas: 224 58% 8%;
+    --background-sidebar: 224 52% 7%;
+    --background-surface: 222 48% 12%;
+    --background-surface-raised: 221 44% 16%;
+    --background-surface-hover: 219 42% 20%;
+    --border-subtle: 216 34% 22%;
+    --border-strong: 211 58% 42%;
+    --text-primary: 213 31% 91%;
+    --text-secondary: 215 20% 68%;
+    --text-muted: 215 16% 52%;
+    --brand-primary: 218 100% 55%;
+    --brand-primary-hover: 214 100% 62%;
+    --accent-pink: 331 93% 56%;
+    --accent-gold: 44 96% 55%;
+    --accent-cyan: 190 96% 63%;
+    --success: 145 70% 45%;
+    --warning: 42 96% 58%;
+    --danger: 0 84% 63%;
+    --live: 145 70% 45%;
+    --projected: 218 100% 64%;
+    --final: 215 20% 68%;
+    --corrected: 267 86% 70%;
+    --delayed: 42 96% 58%;
+    --unavailable: 215 16% 52%;
+    --locked: 24 94% 58%;
+
+    --background: 224 58% 8%;
     --foreground: 213 31% 91%;
 
-    --card: 223 58% 8%;
+    --card: 222 48% 12%;
     --card-foreground: 213 31% 91%;
 
-    --popover: 224 60% 6%;
+    --popover: 223 50% 11%;
     --popover-foreground: 213 31% 91%;
 
     --primary: 210 100% 66%;
     --primary-foreground: 222 47% 11%;
 
-    --secondary: 221 48% 10%;
+    --secondary: 221 44% 16%;
     --secondary-foreground: 213 31% 91%;
 
-    --muted: 222 43% 11%;
+    --muted: 222 38% 15%;
     --muted-foreground: 215 16% 62%;
 
-    --accent: 216 42% 15%;
+    --accent: 216 42% 20%;
     --accent-foreground: 210 100% 66%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 216 36% 16%;
-    --input: 216 36% 16%;
+    --border: 216 34% 22%;
+    --input: 216 34% 22%;
     --ring: 212.7 26.8% 83.9%;
 
-    --sidebar-background: 224 68% 4%;
+    --sidebar-background: 224 52% 7%;
     --sidebar-foreground: 213 31% 91%;
     --sidebar-primary: 210 100% 66%;
     --sidebar-primary-foreground: 222 47% 11%;
     --sidebar-accent: 216 42% 15%;
     --sidebar-accent-foreground: 210 100% 66%;
-    --sidebar-border: 216 36% 13%;
+    --sidebar-border: 216 34% 18%;
     --sidebar-ring: 217 91% 60%;
   }
 }
@@ -100,10 +152,16 @@
   body {
     @apply bg-background text-foreground;
     background:
-      radial-gradient(circle at 18% 8%, rgba(34, 211, 238, 0.11), transparent 30%),
-      radial-gradient(circle at 76% 2%, rgba(96, 165, 250, 0.10), transparent 27%),
-      radial-gradient(circle at 88% 72%, rgba(244, 114, 182, 0.07), transparent 28%),
-      linear-gradient(135deg, hsl(var(--background)), #050d1a 52%, #070a1e);
+      radial-gradient(circle at 16% 8%, rgba(34, 211, 238, 0.15), transparent 31%),
+      radial-gradient(circle at 76% 2%, rgba(96, 165, 250, 0.15), transparent 28%),
+      radial-gradient(circle at 88% 72%, rgba(244, 114, 182, 0.10), transparent 30%),
+      radial-gradient(circle at 8% 88%, rgba(250, 204, 21, 0.06), transparent 28%),
+      linear-gradient(135deg, hsl(var(--background)), #07162b 52%, #110c2d);
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--brand-primary));
+    outline-offset: 3px;
   }
 
   :where(p, span, li, h1, h2, h3, h4, h5, h6, a, button, label, td, th) {
@@ -120,35 +178,35 @@
 
 @layer components {
   .cfb-panel {
-    @apply rounded-[2rem] border border-cyan-100/10 text-card-foreground backdrop-blur-md shadow-[0_22px_55px_rgba(2,6,23,0.38)];
+    @apply rounded-2xl border border-cfb-border-subtle text-card-foreground backdrop-blur-md shadow-[0_18px_42px_rgba(2,6,23,0.34)];
     background:
-      radial-gradient(circle at 12% 0%, rgba(34, 211, 238, 0.07), transparent 34%),
-      linear-gradient(135deg, hsl(var(--card) / 0.78), rgba(14, 165, 233, 0.06) 48%, rgba(124, 58, 237, 0.055)),
+      radial-gradient(circle at 12% 0%, hsl(var(--accent-cyan) / 0.06), transparent 34%),
+      linear-gradient(135deg, hsl(var(--background-surface) / 0.88), hsl(var(--brand-primary) / 0.045) 48%, hsl(var(--accent-pink) / 0.035)),
       linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
     box-shadow:
-      0 22px 55px rgba(2, 6, 23, 0.38),
-      0 0 42px rgba(14, 165, 233, 0.075),
+      0 18px 42px rgba(2, 6, 23, 0.34),
+      0 0 30px hsl(var(--brand-primary) / 0.055),
       inset 0 1px 0 rgba(255, 255, 255, 0.045);
   }
 
   .cfb-panel-strong {
-    @apply rounded-[2.5rem] border border-cyan-100/10 text-card-foreground backdrop-blur-xl shadow-[0_30px_80px_rgba(2,6,23,0.46)];
+    @apply rounded-3xl border border-cfb-border-subtle text-card-foreground backdrop-blur-xl shadow-[0_24px_64px_rgba(2,6,23,0.42)];
     background:
-      radial-gradient(circle at 8% 0%, rgba(34, 211, 238, 0.105), transparent 34%),
-      radial-gradient(circle at 92% 12%, rgba(251, 191, 36, 0.065), transparent 30%),
-      radial-gradient(circle at 55% 100%, rgba(168, 85, 247, 0.055), transparent 34%),
-      linear-gradient(135deg, hsl(var(--card) / 0.84), rgba(29, 78, 216, 0.075), rgba(88, 28, 135, 0.07));
+      radial-gradient(circle at 8% 0%, hsl(var(--accent-cyan) / 0.10), transparent 34%),
+      radial-gradient(circle at 92% 12%, hsl(var(--accent-gold) / 0.07), transparent 30%),
+      radial-gradient(circle at 55% 100%, hsl(var(--accent-pink) / 0.055), transparent 34%),
+      linear-gradient(135deg, hsl(var(--background-surface) / 0.90), hsl(var(--brand-primary) / 0.07), hsl(var(--accent-pink) / 0.045));
     box-shadow:
-      0 30px 80px rgba(2, 6, 23, 0.46),
-      0 0 60px rgba(14, 165, 233, 0.095),
+      0 24px 64px rgba(2, 6, 23, 0.42),
+      0 0 42px hsl(var(--brand-primary) / 0.08),
       inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 
   .cfb-control {
-    @apply rounded-2xl border border-cyan-100/10 bg-white/[0.04] text-foreground backdrop-blur-md transition-all duration-300;
+    @apply rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised/70 text-foreground backdrop-blur-md transition-all duration-200;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.045),
-      0 0 24px rgba(14, 165, 233, 0.035);
+      0 0 20px hsl(var(--brand-primary) / 0.03);
   }
 
   .cfb-control:hover {
@@ -160,15 +218,62 @@
 
   .cfb-control:focus-visible,
   .cfb-control[data-state="open"] {
-    @apply border-primary/40 ring-2 ring-primary/20;
+    @apply border-cfb-brand/50 ring-2 ring-cfb-brand/25;
   }
 
   .cfb-micro-label {
-    @apply text-[10px] font-black uppercase tracking-[0.32em] text-muted-foreground/60;
+    @apply text-[10px] font-black uppercase tracking-[0.28em] text-cfb-text-muted;
   }
 
   .cfb-section-title {
-    @apply text-foreground font-black uppercase italic tracking-tight;
+    @apply text-foreground font-black uppercase italic tracking-tight leading-[1.08];
+  }
+
+  .cfb-display-title {
+    @apply font-display text-foreground font-black uppercase italic tracking-[-0.045em] leading-[1.08];
+  }
+
+  .cfb-yard-lines {
+    background-image:
+      linear-gradient(to right, hsl(var(--border-subtle) / 0.20) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border-subtle) / 0.12) 1px, transparent 1px);
+    background-size: 72px 72px, 72px 72px;
+  }
+
+  .cfb-playbook-pattern {
+    position: relative;
+  }
+
+  .cfb-playbook-pattern::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.10;
+    background:
+      linear-gradient(115deg, transparent 0 5%, hsl(var(--accent-pink) / 0.22) 5.2% 5.9%, transparent 6.2% 100%),
+      linear-gradient(155deg, transparent 0 72%, hsl(var(--accent-gold) / 0.18) 72.2% 72.9%, transparent 73.2% 100%),
+      radial-gradient(circle at 88% 16%, transparent 0 5px, hsl(var(--accent-cyan) / 0.28) 5px 6px, transparent 6.5px);
+    mask-image: linear-gradient(135deg, transparent, black 24%, black 76%, transparent);
+  }
+
+  .cfb-school-grid {
+    background-image:
+      linear-gradient(to right, hsl(var(--accent-cyan) / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--accent-cyan) / 0.04) 1px, transparent 1px),
+      repeating-linear-gradient(135deg, transparent 0 26px, hsl(var(--accent-gold) / 0.035) 27px 28px);
+    background-size: 34px 34px, 34px 34px, 120px 120px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 
   .cfb-tour-active-target {

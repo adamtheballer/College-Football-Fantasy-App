@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from collegefootballfantasy_api.app.schemas.waiver import WaiverClaimRead, WaiverDropCandidateRead
+
 
 class LeagueBasics(BaseModel):
     name: str
@@ -329,7 +331,9 @@ class LeagueWaiversRead(BaseModel):
     league_id: int
     fantasy_team_id: int | None = None
     available_players: list[LeagueWaiverPlayerRead]
-    claims: list[dict] = []
+    claims: list[WaiverClaimRead] = []
+    roster: list[WaiverDropCandidateRead] = []
+    waiver_rules: dict = {}
     total_available: int
     message: str | None = None
 
@@ -357,10 +361,18 @@ class LeagueScheduleRowRead(BaseModel):
     away_win_probability: float = 50.0
 
 
+class LeagueInviteSettingsRead(BaseModel):
+    code: str
+    link: str
+    draft_status: str | None = None
+    visible_until_draft_complete: bool = True
+
+
 class LeagueSettingsViewRead(BaseModel):
     league_id: int
     league_name: str
     league_info: dict
+    invite: LeagueInviteSettingsRead | None = None
     members: list[LeagueMemberRead]
     scoring_settings: dict
     roster_settings: dict[str, int]

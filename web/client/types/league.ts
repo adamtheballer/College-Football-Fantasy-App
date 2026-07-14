@@ -170,16 +170,16 @@ export interface LeagueNewsResponse {
 export interface LeagueRosterPlayer {
   id: number;
   league_id?: number | null;
-  team_id?: number;
+  team_id?: number | null;
   fantasy_team_id: number;
   fantasy_team_name: string;
-  player_id: number;
+  player_id: number | null;
   player_name: string;
   player_school?: string | null;
   player_position?: string | null;
   school?: string | null;
   position?: string | null;
-  slot?: string;
+  slot?: string | null;
   roster_slot?: string | null;
   status?: string;
   acquisition_type?: string;
@@ -187,12 +187,13 @@ export interface LeagueRosterPlayer {
   is_starter?: boolean;
   is_ir?: boolean;
   opponent: string | null;
-  projected_points?: number;
-  floor?: number;
-  ceiling?: number;
-  boom_prob?: number;
-  bust_prob?: number;
-  weekly_projected_fantasy_points: number;
+  projected_points?: number | null;
+  floor?: number | null;
+  ceiling?: number | null;
+  boom_prob?: number | null;
+  bust_prob?: number | null;
+  weekly_projected_fantasy_points: number | null;
+  is_placeholder?: boolean;
 }
 
 export interface LeagueRosterTabResponse {
@@ -289,6 +290,12 @@ export interface LeagueSettingsTabResponse {
   league_id: number;
   league_name: string;
   league_info: Record<string, string | number | boolean | null>;
+  invite?: {
+    code: string;
+    link: string;
+    draft_status?: string | null;
+    visible_until_draft_complete: boolean;
+  } | null;
   members: LeagueMemberSettings[];
   scoring_settings: Record<string, number | string | boolean>;
   roster_settings: Record<string, number>;

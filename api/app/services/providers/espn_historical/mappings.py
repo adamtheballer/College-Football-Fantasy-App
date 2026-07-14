@@ -1,0 +1,92 @@
+CATEGORY_ALIASES = {
+    "passing": "passing",
+    "rushing": "rushing",
+    "receiving": "receiving",
+    "kicking": "kicking",
+    "returning": "returns",
+    "returns": "returns",
+    "fumbles": "turnovers",
+    "miscellaneous": "turnovers",
+}
+
+LABEL_ALIASES = {
+    "passing": {
+        "GP": "games_played",
+        "GS": "games_started",
+        "CMP": "passing_completions",
+        "COMP": "passing_completions",
+        "ATT": "passing_attempts",
+        "YDS": "passing_yards",
+        "TD": "passing_touchdowns",
+        "INT": "interceptions",
+        "SACK": "sacks_taken",
+        "SACKS": "sacks_taken",
+    },
+    "rushing": {
+        "GP": "games_played",
+        "GS": "games_started",
+        "CAR": "rushing_attempts",
+        "ATT": "rushing_attempts",
+        "YDS": "rushing_yards",
+        "LNG": "long_rush",
+        "LONG": "long_rush",
+        "TD": "rushing_touchdowns",
+    },
+    "receiving": {
+        "GP": "games_played",
+        "GS": "games_started",
+        "REC": "receptions",
+        "TGTS": "receiving_targets",
+        "TGT": "receiving_targets",
+        "YDS": "receiving_yards",
+        "LNG": "long_reception",
+        "LONG": "long_reception",
+        "TD": "receiving_touchdowns",
+    },
+    "kicking": {
+        "FGM": "field_goals_made",
+        "FGA": "field_goals_attempted",
+        "1-19": "field_goals_0_19",
+        "0-19": "field_goals_0_19",
+        "20-29": "field_goals_20_29",
+        "30-39": "field_goals_30_39",
+        "40-49": "field_goals_40_49",
+        "50+": "field_goals_50_plus",
+        "XPM": "extra_points_made",
+        "XPA": "extra_points_attempted",
+    },
+    "returns": {
+        "KR": "kick_return_attempts",
+        "KRYDS": "kick_return_yards",
+        "KRTD": "kick_return_touchdowns",
+        "PR": "punt_return_attempts",
+        "PRYDS": "punt_return_yards",
+        "PRTD": "punt_return_touchdowns",
+    },
+    "turnovers": {
+        "FUM": "fumbles",
+        "LST": "fumbles_lost",
+        "LOST": "fumbles_lost",
+    },
+}
+
+INDEX_FALLBACKS = {
+    "rushing": {
+        0: "rushing_attempts",
+        1: "rushing_yards",
+        3: "rushing_touchdowns",
+    },
+    "receiving": {
+        0: "receptions",
+        1: "receiving_yards",
+        3: "receiving_touchdowns",
+    },
+    "passing": {
+        0: "passing_completions",
+        1: "passing_attempts",
+        3: "passing_yards",
+        5: "passing_touchdowns",
+        6: "interceptions",
+        8: "sacks_taken",
+    },
+}

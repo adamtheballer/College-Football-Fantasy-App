@@ -10,6 +10,7 @@ class Player(TimestampMixin, Base):
     __tablename__ = "players"
     __table_args__ = (
         Index("ix_players_external_id", "external_id"),
+        Index("ix_players_sheet_adp", "sheet_adp"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

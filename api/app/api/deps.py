@@ -45,6 +45,12 @@ def require_verified_user(current_user: User = Depends(get_current_user)) -> Use
     return current_user
 
 
+def require_admin_user(current_user: User = Depends(require_verified_user)) -> User:
+    if not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin only")
+    return current_user
+
+
 def get_league_or_404(db: Session, league_id: int) -> League:
     league = db.get(League, league_id)
     if not league:

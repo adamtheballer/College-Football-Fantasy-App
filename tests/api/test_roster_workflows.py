@@ -87,6 +87,30 @@ def create_players(client) -> tuple[int, int]:
     return rows[0]["id"], rows[1]["id"]
 
 
+def create_position_players(client) -> dict[str, int]:
+    response = client.post(
+        "/players",
+        json=[
+            {
+                "external_id": None,
+                "name": "Pocket Passer",
+                "position": "QB",
+                "school": "Texas",
+                "image_url": None,
+            },
+            {
+                "external_id": None,
+                "name": "Place Kicker",
+                "position": "K",
+                "school": "Oregon",
+                "image_url": None,
+            },
+        ],
+    )
+    assert response.status_code == 201
+    return {row["position"]: row["id"] for row in response.json()}
+
+
 def test_team_and_roster_routes_require_membership_and_ownership(client, db_session):
     owner_token = create_user_and_token(client, "owner")
     outsider_token = create_user_and_token(client, "outsider")
@@ -157,6 +181,37 @@ def test_add_drop_lineup_and_transactions_workflow(client, db_session):
     assert "add" in types
     assert "lineup" in types
     assert "add_drop" in types
+
+
+def test_roster_and_lineup_reject_position_ineligible_slots(client, db_session):
+    token = create_user_and_token(client, "slot-owner")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    player_ids = create_position_players(client)
+
+    bad_add_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": player_ids["K"], "slot": "QB", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert bad_add_response.status_code == 409
+    assert bad_add_response.json()["detail"] == "K is not eligible for QB"
+
+    add_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": player_ids["QB"], "slot": "QB", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert add_response.status_code == 201
+    added_entry = add_response.json()
+
+    bad_lineup_response = client.patch(
+        f"/teams/{team.id}/lineup",
+        json={"assignments": [{"roster_entry_id": added_entry["id"], "slot": "K"}]},
+        headers=auth_headers(token),
+    )
+    assert bad_lineup_response.status_code == 409
+    assert bad_lineup_response.json()["detail"] == "QB is not eligible for K"
 
 
 def test_team_and_roster_db_constraints_enforce_league_invariants(client, db_session):
