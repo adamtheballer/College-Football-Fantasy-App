@@ -291,5 +291,7 @@ Production should run at least three separate processes:
 - API process: `uvicorn collegefootballfantasy_api.app.main:app`
 - Static web process/host: built Vite output from `web/dist/spa`
 - Scoring worker process: `PYTHONPATH=. uv run python scripts/run_scoring_worker.py --season <year> --week <week> --mode live`
+- Due trade processor: `PYTHONPATH=. uv run python scripts/process_due_trades.py`
 
 Use `--mode postgame` for 10–30 minute postgame reconciliation and `--mode correction` for next-day correction sweeps.
+Run the due trade processor every 5–15 minutes and once shortly after Monday reset so `accepted_pending` trades with `process_after` are completed.

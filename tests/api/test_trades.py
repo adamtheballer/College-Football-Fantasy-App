@@ -25,7 +25,7 @@ def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def create_user_and_token(client, suffix: str = "trade") -> str:
+def create_user_and_token(client, suffix: str = "trade", *, admin: bool = False) -> str:
     email = f"coach-{suffix}@example.com"
     response = client.post(
         "/auth/signup",
@@ -39,6 +39,7 @@ def create_user_and_token(client, suffix: str = "trade") -> str:
     with TestingSessionLocal() as session:
         user = session.query(User).filter(User.email == email).one()
         user.email_verified_at = datetime.now(timezone.utc)
+        user.is_admin = admin
         session.commit()
     return response.json()["access_token"]
 
@@ -331,6 +332,39 @@ def test_due_trade_worker_waits_until_monday_reset(client, db_session):
     assert db_session.query(RosterEntry).filter_by(team_id=seed["proposing"].id, player_id=seed["receive"].id).one()
     assert db_session.get(TradeOffer, created["id"]).status == "processed"
     assert db_session.query(TradeReview).filter_by(trade_offer_id=created["id"], action="processed").one()
+
+
+def test_admin_process_due_trades_endpoint_processes_accepted_pending_offer(client, db_session, monkeypatch):
+    monkeypatch.setattr(trade_service, "is_cfb_game_week_active", lambda now=None, timezone_name="UTC": False)
+    admin_token = create_user_and_token(client, "admin-process", admin=True)
+    non_admin_token = create_user_and_token(client, "non-admin-process")
+    proposing_token = create_user_and_token(client, "admin-route-a")
+    receiving_token = create_user_and_token(client, "admin-route-b")
+    league = create_league(client, proposing_token, "admin-route", review_type="none")
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+    created = client.post(
+        f"/leagues/{league['id']}/trades",
+        json=trade_offer_payload(seed),
+        headers=auth_headers(proposing_token),
+    ).json()
+    offer = db_session.get(TradeOffer, created["id"])
+    offer.status = "accepted_pending"
+    offer.accepted_at = datetime.now(timezone.utc) - timedelta(days=1)
+    offer.process_after = datetime.now(timezone.utc) - timedelta(minutes=1)
+    db_session.commit()
+
+    forbidden_response = client.post("/admin/trades/process-due", headers=auth_headers(non_admin_token))
+    assert forbidden_response.status_code == 403
+    assert forbidden_response.json()["detail"] == "admin only"
+
+    process_response = client.post("/admin/trades/process-due", headers=auth_headers(admin_token))
+    assert process_response.status_code == 200
+    assert process_response.json() == {"processed": 1, "failed": 0}
+    db_session.expire_all()
+    assert db_session.query(RosterEntry).filter_by(team_id=seed["receiving"].id, player_id=seed["give"].id).one()
+    assert db_session.query(RosterEntry).filter_by(team_id=seed["proposing"].id, player_id=seed["receive"].id).one()
+    assert db_session.get(TradeOffer, created["id"]).status == "processed"
 
 
 def test_accept_commissioner_review_trade_waits_for_approval_then_processes(client, db_session, monkeypatch):

@@ -9,7 +9,8 @@ Run production as separate processes:
 1. **API**: FastAPI via `collegefootballfantasy_api.app.main:app`.
 2. **Web**: static Vite build from `web/dist/spa`.
 3. **Scoring worker**: `scripts/run_scoring_worker.py`.
-4. **Notification worker**: `scripts/send_scheduled_notifications.py`, when scheduled notifications are enabled.
+4. **Trade processor**: `scripts/process_due_trades.py`.
+5. **Notification worker**: `scripts/send_scheduled_notifications.py`, when scheduled notifications are enabled.
 
 Do not run scoring inside the web process. Scoring must survive API deploys, retry safely, and expose failures in `scoring_runs`.
 
@@ -27,6 +28,7 @@ Recommended schedules:
 - Game window: every 30–90 seconds with `--mode live`.
 - Postgame reconciliation: every 10–30 minutes with `--mode postgame`.
 - Next-day correction sweep: hourly or once after provider finalization with `--mode correction`.
+- Due trade processing: every 5–15 minutes, and once shortly after Monday reset, with `scripts/process_due_trades.py`.
 
 Examples:
 
@@ -34,6 +36,7 @@ Examples:
 PYTHONPATH=. uv run python scripts/run_scoring_worker.py --season 2026 --week 1 --mode live
 PYTHONPATH=. uv run python scripts/run_scoring_worker.py --season 2026 --week 1 --mode postgame
 PYTHONPATH=. uv run python scripts/run_scoring_worker.py --season 2026 --week 1 --mode correction --once
+PYTHONPATH=. uv run python scripts/process_due_trades.py
 ```
 
 Retry controls:
