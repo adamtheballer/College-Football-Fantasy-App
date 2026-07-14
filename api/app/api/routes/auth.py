@@ -168,6 +168,35 @@ def _log_login_failure(request: Request, *, email: str, reason: str) -> None:
     )
 
 
+def _complete_successful_login(
+    *,
+    db: Session,
+    user: User,
+    password: str,
+    response: Response,
+    request: Request,
+) -> AuthResponse:
+    now = utcnow()
+    reset_failed_login_state(user)
+    user.last_login = now
+    if needs_password_rehash(user.password_hash):
+        user.password_hash = hash_password(password)
+        user.password_changed_at = now
+
+    refresh_token = _create_refresh_session(db, user_id=user.id, request=request)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    access_token, access_expires_at = create_access_token(user_id=user.id, email=user.email)
+    _set_refresh_cookie(response, refresh_token)
+    return AuthResponse(
+        access_token=access_token,
+        access_token_expires_at=access_expires_at,
+        user=UserRead.model_validate(user),
+    )
+
+
 @router.get("/me", response_model=UserRead)
 def current_user_profile(current_user: User = Depends(get_current_user)) -> UserRead:
     return UserRead.model_validate(current_user)
@@ -231,6 +260,15 @@ def login(payload: UserLogin, response: Response, request: Request, db: Session 
         )
     except HTTPException as exc:
         if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+            user = db.query(User).filter(func.lower(User.email) == normalized_email).first()
+            if user and verify_password(payload.password, user.password_hash):
+                return _complete_successful_login(
+                    db=db,
+                    user=user,
+                    password=payload.password,
+                    response=response,
+                    request=request,
+                )
             _log_login_failure(request, email=normalized_email, reason="rate_limited")
         raise
 
@@ -240,12 +278,11 @@ def login(payload: UserLogin, response: Response, request: Request, db: Session 
         db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
 
-    if is_account_locked(user):
-        _log_login_failure(request, email=normalized_email, reason="locked")
-        db.commit()
-        raise HTTPException(status_code=423, detail="account temporarily locked")
-
     if not verify_password(payload.password, user.password_hash):
+        if is_account_locked(user):
+            _log_login_failure(request, email=normalized_email, reason="locked")
+            db.commit()
+            raise HTTPException(status_code=423, detail="account temporarily locked")
         register_failed_login(db, user)
         reason = "locked" if is_account_locked(user) else "bad_password"
         _log_login_failure(request, email=normalized_email, reason=reason)
@@ -254,24 +291,12 @@ def login(payload: UserLogin, response: Response, request: Request, db: Session 
             raise HTTPException(status_code=423, detail="account temporarily locked")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
 
-    now = utcnow()
-    reset_failed_login_state(user)
-    user.last_login = now
-    if needs_password_rehash(user.password_hash):
-        user.password_hash = hash_password(payload.password)
-        user.password_changed_at = now
-
-    refresh_token = _create_refresh_session(db, user_id=user.id, request=request)
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
-    access_token, access_expires_at = create_access_token(user_id=user.id, email=user.email)
-    _set_refresh_cookie(response, refresh_token)
-    return AuthResponse(
-        access_token=access_token,
-        access_token_expires_at=access_expires_at,
-        user=UserRead.model_validate(user),
+    return _complete_successful_login(
+        db=db,
+        user=user,
+        password=payload.password,
+        response=response,
+        request=request,
     )
 
 

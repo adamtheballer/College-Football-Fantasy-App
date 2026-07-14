@@ -230,7 +230,7 @@ def test_failed_login_limit_locks_account(client, db_session):
     assert user.locked_until is not None
 
 
-def test_locked_account_returns_locked_even_with_correct_password(client, db_session):
+def test_locked_account_allows_correct_password_and_resets_lockout(client, db_session):
     user = User(
         first_name="Locked",
         email="locked@example.com",
@@ -248,8 +248,11 @@ def test_locked_account_returns_locked_even_with_correct_password(client, db_ses
         json={"email": "locked@example.com", "password": STRONG_PASSWORD},
     )
 
-    assert response.status_code == 423
-    assert response.json()["detail"] == "account temporarily locked"
+    assert response.status_code == 200
+    db_session.expire_all()
+    refreshed_user = db_session.query(User).filter(User.email == "locked@example.com").one()
+    assert refreshed_user.failed_login_attempts == 0
+    assert refreshed_user.locked_until is None
 
 
 def test_login_rate_limit_returns_too_many_requests(client):
@@ -270,6 +273,32 @@ def test_login_rate_limit_returns_too_many_requests(client):
 
         assert blocked.status_code == 429
         assert blocked.json()["detail"] == "too many requests"
+    finally:
+        settings.auth_login_rate_limit = original_limit
+
+
+def test_rate_limited_account_allows_correct_password(client, db_session):
+    signup_user(client, "rate-limit-valid")
+    original_limit = settings.auth_login_rate_limit
+    try:
+        settings.auth_login_rate_limit = 2
+        for _ in range(settings.auth_login_rate_limit):
+            response = client.post(
+                "/auth/login",
+                json={"email": "coach-rate-limit-valid@example.com", "password": "WrongPass123!"},
+            )
+            assert response.status_code == 401
+
+        response = client.post(
+            "/auth/login",
+            json={"email": "coach-rate-limit-valid@example.com", "password": STRONG_PASSWORD},
+        )
+
+        assert response.status_code == 200
+        db_session.expire_all()
+        user = db_session.query(User).filter(User.email == "coach-rate-limit-valid@example.com").one()
+        assert user.failed_login_attempts == 0
+        assert user.locked_until is None
     finally:
         settings.auth_login_rate_limit = original_limit
 
