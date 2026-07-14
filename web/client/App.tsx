@@ -104,11 +104,19 @@ const App = () => (
                 />
                 <Route
                   path="/draft"
-                  element={<DraftHome />}
+                  element={
+                    <ProtectedRoute>
+                      <DraftHome />
+                    </ProtectedRoute>
+                  }
                 />
                 <Route
                   path="/draft/mock/single-player"
-                  element={<SinglePlayerMockDraftRoom />}
+                  element={
+                    <ProtectedRoute>
+                      <SinglePlayerMockDraftRoom />
+                    </ProtectedRoute>
+                  }
                 />
                 <Route
                   path="/league/:leagueId"
