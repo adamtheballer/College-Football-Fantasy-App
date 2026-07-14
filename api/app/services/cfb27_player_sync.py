@@ -9,8 +9,14 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.player_pool_filters import generated_test_player_filter
+
+_MODEL_REGISTRY = (League, Player, RosterEntry, Team, User)
 
 
 CFB27_SOURCE_PATH = Path(__file__).resolve().parents[1] / "data" / "cfb27_ratings.json"

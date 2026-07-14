@@ -18,11 +18,21 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column(
+    bind = op.get_bind()
+    columns = {column["name"] for column in sa.inspect(bind).get_columns("league_settings")}
+    if "waiver_period_hours" not in columns:
+        op.add_column(
+            "league_settings",
+            sa.Column("waiver_period_hours", sa.Integer(), nullable=False, server_default="24"),
+        )
+    bind.execute(sa.text("update league_settings set waiver_period_hours = 24 where waiver_period_hours is null"))
+    op.alter_column(
         "league_settings",
-        sa.Column("waiver_period_hours", sa.Integer(), nullable=False, server_default="24"),
+        "waiver_period_hours",
+        existing_type=sa.Integer(),
+        nullable=False,
+        server_default=None,
     )
-    op.alter_column("league_settings", "waiver_period_hours", server_default=None)
 
 
 def downgrade() -> None:

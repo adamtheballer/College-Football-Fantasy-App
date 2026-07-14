@@ -37,7 +37,10 @@ def create_user_and_token(client, suffix: str = "one") -> str:
 
 
 def parse_api_datetime(value: str) -> datetime:
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
 
 
 def create_league(client, token: str, waiver_type: str = "faab", waiver_period_hours: int = 24) -> dict:

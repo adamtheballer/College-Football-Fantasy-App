@@ -4,7 +4,7 @@ from collegefootballfantasy_api.app.core.security import generate_token, hash_pa
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.user import User
 from scripts import repair_local_auth_account as repair_script
-from tests.conftest import TestingSessionLocal
+from conftest import TestingSessionLocal
 
 
 def test_repair_local_auth_account_resets_hash_and_lockout(client, monkeypatch):
