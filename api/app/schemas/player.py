@@ -17,6 +17,10 @@ class PlayerBase(BaseModel):
     sheet_projection_stats: dict | None = None
     sheet_source_sheet_id: str | None = None
     sheet_synced_at: datetime | None = None
+    cfb27_rank: int | None = None
+    cfb27_overall: int | None = None
+    cfb27_position_rank: int | None = None
+    cfb27_synced_at: datetime | None = None
 
 
 class PlayerCreate(PlayerBase):

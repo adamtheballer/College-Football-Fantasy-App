@@ -45,5 +45,9 @@ export interface Player {
   sheetProjectionStats?: Record<string, number | null | undefined>;
   sheetSourceSheetId?: string;
   sheetSyncedAt?: string;
+  cfb27Rank?: number;
+  cfb27Overall?: number;
+  cfb27PositionRank?: number;
+  cfb27SyncedAt?: string;
   number?: number;
 }

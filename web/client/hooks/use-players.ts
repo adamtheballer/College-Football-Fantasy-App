@@ -17,6 +17,10 @@ type BackendPlayerRead = {
   sheet_projection_stats?: Record<string, number | null> | null;
   sheet_source_sheet_id?: string | null;
   sheet_synced_at?: string | null;
+  cfb27_rank?: number | null;
+  cfb27_overall?: number | null;
+  cfb27_position_rank?: number | null;
+  cfb27_synced_at?: string | null;
   board_rank?: number | null;
 };
 
@@ -206,10 +210,10 @@ export const normalizePlayer = (
   imageUrl: player.image_url ?? undefined,
   playerClass: player.player_class ?? undefined,
   conf: context?.conference ?? "N/A",
-  rank: context?.rank ?? player.board_rank ?? player.sheet_adp ?? 0,
-  boardRank: player.board_rank ?? player.sheet_adp ?? context?.rank ?? null,
+  rank: context?.rank ?? player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? 0,
+  boardRank: player.board_rank ?? player.sheet_adp ?? null,
   adp: context?.adp ?? player.sheet_adp ?? 0,
-  posRank: context?.posRank ?? null,
+  posRank: context?.posRank ?? player.cfb27_position_rank ?? null,
   rostered: 0,
   status: normalizeStatus(context?.status),
   projection: mapProjection(context?.projection, player.sheet_projected_season_points ?? 0),
@@ -220,6 +224,10 @@ export const normalizePlayer = (
   sheetProjectionStats: player.sheet_projection_stats ?? undefined,
   sheetSourceSheetId: player.sheet_source_sheet_id ?? undefined,
   sheetSyncedAt: player.sheet_synced_at ?? undefined,
+  cfb27Rank: player.cfb27_rank ?? undefined,
+  cfb27Overall: player.cfb27_overall ?? undefined,
+  cfb27PositionRank: player.cfb27_position_rank ?? undefined,
+  cfb27SyncedAt: player.cfb27_synced_at ?? undefined,
 });
 
 export function usePlayers(
@@ -331,9 +339,9 @@ export function usePlayers(
         data: payload.data.map((player) =>
           normalizePlayer(player, {
             conference: conferenceBySchool.get(player.school.toUpperCase()) ?? "N/A",
-            rank: player.board_rank ?? player.sheet_adp ?? overallRankByPlayer.get(player.id) ?? 0,
+            rank: player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? overallRankByPlayer.get(player.id) ?? 0,
             adp: player.sheet_adp ?? player.board_rank ?? overallRankByPlayer.get(player.id) ?? 0,
-            posRank: null,
+            posRank: player.cfb27_position_rank ?? null,
             status: injuryByPlayerId.get(player.id),
             projection: projectionByPlayerId.get(player.id),
           })
@@ -444,9 +452,9 @@ export function useDraftPlayerPool(
         data: rows.map((player) =>
           normalizePlayer(player, {
             conference: conferenceBySchool.get(player.school.toUpperCase()) ?? "N/A",
-            rank: player.board_rank ?? player.sheet_adp ?? 0,
+            rank: player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? 0,
             adp: player.sheet_adp ?? player.board_rank ?? 0,
-            posRank: null,
+            posRank: player.cfb27_position_rank ?? null,
           })
         ),
       };

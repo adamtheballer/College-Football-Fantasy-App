@@ -21,6 +21,16 @@ def _load_cfb27_seed_migration():
     return module
 
 
+def _load_cfb27_fields_migration():
+    migration_path = Path(__file__).resolve().parents[2] / "api" / "alembic" / "versions" / "0032_add_cfb27_player_fields.py"
+    spec = importlib.util.spec_from_file_location("cfb27_fields_migration", migration_path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_players_expose_and_sort_by_sheet_board_rank(client, db_session):
     db_session.add_all(
         [
@@ -66,6 +76,20 @@ def test_cfb27_seed_migration_uses_backend_rating_source():
     assert rows[("Ahmad Hardy", "Missouri", "RB")]["overall"] == 96
 
 
+def test_cfb27_fields_migration_computes_global_and_position_ranks():
+    migration = _load_cfb27_fields_migration()
+    rows = {
+        (row["name"], row["school"], row["position"]): row
+        for row in migration._load_cfb27_rows()
+    }
+
+    assert migration.down_revision == "0031_seed_cfb27_players"
+    assert rows[("Jeremiah Smith", "Ohio State", "WR")]["rank"] == 1
+    assert rows[("Jeremiah Smith", "Ohio State", "WR")]["position_rank"] == 1
+    assert rows[("Ahmad Hardy", "Missouri", "RB")]["rank"] != rows[("Kewan Lacy", "Ole Miss", "RB")]["rank"]
+    assert rows[("Ahmad Hardy", "Missouri", "RB")]["position_rank"] == 1
+
+
 def test_cfb27_sync_creates_missing_compare_players(client, db_session):
     result = sync_cfb27_players(db_session)
 
@@ -74,8 +98,16 @@ def test_cfb27_sync_creates_missing_compare_players(client, db_session):
     assert result["missing"] == 250
     ahmad = db_session.query(Player).filter_by(name="Ahmad Hardy", school="Missouri", position="RB").one()
     jeremiah = db_session.query(Player).filter_by(name="Jeremiah Smith", school="Ohio State", position="WR").one()
-    assert ahmad.sheet_adp == 1.0
-    assert jeremiah.sheet_adp == 1.0
+    assert ahmad.sheet_adp is None
+    assert jeremiah.sheet_adp is None
+    assert ahmad.cfb27_rank is not None
+    assert jeremiah.cfb27_rank == 1
+    assert ahmad.cfb27_position_rank == 1
+    assert jeremiah.cfb27_position_rank == 1
+    assert ahmad.cfb27_overall == 96
+    assert jeremiah.cfb27_overall == 99
+    assert ahmad.cfb27_synced_at is not None
+    assert jeremiah.cfb27_synced_at is not None
     assert ahmad.external_id.startswith("cfb27:")
     assert jeremiah.external_id.startswith("cfb27:")
 
@@ -105,19 +137,29 @@ def test_cfb27_sync_preserves_duplicates_but_updates_ranked_canonical_row(client
     assert ranked.name == "Ahmad Hardy"
     assert ranked.school == "Missouri"
     assert ranked.sheet_adp == 12.0
+    assert ranked.cfb27_position_rank == 1
+    assert ranked.cfb27_overall == 96
 
 
-def test_players_rank_sort_syncs_cfb27_compare_board(client):
+def test_players_rank_sort_uses_cfb27_compare_board(client, db_session):
+    sync_cfb27_players(db_session)
+
     response = client.get("/players", params={"sort": "rank", "limit": 100})
 
     assert response.status_code == 200
     rows = response.json()["data"]
     names = {row["name"] for row in rows}
+    assert rows[0]["name"] == "Jeremiah Smith"
+    assert rows[0]["cfb27_rank"] == 1
+    assert rows[0]["cfb27_position_rank"] == 1
+    assert rows[0]["sheet_adp"] is None
     assert "Ahmad Hardy" in names
     assert "Jeremiah Smith" in names
 
 
-def test_players_search_syncs_cfb27_compare_board(client):
+def test_players_search_returns_seeded_cfb27_compare_board(client, db_session):
+    sync_cfb27_players(db_session)
+
     jeremiah_response = client.get("/players", params={"search": "Jeremiah Smith", "limit": 10})
     ahmad_response = client.get("/players", params={"search": "Ahmad Hardy", "limit": 10})
 

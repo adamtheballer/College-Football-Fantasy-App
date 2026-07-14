@@ -143,11 +143,13 @@ export const buildPlayerCompareRows = (
 
   return canonicalPlayers
     .map((player) => {
-      const cfb27Rating = findCfb27Rating({
+      const fallbackCfb27Rating = findCfb27Rating({
         name: player.name,
         school: player.school,
         pos: player.pos,
       });
+      const cfb27Overall = player.cfb27Overall ?? fallbackCfb27Rating?.ovr ?? null;
+      const cfb27Rank = player.cfb27PositionRank ?? fallbackCfb27Rating?.rank ?? null;
       const performanceAverage = performanceByPlayerId.get(player.id) ?? null;
       const weeklyPerformanceScore = percentileScore(performanceAverage, performanceValues);
       const positionPeerScore = percentileScore(
@@ -156,7 +158,7 @@ export const buildPlayerCompareRows = (
       );
       const projectionScore = projectionPerformanceScore(performanceAverage, toProjectedPoints(player));
       const valueOverall = weightedOverall({
-        cfb27Score: cfb27Rating ? cfb27Rating.ovr / 99 : null,
+        cfb27Score: cfb27Overall ? cfb27Overall / 99 : null,
         weeklyPerformanceScore,
         positionPeerScore,
         projectionScore,
@@ -165,8 +167,8 @@ export const buildPlayerCompareRows = (
 
       return {
         ...player,
-        cfb27Overall: cfb27Rating?.ovr ?? null,
-        cfb27Rank: cfb27Rating?.rank ?? null,
+        cfb27Overall,
+        cfb27Rank,
         performanceAverage,
         valueOverall,
         compareRank: 0,

@@ -22,7 +22,6 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-CFB27_SOURCE_ID = "cfb27"
 CFB27_EXTERNAL_PREFIX = "cfb27:"
 CFB27_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 CFB27_SOURCE_PATH = Path(__file__).resolve().parents[2] / "app" / "data" / "cfb27_ratings.json"
@@ -108,12 +107,7 @@ def upgrade() -> None:
                     set name = :name,
                         school = :school,
                         position = :position,
-                        sheet_adp = case
-                            when sheet_adp is null or sheet_adp <= 0 then :sheet_adp
-                            else sheet_adp
-                        end,
                         external_id = coalesce(nullif(external_id, ''), :external_id),
-                        sheet_source_sheet_id = coalesce(nullif(sheet_source_sheet_id, ''), :source_id),
                         updated_at = now()
                     where id = :id
                     """
@@ -123,9 +117,7 @@ def upgrade() -> None:
                     "name": rating["name"],
                     "school": rating["school"],
                     "position": rating["position"],
-                    "sheet_adp": float(rating["rank"]),
                     "external_id": external_id,
-                    "source_id": CFB27_SOURCE_ID,
                 },
             )
             continue
@@ -138,8 +130,6 @@ def upgrade() -> None:
                     name,
                     position,
                     school,
-                    sheet_adp,
-                    sheet_source_sheet_id,
                     created_at,
                     updated_at
                 )
@@ -148,8 +138,6 @@ def upgrade() -> None:
                     :name,
                     :position,
                     :school,
-                    :sheet_adp,
-                    :source_id,
                     now(),
                     now()
                 )
@@ -161,8 +149,6 @@ def upgrade() -> None:
                 "name": rating["name"],
                 "position": rating["position"],
                 "school": rating["school"],
-                "sheet_adp": float(rating["rank"]),
-                "source_id": CFB27_SOURCE_ID,
             },
         )
         inserted = result.one()
@@ -175,8 +161,7 @@ def downgrade() -> None:
         sa.text(
             """
             delete from players
-            where sheet_source_sheet_id = :source_id
-              and external_id like :external_id_prefix
+            where external_id like :external_id_prefix
               and id not in (select player_id from roster_entries where player_id is not null)
               and id not in (select player_id from draft_picks where player_id is not null)
               and id not in (select player_id from watchlist_players where player_id is not null)
@@ -186,7 +171,6 @@ def downgrade() -> None:
             """
         ),
         {
-            "source_id": CFB27_SOURCE_ID,
             "external_id_prefix": f"{CFB27_EXTERNAL_PREFIX}%",
         },
     )

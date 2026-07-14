@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Float, Index, String
+from sqlalchemy import JSON, DateTime, Float, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -11,6 +11,8 @@ class Player(TimestampMixin, Base):
     __table_args__ = (
         Index("ix_players_external_id", "external_id"),
         Index("ix_players_sheet_adp", "sheet_adp"),
+        Index("ix_players_cfb27_rank", "cfb27_rank"),
+        Index("ix_players_cfb27_overall", "cfb27_overall"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -25,6 +27,10 @@ class Player(TimestampMixin, Base):
     sheet_projection_stats: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     sheet_source_sheet_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     sheet_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cfb27_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cfb27_overall: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cfb27_position_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cfb27_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     roster_entries = relationship("RosterEntry", back_populates="player", cascade="all, delete-orphan")
 

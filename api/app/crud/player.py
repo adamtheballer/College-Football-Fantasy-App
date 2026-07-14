@@ -7,7 +7,6 @@ from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.schemas.player import PlayerCreate
-from collegefootballfantasy_api.app.services.cfb27_player_sync import sync_cfb27_players
 from collegefootballfantasy_api.app.services.player_pool_filters import generated_test_player_filter
 
 
@@ -31,9 +30,6 @@ def list_players(
     available_only: bool = False,
     sort: str | None = None,
 ) -> tuple[list[Player], int]:
-    if sort == "rank":
-        sync_cfb27_players(db)
-
     stmt: Select = select(Player).where(generated_test_player_filter())
     if position:
         requested_positions = [value.strip().upper() for value in position.split(",") if value.strip()]
@@ -59,7 +55,20 @@ def list_players(
         )
         stmt = stmt.where(Player.id.not_in(rostered_players), Player.id.not_in(draft_picked_players))
 
-    if sort in {"adp", "draft_rank", "rank"}:
+    if sort == "rank":
+        invalid_rank_sort_bucket = case(
+            (Player.cfb27_rank.isnot(None), 0),
+            (Player.sheet_adp.isnot(None), 1),
+            else_=2,
+        )
+        stmt = stmt.order_by(
+            invalid_rank_sort_bucket.asc(),
+            Player.cfb27_rank.asc().nullslast(),
+            Player.sheet_adp.asc().nullslast(),
+            func.lower(Player.name).asc(),
+            Player.id.asc(),
+        )
+    elif sort in {"adp", "draft_rank"}:
         invalid_adp_sort_bucket = case(
             (Player.sheet_adp.is_(None), 1),
             (Player.sheet_adp <= 0, 1),
@@ -80,9 +89,6 @@ def list_players(
 
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = db.scalar(count_stmt)
-    if search and not total:
-        sync_cfb27_players(db)
-        total = db.scalar(count_stmt)
     players = db.scalars(stmt.offset(offset).limit(limit)).all()
     return players, total or 0
 
