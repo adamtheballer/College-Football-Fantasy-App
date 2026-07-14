@@ -215,7 +215,7 @@ def _ensure_player_available(db: Session, league_id: int, player_id: int) -> Non
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player already on a league roster")
 
 
-def _validate_no_gameday_for_players(
+def _validate_no_kicked_off_players(
     db: Session,
     league: League,
     player_ids: set[int],
@@ -228,27 +228,34 @@ def _validate_no_gameday_for_players(
     school_names = {player.school for player in players if player.school}
     if not school_names:
         return
-    league_tz = _league_timezone(db, league)
-    league_date = _as_utc(now or _now()).astimezone(league_tz).date()
+    current = _as_utc(now or _now())
+    week_state = current_cfb_week_state(
+        league.season_year,
+        now=current,
+        timezone_name=_league_timezone_name(db, league),
+    )
     games = (
         db.query(Game)
-        .filter(Game.season == league.season_year, Game.start_date.isnot(None))
+        .filter(
+            Game.season == league.season_year,
+            Game.week == week_state.week,
+            Game.start_date.isnot(None),
+        )
         .filter(or_(Game.home_team.in_(school_names), Game.away_team.in_(school_names)))
         .all()
     )
-    gameday_schools: set[str] = set()
+    locked_schools: set[str] = set()
     for game in games:
-        game_date = _as_utc(game.start_date).astimezone(league_tz).date()
-        if game_date != league_date:
+        if game.start_date is None or _as_utc(game.start_date) > current:
             continue
         if game.home_team in school_names:
-            gameday_schools.add(game.home_team)
+            locked_schools.add(game.home_team)
         if game.away_team in school_names:
-            gameday_schools.add(game.away_team)
-    if gameday_schools:
+            locked_schools.add(game.away_team)
+    if locked_schools:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"waiver moves are blocked on gameday for: {', '.join(sorted(gameday_schools))}",
+            detail=f"waiver moves are locked after kickoff for: {', '.join(sorted(locked_schools))}",
         )
 
 
@@ -334,10 +341,11 @@ def submit_waiver_claim(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
     _ensure_player_available(db, league.id, add_player.id)
     drop_entry = _drop_entry_for_payload(db, team, payload.drop_roster_entry_id)
-    _validate_no_gameday_for_players(
+    _validate_no_kicked_off_players(
         db,
         league,
         {add_player.id, drop_entry.player_id if drop_entry else 0} - {0},
+        now=now,
     )
     _best_slot_after_drop(
         db,
@@ -496,7 +504,7 @@ def _process_single_claim(
             )
             if not drop_entry:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="drop player no longer on roster")
-        _validate_no_gameday_for_players(
+        _validate_no_kicked_off_players(
             db,
             league,
             {claim.add_player_id, claim.drop_player_id or 0} - {0},

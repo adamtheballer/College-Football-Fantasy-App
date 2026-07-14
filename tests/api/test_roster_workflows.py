@@ -4,6 +4,7 @@ from conftest import TestingSessionLocal
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
@@ -11,6 +12,7 @@ from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.services.league_weeks import current_cfb_week_state
+from collegefootballfantasy_api.app.services import waiver_service
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -283,6 +285,64 @@ def test_waiver_claim_uses_configured_waiver_period_hours(client, db_session):
     process_response = client.post(f"/leagues/{league['id']}/waivers/process", headers=auth_headers(token))
     assert process_response.status_code == 200
     assert process_response.json() == {"processed": 0, "failed": 0, "pending": 1}
+
+
+def test_waiver_claim_allows_same_day_before_player_school_kickoff(client, db_session, monkeypatch):
+    fixed_now = datetime(2026, 8, 20, 14, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(waiver_service, "_now", lambda: fixed_now)
+    token = create_user_and_token(client, "waiver-before-kick")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    _drop_player_id, add_player_id = create_players(client)
+    db_session.add(
+        Game(
+            season=2026,
+            week=1,
+            season_type="regular",
+            start_date=fixed_now + timedelta(hours=2),
+            home_team="Oregon",
+            away_team="Other",
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        f"/leagues/{league['id']}/waivers/claims",
+        json={"team_id": team.id, "add_player_id": add_player_id, "faab_bid": 0},
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 201
+    assert parse_api_datetime(response.json()["process_after"]) == fixed_now + timedelta(hours=24)
+
+
+def test_waiver_claim_rejects_player_school_after_kickoff(client, db_session, monkeypatch):
+    fixed_now = datetime(2026, 8, 20, 20, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(waiver_service, "_now", lambda: fixed_now)
+    token = create_user_and_token(client, "waiver-after-kick")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    _drop_player_id, add_player_id = create_players(client)
+    db_session.add(
+        Game(
+            season=2026,
+            week=1,
+            season_type="regular",
+            start_date=fixed_now - timedelta(hours=2),
+            home_team="Oregon",
+            away_team="Other",
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        f"/leagues/{league['id']}/waivers/claims",
+        json={"team_id": team.id, "add_player_id": add_player_id, "faab_bid": 0},
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "waiver moves are locked after kickoff for: Oregon"
 
 
 def test_waiver_claim_cancel_endpoint_marks_pending_claim_cancelled(client, db_session):
