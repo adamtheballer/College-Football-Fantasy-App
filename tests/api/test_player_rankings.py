@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+import importlib.util
+from pathlib import Path
 
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
@@ -7,6 +9,16 @@ from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.services.cfb27_player_sync import load_cfb27_ratings, sync_cfb27_players
+
+
+def _load_cfb27_seed_migration():
+    migration_path = Path(__file__).resolve().parents[2] / "api" / "alembic" / "versions" / "0031_seed_cfb27_players.py"
+    spec = importlib.util.spec_from_file_location("cfb27_seed_migration", migration_path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_players_expose_and_sort_by_sheet_board_rank(client, db_session):
@@ -39,6 +51,19 @@ def test_cfb27_source_contains_critical_compare_players():
     ahmad = ratings[("Ahmad Hardy", "Missouri", "RB")]
     assert jeremiah.overall == 99
     assert ahmad.overall == 96
+
+
+def test_cfb27_seed_migration_uses_backend_rating_source():
+    migration = _load_cfb27_seed_migration()
+    rows = {
+        (row["name"], row["school"], row["position"]): row
+        for row in migration._load_cfb27_rows()
+    }
+
+    assert migration.down_revision == "0030_align_timestamp_nullability"
+    assert len(rows) == len(load_cfb27_ratings())
+    assert rows[("Jeremiah Smith", "Ohio State", "WR")]["overall"] == 99
+    assert rows[("Ahmad Hardy", "Missouri", "RB")]["overall"] == 96
 
 
 def test_cfb27_sync_creates_missing_compare_players(client, db_session):
