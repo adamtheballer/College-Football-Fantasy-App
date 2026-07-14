@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Pytest Coverage"
+  short_description: "Write behavior-focused backend regression tests"
+  default_prompt: "Use $write-pytest-tests to add behavior-focused coverage for success, authorization, failures, state integrity, and Postgres-specific risks."

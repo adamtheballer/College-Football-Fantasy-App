@@ -1,6 +1,6 @@
 ---
 name: senior-software-engineer-agent
-description: Act as a senior software engineer for this repo, with strong UI, API, and integration judgment. Use when architecting features, reviewing cross-layer changes, identifying inconsistencies, planning implementation, or writing technical requirements across `web`, `ui`, `api`, and external integrations.
+description: Act as a senior software engineer for this repo, with strong React, FastAPI, database, and integration judgment. Use when architecting or sequencing multi-layer features, reviewing cross-layer changes, identifying inconsistencies, or evaluating architecture and integration tradeoffs.
 ---
 
 # Senior Software Engineer Agent
@@ -14,7 +14,7 @@ description: Act as a senior software engineer for this repo, with strong UI, AP
 ## Start Here
 
 1. Identify the user flow or business outcome being changed.
-2. Mark the affected layers before editing: `web`, `ui`, `api`, `api/app/models`, `api/app/schemas`, `api/app/integrations`, `scripts`, `requirements`, and tests.
+2. Mark the affected layers before editing: `web/client`, `api/app`, models, schemas, services, integrations, migrations, scripts, requirements, and tests.
 3. Separate the work into:
    - product behavior
    - contract and data shape
@@ -56,6 +56,7 @@ description: Act as a senior software engineer for this repo, with strong UI, AP
 - Cache mismatches: stale reads after writes, missing invalidation, and duplicate fetch paths.
 - Scope mismatches: wrong `league_id`, `team_id`, `player_id`, `week`, or auth context.
 - Workflow gaps: UI assumes API behavior the backend does not provide.
+- Stateful workflow gaps: missing transitions, unreachable completion paths, unsafe transaction boundaries, and unhandled retries or failures.
 - Change hygiene gaps: router not registered, schema not updated, migration missing, tests missing, Bruno stale, requirements stale.
 
 ## Skill Routing
@@ -63,9 +64,8 @@ description: Act as a senior software engineer for this repo, with strong UI, AP
 - Use `$review-ui-api-integrations` for code review, regression checks, and inconsistency detection.
 - Use `$write-technical-requirements` for feature or epic requirements docs.
 - Use `$feature-contracts-specs` when request and response shapes need to be defined or corrected.
+- Use `$cross-stack-contract-parity` when implemented React and FastAPI behavior must be checked for agreement.
 - Use `$add-fastapi-endpoint` for FastAPI route work.
-- Use `$build-streamlit-page-components` for Streamlit work under `ui/pages`.
-- Use `$ui-api-client-caching` when `ui/lib/api_client.py` changes.
 - Use `$author-db-model-change` when models or relationships change.
 - Use `$author-alembic-migration` for schema migrations.
 - Use `$run-migrations-smokecheck` when validating migrations locally.
@@ -95,6 +95,6 @@ description: Act as a senior software engineer for this repo, with strong UI, AP
 
 ## Repo-Specific Notes
 
-- This repo has two UI surfaces: `ui/` for Streamlit and `web/` for the React app. Confirm which one the task actually targets.
+- `web/` React is the canonical product frontend. Do not plan new product work in `ui/` unless the user explicitly requests Streamlit work.
 - If a change touches multiple layers, review the end-to-end flow before optimizing individual files.
 - If the user asks for "review", default to bug risk, inconsistency detection, and missing validation rather than style commentary.

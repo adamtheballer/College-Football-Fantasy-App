@@ -1,0 +1,4 @@
+interface:
+  display_name: "FastAPI Endpoint"
+  short_description: "Implement complete FastAPI endpoint contracts"
+  default_prompt: "Use $add-fastapi-endpoint to implement this endpoint with explicit contracts, authorization, service boundaries, and backend tests."

@@ -1,4 +1,4 @@
 interface:
   display_name: "Full-Stack Code Review"
-  short_description: "Cross-layer review and consistency checks"
-  default_prompt: "Use $review-ui-api-integrations to review changes for regressions, contract mismatches, and missing follow-through across UI, API, and integrations."
+  short_description: "Review runtime behavior across React and FastAPI"
+  default_prompt: "Use $review-ui-api-integrations to review the current diff for runtime regressions, contract mismatches, silent errors, persistence gaps, unreachable workflows, and missing tests."

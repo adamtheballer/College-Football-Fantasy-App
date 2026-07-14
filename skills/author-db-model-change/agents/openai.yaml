@@ -1,0 +1,4 @@
+interface:
+  display_name: "Database Model Change"
+  short_description: "Model database invariants and downstream impacts"
+  default_prompt: "Use $author-db-model-change to implement this model change with durable constraints, safe relationships, migrations, contracts, and tests."

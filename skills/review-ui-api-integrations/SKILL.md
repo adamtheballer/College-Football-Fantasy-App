@@ -1,6 +1,6 @@
 ---
 name: review-ui-api-integrations
-description: Review full-stack changes in this repo across UI, API, database, tests, and integrations. Use when asked to review code, identify inconsistencies, find regressions, or check cross-layer alignment between `web`, `ui`, `api`, and external data sources.
+description: Review full-stack changes in this repo across the React frontend, FastAPI backend, database, tests, and external integrations. Use when asked to review code, find regressions, or check cross-layer alignment.
 ---
 
 # Review UI API Integrations
@@ -12,11 +12,11 @@ description: Review full-stack changes in this repo across UI, API, database, te
 
 ## Review Order
 
-1. Define the user flow or API workflow being changed.
-2. Check UI assumptions against the actual API contract.
-3. Check schemas, CRUD or service logic, and persistence changes.
-4. Check integration boundaries, cache behavior, and tests.
-5. Check whether docs or Bruno requests should have changed too.
+1. Resolve the exact diff or file scope and identify the user flow it changes.
+2. Establish runtime reachability from React routes, FastAPI router registration, scheduled callers, or worker entrypoints. Trace reachable flows end to end and report intended features that are unmounted or have no production caller.
+3. Check UI assumptions against actual Pydantic models and serialized responses; use `$cross-stack-contract-parity` when both sides changed.
+4. Check transaction boundaries, migrations, background-worker invocation, external integrations, cache behavior, and tests.
+5. Run the narrowest useful verification and check whether requirements, docs, or Bruno workflows became stale.
 
 ## What to Look For
 
@@ -49,8 +49,19 @@ description: Review full-stack changes in this repo across UI, API, database, te
 ### Validation gaps
 
 - Contract changes without tests.
+- Frontend types or fixtures that do not match actual FastAPI responses.
+- API failures rendered as empty, preview, or successful states.
+- A service or worker that has no production caller, scheduler, or route.
+- Tests that reproduce their own mocked contract without exercising the implementation boundary.
 - New routes without Bruno coverage when relevant.
 - Requirements or specs left stale after behavior changes.
+
+### Reachability and completion risks
+
+- Dead or unmounted code being reviewed as if it ships.
+- A UI action with no complete backend path, or a backend capability with no reachable UI when the feature requires one.
+- Statuses with no legal path to completion or no handler for retries and failures.
+- Multi-row mutations that can commit partial state.
 
 ## Output Format
 
@@ -61,17 +72,26 @@ description: Review full-stack changes in this repo across UI, API, database, te
   - why it matters to the flow
   - the smallest credible fix
 - If no findings are present, say that directly and then note any residual testing or environment gaps.
+- Separate confirmed findings from unverified concerns; omit speculative style commentary.
+- Include the verification performed and any runtime boundary that was not exercised.
 
 ## Repo Files to Check
 
+- `web/client/App.tsx`
 - `web/client`
-- `web/shared/api.ts`
-- `ui/pages`
-- `ui/lib/api_client.py`
+- `web/client/lib/api.ts`
+- `web/client/hooks`
+- `web/client/types`
 - `api/app/api/routes`
+- `api/app/main.py`
 - `api/app/schemas`
 - `api/app/crud`
+- `api/app/services`
 - `api/app/models`
 - `api/app/integrations`
 - `tests/api`
+- `web/client/**/*.spec.ts`
+- `web/tests/e2e`
+- `scripts`
+- `.github/workflows`
 - `bruno/collections/backend-api`

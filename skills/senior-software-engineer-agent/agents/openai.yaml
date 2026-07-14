@@ -1,4 +1,4 @@
 interface:
   display_name: "Senior Software Engineer"
-  short_description: "Full-stack architecture and review expert"
-  default_prompt: "Use $senior-software-engineer-agent to architect, review, or refine UI, API, and integration work for this repo."
+  short_description: "Plan React and FastAPI architecture changes"
+  default_prompt: "Use $senior-software-engineer-agent to architect this React and FastAPI change by mapping affected layers, contracts, persistence, failure paths, sequencing, and verification."
