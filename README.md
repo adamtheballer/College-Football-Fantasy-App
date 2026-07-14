@@ -43,6 +43,12 @@ uv run alembic -c api/alembic.ini upgrade head
 ```
 
 Migrations also seed the CFB27 player board into `players`, so clean databases do not require a separate manual `sync_cfb27_ratings.py` run before Player Compare works.
+`api/app/data/cfb27_ratings.json` is the source of truth for CFB27 ratings. Regenerate the frontend module after changing it:
+
+```bash
+PYTHONPATH=. uv run python scripts/generate_cfb27_frontend.py
+PYTHONPATH=. uv run python scripts/generate_cfb27_frontend.py --check
+```
 
 5) Install web dependencies
 
@@ -167,7 +173,7 @@ Apply migrations:
 uv run alembic -c api/alembic.ini upgrade head
 ```
 
-The CFB27 player pool is data-migration backed. `scripts/sync_cfb27_ratings.py` is a manual resync/repair helper, not a required setup step.
+The CFB27 player pool is data-migration backed. `scripts/sync_cfb27_ratings.py` is a manual resync/repair helper, not a required setup step. `web/client/lib/cfb27Ratings.ts` is generated from `api/app/data/cfb27_ratings.json`; do not edit the frontend file by hand.
 
 ## API tests (pytest)
 
