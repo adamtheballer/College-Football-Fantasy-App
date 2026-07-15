@@ -22,4 +22,5 @@ class LineupWeekSnapshot(TimestampMixin, Base):
     week: Mapped[int] = mapped_column(Integer)
     slot: Mapped[str] = mapped_column(String(50))
     is_starter: Mapped[bool] = mapped_column(Boolean, default=False)
-    locked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    game_start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

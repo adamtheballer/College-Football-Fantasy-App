@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta, timezone
 
-from conftest import TestingSessionLocal
+from conftest import TestingSessionLocal, admin_headers
 import pytest
 from sqlalchemy.exc import IntegrityError
 
 from collegefootballfantasy_api.app.models.game import Game
+from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
@@ -95,6 +96,7 @@ def create_players(client) -> tuple[int, int]:
                 "image_url": None,
             },
         ],
+        headers=admin_headers(client),
     )
     assert response.status_code == 201
     rows = response.json()
@@ -120,6 +122,7 @@ def create_position_players(client) -> dict[str, int]:
                 "image_url": None,
             },
         ],
+        headers=admin_headers(client),
     )
     assert response.status_code == 201
     return {row["position"]: row["id"] for row in response.json()}
@@ -234,8 +237,10 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
     assert body["faab_bid"] == 7
     assert body["process_after"] is not None
     process_after = parse_api_datetime(body["process_after"])
-    assert submitted_at + timedelta(hours=23, minutes=55) <= process_after
-    assert process_after <= submitted_at + timedelta(hours=24, minutes=5)
+    settings = db_session.query(LeagueSettings).filter_by(league_id=league["id"]).one()
+    assert settings.next_waiver_run_at is not None
+    assert process_after == parse_api_datetime(settings.next_waiver_run_at.isoformat())
+    assert process_after > submitted_at
 
     list_response = client.get(f"/leagues/{league['id']}/waivers", headers=auth_headers(token))
     assert list_response.status_code == 200
@@ -282,8 +287,10 @@ def test_waiver_claim_uses_configured_waiver_period_hours(client, db_session):
 
     assert submit_response.status_code == 201
     process_after = parse_api_datetime(submit_response.json()["process_after"])
-    assert submitted_at + timedelta(hours=47, minutes=55) <= process_after
-    assert process_after <= submitted_at + timedelta(hours=48, minutes=5)
+    assert process_after > submitted_at
+    settings = db_session.query(LeagueSettings).filter_by(league_id=league["id"]).one()
+    assert settings.next_waiver_run_at is not None
+    assert process_after == parse_api_datetime(settings.next_waiver_run_at.isoformat())
 
     process_response = client.post(f"/leagues/{league['id']}/waivers/process", headers=auth_headers(token))
     assert process_response.status_code == 200
@@ -316,7 +323,7 @@ def test_waiver_claim_allows_same_day_before_player_school_kickoff(client, db_se
     )
 
     assert response.status_code == 201
-    assert parse_api_datetime(response.json()["process_after"]) == fixed_now + timedelta(hours=24)
+    assert parse_api_datetime(response.json()["process_after"]) > fixed_now
 
 
 def test_waiver_claim_rejects_player_school_after_kickoff(client, db_session, monkeypatch):
@@ -473,7 +480,7 @@ def test_waiver_priority_processing_moves_winner_to_bottom(client, db_session):
     assert winner.priority == max(priority.priority for priority in priorities)
 
 
-def test_waiver_locked_drop_player_fails_processing(client, db_session):
+def test_waiver_locked_drop_player_is_rejected_after_kickoff(client, db_session):
     token = create_user_and_token(client, "waiver-locked-drop")
     league = create_league(client, token)
     team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
@@ -487,15 +494,13 @@ def test_waiver_locked_drop_player_fails_processing(client, db_session):
     drop_entry_id = roster_response.json()["id"]
     week_state = current_cfb_week_state(2026, now=datetime.now(timezone.utc), timezone_name="America/Los_Angeles")
     db_session.add(
-        LineupWeekSnapshot(
-            league_id=league["id"],
-            team_id=team.id,
-            player_id=drop_player_id,
+        Game(
+            external_id="waiver-locked-drop-game",
             season=2026,
             week=week_state.week,
-            slot="RB",
-            is_starter=True,
-            locked_at=datetime.now(timezone.utc),
+            home_team="Texas",
+            away_team="Oregon",
+            start_date=datetime.now(timezone.utc) - timedelta(minutes=1),
         )
     )
     db_session.commit()
@@ -510,18 +515,8 @@ def test_waiver_locked_drop_player_fails_processing(client, db_session):
         },
         headers=auth_headers(token),
     )
-    assert submit_response.status_code == 201
-    claim = db_session.get(WaiverClaim, submit_response.json()["id"])
-    claim.process_after = datetime.now(timezone.utc) - timedelta(minutes=1)
-    db_session.commit()
-
-    process_response = client.post(f"/leagues/{league['id']}/waivers/process", headers=auth_headers(token))
-    assert process_response.status_code == 200
-    assert process_response.json() == {"processed": 0, "failed": 1, "pending": 0}
-    db_session.expire_all()
-    failed_claim = db_session.get(WaiverClaim, submit_response.json()["id"])
-    assert failed_claim.status == "failed"
-    assert failed_claim.failure_reason == "locked drop player cannot be waived"
+    assert submit_response.status_code == 409
+    assert "locked after kickoff" in submit_response.json()["detail"]
     assert db_session.query(RosterEntry).filter_by(id=drop_entry_id, player_id=drop_player_id).one()
 
 

@@ -17,6 +17,7 @@ from collegefootballfantasy_api.app.models.scoring_run import ScoringRun
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.team_week_score import TeamWeekScore
+from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_starts_for_players
 
 
 DEFAULT_SCORING_RULES = {
@@ -172,9 +173,9 @@ def _league_settings(db: Session, league_id: int) -> LeagueSettings | None:
 
 
 def create_or_refresh_lineup_snapshots(db: Session, league_id: int, season: int, week: int) -> int:
-    existing_player_ids = {
-        player_id
-        for (player_id,) in db.query(LineupWeekSnapshot.player_id)
+    existing = {
+        (snapshot.team_id, snapshot.player_id): snapshot
+        for snapshot in db.query(LineupWeekSnapshot)
         .filter(
             LineupWeekSnapshot.league_id == league_id,
             LineupWeekSnapshot.season == season,
@@ -188,24 +189,41 @@ def create_or_refresh_lineup_snapshots(db: Session, league_id: int, season: int,
         .order_by(RosterEntry.team_id.asc(), RosterEntry.id.asc())
         .all()
     )
-    locked_at = _now()
+    now = _now()
+    player_ids = {entry.player_id for entry in roster_entries}
+    game_starts = game_starts_for_players(db, player_ids=player_ids, season=season, week=week)
+    current_keys = {(entry.team_id, entry.player_id) for entry in roster_entries}
     created = 0
     for entry in roster_entries:
-        if entry.player_id in existing_player_ids:
+        game_start_at = game_starts.get(entry.player_id)
+        snapshot = existing.get((entry.team_id, entry.player_id))
+        if snapshot and snapshot.locked_at is not None:
             continue
-        snapshot = LineupWeekSnapshot(
-            league_id=league_id,
-            team_id=entry.team_id,
-            player_id=entry.player_id,
-            season=season,
-            week=week,
-            slot=(entry.slot or "BENCH").upper(),
-            is_starter=is_starting_slot(entry.slot or ""),
-            locked_at=locked_at,
-        )
-        db.add(snapshot)
-        created += 1
-    if created:
+        if snapshot is None:
+            snapshot = LineupWeekSnapshot(
+                league_id=league_id,
+                team_id=entry.team_id,
+                player_id=entry.player_id,
+                season=season,
+                week=week,
+                slot=(entry.slot or "BENCH").upper(),
+                is_starter=is_starting_slot(entry.slot or ""),
+                game_start_at=game_start_at,
+                locked_at=as_utc(now) if game_start_at is not None and game_start_at <= as_utc(now) else None,
+            )
+            db.add(snapshot)
+            created += 1
+            continue
+        snapshot.slot = (entry.slot or "BENCH").upper()
+        snapshot.is_starter = is_starting_slot(entry.slot or "")
+        snapshot.game_start_at = game_start_at
+        if game_start_at is not None and game_start_at <= as_utc(now):
+            snapshot.locked_at = as_utc(now)
+
+    for key, snapshot in existing.items():
+        if key not in current_keys and snapshot.locked_at is None:
+            db.delete(snapshot)
+    if created or existing:
         db.flush()
     return created
 

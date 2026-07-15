@@ -8,6 +8,7 @@ from sqlalchemy.pool import StaticPool
 
 from collegefootballfantasy_api.app.db.base import Base
 from collegefootballfantasy_api.app.db.session import get_db
+from collegefootballfantasy_api.app.core.security import create_access_token
 from collegefootballfantasy_api.app.main import app
 from collegefootballfantasy_api.app.models import (  # noqa: F401
     cfb_standing_snapshot,
@@ -54,6 +55,7 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     watchlist,
     weekly_projection,
 )
+from collegefootballfantasy_api.app.models.user import User
 
 TEST_DATABASE_URL = "sqlite://"
 engine = create_engine(
@@ -70,6 +72,34 @@ def override_get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def admin_headers(client: TestClient) -> dict[str, str]:
+    """Create one test-only administrator for protected ingestion endpoints."""
+    email = "admin-seed@example.com"
+    with TestingSessionLocal() as session:
+        user = session.query(User).filter(User.email == email).one_or_none()
+        if user is not None:
+            user_id = user.id
+
+    if user is None:
+        response = client.post(
+            "/auth/signup",
+            json={
+                "first_name": "Admin",
+                "email": email,
+                "password": "StrongPass123!",
+            },
+        )
+        assert response.status_code == 201
+        with TestingSessionLocal() as session:
+            user = session.query(User).filter(User.email == email).one()
+            user.is_admin = True
+            session.commit()
+            user_id = user.id
+
+    token, _ = create_access_token(user_id=user_id, email=email)
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture(name="client")

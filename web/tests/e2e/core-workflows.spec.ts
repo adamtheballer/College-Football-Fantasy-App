@@ -292,6 +292,13 @@ test.describe("critical browser workflows", () => {
         body: JSON.stringify({ detail: "expired access token" }),
       });
     });
+    await page.route("**/auth/refresh", async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "invalid refresh token" }),
+      });
+    });
 
     await page.goto("/rosters");
     await page.waitForURL("**/login");

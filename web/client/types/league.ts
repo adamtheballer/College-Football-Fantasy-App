@@ -6,7 +6,17 @@ export interface LeagueSettings {
   playoff_teams: number;
   waiver_type: string;
   waiver_period_hours: number;
+  waiver_process_day?: number;
+  waiver_process_hour?: number;
+  next_waiver_run_at?: string | null;
+  faab_budget?: number;
+  allow_zero_dollar_bids?: boolean;
+  waiver_tiebreaker?: string;
+  initial_waiver_priority_method?: string;
+  post_drop_waiver_hours?: number;
   trade_review_type: string;
+  trade_deadline_week?: number | null;
+  trade_deadline_at?: string | null;
   superflex_enabled: boolean;
   kicker_enabled: boolean;
   defense_enabled: boolean;

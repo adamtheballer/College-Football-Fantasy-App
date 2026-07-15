@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+from conftest import admin_headers
 from collegefootballfantasy_api.app.api.routes import stats as stats_routes
 from collegefootballfantasy_api.app.integrations.sportsdata import SportsDataClient
 from collegefootballfantasy_api.app.models.injury import Injury
@@ -20,6 +21,7 @@ def test_player_stats_endpoint_uses_db_backed_sportsdata_cache(client, db_sessio
                 "school": "Alabama",
             }
         ],
+        headers=admin_headers(client),
     )
     assert create_response.status_code == 201
     player_id = create_response.json()[0]["id"]
@@ -32,7 +34,10 @@ def test_player_stats_endpoint_uses_db_backed_sportsdata_cache(client, db_sessio
 
     monkeypatch.setattr(SportsDataClient, "get_player_stats", fake_get_player_stats)
 
-    first = client.get(f"/players/{player_id}/stats?season=2025&week=1")
+    first = client.get(
+        f"/players/{player_id}/stats?season=2025&week=1&refresh=true",
+        headers=admin_headers(client),
+    )
     assert first.status_code == 200
     assert first.json()["cached"] is False
     assert first.json()["stats"]["PassingYards"] == 312
@@ -67,6 +72,7 @@ def test_player_stats_endpoint_falls_back_to_stale_cache_when_provider_fails(cli
                 "school": "Texas",
             }
         ],
+        headers=admin_headers(client),
     )
     assert create_response.status_code == 201
     player_id = create_response.json()[0]["id"]
@@ -81,7 +87,10 @@ def test_player_stats_endpoint_falls_back_to_stale_cache_when_provider_fails(cli
             "Week": week,
         },
     )
-    seeded = client.get(f"/players/{player_id}/stats?season=2025&week=2")
+    seeded = client.get(
+        f"/players/{player_id}/stats?season=2025&week=2&refresh=true",
+        headers=admin_headers(client),
+    )
     assert seeded.status_code == 200
     assert seeded.json()["stats"]["RushingYards"] == 98
 
@@ -102,7 +111,10 @@ def test_player_stats_endpoint_falls_back_to_stale_cache_when_provider_fails(cli
         ),
     )
 
-    stale_response = client.get(f"/players/{player_id}/stats?season=2025&week=2")
+    stale_response = client.get(
+        f"/players/{player_id}/stats?season=2025&week=2&refresh=true",
+        headers=admin_headers(client),
+    )
     assert stale_response.status_code == 200
     payload = stale_response.json()
     assert payload["cached"] is True

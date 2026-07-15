@@ -60,6 +60,7 @@ from collegefootballfantasy_api.app.models import (
     waiver_priority,
     watchlist,
     weekly_projection,
+    worker_heartbeat,
 )
 
 config = context.config

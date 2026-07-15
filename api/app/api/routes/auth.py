@@ -143,12 +143,14 @@ def _send_password_reset_email(db: Session, *, user: User, request: Request) -> 
 
 
 def _log_login_failure(request: Request, *, email: str, reason: str) -> None:
+    local, separator, domain = email.partition("@")
+    redacted_email = f"{local[:1]}***{separator}{domain}" if separator else "***"
     logger.info(
         "auth_login_failed",
         extra={
-            "normalized_email": email,
+            "email": redacted_email,
             "failure_reason": reason,
-            "request_ip": request_ip(request),
+            "request_ip_hash": hash_token(request_ip(request) or "") if request_ip(request) else None,
         },
     )
 

@@ -1,3 +1,5 @@
+from conftest import admin_headers
+
 from collegefootballfantasy_api.app.api.routes import players as players_route
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.injury import Injury
@@ -58,7 +60,11 @@ def test_player_season_stats_missing_sportsdata_key_returns_nullable_response(
     db_session.add(player)
     db_session.commit()
 
-    response = client.get(f"/players/{player.id}/season-stats", params={"season": 2025})
+    response = client.get(
+        f"/players/{player.id}/season-stats",
+        params={"season": 2025, "refresh": True},
+        headers=admin_headers(client),
+    )
 
     assert response.status_code == 200
     body = response.json()
@@ -108,7 +114,11 @@ def test_player_season_stats_missing_provider_data_returns_nullable_response(
     db_session.add(player)
     db_session.commit()
 
-    response = client.get(f"/players/{player.id}/season-stats", params={"season": 2025})
+    response = client.get(
+        f"/players/{player.id}/season-stats",
+        params={"season": 2025, "refresh": True},
+        headers=admin_headers(client),
+    )
 
     assert response.status_code == 200
     body = response.json()
@@ -168,7 +178,7 @@ def test_player_card_returns_espn_about_injury_history_and_cached_stats(client, 
     )
     db_session.commit()
 
-    response = client.get(f"/players/{player.id}/card")
+    response = client.get(f"/players/{player.id}/card?refresh=true", headers=admin_headers(client))
 
     assert response.status_code == 200
     body = response.json()
@@ -219,7 +229,7 @@ def test_player_card_uses_normalized_espn_provider_mapping(client, db_session, m
     )
     db_session.commit()
 
-    response = client.get(f"/players/{player.id}/card")
+    response = client.get(f"/players/{player.id}/card?refresh=true", headers=admin_headers(client))
 
     assert response.status_code == 200
     body = response.json()
@@ -318,7 +328,7 @@ def test_player_card_resolves_espn_by_name_and_imports_historical_stats(client, 
     db_session.add(player)
     db_session.commit()
 
-    response = client.get(f"/players/{player.id}/card")
+    response = client.get(f"/players/{player.id}/card?refresh=true", headers=admin_headers(client))
 
     assert response.status_code == 200
     body = response.json()

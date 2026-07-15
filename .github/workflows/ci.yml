@@ -53,6 +53,9 @@ jobs:
       - name: Verify database is at Alembic head
         run: PYTHONPATH=. uv run python scripts/check_alembic_head.py
 
+      - name: Verify Alembic metadata has no drift
+        run: PYTHONPATH=. uv run alembic -c api/alembic.ini check
+
       - name: Run backend tests
         run: PYTHONPATH=. uv run pytest -q tests
 
@@ -74,3 +77,33 @@ jobs:
 
       - name: Build frontend
         run: npm --prefix web run build
+
+      - name: Install Playwright browser
+        run: npm --prefix web exec -- playwright install --with-deps chromium
+
+      - name: Run frontend E2E tests
+        run: npm --prefix web run test:e2e
+
+  docker-clean-boot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build and start isolated stack
+        run: COMPOSE_PROJECT_NAME=cff_ci DB_PORT=55450 docker compose up --build -d
+
+      - name: Verify API and web readiness
+        run: |
+          for attempt in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:8000/health && \
+              curl --fail --silent http://127.0.0.1:8000/health/ready && \
+              curl --fail --silent --head http://127.0.0.1:8080 && exit 0
+            sleep 5
+          done
+          docker compose -p cff_ci logs
+          exit 1
+
+      - name: Stop isolated stack
+        if: always()
+        run: COMPOSE_PROJECT_NAME=cff_ci docker compose down -v

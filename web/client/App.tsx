@@ -181,7 +181,7 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
-                <Route path="/settings" element={<Settings />} />
+                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/rosters" element={<ProtectedRoute><Rosters /></ProtectedRoute>} />
                 <Route path="/chats" element={<ProtectedRoute><Chats /></ProtectedRoute>} />
                 <Route path="/waivers" element={<ProtectedRoute><Navigate to="/leagues" replace /></ProtectedRoute>} />
@@ -197,7 +197,6 @@ const App = () => (
                 <Route path="/stats/players" element={<Navigate to="/player-compare" replace />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
-                <Route path="/verify-email" element={<Navigate to="/leagues" replace />} />
                 <Route path="/password-reset/confirm" element={<PasswordResetConfirm />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

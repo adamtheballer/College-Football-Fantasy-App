@@ -1,3 +1,6 @@
+from conftest import admin_headers
+
+
 def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
@@ -27,6 +30,7 @@ def create_player(client, name: str = "Watch Player") -> int:
                 "image_url": None,
             }
         ],
+        headers=admin_headers(client),
     )
     assert response.status_code == 201
     return response.json()[0]["id"]

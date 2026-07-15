@@ -43,6 +43,13 @@ class TradeOfferCreate(BaseModel):
     def validate_sides(self) -> "TradeOfferCreate":
         if not self.give_items or not self.receive_items:
             raise ValueError("trade offer requires players from both teams")
+        keys = [(item.team_id, item.player_id, item.draft_pick_id) for item in [*self.give_items, *self.receive_items]]
+        if len(keys) != len(set(keys)):
+            raise ValueError("trade offer cannot contain duplicate items")
+        give_player_ids = {item.player_id for item in self.give_items if item.player_id is not None}
+        receive_player_ids = {item.player_id for item in self.receive_items if item.player_id is not None}
+        if give_player_ids & receive_player_ids:
+            raise ValueError("a player cannot appear on both sides of a trade")
         return self
 
 

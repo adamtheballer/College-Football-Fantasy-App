@@ -9,7 +9,6 @@ from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
-from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.notification import NotificationLog
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
@@ -34,6 +33,7 @@ from collegefootballfantasy_api.app.services.league_weeks import (
     next_cfb_trade_process_time,
 )
 from collegefootballfantasy_api.app.services.notification_service import legacy_user_key
+from collegefootballfantasy_api.app.services.player_lock_service import locked_player_ids
 
 TRADE_STATUS_PROPOSED = "proposed"
 TRADE_STATUS_ACCEPTED_PENDING = "accepted_pending"
@@ -79,7 +79,22 @@ def _league_settings(db: Session, league_id: int) -> LeagueSettings | None:
 
 def _trade_requires_commissioner(db: Session, league_id: int) -> bool:
     settings = _league_settings(db, league_id)
-    return bool(settings and (settings.trade_review_type or "").lower() == "commissioner")
+    review_type = (settings.trade_review_type or "none").strip().lower() if settings else "none"
+    if review_type not in {"none", "commissioner"}:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="unsupported trade review type")
+    return review_type == "commissioner"
+
+
+def _ensure_trade_deadline_open(db: Session, league: League, now: datetime) -> None:
+    settings = _league_settings(db, league.id)
+    if not settings:
+        return
+    if settings.trade_deadline_at is not None and _as_utc(settings.trade_deadline_at) <= _as_utc(now):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade deadline has passed")
+    if settings.trade_deadline_week is not None:
+        week_state = current_cfb_week_state(league.season_year, _as_utc(now), _trade_timezone(db, league.id))
+        if week_state.week >= settings.trade_deadline_week:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade deadline has passed")
 
 
 def _member_or_404(db: Session, league_id: int, user_id: int) -> LeagueMember:
@@ -239,15 +254,12 @@ def _validate_no_locked_players(db: Session, league: League, offer: TradeOffer, 
     if not player_ids:
         return
     week_state = current_cfb_week_state(league.season_year, now or _utcnow(), _trade_timezone(db, league.id))
-    locked = (
-        db.query(LineupWeekSnapshot.player_id)
-        .filter(
-            LineupWeekSnapshot.league_id == league.id,
-            LineupWeekSnapshot.season == league.season_year,
-            LineupWeekSnapshot.week == week_state.week,
-            LineupWeekSnapshot.player_id.in_(player_ids),
-        )
-        .first()
+    locked = locked_player_ids(
+        db,
+        player_ids=player_ids,
+        season=league.season_year,
+        week=week_state.week,
+        now=now or _utcnow(),
     )
     if locked:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="locked player cannot be traded")
@@ -429,6 +441,7 @@ def get_trade_offer(db: Session, league: League, trade_id: int, current_user: Us
 
 def create_trade_offer(db: Session, league: League, current_user: User, payload: TradeOfferCreate) -> TradeOfferRead:
     _member_or_404(db, league.id, current_user.id)
+    _ensure_trade_deadline_open(db, league, _utcnow())
     proposing, receiving = _validate_payload(db, league.id, payload)
     _require_team_owner(proposing, current_user)
 
@@ -496,6 +509,7 @@ def accept_trade_offer(db: Session, league: League, trade_id: int, current_user:
     if offer.status != TRADE_STATUS_PROPOSED:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade offer is not pending acceptance")
     now = _utcnow()
+    _ensure_trade_deadline_open(db, league, now)
     _ensure_not_expired(offer, now)
     _proposing, receiving = _offer_participants(db, offer)
     _require_team_owner(receiving, current_user)
@@ -536,8 +550,9 @@ def commissioner_approve_trade(db: Session, league: League, trade_id: int, curre
     if offer.status != TRADE_STATUS_COMMISSIONER_REVIEW:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade offer is not awaiting commissioner review")
     _validate_offer_ownership(db, offer)
-    _validate_no_locked_players(db, league, offer)
     now = _utcnow()
+    _ensure_trade_deadline_open(db, league, now)
+    _validate_no_locked_players(db, league, offer, now)
     if is_cfb_game_week_active(now, _trade_timezone(db, league.id)):
         offer.status = TRADE_STATUS_ACCEPTED_PENDING
         offer.accepted_at = offer.accepted_at or now
@@ -591,18 +606,10 @@ def cancel_trade_offer(db: Session, league: League, trade_id: int, current_user:
 
 
 def counter_trade_offer(db: Session, league: League, trade_id: int, current_user: User, payload: TradeActionRequest) -> TradeOfferRead:
-    offer = _load_offer(db, trade_id, for_update=True)
-    if offer.league_id != league.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="trade offer not found")
-    if offer.status != TRADE_STATUS_PROPOSED:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade offer is not pending counter")
-    _proposing, receiving = _offer_participants(db, offer)
-    _require_team_owner(receiving, current_user)
-    offer.status = TRADE_STATUS_COUNTERED
-    _add_review(db, offer, "countered", current_user.id, payload.reason)
-    _notify_participants(db, offer, "TRADE_COUNTERED", "Trade Countered", "A trade offer was countered.")
-    db.commit()
-    return _serialize_offer(_load_offer(db, offer.id))
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="counter offers are unavailable until linked replacement offers are implemented",
+    )
 
 
 def commissioner_veto_trade(db: Session, league: League, trade_id: int, current_user: User, payload: TradeActionRequest) -> TradeOfferRead:
@@ -660,20 +667,22 @@ def process_trade_offers_once(db: Session, now: datetime | None = None) -> dict[
         if is_cfb_game_week_active(current, timezone_name):
             continue
         try:
-            _validate_offer_ownership(db, offer)
-            _validate_no_locked_players(db, league, offer, current)
-            _complete_accepted_trade(
-                db,
-                league=league,
-                offer=offer,
-                actor_user_id=None,
-                now=current,
-                review_action="processed",
-            )
+            with db.begin_nested():
+                _ensure_trade_deadline_open(db, league, current)
+                _validate_offer_ownership(db, offer)
+                _validate_no_locked_players(db, league, offer, current)
+                _complete_accepted_trade(
+                    db,
+                    league=league,
+                    offer=offer,
+                    actor_user_id=None,
+                    now=current,
+                    review_action="processed",
+                )
             processed += 1
-        except HTTPException as exc:
+        except Exception as exc:
             offer.status = TRADE_STATUS_FAILED
-            offer.failure_reason = str(exc.detail)
+            offer.failure_reason = str(exc.detail) if isinstance(exc, HTTPException) else "trade processing failed"
             _add_review(db, offer, "failed", None, offer.failure_reason)
             _notify_participants(db, offer, "TRADE_FAILED", "Trade Failed", offer.failure_reason)
             failed += 1

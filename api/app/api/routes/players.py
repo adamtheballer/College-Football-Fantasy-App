@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.core.config import settings
+from collegefootballfantasy_api.app.api.deps import get_optional_current_user, require_admin_user
 from collegefootballfantasy_api.app.crud.player import create_players, get_player, list_players
 from collegefootballfantasy_api.app.crud.player_stat import get_player_stat, upsert_player_stat
 from collegefootballfantasy_api.app.db.session import get_db
@@ -14,6 +15,7 @@ from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
+from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.player import (
     PlayerCardAboutRead,
     PlayerCardInjuryRead,
@@ -31,6 +33,7 @@ from collegefootballfantasy_api.app.services.historical_stats import (
     get_player_historical_stats_response,
 )
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
+from collegefootballfantasy_api.app.services.auth_security import enforce_auth_rate_limit
 
 router = APIRouter()
 
@@ -167,7 +170,9 @@ def _player_card_player_with_sheet_projection_fallback(db: Session, player: Play
 
 @router.post("", response_model=list[PlayerRead], status_code=status.HTTP_201_CREATED)
 def create_players_endpoint(
-    players_in: list[PlayerCreate], db: Session = Depends(get_db)
+    players_in: list[PlayerCreate],
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(require_admin_user),
 ) -> list[PlayerRead]:
     return create_players(db, players_in)
 
@@ -209,18 +214,31 @@ def get_player_endpoint(player_id: int, db: Session = Depends(get_db)) -> Player
 @router.get("/{player_id}/card", response_model=PlayerCardRead)
 def get_player_card_endpoint(
     player_id: int,
+    request: Request,
     refresh: bool = False,
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> PlayerCardRead:
     player = get_player(db, player_id)
     if not player:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
 
+    if refresh and (current_user is None or not current_user.is_admin):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin only")
+    if refresh:
+        enforce_auth_rate_limit(
+            db,
+            action="provider_refresh",
+            identifier=str(current_user.id),
+            request=request,
+            limit=settings.provider_refresh_rate_limit,
+        )
+
     profile_payload: dict | None = None
     profile_message: str | None = None
     espn_client = ESPNClient()
     espn_id = _resolved_espn_player_id(db, player.id, player.external_id)
-    if not espn_id and settings.espn_historical_stats_enabled:
+    if refresh and not espn_id and settings.espn_historical_stats_enabled:
         try:
             resolved = resolve_espn_player_by_name(db, player, client=espn_client)
             if resolved:
@@ -229,14 +247,14 @@ def get_player_card_endpoint(
         except Exception as exc:
             profile_message = f"ESPN profile lookup unavailable: {exc}"
 
-    if espn_id:
+    if refresh and espn_id:
         if profile_payload is None:
             try:
                 profile_payload = espn_client.get_athlete_profile(espn_id)
             except Exception as exc:
                 profile_message = f"ESPN profile unavailable: {exc}"
     else:
-        profile_message = profile_message or "No trusted ESPN player match is linked to this player."
+        profile_message = None
 
     injury_rows = (
         db.query(Injury)
@@ -254,7 +272,7 @@ def get_player_card_endpoint(
     should_import_history = (
         settings.espn_historical_stats_enabled
         and espn_id is not None
-        and (refresh or historical_stats.status == "not_available")
+        and refresh
     )
     if should_import_history:
         try:
@@ -315,9 +333,11 @@ def get_player_historical_stats_endpoint(
 @router.get("/{player_id}/season-stats", response_model=PlayerStatResponse)
 def get_player_season_stats_endpoint(
     player_id: int,
+    request: Request,
     season: int = 2025,
     refresh: bool = False,
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> PlayerStatResponse:
     player = get_player(db, player_id)
     if not player:
@@ -326,7 +346,17 @@ def get_player_season_stats_endpoint(
     week_value = 0
     existing = get_player_stat(db, player_id, season, week_value)
     stale = _is_stale(existing.updated_at, settings.sportsdata_cache_ttl_days) if existing else True
-    should_refresh = refresh or not existing or stale
+    if refresh and (current_user is None or not current_user.is_admin):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin only")
+    if refresh:
+        enforce_auth_rate_limit(
+            db,
+            action="provider_refresh",
+            identifier=str(current_user.id),
+            request=request,
+            limit=settings.provider_refresh_rate_limit,
+        )
+    should_refresh = refresh
 
     if existing and not should_refresh:
         return PlayerStatResponse(
@@ -429,10 +459,12 @@ def get_player_season_stats_endpoint(
 @router.get("/{player_id}/stats", response_model=PlayerStatResponse)
 def get_player_stats_endpoint(
     player_id: int,
+    request: Request,
     season: int | None = None,
     week: int | None = None,
     refresh: bool = False,
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> PlayerStatResponse:
     player = get_player(db, player_id)
     if not player:
@@ -443,7 +475,17 @@ def get_player_stats_endpoint(
 
     existing = get_player_stat(db, player_id, season_value, week_value)
     stale = _is_stale(existing.updated_at, settings.sportsdata_cache_ttl_days) if existing else True
-    should_refresh = refresh or not existing or stale
+    if refresh and (current_user is None or not current_user.is_admin):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin only")
+    if refresh:
+        enforce_auth_rate_limit(
+            db,
+            action="provider_refresh",
+            identifier=str(current_user.id),
+            request=request,
+            limit=settings.provider_refresh_rate_limit,
+        )
+    should_refresh = refresh
 
     if existing and not should_refresh:
         return PlayerStatResponse(

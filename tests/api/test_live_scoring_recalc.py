@@ -1,5 +1,7 @@
 import pytest
+from datetime import datetime, timedelta, timezone
 
+from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
@@ -7,6 +9,7 @@ from collegefootballfantasy_api.app.models.scoring_run import ScoringRun
 from collegefootballfantasy_api.app.models.team_week_score import TeamWeekScore
 from collegefootballfantasy_api.app.services import scoring_service
 from collegefootballfantasy_api.app.services.scoring_service import (
+    create_or_refresh_lineup_snapshots,
     recalculate_league_week_scores,
     run_league_scoring_recalculation,
 )
@@ -31,6 +34,38 @@ def test_recalculate_league_week_scores_is_idempotent_and_sums_starters_only(cli
     assert home_score.total_points == 56.0
     assert any(row["player_id"] == players["bench"].id for row in home_score.breakdown_json["players"])
     assert all(row["status"] == "live" for row in home_score.breakdown_json["players"] if row["player_id"] != players["ir"].id)
+
+
+def test_lineup_snapshot_refreshes_before_kickoff_then_freezes(client, db_session, monkeypatch):
+    league, home, _away, players, _matchup = create_scoring_fixture(db_session)
+    before_kickoff = datetime(2026, 8, 20, 14, 0, tzinfo=timezone.utc)
+    db_session.add(
+        Game(
+            season=2026,
+            week=1,
+            season_type="regular",
+            start_date=before_kickoff + timedelta(hours=2),
+            home_team="Test",
+            away_team="Opponent",
+        )
+    )
+    db_session.commit()
+    monkeypatch.setattr(scoring_service, "_now", lambda: before_kickoff)
+
+    create_or_refresh_lineup_snapshots(db_session, league.id, 2026, 1)
+    qb_entry = next(entry for entry in home.roster_entries if entry.player_id == players["qb"].id)
+    qb_entry.slot = "BENCH"
+    create_or_refresh_lineup_snapshots(db_session, league.id, 2026, 1)
+    snapshot = db_session.query(LineupWeekSnapshot).filter_by(player_id=players["qb"].id).one()
+    assert snapshot.slot == "BENCH"
+    assert snapshot.locked_at is None
+
+    monkeypatch.setattr(scoring_service, "_now", lambda: before_kickoff + timedelta(hours=3))
+    create_or_refresh_lineup_snapshots(db_session, league.id, 2026, 1)
+    assert snapshot.locked_at is not None
+    qb_entry.slot = "QB"
+    create_or_refresh_lineup_snapshots(db_session, league.id, 2026, 1)
+    assert snapshot.slot == "BENCH"
 
 
 def test_stat_correction_changes_scores_without_incrementing(client, db_session):

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from conftest import TestingSessionLocal
+from conftest import TestingSessionLocal, admin_headers
 from fastapi import HTTPException
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -112,6 +112,7 @@ def create_player(client, name: str = "Arch Manning", position: str = "QB") -> i
                 "image_url": None,
             }
         ],
+        headers=admin_headers(client),
     )
     assert response.status_code == 201
     return response.json()[0]["id"]

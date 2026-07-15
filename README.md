@@ -141,7 +141,7 @@ Production must use:
 - `REFRESH_COOKIE_SECURE=true`
 - `REFRESH_COOKIE_SAMESITE=lax` or stricter unless the deployment requires cross-site cookies
 - `EMAIL_DELIVERY_MODE=smtp` or another production mail adapter
-- valid SMTP sender configuration so `/verify-email?token=...` links are deliverable
+- valid SMTP sender configuration so password-reset links are deliverable
 - `SCORING_PROVIDER=sportsdata` or another licensed provider integration approved for production use
 - `SUPPORT_EMAIL`, `PRIVACY_POLICY_URL`, `TERMS_URL`, and `PROVIDER_DISCLOSURE_URL` set to public support/legal pages
 

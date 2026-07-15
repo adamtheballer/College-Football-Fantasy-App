@@ -7,6 +7,7 @@ from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.scoring_admin_audit import ScoringAdminAudit
 from collegefootballfantasy_api.app.models.scoring_run import ScoringRun
 from collegefootballfantasy_api.app.models.user import User
+from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbeat
 from collegefootballfantasy_api.app.schemas.admin_scoring import (
     AdminActionResponse,
     AdminCorrectionRequest,
@@ -31,6 +32,25 @@ from collegefootballfantasy_api.app.services.admin_scoring_service import (
 )
 
 router = APIRouter()
+
+
+@router.get("/workers")
+def list_worker_health(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_user),
+) -> list[dict]:
+    rows = db.query(WorkerHeartbeat).order_by(WorkerHeartbeat.worker_name.asc()).all()
+    return [
+        {
+            "worker_name": row.worker_name,
+            "status": row.status,
+            "heartbeat_at": row.heartbeat_at,
+            "last_success_at": row.last_success_at,
+            "last_failure_at": row.last_failure_at,
+            "details": row.details_json,
+        }
+        for row in rows
+    ]
 
 
 @router.get("/runs", response_model=ScoringRunsList)

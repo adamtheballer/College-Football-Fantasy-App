@@ -80,7 +80,6 @@ class Settings(BaseSettings):
     refresh_cookie_samesite: str = "lax"
     refresh_cookie_domain: str | None = None
     allow_legacy_api_token_auth: bool = False
-    auth_email_verification_ttl_hours: int = 24
     auth_password_reset_ttl_minutes: int = 30
     auth_failed_login_limit: int = 5
     auth_failed_login_window_minutes: int = 15
@@ -90,7 +89,7 @@ class Settings(BaseSettings):
     auth_login_rate_limit: int = 10
     auth_refresh_rate_limit: int = 30
     auth_password_reset_rate_limit: int = 5
-    auth_resend_verification_rate_limit: int = 5
+    provider_refresh_rate_limit: int = 30
     email_delivery_mode: str = "console"
     smtp_host: str | None = None
     smtp_port: int = 587

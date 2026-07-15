@@ -10,6 +10,7 @@ from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.models.scoring_run import ScoringRun
 from scripts.sync_live_scores import run_once
+from collegefootballfantasy_api.app.services.worker_health import record_worker_heartbeat
 
 logger = logging.getLogger("collegefootballfantasy_api.scoring_worker")
 
@@ -88,6 +89,13 @@ def run_with_retries(args: argparse.Namespace) -> None:
     for attempt in range(1, attempts + 1):
         try:
             run_iteration(args)
+            with SessionLocal() as db:
+                record_worker_heartbeat(
+                    db,
+                    worker_name="scoring_processor",
+                    success=True,
+                    details={"season": args.season, "week": args.week, "league_id": args.league_id, "mode": args.mode},
+                )
             return
         except Exception as exc:  # pragma: no cover - provider/DB failure mode depends on runtime
             last_error = exc
@@ -115,6 +123,13 @@ def run_with_retries(args: argparse.Namespace) -> None:
             mode=args.mode,
             error=last_error,
         )
+        with SessionLocal() as db:
+            record_worker_heartbeat(
+                db,
+                worker_name="scoring_processor",
+                success=False,
+                details={"season": args.season, "week": args.week, "league_id": args.league_id, "mode": args.mode},
+            )
         raise last_error
 
 

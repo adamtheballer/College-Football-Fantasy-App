@@ -15,6 +15,7 @@ from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.services.draft_service import process_expired_draft_picks_once
 from collegefootballfantasy_api.app.services.trade_service import process_trade_offers_once
 from collegefootballfantasy_api.app.services.waiver_service import process_waiver_claims_once
+from collegefootballfantasy_api.app.services.worker_health import record_worker_heartbeat
 
 logger = logging.getLogger("collegefootballfantasy_api.lifecycle_worker")
 
@@ -46,8 +47,12 @@ def main() -> None:
     while True:
         try:
             result = run_once()
+            with SessionLocal() as db:
+                record_worker_heartbeat(db, worker_name="lifecycle_processor", success=True, details=result)
             logger.info("lifecycle_worker_iteration_complete", extra=result)
         except Exception:  # pragma: no cover - operational failure path
+            with SessionLocal() as db:
+                record_worker_heartbeat(db, worker_name="lifecycle_processor", success=False)
             logger.exception("lifecycle_worker_iteration_failed")
         if args.once:
             return

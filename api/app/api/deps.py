@@ -39,6 +39,15 @@ def get_current_user(
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing auth token")
 
 
+def get_optional_current_user(
+    db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
+) -> User | None:
+    if not authorization:
+        return None
+    return get_current_user(db=db, authorization=authorization)
+
+
 def require_verified_user(current_user: User = Depends(get_current_user)) -> User:
     # Kept as a compatibility dependency while email verification is disabled.
     # Existing routes still require a valid authenticated account.

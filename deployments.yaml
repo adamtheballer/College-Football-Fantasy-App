@@ -94,6 +94,10 @@ environments:
       env:
         VITE_API_BASE_URL: ${PUBLIC_API_BASE_URL}
     workers:
+      scoring_processor:
+        enabled: true
+        command: PYTHONPATH=. uv run python scripts/run_scoring_worker.py --season ${SCORING_SEASON} --week ${SCORING_WEEK} --mode live
+        note: Required server-side processor for live score ingestion and matchup recalculation.
       lifecycle_processor:
         enabled: true
         command: PYTHONPATH=. uv run python scripts/run_lifecycle_worker.py
@@ -109,6 +113,8 @@ environments:
       - REFRESH_COOKIE_SECURE
       - REFRESH_COOKIE_SAMESITE
       - EMAIL_DELIVERY_MODE
+      - SCORING_SEASON
+      - SCORING_WEEK
     optional_env:
       - CORS_ORIGIN_REGEX
       - SPORTSDATA_API_KEY
@@ -130,4 +136,3 @@ environments:
       require_health_ready_before_traffic: true
       no_express_backend: true
       no_localhost_public_urls: true
-      email_verification_route_required: /verify-email

@@ -519,8 +519,8 @@ def test_trade_reject_cancel_counter_and_veto_endpoints(client, db_session):
         json={"reason": "Send a better one"},
         headers=auth_headers(receiving_token),
     )
-    assert counter_response.status_code == 200
-    assert counter_response.json()["status"] == "countered"
+    assert counter_response.status_code == 409
+    assert "unavailable" in counter_response.json()["detail"]
 
     seed = seed_trade_rosters(db_session, league["id"])
     vetoed = client.post(
@@ -548,16 +548,16 @@ def test_locked_player_cannot_be_traded(client, db_session):
     league = create_league(client, proposing_token, "locked", review_type="none")
     join_league(client, receiving_token, league["id"])
     seed = seed_trade_rosters(db_session, league["id"])
+    from collegefootballfantasy_api.app.models.game import Game
+
     db_session.add(
-        LineupWeekSnapshot(
-            league_id=league["id"],
-            team_id=seed["proposing"].id,
-            player_id=seed["give"].id,
+        Game(
             season=2026,
             week=1,
-            slot="QB",
-            is_starter=True,
-            locked_at=datetime.now(timezone.utc),
+            season_type="regular",
+            start_date=datetime.now(timezone.utc) - timedelta(hours=1),
+            home_team=seed["give"].school,
+            away_team="Opponent",
         )
     )
     db_session.commit()

@@ -231,7 +231,16 @@ def create_league(
             playoff_teams=payload.settings.playoff_teams,
             waiver_type=payload.settings.waiver_type,
             waiver_period_hours=payload.settings.waiver_period_hours,
+            waiver_process_day=payload.settings.waiver_process_day,
+            waiver_process_hour=payload.settings.waiver_process_hour,
+            faab_budget=payload.settings.faab_budget,
+            allow_zero_dollar_bids=payload.settings.allow_zero_dollar_bids,
+            waiver_tiebreaker=payload.settings.waiver_tiebreaker,
+            initial_waiver_priority_method=payload.settings.initial_waiver_priority_method,
+            post_drop_waiver_hours=payload.settings.post_drop_waiver_hours,
             trade_review_type=payload.settings.trade_review_type,
+            trade_deadline_week=payload.settings.trade_deadline_week,
+            trade_deadline_at=payload.settings.trade_deadline_at,
             superflex_enabled=payload.settings.superflex_enabled,
             kicker_enabled=payload.settings.kicker_enabled,
             defense_enabled=payload.settings.defense_enabled,
@@ -344,7 +353,23 @@ def update_league_settings(
     settings_row.waiver_type = payload.waiver_type
     if payload.waiver_period_hours is not None:
         settings_row.waiver_period_hours = payload.waiver_period_hours
+    if payload.waiver_process_day is not None:
+        settings_row.waiver_process_day = payload.waiver_process_day
+    if payload.waiver_process_hour is not None:
+        settings_row.waiver_process_hour = payload.waiver_process_hour
+    if payload.faab_budget is not None:
+        settings_row.faab_budget = payload.faab_budget
+    if payload.allow_zero_dollar_bids is not None:
+        settings_row.allow_zero_dollar_bids = payload.allow_zero_dollar_bids
+    if payload.waiver_tiebreaker is not None:
+        settings_row.waiver_tiebreaker = payload.waiver_tiebreaker
+    if payload.initial_waiver_priority_method is not None:
+        settings_row.initial_waiver_priority_method = payload.initial_waiver_priority_method
+    if payload.post_drop_waiver_hours is not None:
+        settings_row.post_drop_waiver_hours = payload.post_drop_waiver_hours
     settings_row.trade_review_type = payload.trade_review_type
+    settings_row.trade_deadline_week = payload.trade_deadline_week
+    settings_row.trade_deadline_at = payload.trade_deadline_at
     settings_row.superflex_enabled = payload.superflex_enabled
     settings_row.kicker_enabled = payload.kicker_enabled
     settings_row.defense_enabled = payload.defense_enabled

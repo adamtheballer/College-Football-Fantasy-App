@@ -28,7 +28,6 @@ describe("app shell navigation helpers", () => {
     expect(isCreateLeagueRoute("/leagues/create")).toBe(true);
     expect(isCreateLeagueRoute("/leagues/join")).toBe(false);
     expect(isAuthFlowRoute("/login")).toBe(true);
-    expect(isAuthFlowRoute("/verify-email")).toBe(false);
     expect(isAuthFlowRoute("/league/1/roster")).toBe(false);
   });
 

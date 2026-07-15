@@ -8,10 +8,10 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.models.draft import Draft
+from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
-from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.notification import NotificationLog
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
@@ -24,13 +24,13 @@ from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.schemas.waiver import WaiverClaimCreate, WaiverClaimRead
 from collegefootballfantasy_api.app.services.league_weeks import current_cfb_week_state
 from collegefootballfantasy_api.app.services.roster_legality import assign_best_roster_slot_for_position
+from collegefootballfantasy_api.app.services.player_lock_service import is_player_locked
 
 WAIVER_STATUS_PENDING = "pending"
 WAIVER_STATUS_CANCELLED = "cancelled"
 WAIVER_STATUS_PROCESSED = "processed"
 WAIVER_STATUS_FAILED = "failed"
 TERMINAL_WAIVER_STATUSES = {WAIVER_STATUS_CANCELLED, WAIVER_STATUS_PROCESSED, WAIVER_STATUS_FAILED}
-DEFAULT_FAAB_BUDGET = 100
 DEFAULT_WAIVER_PERIOD_HOURS = 24
 
 
@@ -75,9 +75,26 @@ def _waiver_period_hours(settings: LeagueSettings) -> int:
     return max(1, min(int(value), 168))
 
 
-def _next_waiver_process_time(settings: LeagueSettings, *, now: datetime | None = None) -> datetime:
+def _next_waiver_process_time(
+    db: Session,
+    league: League,
+    settings: LeagueSettings,
+    *,
+    now: datetime | None = None,
+) -> datetime:
     current = _as_utc(now or _now())
-    return current + timedelta(hours=_waiver_period_hours(settings))
+    if settings.next_waiver_run_at is not None and _as_utc(settings.next_waiver_run_at) > current:
+        return _as_utc(settings.next_waiver_run_at)
+    local_now = current.astimezone(_league_timezone(db, league))
+    weekday_offset = (int(settings.waiver_process_day) - local_now.weekday()) % 7
+    candidate = (local_now + timedelta(days=weekday_offset)).replace(
+        hour=int(settings.waiver_process_hour), minute=0, second=0, microsecond=0
+    )
+    if candidate <= local_now:
+        candidate += timedelta(days=7)
+    settings.next_waiver_run_at = candidate.astimezone(timezone.utc)
+    db.add(settings)
+    return settings.next_waiver_run_at
 
 
 def _owned_team(db: Session, league_id: int, user_id: int) -> Team:
@@ -177,8 +194,30 @@ def _notify_user(
     )
 
 
-def _ensure_priorities_for_league(db: Session, league_id: int) -> dict[int, WaiverPriority]:
+def _ensure_priorities_for_league(
+    db: Session,
+    league_id: int,
+    settings: LeagueSettings,
+) -> dict[int, WaiverPriority]:
     teams = db.query(Team).filter(Team.league_id == league_id).order_by(Team.id.asc()).all()
+    if settings.initial_waiver_priority_method == "reverse_draft":
+        draft = db.query(Draft).filter(Draft.league_id == league_id).first()
+        first_pick_by_team: dict[int, int] = {}
+        if draft:
+            for pick in (
+                db.query(DraftPick)
+                .filter(DraftPick.draft_id == draft.id)
+                .order_by(DraftPick.overall_pick.asc())
+                .all()
+            ):
+                first_pick_by_team.setdefault(pick.team_id, pick.overall_pick)
+        teams.sort(
+            key=lambda team: (
+                0 if team.id in first_pick_by_team else 1,
+                -first_pick_by_team.get(team.id, 0),
+                -team.id,
+            )
+        )
     existing = {
         row.team_id: row
         for row in db.query(WaiverPriority).filter(WaiverPriority.league_id == league_id).all()
@@ -191,7 +230,7 @@ def _ensure_priorities_for_league(db: Session, league_id: int) -> dict[int, Waiv
             league_id=league_id,
             team_id=team.id,
             priority=next_priority,
-            faab_budget=DEFAULT_FAAB_BUDGET,
+            faab_budget=settings.faab_budget,
             faab_spent=0,
         )
         db.add(row)
@@ -273,17 +312,13 @@ def _validate_drop_player_unlocked(
         now=now,
         timezone_name=_league_timezone_name(db, league),
     )
-    snapshot = (
-        db.query(LineupWeekSnapshot.id)
-        .filter(
-            LineupWeekSnapshot.league_id == league.id,
-            LineupWeekSnapshot.player_id == player_id,
-            LineupWeekSnapshot.season == league.season_year,
-            LineupWeekSnapshot.week == week_state.week,
-        )
-        .first()
-    )
-    if snapshot:
+    if is_player_locked(
+        db,
+        player_id=player_id,
+        season=league.season_year,
+        week=week_state.week,
+        now=now,
+    ):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="locked drop player cannot be waived")
 
 
@@ -370,8 +405,10 @@ def submit_waiver_claim(
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="duplicate pending waiver claim")
 
-    priorities = _ensure_priorities_for_league(db, league.id)
+    priorities = _ensure_priorities_for_league(db, league.id, settings)
     priority = priorities[team.id]
+    if _waiver_type(settings) == "faab" and not settings.allow_zero_dollar_bids and payload.faab_bid == 0:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="zero-dollar FAAB bids are disabled")
     if _waiver_type(settings) == "faab" and payload.faab_bid > _remaining_faab(priority):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="insufficient FAAB budget")
 
@@ -385,7 +422,7 @@ def submit_waiver_claim(
         status=WAIVER_STATUS_PENDING,
         priority_snapshot=priority.priority,
         faab_bid=payload.faab_bid if _waiver_type(settings) == "faab" else 0,
-        process_after=_next_waiver_process_time(settings, now=now),
+        process_after=_next_waiver_process_time(db, league, settings, now=now),
     )
     db.add(claim)
     db.flush()
@@ -461,7 +498,11 @@ def _pending_claim_sort_key(settings: LeagueSettings, priority_by_team: dict[int
         priority_value = claim.priority_snapshot or (priority.priority if priority else 999_999)
         created_at = claim.created_at or _now()
         if waiver_type == "faab":
+            if settings.waiver_tiebreaker == "earliest_claim":
+                return (-int(claim.faab_bid or 0), created_at, priority_value, claim.id)
             return (-int(claim.faab_bid or 0), priority_value, created_at, claim.id)
+        if settings.waiver_tiebreaker == "earliest_claim":
+            return (created_at, priority_value, claim.id)
         return (priority_value, created_at, claim.id)
 
     return key
@@ -608,7 +649,7 @@ def process_waiver_claims_once(
         if not pending:
             continue
         settings = _league_settings(db, league.id)
-        priorities = _ensure_priorities_for_league(db, league.id)
+        priorities = _ensure_priorities_for_league(db, league.id, settings)
         priorities = {
             priority.team_id: priority
             for priority in (
@@ -629,18 +670,37 @@ def process_waiver_claims_once(
                 _audit_claim(db, claim, action="failed", actor_user_id=None, reason=claim.failure_reason)
                 summary["failed"] += 1
                 continue
-            success = _process_single_claim(
-                db,
-                league=league,
-                settings=settings,
-                claim=claim,
-                priority=priority,
-                now=processed_at,
-            )
+            try:
+                with db.begin_nested():
+                    success = _process_single_claim(
+                        db,
+                        league=league,
+                        settings=settings,
+                        claim=claim,
+                        priority=priority,
+                        now=processed_at,
+                    )
+            except Exception:
+                claim.status = WAIVER_STATUS_FAILED
+                claim.failure_reason = "waiver processing failed"
+                claim.processed_at = processed_at
+                db.add(claim)
+                _audit_claim(db, claim, action="failed", actor_user_id=None, reason=claim.failure_reason)
+                _notify_user(
+                    db,
+                    user_id=claim.created_by_user_id,
+                    alert_type="WAIVER_FAILED",
+                    title="Waiver claim failed",
+                    body=claim.failure_reason,
+                    payload={"league_id": league.id, "claim_id": claim.id},
+                )
+                success = False
             if success:
                 summary["processed"] += 1
             else:
                 summary["failed"] += 1
+        settings.next_waiver_run_at = None
+        _next_waiver_process_time(db, league, settings, now=processed_at)
         db.commit()
     remaining_query = db.query(WaiverClaim).filter(WaiverClaim.status == WAIVER_STATUS_PENDING)
     if league_id is not None:

@@ -27,7 +27,16 @@ class LeagueSettingsInput(BaseModel):
     playoff_teams: int
     waiver_type: str
     waiver_period_hours: int = 24
+    waiver_process_day: int = 2
+    waiver_process_hour: int = 3
+    faab_budget: int = 100
+    allow_zero_dollar_bids: bool = True
+    waiver_tiebreaker: str = "priority"
+    initial_waiver_priority_method: str = "reverse_draft"
+    post_drop_waiver_hours: int = 24
     trade_review_type: str
+    trade_deadline_week: int | None = None
+    trade_deadline_at: datetime | None = None
     superflex_enabled: bool
     kicker_enabled: bool
     defense_enabled: bool
@@ -38,6 +47,36 @@ class LeagueSettingsInput(BaseModel):
         if value < 1 or value > 168:
             raise ValueError("waiver_period_hours must be between 1 and 168")
         return value
+
+    @field_validator("waiver_process_day")
+    @classmethod
+    def validate_waiver_process_day(cls, value: int) -> int:
+        if value < 0 or value > 6:
+            raise ValueError("waiver_process_day must be between 0 and 6")
+        return value
+
+    @field_validator("waiver_process_hour")
+    @classmethod
+    def validate_waiver_process_hour(cls, value: int) -> int:
+        if value < 0 or value > 23:
+            raise ValueError("waiver_process_hour must be between 0 and 23")
+        return value
+
+    @field_validator("trade_review_type")
+    @classmethod
+    def validate_trade_review_type(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"none", "commissioner"}:
+            raise ValueError("trade_review_type must be none or commissioner")
+        return normalized
+
+    @field_validator("waiver_tiebreaker")
+    @classmethod
+    def validate_waiver_tiebreaker(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"priority", "earliest_claim"}:
+            raise ValueError("waiver_tiebreaker must be priority or earliest_claim")
+        return normalized
 
 
 class DraftScheduleInput(BaseModel):
@@ -81,7 +120,17 @@ class LeagueSettingsRead(BaseModel):
     playoff_teams: int
     waiver_type: str
     waiver_period_hours: int
+    waiver_process_day: int
+    waiver_process_hour: int
+    next_waiver_run_at: datetime | None
+    faab_budget: int
+    allow_zero_dollar_bids: bool
+    waiver_tiebreaker: str
+    initial_waiver_priority_method: str
+    post_drop_waiver_hours: int
     trade_review_type: str
+    trade_deadline_week: int | None
+    trade_deadline_at: datetime | None
     superflex_enabled: bool
     kicker_enabled: bool
     defense_enabled: bool
@@ -93,7 +142,16 @@ class LeagueSettingsUpdate(BaseModel):
     playoff_teams: int
     waiver_type: str
     waiver_period_hours: int | None = None
+    waiver_process_day: int | None = None
+    waiver_process_hour: int | None = None
+    faab_budget: int | None = None
+    allow_zero_dollar_bids: bool | None = None
+    waiver_tiebreaker: str | None = None
+    initial_waiver_priority_method: str | None = None
+    post_drop_waiver_hours: int | None = None
     trade_review_type: str
+    trade_deadline_week: int | None = None
+    trade_deadline_at: datetime | None = None
     superflex_enabled: bool
     kicker_enabled: bool
     defense_enabled: bool
@@ -106,6 +164,24 @@ class LeagueSettingsUpdate(BaseModel):
         if value < 1 or value > 168:
             raise ValueError("waiver_period_hours must be between 1 and 168")
         return value
+
+    @field_validator("trade_review_type")
+    @classmethod
+    def validate_updated_trade_review_type(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"none", "commissioner"}:
+            raise ValueError("trade_review_type must be none or commissioner")
+        return normalized
+
+    @field_validator("waiver_tiebreaker")
+    @classmethod
+    def validate_optional_waiver_tiebreaker(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        normalized = value.strip().lower()
+        if normalized not in {"priority", "earliest_claim"}:
+            raise ValueError("waiver_tiebreaker must be priority or earliest_claim")
+        return normalized
 
 
 class DraftUpdate(BaseModel):
