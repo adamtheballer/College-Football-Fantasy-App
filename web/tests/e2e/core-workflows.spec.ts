@@ -84,7 +84,7 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/login");
-    await expect(page.getByRole("heading", { name: /Welcome Back/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Sign in$/i })).toBeVisible();
     await page.getByPlaceholder("coach@saturday.com").fill("coach@example.com");
     await page.getByPlaceholder("••••••••").fill("password123");
     await page.getByRole("button", { name: /Sign In to Dashboard/i }).click();
@@ -267,7 +267,7 @@ test.describe("critical browser workflows", () => {
       .getByRole("button", { name: /^League Hub$/i })
       .click();
     await page.waitForURL("**/league/1**");
-    await expect(page.getByRole("heading", { name: /^Roster$/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Draft Countdown$/i })).toBeVisible();
   });
 
   test("invalid bootstrap session forces logout and redirects protected routes to login", async ({ page }) => {
@@ -295,7 +295,7 @@ test.describe("critical browser workflows", () => {
 
     await page.goto("/rosters");
     await page.waitForURL("**/login");
-    await expect(page.getByRole("heading", { name: /Welcome Back/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Sign in$/i })).toBeVisible();
 
     const token = await page.evaluate(() => window.localStorage.getItem("cfb_access_token"));
     const user = await page.evaluate(() => window.localStorage.getItem("cfb_user"));
@@ -414,7 +414,7 @@ test.describe("critical browser workflows", () => {
     await page.getByRole("button", { name: /Open League Hub/i }).click();
 
     await page.waitForURL("**/league/1");
-    await expect(page.getByRole("heading", { name: /^Roster$/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Draft Countdown$/i })).toBeVisible();
   });
 
   test("join-by-code flow previews league and joins with backend response", async ({ page }) => {
@@ -539,8 +539,8 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("Invite League")).toBeVisible();
     await page.getByRole("button", { name: /^Join League$/i }).click();
     await page.waitForURL("**/league/77");
-    await expect(page.getByRole("heading", { name: /^Roster$/i })).toBeVisible();
-    await expect(page.getByText(/Week 1 placeholder roster/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Draft Countdown$/i })).toBeVisible();
+    await expect(page.getByText(/Draft room access stays locked/i)).toBeVisible();
   });
 
   test("draft-room pick mutation updates persisted draft state in UI", async ({ page }) => {
@@ -709,11 +709,51 @@ test.describe("critical browser workflows", () => {
     await page.getByRole("button", { name: /^Draft$/i }).first().click();
     await expect(page.getByText(/Last pick/i)).toBeVisible();
     await expect(page.getByText(/Arch Manning/i).first()).toBeVisible();
-    await expect(page.getByText(/No legal players available/i)).toBeVisible();
+    await expect(page.getByText(/Other Team/i).first()).toBeVisible();
   });
 
   test("league matchup page renders projected teams and honest empty state", async ({ page }) => {
     await seedAuthenticatedSession(page);
+
+    const leagueDetail = {
+      id: 1,
+      name: "Matchup Test League",
+      commissioner_user_id: 42,
+      season_year: 2026,
+      max_teams: 2,
+      is_private: true,
+      invite_code: "MATCHUPTESTCODE",
+      description: null,
+      icon_url: null,
+      status: "post_draft",
+      created_at: "2026-03-01T10:00:00Z",
+      updated_at: "2026-03-05T10:00:00Z",
+      settings: {
+        id: 1,
+        league_id: 1,
+        scoring_json: {},
+        roster_slots_json: { QB: 1, RB: 2, WR: 2, TE: 1, K: 1, BENCH: 4, IR: 1 },
+        playoff_teams: 4,
+        waiver_type: "faab",
+        trade_review_type: "commissioner",
+        superflex_enabled: false,
+        kicker_enabled: true,
+        defense_enabled: false,
+      },
+      draft: {
+        id: 1,
+        league_id: 1,
+        draft_datetime_utc: "2026-08-30T23:00:00Z",
+        timezone: "America/New_York",
+        draft_type: "snake",
+        pick_timer_seconds: 90,
+        status: "completed",
+      },
+      members: [
+        { id: 1, user_id: 42, role: "commissioner", joined_at: "2026-03-01T10:01:00Z" },
+        { id: 2, user_id: 43, role: "manager", joined_at: "2026-03-01T10:01:00Z" },
+      ],
+    };
 
     const rosterRow = (
       id: number,
@@ -830,6 +870,10 @@ test.describe("critical browser workflows", () => {
       message: "No matchup generated yet.",
     };
     let matchupPayload: unknown = scheduledPayload;
+
+    await page.route("**/leagues/1", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(leagueDetail) });
+    });
 
     await page.route("**/leagues/1/matchup**", async (route) => {
       await route.fulfill({
@@ -1094,11 +1138,13 @@ test.describe("critical browser workflows", () => {
 
     await expect(page.getByText("Strong Loss")).toBeVisible();
     await expect(page.getByText("-6.00")).toBeVisible();
+    await expect.poll(() => analyzePayload).not.toBeNull();
     expect(analyzePayload).toMatchObject({
       give_ids: [201],
       receive_ids: [301],
       season: 2026,
       week: 1,
+      league_id: 1,
       league_size: 2,
     });
 
@@ -1257,7 +1303,7 @@ test.describe("critical browser workflows", () => {
         invite_code: "ABCDEFGHIJKLMNOPQRST",
         description: null,
         icon_url: null,
-        status: "draft_scheduled",
+        status: "post_draft",
         created_at: "2026-03-01T10:00:00Z",
         updated_at: "2026-03-05T10:00:00Z",
         settings: {
@@ -1272,7 +1318,15 @@ test.describe("critical browser workflows", () => {
           kicker_enabled: true,
           defense_enabled: false,
         },
-        draft: null,
+        draft: {
+          id: 1,
+          league_id: 1,
+          draft_datetime_utc: "2026-08-30T23:00:00Z",
+          timezone: "America/New_York",
+          draft_type: "snake",
+          pick_timer_seconds: 90,
+          status: "completed",
+        },
         members: [{ id: 1, user_id: 42, role: "commissioner", joined_at: "2026-03-01T10:01:00Z" }],
       },
     ];
@@ -1290,6 +1344,10 @@ test.describe("critical browser workflows", () => {
         contentType: "application/json",
         body: JSON.stringify({ data: leagues, total: leagues.length, limit: 20, offset: 0 }),
       });
+    });
+
+    await page.route("**/leagues/1", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(leagues[0]) });
     });
 
     await page.route("**/players?**", async (route) => {
@@ -1393,6 +1451,8 @@ test.describe("critical browser workflows", () => {
             weekly_projected_fantasy_points: player.id === 801 ? 24.0 : 18.5,
           })),
           claims: [],
+          roster: [],
+          waiver_rules: { waiver_type: "rolling" },
           total_available: players.length,
           message: null,
         }),
@@ -1402,8 +1462,9 @@ test.describe("critical browser workflows", () => {
     await page.goto("/league/1/waivers");
     await expect(page.getByRole("heading", { level: 1, name: /^Available Players$/i })).toBeVisible();
 
-    await page.getByRole("button", { name: /^Watch$/i }).first().click();
-    await expect(page.getByRole("button", { name: /^Watching$/i }).first()).toBeVisible();
+    const archManningRow = page.getByText("Arch Manning").locator("xpath=ancestor::tr");
+    await archManningRow.getByRole("button", { name: /^Watch$/i }).click();
+    await expect(archManningRow.getByRole("button", { name: /^Watching$/i })).toBeVisible();
 
     await page.goto("/league/1/watchlist");
     await expect(page.getByRole("heading", { name: /^Watchlist$/i })).toBeVisible();
@@ -1420,6 +1481,59 @@ test.describe("critical browser workflows", () => {
     await seedAuthenticatedSession(page);
 
     const addDropCalls: string[] = [];
+    const leagueDetail = {
+      id: 1,
+      name: "Waiver Test League",
+      commissioner_user_id: 42,
+      season_year: 2026,
+      max_teams: 2,
+      is_private: true,
+      invite_code: "WAIVERTESTCODE",
+      description: null,
+      icon_url: null,
+      status: "post_draft",
+      created_at: "2026-03-01T10:00:00Z",
+      updated_at: "2026-03-05T10:00:00Z",
+      settings: {
+        id: 1,
+        league_id: 1,
+        scoring_json: {},
+        roster_slots_json: { QB: 1, RB: 2, WR: 2, TE: 1, K: 1, BENCH: 4, IR: 1 },
+        playoff_teams: 4,
+        waiver_type: "faab",
+        trade_review_type: "commissioner",
+        superflex_enabled: false,
+        kicker_enabled: true,
+        defense_enabled: false,
+      },
+      draft: {
+        id: 1,
+        league_id: 1,
+        draft_datetime_utc: "2026-08-30T23:00:00Z",
+        timezone: "America/New_York",
+        draft_type: "snake",
+        pick_timer_seconds: 90,
+        status: "completed",
+      },
+      members: [
+        { id: 1, user_id: 42, role: "commissioner", joined_at: "2026-03-01T10:01:00Z" },
+        { id: 2, user_id: 43, role: "manager", joined_at: "2026-03-01T10:01:00Z" },
+      ],
+    };
+    const availablePlayers = [
+      { id: 901, name: "Arch Manning", position: "QB", school: "Texas", board_rank: 1, sheet_adp: 1 },
+      { id: 902, name: "Ryan Wingo", position: "WR", school: "Texas", board_rank: 2, sheet_adp: 2 },
+    ];
+    await page.route("**/leagues/1", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(leagueDetail) });
+    });
+    await page.route("**/players?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: availablePlayers, total: availablePlayers.length, limit: 100, offset: 0 }),
+      });
+    });
     await page.route("**/leagues/1/waivers**", async (route) => {
       await route.fulfill({
         status: 200,
@@ -1432,6 +1546,8 @@ test.describe("critical browser workflows", () => {
             { id: 902, name: "Ryan Wingo", position: "WR", school: "Texas", weekly_projected_fantasy_points: 18.5 },
           ],
           claims: [],
+          roster: [],
+          waiver_rules: { waiver_type: "faab" },
           total_available: 2,
           message: null,
         }),
@@ -1451,10 +1567,10 @@ test.describe("critical browser workflows", () => {
 
     await page.goto("/league/1/waivers");
     await expect(page.getByRole("heading", { level: 1, name: /^Available Players$/i })).toBeVisible();
-    await expect(page.getByText(/Claims are not enabled yet/i)).toBeVisible();
+    await expect(page.getByText(/No active or recent waiver claims/i)).toBeVisible();
     await expect(page.getByText("Arch Manning")).toBeVisible();
     await expect(page.getByRole("button", { name: /^Add$/i })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /Claims Off/i }).first()).toBeDisabled();
+    await expect(page.getByRole("button", { name: /^Claim API$/i }).first()).toBeDisabled();
     expect(addDropCalls).toEqual([]);
   });
 });

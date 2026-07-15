@@ -162,6 +162,7 @@ def test_players_rank_sort_uses_cfb27_compare_board(client, db_session):
     assert rows[0]["name"] == "Jeremiah Smith"
     assert rows[0]["cfb27_rank"] == 1
     assert rows[0]["cfb27_position_rank"] == 1
+    assert rows[0]["board_rank"] == 1
     assert rows[0]["sheet_adp"] is None
     assert "Ahmad Hardy" in names
     assert "Jeremiah Smith" in names
@@ -175,7 +176,8 @@ def test_players_search_returns_seeded_cfb27_compare_board(client, db_session):
 
     assert jeremiah_response.status_code == 200
     assert ahmad_response.status_code == 200
-    assert any(row["name"] == "Jeremiah Smith" for row in jeremiah_response.json()["data"])
+    jeremiah = next(row for row in jeremiah_response.json()["data"] if row["name"] == "Jeremiah Smith")
+    assert jeremiah["board_rank"] == 1
     assert any(row["name"] == "Ahmad Hardy" for row in ahmad_response.json()["data"])
 
 

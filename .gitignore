@@ -33,6 +33,7 @@ dist/
 
 # Node/npm caches
 .npm-cache/
+node_modules/
 
 # Logs
 *.log
@@ -51,3 +52,4 @@ Thumbs.db
 /docs/architecture-audit-*.md
 /output/
 /tmp/
+/web/test-results/

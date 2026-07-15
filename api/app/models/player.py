@@ -36,6 +36,8 @@ class Player(TimestampMixin, Base):
 
     @property
     def board_rank(self) -> int | None:
-        if self.sheet_adp is None:
-            return None
-        return int(self.sheet_adp)
+        if self.cfb27_rank is not None:
+            return self.cfb27_rank
+        if self.sheet_adp is not None:
+            return int(self.sheet_adp)
+        return None
