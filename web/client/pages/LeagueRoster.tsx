@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
 import { WeekSelector } from "@/components/league/WeekSelector";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useLeagueRosterTab } from "@/hooks/use-leagues";
+import { useLeagueDetail, useLeagueRosterTab } from "@/hooks/use-leagues";
 import { useUpdateLineup } from "@/hooks/use-roster-actions";
 import {
   DEMO_LEAGUE_ID,
   createDemoLeagueRosterResponse,
 } from "@/lib/leaguePreviewData";
+import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import { getEligibleSlotsForPosition, normalizePosition } from "@/lib/rosterLegality";
 import type { LeagueRosterPlayer } from "@/types/league";
 
@@ -82,7 +83,12 @@ export default function LeagueRoster() {
   const [selectedWeek, setSelectedWeek] = useState<number | null>(1);
   const [lineupSlots, setLineupSlots] = useState<Record<number, string>>({});
   const [lineupMessage, setLineupMessage] = useState<string | null>(null);
-  const rosterQuery = useLeagueRosterTab(parsedLeagueId, selectedWeek ?? undefined, !isDemoLeague);
+  const leagueQuery = useLeagueDetail(parsedLeagueId, !isDemoLeague);
+  const postDraft = isDemoLeague || isLeaguePostDraft({
+    draftStatus: leagueQuery.data?.draft?.status,
+    leagueStatus: leagueQuery.data?.status,
+  });
+  const rosterQuery = useLeagueRosterTab(parsedLeagueId, selectedWeek ?? undefined, !isDemoLeague && postDraft);
   const demoData = isDemoLeague ? createDemoLeagueRosterResponse() : null;
   const rosterData = demoData ?? rosterQuery.data;
   const fetchedRoster = rosterData?.roster ?? rosterData?.data ?? [];
@@ -178,6 +184,20 @@ export default function LeagueRoster() {
       )
     : null;
 
+  if (!isDemoLeague && leagueQuery.isLoading) {
+    return (
+      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
+        <div className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface-raised/80 p-8 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cfb-text-muted">
+          Loading league...
+        </div>
+      </main>
+    );
+  }
+
+  if (!postDraft) {
+    return <Navigate to={`/league/${parsedLeagueId}/lobby`} replace />;
+  }
+
   return (
     <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] rounded-[3rem] bg-[radial-gradient(circle_at_18%_12%,rgba(56,189,248,0.2),transparent_34%),radial-gradient(circle_at_78%_8%,rgba(59,130,246,0.18),transparent_36%)] blur-2xl" />
@@ -198,7 +218,11 @@ export default function LeagueRoster() {
             onChange={setSelectedWeek}
           />
         </div>
-        <LeagueTabs leagueId={parsedLeagueId} />
+        <LeagueTabs
+          leagueId={parsedLeagueId}
+          draftStatus={leagueQuery.data?.draft?.status}
+          leagueStatus={leagueQuery.data?.status}
+        />
       </div>
 
       {isEmptyRoster ? (

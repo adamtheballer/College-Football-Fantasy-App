@@ -40,6 +40,9 @@ class DraftRoomRead(BaseModel):
     current_team_name: str | None = None
     user_team_id: int | None = None
     can_make_pick: bool
+    pick_started_at: datetime | None = None
+    pick_expires_at: datetime | None = None
+    server_time: datetime
 
 
 class DraftPickCreate(BaseModel):

@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     scoring_worker_interval_correction_seconds: int = 3600
     scoring_worker_retry_max_attempts: int = 3
     scoring_worker_retry_base_seconds: int = 5
+    lifecycle_worker_interval_seconds: int = 5
     scoring_dead_letter_after_failures: int = 3
     provider_unmatched_failure_threshold_percent: float = 10.0
     projection_provider: str = "sportsdataio"

@@ -117,7 +117,7 @@ def _load_offer(db: Session, trade_id: int, *, for_update: bool = False) -> Trad
         .filter(TradeOffer.id == trade_id)
     )
     if for_update:
-        query = query.with_for_update()
+        query = query.with_for_update(of=TradeOffer)
     offer = query.first()
     if not offer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="trade offer not found")
@@ -295,7 +295,7 @@ def _process_roster_swap(db: Session, offer: TradeOffer, actor_user_id: int | No
         db.query(RosterEntry)
         .options(joinedload(RosterEntry.player))
         .filter(RosterEntry.league_id == offer.league_id, RosterEntry.player_id.in_(player_ids))
-        .with_for_update()
+        .with_for_update(of=RosterEntry)
         .all()
     )
     entry_by_player = {entry.player_id: entry for entry in outgoing_entries}
@@ -319,7 +319,7 @@ def _process_roster_swap(db: Session, offer: TradeOffer, actor_user_id: int | No
             db.query(RosterEntry)
             .filter(RosterEntry.league_id == offer.league_id, RosterEntry.team_id == team_id)
             .filter(~RosterEntry.player_id.in_(player_ids))
-            .with_for_update()
+            .with_for_update(of=RosterEntry)
             .all()
         )
         counts: dict[str, int] = {}
@@ -621,22 +621,40 @@ def commissioner_veto_trade(db: Session, league: League, trade_id: int, current_
 
 def process_trade_offers_once(db: Session, now: datetime | None = None) -> dict[str, int]:
     current = _as_utc(now or _utcnow())
-    offers = (
+    offer_ids = [
+        offer_id
+        for (offer_id,) in (
         db.query(TradeOffer)
-        .options(joinedload(TradeOffer.items).joinedload(TradeOfferItem.player), joinedload(TradeOffer.reviews))
+        .with_entities(TradeOffer.id)
         .filter(TradeOffer.status == TRADE_STATUS_ACCEPTED_PENDING)
         .filter(TradeOffer.process_after.isnot(None), TradeOffer.process_after <= current)
         .order_by(TradeOffer.process_after.asc(), TradeOffer.id.asc())
         .all()
-    )
+        )
+    ]
     processed = 0
     failed = 0
-    for offer in offers:
+    for offer_id in offer_ids:
+        offer = (
+            db.query(TradeOffer)
+            .options(joinedload(TradeOffer.items).joinedload(TradeOfferItem.player), joinedload(TradeOffer.reviews))
+            .filter(TradeOffer.id == offer_id)
+            .with_for_update(skip_locked=True, of=TradeOffer)
+            .first()
+        )
+        if (
+            offer is None
+            or offer.status != TRADE_STATUS_ACCEPTED_PENDING
+            or offer.process_after is None
+            or _as_utc(offer.process_after) > current
+        ):
+            continue
         league = db.get(League, offer.league_id)
         if not league:
             offer.status = TRADE_STATUS_FAILED
             offer.failure_reason = "league no longer exists"
             failed += 1
+            db.commit()
             continue
         timezone_name = _trade_timezone(db, league.id)
         if is_cfb_game_week_active(current, timezone_name):
@@ -659,5 +677,5 @@ def process_trade_offers_once(db: Session, now: datetime | None = None) -> dict[
             _add_review(db, offer, "failed", None, offer.failure_reason)
             _notify_participants(db, offer, "TRADE_FAILED", "Trade Failed", offer.failure_reason)
             failed += 1
-    db.commit()
+        db.commit()
     return {"processed": processed, "failed": failed}

@@ -595,19 +595,29 @@ def process_waiver_claims_once(
     league_query = db.query(League)
     if league_id is not None:
         league_query = league_query.filter(League.id == league_id)
-    leagues = league_query.order_by(League.id.asc()).all()
+    leagues = league_query.order_by(League.id.asc()).with_for_update(skip_locked=True).all()
     summary = {"processed": 0, "failed": 0, "pending": 0}
     for league in leagues:
         pending = (
             db.query(WaiverClaim)
             .filter(WaiverClaim.league_id == league.id, WaiverClaim.status == WAIVER_STATUS_PENDING)
             .filter(or_(WaiverClaim.process_after.is_(None), WaiverClaim.process_after <= processed_at))
+            .with_for_update()
             .all()
         )
         if not pending:
             continue
         settings = _league_settings(db, league.id)
         priorities = _ensure_priorities_for_league(db, league.id)
+        priorities = {
+            priority.team_id: priority
+            for priority in (
+                db.query(WaiverPriority)
+                .filter(WaiverPriority.league_id == league.id)
+                .with_for_update()
+                .all()
+            )
+        }
         pending.sort(key=_pending_claim_sort_key(settings, priorities))
         for claim in pending:
             priority = priorities.get(claim.team_id)
@@ -618,7 +628,6 @@ def process_waiver_claims_once(
                 db.add(claim)
                 _audit_claim(db, claim, action="failed", actor_user_id=None, reason=claim.failure_reason)
                 summary["failed"] += 1
-                db.commit()
                 continue
             success = _process_single_claim(
                 db,
@@ -632,7 +641,7 @@ def process_waiver_claims_once(
                 summary["processed"] += 1
             else:
                 summary["failed"] += 1
-            db.commit()
+        db.commit()
     remaining_query = db.query(WaiverClaim).filter(WaiverClaim.status == WAIVER_STATUS_PENDING)
     if league_id is not None:
         remaining_query = remaining_query.filter(WaiverClaim.league_id == league_id)

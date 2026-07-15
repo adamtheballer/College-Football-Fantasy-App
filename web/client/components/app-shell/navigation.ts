@@ -30,7 +30,6 @@ export const isCreateLeagueRoute = (pathname: string) => pathname === "/leagues/
 export const isAuthFlowRoute = (pathname: string) =>
   pathname === "/login" ||
   pathname === "/signup" ||
-  pathname === "/verify-email" ||
   pathname === "/password-reset/confirm";
 
 export const getShellNavItems = (user: User | null, isLoggedIn: boolean): ShellNavItem[] => {

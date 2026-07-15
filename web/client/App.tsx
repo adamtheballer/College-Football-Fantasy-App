@@ -17,7 +17,6 @@ const Leagues = lazy(() => import("./pages/Leagues"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
-const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
 const PasswordResetConfirm = lazy(() => import("./pages/PasswordResetConfirm"));
 const CreateLeague = lazy(() => import("./pages/CreateLeague"));
 const JoinLeague = lazy(() => import("./pages/JoinLeague"));
@@ -198,7 +197,7 @@ const App = () => (
                 <Route path="/stats/players" element={<Navigate to="/player-compare" replace />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
-                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/verify-email" element={<Navigate to="/leagues" replace />} />
                 <Route path="/password-reset/confirm" element={<PasswordResetConfirm />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

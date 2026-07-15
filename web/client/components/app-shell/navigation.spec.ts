@@ -14,7 +14,6 @@ const user: User = {
   id: 1,
   firstName: "Adam",
   email: "adam@example.com",
-  emailVerifiedAt: "2026-01-01T00:00:00Z",
   isAdmin: false,
 };
 
@@ -29,7 +28,7 @@ describe("app shell navigation helpers", () => {
     expect(isCreateLeagueRoute("/leagues/create")).toBe(true);
     expect(isCreateLeagueRoute("/leagues/join")).toBe(false);
     expect(isAuthFlowRoute("/login")).toBe(true);
-    expect(isAuthFlowRoute("/verify-email")).toBe(true);
+    expect(isAuthFlowRoute("/verify-email")).toBe(false);
     expect(isAuthFlowRoute("/league/1/roster")).toBe(false);
   });
 

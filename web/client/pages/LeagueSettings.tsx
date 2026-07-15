@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 import {
   CalendarDays,
   ClipboardList,
@@ -16,9 +16,10 @@ import {
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useLeagueSettingsTab } from "@/hooks/use-leagues";
+import { useLeagueDetail, useLeagueSettingsTab } from "@/hooks/use-leagues";
 import { useLeagueTransactions } from "@/hooks/use-roster-actions";
 import { DEMO_LEAGUE_ID, createDemoLeagueSettingsResponse } from "@/lib/leaguePreviewData";
+import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import type { LeagueRosterPlayer, LeagueSettingsTabResponse } from "@/types/league";
 
 type SettingsPanel = "standings" | "scoring" | "schedule" | "rosters" | "trades" | "draft";
@@ -93,8 +94,13 @@ export default function LeagueSettings() {
   const [selectedRosterTeam, setSelectedRosterTeam] = useState<string>("");
   const [selectedScheduleWeek, setSelectedScheduleWeek] = useState<number | null>(null);
   const [copiedInviteField, setCopiedInviteField] = useState<"code" | "link" | null>(null);
-  const settingsQuery = useLeagueSettingsTab(parsedLeagueId, !isDemoLeague);
-  const transactionsQuery = useLeagueTransactions(parsedLeagueId, !isDemoLeague);
+  const leagueQuery = useLeagueDetail(parsedLeagueId, !isDemoLeague);
+  const postDraft = isDemoLeague || isLeaguePostDraft({
+    draftStatus: leagueQuery.data?.draft?.status,
+    leagueStatus: leagueQuery.data?.status,
+  });
+  const settingsQuery = useLeagueSettingsTab(parsedLeagueId, !isDemoLeague && postDraft);
+  const transactionsQuery = useLeagueTransactions(parsedLeagueId, !isDemoLeague && postDraft);
   const data = isDemoLeague ? createDemoLeagueSettingsResponse() : settingsQuery.data;
   const tradeTransactions = (transactionsQuery.data?.data ?? []).filter((transaction) =>
     transaction.transaction_type.toLowerCase().includes("trade")
@@ -145,6 +151,20 @@ export default function LeagueSettings() {
     window.setTimeout(() => setCopiedInviteField(null), 1800);
   };
 
+  if (!isDemoLeague && leagueQuery.isLoading) {
+    return (
+      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
+        <div className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface-raised/80 p-8 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cfb-text-muted">
+          Loading league...
+        </div>
+      </main>
+    );
+  }
+
+  if (!postDraft) {
+    return <Navigate to={`/league/${parsedLeagueId}/lobby`} replace />;
+  }
+
   return (
     <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[460px] rounded-[3rem] bg-[radial-gradient(circle_at_18%_8%,rgba(56,189,248,0.2),transparent_34%),radial-gradient(circle_at_76%_0%,rgba(99,102,241,0.18),transparent_38%)] blur-2xl" />
@@ -178,7 +198,11 @@ export default function LeagueSettings() {
             </div>
           </div>
         </div>
-        <LeagueTabs leagueId={parsedLeagueId} />
+        <LeagueTabs
+          leagueId={parsedLeagueId}
+          draftStatus={leagueQuery.data?.draft?.status}
+          leagueStatus={leagueQuery.data?.status}
+        />
       </div>
 
       {data?.invite ? (

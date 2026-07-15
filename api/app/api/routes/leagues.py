@@ -41,6 +41,7 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     JoinByCodeRequest,
 )
 from collegefootballfantasy_api.app.services.draft_service import (
+    auto_pick_expired_draft_pick,
     build_draft_room_state,
     create_real_draft_pick,
 )
@@ -249,6 +250,17 @@ def create_draft_pick_endpoint(
     league = get_league_or_404(db, league_id)
     require_league_member(db, league.id, current_user)
     return create_real_draft_pick(db, league=league, payload=payload, current_user=current_user)
+
+
+@router.post("/{league_id}/draft-picks/auto", response_model=DraftRoomRead)
+def auto_pick_draft_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DraftRoomRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return auto_pick_expired_draft_pick(db, league=league, current_user=current_user)
 
 
 @router.get("/{league_id}/members", response_model=LeagueMembersList)

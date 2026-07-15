@@ -236,7 +236,7 @@ export function PlayerCardModal({
   const latestStats = useMemo(() => getLatestStats(card ?? undefined), [card]);
   const projectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
   const aboutMessage = visiblePlayerCardAboutMessage(card?.about.message);
-  const projectionHighlights: Array<[string, unknown]> = [
+  const projectionHighlights = [
     ["Fantasy", projectionStats?.fpts ?? player.projectedPoints],
     ["Floor", projectionStats?.floor],
     ["Ceiling", projectionStats?.ceiling],
@@ -249,7 +249,10 @@ export function PlayerCardModal({
       typeof projectionStats?.bustProb === "number" ? `${Math.round(projectionStats.bustProb * 100)}%` : null,
     ],
     ["Opponent", player.opponent],
-  ].filter(([, value]) => value !== null && value !== undefined && value !== "");
+  ] as Array<[string, unknown]>;
+  const visibleProjectionHighlights = projectionHighlights.filter(
+    ([, value]) => value !== null && value !== undefined && value !== "",
+  );
   const projectionRows = statRowsForPosition(position || player.position || "");
   const projectionDetailRows = projectionStats
     ? projectionRows
@@ -604,9 +607,9 @@ export function PlayerCardModal({
               <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Fantasy Projection</p>
               {projectionStats ? (
                 <div className="mt-5 space-y-4">
-                  {projectionHighlights.length ? (
+                  {visibleProjectionHighlights.length ? (
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                      {projectionHighlights.map(([label, value]) => (
+                      {visibleProjectionHighlights.map(([label, value]) => (
                         <div key={label} className="rounded-2xl border border-white/10 bg-black/20 p-3">
                           <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
                           <p className="mt-2 truncate text-xl font-black tabular-nums text-white">

@@ -35,4 +35,7 @@ export interface DraftRoom {
   current_team_name: string | null;
   user_team_id: number | null;
   can_make_pick: boolean;
+  pick_started_at: string | null;
+  pick_expires_at: string | null;
+  server_time: string;
 }

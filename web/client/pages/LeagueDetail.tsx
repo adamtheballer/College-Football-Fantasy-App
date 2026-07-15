@@ -2,14 +2,13 @@ import { useMemo, useState, type ComponentType } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Calendar,
+  CalendarClock,
   ChevronRight,
   ClipboardList,
   Globe2,
   LineChart,
-  ListOrdered,
   Lock,
   Settings2,
-  ShieldCheck,
   Trophy,
   Users,
 } from "lucide-react";
@@ -22,7 +21,6 @@ import {
   useLeagueMatchupTab,
   useLeagueRosterTab,
   useLeagueSettingsTab,
-  useLeagueWaiverTab,
 } from "@/hooks/use-leagues";
 import { cn } from "@/lib/utils";
 import type {
@@ -31,15 +29,14 @@ import type {
   LeagueRosterPlayer,
   LeagueRosterTabResponse,
   LeagueSettingsTabResponse,
-  LeagueWaiverTabResponse,
 } from "@/types/league";
 
-type LeagueTab = "roster" | "matchup" | "waivers" | "settings";
+type LeagueTab = "roster" | "matchup" | "draft" | "settings";
 
 const tabs: Array<{ id: LeagueTab; label: string; icon: ComponentType<{ className?: string }> }> = [
   { id: "roster", label: "Roster", icon: ClipboardList },
   { id: "matchup", label: "Matchup", icon: Trophy },
-  { id: "waivers", label: "Available Players", icon: ShieldCheck },
+  { id: "draft", label: "Draft Room", icon: CalendarClock },
   { id: "settings", label: "Settings", icon: Settings2 },
 ];
 
@@ -372,84 +369,44 @@ function MatchupTab({
   );
 }
 
-function WaiverTab({
-  data,
-  isLoading,
+function DraftRoomTab({
+  leagueId,
+  draftDate,
+  onOpenLobby,
 }: {
-  data?: LeagueWaiverTabResponse;
-  isLoading: boolean;
+  leagueId: number;
+  draftDate: string;
+  onOpenLobby: () => void;
 }) {
   return (
     <Card className="rounded-[2rem] border-white/10 bg-[#0d1727]/90">
       <CardHeader className="border-b border-white/10">
         <CardTitle className="flex items-center justify-between gap-4">
           <span className="text-[11px] font-black uppercase tracking-[0.24em] text-sky-300">
-            Available Players
+            Draft Room
           </span>
           <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-            {data?.total_available ?? 0} available
+            Locked until scheduled time
           </span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-6 p-6 xl:grid-cols-[1.2fr_0.8fr]">
+      <CardContent className="flex flex-col gap-5 p-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-            Available In This League
+          <p className="text-2xl font-black uppercase italic text-slate-50">
+            Draft scheduled
           </p>
-          {isLoading ? (
-            <EmptyState title="Loading available players" detail="Checking current league ownership only." />
-          ) : (data?.available_players ?? []).length === 0 ? (
-            <EmptyState title="No available players" detail="Every visible player is already owned in this league." />
-          ) : (
-            <div className="max-h-[520px] overflow-y-auto rounded-[1.5rem] border border-white/10">
-              {data?.available_players.map((player) => (
-                <div
-                  key={player.id}
-                  className="grid grid-cols-[1fr_auto] gap-4 border-b border-white/10 px-5 py-4 last:border-b-0"
-                >
-                  <div>
-                    <p className="font-black text-slate-50">{player.name}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                      {player.position || "-"} · {player.school || "-"}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-black text-sky-200">
-                      {formatNumber(player.weekly_projected_fantasy_points)}
-                    </p>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                      Proj
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div>
-          <p className="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-            Waiver Claims
+          <p className="mt-2 text-sm font-bold leading-6 text-slate-400">
+            {draftDate}. Open the draft lobby to view the countdown, player-pool readiness, and the join button that unlocks at kickoff.
           </p>
-          {(data?.claims ?? []).length === 0 ? (
-            <EmptyState
-              title="No waiver claims"
-              detail="Submitted claims for your team appear here with pending, processed, cancelled, or failed status."
-            />
-          ) : (
-            <div className="space-y-3">
-              {data?.claims.map((claim) => (
-                <div key={claim.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  <p className="text-sm font-black text-slate-50">{claim.add_player_name}</p>
-                  <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                    {claim.status}
-                    {claim.drop_player_name ? ` · Drop ${claim.drop_player_name}` : ""}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
+        <Button
+          type="button"
+          className="h-12 rounded-2xl bg-primary px-8 text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground"
+          onClick={onOpenLobby}
+        >
+          Open Draft Lobby
+          <ChevronRight className="ml-2 h-3 w-3" />
+        </Button>
       </CardContent>
     </Card>
   );
@@ -667,7 +624,6 @@ export default function LeagueDetail() {
   const rosterQuery = useLeagueRosterTab(parsedLeagueId, undefined, activeTab === "roster");
   const matchupQuery = useLeagueMatchupTab(parsedLeagueId, undefined, activeTab === "matchup");
   const settingsQuery = useLeagueSettingsTab(parsedLeagueId, activeTab === "settings");
-  const waiverQuery = useLeagueWaiverTab(parsedLeagueId, 50, 0, activeTab === "waivers");
 
   if (!parsedLeagueId) {
     return (
@@ -810,8 +766,12 @@ export default function LeagueDetail() {
       {activeTab === "matchup" && (
         <MatchupTab data={matchupQuery.data} isLoading={matchupQuery.isLoading} />
       )}
-      {activeTab === "waivers" && (
-        <WaiverTab data={waiverQuery.data} isLoading={waiverQuery.isLoading} />
+      {activeTab === "draft" && (
+        <DraftRoomTab
+          leagueId={league.id}
+          draftDate={draftDate}
+          onOpenLobby={() => navigate(`/league/${league.id}/lobby`)}
+        />
       )}
       {activeTab === "settings" && (
         <SettingsTab data={settingsQuery.data} isLoading={settingsQuery.isLoading} />

@@ -13,7 +13,6 @@ from collegefootballfantasy_api.app.models.auth_rate_limit_event import AuthRate
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
 from collegefootballfantasy_api.app.models.user import User
 
-EMAIL_VERIFICATION_TOKEN = "email_verification"
 PASSWORD_RESET_TOKEN = "password_reset"
 
 

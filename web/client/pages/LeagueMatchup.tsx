@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Clock, Radio, ShieldAlert, Trophy } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
@@ -8,11 +8,12 @@ import { WeekSelector } from "@/components/league/WeekSelector";
 import { WinChanceMeter } from "@/components/league/WinChanceMeter";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { StatCard, StatusBadge, SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
-import { useLeagueMatchupTab } from "@/hooks/use-leagues";
+import { useLeagueDetail, useLeagueMatchupTab } from "@/hooks/use-leagues";
 import {
   DEMO_LEAGUE_ID,
   createDemoLeagueMatchupResponse,
 } from "@/lib/leaguePreviewData";
+import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import type { LeagueMatchupTabResponse, LeagueMatchupTeam } from "@/types/league";
 
 export function formatMatchupStatus(status: string | null | undefined) {
@@ -109,7 +110,12 @@ export default function LeagueMatchup() {
   const parsedLeagueId = Number(leagueId);
   const isDemoLeague = parsedLeagueId === DEMO_LEAGUE_ID;
   const [selectedWeek, setSelectedWeek] = useState<number | null>(1);
-  const matchupQuery = useLeagueMatchupTab(parsedLeagueId, selectedWeek ?? undefined, !isDemoLeague);
+  const leagueQuery = useLeagueDetail(parsedLeagueId, !isDemoLeague);
+  const postDraft = isDemoLeague || isLeaguePostDraft({
+    draftStatus: leagueQuery.data?.draft?.status,
+    leagueStatus: leagueQuery.data?.status,
+  });
+  const matchupQuery = useLeagueMatchupTab(parsedLeagueId, selectedWeek ?? undefined, !isDemoLeague && postDraft);
   const data = isDemoLeague ? createDemoLeagueMatchupResponse() : matchupQuery.data;
   const myTeam = data?.my_team ?? data?.user_team ?? null;
   const opponentTeam = data?.opponent_team ?? null;
@@ -118,6 +124,20 @@ export default function LeagueMatchup() {
   const statusLabel = formatMatchupStatus(data?.status);
   const statusVariant = matchupStatusVariant(data?.status);
   const shouldShowScorePanels = shouldShowMatchupScorePanels(data?.status);
+
+  if (!isDemoLeague && leagueQuery.isLoading) {
+    return (
+      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
+        <div className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface-raised/80 p-8 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cfb-text-muted">
+          Loading league...
+        </div>
+      </main>
+    );
+  }
+
+  if (!postDraft) {
+    return <Navigate to={`/league/${parsedLeagueId}/lobby`} replace />;
+  }
 
   return (
     <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-0 py-2 sm:px-2">
@@ -135,7 +155,11 @@ export default function LeagueMatchup() {
           </div>
           <WeekSelector week={data?.week} selectedWeek={selectedWeek} onChange={setSelectedWeek} />
         </div>
-        <LeagueTabs leagueId={parsedLeagueId} />
+        <LeagueTabs
+          leagueId={parsedLeagueId}
+          draftStatus={leagueQuery.data?.draft?.status}
+          leagueStatus={leagueQuery.data?.status}
+        />
       </div>
 
       {matchupQuery.isError && !isDemoLeague ? (

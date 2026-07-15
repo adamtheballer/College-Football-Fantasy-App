@@ -1,12 +1,27 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { AlertTriangle, CalendarClock, Clock, Users, Zap } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, Clock, Lock, Users, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagueDetail, useRescheduleDraft } from "@/hooks/use-leagues";
+import { useDraftPlayerPool } from "@/hooks/use-players";
+import { CFB27_RATINGS } from "@/lib/cfb27Ratings";
+import {
+  canJoinDraftRoom,
+  formatDraftCountdown,
+  getDraftCountdownParts,
+  hasDraftStarted,
+} from "@/lib/draftStatus";
 
 const toDateTimeLocalValue = (date: Date | null) => {
   if (!date || Number.isNaN(date.getTime())) return "";
@@ -32,6 +47,14 @@ export default function DraftLobby() {
   const [showReschedule, setShowReschedule] = useState(false);
   const [draftDateTime, setDraftDateTime] = useState("");
   const [rescheduleError, setRescheduleError] = useState<string | null>(null);
+  const [dismissedPoolWarning, setDismissedPoolWarning] = useState(false);
+  const playerPoolQuery = useDraftPlayerPool({
+    limit: 100,
+    offset: 0,
+    pages: 1,
+    sort: "draft_rank",
+    enabled: typeof parsedLeagueId === "number" && Number.isFinite(parsedLeagueId),
+  });
 
   const draftTime = league?.draft?.draft_datetime_utc ? new Date(league.draft.draft_datetime_utc) : null;
 
@@ -40,27 +63,31 @@ export default function DraftLobby() {
   }, [draftTime]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => setNow(Date.now()), 30_000);
+    const interval = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(interval);
   }, []);
 
   const countdown = useMemo(() => {
-    if (!draftTime) return "--";
-    const diff = draftTime.getTime() - now;
-    const hours = Math.max(0, Math.floor(diff / (1000 * 60 * 60)));
-    const minutes = Math.max(0, Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)));
-    return `${hours}h ${minutes}m`;
+    return formatDraftCountdown(draftTime, now);
   }, [draftTime, now]);
 
+  const countdownParts = useMemo(() => getDraftCountdownParts(draftTime, now), [draftTime, now]);
+
   const canEnterDraft = useMemo(() => {
-    if (!draftTime) return false;
-    const diff = draftTime.getTime() - now;
-    return diff <= 15 * 60 * 1000;
+    return hasDraftStarted(draftTime, now);
   }, [draftTime, now]);
 
   const isFull = league ? league.members.length >= league.max_teams : false;
   const missingManagers = league ? Math.max(0, league.max_teams - league.members.length) : 0;
   const isCommissioner = Boolean(league && user?.id === league.commissioner_user_id);
+  const expectedPlayerCount = CFB27_RATINGS.length;
+  const loadedPlayerCount = playerPoolQuery.data?.total ?? 0;
+  const playerPoolComplete = !playerPoolQuery.isLoading && loadedPlayerCount >= expectedPlayerCount;
+  const showPlayerPoolWarning =
+    !playerPoolQuery.isLoading &&
+    !playerPoolComplete &&
+    !dismissedPoolWarning &&
+    Boolean(parsedLeagueId);
 
   if (!parsedLeagueId) {
     return (
@@ -93,7 +120,12 @@ export default function DraftLobby() {
   }
 
   const draftRoomPath = `/league/${league.id}/draft`;
-  const draftIsReadyToCommence = isFull && canEnterDraft;
+  const draftIsReadyToCommence = canJoinDraftRoom({
+    draftDateTime: draftTime,
+    memberCount: league.members.length,
+    maxTeams: league.max_teams,
+    now,
+  });
 
   const handleRescheduleDraft = async () => {
     const nextDraftTime = draftDateTime ? new Date(draftDateTime) : null;
@@ -119,6 +151,43 @@ export default function DraftLobby() {
 
   return (
     <div className="max-w-5xl mx-auto py-12 space-y-10">
+      <Dialog open={showPlayerPoolWarning} onOpenChange={(open) => setDismissedPoolWarning(!open)}>
+        <DialogContent className="max-w-xl border-amber-300/20 bg-[#101928]">
+          <DialogHeader>
+            <DialogTitle className="pr-8 text-2xl font-black uppercase italic text-amber-100">
+              Draft player pool is not ready
+            </DialogTitle>
+            <DialogDescription className="text-sm font-semibold leading-6 text-slate-300">
+              This draft has {loadedPlayerCount} backend players available, but the CFB27 draft
+              board expects at least {expectedPlayerCount}. Reschedule the draft so the player
+              sync can finish before managers enter the room.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            {isCommissioner ? (
+              <Button
+                type="button"
+                className="h-11 rounded-2xl bg-amber-300 px-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-950 hover:bg-amber-200"
+                onClick={() => {
+                  setDismissedPoolWarning(true);
+                  setShowReschedule(true);
+                }}
+              >
+                Reschedule Draft
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
+              onClick={() => setDismissedPoolWarning(true)}
+            >
+              Review Lobby
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="space-y-3">
         <h1 className="text-6xl font-black italic uppercase text-foreground">{league.name}</h1>
         <p className="text-sm font-medium text-muted-foreground uppercase tracking-[0.2em]">
@@ -131,8 +200,8 @@ export default function DraftLobby() {
           <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">Draft Countdown</CardTitle>
         </CardHeader>
         <CardContent className="px-10 pb-10 space-y-6">
-          <div className="flex flex-wrap items-center gap-6">
-            <div className="flex items-center gap-4 px-6 py-4 rounded-2xl bg-white/5 border border-white/10">
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="flex items-center gap-4 px-6 py-4 rounded-2xl bg-white/5 border border-white/10 md:col-span-2">
               <Clock className="w-6 h-6 text-primary" />
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Starts In</p>
@@ -154,12 +223,70 @@ export default function DraftLobby() {
               </div>
             </div>
           </div>
+          {countdownParts && countdownParts.totalMs > 0 ? (
+            <div className="grid grid-cols-4 gap-3">
+              {[
+                ["Days", countdownParts.days],
+                ["Hours", countdownParts.hours],
+                ["Minutes", countdownParts.minutes],
+                ["Seconds", countdownParts.seconds],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border border-white/10 bg-black/15 p-4 text-center">
+                  <p className="text-3xl font-black text-slate-50">{value}</p>
+                  <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-slate-500">{label}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           <div className="space-y-2 text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground">
             <p>Draft Order: Pending</p>
             <p>Timezone: {league.draft?.timezone}</p>
             <p>Draft Time: {draftTime?.toLocaleString()}</p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card
+        className={[
+          "border-border/60 rounded-[2.5rem]",
+          draftIsReadyToCommence
+            ? "bg-emerald-400/10 border-emerald-300/25"
+            : "bg-card/40",
+        ].join(" ")}
+      >
+        <CardContent className="flex flex-col gap-5 p-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+              {draftIsReadyToCommence ? (
+                <CheckCircle2 className="h-6 w-6 text-emerald-300" />
+              ) : (
+                <Lock className="h-6 w-6 text-sky-300" />
+              )}
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-sky-300">
+                Draft Room
+              </p>
+              <h2 className="mt-1 text-2xl font-black uppercase italic text-slate-50">
+                {draftIsReadyToCommence ? "Ready to join" : "Locked until draft kickoff"}
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-400">
+                {!isFull
+                  ? `${missingManagers} more ${missingManagers === 1 ? "manager needs" : "managers need"} to join before the room unlocks.`
+                  : canEnterDraft
+                      ? "The scheduled time has arrived. League members can enter the draft room."
+                      : "Managers can view this lobby now. The join button unlocks when the scheduled draft time arrives."}
+              </p>
+            </div>
+          </div>
+          <Button
+            className="h-12 rounded-2xl bg-primary px-8 text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"
+            disabled={!draftIsReadyToCommence}
+            onClick={() => navigate(draftRoomPath)}
+          >
+            {draftIsReadyToCommence ? "Join Draft Room" : "Draft Room Locked"}
+          </Button>
         </CardContent>
       </Card>
 
@@ -240,16 +367,17 @@ export default function DraftLobby() {
 
       {(!isFull || !canEnterDraft) && (
         <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground/70">
-          Draft room is available in preview mode. Picks unlock only when the league is full and the scheduled draft window opens.
+          Draft room access stays locked until the league is full and the scheduled draft time has arrived.
         </p>
       )}
 
       <div className="flex items-center gap-4">
         <Button
-          className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em]"
+          className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em] disabled:cursor-not-allowed disabled:opacity-45"
+          disabled={!draftIsReadyToCommence}
           onClick={() => navigate(draftRoomPath)}
         >
-          {draftIsReadyToCommence ? "Enter Draft Room" : "Open Draft Preview"}
+          {draftIsReadyToCommence ? "Join Draft Room" : "Draft Room Locked"}
         </Button>
         <Button
           variant="outline"

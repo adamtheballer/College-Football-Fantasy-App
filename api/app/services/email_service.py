@@ -21,16 +21,6 @@ class EmailService:
     def send(self, payload: EmailPayload) -> None:
         raise NotImplementedError
 
-    def send_email_verification(self, email: str, token: str) -> None:
-        link = f"{settings.ui_base_url.rstrip('/')}/verify-email?token={token}"
-        self.send(
-            EmailPayload(
-                to_email=email,
-                subject="Verify your CFB Fantasy account",
-                body=f"Verify your account: {link}",
-            )
-        )
-
     def send_password_reset(self, email: str, token: str) -> None:
         link = f"{settings.ui_base_url.rstrip('/')}/password-reset/confirm?token={token}"
         self.send(

@@ -94,10 +94,10 @@ environments:
       env:
         VITE_API_BASE_URL: ${PUBLIC_API_BASE_URL}
     workers:
-      trade_processor:
-        enabled: false
-        command: PYTHONPATH=. uv run python scripts/process_due_trades.py --limit 100
-        note: Enable only after the trade worker is deployed as a trusted scheduled process.
+      lifecycle_processor:
+        enabled: true
+        command: PYTHONPATH=. uv run python scripts/run_lifecycle_worker.py
+        note: Required server-side processor for expired draft picks and due waiver and trade work.
     required_env:
       - DATABASE_URL
       - JWT_SECRET_KEY

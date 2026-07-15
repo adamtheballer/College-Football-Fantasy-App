@@ -1,6 +1,7 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
+from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -27,6 +28,18 @@ from collegefootballfantasy_api.app.services.roster_legality import (
 )
 
 
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _ensure_aware(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def ordered_draft_teams(db: Session, league_id: int) -> list[Team]:
     teams = db.query(Team).filter(Team.league_id == league_id).all()
     return sorted(teams, key=lambda team: (team.created_at, team.id))
@@ -42,7 +55,27 @@ def draft_pick_team_for_number(teams: list[Team], pick_number: int) -> tuple[int
     return round_number, round_pick, ordered_teams[round_pick - 1]
 
 
+def _current_pick_clock(
+    *,
+    draft_row: Draft,
+    picks_rows: list[tuple[DraftPick, Team, Player]],
+    total_picks: int,
+    now: datetime,
+) -> tuple[datetime | None, datetime | None]:
+    if draft_row.status == "completed" or (total_picks and len(picks_rows) >= total_picks):
+        return None, None
+    if draft_row.status not in {"scheduled", "live", "active"}:
+        return None, None
+
+    latest_pick = picks_rows[-1][0] if picks_rows else None
+    started_at = _ensure_aware(latest_pick.created_at if latest_pick else draft_row.draft_datetime_utc)
+    if not started_at or started_at > now:
+        return None, None
+    return started_at, started_at + timedelta(seconds=max(1, draft_row.pick_timer_seconds))
+
+
 def build_draft_room_state(db: Session, league: League, current_user: User) -> DraftRoomRead:
+    now = _now()
     draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
     if not draft_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
@@ -79,6 +112,12 @@ def build_draft_room_state(db: Session, league: League, current_user: User) -> D
             current_user.id == league.commissioner_user_id
             or current_user.id == current_team.owner_user_id
         )
+    )
+    pick_started_at, pick_expires_at = _current_pick_clock(
+        draft_row=draft_row,
+        picks_rows=picks_rows,
+        total_picks=total_picks,
+        now=now,
     )
 
     return DraftRoomRead(
@@ -120,7 +159,208 @@ def build_draft_room_state(db: Session, league: League, current_user: User) -> D
         current_team_name=current_team.name if current_team else None,
         user_team_id=user_team.id if user_team else None,
         can_make_pick=can_make_pick,
+        pick_started_at=pick_started_at,
+        pick_expires_at=pick_expires_at,
+        server_time=now,
     )
+
+
+def auto_pick_expired_draft_pick(
+    db: Session,
+    *,
+    league: League,
+    current_user: User,
+) -> DraftRoomRead:
+    now = _now()
+    try:
+        draft_row = (
+            db.query(Draft)
+            .filter(Draft.league_id == league.id)
+            .with_for_update()
+            .first()
+        )
+        if not draft_row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
+
+        member_count = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).count()
+        if member_count < league.max_teams:
+            return build_draft_room_state(db, league, current_user)
+
+        settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
+        if not settings_row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league settings not found")
+
+        teams = ordered_draft_teams(db, league.id)
+        if not teams:
+            return build_draft_room_state(db, league, current_user)
+
+        picks_rows = (
+            db.query(DraftPick, Team, Player)
+            .join(Team, Team.id == DraftPick.team_id)
+            .join(Player, Player.id == DraftPick.player_id)
+            .filter(DraftPick.draft_id == draft_row.id)
+            .order_by(DraftPick.overall_pick.asc())
+            .all()
+        )
+        roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
+        draft_roster_slots = normalize_roster_slot_limits(roster_slots)
+        total_picks = sum(int(value) for value in draft_roster_slots.values()) * len(teams)
+        if total_picks and len(picks_rows) >= total_picks:
+            return build_draft_room_state(db, league, current_user)
+
+        pick_started_at, pick_expires_at = _current_pick_clock(
+            draft_row=draft_row,
+            picks_rows=picks_rows,
+            total_picks=total_picks,
+            now=now,
+        )
+        if not pick_started_at or not pick_expires_at or pick_expires_at > now:
+            return build_draft_room_state(db, league, current_user)
+
+        existing_picks = len(picks_rows)
+        round_number, round_pick, current_team = draft_pick_team_for_number(teams, existing_picks + 1)
+        if current_team is None:
+            return build_draft_room_state(db, league, current_user)
+
+        drafted_player_ids = select(DraftPick.player_id).where(DraftPick.draft_id == draft_row.id)
+        rostered_player_ids = (
+            select(RosterEntry.player_id)
+            .join(Team, Team.id == RosterEntry.team_id)
+            .where(Team.league_id == league.id)
+        )
+        rank_bucket = case(
+            (Player.sheet_adp.isnot(None), 0),
+            (Player.cfb27_rank.isnot(None), 1),
+            else_=2,
+        )
+        candidates = (
+            db.query(Player)
+            .filter(Player.id.not_in(drafted_player_ids), Player.id.not_in(rostered_player_ids))
+            .order_by(
+                rank_bucket.asc(),
+                Player.sheet_adp.asc().nullslast(),
+                Player.cfb27_rank.asc().nullslast(),
+                Player.sheet_projected_season_points.desc().nullslast(),
+                func.lower(Player.name).asc(),
+                Player.id.asc(),
+            )
+            .limit(500)
+            .all()
+        )
+
+        selected_player: Player | None = None
+        selected_slot: str | None = None
+        for candidate in candidates:
+            slot = assign_best_roster_slot_for_team(
+                db,
+                current_team.id,
+                candidate.position,
+                roster_slots,
+                superflex_enabled=settings_row.superflex_enabled,
+            )
+            if slot:
+                selected_player = candidate
+                selected_slot = slot
+                break
+
+        if not selected_player or not selected_slot:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="no legal auto-pick player available")
+
+        pick = DraftPick(
+            draft_id=draft_row.id,
+            team_id=current_team.id,
+            player_id=selected_player.id,
+            made_by_user_id=None,
+            round_number=round_number,
+            round_pick=round_pick,
+            overall_pick=existing_picks + 1,
+        )
+        db.add(pick)
+        db.flush()
+
+        db.add(
+            RosterEntry(
+                league_id=league.id,
+                team_id=current_team.id,
+                player_id=selected_player.id,
+                slot=selected_slot,
+                status="active",
+            )
+        )
+        db.flush()
+
+        if draft_row.status == "scheduled":
+            draft_row.status = "live"
+        league.status = "draft_live"
+        if total_picks and existing_picks + 1 >= total_picks:
+            draft_row.status = "completed"
+            league.status = "post_draft"
+            finalize_draft_rosters_and_matchups(db, league)
+
+        db.add(draft_row)
+        db.add(league)
+        db.commit()
+        return build_draft_room_state(db, league, current_user)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="auto-pick conflicts with existing draft or roster state",
+        ) from exc
+    except HTTPException:
+        db.rollback()
+        raise
+
+
+def process_expired_draft_picks_once(
+    db: Session,
+    *,
+    now: datetime | None = None,
+) -> dict[str, int]:
+    """Advance each expired live draft once without depending on a browser client."""
+    current = _ensure_aware(now or _now())
+    draft_ids = [
+        draft_id
+        for (draft_id,) in (
+            db.query(Draft.id)
+            .filter(Draft.status.in_(("scheduled", "live", "active")))
+            .filter(Draft.draft_datetime_utc <= current)
+            .order_by(Draft.id.asc())
+            .all()
+        )
+    ]
+    summary = {"auto_picked": 0, "skipped": 0}
+    for draft_id in draft_ids:
+        draft_row = db.query(Draft).filter(Draft.id == draft_id).with_for_update(skip_locked=True).first()
+        if draft_row is None:
+            continue
+        league = db.get(League, draft_row.league_id)
+        if league is None:
+            summary["skipped"] += 1
+            continue
+        current_user = (
+            db.query(User)
+            .join(Team, Team.owner_user_id == User.id)
+            .filter(Team.league_id == league.id)
+            .order_by(Team.id.asc())
+            .first()
+        )
+        if current_user is None:
+            summary["skipped"] += 1
+            continue
+        before_count = db.query(DraftPick).filter(DraftPick.draft_id == draft_row.id).count()
+        try:
+            auto_pick_expired_draft_pick(db, league=league, current_user=current_user)
+        except HTTPException:
+            # A non-expired or unfillable draft is not a worker failure; it will be retried after state changes.
+            summary["skipped"] += 1
+            continue
+        after_count = db.query(DraftPick).filter(DraftPick.draft_id == draft_row.id).count()
+        if after_count > before_count:
+            summary["auto_picked"] += 1
+        else:
+            summary["skipped"] += 1
+    return summary
 
 
 def create_real_draft_pick(
@@ -131,6 +371,7 @@ def create_real_draft_pick(
     current_user: User,
 ) -> DraftRoomRead:
     try:
+        now = _now()
         draft_row = (
             db.query(Draft)
             .filter(Draft.league_id == league.id)
@@ -150,7 +391,7 @@ def create_real_draft_pick(
         draft_start = draft_row.draft_datetime_utc
         if draft_start.tzinfo is None:
             draft_start = draft_start.replace(tzinfo=timezone.utc)
-        if draft_row.status == "scheduled" and draft_start > datetime.now(timezone.utc):
+        if draft_row.status == "scheduled" and draft_start > now:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="draft has not started yet")
 
         settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
@@ -167,6 +408,25 @@ def create_real_draft_pick(
         total_picks = sum(int(value) for value in draft_roster_slots.values()) * len(teams)
         if total_picks and existing_picks >= total_picks:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="draft is complete")
+
+        latest_pick = (
+            db.query(DraftPick)
+            .filter(DraftPick.draft_id == draft_row.id)
+            .order_by(DraftPick.overall_pick.desc())
+            .first()
+        )
+        pick_started_at = _ensure_aware(latest_pick.created_at if latest_pick else draft_row.draft_datetime_utc)
+        pick_expires_at = (
+            pick_started_at + timedelta(seconds=max(1, draft_row.pick_timer_seconds))
+            if pick_started_at is not None
+            else None
+        )
+        if pick_expires_at is not None and pick_expires_at <= now:
+            auto_pick_expired_draft_pick(db, league=league, current_user=current_user)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="pick expired; an auto-pick was applied",
+            )
 
         round_number, round_pick, current_team = draft_pick_team_for_number(teams, existing_picks + 1)
         if current_team is None:

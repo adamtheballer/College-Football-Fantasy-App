@@ -51,6 +51,16 @@ def test_players_expose_and_sort_by_sheet_board_rank(client, db_session):
     assert rows[1]["board_rank"] == 22
 
 
+def test_player_rank_requests_do_not_run_cfb27_sync(client, db_session):
+    assert db_session.query(Player).count() == 0
+
+    response = client.get("/players", params={"sort": "rank", "limit": 10})
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 0
+    assert db_session.query(Player).count() == 0
+
+
 def test_cfb27_source_contains_critical_compare_players():
     ratings = {
         (rating.name, rating.school, rating.position): rating

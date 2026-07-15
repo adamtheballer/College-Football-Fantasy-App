@@ -14,7 +14,10 @@ from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.draft_room import DraftPickCreate
-from collegefootballfantasy_api.app.services.draft_service import create_real_draft_pick
+from collegefootballfantasy_api.app.services.draft_service import (
+    create_real_draft_pick,
+    process_expired_draft_picks_once,
+)
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.services.draft_completion import finalize_draft_rosters_and_matchups
 from collegefootballfantasy_api.app.services.league_weeks import (
@@ -57,7 +60,7 @@ def create_league(
     kicker_enabled: bool = False,
     fill_league: bool = True,
 ) -> dict:
-    draft_start = draft_datetime_utc or (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+    draft_start = draft_datetime_utc or datetime.now(timezone.utc).isoformat()
     payload = {
         "basics": {
             "name": "Draft Test League",
@@ -290,6 +293,96 @@ def test_two_user_real_draft_stays_in_sync_and_creates_rosters(client, db_sessio
     assert len(teams) == 2
     assert {entry.player_id for entry in roster_entries} == {first_qb_id, second_qb_id}
     assert {entry.team_id for entry in roster_entries} == set(teams)
+
+
+def test_member_can_trigger_expired_real_draft_auto_pick(client, db_session):
+    owner_token = create_user_and_token(client, "real-autopick-owner")
+    league = create_league(
+        client,
+        owner_token,
+        roster_slots={"QB": 1},
+        max_teams=2,
+        fill_league=False,
+    )
+    member_token = join_league(client, league["id"], "real-autopick-member")
+    top_qb = Player(name="Auto Pick QB One", position="QB", school="Texas", sheet_adp=1)
+    next_qb = Player(name="Auto Pick QB Two", position="QB", school="Texas", sheet_adp=2)
+    db_session.add_all([top_qb, next_qb])
+    db_session.commit()
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    draft.draft_datetime_utc = datetime.now(timezone.utc) - timedelta(minutes=5)
+    draft.pick_timer_seconds = 1
+    db_session.commit()
+
+    room_response = client.get(
+        f"/leagues/{league['id']}/draft-room",
+        headers=auth_headers(member_token),
+    )
+    assert room_response.status_code == 200
+    room = room_response.json()
+    assert room["pick_started_at"] is not None
+    assert room["pick_expires_at"] is not None
+    assert room["server_time"] is not None
+    assert room["picks"] == []
+
+    auto_response = client.post(
+        f"/leagues/{league['id']}/draft-picks/auto",
+        headers=auth_headers(member_token),
+    )
+
+    assert auto_response.status_code == 200
+    updated_room = auto_response.json()
+    assert len(updated_room["picks"]) == 1
+    assert updated_room["picks"][0]["player_id"] == top_qb.id
+    assert updated_room["picks"][0]["made_by_user_id"] is None
+    assert updated_room["current_pick"] == 2
+    assert updated_room["can_make_pick"] is True
+
+    db_session.expire_all()
+    assert db_session.query(DraftPick).filter(DraftPick.player_id == top_qb.id).count() == 1
+    assert db_session.query(RosterEntry).filter(RosterEntry.player_id == top_qb.id).count() == 1
+
+
+def test_expired_manual_pick_applies_auto_pick_and_returns_conflict(client, db_session):
+    token = create_user_and_token(client, "expired-manual")
+    league = create_league(client, token, roster_slots={"QB": 1})
+    auto_player = Player(name="Expired Auto Pick QB", position="QB", school="Texas", sheet_adp=1)
+    late_player = Player(name="Late Manual Pick QB", position="QB", school="Texas", sheet_adp=2)
+    db_session.add_all([auto_player, late_player])
+    db_session.flush()
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    draft.draft_datetime_utc = datetime.now(timezone.utc) - timedelta(minutes=5)
+    draft.pick_timer_seconds = 1
+    db_session.commit()
+
+    response = client.post(
+        f"/leagues/{league['id']}/draft-picks",
+        json={"player_id": late_player.id},
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "pick expired; an auto-pick was applied"
+    assert db_session.query(DraftPick).filter(DraftPick.player_id == auto_player.id).count() == 1
+    assert db_session.query(DraftPick).filter(DraftPick.player_id == late_player.id).count() == 0
+
+
+def test_lifecycle_worker_advances_expired_draft_without_browser(client, db_session):
+    token = create_user_and_token(client, "worker-autopick")
+    league = create_league(client, token, roster_slots={"QB": 1})
+    player = Player(name="Worker Auto Pick QB", position="QB", school="Texas", sheet_adp=1)
+    db_session.add(player)
+    db_session.flush()
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    draft.draft_datetime_utc = datetime.now(timezone.utc) - timedelta(minutes=5)
+    draft.pick_timer_seconds = 1
+    db_session.commit()
+
+    result = process_expired_draft_picks_once(db_session)
+
+    assert result == {"auto_picked": 1, "skipped": 0}
+    assert db_session.query(DraftPick).filter(DraftPick.player_id == player.id).count() == 1
+    assert process_expired_draft_picks_once(db_session) == {"auto_picked": 0, "skipped": 1}
 
 
 def test_duplicate_draft_pick_returns_409_and_does_not_create_extra_rows(client, db_session):

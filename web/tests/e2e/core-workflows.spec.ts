@@ -98,59 +98,31 @@ test.describe("critical browser workflows", () => {
     expect(user).toContain("coach@example.com");
   });
 
-  test("signup verifies email link then logs in and opens league access", async ({ page }) => {
-    const unverifiedPayload = {
-      ...mockAuthPayload,
-      access_token: "signup-access-token",
-      user: {
-        ...mockAuthPayload.user,
-        first_name: "Adam",
-        email: "adam@example.com",
-        email_verified_at: null,
-      },
-    };
-    const verifiedUser = {
-      ...unverifiedPayload.user,
+  test("signup opens league access immediately without email verification", async ({ page }) => {
+    const readyUser = {
+      ...mockAuthPayload.user,
+      first_name: "Adam",
+      email: "adam@example.com",
       email_verified_at: "2026-07-10T20:00:00Z",
     };
-    const verifiedPayload = {
+    const signupPayload = {
       ...mockAuthPayload,
-      access_token: "verified-access-token",
-      user: verifiedUser,
+      access_token: "signup-access-token",
+      user: readyUser,
     };
-    let verifyPayload: unknown = null;
 
     await page.route("**/auth/signup", async (route) => {
       await route.fulfill({
         status: 201,
         contentType: "application/json",
-        body: JSON.stringify(unverifiedPayload),
-      });
-    });
-    await page.route("**/auth/verify-email", async (route) => {
-      verifyPayload = route.request().postDataJSON();
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          status: "verified",
-          message: "email verified",
-        }),
-      });
-    });
-    await page.route("**/auth/login", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(verifiedPayload),
+        body: JSON.stringify(signupPayload),
       });
     });
     await page.route("**/auth/me", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(verifiedUser),
+        body: JSON.stringify(readyUser),
       });
     });
     await page.route("**/notifications/preferences**", async (route) => {
@@ -188,18 +160,6 @@ test.describe("critical browser workflows", () => {
     await expect
       .poll(() => page.evaluate(() => window.localStorage.getItem("cfb_access_token")))
       .toBe("signup-access-token");
-
-    await page.goto("/verify-email?token=public-token-123");
-    await expect(page.getByRole("heading", { name: /Email Verified/i })).toBeVisible();
-    await expect(page.getByText(/verified\. You can now create and join leagues/i)).toBeVisible();
-    expect(page.url()).not.toContain("public-token-123");
-    expect(verifyPayload).toEqual({ token: "public-token-123" });
-
-    await page.getByRole("button", { name: /SIGN OUT/i }).click();
-    await page.goto("/login");
-    await page.getByPlaceholder("coach@saturday.com").fill("adam@example.com");
-    await page.getByPlaceholder("••••••••").fill("StrongPass123!");
-    await page.getByRole("button", { name: /Sign In to Dashboard/i }).click();
     await page.waitForURL("**/");
     const endGuideButton = page.getByRole("button", { name: /End Guide/i });
     if (await endGuideButton.isVisible().catch(() => false)) {
@@ -208,12 +168,12 @@ test.describe("critical browser workflows", () => {
     await page.evaluate((userId) => {
       window.localStorage.setItem(`cfb_completed_guide_${userId}`, "true");
       window.localStorage.removeItem(`cfb_pending_guide_${userId}`);
-    }, verifiedUser.id);
+    }, readyUser.id);
 
     await page.goto("/leagues");
     await expect(page.getByRole("heading", { name: /^Leagues$/i })).toBeVisible();
     const storedUser = await page.evaluate(() => window.localStorage.getItem("cfb_user"));
-    expect(storedUser).toContain("2026-07-10T20:00:00Z");
+    expect(storedUser).toContain("adam@example.com");
   });
 
   test("leagues page renders backend response for authenticated session", async ({ page }) => {

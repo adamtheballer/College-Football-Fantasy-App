@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 import { Search, Sparkles, UserPlus, Zap } from "lucide-react";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
@@ -7,7 +7,7 @@ import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
-import { useLeagueWaiverTab } from "@/hooks/use-leagues";
+import { useLeagueDetail, useLeagueWaiverTab } from "@/hooks/use-leagues";
 import { useDraftPlayerPool, usePlayerCard } from "@/hooks/use-players";
 import {
   useCreateWatchlist,
@@ -16,6 +16,7 @@ import {
 } from "@/hooks/use-watchlists";
 import { DEMO_LEAGUE_ID, createDemoLeagueWaiverResponse } from "@/lib/leaguePreviewData";
 import { buildDraftBoard } from "@/lib/draftRankings";
+import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import type { PlayerStats } from "@/types/player";
 
 const positions = ["ALL", "QB", "RB", "WR", "TE", "K"] as const;
@@ -105,7 +106,12 @@ export default function LeagueWaivers() {
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState<(typeof positions)[number]>("ALL");
   const [selectedPlayer, setSelectedPlayer] = useState<AvailablePlayerRow | null>(null);
-  const waiverQuery = useLeagueWaiverTab(parsedLeagueId, 50, 0, !isDemoLeague);
+  const leagueQuery = useLeagueDetail(parsedLeagueId, !isDemoLeague);
+  const postDraft = isDemoLeague || isLeaguePostDraft({
+    draftStatus: leagueQuery.data?.draft?.status,
+    leagueStatus: leagueQuery.data?.status,
+  });
+  const waiverQuery = useLeagueWaiverTab(parsedLeagueId, 50, 0, !isDemoLeague && postDraft);
   const waiverData = isDemoLeague ? createDemoLeagueWaiverResponse() : waiverQuery.data;
   const playerPoolQuery = useDraftPlayerPool({
     league_id: parsedLeagueId,
@@ -114,11 +120,11 @@ export default function LeagueWaivers() {
     offset: 0,
     fetchAll: true,
     sort: "draft_rank",
-    enabled: !isDemoLeague && Number.isFinite(parsedLeagueId),
+    enabled: !isDemoLeague && postDraft && Number.isFinite(parsedLeagueId),
   });
   const watchlistsQuery = useWatchlists(
     parsedLeagueId,
-    !isDemoLeague && typeof parsedLeagueId === "number" && !Number.isNaN(parsedLeagueId)
+    !isDemoLeague && postDraft && typeof parsedLeagueId === "number" && !Number.isNaN(parsedLeagueId)
   );
   const createWatchlist = useCreateWatchlist();
   const toggleWatchlistPlayer = useToggleWatchlistPlayer();
@@ -228,6 +234,20 @@ export default function LeagueWaivers() {
     }
   };
 
+  if (!isDemoLeague && leagueQuery.isLoading) {
+    return (
+      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
+        <div className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface-raised/80 p-8 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cfb-text-muted">
+          Loading league...
+        </div>
+      </main>
+    );
+  }
+
+  if (!postDraft) {
+    return <Navigate to={`/league/${parsedLeagueId}/lobby`} replace />;
+  }
+
   return (
     <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[460px] rounded-[3rem] bg-[radial-gradient(circle_at_20%_8%,rgba(56,189,248,0.2),transparent_32%),radial-gradient(circle_at_72%_0%,rgba(99,102,241,0.18),transparent_38%),radial-gradient(circle_at_50%_30%,rgba(14,165,233,0.12),transparent_42%)] blur-2xl" />
@@ -257,7 +277,11 @@ export default function LeagueWaivers() {
             </div>
           </div>
         </div>
-        <LeagueTabs leagueId={parsedLeagueId} />
+        <LeagueTabs
+          leagueId={parsedLeagueId}
+          draftStatus={leagueQuery.data?.draft?.status}
+          leagueStatus={leagueQuery.data?.status}
+        />
       </div>
 
       <section className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(13,23,39,0.96),rgba(16,30,52,0.9)_48%,rgba(15,23,42,0.96))] shadow-[0_24px_90px_rgba(14,165,233,0.12)]">

@@ -1,4 +1,4 @@
-import { type MouseEvent, useState } from "react";
+import { type MouseEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Trophy,
@@ -11,6 +11,7 @@ import {
   Users,
   Copy,
   Link2,
+  LockKeyhole,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -18,6 +19,8 @@ import { Button } from "@/components/ui/button";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagues } from "@/hooks/use-leagues";
+import { formatDraftCountdown, hasDraftStarted } from "@/lib/draftStatus";
+import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import { DEMO_LEAGUE_DETAIL, DEMO_LEAGUE_ID } from "@/lib/leaguePreviewData";
 
 const LeagueCard = ({
@@ -27,6 +30,7 @@ const LeagueCard = ({
   teams,
   memberCount,
   draftLabel,
+  draftDateTime,
   isPrivate,
   draftStatus,
   inviteCode,
@@ -39,16 +43,25 @@ const LeagueCard = ({
   teams: number;
   memberCount: number;
   draftLabel: string;
+  draftDateTime?: string | null;
   isPrivate: boolean;
   draftStatus: string;
   inviteCode?: string | null;
   onOpen: (leagueId: number) => void;
-  onOpenDraft: (leagueId: number, draftStatus: string) => void;
+  onOpenDraft: (leagueId: number, draftUnlocked: boolean) => void;
 }) => {
   const [copiedInviteField, setCopiedInviteField] = useState<"code" | "link" | null>(null);
+  const [now, setNow] = useState(Date.now());
   const openLeague = () => onOpen(id);
   const normalizedDraftStatus = (draftStatus || "").toLowerCase();
   const normalizedLeagueStatus = (status || "").toLowerCase();
+  const draftScheduled =
+    normalizedDraftStatus === "scheduled" ||
+    normalizedDraftStatus === "draft_scheduled" ||
+    normalizedLeagueStatus === "draft_scheduled";
+  const draftLive = normalizedDraftStatus === "live" || normalizedDraftStatus === "draft_live";
+  const draftUnlocked = draftLive || hasDraftStarted(draftDateTime, now);
+  const shouldShowDraftAction = draftLive || draftScheduled || Boolean(draftDateTime);
   const completeStatuses = ["completed", "complete", "draft_completed", "final", "closed", "post_draft"];
   const inviteShouldBeVisible =
     Boolean(inviteCode) &&
@@ -58,6 +71,12 @@ const LeagueCard = ({
     inviteCode && typeof window !== "undefined"
       ? `${window.location.origin}/join/${inviteCode}`
       : null;
+
+  useEffect(() => {
+    if (!shouldShowDraftAction || draftUnlocked) return undefined;
+    const interval = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(interval);
+  }, [draftUnlocked, shouldShowDraftAction]);
 
   const copyInviteValue = async (
     event: MouseEvent<HTMLButtonElement>,
@@ -176,19 +195,29 @@ const LeagueCard = ({
           League Hub
           <ChevronRight className="w-3 h-3 ml-2" />
         </Button>
-        {(draftStatus === "draft_live" || draftStatus === "draft_scheduled") && (
+        {shouldShowDraftAction && (
           <Button
             variant="outline"
-            className="w-full border-primary/30 bg-primary/10 text-primary font-black tracking-[0.2em] text-[10px] uppercase h-12 px-8 rounded-2xl hover:bg-primary/15 transition-all duration-300"
+            className={[
+              "w-full font-black tracking-[0.2em] text-[10px] uppercase h-12 px-8 rounded-2xl transition-all duration-300",
+              draftUnlocked
+                ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
+                : "border-amber-300/25 bg-amber-300/10 text-amber-100 hover:bg-amber-300/15",
+            ].join(" ")}
             onClick={(event) => {
               event.stopPropagation();
-              onOpenDraft(id, draftStatus);
+              onOpenDraft(id, draftUnlocked);
             }}
           >
-            {draftStatus === "draft_live" ? "Enter Draft Room" : "Open Draft Lobby"}
-            <ChevronRight className="w-3 h-3 ml-2" />
+            {draftUnlocked ? "Join Draft Room" : "Draft Room Locked"}
+            {draftUnlocked ? <ChevronRight className="w-3 h-3 ml-2" /> : <LockKeyhole className="w-3 h-3 ml-2" />}
           </Button>
         )}
+        {shouldShowDraftAction && !draftUnlocked ? (
+          <p className="text-center text-[9px] font-black uppercase tracking-[0.16em] text-amber-100/80">
+            Opens in {formatDraftCountdown(draftDateTime, now)}
+          </p>
+        ) : null}
       </div>
     </div>
     </Card>
@@ -268,16 +297,21 @@ export default function Leagues() {
                   ? new Date(league.draft.draft_datetime_utc).toLocaleString()
                   : "Draft not scheduled"
               }
+              draftDateTime={league.draft?.draft_datetime_utc}
               isPrivate={league.is_private}
               draftStatus={league.draft?.status || "none"}
               inviteCode={league.invite_code}
               onOpen={(leagueId) => {
                 setActiveLeagueId(leagueId);
-                navigate(`/league/${leagueId}/roster`);
+                const postDraft = isLeaguePostDraft({
+                  draftStatus: league.draft?.status,
+                  leagueStatus: league.status,
+                });
+                navigate(postDraft ? `/league/${leagueId}/roster` : `/league/${leagueId}/lobby`);
               }}
-              onOpenDraft={(leagueId, draftStatus) => {
+              onOpenDraft={(leagueId, draftUnlocked) => {
                 setActiveLeagueId(leagueId);
-                if (draftStatus === "draft_live") {
+                if (draftUnlocked) {
                   navigate(`/league/${leagueId}/draft`);
                   return;
                 }
@@ -290,7 +324,7 @@ export default function Leagues() {
               <div className="space-y-3 text-center">
                 <h3 className="text-2xl font-black uppercase text-foreground">Placeholder league loaded</h3>
                 <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">
-                  Open Alpha Demo League to inspect the 10-manager Roster, Matchup, Available Players, and Settings flow.
+                  Open Alpha Demo League to inspect the 10-manager Roster, Matchup, Draft Room, Watchlist, and Settings flow.
                 </p>
               </div>
 
@@ -314,7 +348,7 @@ export default function Leagues() {
                   <div className="space-y-2">
                     <h4 className="text-sm font-black uppercase tracking-[0.14em] text-foreground">Invite Your League</h4>
                     <p className="text-xs font-medium leading-6 text-muted-foreground/75">
-                      Available Players is league-specific and only appears once a league is opened.
+                      The Draft Room opens from the league hub and unlocks when the scheduled draft time arrives.
                     </p>
                   </div>
                 </div>

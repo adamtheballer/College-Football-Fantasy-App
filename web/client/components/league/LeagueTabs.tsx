@@ -1,5 +1,7 @@
-import { Bookmark, ClipboardList, Settings2, ShieldCheck, Swords } from "lucide-react";
+import { Bookmark, CalendarClock, ClipboardList, Settings2, ShieldCheck, Swords } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+
+import { shouldRestrictLeagueToDraft } from "@/lib/leagueLifecycle";
 
 const tabs = [
   { label: "Roster", path: "roster", icon: ClipboardList },
@@ -9,18 +11,33 @@ const tabs = [
   { label: "Settings", path: "settings", icon: Settings2 },
 ];
 
-export function LeagueTabs({ leagueId }: { leagueId: number }) {
+export function LeagueTabs({
+  leagueId,
+  draftStatus,
+  leagueStatus,
+}: {
+  leagueId: number;
+  draftStatus?: string | null;
+  leagueStatus?: string | null;
+}) {
   const location = useLocation();
+  const hasLifecycleStatus = draftStatus !== undefined || leagueStatus !== undefined;
+  const restrictedToDraft = hasLifecycleStatus && shouldRestrictLeagueToDraft({ draftStatus, leagueStatus });
+  const visibleTabs = restrictedToDraft
+    ? [{ label: "Draft", path: "lobby", icon: CalendarClock }]
+    : tabs;
 
   return (
     <div
       className="w-full max-w-none gap-2 rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised/85 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_44px_rgba(2,6,23,0.26)]"
-      style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}
+      style={{ display: "grid", gridTemplateColumns: `repeat(${visibleTabs.length}, minmax(0, 1fr))` }}
     >
-      {tabs.map((tab) => {
+      {visibleTabs.map((tab) => {
         const href = `/league/${leagueId}/${tab.path}`;
         const Icon = tab.icon;
-        const active = location.pathname === href;
+        const active =
+          location.pathname === href ||
+          (tab.path === "lobby" && location.pathname === `/league/${leagueId}/draft`);
         return (
           <div key={tab.path} className="min-w-0">
             <Link

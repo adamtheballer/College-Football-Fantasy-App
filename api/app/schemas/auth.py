@@ -1,6 +1,6 @@
 from datetime import datetime
 import re
-from typing import Literal, Optional
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -111,31 +111,6 @@ class LogoutResponse(BaseModel):
 class AuthMessageResponse(BaseModel):
     success: bool = True
     message: str
-
-
-class VerifyEmailResponse(AuthMessageResponse):
-    status: Literal["verified", "already_verified"]
-
-
-class VerifyEmailRequest(BaseModel):
-    token: str
-
-    @field_validator("token")
-    @classmethod
-    def validate_token(cls, value: str) -> str:
-        normalized = value.strip()
-        if not normalized:
-            raise ValueError("token is required")
-        return normalized
-
-
-class ResendVerificationRequest(BaseModel):
-    email: str
-
-    @field_validator("email")
-    @classmethod
-    def normalize_email_field(cls, value: str) -> str:
-        return normalize_email(value)
 
 
 class PasswordResetRequest(BaseModel):

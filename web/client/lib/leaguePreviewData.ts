@@ -57,7 +57,7 @@ export const DEMO_LEAGUE_DETAIL: LeagueDetail = {
   max_teams: 10,
   is_private: true,
   invite_code: "DEMOLEAGUE",
-  description: "Dev-only 10-manager demo league for roster, matchup, Available Players, and settings visuals.",
+  description: "Dev-only 10-manager demo league for roster, matchup, draft room, watchlist, and settings visuals.",
   icon_url: null,
   status: "post_draft",
   created_at: nowIso,

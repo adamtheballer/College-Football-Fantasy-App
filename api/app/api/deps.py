@@ -40,8 +40,8 @@ def get_current_user(
 
 
 def require_verified_user(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.email_verified_at is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="email verification required")
+    # Kept as a compatibility dependency while email verification is disabled.
+    # Existing routes still require a valid authenticated account.
     return current_user
 
 

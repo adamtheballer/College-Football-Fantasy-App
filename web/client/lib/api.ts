@@ -108,9 +108,11 @@ type RefreshPayload = {
   access_token_expires_at: string;
 };
 
-let inflightRefresh: Promise<boolean> | null = null;
+type RefreshResult = "refreshed" | "terminal_failure" | "transient_failure";
 
-const refreshAccessToken = async (): Promise<boolean> => {
+let inflightRefresh: Promise<RefreshResult> | null = null;
+
+const refreshAccessToken = async (): Promise<RefreshResult> => {
   if (inflightRefresh) {
     return inflightRefresh;
   }
@@ -121,19 +123,20 @@ const refreshAccessToken = async (): Promise<boolean> => {
         credentials: "include",
       });
       if (!res.ok) {
-        clearAccessTokenSession();
-        return false;
+        if (res.status === 401 || res.status === 403) {
+          clearAccessTokenSession();
+          return "terminal_failure";
+        }
+        return "transient_failure";
       }
       const payload = (await res.json()) as RefreshPayload;
       if (!payload.access_token || !payload.access_token_expires_at) {
-        clearAccessTokenSession();
-        return false;
+        return "transient_failure";
       }
       storeAccessTokenSession(payload.access_token, payload.access_token_expires_at);
-      return true;
+      return "refreshed";
     } catch {
-      clearAccessTokenSession();
-      return false;
+      return "transient_failure";
     } finally {
       inflightRefresh = null;
     }
@@ -255,9 +258,11 @@ const apiRequest = async <T>({
       { cause: error instanceof Error ? error.message : String(error), apiBase: API_BASE }
     );
   }
-  if (res.status === 401 && retryOn401 && !path.startsWith("/auth/")) {
-    const refreshed = await refreshAccessToken();
-    if (refreshed) {
+  const canRefreshForPath =
+    !path.startsWith("/auth/") || path === "/auth/me";
+  if (res.status === 401 && retryOn401 && canRefreshForPath) {
+    const refreshResult = await refreshAccessToken();
+    if (refreshResult === "refreshed") {
       return apiRequest<T>({
         method,
         path,
@@ -266,6 +271,13 @@ const apiRequest = async <T>({
         signal,
         retryOn401: false,
       });
+    }
+    if (refreshResult === "transient_failure") {
+      throw new ApiError(
+        0,
+        `Unable to refresh your sign-in session at ${API_BASE}. Check your connection and try again; you have not been signed out.`,
+        { apiBase: API_BASE, refresh: "transient_failure" }
+      );
     }
   }
   if (!res.ok) {

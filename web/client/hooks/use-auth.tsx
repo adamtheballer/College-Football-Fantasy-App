@@ -23,7 +23,6 @@ export interface User {
   firstName: string;
   email: string;
   id: number;
-  emailVerifiedAt: string | null;
   isAdmin: boolean;
 }
 
@@ -67,21 +66,11 @@ type SessionsPayload = {
   sessions: AuthSessionPayload[];
 };
 
-export type VerifyEmailStatus = "verified" | "already_verified";
-
-type VerifyEmailPayload = {
-  status: VerifyEmailStatus;
-  message: string;
-  success?: boolean;
-};
-
 type AuthContextValue = {
   user: User | null;
   login: (email: string, password: string) => Promise<User>;
   signup: (firstName: string, email: string, password: string) => Promise<User>;
   logout: () => void;
-  resendVerification: (email?: string) => Promise<void>;
-  verifyEmail: (token: string) => Promise<VerifyEmailStatus>;
   requestPasswordReset: (email: string) => Promise<void>;
   confirmPasswordReset: (token: string, newPassword: string) => Promise<void>;
   listSessions: () => Promise<AuthSession[]>;
@@ -131,12 +120,7 @@ const clearStoredAuth = () => {
 
 const loadStoredUser = (): User | null => {
   const savedUser = safeStorageGet(USER_STORAGE_KEY);
-  const storedToken = getStoredAccessToken();
-  if (!savedUser && !storedToken) {
-    return null;
-  }
-  if (!savedUser || !storedToken) {
-    clearStoredAuth();
+  if (!savedUser) {
     return null;
   }
 
@@ -146,7 +130,7 @@ const loadStoredUser = (): User | null => {
       clearStoredAuth();
       return null;
     }
-    return { ...parsedUser, emailVerifiedAt: parsedUser.emailVerifiedAt ?? null, isAdmin: !!parsedUser.isAdmin };
+    return { ...parsedUser, isAdmin: !!parsedUser.isAdmin };
   } catch {
     clearStoredAuth();
     return null;
@@ -162,7 +146,6 @@ const mapUserPayload = (payload: AuthUserPayload): User => ({
   id: payload.id,
   firstName: payload.first_name,
   email: payload.email,
-  emailVerifiedAt: payload.email_verified_at ?? null,
   isAdmin: !!payload.is_admin,
 });
 
@@ -185,9 +168,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const storedUser = loadStoredUser();
+    const storedToken = getStoredAccessToken();
     setUser(storedUser);
 
-    if (!storedUser) {
+    if (!storedUser && !storedToken) {
       setIsBootstrapping(false);
       return;
     }
@@ -268,37 +252,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatchAuthChanged();
   }, [queryClient]);
 
-  const resendVerification = useCallback(async (email?: string) => {
-    const targetEmail = (email || user?.email || "").trim();
-    if (!targetEmail) {
-      throw new Error("Email is required to resend verification.");
-    }
-    await apiPost("/auth/resend-verification", { email: targetEmail });
-  }, [user?.email]);
-
-  const verifyEmail = useCallback(async (token: string) => {
-    const payload = await apiPost<VerifyEmailPayload>("/auth/verify-email", { token });
-    const storedToken = getStoredAccessToken();
-    if (storedToken) {
-      try {
-        const nextUserPayload = await apiGet<UserReadPayload>("/auth/me");
-        const nextUser = mapUserPayload(nextUserPayload);
-        safeStorageSet(USER_STORAGE_KEY, JSON.stringify(nextUser));
-        queryClient.invalidateQueries();
-        setUser(nextUser);
-      } catch (error) {
-        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-          clearStoredAuth();
-          setUser(null);
-        } else {
-          throw error;
-        }
-      }
-    }
-    dispatchAuthChanged();
-    return payload.status;
-  }, [queryClient]);
-
   const requestPasswordReset = useCallback(async (email: string) => {
     await apiPost("/auth/password-reset/request", { email });
   }, []);
@@ -334,14 +287,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       signup,
       logout,
-      resendVerification,
-      verifyEmail,
       requestPasswordReset,
       confirmPasswordReset,
       listSessions,
       revokeSession,
       logoutAll,
-      isLoggedIn: !!user && !!getStoredAccessToken(),
+      isLoggedIn: !!user,
       isBootstrapping,
     }),
     [
@@ -352,11 +303,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       logoutAll,
       requestPasswordReset,
-      resendVerification,
       revokeSession,
       signup,
       user,
-      verifyEmail,
     ]
   );
 

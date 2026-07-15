@@ -385,6 +385,28 @@ def test_due_trade_worker_waits_until_monday_reset(client, db_session):
     assert db_session.query(TradeReview).filter_by(trade_offer_id=created["id"], action="processed").one()
 
 
+def test_due_trade_processor_is_idempotent_after_processing(client, db_session, monkeypatch):
+    monkeypatch.setattr(trade_service, "is_cfb_game_week_active", lambda now=None, timezone_name="UTC": False)
+    proposing_token = create_user_and_token(client, "due-idempotent-a")
+    receiving_token = create_user_and_token(client, "due-idempotent-b")
+    league = create_league(client, proposing_token, "due-idempotent", review_type="none")
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+    created = client.post(
+        f"/leagues/{league['id']}/trades",
+        json=trade_offer_payload(seed),
+        headers=auth_headers(proposing_token),
+    ).json()
+    offer = db_session.get(TradeOffer, created["id"])
+    offer.status = "accepted_pending"
+    offer.process_after = datetime.now(timezone.utc) - timedelta(minutes=1)
+    db_session.commit()
+
+    assert process_trade_offers_once(db_session) == {"processed": 1, "failed": 0}
+    assert process_trade_offers_once(db_session) == {"processed": 0, "failed": 0}
+    assert db_session.query(TradeReview).filter_by(trade_offer_id=created["id"], action="processed").count() == 1
+
+
 def test_admin_process_due_trades_endpoint_processes_accepted_pending_offer(client, db_session, monkeypatch):
     monkeypatch.setattr(trade_service, "is_cfb_game_week_active", lambda now=None, timezone_name="UTC": False)
     admin_token = create_user_and_token(client, "admin-process", admin=True)

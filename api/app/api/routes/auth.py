@@ -29,17 +29,13 @@ from collegefootballfantasy_api.app.schemas.auth import (
     PasswordResetConfirm,
     PasswordResetRequest,
     RefreshResponse,
-    ResendVerificationRequest,
     SessionRead,
     SessionsResponse,
     UserCreate,
     UserLogin,
     UserRead,
-    VerifyEmailRequest,
-    VerifyEmailResponse,
 )
 from collegefootballfantasy_api.app.services.auth_security import (
-    EMAIL_VERIFICATION_TOKEN,
     PASSWORD_RESET_TOKEN,
     consume_auth_action_token,
     create_auth_action_token,
@@ -135,17 +131,6 @@ def _current_refresh_session(db: Session, request: Request) -> RefreshSession | 
     return db.query(RefreshSession).filter(RefreshSession.token_hash == hash_token(refresh_token)).first()
 
 
-def _send_verification_email(db: Session, *, user: User, request: Request) -> None:
-    token = create_auth_action_token(
-        db,
-        user=user,
-        token_type=EMAIL_VERIFICATION_TOKEN,
-        ttl=timedelta(hours=settings.auth_email_verification_ttl_hours),
-        request=request,
-    )
-    get_email_service().send_email_verification(user.email, token)
-
-
 def _send_password_reset_email(db: Session, *, user: User, request: Request) -> None:
     token = create_auth_action_token(
         db,
@@ -230,10 +215,10 @@ def signup(payload: UserCreate, response: Response, request: Request, db: Sessio
         api_token=generate_token(32),
         last_login=now,
         password_changed_at=now,
+        email_verified_at=now,
     )
     db.add(user)
     db.flush()
-    _send_verification_email(db, user=user, request=request)
     refresh_token = _create_refresh_session(db, user_id=user.id, request=request)
     db.commit()
     db.refresh(user)
@@ -370,43 +355,6 @@ def logout(response: Response, request: Request, db: Session = Depends(get_db)) 
         db.commit()
     _clear_refresh_cookie(response)
     return LogoutResponse(success=True)
-
-
-@router.post("/verify-email", response_model=VerifyEmailResponse)
-def verify_email(payload: VerifyEmailRequest, db: Session = Depends(get_db)) -> VerifyEmailResponse:
-    token_row = consume_auth_action_token(db, token_type=EMAIL_VERIFICATION_TOKEN, token=payload.token)
-    user = db.get(User, token_row.user_id)
-    if not user or not user.is_active:
-        db.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid token")
-    if user.email_verified_at is not None:
-        db.commit()
-        return VerifyEmailResponse(status="already_verified", message="email already verified")
-    else:
-        user.email_verified_at = utcnow()
-        db.add(user)
-        db.commit()
-        return VerifyEmailResponse(status="verified", message="email verified")
-
-
-@router.post("/resend-verification", response_model=AuthMessageResponse)
-def resend_verification(
-    payload: ResendVerificationRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-) -> AuthMessageResponse:
-    enforce_auth_rate_limit(
-        db,
-        action="resend_verification",
-        identifier=payload.email,
-        request=request,
-        limit=settings.auth_resend_verification_rate_limit,
-    )
-    user = db.query(User).filter(func.lower(User.email) == payload.email).first()
-    if user and user.is_active and user.email_verified_at is None:
-        _send_verification_email(db, user=user, request=request)
-    db.commit()
-    return AuthMessageResponse(message="if an account needs verification, a new email was sent")
 
 
 @router.post("/password-reset/request", response_model=AuthMessageResponse)

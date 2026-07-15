@@ -47,3 +47,29 @@ export function useDraftPick(leagueId?: number) {
     },
   });
 }
+
+export function useDraftAutoPick(leagueId?: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (typeof leagueId !== "number" || Number.isNaN(leagueId)) {
+        throw new Error("Draft room is missing a valid league id.");
+      }
+      return apiPost<DraftRoom>(`/leagues/${leagueId}/draft-picks/auto`, {});
+    },
+    onSuccess: (payload) => {
+      queryClient.setQueryData(["league", leagueId, "draft-room"], payload);
+      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
+      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "teams"] });
+      queryClient.invalidateQueries({ queryKey: ["draft-player-pool"] });
+      queryClient.invalidateQueries({ queryKey: ["players"] });
+      if (payload.user_team_id) {
+        queryClient.invalidateQueries({ queryKey: ["team", payload.user_team_id, "roster"] });
+      }
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "draft-room"] });
+    },
+  });
+}

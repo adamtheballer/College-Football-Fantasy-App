@@ -1,13 +1,15 @@
 import { useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 import { Bookmark, Search, X } from "lucide-react";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
+import { useLeagueDetail } from "@/hooks/use-leagues";
 import { useToggleWatchlistPlayer, useWatchlists } from "@/hooks/use-watchlists";
 import { ApiError } from "@/lib/api";
 import { DEMO_LEAGUE_ID } from "@/lib/leaguePreviewData";
+import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import type { Player } from "@/types/player";
 
 const positionTone = (position?: string | null) => {
@@ -31,9 +33,14 @@ export default function LeagueWatchlist() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
   const isDemoLeague = parsedLeagueId === DEMO_LEAGUE_ID;
+  const leagueQuery = useLeagueDetail(parsedLeagueId, !isDemoLeague);
+  const postDraft = isDemoLeague || isLeaguePostDraft({
+    draftStatus: leagueQuery.data?.draft?.status,
+    leagueStatus: leagueQuery.data?.status,
+  });
   const watchlistsQuery = useWatchlists(
     parsedLeagueId,
-    !isDemoLeague && typeof parsedLeagueId === "number" && !Number.isNaN(parsedLeagueId)
+    !isDemoLeague && postDraft && typeof parsedLeagueId === "number" && !Number.isNaN(parsedLeagueId)
   );
   const toggleWatchlistPlayer = useToggleWatchlistPlayer();
   const watchlists = watchlistsQuery.data?.data ?? [];
@@ -58,6 +65,20 @@ export default function LeagueWatchlist() {
     );
   }, [watchlists]);
 
+  if (!isDemoLeague && leagueQuery.isLoading) {
+    return (
+      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
+        <div className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface-raised/80 p-8 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cfb-text-muted">
+          Loading league...
+        </div>
+      </main>
+    );
+  }
+
+  if (!postDraft) {
+    return <Navigate to={`/league/${parsedLeagueId}/lobby`} replace />;
+  }
+
   return (
     <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] rounded-[3rem] bg-[radial-gradient(circle_at_20%_8%,rgba(56,189,248,0.16),transparent_32%),radial-gradient(circle_at_72%_0%,rgba(59,130,246,0.13),transparent_38%)] blur-2xl" />
@@ -77,7 +98,11 @@ export default function LeagueWatchlist() {
             <p className="mt-1 text-2xl font-black text-sky-100">{watchedPlayers.length}</p>
           </div>
         </div>
-        <LeagueTabs leagueId={parsedLeagueId} />
+        <LeagueTabs
+          leagueId={parsedLeagueId}
+          draftStatus={leagueQuery.data?.draft?.status}
+          leagueStatus={leagueQuery.data?.status}
+        />
       </div>
 
       <section className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(8,15,29,0.97),rgba(12,25,45,0.94))] shadow-[0_24px_80px_rgba(14,165,233,0.10)]">
@@ -86,7 +111,7 @@ export default function LeagueWatchlist() {
             Saved Targets
           </h2>
           <p className="mt-2 text-xs font-semibold text-slate-500">
-            Use the Available Players tab to add players here.
+            Add players from league player cards or supported waiver actions.
           </p>
         </div>
 
@@ -112,7 +137,7 @@ export default function LeagueWatchlist() {
           <div className="px-5 py-12 text-center">
             <Search className="mx-auto h-10 w-10 text-sky-300/70" />
             <p className="mt-4 text-sm font-bold text-slate-300">No watched players yet.</p>
-            <p className="mt-2 text-xs font-semibold text-slate-500">Open Available Players and press Watch on any available player.</p>
+            <p className="mt-2 text-xs font-semibold text-slate-500">Open a player card and press Watch to save a target here.</p>
           </div>
         ) : (
           <div className="divide-y divide-sky-300/10">
