@@ -14,6 +14,7 @@ class TradeOffer(TimestampMixin, Base):
         Index("ix_trade_offers_process_after", "process_after"),
         Index("ix_trade_offers_proposing_team_id", "proposing_team_id"),
         Index("ix_trade_offers_receiving_team_id", "receiving_team_id"),
+        Index("ix_trade_offers_countered_from_trade_id", "countered_from_trade_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -28,6 +29,10 @@ class TradeOffer(TimestampMixin, Base):
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     failure_reason: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    countered_from_trade_id: Mapped[int | None] = mapped_column(
+        ForeignKey("trade_offers.id", ondelete="SET NULL"), nullable=True
+    )
 
     items = relationship("TradeOfferItem", back_populates="trade_offer", cascade="all, delete-orphan")
     reviews = relationship("TradeReview", back_populates="trade_offer", cascade="all, delete-orphan")
+    countered_from_trade = relationship("TradeOffer", remote_side="TradeOffer.id", uselist=False)

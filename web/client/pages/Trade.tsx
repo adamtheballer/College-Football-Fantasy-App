@@ -6,6 +6,14 @@ import { ArrowLeft, ArrowRightLeft, ChevronRight, Search, ShieldAlert, Users } f
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -70,6 +78,7 @@ type TradeOffer = {
   process_after: string | null;
   processed_at: string | null;
   failure_reason: string | null;
+  countered_from_trade_id: number | null;
   items: TradeOfferItem[];
 };
 
@@ -341,8 +350,11 @@ export default function Trade() {
   const [analysisSignature, setAnalysisSignature] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isAnalysisReviewOpen, setIsAnalysisReviewOpen] = useState(false);
   const [tradeMessage, setTradeMessage] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [counteringOfferId, setCounteringOfferId] = useState<number | null>(null);
   const targetTeamIdParam = searchParams.get("teamId");
   const targetTeamId =
     targetTeamIdParam && /^\d+$/.test(targetTeamIdParam)
@@ -471,6 +483,7 @@ export default function Trade() {
     setAnalysis(null);
     setAnalysisSignature(null);
     setAnalysisError(null);
+    setIsAnalysisReviewOpen(false);
     setSendError(null);
   }, [giveIds, receiveIds, opponentTeamId, leagueId]);
 
@@ -481,20 +494,25 @@ export default function Trade() {
   });
 
   const createOfferMutation = useMutation({
-    mutationFn: () =>
-      apiPost<TradeOffer>(`/leagues/${leagueId}/trades`, {
-        proposing_team_id: ownedTeamId,
-        receiving_team_id: opponentTeamId,
-        give_items: selectedGiveRows.map((row) => ({ team_id: row.teamId, player_id: row.playerId })),
-        receive_items: selectedReceiveRows.map((row) => ({ team_id: row.teamId, player_id: row.playerId })),
-        message: tradeMessage.trim() || null,
-      }),
+    mutationFn: (counterTradeId: number | null) =>
+      apiPost<TradeOffer>(
+        counterTradeId ? `/leagues/${leagueId}/trades/${counterTradeId}/counter` : `/leagues/${leagueId}/trades`,
+        {
+          proposing_team_id: ownedTeamId,
+          receiving_team_id: opponentTeamId,
+          give_items: selectedGiveRows.map((row) => ({ team_id: row.teamId, player_id: row.playerId })),
+          receive_items: selectedReceiveRows.map((row) => ({ team_id: row.teamId, player_id: row.playerId })),
+          message: tradeMessage.trim() || null,
+        }
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["league", leagueId, "trade-offers"] });
       queryClient.invalidateQueries({ queryKey: ["notifications", "alerts"] });
       setGiveIds([]);
       setReceiveIds([]);
       setTradeMessage("");
+      setCounteringOfferId(null);
+      setIsAnalysisReviewOpen(false);
       setSendError(null);
     },
     onError: (error) => {
@@ -503,13 +521,15 @@ export default function Trade() {
   });
 
   const tradeActionMutation = useMutation({
-    mutationFn: ({ tradeId, action }: { tradeId: number; action: "accept" | "reject" | "cancel" }) =>
+    mutationFn: ({ tradeId, action }: { tradeId: number; action: "accept" | "reject" | "cancel" | "commissioner/approve" | "commissioner/veto" }) =>
       apiPost<TradeOffer>(`/leagues/${leagueId}/trades/${tradeId}/${action}`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["league", leagueId, "trade-offers"] });
       queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
       queryClient.invalidateQueries({ queryKey: ["notifications", "alerts"] });
+      setActionError(null);
     },
+    onError: (error) => setActionError(error instanceof Error ? error.message : "Unable to update trade offer."),
   });
 
   const opponentTeam = teams.find((team) => team.id === opponentTeamId) ?? null;
@@ -562,6 +582,7 @@ export default function Trade() {
       const result = await apiPost<TradeAnalyzeResult>("/trade/analyze", payload);
       setAnalysis(result);
       setAnalysisSignature(currentTradeSignature);
+      setIsAnalysisReviewOpen(true);
     } catch (error) {
       setAnalysis(null);
       setAnalysisSignature(null);
@@ -571,13 +592,9 @@ export default function Trade() {
     }
   };
 
+  const analysisIsCurrent = Boolean(analysis && analysisSignature === currentTradeSignature);
   const sendEnabled =
-    canSendTradeOffer(
-      analysis,
-      analysisSignature,
-      currentTradeSignature,
-      createOfferMutation.isPending
-    ) &&
+    canSendTradeOffer(analysis, analysisSignature, currentTradeSignature, createOfferMutation.isPending) &&
     Boolean(ownedTeamId && opponentTeamId && selectedGiveRows.length && selectedReceiveRows.length);
 
   const handleSendTrade = () => {
@@ -586,7 +603,23 @@ export default function Trade() {
       return;
     }
     setSendError(null);
-    createOfferMutation.mutate();
+    createOfferMutation.mutate(counteringOfferId);
+  };
+
+  const beginCounterOffer = (offer: TradeOffer) => {
+    const originalGiveIds = offer.items
+      .filter((item) => item.team_id === offer.proposing_team_id && item.player_id !== null)
+      .map((item) => item.player_id as number);
+    const originalReceiveIds = offer.items
+      .filter((item) => item.team_id === offer.receiving_team_id && item.player_id !== null)
+      .map((item) => item.player_id as number);
+    setOpponentTeamId(offer.proposing_team_id);
+    setGiveIds(originalReceiveIds);
+    setReceiveIds(originalGiveIds);
+    setTradeMessage(`Counter to trade #${offer.id}`);
+    setCounteringOfferId(offer.id);
+    setSendError(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   if (!leagueId) {
@@ -620,7 +653,9 @@ export default function Trade() {
             Trade Builder
           </h1>
           <p className="text-sm text-muted-foreground">
-            Select players from both rosters and compare trade value.
+            {counteringOfferId
+              ? `Countering trade #${counteringOfferId}. Update either side, then run a fresh analysis.`
+              : "Select players from both rosters and compare trade value."}
           </p>
         </div>
         <Button
@@ -744,9 +779,9 @@ export default function Trade() {
           <Button
             className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
             disabled={isAnalyzing || !giveIds.length || !receiveIds.length || !league || !workspace}
-            onClick={handleAnalyze}
+            onClick={() => (analysisIsCurrent ? setIsAnalysisReviewOpen(true) : handleAnalyze())}
           >
-            {isAnalyzing ? "Analyzing..." : "Analyze Trade"}
+            {isAnalyzing ? "Analyzing..." : analysisIsCurrent ? "Review Analysis" : "Analyze Trade"}
             {!isAnalyzing && <ChevronRight className="ml-2 h-4 w-4" />}
           </Button>
         </CardHeader>
@@ -799,42 +834,11 @@ export default function Trade() {
             </p>
           )}
 
-          {analysis ? (
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                  Give Value
-                </p>
-                <p className="mt-2 text-xl font-black text-foreground">{analysis.give_value.toFixed(2)}</p>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                  Receive Value
-                </p>
-                <p className="mt-2 text-xl font-black text-foreground">
-                  {analysis.receive_value.toFixed(2)}
-                </p>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                  Delta
-                </p>
-                <p
-                  className={cn(
-                    "mt-2 text-xl font-black",
-                    analysis.delta >= 0 ? "text-emerald-300" : "text-red-300"
-                  )}
-                >
-                  {analysis.delta >= 0 ? "+" : ""}
-                  {analysis.delta.toFixed(2)}
-                </p>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                  Verdict
-                </p>
-                <p className="mt-2 text-xl font-black text-primary">{analysis.verdict}</p>
-              </div>
+          {analysisIsCurrent ? (
+            <div className="rounded-xl border border-emerald-300/25 bg-emerald-500/10 p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">
+                Analysis ready. Review the final trade before sending it.
+              </p>
             </div>
           ) : (
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
@@ -860,16 +864,62 @@ export default function Trade() {
                 </p>
               ) : null}
             </div>
-            <Button
-              className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
-              disabled={!sendEnabled}
-              onClick={handleSendTrade}
-            >
-              {createOfferMutation.isPending ? "Sending..." : "Send Trade Offer"}
-            </Button>
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isAnalysisReviewOpen} onOpenChange={setIsAnalysisReviewOpen}>
+        <DialogContent className="max-w-2xl border-cfb-brand/30 bg-[#081321] text-foreground">
+          <DialogHeader>
+            <DialogTitle className="pr-8 text-3xl font-black uppercase italic tracking-tight">
+              Review Trade Offer
+            </DialogTitle>
+            <DialogDescription className="text-sm font-semibold leading-6 text-muted-foreground">
+              Week 1 is weighted entirely to CFB27 ratings. As the season progresses, the model increases the weight of actual fantasy output and performance against weekly projections.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-red-300/20 bg-red-500/10 p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-100">You send</p>
+              <p className="mt-2 text-2xl font-black tabular-nums">{analysis?.give_value.toFixed(2) ?? "0.00"}</p>
+              <p className="mt-3 text-xs font-semibold leading-5 text-muted-foreground">
+                {selectedGiveRows.map((row) => row.name).join(", ") || "No players selected"}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/10 p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">You receive</p>
+              <p className="mt-2 text-2xl font-black tabular-nums">{analysis?.receive_value.toFixed(2) ?? "0.00"}</p>
+              <p className="mt-3 text-xs font-semibold leading-5 text-muted-foreground">
+                {selectedReceiveRows.map((row) => row.name).join(", ") || "No players selected"}
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Trade verdict</p>
+            <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+              <p className="text-2xl font-black text-primary">{analysis?.verdict ?? "Analysis unavailable"}</p>
+              <p className={cn("text-xl font-black tabular-nums", (analysis?.delta ?? 0) >= 0 ? "text-emerald-300" : "text-red-300")}>
+                {(analysis?.delta ?? 0) >= 0 ? "+" : ""}{analysis?.delta.toFixed(2) ?? "0.00"}
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-3 sm:gap-3">
+            <Button variant="outline" onClick={() => setIsAnalysisReviewOpen(false)}>
+              Keep Editing
+            </Button>
+            <Button disabled={!sendEnabled} onClick={handleSendTrade}>
+              {createOfferMutation.isPending
+                ? "Sending..."
+                : counteringOfferId
+                  ? "Send Final Counter"
+                  : "Send Final Trade"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card className="rounded-[2rem] border border-white/10 bg-card/40">
         <CardHeader className="border-b border-white/10">
@@ -900,6 +950,8 @@ export default function Trade() {
             const receiveItems = offer.items.filter((item) => item.team_id === offer.receiving_team_id);
             const canAccept = offer.status === "proposed" && receivingTeam?.owner_user_id === user?.id;
             const canCancel = ["proposed", "commissioner_review"].includes(offer.status) && proposingTeam?.owner_user_id === user?.id;
+            const canCounter = offer.status === "proposed" && receivingTeam?.owner_user_id === user?.id;
+            const canReview = offer.status === "commissioner_review" && league?.commissioner_user_id === user?.id;
             return (
               <div key={offer.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -940,6 +992,11 @@ export default function Trade() {
                         {offer.failure_reason}
                       </p>
                     ) : null}
+                    {offer.countered_from_trade_id ? (
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-200">
+                        Counter offer to trade #{offer.countered_from_trade_id}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {canAccept ? (
@@ -961,6 +1018,16 @@ export default function Trade() {
                         </Button>
                       </>
                     ) : null}
+                    {canCounter ? (
+                      <Button
+                        variant="outline"
+                        className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
+                        disabled={tradeActionMutation.isPending || createOfferMutation.isPending}
+                        onClick={() => beginCounterOffer(offer)}
+                      >
+                        Counter
+                      </Button>
+                    ) : null}
                     {canCancel ? (
                       <Button
                         variant="outline"
@@ -968,14 +1035,36 @@ export default function Trade() {
                         disabled={tradeActionMutation.isPending}
                         onClick={() => tradeActionMutation.mutate({ tradeId: offer.id, action: "cancel" })}
                       >
-                        Cancel
+                        Unsend Offer
                       </Button>
+                    ) : null}
+                    {canReview ? (
+                      <>
+                        <Button
+                          className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
+                          disabled={tradeActionMutation.isPending}
+                          onClick={() => tradeActionMutation.mutate({ tradeId: offer.id, action: "commissioner/approve" })}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
+                          disabled={tradeActionMutation.isPending}
+                          onClick={() => tradeActionMutation.mutate({ tradeId: offer.id, action: "commissioner/veto" })}
+                        >
+                          Veto
+                        </Button>
+                      </>
                     ) : null}
                   </div>
                 </div>
               </div>
             );
           })}
+          {actionError ? (
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-red-300">{actionError}</p>
+          ) : null}
         </CardContent>
       </Card>
 

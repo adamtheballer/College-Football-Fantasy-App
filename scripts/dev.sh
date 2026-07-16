@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "$REPO_ROOT"
+
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   COMPOSE_BIN=(docker compose)
 elif command -v docker-compose >/dev/null 2>&1; then
@@ -13,7 +17,8 @@ fi
 DB_PORT="${DB_PORT:-5433}"
 export DB_PORT
 export DATABASE_URL="${DATABASE_URL:-postgresql+psycopg://postgres:postgres@localhost:${DB_PORT}/collegefootballfantasy}"
-export UI_BASE_URL="${UI_BASE_URL:-http://localhost:5173}"
+export UI_BASE_URL="${UI_BASE_URL:-http://localhost:8080}"
+export VITE_API_BASE_URL="${VITE_API_BASE_URL:-http://localhost:8000}"
 
 echo "Starting postgres..."
 "${COMPOSE_BIN[@]}" up -d db --remove-orphans
@@ -37,17 +42,43 @@ if [ ! -d web/node_modules ]; then
 fi
 
 echo "Running migrations..."
-uv run alembic -c api/alembic.ini upgrade head
+PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head
 
-echo "Starting API and UI..."
+echo "Starting API..."
 PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port 8000 &
 API_PID=$!
 
-npm --prefix web run dev -- --host 0.0.0.0 &
+for attempt in {1..60}; do
+  if curl --fail --silent --max-time 2 "${VITE_API_BASE_URL}/health/ready" >/dev/null; then
+    break
+  fi
+  if ! kill -0 "$API_PID" 2>/dev/null; then
+    echo "FastAPI exited before it became ready." >&2
+    exit 1
+  fi
+  sleep 1
+done
+
+if ! curl --fail --silent --max-time 2 "${VITE_API_BASE_URL}/health/ready" >/dev/null; then
+  echo "FastAPI did not become ready at ${VITE_API_BASE_URL}/health/ready." >&2
+  exit 1
+fi
+
+echo "FastAPI is ready. Starting UI..."
+npm --prefix web run dev:vite -- --host 0.0.0.0 &
 UI_PID=$!
 
 echo "API -> http://localhost:8000"
-echo "UI  -> http://localhost:5173"
+echo "UI  -> http://localhost:8080"
 
 trap 'kill "$API_PID" "$UI_PID"' EXIT
-wait
+while kill -0 "$API_PID" 2>/dev/null && kill -0 "$UI_PID" 2>/dev/null; do
+  sleep 1
+done
+
+if ! kill -0 "$API_PID" 2>/dev/null; then
+  echo "FastAPI stopped; closing the paired UI process." >&2
+  exit 1
+fi
+
+echo "UI stopped; closing FastAPI." >&2

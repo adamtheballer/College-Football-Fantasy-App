@@ -288,7 +288,7 @@ def create_league(
 
     db.commit()
     db.refresh(league)
-    detail = get_league_detail(db, league)
+    detail = get_league_detail(db, league, viewer=current_user)
     invite_link = f"{settings.ui_base_url.rstrip('/')}/join/{code}"
     return LeagueCreateResponse(league=detail, invite_code=code, invite_link=invite_link)
 
@@ -300,7 +300,7 @@ def join_league(db: Session, league: League, current_user: User) -> LeagueDetail
         .first()
     )
     if existing:
-        return get_league_detail(db, league)
+        return get_league_detail(db, league, viewer=current_user)
 
     member_count = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).count()
     if member_count >= league.max_teams:
@@ -320,7 +320,7 @@ def join_league(db: Session, league: League, current_user: User) -> LeagueDetail
         schedule_draft_notifications(db, league.id, current_user.id, draft_row.draft_datetime_utc)
     db.commit()
     db.refresh(league)
-    return get_league_detail(db, league)
+    return get_league_detail(db, league, viewer=current_user)
 
 
 def regenerate_invite(db: Session, league: League, current_user: User) -> LeagueCreateResponse:
@@ -332,15 +332,26 @@ def regenerate_invite(db: Session, league: League, current_user: User) -> League
     league.invite_code = code
     db.add(league)
     db.commit()
-    detail = get_league_detail(db, league)
+    detail = get_league_detail(db, league, viewer=current_user)
     invite_link = f"{settings.ui_base_url.rstrip('/')}/join/{code}"
     return LeagueCreateResponse(league=detail, invite_code=code, invite_link=invite_link)
+
+
+def revoke_invite(db: Session, league: League, current_user: User) -> LeagueDetailRead:
+    db.query(LeagueInvite).filter(LeagueInvite.league_id == league.id, LeagueInvite.active.is_(True)).update(
+        {"active": False, "disabled_at": datetime.utcnow()}
+    )
+    league.invite_code = None
+    db.add(league)
+    db.commit()
+    return get_league_detail(db, league, viewer=current_user)
 
 
 def update_league_settings(
     db: Session,
     league: League,
     payload: LeagueSettingsUpdate,
+    current_user: User,
 ) -> LeagueDetailRead:
     settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
     if not settings_row:
@@ -375,7 +386,7 @@ def update_league_settings(
     settings_row.defense_enabled = payload.defense_enabled
     db.add(settings_row)
     db.commit()
-    return get_league_detail(db, league)
+    return get_league_detail(db, league, viewer=current_user)
 
 
 def reschedule_draft(

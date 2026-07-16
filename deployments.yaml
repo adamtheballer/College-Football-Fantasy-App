@@ -81,6 +81,12 @@ environments:
       start_command: PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port ${API_PORT:-8000}
       health_path: /health
       readiness_path: /health/ready
+      minimum_replicas: 1
+      restart_policy: always
+      healthcheck:
+        path: /health/ready
+        interval_seconds: 10
+        failure_threshold: 3
       promotion_order:
         - build_artifact
         - run_database_migrations
@@ -93,6 +99,8 @@ environments:
       static_output: web/dist/spa
       env:
         VITE_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+      requires_api_readiness: true
+      release_check: curl --fail --show-error --silent ${PUBLIC_API_BASE_URL}/health/ready
     workers:
       scoring_processor:
         enabled: true
@@ -134,5 +142,6 @@ environments:
       migrations_before_api: true
       verify_alembic_head_before_promotion: true
       require_health_ready_before_traffic: true
+      require_public_api_ready_before_web_promotion: true
       no_express_backend: true
       no_localhost_public_urls: true

@@ -170,7 +170,10 @@ export default function Index() {
 
   const rosterSize = workspace?.roster?.length ?? 0;
   const draftReadyCount = leagues.filter(
-    (league) => league.status === "draft_live" || league.status === "draft_scheduled",
+    (league) =>
+      league.status === "draft_live" ||
+      league.status === "draft_pre_draft" ||
+      league.status === "draft_scheduled",
   ).length;
   const upcomingDrafts = useMemo(
     () =>

@@ -21,7 +21,7 @@ describe("loginErrorMessage", () => {
       "Too many sign-in attempts. Wait a few minutes and try again."
     );
     expect(loginErrorMessage(new ApiError(0, "network failed"))).toContain(
-      "Unable to reach the backend API"
+      "Local API is unavailable"
     );
   });
 

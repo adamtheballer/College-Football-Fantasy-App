@@ -1,0 +1,4 @@
+interface:
+  display_name: "Migration Smoke Check"
+  short_description: "Verify Alembic migrations against Postgres"
+  default_prompt: "Use $run-migrations-smokecheck to verify upgrade-to-head, migration consistency, schema drift, readiness, and affected tests on Postgres."

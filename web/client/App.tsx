@@ -31,7 +31,6 @@ const Draft = lazy(() => import("./pages/Draft"));
 const SinglePlayerMockDraftRoom = lazy(() => import("./pages/SinglePlayerMockDraftRoom"));
 const Rosters = lazy(() => import("./pages/Rosters"));
 const Alerts = lazy(() => import("./pages/Alerts"));
-const PlayerCompare = lazy(() => import("./pages/PlayerCompare"));
 const Chats = lazy(() => import("./pages/Chats"));
 const InjuryCenter = lazy(() => import("./pages/InjuryCenter"));
 const Trade = lazy(() => import("./pages/Trade"));
@@ -192,9 +191,8 @@ const App = () => (
                 <Route path="/trade/:leagueId/:playerId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
                 <Route path="/leagues/:leagueId/trades/:tradeId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
                 <Route path="/admin/scoring" element={<ProtectedRoute><AdminScoring /></ProtectedRoute>} />
-                <Route path="/player-compare" element={<PlayerCompare />} />
-                <Route path="/stats" element={<Navigate to="/player-compare" replace />} />
-                <Route path="/stats/players" element={<Navigate to="/player-compare" replace />} />
+                <Route path="/stats" element={<Navigate to="/leagues" replace />} />
+                <Route path="/stats/players" element={<Navigate to="/leagues" replace />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/password-reset/confirm" element={<PasswordResetConfirm />} />

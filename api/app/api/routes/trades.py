@@ -14,10 +14,12 @@ from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.schemas.trade import (
     TradeActionRequest,
     TradeAnalyzeRequest,
     TradeAnalyzeResponse,
+    TradeOfferCounterCreate,
     TradeOfferCreate,
     TradeOfferList,
     TradeOfferRead,
@@ -65,6 +67,88 @@ GRADE_MULTIPLIER = {
     "D": 0.97,
     "F": 0.94,
 }
+
+TRADE_VALUE_MAX_WEEK = 9
+
+
+def _clamp(value: float, minimum: float, maximum: float) -> float:
+    return min(maximum, max(minimum, value))
+
+
+def _percentile_score(value: float | None, values: list[float]) -> float | None:
+    if value is None or not values:
+        return None
+    if len(values) == 1:
+        return 50.0
+    sorted_values = sorted(values)
+    lower_count = sum(candidate < value for candidate in sorted_values)
+    equal_count = sum(candidate == value for candidate in sorted_values)
+    return 99.0 * _clamp(
+        (lower_count + max(equal_count - 1, 0) / 2) / (len(sorted_values) - 1), 0.0, 1.0
+    )
+
+
+def _trade_value_weights(week: int) -> dict[str, float]:
+    completed_weeks = _clamp(float(week - 1), 0.0, float(TRADE_VALUE_MAX_WEEK - 1))
+    season_shift = completed_weeks / float(TRADE_VALUE_MAX_WEEK - 1)
+    return {
+        "cfb27": 1.0 - season_shift * 0.55,
+        "weekly_performance": season_shift * 0.30,
+        "position_peer": season_shift * 0.15,
+        "projection_performance": season_shift * 0.10,
+    }
+
+
+def _build_performance_context(
+    db: Session,
+    league_id: int | None,
+    season: int,
+    week: int,
+    scoring_rules: dict | None,
+) -> dict[str, dict]:
+    if league_id is None or week <= 1:
+        return {"actual_by_player": {}, "actual_by_position": {}, "projection_by_player": {}}
+
+    score_rows = (
+        db.query(PlayerWeekScore, Player)
+        .join(Player, PlayerWeekScore.player_id == Player.id)
+        .filter(
+            PlayerWeekScore.league_id == league_id,
+            PlayerWeekScore.season == season,
+            PlayerWeekScore.week < week,
+        )
+        .all()
+    )
+    actual_points: dict[int, list[float]] = {}
+    positions_by_player: dict[int, str] = {}
+    for score, player in score_rows:
+        actual_points.setdefault(player.id, []).append(float(score.fantasy_points or 0.0))
+        positions_by_player[player.id] = player.position.upper()
+
+    actual_by_player = {
+        player_id: sum(points) / len(points) for player_id, points in actual_points.items() if points
+    }
+    actual_by_position: dict[str, list[float]] = {}
+    for player_id, points in actual_by_player.items():
+        actual_by_position.setdefault(positions_by_player[player_id], []).append(points)
+
+    projection_rows = (
+        db.query(WeeklyProjection, Player)
+        .join(Player, WeeklyProjection.player_id == Player.id)
+        .filter(WeeklyProjection.season == season, WeeklyProjection.week < week)
+        .all()
+    )
+    projected_points: dict[int, list[float]] = {}
+    for projection, player in projection_rows:
+        projected_points.setdefault(player.id, []).append(_projection_points(player, projection, scoring_rules))
+    projection_by_player = {
+        player_id: sum(points) / len(points) for player_id, points in projected_points.items() if points
+    }
+    return {
+        "actual_by_player": actual_by_player,
+        "actual_by_position": actual_by_position,
+        "projection_by_player": projection_by_player,
+    }
 
 
 def _normalize_roster_slots(roster_slots: dict[str, int] | None) -> dict[str, int]:
@@ -230,7 +314,34 @@ def _player_value(
     injury_status: str | None,
     schedule_mult: float,
     scoring_rules: dict | None = None,
+    performance_context: dict[str, dict] | None = None,
+    week: int = 1,
 ) -> float:
+    if player.cfb27_overall is not None:
+        weights = _trade_value_weights(week)
+        actual_by_player = (performance_context or {}).get("actual_by_player", {})
+        actual_by_position = (performance_context or {}).get("actual_by_position", {})
+        projection_by_player = (performance_context or {}).get("projection_by_player", {})
+        actual = actual_by_player.get(player.id)
+        projected_average = projection_by_player.get(player.id)
+        performance_score = _percentile_score(actual, list(actual_by_player.values()))
+        position_peer_score = _percentile_score(actual, actual_by_position.get(player.position.upper(), []))
+        projection_score = (
+            99.0 * _clamp(0.5 + ((actual - projected_average) / projected_average) * 0.5, 0.0, 1.0)
+            if actual is not None and projected_average and projected_average > 0
+            else None
+        )
+        weighted_parts = [
+            (float(player.cfb27_overall), weights["cfb27"]),
+            (performance_score, weights["weekly_performance"]),
+            (position_peer_score, weights["position_peer"]),
+            (projection_score, weights["projection_performance"]),
+        ]
+        available_parts = [(score, weight) for score, weight in weighted_parts if score is not None and weight > 0]
+        total_weight = sum(weight for _score, weight in available_parts)
+        if total_weight > 0:
+            return round(sum(score * weight for score, weight in available_parts) / total_weight, 2)
+
     points = _projection_points(player, projection, scoring_rules)
     replacement = replacement_by_pos.get(player.position.upper(), 0.0)
     points_above = points - replacement
@@ -278,6 +389,13 @@ def analyze_trade(
         roster_slots,
         scoring_rules,
     )
+    performance_context = _build_performance_context(
+        db,
+        payload.league_id,
+        payload.season,
+        payload.week,
+        scoring_rules,
+    )
 
     receive_value = 0.0
     for pid in payload.receive_ids:
@@ -292,6 +410,8 @@ def analyze_trade(
                 injury_status,
                 schedule_mult,
                 scoring_rules,
+                performance_context,
+                payload.week,
             )
 
     give_value = 0.0
@@ -307,6 +427,8 @@ def analyze_trade(
                 injury_status,
                 schedule_mult,
                 scoring_rules,
+                performance_context,
+                payload.week,
             )
 
     delta = receive_value - give_value
@@ -403,11 +525,11 @@ def cancel_league_trade(
 def counter_league_trade(
     league_id: int,
     trade_id: int,
-    payload: TradeActionRequest | None = None,
+    payload: TradeOfferCounterCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_verified_user),
 ) -> TradeOfferRead:
-    return counter_trade_offer(db, _league_or_404(db, league_id), trade_id, current_user, payload or TradeActionRequest())
+    return counter_trade_offer(db, _league_or_404(db, league_id), trade_id, current_user, payload)
 
 
 @league_router.post("/leagues/{league_id}/trades/{trade_id}/commissioner/approve", response_model=TradeOfferRead)

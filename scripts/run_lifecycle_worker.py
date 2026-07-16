@@ -13,7 +13,7 @@ if ROOT_DIR not in sys.path:
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.services.draft_service import process_expired_draft_picks_once
-from collegefootballfantasy_api.app.services.trade_service import process_trade_offers_once
+from collegefootballfantasy_api.app.services.trade_service import expire_trade_offers_once, process_trade_offers_once
 from collegefootballfantasy_api.app.services.waiver_service import process_waiver_claims_once
 from collegefootballfantasy_api.app.services.worker_health import record_worker_heartbeat
 
@@ -37,6 +37,7 @@ def run_once() -> dict[str, dict[str, int]]:
         return {
             "drafts": process_expired_draft_picks_once(db),
             "waivers": process_waiver_claims_once(db),
+            "expired_trades": expire_trade_offers_once(db),
             "trades": process_trade_offers_once(db),
         }
 

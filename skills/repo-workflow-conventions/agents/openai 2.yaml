@@ -1,0 +1,4 @@
+interface:
+  display_name: "Repo Workflow"
+  short_description: "Run and verify the local development stack"
+  default_prompt: "Use $repo-workflow-conventions to set up, run, test, and verify this repository locally, reporting the actual services and checks completed."

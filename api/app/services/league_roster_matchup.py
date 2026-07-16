@@ -16,6 +16,7 @@ from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
+from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueMatchupTabRead,
@@ -416,8 +417,17 @@ def build_waivers_view(
     }
     claims = []
     roster = []
+    waiver_priority = None
+    faab_remaining = None
     settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
     if team:
+        priority_row = (
+            db.query(WaiverPriority)
+            .filter(WaiverPriority.league_id == league.id, WaiverPriority.team_id == team.id)
+            .first()
+        )
+        waiver_priority = priority_row.priority if priority_row else None
+        faab_remaining = priority_row.faab_remaining if priority_row else (settings.faab_budget if settings else 100)
         claim_rows = (
             db.query(WaiverClaim)
             .filter(WaiverClaim.league_id == league.id, WaiverClaim.team_id == team.id)
@@ -440,6 +450,8 @@ def build_waivers_view(
     return LeagueWaiversRead(
         league_id=league.id,
         fantasy_team_id=team.id if team else None,
+        waiver_priority=waiver_priority,
+        faab_remaining=faab_remaining,
         available_players=[
             LeagueWaiverPlayerRead(
                 id=player.id,
@@ -461,7 +473,7 @@ def build_waivers_view(
         waiver_rules={
             "waiver_type": settings.waiver_type if settings else "FAAB",
             "waiver_period_hours": settings.waiver_period_hours if settings else 24,
-            "faab_budget": 100,
+            "faab_budget": settings.faab_budget if settings else 100,
         },
         total_available=total,
         message=None if team else "No team found for your user in this league.",

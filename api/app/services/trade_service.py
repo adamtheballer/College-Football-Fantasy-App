@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
@@ -10,7 +12,6 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.notification import NotificationLog
-from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.trade_offer import TradeOffer
@@ -20,6 +21,7 @@ from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.trade import (
     TradeActionRequest,
+    TradeOfferCounterCreate,
     TradeOfferCreate,
     TradeOfferItemRead,
     TradeOfferList,
@@ -34,6 +36,10 @@ from collegefootballfantasy_api.app.services.league_weeks import (
 )
 from collegefootballfantasy_api.app.services.notification_service import legacy_user_key
 from collegefootballfantasy_api.app.services.player_lock_service import locked_player_ids
+from collegefootballfantasy_api.app.services.roster_legality import (
+    assign_best_roster_slot_for_position,
+    normalize_roster_slot_limits,
+)
 
 TRADE_STATUS_PROPOSED = "proposed"
 TRADE_STATUS_ACCEPTED_PENDING = "accepted_pending"
@@ -44,6 +50,7 @@ TRADE_STATUS_CANCELLED = "cancelled"
 TRADE_STATUS_COUNTERED = "countered"
 TRADE_STATUS_VETOED = "vetoed"
 TRADE_STATUS_FAILED = "failed"
+TRADE_STATUS_EXPIRED = "expired"
 
 OPEN_STATUSES = {TRADE_STATUS_PROPOSED, TRADE_STATUS_COMMISSIONER_REVIEW}
 FINAL_STATUSES = {
@@ -53,9 +60,18 @@ FINAL_STATUSES = {
     TRADE_STATUS_COUNTERED,
     TRADE_STATUS_VETOED,
     TRADE_STATUS_FAILED,
+    TRADE_STATUS_EXPIRED,
 }
 STARTER_SLOTS = {"QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K"}
 DEFAULT_TRADE_EXPIRATION_DAYS = 7
+
+
+@dataclass(frozen=True)
+class TradeRosterMove:
+    player_id: int
+    source_team_id: int
+    target_team_id: int
+    slot: str
 
 
 def _utcnow() -> datetime:
@@ -125,16 +141,22 @@ def _require_commissioner(league: League, user: User) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="only the commissioner can review this trade")
 
 
-def _load_offer(db: Session, trade_id: int, *, for_update: bool = False) -> TradeOffer:
+def _load_offer(
+    db: Session,
+    trade_id: int,
+    *,
+    for_update: bool = False,
+    skip_locked: bool = False,
+) -> TradeOffer | None:
     query = (
         db.query(TradeOffer)
         .options(joinedload(TradeOffer.items).joinedload(TradeOfferItem.player), joinedload(TradeOffer.reviews))
         .filter(TradeOffer.id == trade_id)
     )
     if for_update:
-        query = query.with_for_update(of=TradeOffer)
+        query = query.with_for_update(of=TradeOffer, skip_locked=skip_locked)
     offer = query.first()
-    if not offer:
+    if not offer and not skip_locked:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="trade offer not found")
     return offer
 
@@ -265,108 +287,117 @@ def _validate_no_locked_players(db: Session, league: League, offer: TradeOffer, 
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="locked player cannot be traded")
 
 
-def _slot_limits(db: Session, league_id: int) -> dict[str, int]:
+def _roster_slot_limits(db: Session, league_id: int) -> tuple[dict[str, int], bool]:
     settings = _league_settings(db, league_id)
-    raw = settings.roster_slots_json if settings and settings.roster_slots_json else {}
-    return {
-        "QB": int(raw.get("QB", 1)),
-        "RB": int(raw.get("RB", 2)),
-        "WR": int(raw.get("WR", 2)),
-        "TE": int(raw.get("TE", 1)),
-        "FLEX": int(raw.get("FLEX", 1)),
-        "SUPERFLEX": int(raw.get("SUPERFLEX", 0)),
-        "K": int(raw.get("K", 1)),
-        "BENCH": int(raw.get("BENCH", raw.get("BE", 5))),
-        "IR": int(raw.get("IR", 1)),
+    raw = {
+        "QB": 1,
+        "RB": 2,
+        "WR": 2,
+        "TE": 1,
+        "FLEX": 1,
+        "SUPERFLEX": 0,
+        "K": 1,
+        "BENCH": 5,
+        "IR": 1,
     }
+    configured = settings.roster_slots_json if settings and settings.roster_slots_json else {}
+    raw.update(configured)
+    if "BE" in configured and "BENCH" not in configured:
+        raw["BENCH"] = configured["BE"]
+    return normalize_roster_slot_limits(raw), bool(settings and settings.superflex_enabled)
 
 
-def _eligible_slots(position: str) -> list[str]:
-    pos = position.upper()
-    slots = [pos]
-    if pos in {"RB", "WR", "TE"}:
-        slots.append("FLEX")
-    if pos in {"QB", "RB", "WR", "TE"}:
-        slots.append("SUPERFLEX")
-    slots.append("BENCH")
-    return slots
+def _plan_roster_swap(db: Session, offer: TradeOffer) -> tuple[list[RosterEntry], list[TradeRosterMove]]:
+    team_ids = sorted({offer.proposing_team_id, offer.receiving_team_id})
+    locked_teams = (
+        db.query(Team)
+        .filter(Team.league_id == offer.league_id, Team.id.in_(team_ids))
+        .order_by(Team.id.asc())
+        .with_for_update(of=Team)
+        .all()
+    )
+    if {team.id for team in locked_teams} != set(team_ids):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade teams are no longer available")
 
-
-def _assign_slot(player: Player, counts: dict[str, int], limits: dict[str, int]) -> str:
-    for slot in _eligible_slots(player.position):
-        if counts.get(slot, 0) < limits.get(slot, 0):
-            counts[slot] = counts.get(slot, 0) + 1
-            return slot
-    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade would create an illegal roster")
-
-
-def _process_roster_swap(db: Session, offer: TradeOffer, actor_user_id: int | None = None) -> None:
-    limits = _slot_limits(db, offer.league_id)
     player_ids = _player_ids_for_offer(offer)
-    outgoing_entries = (
+    all_entries = (
         db.query(RosterEntry)
         .options(joinedload(RosterEntry.player))
-        .filter(RosterEntry.league_id == offer.league_id, RosterEntry.player_id.in_(player_ids))
+        .filter(RosterEntry.league_id == offer.league_id, RosterEntry.team_id.in_(team_ids))
+        .order_by(RosterEntry.team_id.asc(), RosterEntry.id.asc())
         .with_for_update(of=RosterEntry)
         .all()
     )
-    entry_by_player = {entry.player_id: entry for entry in outgoing_entries}
-    if len(entry_by_player) != len(set(player_ids)):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="one or more traded players are no longer rostered")
-
     target_by_player: dict[int, int] = {}
+    source_by_player: dict[int, int] = {}
     for item in offer.items:
         if item.player_id is None:
             continue
         if item.team_id == offer.proposing_team_id:
+            source_by_player[item.player_id] = offer.proposing_team_id
             target_by_player[item.player_id] = offer.receiving_team_id
         elif item.team_id == offer.receiving_team_id:
+            source_by_player[item.player_id] = offer.receiving_team_id
             target_by_player[item.player_id] = offer.proposing_team_id
         else:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade item team no longer matches offer")
 
-    remaining_counts_by_team: dict[int, dict[str, int]] = {}
-    for team_id in {offer.proposing_team_id, offer.receiving_team_id}:
-        remaining_entries = (
-            db.query(RosterEntry)
-            .filter(RosterEntry.league_id == offer.league_id, RosterEntry.team_id == team_id)
-            .filter(~RosterEntry.player_id.in_(player_ids))
-            .with_for_update(of=RosterEntry)
-            .all()
-        )
-        counts: dict[str, int] = {}
-        for entry in remaining_entries:
-            counts[entry.slot] = counts.get(entry.slot, 0) + 1
-        remaining_counts_by_team[team_id] = counts
+    outgoing_entries = [entry for entry in all_entries if entry.player_id in target_by_player]
+    entry_by_player = {entry.player_id: entry for entry in outgoing_entries}
+    if set(entry_by_player) != set(player_ids) or any(
+        entry_by_player[player_id].team_id != source_by_player[player_id] for player_id in player_ids
+    ):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="one or more players are no longer owned by that team")
 
-    moved_players: list[tuple[int, int, int]] = []
-    for entry in outgoing_entries:
-        source_team_id = entry.team_id
+    limits, superflex_enabled = _roster_slot_limits(db, offer.league_id)
+    simulated_entries = {
+        team_id: [entry for entry in all_entries if entry.team_id == team_id and entry.player_id not in target_by_player]
+        for team_id in team_ids
+    }
+    moves: list[TradeRosterMove] = []
+    for entry in sorted(outgoing_entries, key=lambda row: row.player_id):
         target_team_id = target_by_player[entry.player_id]
-        db.delete(entry)
-        moved_players.append((entry.player_id, source_team_id, target_team_id))
-    db.flush()
+        slot = assign_best_roster_slot_for_position(
+            entry.player.position,
+            simulated_entries[target_team_id],
+            limits,
+            superflex_enabled=superflex_enabled,
+        )
+        if slot is None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade would create an illegal roster")
+        simulated_entries[target_team_id].append(SimpleNamespace(slot=slot))
+        moves.append(
+            TradeRosterMove(
+                player_id=entry.player_id,
+                source_team_id=entry.team_id,
+                target_team_id=target_team_id,
+                slot=slot,
+            )
+        )
+    return outgoing_entries, moves
 
-    players = db.query(Player).filter(Player.id.in_(player_ids)).all()
-    player_by_id = {player.id: player for player in players}
-    for player_id, _source_team_id, target_team_id in moved_players:
-        player = player_by_id[player_id]
-        slot = _assign_slot(player, remaining_counts_by_team[target_team_id], limits)
+
+def _process_roster_swap(db: Session, offer: TradeOffer, actor_user_id: int | None = None) -> None:
+    outgoing_entries, moves = _plan_roster_swap(db, offer)
+    for entry in outgoing_entries:
+        db.delete(entry)
+    db.flush()
+    for move in moves:
         db.add(
             RosterEntry(
                 league_id=offer.league_id,
-                team_id=target_team_id,
-                player_id=player_id,
-                slot=slot,
+                team_id=move.target_team_id,
+                player_id=move.player_id,
+                slot=move.slot,
                 status="active",
             )
         )
         db.add(
             Transaction(
                 league_id=offer.league_id,
-                team_id=target_team_id,
+                team_id=move.target_team_id,
                 transaction_type="trade_processed",
-                player_id=player_id,
+                player_id=move.player_id,
                 created_by_user_id=actor_user_id,
                 reason=f"Trade offer #{offer.id} processed",
             )
@@ -412,6 +443,7 @@ def _serialize_offer(offer: TradeOffer) -> TradeOfferRead:
         processed_at=offer.processed_at,
         expires_at=offer.expires_at,
         failure_reason=offer.failure_reason,
+        countered_from_trade_id=offer.countered_from_trade_id,
         created_at=offer.created_at,
         updated_at=offer.updated_at,
         items=items,
@@ -439,12 +471,16 @@ def get_trade_offer(db: Session, league: League, trade_id: int, current_user: Us
     return _serialize_offer(offer)
 
 
-def create_trade_offer(db: Session, league: League, current_user: User, payload: TradeOfferCreate) -> TradeOfferRead:
-    _member_or_404(db, league.id, current_user.id)
-    _ensure_trade_deadline_open(db, league, _utcnow())
-    proposing, receiving = _validate_payload(db, league.id, payload)
-    _require_team_owner(proposing, current_user)
-
+def _create_trade_offer_record(
+    db: Session,
+    *,
+    league: League,
+    current_user: User,
+    payload: TradeOfferCreate,
+    proposing: Team,
+    receiving: Team,
+    countered_from_trade_id: int | None = None,
+) -> TradeOffer:
     offer = TradeOffer(
         league_id=league.id,
         proposing_team_id=proposing.id,
@@ -453,13 +489,14 @@ def create_trade_offer(db: Session, league: League, current_user: User, payload:
         status=TRADE_STATUS_PROPOSED,
         message=payload.message,
         expires_at=_utcnow() + timedelta(days=DEFAULT_TRADE_EXPIRATION_DAYS),
+        countered_from_trade_id=countered_from_trade_id,
     )
     db.add(offer)
     db.flush()
     for item in [*payload.give_items, *payload.receive_items]:
         db.add(
             TradeOfferItem(
-                trade_offer_id=offer.id,
+                trade_offer=offer,
                 team_id=item.team_id,
                 player_id=item.player_id,
                 draft_pick_id=item.draft_pick_id,
@@ -476,6 +513,27 @@ def create_trade_offer(db: Session, league: League, current_user: User, payload:
         league_id=league.id,
         trade_id=offer.id,
     )
+    return offer
+
+
+def create_trade_offer(db: Session, league: League, current_user: User, payload: TradeOfferCreate) -> TradeOfferRead:
+    _member_or_404(db, league.id, current_user.id)
+    now = _utcnow()
+    _ensure_trade_deadline_open(db, league, now)
+    proposing, receiving = _validate_payload(db, league.id, payload)
+    _require_team_owner(proposing, current_user)
+
+    with db.begin_nested():
+        offer = _create_trade_offer_record(
+            db,
+            league=league,
+            current_user=current_user,
+            payload=payload,
+            proposing=proposing,
+            receiving=receiving,
+        )
+        _validate_no_locked_players(db, league, offer, now)
+        _plan_roster_swap(db, offer)
     db.commit()
     return _serialize_offer(_load_offer(db, offer.id))
 
@@ -605,11 +663,48 @@ def cancel_trade_offer(db: Session, league: League, trade_id: int, current_user:
     return _serialize_offer(_load_offer(db, offer.id))
 
 
-def counter_trade_offer(db: Session, league: League, trade_id: int, current_user: User, payload: TradeActionRequest) -> TradeOfferRead:
-    raise HTTPException(
-        status_code=status.HTTP_409_CONFLICT,
-        detail="counter offers are unavailable until linked replacement offers are implemented",
-    )
+def counter_trade_offer(
+    db: Session,
+    league: League,
+    trade_id: int,
+    current_user: User,
+    payload: TradeOfferCounterCreate,
+) -> TradeOfferRead:
+    offer = _load_offer(db, trade_id, for_update=True)
+    if offer.league_id != league.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="trade offer not found")
+    if offer.status != TRADE_STATUS_PROPOSED:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade offer is not pending a counter")
+    now = _utcnow()
+    _ensure_not_expired(offer, now)
+    _ensure_trade_deadline_open(db, league, now)
+    _proposing, receiving = _offer_participants(db, offer)
+    _require_team_owner(receiving, current_user)
+    proposing, counter_receiving = _validate_payload(db, league.id, payload)
+    if proposing.id != offer.receiving_team_id or counter_receiving.id != offer.proposing_team_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="counter offer must reverse the original trade participants",
+        )
+    _require_team_owner(proposing, current_user)
+
+    with db.begin_nested():
+        replacement = _create_trade_offer_record(
+            db,
+            league=league,
+            current_user=current_user,
+            payload=payload,
+            proposing=proposing,
+            receiving=counter_receiving,
+            countered_from_trade_id=offer.id,
+        )
+        _validate_no_locked_players(db, league, replacement, now)
+        _plan_roster_swap(db, replacement)
+        offer.status = TRADE_STATUS_COUNTERED
+        _add_review(db, offer, "countered", current_user.id, payload.message)
+        _notify_participants(db, offer, "TRADE_COUNTERED", "Trade Countered", "A replacement trade offer was sent.")
+    db.commit()
+    return _serialize_offer(_load_offer(db, replacement.id))
 
 
 def commissioner_veto_trade(db: Session, league: League, trade_id: int, current_user: User, payload: TradeActionRequest) -> TradeOfferRead:
@@ -624,6 +719,31 @@ def commissioner_veto_trade(db: Session, league: League, trade_id: int, current_
     _notify_participants(db, offer, "TRADE_VETOED", "Trade Vetoed", "A trade offer was vetoed.")
     db.commit()
     return _serialize_offer(_load_offer(db, offer.id))
+
+
+def expire_trade_offers_once(db: Session, now: datetime | None = None) -> dict[str, int]:
+    current = _as_utc(now or _utcnow())
+    offer_ids = [
+        offer_id
+        for (offer_id,) in (
+            db.query(TradeOffer.id)
+            .filter(TradeOffer.status.in_(OPEN_STATUSES))
+            .filter(TradeOffer.expires_at.isnot(None), TradeOffer.expires_at <= current)
+            .order_by(TradeOffer.expires_at.asc(), TradeOffer.id.asc())
+            .all()
+        )
+    ]
+    expired = 0
+    for offer_id in offer_ids:
+        offer = _load_offer(db, offer_id, for_update=True, skip_locked=True)
+        if offer is None or offer.status not in OPEN_STATUSES or offer.expires_at is None or _as_utc(offer.expires_at) > current:
+            continue
+        offer.status = TRADE_STATUS_EXPIRED
+        _add_review(db, offer, "expired", None, "trade offer expired")
+        _notify_participants(db, offer, "TRADE_EXPIRED", "Trade Expired", "A trade offer expired before acceptance.")
+        db.commit()
+        expired += 1
+    return {"expired": expired}
 
 
 def process_trade_offers_once(db: Session, now: datetime | None = None) -> dict[str, int]:

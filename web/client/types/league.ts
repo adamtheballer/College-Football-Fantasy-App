@@ -307,6 +307,8 @@ export interface LeagueWaiverDropCandidate {
 export interface LeagueWaiverTabResponse {
   league_id: number;
   fantasy_team_id: number | null;
+  waiver_priority: number | null;
+  faab_remaining: number | null;
   available_players: LeagueWaiverPlayer[];
   claims: LeagueWaiverClaim[];
   roster: LeagueWaiverDropCandidate[];

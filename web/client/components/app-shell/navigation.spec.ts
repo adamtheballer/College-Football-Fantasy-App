@@ -37,7 +37,6 @@ describe("app shell navigation helpers", () => {
     expect(items.map((item) => item.name)).toEqual([
       "HOME",
       "LEAGUES",
-      "PLAYER COMPARE",
       "SETTINGS",
       "SIGN IN",
     ]);
@@ -56,7 +55,7 @@ describe("app shell navigation helpers", () => {
     const items = getShellNavItems(user, true);
     const mobile = getMobileNavItems(items).map((item) => item.name);
 
-    expect(mobile).toEqual(["HOME", "LEAGUES", "PLAYER COMPARE", "MOCK DRAFT", "SETTINGS"]);
+    expect(mobile).toEqual(["HOME", "LEAGUES", "CHATS", "MOCK DRAFT", "SETTINGS"]);
     expect(mobile).not.toContain("SIGN OUT");
   });
 

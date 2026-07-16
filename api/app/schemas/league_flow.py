@@ -425,6 +425,8 @@ class LeagueWaiverPlayerRead(BaseModel):
 class LeagueWaiversRead(BaseModel):
     league_id: int
     fantasy_team_id: int | None = None
+    waiver_priority: int | None = None
+    faab_remaining: int | None = None
     available_players: list[LeagueWaiverPlayerRead]
     claims: list[WaiverClaimRead] = []
     roster: list[WaiverDropCandidateRead] = []

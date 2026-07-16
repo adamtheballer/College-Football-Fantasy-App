@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bruno API Collections"
+  short_description: "Maintain executable Bruno API workflows"
+  default_prompt: "Use $author-bruno-collections to update and verify Bruno requests for this API contract, including authentication, workflow variables, and expected responses."

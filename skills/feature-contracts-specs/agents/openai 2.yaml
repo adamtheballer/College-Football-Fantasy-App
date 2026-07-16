@@ -1,0 +1,4 @@
+interface:
+  display_name: "API Contract Specification"
+  short_description: "Define FastAPI contracts consumed by React"
+  default_prompt: "Use $feature-contracts-specs to define this FastAPI request, response, error, pagination, and nullability contract before implementation."

@@ -22,6 +22,7 @@ class DraftRoomPickRead(BaseModel):
     player_position: str
     player_school: str
     made_by_user_id: int | None = None
+    auto_pick: bool = False
     created_at: datetime
 
 
@@ -40,6 +41,14 @@ class DraftRoomRead(BaseModel):
     current_team_name: str | None = None
     user_team_id: int | None = None
     can_make_pick: bool
+    can_start_draft: bool = False
+    pre_draft_starts_at: datetime | None = None
+    draft_starts_at: datetime | None = None
+    current_pick_started_at: datetime | None = None
+    current_pick_deadline: datetime | None = None
+    transition_ends_at: datetime | None = None
+    seconds_remaining: int = 0
+    draft_version: int = 0
     pick_started_at: datetime | None = None
     pick_expires_at: datetime | None = None
     server_time: datetime
@@ -47,3 +56,5 @@ class DraftRoomRead(BaseModel):
 
 class DraftPickCreate(BaseModel):
     player_id: int
+    pick_number: int
+    draft_version: int

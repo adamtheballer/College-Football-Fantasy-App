@@ -29,11 +29,24 @@ services:
       PYTHONPATH: /app
     ports:
       - "${API_PORT:-8000}:8000"
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     command: >-
       sh -c "pip install uv && uv sync && cd api && PYTHONPATH=/app uv run alembic -c alembic.ini upgrade head && cd /app && uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
   web:
     image: node:20
     working_dir: /app/web
@@ -42,10 +55,12 @@ services:
       - /app/web/node_modules
     ports:
       - "${WEB_PORT:-8080}:8080"
+    restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     command: >-
-      sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+      sh -c "npm ci && npm run dev:vite -- --host 0.0.0.0"
 
 volumes:
   pgdata:

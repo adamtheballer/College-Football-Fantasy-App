@@ -4,14 +4,14 @@ import { CheckCircle2, KeyRound, Loader2, ShieldAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ApiError } from "@/lib/api";
+import { ApiError, apiUnavailableMessage } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 
 export const passwordResetErrorMessage = (error: unknown) => {
   if (error instanceof ApiError) {
     if (error.status === 400) return "This password reset link is invalid, expired, or already used.";
     if (error.status === 429) return "Too many reset attempts. Wait a few minutes and try again.";
-    if (error.status === 0) return "Unable to reach the backend API. Start FastAPI and try again.";
+    if (error.status === 0) return apiUnavailableMessage();
     return error.message;
   }
   if (error instanceof Error) return error.message;

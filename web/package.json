@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "bash ../scripts/dev.sh",
+    "dev:vite": "vite",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest --run --exclude '**/tests/e2e/**' --maxWorkers=1",

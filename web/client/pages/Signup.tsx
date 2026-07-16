@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { setPendingGuide } from "@/lib/onboarding";
-import { ApiError } from "@/lib/api";
+import { ApiError, apiUnavailableMessage } from "@/lib/api";
 import {
   Trophy,
   Mail,
@@ -59,7 +59,7 @@ export default function Signup() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
       if (err instanceof ApiError && err.status === 0) {
-        setError("Unable to reach the backend API. Start FastAPI on port 8000 and try again.");
+        setError(apiUnavailableMessage());
       } else if (message.includes("409")) {
         setError("That email is already registered. Try signing in instead.");
       } else if (message) {

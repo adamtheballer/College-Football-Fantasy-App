@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Index, Integer, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -24,3 +24,4 @@ class DraftPick(TimestampMixin, Base):
     round_number: Mapped[int] = mapped_column(Integer)
     round_pick: Mapped[int] = mapped_column(Integer)
     overall_pick: Mapped[int] = mapped_column(Integer)
+    auto_pick: Mapped[bool] = mapped_column(Boolean, default=False)

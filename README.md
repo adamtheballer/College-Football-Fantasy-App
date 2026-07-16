@@ -42,7 +42,7 @@ docker compose up -d db
 uv run alembic -c api/alembic.ini upgrade head
 ```
 
-Migrations also seed the CFB27 player board into `players`, so clean databases do not require a separate manual `sync_cfb27_ratings.py` run before Player Compare works.
+Migrations also seed the CFB27 player board into `players`, so clean databases do not require a separate manual `sync_cfb27_ratings.py` run before drafts and trade analysis work.
 `api/app/data/cfb27_ratings.json` is the source of truth for CFB27 ratings. Regenerate the frontend module after changing it:
 
 ```bash
@@ -56,12 +56,15 @@ PYTHONPATH=. uv run python scripts/generate_cfb27_frontend.py --check
 cd web && npm ci
 ```
 
-6) Start API and UI
+6) Start the full local stack
 
 ```bash
-PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port 8000
-cd web && npm run dev
+npm --prefix web run dev
 ```
+
+This is the supported local UI command. It starts Postgres and FastAPI, waits for
+`/health/ready`, then starts Vite. If FastAPI stops, the paired UI process exits
+instead of leaving a page that cannot reach the API.
 
 Backend import smoke check:
 
@@ -84,7 +87,7 @@ make dev
 
 Local dev URLs:
 
-- UI: `http://localhost:5173`
+- UI: `http://localhost:8080`
 - API: `http://localhost:8000`
 
 ## Environment variables
@@ -228,7 +231,10 @@ docker compose up --build
 
 API runs on `http://localhost:8000`, UI runs on `http://localhost:8080`.
 
-Docker Compose runs Alembic migrations before Uvicorn starts the API. If local port `5433` is already in use, override the database host port without changing the container network URL:
+Docker Compose runs Alembic migrations before Uvicorn starts the API, waits for
+`/health/ready` before starting Vite, and restarts the API if it exits. If local
+port `5433` is already in use, override the database host port without changing
+the container network URL:
 
 ```bash
 DB_PORT=55433 docker compose up --build
@@ -255,8 +261,10 @@ Production deploy order:
 3. Verify the managed database is at the repository Alembic head.
 4. Start Uvicorn with `collegefootballfantasy_api.app.main:app`.
 5. Require `GET /health/ready` to return `200` before routing traffic.
-6. Build the Vite app with `npm --prefix web ci && npm --prefix web run build`.
-7. Serve `web/dist/spa` from the static frontend host.
+6. Keep at least one healthy FastAPI replica running with automatic restart.
+7. Verify `${PUBLIC_API_BASE_URL}/health/ready` immediately before promoting the web build.
+8. Build the Vite app with `npm --prefix web ci && npm --prefix web run build`.
+9. Serve `web/dist/spa` from the static frontend host.
 
 Useful migration verification command:
 

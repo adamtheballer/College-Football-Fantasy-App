@@ -1,0 +1,4 @@
+interface:
+  display_name: "Safe Alembic Migration"
+  short_description: "Author and verify safe Postgres migrations"
+  default_prompt: "Use $author-alembic-migration to create a safe migration with reviewed operations, compatible backfills, honest downgrade behavior, and Postgres verification."
