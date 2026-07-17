@@ -3,10 +3,9 @@ import { Search, ShieldAlert, AlertTriangle, TimerReset } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { PlayerDetailModal } from "@/components/PlayerDetailModal";
+import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { apiGet } from "@/lib/api";
-import { usePlayerDetail } from "@/hooks/use-players";
-import type { Player } from "@/types/player";
+import { usePlayerCard } from "@/hooks/use-players";
 import {
   Select,
   SelectContent,
@@ -15,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type InjuryItem = {
+export type InjuryItem = {
   id: number;
   name: string;
   team: string;
@@ -63,14 +62,20 @@ const statusSortOrder: Record<string, number> = {
 
 const statusLabel = (value: string) => value.split("_").join(" ");
 
+export const buildInjuryPlayerCard = (injury: InjuryItem) => ({
+  id: injury.id,
+  name: injury.name,
+  school: injury.team,
+  position: injury.pos,
+  status: statusLabel(injury.status),
+});
+
 export default function InjuryCenter() {
   const [searchQuery, setSearchQuery] = useState("");
   const [conferenceFilter, setConferenceFilter] = useState("ALL");
-  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
-  const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false);
   const [injuries, setInjuries] = useState<InjuryItem[]>([]);
-  const { data: playerDetail } = usePlayerDetail(selectedPlayerId, selectedPlayerId !== null);
+  const playerCardQuery = usePlayerCard(selectedPlayerId, selectedPlayerId !== null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -107,12 +112,6 @@ export default function InjuryCenter() {
       });
     return () => controller.abort();
   }, [conferenceFilter]);
-
-  useEffect(() => {
-    if (!playerDetail) return;
-    setSelectedPlayer(playerDetail);
-    setIsPlayerModalOpen(true);
-  }, [playerDetail]);
 
   const filtered = useMemo(() => {
     return injuries
@@ -151,17 +150,22 @@ export default function InjuryCenter() {
   }, [injuries, searchQuery]);
 
   const openPlayer = (playerId: number) => {
-    setSelectedPlayer(null);
     setSelectedPlayerId(playerId);
   };
+  const selectedInjury = injuries.find((injury) => injury.id === selectedPlayerId) ?? null;
 
   return (
     <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-1000">
-      <PlayerDetailModal
-        player={selectedPlayer}
-        isOpen={isPlayerModalOpen}
-        onClose={() => setIsPlayerModalOpen(false)}
-      />
+      {selectedInjury ? (
+        <PlayerCardModal
+          player={buildInjuryPlayerCard(selectedInjury)}
+          card={playerCardQuery.data}
+          loading={playerCardQuery.isLoading}
+          title="Injury Player Card"
+          note={`${selectedInjury.injury} • Expected return: ${selectedInjury.returnTimeline}`}
+          onClose={() => setSelectedPlayerId(null)}
+        />
+      ) : null}
 
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div className="space-y-2">

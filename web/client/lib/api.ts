@@ -9,9 +9,25 @@ const resolveDefaultApiBase = () => {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || resolveDefaultApiBase();
 
+const isLocalApiBase = () => {
+  try {
+    const origin = typeof window === "undefined" ? "http://127.0.0.1" : window.location.origin;
+    const hostname = new URL(API_BASE, origin).hostname;
+    return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1";
+  } catch {
+    return false;
+  }
+};
+
+export const apiUnavailableMessage = () =>
+  isLocalApiBase()
+    ? "Local API is unavailable. Start the full stack with npm --prefix web run dev and try again."
+    : "The service is temporarily unavailable. Your sign-in session is still saved; please try again shortly.";
+
 const ACCESS_TOKEN_STORAGE_KEY = "cfb_access_token";
 const ACCESS_TOKEN_EXPIRES_AT_STORAGE_KEY = "cfb_access_token_expires_at";
 const AUTH_CHANGED_EVENT = "cfb-auth-changed";
+export const API_REQUEST_TIMEOUT_MS = 15_000;
 
 export class ApiError extends Error {
   status: number;
@@ -28,7 +44,8 @@ export class ApiError extends Error {
 const buildUrl = (path: string, params?: Record<string, string | number | boolean | undefined>) => {
   const base = API_BASE.replace(/\/+$/, "");
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
-  const url = new URL(`${base}${cleanPath}`);
+  const origin = typeof window === "undefined" ? "http://127.0.0.1" : window.location.origin;
+  const url = new URL(`${base}${cleanPath}`, origin);
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (value === undefined || value === null) return;
@@ -225,6 +242,32 @@ type RequestOptions = {
   retryOn401?: boolean;
 };
 
+const createRequestSignal = (externalSignal?: AbortSignal) => {
+  const controller = new AbortController();
+  let timedOut = false;
+
+  const abortFromExternalSignal = () => controller.abort(externalSignal?.reason);
+  if (externalSignal?.aborted) {
+    abortFromExternalSignal();
+  } else {
+    externalSignal?.addEventListener("abort", abortFromExternalSignal, { once: true });
+  }
+
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort(new DOMException("API request timed out", "TimeoutError"));
+  }, API_REQUEST_TIMEOUT_MS);
+
+  return {
+    signal: controller.signal,
+    didTimeOut: () => timedOut,
+    dispose: () => {
+      clearTimeout(timeout);
+      externalSignal?.removeEventListener("abort", abortFromExternalSignal);
+    },
+  };
+};
+
 const apiRequest = async <T>({
   method,
   path,
@@ -240,23 +283,33 @@ const apiRequest = async <T>({
     headers["Content-Type"] = "application/json";
   }
   let res: Response;
+  const requestSignal = createRequestSignal(signal);
   try {
     res = await fetch(buildUrl(path, params), {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal,
+      signal: requestSignal.signal,
       credentials: "include",
     });
   } catch (error) {
+    if (requestSignal.didTimeOut()) {
+      throw new ApiError(
+        0,
+        `The service took too long to respond. ${apiUnavailableMessage()}`,
+        { apiBase: API_BASE, timeoutMs: API_REQUEST_TIMEOUT_MS }
+      );
+    }
     if (error instanceof DOMException && error.name === "AbortError") {
       throw error;
     }
     throw new ApiError(
       0,
-      `Unable to reach the backend API at ${API_BASE}. Make sure FastAPI is running and CORS allows this web origin.`,
+      apiUnavailableMessage(),
       { cause: error instanceof Error ? error.message : String(error), apiBase: API_BASE }
     );
+  } finally {
+    requestSignal.dispose();
   }
   const canRefreshForPath =
     !path.startsWith("/auth/") || path === "/auth/me";

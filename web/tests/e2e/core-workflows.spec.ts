@@ -558,7 +558,7 @@ test.describe("critical browser workflows", () => {
       name: "Draft Test League",
       commissioner_user_id: 42,
       season_year: 2026,
-      max_teams: 12,
+      max_teams: 2,
       is_private: true,
       invite_code: "ABCDEFGHIJKLMNOPQRST",
       description: null,
@@ -587,7 +587,7 @@ test.describe("critical browser workflows", () => {
         pick_timer_seconds: 90,
         status: "live",
       },
-      members: Array.from({ length: 12 }, (_, index) => ({
+      members: Array.from({ length: 2 }, (_, index) => ({
         id: 701 + index,
         user_id: index === 0 ? 42 : 90 + index,
         role: index === 0 ? "commissioner" : "manager",
@@ -614,7 +614,7 @@ test.describe("critical browser workflows", () => {
     let draftRoom = {
       league_id: 1,
       draft_id: 21,
-      status: "live",
+      status: "on_clock",
       pick_timer_seconds: 90,
       roster_slots: { QB: 1, RB: 2, WR: 2, TE: 1, K: 1, BENCH: 4, IR: 1 },
       teams: [
@@ -1140,15 +1140,17 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByRole("heading", { name: /Trade Builder/i })).toBeVisible();
     await expect(page.getByText("Codex Team").first()).toBeVisible();
     await expect(page.getByText("Rival Team").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: /Send Trade Offer/i })).toBeDisabled();
+    await expect(page.getByRole("button", { name: /^Analyze Trade$/i })).toBeDisabled();
 
     await page.getByRole("button", { name: /Arch Manning/i }).click();
     await page.getByRole("button", { name: /Rival QB/i }).click();
-    await expect(page.getByRole("button", { name: /Send Trade Offer/i })).toBeDisabled();
+    await expect(page.getByRole("button", { name: /^Analyze Trade$/i })).toBeEnabled();
     await page.getByRole("button", { name: /Analyze Trade/i }).click();
 
-    await expect(page.getByText("Strong Loss")).toBeVisible();
-    await expect(page.getByText("-6.00")).toBeVisible();
+    const reviewDialog = page.getByRole("dialog", { name: /Review Trade Offer/i });
+    await expect(reviewDialog).toBeVisible();
+    await expect(reviewDialog.getByText("Strong Loss")).toBeVisible();
+    await expect(reviewDialog.getByText("-6.00")).toBeVisible();
     await expect.poll(() => analyzePayload).not.toBeNull();
     expect(analyzePayload).toMatchObject({
       give_ids: [201],
@@ -1159,9 +1161,8 @@ test.describe("critical browser workflows", () => {
       league_size: 2,
     });
 
-    await expect(page.getByText(/Sending is locked until the current offer has a fresh analysis/i)).toBeVisible();
-    await expect(page.getByRole("button", { name: /Send Trade Offer/i })).toBeEnabled();
-    await page.getByRole("button", { name: /Send Trade Offer/i }).click();
+    await expect(reviewDialog.getByRole("button", { name: /^Send Final Trade$/i })).toBeEnabled();
+    await reviewDialog.getByRole("button", { name: /^Send Final Trade$/i }).click();
     expect(proposalPayload).toMatchObject({
       proposing_team_id: 11,
       receiving_team_id: 12,
@@ -1488,10 +1489,11 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText(/No watched players yet/i)).toBeVisible();
   });
 
-  test("available players page marks claims disabled and avoids add-drop", async ({ page }) => {
+  test("available players page submits a waiver claim without using the legacy add-drop endpoint", async ({ page }) => {
     await seedAuthenticatedSession(page);
 
     const addDropCalls: string[] = [];
+    let claimPayload: unknown = null;
     const leagueDetail = {
       id: 1,
       name: "Waiver Test League",
@@ -1571,6 +1573,24 @@ test.describe("critical browser workflows", () => {
         body: JSON.stringify({ data: [], total: 0, limit: 50, offset: 0 }),
       });
     });
+    await page.route("**/leagues/1/waivers/claims", async (route) => {
+      claimPayload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 301,
+          league_id: 1,
+          team_id: 11,
+          add_player_id: 901,
+          add_player_name: "Arch Manning",
+          drop_roster_entry_id: null,
+          faab_bid: 0,
+          status: "pending",
+          process_after: "2026-08-31T12:00:00Z",
+        }),
+      });
+    });
     await page.route("**/teams/**/add-drop", async (route) => {
       addDropCalls.push(route.request().url());
       await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "add/drop disabled" }) });
@@ -1581,7 +1601,17 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText(/No active or recent waiver claims/i)).toBeVisible();
     await expect(page.getByText("Arch Manning")).toBeVisible();
     await expect(page.getByRole("button", { name: /^Add$/i })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /^Claim API$/i }).first()).toBeDisabled();
+    const archManningRow = page.getByText("Arch Manning").locator("xpath=ancestor::tr");
+    await archManningRow.getByRole("button", { name: /^Claim$/i }).click();
+    const claimDialog = page.getByRole("dialog", { name: /Submit Waiver Claim/i });
+    await expect(claimDialog).toBeVisible();
+    await claimDialog.getByRole("button", { name: /Confirm Waiver Claim/i }).click();
+    await expect.poll(() => claimPayload).not.toBeNull();
+    expect(claimPayload).toEqual({
+      team_id: 11,
+      add_player_id: 901,
+      faab_bid: 0,
+    });
     expect(addDropCalls).toEqual([]);
   });
 });

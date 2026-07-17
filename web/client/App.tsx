@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/use-auth";
+import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ApiError } from "@/lib/api";
 import Layout from "./components/Layout";
@@ -31,7 +32,6 @@ const Draft = lazy(() => import("./pages/Draft"));
 const SinglePlayerMockDraftRoom = lazy(() => import("./pages/SinglePlayerMockDraftRoom"));
 const Rosters = lazy(() => import("./pages/Rosters"));
 const Alerts = lazy(() => import("./pages/Alerts"));
-const PlayerCompare = lazy(() => import("./pages/PlayerCompare"));
 const Chats = lazy(() => import("./pages/Chats"));
 const InjuryCenter = lazy(() => import("./pages/InjuryCenter"));
 const Trade = lazy(() => import("./pages/Trade"));
@@ -71,9 +71,10 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <Layout>
-            <Suspense fallback={<RouteFallback />}>
+        <AppErrorBoundary>
+          <BrowserRouter>
+            <Layout>
+              <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/leagues" element={<Leagues />} />
@@ -181,7 +182,7 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
-                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="/settings" element={<Settings />} />
                 <Route path="/rosters" element={<ProtectedRoute><Rosters /></ProtectedRoute>} />
                 <Route path="/chats" element={<ProtectedRoute><Chats /></ProtectedRoute>} />
                 <Route path="/waivers" element={<ProtectedRoute><Navigate to="/leagues" replace /></ProtectedRoute>} />
@@ -192,17 +193,17 @@ const App = () => (
                 <Route path="/trade/:leagueId/:playerId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
                 <Route path="/leagues/:leagueId/trades/:tradeId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
                 <Route path="/admin/scoring" element={<ProtectedRoute><AdminScoring /></ProtectedRoute>} />
-                <Route path="/player-compare" element={<PlayerCompare />} />
-                <Route path="/stats" element={<Navigate to="/player-compare" replace />} />
-                <Route path="/stats/players" element={<Navigate to="/player-compare" replace />} />
+                <Route path="/stats" element={<Navigate to="/leagues" replace />} />
+                <Route path="/stats/players" element={<Navigate to="/leagues" replace />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/password-reset/confirm" element={<PasswordResetConfirm />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </Suspense>
-          </Layout>
-        </BrowserRouter>
+              </Suspense>
+            </Layout>
+          </BrowserRouter>
+        </AppErrorBoundary>
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>

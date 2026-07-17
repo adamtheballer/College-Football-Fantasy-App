@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -29,7 +31,27 @@ const rosterPlayer = (id: number, position: string, assignedSlot: string): Roste
 
 const draftPlayer = (id: number, pos: string): DraftablePlayer => ({ id, pos });
 
+type SharedLegalityCase = {
+  name: string;
+  roster_slots: RosterSlotLimits;
+  roster: Array<{ position: string; slot: string }>;
+  candidate_position: string;
+  expected_slot: string | null;
+};
+
+const sharedLegalityCases = JSON.parse(
+  readFileSync(new URL("../../../fixtures/roster_legality_cases.json", import.meta.url), "utf8")
+) as SharedLegalityCase[];
+
 describe("rosterLegality", () => {
+  it.each(sharedLegalityCases)("matches the shared backend fixture: $name", (testCase) => {
+    const roster = testCase.roster.map((player, index) => rosterPlayer(index + 1, player.position, player.slot));
+
+    expect(assignBestRosterSlotForPosition(testCase.candidate_position, roster, testCase.roster_slots)).toBe(
+      testCase.expected_slot
+    );
+  });
+
   it("only allows kickers when every other slot and bench is full", () => {
     const roster = [
       rosterPlayer(1, "QB", "QB"),

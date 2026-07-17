@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, apiPatch, ApiError } from "@/lib/api";
+import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import type {
   DraftInfo,
   LeagueDetail,
+  LeagueCreateResponse,
   LeagueListResponse,
   LeagueMatchupTabResponse,
   LeagueNewsResponse,
@@ -63,6 +64,44 @@ export function useRescheduleDraft(leagueId?: number) {
       queryClient.invalidateQueries({ queryKey: ["league", leagueId, "settings-view"] });
       queryClient.invalidateQueries({ queryKey: ["league", leagueId, "draft-room"] });
       queryClient.invalidateQueries({ queryKey: ["draft-room", leagueId] });
+    },
+  });
+}
+
+const invalidateLeagueQueries = (queryClient: ReturnType<typeof useQueryClient>, leagueId: number) => {
+  queryClient.invalidateQueries({ queryKey: ["league", leagueId] });
+  queryClient.invalidateQueries({ queryKey: ["leagues"] });
+  queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
+  queryClient.invalidateQueries({ queryKey: ["league", leagueId, "settings-view"] });
+  queryClient.invalidateQueries({ queryKey: ["league", leagueId, "draft-room"] });
+};
+
+export function useRotateLeagueInvite(leagueId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => {
+      if (typeof leagueId !== "number" || Number.isNaN(leagueId)) {
+        throw new ApiError(400, "Invalid league ID.");
+      }
+      return apiPost<LeagueCreateResponse>(`/leagues/${leagueId}/invite/rotate`, {});
+    },
+    onSuccess: () => {
+      if (typeof leagueId === "number") invalidateLeagueQueries(queryClient, leagueId);
+    },
+  });
+}
+
+export function useRevokeLeagueInvite(leagueId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => {
+      if (typeof leagueId !== "number" || Number.isNaN(leagueId)) {
+        throw new ApiError(400, "Invalid league ID.");
+      }
+      return apiPost<LeagueDetail>(`/leagues/${leagueId}/invite/revoke`, {});
+    },
+    onSuccess: () => {
+      if (typeof leagueId === "number") invalidateLeagueQueries(queryClient, leagueId);
     },
   });
 }

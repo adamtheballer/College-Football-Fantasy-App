@@ -17,7 +17,7 @@ import { PlaybookDecor, SurfaceCard } from "@/components/fantasy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
-import { ApiError } from "@/lib/api";
+import { ApiError, apiUnavailableMessage } from "@/lib/api";
 import { setPendingGuide } from "@/lib/onboarding";
 
 const featureCards = [
@@ -44,7 +44,7 @@ const featureCards = [
 export const loginErrorMessage = (error: unknown): string => {
   if (error instanceof ApiError) {
     if (error.status === 0) {
-      return "Unable to reach the backend API. Start FastAPI on port 8000 and try again.";
+      return apiUnavailableMessage();
     }
     if (error.status === 401) {
       return "Email or password is incorrect.";
@@ -64,7 +64,7 @@ export const loginErrorMessage = (error: unknown): string => {
   }
 
   if (error instanceof Error && error.message.includes("Failed to fetch")) {
-    return "Cannot reach the server. Make sure backend is running on port 8000.";
+    return apiUnavailableMessage();
   }
 
   return "Sign in failed. Try again or contact support.";

@@ -204,6 +204,8 @@ export interface LeagueRosterPlayer {
   boom_prob?: number | null;
   bust_prob?: number | null;
   weekly_projected_fantasy_points: number | null;
+  game_start_at?: string | null;
+  is_locked?: boolean;
   is_placeholder?: boolean;
 }
 
@@ -307,6 +309,8 @@ export interface LeagueWaiverDropCandidate {
 export interface LeagueWaiverTabResponse {
   league_id: number;
   fantasy_team_id: number | null;
+  waiver_priority: number | null;
+  faab_remaining: number | null;
   available_players: LeagueWaiverPlayer[];
   claims: LeagueWaiverClaim[];
   roster: LeagueWaiverDropCandidate[];

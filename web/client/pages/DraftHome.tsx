@@ -55,9 +55,9 @@ export default function DraftHome() {
   const realDrafts = leagues.filter(
     (league) =>
       league.status === "draft_live" ||
+      league.status === "draft_pre_draft" ||
       league.status === "draft_scheduled" ||
-      league.draft?.status === "live" ||
-      league.draft?.status === "scheduled"
+      ["pre_draft", "on_clock", "transition", "live", "scheduled"].includes(league.draft?.status ?? "")
   );
 
   return (

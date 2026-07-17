@@ -8,6 +8,7 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("api client", () => {
@@ -34,7 +35,7 @@ describe("api client", () => {
     await expect(apiGet("/health")).rejects.toMatchObject({
       name: "ApiError",
       status: 0,
-      message: expect.stringContaining("Unable to reach the backend API"),
+      message: expect.stringContaining("Local API is unavailable"),
     });
   });
 

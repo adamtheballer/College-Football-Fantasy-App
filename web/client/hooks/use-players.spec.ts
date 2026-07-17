@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getDraftPlayerPoolBackendLimit, getDraftPlayerPoolPageOffsets } from "./use-players";
+import {
+  getDraftPlayerPoolBackendLimit,
+  getDraftPlayerPoolPageOffsets,
+  normalizePlayer,
+} from "./use-players";
 
 describe("getDraftPlayerPoolBackendLimit", () => {
   it("never exceeds the backend /players API page limit", () => {
@@ -58,5 +62,49 @@ describe("getDraftPlayerPoolPageOffsets", () => {
         total: 1200,
       })
     ).toEqual([0, 100, 200]);
+  });
+});
+
+describe("normalizePlayer", () => {
+  it("uses the weekly projection when the draft pool supplies one", () => {
+    const player = normalizePlayer(
+      { id: 1, name: "Projected Player", position: "QB", school: "Georgia" },
+      {
+        projection: {
+          player_id: 1,
+          pass_yards: 260,
+          pass_tds: 2,
+          interceptions: 1,
+          rush_yards: 30,
+          rush_tds: 0,
+          rec_yards: 0,
+          rec_tds: 0,
+          receptions: 0,
+          fantasy_points: 24.6,
+          floor: 16,
+          ceiling: 34,
+          boom_prob: 0.3,
+          bust_prob: 0.15,
+          expected_plays: 68,
+          expected_rush_per_play: 3.5,
+          expected_td_per_play: 0.04,
+        },
+      }
+    );
+
+    expect(player.projection.fpts).toBe(24.6);
+    expect(player.projection.passingYards).toBe(260);
+    expect(player.hasWeeklyProjection).toBe(true);
+  });
+
+  it("marks players without a weekly projection so draft views can avoid fake values", () => {
+    const player = normalizePlayer({
+      id: 2,
+      name: "Unprojected Player",
+      position: "WR",
+      school: "Georgia",
+    });
+
+    expect(player.hasWeeklyProjection).toBe(false);
   });
 });
