@@ -858,6 +858,7 @@ export default function SinglePlayerMockDraftRoom() {
               return (
                 <div
                   key={slot.overallPick}
+                  aria-current={isCurrent ? "step" : undefined}
                   ref={(node) => {
                     if (node) {
                       pickRefs.current.set(slot.overallPick, node);
@@ -866,7 +867,7 @@ export default function SinglePlayerMockDraftRoom() {
                     }
                   }}
                   className={cn(
-                    "min-w-[178px] rounded-3xl border p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition",
+                    "relative min-w-[178px] rounded-3xl border p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition",
                     isCurrent
                       ? "border-cyan-200/80 bg-cyan-300/14 shadow-[0_0_52px_rgba(103,232,249,0.36),inset_0_1px_0_rgba(255,255,255,0.07)]"
                       : isUser
@@ -875,6 +876,14 @@ export default function SinglePlayerMockDraftRoom() {
                     isLocked && "opacity-80"
                   )}
                 >
+                  {isCurrent ? (
+                    <div
+                      aria-label="Current pick"
+                      className="absolute -top-3 left-1/2 z-10 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border border-cyan-100/70 bg-slate-950 text-cyan-100 shadow-[0_0_24px_rgba(103,232,249,0.55)]"
+                    >
+                      <LocateFixed className="h-3.5 w-3.5" />
+                    </div>
+                  ) : null}
                   <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Pick {slot.overallPick}</p>
                   <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{slot.round}.{slot.roundPick}</p>
                   <div className="mt-3 flex h-8 w-8 items-center justify-center rounded-xl border border-cyan-200/30 bg-slate-950/55 text-cyan-100 shadow-[0_0_22px_rgba(103,232,249,0.24),inset_0_0_12px_rgba(103,232,249,0.08)]">
