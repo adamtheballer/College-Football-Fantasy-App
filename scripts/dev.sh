@@ -73,7 +73,7 @@ if ! curl --fail --silent --max-time 2 "${VITE_API_BASE_URL}/health/ready" >/dev
 fi
 
 echo "FastAPI is ready. Starting UI..."
-npm --prefix web run dev:vite -- --host 0.0.0.0 &
+npm --prefix web run dev:vite -- --host 0.0.0.0 --port "$WEB_PORT" &
 UI_PID=$!
 
 echo "API -> http://localhost:${API_PORT}"
