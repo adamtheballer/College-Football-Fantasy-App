@@ -3,13 +3,15 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
 const apiProxyTarget = process.env.VITE_API_PROXY_TARGET ?? "http://api:8000";
+const configuredDevPort = Number(process.env.WEB_PORT ?? "8080");
+const devServerPort = Number.isInteger(configuredDevPort) && configuredDevPort > 0 ? configuredDevPort : 8080;
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   root: __dirname,
   server: {
     host: "::",
-    port: 8080,
+    port: devServerPort,
     allowedHosts: ["web"],
     proxy: {
       "/api": {
