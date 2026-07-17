@@ -56,7 +56,9 @@ def finalize_draft_rosters_and_matchups(db: Session, league: League) -> dict[str
             player.position,
             roster_slots,
             superflex_enabled=superflex_enabled,
-        ) or "BENCH"
+        )
+        if slot is None:
+            raise RuntimeError("draft roster backfill found no legal slot for a drafted player")
         db.add(
             RosterEntry(
                 league_id=league.id,

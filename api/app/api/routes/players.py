@@ -14,7 +14,6 @@ from collegefootballfantasy_api.app.integrations.sportsdata import SportsDataCli
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
-from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.player import (
     PlayerCardAboutRead,
@@ -27,10 +26,14 @@ from collegefootballfantasy_api.app.schemas.player import (
 )
 from collegefootballfantasy_api.app.schemas.historical_stats import PlayerHistoricalStatsResponse
 from collegefootballfantasy_api.app.schemas.player_stat import PlayerStatResponse
-from collegefootballfantasy_api.app.services.espn_player_lookup import resolve_espn_player_by_name
+from collegefootballfantasy_api.app.services.espn_player_lookup import (
+    persist_espn_player_profile,
+    resolve_espn_player_by_name,
+)
 from collegefootballfantasy_api.app.services.historical_stats import (
     fetch_and_store_player_history,
     get_player_historical_stats_response,
+    resolve_espn_player_id,
 )
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
 from collegefootballfantasy_api.app.services.auth_security import enforce_auth_rate_limit
@@ -45,20 +48,8 @@ def _espn_player_id(external_id: str | None) -> str | None:
     if not normalized:
         return None
     if normalized.lower().startswith("espn:"):
-        normalized = normalized.split(":", 1)[1].strip()
-    return normalized or None
-
-
-def _resolved_espn_player_id(db: Session, player_id: int, external_id: str | None) -> str | None:
-    provider_row = (
-        db.query(PlayerProviderId)
-        .filter(PlayerProviderId.player_id == player_id, PlayerProviderId.provider == "espn")
-        .order_by(PlayerProviderId.verified_at.desc().nullslast(), PlayerProviderId.updated_at.desc())
-        .first()
-    )
-    if provider_row and provider_row.provider_player_id:
-        return _profile_text(provider_row.provider_player_id)
-    return _espn_player_id(external_id)
+        return normalized.split(":", 1)[1].strip() or None
+    return normalized if normalized.isdecimal() else None
 
 
 def _profile_text(value: object) -> str | None:
@@ -88,6 +79,7 @@ def _birthplace(athlete: dict) -> str | None:
 
 
 def _map_espn_about(
+    stored_player: Player,
     player: PlayerRead,
     payload: dict | None,
     message: str | None = None,
@@ -97,10 +89,16 @@ def _map_espn_about(
     if not isinstance(athlete, dict):
         return PlayerCardAboutRead(
             espn_player_id=espn_player_id or _espn_player_id(player.external_id),
+            height=stored_player.espn_height,
+            weight=stored_player.espn_weight,
             player_class=player.player_class,
+            birthplace=stored_player.espn_birthplace,
+            status=stored_player.espn_status or "Active",
+            jersey=stored_player.espn_jersey,
             position=player.position,
             team=player.school,
-            source="local",
+            headshot_url=stored_player.espn_headshot_url or player.image_url,
+            source="espn" if stored_player.espn_profile_synced_at else "local",
             message=message,
         )
     status = athlete.get("status") if isinstance(athlete.get("status"), dict) else {}
@@ -109,15 +107,15 @@ def _map_espn_about(
     headshot = athlete.get("headshot") if isinstance(athlete.get("headshot"), dict) else {}
     return PlayerCardAboutRead(
         espn_player_id=_profile_text(athlete.get("id")) or espn_player_id or _espn_player_id(player.external_id),
-        height=_profile_text(athlete.get("displayHeight")),
-        weight=_profile_text(athlete.get("displayWeight")),
+        height=_profile_text(athlete.get("displayHeight")) or stored_player.espn_height,
+        weight=_profile_text(athlete.get("displayWeight")) or stored_player.espn_weight,
         player_class=player.player_class,
-        birthplace=_birthplace(athlete),
-        status=_profile_text(status.get("name") or status.get("abbreviation")) or "Active",
-        jersey=_profile_text(athlete.get("jersey")),
+        birthplace=_birthplace(athlete) or stored_player.espn_birthplace,
+        status=_profile_text(status.get("name") or status.get("abbreviation")) or stored_player.espn_status or "Active",
+        jersey=_profile_text(athlete.get("jersey")) or stored_player.espn_jersey,
         position=_profile_text(position.get("displayName") or position.get("abbreviation")) or player.position,
         team=_profile_text(team.get("displayName") or team.get("shortDisplayName")) or player.school,
-        headshot_url=_profile_text(headshot.get("href")) or player.image_url,
+        headshot_url=_profile_text(headshot.get("href")) or stored_player.espn_headshot_url or player.image_url,
         source="espn",
         message=message,
     )
@@ -237,7 +235,7 @@ def get_player_card_endpoint(
     profile_payload: dict | None = None
     profile_message: str | None = None
     espn_client = ESPNClient()
-    espn_id = _resolved_espn_player_id(db, player.id, player.external_id)
+    espn_id = resolve_espn_player_id(db, player)
     if refresh and not espn_id and settings.espn_historical_stats_enabled:
         try:
             resolved = resolve_espn_player_by_name(db, player, client=espn_client)
@@ -251,6 +249,8 @@ def get_player_card_endpoint(
         if profile_payload is None:
             try:
                 profile_payload = espn_client.get_athlete_profile(espn_id)
+                persist_espn_player_profile(player, profile_payload)
+                db.commit()
             except Exception as exc:
                 profile_message = f"ESPN profile unavailable: {exc}"
     else:
@@ -286,7 +286,7 @@ def get_player_card_endpoint(
     card_player = _player_card_player_with_sheet_projection_fallback(db, player)
     return PlayerCardRead(
         player=card_player,
-        about=_map_espn_about(card_player, profile_payload, profile_message, espn_player_id=espn_id),
+        about=_map_espn_about(player, card_player, profile_payload, profile_message, espn_player_id=espn_id),
         injuries=[
             PlayerCardInjuryRead(
                 id=row.id,

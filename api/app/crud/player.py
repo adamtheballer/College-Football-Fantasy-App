@@ -51,7 +51,10 @@ def list_players(
         draft_picked_players = (
             select(DraftPick.player_id)
             .join(Draft, Draft.id == DraftPick.draft_id)
-            .where(Draft.league_id == league_id, Draft.status.in_(("scheduled", "live", "active")))
+            .where(
+                Draft.league_id == league_id,
+                Draft.status.in_(("scheduled", "pre_draft", "on_clock", "transition", "live", "active")),
+            )
         )
         stmt = stmt.where(Player.id.not_in(rostered_players), Player.id.not_in(draft_picked_players))
 

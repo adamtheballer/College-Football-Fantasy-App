@@ -85,53 +85,58 @@ def upsert_espn_weekly_player_stats(
     week: int,
     client: ESPNClient | None = None,
 ) -> dict[str, int]:
+    created_client = client is None
     espn = client or ESPNClient()
-    summaries = espn.get_weekly_boxscore_summaries(season=season, week=week)
-    rows = [row for summary in summaries for row in extract_player_box_score_stats(summary)]
+    try:
+        summaries = espn.get_weekly_boxscore_summaries(season=season, week=week)
+        rows = [row for summary in summaries for row in extract_player_box_score_stats(summary)]
 
-    players = db.query(Player).all()
-    provider_index = _build_provider_player_index(db)
-    external_index, name_school_index = _build_player_indexes(players)
+        players = db.query(Player).all()
+        provider_index = _build_provider_player_index(db)
+        external_index, name_school_index = _build_player_indexes(players)
 
-    upserted = 0
-    skipped = 0
-    for row in rows:
-        player, unmatched_reason = _match_player(row, provider_index, external_index, name_school_index)
-        if not player:
-            record_unmatched_provider_row(
-                db,
-                provider="espn",
-                feed="weekly_boxscore_player_stats",
-                row=row,
-                season=season,
-                week=week,
-                reason=unmatched_reason,
+        upserted = 0
+        skipped = 0
+        for row in rows:
+            player, unmatched_reason = _match_player(row, provider_index, external_index, name_school_index)
+            if not player:
+                record_unmatched_provider_row(
+                    db,
+                    provider="espn",
+                    feed="weekly_boxscore_player_stats",
+                    row=row,
+                    season=season,
+                    week=week,
+                    reason=unmatched_reason,
+                )
+                skipped += 1
+                continue
+            stat = (
+                db.query(PlayerStat)
+                .filter(
+                    PlayerStat.player_id == player.id,
+                    PlayerStat.season == season,
+                    PlayerStat.week == week,
+                )
+                .first()
             )
-            skipped += 1
-            continue
-        stat = (
-            db.query(PlayerStat)
-            .filter(
-                PlayerStat.player_id == player.id,
-                PlayerStat.season == season,
-                PlayerStat.week == week,
-            )
-            .first()
-        )
-        if not stat:
-            stat = PlayerStat(player_id=player.id, season=season, week=week, source="espn", stats=row)
-            db.add(stat)
-        else:
-            stat.source = "espn"
-            stat.stats = row
-        upserted += 1
+            if not stat:
+                stat = PlayerStat(player_id=player.id, season=season, week=week, source="espn", stats=row)
+                db.add(stat)
+            else:
+                stat.source = "espn"
+                stat.stats = row
+            upserted += 1
 
-    db.commit()
-    return {
-        "events": len(summaries),
-        "rows_seen": len(rows),
-        "upserted": upserted,
-        "skipped": skipped,
-        "unmatched_rows": skipped,
-        "unmatched_rate": round(skipped / len(rows), 4) if rows else 0,
-    }
+        db.commit()
+        return {
+            "events": len(summaries),
+            "rows_seen": len(rows),
+            "upserted": upserted,
+            "skipped": skipped,
+            "unmatched_rows": skipped,
+            "unmatched_rate": round(skipped / len(rows), 4) if rows else 0,
+        }
+    finally:
+        if created_client:
+            espn.close()

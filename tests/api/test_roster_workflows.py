@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
+from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
@@ -575,6 +576,121 @@ def test_roster_and_lineup_reject_position_ineligible_slots(client, db_session):
     )
     assert bad_lineup_response.status_code == 409
     assert bad_lineup_response.json()["detail"] == "QB is not eligible for K"
+
+
+def test_lineup_move_is_allowed_before_kickoff_then_locked_after_kickoff(client, db_session):
+    token = create_user_and_token(client, "lineup-kickoff-lock")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    player_id, _ = create_players(client)
+    roster_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": player_id, "slot": "RB", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert roster_response.status_code == 201
+    roster_entry_id = roster_response.json()["id"]
+
+    week_state = current_cfb_week_state(2026, now=datetime.now(timezone.utc), timezone_name="America/Los_Angeles")
+    game = Game(
+        external_id="lineup-kickoff-lock-game",
+        season=2026,
+        week=week_state.week,
+        home_team="Texas",
+        away_team="Oregon",
+        start_date=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    db_session.add(game)
+    db_session.commit()
+
+    before_kickoff_response = client.patch(
+        f"/teams/{team.id}/lineup",
+        json={"assignments": [{"roster_entry_id": roster_entry_id, "slot": "BENCH"}]},
+        headers=auth_headers(token),
+    )
+    assert before_kickoff_response.status_code == 200
+
+    game.start_date = datetime.now(timezone.utc) - timedelta(minutes=1)
+    db_session.commit()
+    after_kickoff_response = client.patch(
+        f"/teams/{team.id}/lineup",
+        json={"assignments": [{"roster_entry_id": roster_entry_id, "slot": "RB"}]},
+        headers=auth_headers(token),
+    )
+    assert after_kickoff_response.status_code == 409
+    assert after_kickoff_response.json()["detail"] == "lineup changes are locked after kickoff for: Runner One"
+
+    db_session.expire_all()
+    assert db_session.get(RosterEntry, roster_entry_id).slot == "BENCH"
+    roster_tab_response = client.get(f"/leagues/{league['id']}/roster", headers=auth_headers(token))
+    assert roster_tab_response.status_code == 200
+    locked_player = next(row for row in roster_tab_response.json()["roster"] if row["id"] == roster_entry_id)
+    assert locked_player["is_locked"] is True
+    assert locked_player["game_start_at"] is not None
+
+
+def test_add_drop_uses_open_flex_slot_when_primary_position_is_full(client, db_session):
+    token = create_user_and_token(client, "add-drop-flex")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    settings = db_session.query(LeagueSettings).filter(LeagueSettings.league_id == league["id"]).one()
+    settings.roster_slots_json = {"QB": 0, "RB": 2, "WR": 0, "TE": 0, "FLEX": 1, "K": 1, "BENCH": 0}
+    db_session.commit()
+
+    players = [
+        Player(name=f"Flex Runner {index}", position="RB", school="Texas") for index in range(1, 4)
+    ] + [Player(name="Flex Kicker", position="K", school="Oregon")]
+    db_session.add_all(players)
+    db_session.commit()
+
+    for player in players[:2]:
+        response = client.post(
+            f"/teams/{team.id}/roster",
+            json={"player_id": player.id, "slot": "RB", "status": "active"},
+            headers=auth_headers(token),
+        )
+        assert response.status_code == 201
+    kicker_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": players[3].id, "slot": "K", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert kicker_response.status_code == 201
+
+    response = client.post(
+        f"/teams/{team.id}/add-drop",
+        json={
+            "add_player_id": players[2].id,
+            "drop_roster_entry_id": kicker_response.json()["id"],
+            "reason": "Need RB depth",
+        },
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 201
+    added_entry = next(entry for entry in response.json()["roster"] if entry["player_id"] == players[2].id)
+    assert added_entry["slot"] == "FLEX"
+
+
+def test_superflex_slot_is_legal_when_it_is_configured(client, db_session):
+    token = create_user_and_token(client, "configured-superflex")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    settings = db_session.query(LeagueSettings).filter(LeagueSettings.league_id == league["id"]).one()
+    settings.roster_slots_json = {"QB": 1, "RB": 0, "WR": 0, "TE": 0, "FLEX": 0, "SUPERFLEX": 1, "K": 0, "BENCH": 0}
+    settings.superflex_enabled = False
+    qb = Player(name="Configured Superflex QB", position="QB", school="Texas")
+    db_session.add(qb)
+    db_session.commit()
+
+    response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": qb.id, "slot": "SUPERFLEX", "status": "active"},
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["slot"] == "SUPERFLEX"
 
 
 def test_team_and_roster_db_constraints_enforce_league_invariants(client, db_session):

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     scoring_worker_retry_max_attempts: int = 3
     scoring_worker_retry_base_seconds: int = 5
     lifecycle_worker_interval_seconds: int = 5
+    draft_cpu_pick_delay_seconds: int = 4
     scoring_dead_letter_after_failures: int = 3
     provider_unmatched_failure_threshold_percent: float = 10.0
     projection_provider: str = "sportsdataio"
@@ -117,6 +118,13 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @field_validator("draft_cpu_pick_delay_seconds")
+    @classmethod
+    def validate_draft_cpu_pick_delay_seconds(cls, value: int) -> int:
+        if value < 2 or value > 8:
+            raise ValueError("DRAFT_CPU_PICK_DELAY_SECONDS must be between 2 and 8")
+        return value
 
     @property
     def is_production(self) -> bool:

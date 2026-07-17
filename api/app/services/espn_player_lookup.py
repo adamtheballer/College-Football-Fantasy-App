@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -28,6 +29,14 @@ POSITION_ALIASES = {
 class ResolvedESPNPlayer:
     provider_player_id: str
     profile_payload: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class ESPNIdentityResolution:
+    outcome: str
+    resolved: ResolvedESPNPlayer | None = None
+    profile_updated: bool = False
+    detail: str | None = None
 
 
 def normalize_espn_lookup_text(value: str | None) -> str:
@@ -62,6 +71,56 @@ def _profile_position(profile_payload: dict[str, Any] | None) -> str | None:
         return None
     text = str(raw).strip().upper()
     return POSITION_ALIASES.get(text, text)
+
+
+def _profile_text(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _profile_birthplace(profile_payload: dict[str, Any] | None) -> str | None:
+    athlete = _profile_athlete(profile_payload)
+    birth_place = athlete.get("birthPlace")
+    if isinstance(birth_place, dict):
+        values = [
+            _profile_text(birth_place.get("city")),
+            _profile_text(birth_place.get("state")),
+            _profile_text(birth_place.get("country")),
+        ]
+    elif isinstance(birth_place, str):
+        return _profile_text(birth_place)
+    else:
+        values = [
+            _profile_text(athlete.get("birthCity")),
+            _profile_text(athlete.get("birthState")),
+            _profile_text(athlete.get("birthCountry")),
+        ]
+    return ", ".join(value for value in values if value) or None
+
+
+def persist_espn_player_profile(player: Player, profile_payload: dict[str, Any] | None) -> bool:
+    athlete = _profile_athlete(profile_payload)
+    if not athlete:
+        return False
+    status = athlete.get("status") if isinstance(athlete.get("status"), dict) else {}
+    headshot = athlete.get("headshot") if isinstance(athlete.get("headshot"), dict) else {}
+    values = {
+        "espn_height": _profile_text(athlete.get("displayHeight")),
+        "espn_weight": _profile_text(athlete.get("displayWeight")),
+        "espn_birthplace": _profile_birthplace(profile_payload),
+        "espn_status": _profile_text(status.get("name") or status.get("abbreviation")),
+        "espn_jersey": _profile_text(athlete.get("jersey")),
+        "espn_headshot_url": _profile_text(headshot.get("href")),
+    }
+    for attribute, value in values.items():
+        if value is not None:
+            setattr(player, attribute, value)
+    if values["espn_headshot_url"] and not player.image_url:
+        player.image_url = values["espn_headshot_url"]
+    player.espn_profile_synced_at = datetime.now(timezone.utc)
+    return True
 
 
 def _item_name_matches(item: dict[str, Any], player: Player) -> bool:
@@ -99,14 +158,14 @@ def _position_matches(profile_payload: dict[str, Any] | None, player: Player) ->
     return profile_position == (player.position or "").strip().upper()
 
 
-def resolve_espn_player_by_name(
+def resolve_espn_player_identity_and_profile(
     db: Session,
     player: Player,
     *,
     client: ESPNClient | None = None,
-) -> ResolvedESPNPlayer | None:
+) -> ESPNIdentityResolution:
     if not player.name or not player.school or not player.position:
-        return None
+        return ESPNIdentityResolution(outcome="not_found", detail="Player is missing name, school, or position.")
 
     espn_client = client or ESPNClient()
     candidates = [
@@ -114,27 +173,47 @@ def resolve_espn_player_by_name(
         for item in espn_client.search_players(player.name, limit=10)
         if _item_is_college_football_player(item) and _item_name_matches(item, player) and item.get("id")
     ]
+    matches: list[ResolvedESPNPlayer] = []
+    seen_provider_ids: set[str] = set()
     for candidate in candidates:
         provider_player_id = str(candidate["id"]).strip()
-        if not provider_player_id:
+        if not provider_player_id or provider_player_id in seen_provider_ids:
             continue
+        seen_provider_ids.add(provider_player_id)
         profile_payload = espn_client.get_athlete_profile(provider_player_id)
         if not (_school_matches(profile_payload, player) and _position_matches(profile_payload, player)):
             continue
-        try:
-            upsert_player_provider_mapping(
-                db,
-                player_id=player.id,
-                provider="espn",
-                provider_player_id=provider_player_id,
-                match_confidence=0.95,
-                verification_status="legacy_backfill",
-                reason="Exact ESPN player search match by name, school, and position.",
-            )
-            db.commit()
-        except ProviderIdentityConflict:
-            db.rollback()
-            return None
-        return ResolvedESPNPlayer(provider_player_id=provider_player_id, profile_payload=profile_payload)
+        matches.append(ResolvedESPNPlayer(provider_player_id=provider_player_id, profile_payload=profile_payload))
 
-    return None
+    if not matches:
+        return ESPNIdentityResolution(outcome="not_found")
+    if len(matches) > 1:
+        return ESPNIdentityResolution(outcome="ambiguous", detail="Multiple ESPN profiles matched the player identity.")
+
+    resolved = matches[0]
+    try:
+        upsert_player_provider_mapping(
+            db,
+            player_id=player.id,
+            provider="espn",
+            provider_player_id=resolved.provider_player_id,
+            match_confidence=0.95,
+            verification_status="legacy_backfill",
+            reason="Exact ESPN player search match by name, school, and position.",
+        )
+        profile_updated = persist_espn_player_profile(player, resolved.profile_payload)
+        db.commit()
+    except ProviderIdentityConflict:
+        db.rollback()
+        return ESPNIdentityResolution(outcome="ambiguous", detail="ESPN identity conflicts with an existing trusted mapping.")
+    return ESPNIdentityResolution(outcome="matched", resolved=resolved, profile_updated=profile_updated)
+
+
+def resolve_espn_player_by_name(
+    db: Session,
+    player: Player,
+    *,
+    client: ESPNClient | None = None,
+) -> ResolvedESPNPlayer | None:
+    resolution = resolve_espn_player_identity_and_profile(db, player, client=client)
+    return resolution.resolved if resolution.outcome == "matched" else None

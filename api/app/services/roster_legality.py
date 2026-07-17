@@ -51,6 +51,15 @@ def eligible_slots_for_position(position: str, superflex_enabled: bool = False) 
     return []
 
 
+def superflex_is_enabled(
+    roster_slots: Mapping[str, int] | None,
+    *,
+    configured: bool = False,
+) -> bool:
+    """A configured SUPERFLEX slot is authoritative for legacy settings rows."""
+    return configured or normalize_roster_slot_limits(roster_slots).get("SUPERFLEX", 0) > 0
+
+
 def count_roster_slots(entries: list[RosterEntry]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for entry in entries:
@@ -74,7 +83,10 @@ def assign_best_roster_slot_for_position(
 
     slot_limits = normalize_roster_slot_limits(roster_slots)
     counts = count_roster_slots(roster_entries)
-    for slot in eligible_slots_for_position(normalized_position, superflex_enabled):
+    for slot in eligible_slots_for_position(
+        normalized_position,
+        superflex_is_enabled(slot_limits, configured=superflex_enabled),
+    ):
         if slot_limits.get(slot, 0) > counts.get(slot, 0):
             return slot
     return None

@@ -369,6 +369,8 @@ class RosterTabEntryRead(BaseModel):
     bust_prob: float = 0.0
     opponent: str | None = None
     weekly_projected_fantasy_points: float = 0.0
+    game_start_at: datetime | None = None
+    is_locked: bool = False
     acquisition_type: str = "ROSTER"
     draft_pick_id: int | None = None
 
@@ -425,6 +427,8 @@ class LeagueWaiverPlayerRead(BaseModel):
 class LeagueWaiversRead(BaseModel):
     league_id: int
     fantasy_team_id: int | None = None
+    waiver_priority: int | None = None
+    faab_remaining: int | None = None
     available_players: list[LeagueWaiverPlayerRead]
     claims: list[WaiverClaimRead] = []
     roster: list[WaiverDropCandidateRead] = []

@@ -44,6 +44,14 @@ def test_custom_league_scoring_changes_points():
     assert points == 12.0
 
 
+def test_custom_interception_penalty_deducts_exactly_three_points():
+    stats = normalize_player_stats({"Interceptions": 1})
+    points, breakdown = calculate_player_fantasy_points(stats, {"int": -3})
+
+    assert points == -3.0
+    assert breakdown["interceptions"] == {"stat": 1.0, "multiplier": -3.0, "points": -3.0}
+
+
 def test_starting_slot_detection_excludes_bench_and_ir():
     assert is_starting_slot("QB") is True
     assert is_starting_slot("FLEX") is True

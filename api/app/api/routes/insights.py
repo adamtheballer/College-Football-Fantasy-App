@@ -9,28 +9,19 @@ from sqlalchemy.orm import Session, aliased
 
 from collegefootballfantasy_api.app.api.deps import get_current_user
 from collegefootballfantasy_api.app.db.session import get_db
-from collegefootballfantasy_api.app.models.defense_rating import DefenseRating
-from collegefootballfantasy_api.app.models.defense_vs_position import DefenseVsPosition
-from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.notification import NotificationLog
-from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
-from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.insights import (
     AccoladesResponse,
     DynastyCareerResponse,
-    PlayerCompareRequest,
-    PlayerCompareResponse,
-    PlayerCompareSide,
     RivalryList,
     RivalryRow,
     UserAnalyticsList,
     UserAnalyticsRow,
 )
-from collegefootballfantasy_api.app.services.matchup_grades import build_matchup_row
 
 router = APIRouter()
 
@@ -431,90 +422,3 @@ def get_user_analytics_leaderboard(
         )
     rows.sort(key=lambda row: row.dynasty_power_rating, reverse=True)
     return UserAnalyticsList(data=rows[:limit], total=min(len(rows), limit))
-
-
-def _next_opponent_for_player(db: Session, player: Player, season: int, week: int) -> str | None:
-    game = (
-        db.query(Game)
-        .filter(
-            Game.season == season,
-            Game.week == week,
-            or_(Game.home_team == player.school, Game.away_team == player.school),
-        )
-        .first()
-    )
-    if not game:
-        return None
-    return game.away_team if game.home_team == player.school else game.home_team
-
-
-def _compare_side(db: Session, player: Player, season: int, week: int) -> PlayerCompareSide:
-    projection = (
-        db.query(WeeklyProjection)
-        .filter(
-            WeeklyProjection.player_id == player.id,
-            WeeklyProjection.season == season,
-            WeeklyProjection.week == week,
-        )
-        .first()
-    )
-    fantasy_ppg = float(projection.fantasy_points or 0.0) if projection else 0.0
-    usage_rate = 0.0
-    red_zone_touches = 0.0
-    if projection:
-        if player.position.upper() == "QB":
-            usage_rate = float(projection.pass_attempts or 0.0) + float(projection.rush_attempts or 0.0)
-        else:
-            usage_rate = float(projection.targets or 0.0) + float(projection.rush_attempts or 0.0)
-        red_zone_touches = (
-            float(projection.rush_tds or 0.0) * 2.4
-            + float(projection.rec_tds or 0.0) * 2.1
-            + float(projection.pass_tds or 0.0) * 0.8
-        )
-
-    opponent = _next_opponent_for_player(db, player, season, week)
-    difficulty = "C"
-    if opponent:
-        defense = (
-            db.query(DefenseRating)
-            .filter(DefenseRating.team_name == opponent, DefenseRating.season == season, DefenseRating.week == week)
-            .first()
-        )
-        cached = (
-            db.query(DefenseVsPosition)
-            .filter(
-                DefenseVsPosition.team_name == opponent,
-                DefenseVsPosition.season == season,
-                DefenseVsPosition.week == week,
-                DefenseVsPosition.position == player.position.upper(),
-            )
-            .first()
-        )
-        row = build_matchup_row(opponent, season, week, player.position.upper(), defense, cached)
-        difficulty = row.get("grade", "C")
-
-    return PlayerCompareSide(
-        player_id=player.id,
-        player_name=player.name,
-        school=player.school,
-        position=player.position,
-        fantasy_ppg=round(fantasy_ppg, 2),
-        usage_rate=round(usage_rate, 2),
-        red_zone_touches=round(red_zone_touches, 2),
-        projected_matchup_difficulty=difficulty,
-    )
-
-
-@router.post("/player-compare", response_model=PlayerCompareResponse)
-def compare_players(
-    payload: PlayerCompareRequest,
-    db: Session = Depends(get_db),
-) -> PlayerCompareResponse:
-    player_a = db.query(Player).filter(Player.id == payload.player_a_id).first()
-    player_b = db.query(Player).filter(Player.id == payload.player_b_id).first()
-    if not player_a or not player_b:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
-    return PlayerCompareResponse(
-        player_a=_compare_side(db, player_a, payload.season, payload.week),
-        player_b=_compare_side(db, player_b, payload.season, payload.week),
-    )

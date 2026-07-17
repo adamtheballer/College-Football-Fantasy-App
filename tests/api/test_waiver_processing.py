@@ -8,6 +8,7 @@ from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
+from collegefootballfantasy_api.app.services.league_roster_matchup import build_waivers_view
 from collegefootballfantasy_api.app.services.waiver_service import process_waiver_claims_once
 
 
@@ -52,3 +53,8 @@ def test_due_waiver_processing_is_idempotent_with_league_serialization(client, d
     assert process_waiver_claims_once(db_session) == {"processed": 0, "failed": 0, "pending": 0}
     assert db_session.query(RosterEntry).filter_by(league_id=league.id, player_id=player.id).count() == 1
     assert db_session.query(WaiverPriority).filter_by(league_id=league.id, team_id=team.id).one().faab_spent == 7
+
+    waiver_view = build_waivers_view(db_session, league, user)
+    assert waiver_view.waiver_priority == 1
+    assert waiver_view.faab_remaining == 93
+    assert waiver_view.waiver_rules["faab_budget"] == 100

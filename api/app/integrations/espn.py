@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import httpx
@@ -21,13 +22,37 @@ class ESPNClient:
         "SEC": 8,
     }
 
-    def __init__(self, base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        base_url: str | None = None,
+        *,
+        summary_concurrency: int = 4,
+        http_client: httpx.Client | None = None,
+    ) -> None:
         self.base_url = (base_url or self.BASE_URL).rstrip("/")
+        self.summary_concurrency = max(1, summary_concurrency)
+        self._http_client = http_client
+        self._owns_http_client = http_client is None
+
+    def _client(self) -> httpx.Client:
+        if self._http_client is None:
+            self._http_client = httpx.Client(timeout=20.0, follow_redirects=True)
+        return self._http_client
+
+    def close(self) -> None:
+        if self._http_client is not None and self._owns_http_client:
+            self._http_client.close()
+        self._http_client = None
+
+    def __enter__(self) -> "ESPNClient":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        self.close()
 
     def _request(self, path: str, params: dict[str, Any], *, base_url: str | None = None) -> dict[str, Any]:
         url = f"{(base_url or self.base_url).rstrip('/')}/{path.lstrip('/')}"
-        with httpx.Client(timeout=20.0) as client:
-            response = client.get(url, params=params)
+        response = self._client().get(url, params=params)
         response.raise_for_status()
         payload = response.json()
         if isinstance(payload, dict):
@@ -84,12 +109,18 @@ class ESPNClient:
         return [item for item in items if isinstance(item, dict)]
 
     def get_weekly_boxscore_summaries(self, season: int, week: int, *, seasontype: int = 2) -> list[dict[str, Any]]:
+        event_ids = [
+            event_id
+            for event in self.get_scoreboard_events(season=season, week=week, seasontype=seasontype)
+            if (event_id := event.get("id")) is not None
+        ]
+        if not event_ids:
+            return []
+        with ThreadPoolExecutor(max_workers=min(self.summary_concurrency, len(event_ids))) as executor:
+            summaries_by_event = list(executor.map(self.get_summary, event_ids))
+
         summaries: list[dict[str, Any]] = []
-        for event in self.get_scoreboard_events(season=season, week=week, seasontype=seasontype):
-            event_id = event.get("id")
-            if event_id is None:
-                continue
-            summary = self.get_summary(event_id)
+        for event_id, summary in zip(event_ids, summaries_by_event, strict=True):
             if summary:
                 summary.setdefault("event_id", str(event_id))
                 summaries.append(summary)
@@ -116,8 +147,7 @@ class ESPNClient:
             return []
 
         url = self.WEB_STANDINGS_URL.format(group=group)
-        with httpx.Client(timeout=20.0, follow_redirects=True) as client:
-            response = client.get(url, params={"season": season})
+        response = self._client().get(url, params={"season": season})
         response.raise_for_status()
         html = response.text
 

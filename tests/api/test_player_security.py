@@ -33,6 +33,20 @@ def test_player_creation_requires_admin(client, db_session):
     assert created.status_code == 201
 
 
+def test_guest_can_browse_players_and_open_cached_player_cards(client, db_session):
+    player = Player(name="Guest Board Player", position="WR", school="Ohio State", cfb27_rank=1)
+    db_session.add(player)
+    db_session.commit()
+
+    board_response = client.get("/players", params={"sort": "rank", "limit": 10})
+    assert board_response.status_code == 200
+    assert [row["id"] for row in board_response.json()["data"]] == [player.id]
+
+    card_response = client.get(f"/players/{player.id}/card")
+    assert card_response.status_code == 200
+    assert card_response.json()["player"]["id"] == player.id
+
+
 def test_player_refresh_requires_admin(client, db_session):
     player = Player(name="Cached Player", position="RB", school="Oregon", external_id="123")
     db_session.add(player)

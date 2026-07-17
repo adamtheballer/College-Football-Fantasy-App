@@ -53,6 +53,10 @@ class TradeOfferCreate(BaseModel):
         return self
 
 
+class TradeOfferCounterCreate(TradeOfferCreate):
+    pass
+
+
 class TradeActionRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=1000)
 
@@ -97,6 +101,7 @@ class TradeOfferRead(BaseModel):
     processed_at: datetime | None
     expires_at: datetime | None
     failure_reason: str | None
+    countered_from_trade_id: int | None
     created_at: datetime
     updated_at: datetime
     items: list[TradeOfferItemRead]

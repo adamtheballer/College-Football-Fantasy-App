@@ -1,5 +1,7 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from collegefootballfantasy_api.app.core.config import settings as app_settings
 from collegefootballfantasy_api.app.models.draft import Draft
@@ -16,6 +18,7 @@ from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
+from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueMatchupTabRead,
@@ -38,6 +41,7 @@ from collegefootballfantasy_api.app.services.matchup_probability import (
     estimate_player_std_dev,
     is_starting_slot,
 )
+from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_starts_for_players
 from collegefootballfantasy_api.app.services.waiver_service import serialize_claims
 
 DEFAULT_ROSTER_SLOTS = {
@@ -68,25 +72,29 @@ def _owned_team(db: Session, league: League, user: User) -> Team | None:
 
 
 def _team_record(db: Session, league: League, team_id: int) -> str:
-    latest_week = (
-        db.query(func.max(Standing.week))
-        .filter(Standing.league_id == league.id, Standing.season == league.season_year)
-        .scalar()
-    )
-    if latest_week is not None:
-        standing = (
-            db.query(Standing)
-            .filter(
-                Standing.league_id == league.id,
-                Standing.season == league.season_year,
-                Standing.week == latest_week,
-                Standing.team_id == team_id,
-            )
-            .first()
+    return _team_records(db, league, {team_id}).get(team_id, "0-0-0")
+
+
+def _team_records(db: Session, league: League, team_ids: set[int]) -> dict[int, str]:
+    if not team_ids:
+        return {}
+    standings = (
+        db.query(Standing)
+        .filter(
+            Standing.league_id == league.id,
+            Standing.season == league.season_year,
+            Standing.team_id.in_(team_ids),
         )
-        if standing:
-            return f"{standing.wins}-{standing.losses}-{standing.ties}"
-    return "0-0-0"
+        .order_by(Standing.team_id.asc(), Standing.week.desc(), Standing.id.desc())
+        .all()
+    )
+    records = {team_id: "0-0-0" for team_id in team_ids}
+    seen_team_ids: set[int] = set()
+    for standing in standings:
+        if standing.team_id not in seen_team_ids:
+            records[standing.team_id] = f"{standing.wins}-{standing.losses}-{standing.ties}"
+            seen_team_ids.add(standing.team_id)
+    return records
 
 
 def _team_read(db: Session, league: League, team: Team) -> RosterTabTeamRead:
@@ -121,16 +129,35 @@ def _projection_map(
 def _roster_rows(db: Session, team_id: int) -> list[RosterEntry]:
     return (
         db.query(RosterEntry)
+        .options(joinedload(RosterEntry.player))
         .filter(RosterEntry.team_id == team_id)
         .order_by(RosterEntry.slot.asc(), RosterEntry.id.asc())
         .all()
     )
 
 
+def _rosters_for_teams(db: Session, team_ids: set[int]) -> dict[int, list[RosterEntry]]:
+    rosters = {team_id: [] for team_id in team_ids}
+    if not team_ids:
+        return rosters
+    entries = (
+        db.query(RosterEntry)
+        .options(joinedload(RosterEntry.player))
+        .filter(RosterEntry.team_id.in_(team_ids))
+        .order_by(RosterEntry.team_id.asc(), RosterEntry.slot.asc(), RosterEntry.id.asc())
+        .all()
+    )
+    for entry in entries:
+        rosters.setdefault(entry.team_id, []).append(entry)
+    return rosters
+
+
 def _serialize_roster_entry(
     entry: RosterEntry,
     projection: WeeklyProjection | None,
     opponent: str | None = None,
+    game_start_at: datetime | None = None,
+    is_locked: bool = False,
 ) -> RosterTabEntryRead:
     slot = (entry.slot or "BENCH").upper()
     projected = float(projection.fantasy_points or 0.0) if projection else 0.0
@@ -160,6 +187,8 @@ def _serialize_roster_entry(
         bust_prob=float(projection.bust_prob or 0.0) if projection else 0.0,
         opponent=opponent,
         weekly_projected_fantasy_points=projected,
+        game_start_at=game_start_at,
+        is_locked=is_locked,
     )
 
 
@@ -171,16 +200,74 @@ def _serialize_team_roster(
     opponent: str | None = None,
 ) -> list[RosterTabEntryRead]:
     entries = _roster_rows(db, team.id)
+    player_ids = {entry.player_id for entry in entries}
     projection_by_player = _projection_map(
         db,
         league.season_year,
         week,
-        {entry.player_id for entry in entries},
+        player_ids,
     )
+    game_starts = game_starts_for_players(
+        db,
+        player_ids=player_ids,
+        season=league.season_year,
+        week=week,
+        player_schools={entry.player_id: entry.player.school if entry.player else None for entry in entries},
+    )
+    current_time = datetime.now(timezone.utc)
     return [
-        _serialize_roster_entry(entry, projection_by_player.get(entry.player_id), opponent)
+        _serialize_roster_entry(
+            entry,
+            projection_by_player.get(entry.player_id),
+            opponent,
+            game_start_at=game_starts.get(entry.player_id),
+            is_locked=(
+                game_starts.get(entry.player_id) is not None
+                and as_utc(game_starts[entry.player_id]) <= current_time
+            ),
+        )
         for entry in entries
     ]
+
+
+def _serialize_team_rosters(
+    db: Session,
+    league: League,
+    teams: dict[int, Team],
+    week: int,
+    opponents: dict[int, str | None],
+) -> dict[int, list[RosterTabEntryRead]]:
+    entries_by_team = _rosters_for_teams(db, set(teams))
+    player_ids = {entry.player_id for entries in entries_by_team.values() for entry in entries}
+    projection_by_player = _projection_map(db, league.season_year, week, player_ids)
+    game_starts = game_starts_for_players(
+        db,
+        player_ids=player_ids,
+        season=league.season_year,
+        week=week,
+        player_schools={
+            entry.player_id: entry.player.school if entry.player else None
+            for entries in entries_by_team.values()
+            for entry in entries
+        },
+    )
+    current_time = datetime.now(timezone.utc)
+    return {
+        team_id: [
+            _serialize_roster_entry(
+                entry,
+                projection_by_player.get(entry.player_id),
+                opponents.get(team_id),
+                game_start_at=game_starts.get(entry.player_id),
+                is_locked=(
+                    game_starts.get(entry.player_id) is not None
+                    and as_utc(game_starts[entry.player_id]) <= current_time
+                ),
+            )
+            for entry in entries_by_team.get(team_id, [])
+        ]
+        for team_id in teams
+    }
 
 
 def _starter_projection_summary(roster: list[RosterTabEntryRead]) -> tuple[float, float]:
@@ -309,8 +396,15 @@ def build_matchup_tab_view(
     opponent_id = matchup.away_team_id if matchup.home_team_id == team.id else matchup.home_team_id
     opponent = db.get(Team, opponent_id)
     opponent_name = opponent.name if opponent else "TBD"
-    my_roster = _serialize_team_roster(db, league, team, week, opponent_name)
-    opponent_roster = _serialize_team_roster(db, league, opponent, week, team.name) if opponent else []
+    roster_by_team = _serialize_team_rosters(
+        db,
+        league,
+        {team.id: team, **({opponent.id: opponent} if opponent else {})},
+        week,
+        {team.id: opponent_name, **({opponent.id: team.name} if opponent else {})},
+    )
+    my_roster = roster_by_team[team.id]
+    opponent_roster = roster_by_team.get(opponent.id, []) if opponent else []
     my_total, my_variance = _starter_projection_summary(my_roster)
     opponent_total, opponent_variance = _starter_projection_summary(opponent_roster)
     status = (matchup.status or "").lower()
@@ -329,10 +423,14 @@ def build_matchup_tab_view(
         opponent_variance,
     )
 
+    record_team_ids = {team.id}
+    if opponent:
+        record_team_ids.add(opponent.id)
+    records = _team_records(db, league, record_team_ids)
     my_team = MatchupTeamRead(
         id=team.id,
         name=team.name,
-        record=_team_record(db, league, team.id),
+        record=records[team.id],
         projected_points=my_total,
         win_probability=my_probability,
         fantasy_team_id=team.id,
@@ -344,7 +442,7 @@ def build_matchup_tab_view(
         MatchupTeamRead(
             id=opponent.id,
             name=opponent.name,
-            record=_team_record(db, league, opponent.id),
+            record=records[opponent.id],
             projected_points=opponent_total,
             win_probability=opponent_probability,
             fantasy_team_id=opponent.id,
@@ -416,8 +514,17 @@ def build_waivers_view(
     }
     claims = []
     roster = []
+    waiver_priority = None
+    faab_remaining = None
     settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
     if team:
+        priority_row = (
+            db.query(WaiverPriority)
+            .filter(WaiverPriority.league_id == league.id, WaiverPriority.team_id == team.id)
+            .first()
+        )
+        waiver_priority = priority_row.priority if priority_row else None
+        faab_remaining = priority_row.faab_remaining if priority_row else (settings.faab_budget if settings else 100)
         claim_rows = (
             db.query(WaiverClaim)
             .filter(WaiverClaim.league_id == league.id, WaiverClaim.team_id == team.id)
@@ -440,6 +547,8 @@ def build_waivers_view(
     return LeagueWaiversRead(
         league_id=league.id,
         fantasy_team_id=team.id if team else None,
+        waiver_priority=waiver_priority,
+        faab_remaining=faab_remaining,
         available_players=[
             LeagueWaiverPlayerRead(
                 id=player.id,
@@ -461,7 +570,7 @@ def build_waivers_view(
         waiver_rules={
             "waiver_type": settings.waiver_type if settings else "FAAB",
             "waiver_period_hours": settings.waiver_period_hours if settings else 24,
-            "faab_budget": 100,
+            "faab_budget": settings.faab_budget if settings else 100,
         },
         total_available=total,
         message=None if team else "No team found for your user in this league.",

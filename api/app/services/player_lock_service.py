@@ -21,11 +21,16 @@ def game_starts_for_players(
     player_ids: set[int],
     season: int,
     week: int,
+    player_schools: dict[int, str | None] | None = None,
 ) -> dict[int, datetime | None]:
     if not player_ids:
         return {}
-    players = db.query(Player.id, Player.school).filter(Player.id.in_(player_ids)).all()
-    schools = {school for _, school in players if school}
+    if player_schools is None:
+        player_schools = {
+            player_id: school
+            for player_id, school in db.query(Player.id, Player.school).filter(Player.id.in_(player_ids)).all()
+        }
+    schools = {school for school in player_schools.values() if school}
     if not schools:
         return {player_id: None for player_id in player_ids}
     games = (
@@ -46,7 +51,7 @@ def game_starts_for_players(
         for school in (game.home_team, game.away_team):
             if school in schools and (school not in starts_by_school or start < starts_by_school[school]):
                 starts_by_school[school] = start
-    return {player_id: starts_by_school.get(school) for player_id, school in players}
+    return {player_id: starts_by_school.get(player_schools.get(player_id)) for player_id in player_ids}
 
 
 def locked_player_ids(

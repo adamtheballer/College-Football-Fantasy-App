@@ -51,7 +51,7 @@ def legacy_espn_player_id(external_id: str | None) -> str | None:
         return None
     if text.lower().startswith("espn:"):
         return text.split(":", 1)[1].strip() or None
-    return text
+    return text if text.isdecimal() else None
 
 
 def resolve_espn_player_id(db: Session, player: Player) -> str | None:
@@ -282,8 +282,9 @@ def fetch_and_store_player_history(
     *,
     provider: ESPNHistoricalPlayerStatsProvider | None = None,
     league_id: int | None = None,
+    allow_disabled: bool = False,
 ) -> PlayerHistoricalStatsResponse:
-    if not settings.espn_historical_stats_enabled:
+    if not settings.espn_historical_stats_enabled and not allow_disabled:
         return PlayerHistoricalStatsResponse(
             player_id=player.id,
             status="disabled",
