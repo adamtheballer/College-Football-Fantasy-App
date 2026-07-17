@@ -713,7 +713,11 @@ test.describe("critical browser workflows", () => {
 
     await page.goto("/league/1/draft");
     await expect(page.getByRole("heading", { name: /Draft Test League/i })).toBeVisible();
-    await page.getByRole("button", { name: /^Draft$/i }).first().click();
+    await page
+      .getByTestId("draft-player-row")
+      .filter({ hasText: "Arch Manning" })
+      .getByRole("button", { name: /^Draft$/i })
+      .click();
     await expect(page.getByText(/Last pick/i)).toBeVisible();
     await expect(page.getByText(/Arch Manning/i).first()).toBeVisible();
     await expect(page.getByText(/Other Team/i).first()).toBeVisible();

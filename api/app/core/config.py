@@ -90,6 +90,15 @@ class Settings(BaseSettings):
     auth_refresh_rate_limit: int = 30
     auth_password_reset_rate_limit: int = 5
     provider_refresh_rate_limit: int = 30
+    chat_message_rate_limit: int = 30
+    chat_message_rate_limit_window_minutes: int = 1
+    chat_message_sustained_rate_limit: int = 120
+    chat_message_sustained_rate_limit_window_minutes: int = 15
+    chat_direct_thread_rate_limit: int = 20
+    chat_direct_thread_rate_limit_window_minutes: int = 60
+    chat_read_rate_limit: int = 120
+    chat_read_rate_limit_window_minutes: int = 1
+    chat_edit_window_minutes: int = 15
     email_delivery_mode: str = "console"
     smtp_host: str | None = None
     smtp_port: int = 587

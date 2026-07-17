@@ -64,6 +64,15 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
                 )}
               />
               <span>{item.name}</span>
+              {item.badge ? (
+                <span
+                  role="status"
+                  aria-label={`${item.badge} unread chat messages`}
+                  className="ml-auto inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-black tracking-normal text-white shadow-[0_0_14px_rgba(239,68,68,0.42)]"
+                >
+                  {item.badge}
+                </span>
+              ) : null}
               {isActive && !isSignOut && !isAuth ? (
                 <div
                   aria-hidden="true"

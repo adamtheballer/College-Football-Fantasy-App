@@ -23,6 +23,7 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueSettingsUpdate,
 )
 from collegefootballfantasy_api.app.services.league_workspace import get_league_detail
+from collegefootballfantasy_api.app.services.chat_service import get_or_create_league_chat_thread
 from collegefootballfantasy_api.app.services.notification_service import (
     cancel_scheduled_notifications,
     schedule_draft_notifications,
@@ -222,6 +223,10 @@ def create_league(
     )
     db.add(league)
     db.flush()
+
+    # Every league has one master chat thread from creation. Existing leagues are
+    # backfilled by the chat migration; this covers all future leagues atomically.
+    get_or_create_league_chat_thread(db, league.id)
 
     db.add(
         LeagueSettings(

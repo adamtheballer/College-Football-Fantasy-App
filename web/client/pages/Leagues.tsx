@@ -12,10 +12,12 @@ import {
   Copy,
   Link2,
   LockKeyhole,
+  UsersRound,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/use-toast";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagues } from "@/hooks/use-leagues";
@@ -243,6 +245,20 @@ export default function Leagues() {
           </h1>
           {isLoggedIn && (
             <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="ghost"
+                aria-label="Quick Join is coming soon"
+                className="h-10 rounded-xl border border-dashed border-white/15 px-3 text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                onClick={() => toast({
+                  title: "Quick Join coming soon",
+                  description: "Leagues are invite-only for now. Quick Join will help you find a public league in a future release.",
+                })}
+              >
+                <UsersRound className="mr-1.5 h-3.5 w-3.5 text-primary" />
+                Quick Join
+                <span className="ml-1 rounded-full border border-amber-300/30 bg-amber-300/10 px-1.5 py-0.5 text-[8px] text-amber-100">Coming soon</span>
+              </Button>
               <Button
                 variant="outline"
                 className="border-primary/30 text-primary text-[10px] font-black uppercase tracking-widest rounded-2xl h-12 px-8 hover:bg-primary/10 transition-all"

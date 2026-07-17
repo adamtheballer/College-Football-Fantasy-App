@@ -26,7 +26,10 @@ from collegefootballfantasy_api.app.schemas.trade import (
     TradeOfferRead,
     TradeReviewRead,
 )
-from collegefootballfantasy_api.app.services.league_chat import create_system_message
+from collegefootballfantasy_api.app.services.chat_service import (
+    create_trade_finalized_chat_message,
+    mark_trade_finalized_chat_message_processed,
+)
 from collegefootballfantasy_api.app.services.league_weeks import (
     current_cfb_week_state,
     is_cfb_game_week_active,
@@ -186,6 +189,21 @@ def _notify_participants(db: Session, offer: TradeOffer, alert_type: str, title:
             league_id=offer.league_id,
             trade_id=offer.id,
         )
+
+
+def _announce_trade_finalized(
+    db: Session,
+    offer: TradeOffer,
+    *,
+    finalized_at: datetime,
+) -> None:
+    """Write the binding event in the transaction that finalizes the offer."""
+    create_trade_finalized_chat_message(
+        db,
+        offer,
+        finalized_at=finalized_at,
+        process_after=offer.process_after,
+    )
 
 
 def _player_ids_for_offer(offer: TradeOffer) -> list[int]:
@@ -537,7 +555,8 @@ def accept_trade_offer(db: Session, league: League, trade_id: int, current_user:
         body = "Trade accepted and processed."
     _add_review(db, offer, "accepted", current_user.id, payload.reason)
     _notify_participants(db, offer, "TRADE_ACCEPTED", "Trade Accepted", body)
-    create_system_message(db, league_id=league.id, user_id=current_user.id, body=body, message_type="trade")
+    if offer.status != TRADE_STATUS_COMMISSIONER_REVIEW:
+        _announce_trade_finalized(db, offer, finalized_at=now)
     db.commit()
     return _serialize_offer(_load_offer(db, offer.id))
 
@@ -570,7 +589,7 @@ def commissioner_approve_trade(db: Session, league: League, trade_id: int, curre
         body = "Trade approved and processed."
     _add_review(db, offer, "approved", current_user.id, payload.reason)
     _notify_participants(db, offer, "TRADE_APPROVED", "Trade Approved", body)
-    create_system_message(db, league_id=league.id, user_id=current_user.id, body=body, message_type="trade")
+    _announce_trade_finalized(db, offer, finalized_at=now)
     db.commit()
     return _serialize_offer(_load_offer(db, offer.id))
 
@@ -679,6 +698,7 @@ def process_trade_offers_once(db: Session, now: datetime | None = None) -> dict[
                     now=current,
                     review_action="processed",
                 )
+                mark_trade_finalized_chat_message_processed(db, offer)
             processed += 1
         except Exception as exc:
             offer.status = TRADE_STATUS_FAILED

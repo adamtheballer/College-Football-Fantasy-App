@@ -7,7 +7,7 @@ from collegefootballfantasy_api.app.api.routes.trades import (
 )
 from conftest import TestingSessionLocal
 from collegefootballfantasy_api.app.models.game import Game
-from collegefootballfantasy_api.app.models.league_message import LeagueMessage
+from collegefootballfantasy_api.app.models.chat import ChatAuditEvent, ChatMessage
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.notification import NotificationLog
@@ -20,6 +20,7 @@ from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjec
 from collegefootballfantasy_api.app.schemas.trade import TradeOfferCreate, TradeOfferRead
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services import trade_service
+from collegefootballfantasy_api.app.services.chat_service import create_trade_finalized_chat_message
 from collegefootballfantasy_api.app.services.trade_service import process_trade_offers_once
 
 
@@ -343,8 +344,48 @@ def test_accept_no_review_trade_processes_roster_swap_and_writes_chat(client, db
     db_session.expire_all()
     assert db_session.query(RosterEntry).filter_by(team_id=seed["receiving"].id, player_id=seed["give"].id).one()
     assert db_session.query(RosterEntry).filter_by(team_id=seed["proposing"].id, player_id=seed["receive"].id).one()
-    message = db_session.query(LeagueMessage).filter(LeagueMessage.message_type == "trade").one()
-    assert "Trade accepted" in message.body
+    message = db_session.query(ChatMessage).filter(ChatMessage.message_type == "trade_finalized").one()
+    assert message.event_key == f"trade:{created['id']}:finalized"
+    assert message.metadata_json["event_key"] == message.event_key
+    assert message.metadata_json["trade_id"] == created["id"]
+    assert message.metadata_json["proposing_team"]["id"] == seed["proposing"].id
+    assert message.metadata_json["receiving_team"]["id"] == seed["receiving"].id
+    assert message.metadata_json["proposing_team_sends"] == [
+        {
+            "player_id": seed["give"].id,
+            "name": seed["give"].name,
+            "position": "QB",
+            "school": "Alpha",
+        }
+    ]
+    assert message.metadata_json["receiving_team_sends"] == [
+        {
+            "player_id": seed["receive"].id,
+            "name": seed["receive"].name,
+            "position": "RB",
+            "school": "Bravo",
+        }
+    ]
+    assert message.metadata_json["processing_status"] == "processed"
+    assert message.metadata_json["processed_at"] is not None
+
+    replayed = create_trade_finalized_chat_message(
+        db_session,
+        db_session.get(TradeOffer, created["id"]),
+        finalized_at=datetime.now(timezone.utc),
+        process_after=None,
+    )
+    assert replayed.id == message.id
+    assert db_session.query(ChatMessage).filter(ChatMessage.event_key == message.event_key).count() == 1
+    assert (
+        db_session.query(ChatAuditEvent)
+        .filter(
+            ChatAuditEvent.action == "system_trade_message_generated",
+            ChatAuditEvent.message_id == message.id,
+        )
+        .count()
+        == 1
+    )
 
 
 def test_due_trade_worker_waits_until_monday_reset(client, db_session):
@@ -461,6 +502,7 @@ def test_accept_commissioner_review_trade_waits_for_approval_then_processes(clie
     assert accepted.status_code == 200
     assert accepted.json()["status"] == "commissioner_review"
     assert db_session.query(RosterEntry).filter_by(team_id=seed["proposing"].id, player_id=seed["give"].id).one()
+    assert db_session.query(ChatMessage).filter(ChatMessage.message_type == "trade_finalized").count() == 0
 
     approved = client.post(
         f"/leagues/{league['id']}/trades/{created['id']}/commissioner/approve",
@@ -472,6 +514,85 @@ def test_accept_commissioner_review_trade_waits_for_approval_then_processes(clie
     db_session.expire_all()
     assert db_session.query(RosterEntry).filter_by(team_id=seed["receiving"].id, player_id=seed["give"].id).one()
     assert db_session.query(TradeReview).filter_by(trade_offer_id=created["id"], action="approved").one()
+    assert db_session.query(ChatMessage).filter(ChatMessage.event_key == f"trade:{created['id']}:finalized").count() == 1
+
+
+def test_delayed_trade_updates_its_finalized_chat_card_after_processing(client, db_session, monkeypatch):
+    game_week_active = {"value": True}
+    monkeypatch.setattr(
+        trade_service,
+        "is_cfb_game_week_active",
+        lambda *_args, **_kwargs: game_week_active["value"],
+    )
+    proposing_token = create_user_and_token(client, "chat-pending-a")
+    receiving_token = create_user_and_token(client, "chat-pending-b")
+    league = create_league(client, proposing_token, "chat-pending", review_type="none")
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+    created = client.post(
+        f"/leagues/{league['id']}/trades",
+        json=trade_offer_payload(seed),
+        headers=auth_headers(proposing_token),
+    ).json()
+
+    accepted = client.post(
+        f"/leagues/{league['id']}/trades/{created['id']}/accept",
+        json={},
+        headers=auth_headers(receiving_token),
+    )
+    assert accepted.status_code == 200
+    assert accepted.json()["status"] == "accepted_pending"
+    message = db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:finalized").one()
+    message_id = message.id
+    assert message.metadata_json["processing_status"] == "pending_transfer"
+    assert message.metadata_json["players_process_at"] is not None
+
+    offer = db_session.get(TradeOffer, created["id"])
+    offer.process_after = datetime.now(timezone.utc) - timedelta(minutes=1)
+    db_session.commit()
+    game_week_active["value"] = False
+
+    assert process_trade_offers_once(db_session) == {"processed": 1, "failed": 0}
+    db_session.expire_all()
+    updated_message = db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:finalized").one()
+    assert updated_message.id == message_id
+    assert updated_message.metadata_json["processing_status"] == "processed"
+    assert updated_message.metadata_json["processed_at"] is not None
+    assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:finalized").count() == 1
+
+
+def test_chat_finalization_failure_rolls_back_trade_acceptance(client, db_session, monkeypatch):
+    monkeypatch.setattr(trade_service, "is_cfb_game_week_active", lambda now=None, timezone_name="UTC": False)
+    proposing_token = create_user_and_token(client, "chat-rollback-a")
+    receiving_token = create_user_and_token(client, "chat-rollback-b")
+    league = create_league(client, proposing_token, "chat-rollback", review_type="none")
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+    created = client.post(
+        f"/leagues/{league['id']}/trades",
+        json=trade_offer_payload(seed),
+        headers=auth_headers(proposing_token),
+    ).json()
+
+    def fail_chat_finalization(*_args, **_kwargs):
+        raise RuntimeError("chat persistence unavailable")
+
+    monkeypatch.setattr(trade_service, "create_trade_finalized_chat_message", fail_chat_finalization)
+    with pytest.raises(RuntimeError, match="chat persistence unavailable"):
+        client.post(
+            f"/leagues/{league['id']}/trades/{created['id']}/accept",
+            json={},
+            headers=auth_headers(receiving_token),
+        )
+
+    db_session.expire_all()
+    offer = db_session.get(TradeOffer, created["id"])
+    assert offer.status == "proposed"
+    assert offer.accepted_at is None
+    assert offer.processed_at is None
+    assert db_session.query(RosterEntry).filter_by(team_id=seed["proposing"].id, player_id=seed["give"].id).one()
+    assert db_session.query(RosterEntry).filter_by(team_id=seed["receiving"].id, player_id=seed["receive"].id).one()
+    assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:finalized").count() == 0
 
 
 def test_trade_reject_cancel_counter_and_veto_endpoints(client, db_session):
@@ -621,7 +742,8 @@ def test_trade_offer_list_and_invalid_paths(client, db_session):
     assert invalid_response.status_code == 404
 
 
-def test_stale_ownership_fails_before_processing(client, db_session):
+def test_stale_ownership_fails_before_processing(client, db_session, monkeypatch):
+    monkeypatch.setattr(trade_service, "is_cfb_game_week_active", lambda now=None, timezone_name="UTC": False)
     proposing_token = create_user_and_token(client, "stale-a")
     receiving_token = create_user_and_token(client, "stale-b")
     league = create_league(client, proposing_token, "stale", review_type="none")

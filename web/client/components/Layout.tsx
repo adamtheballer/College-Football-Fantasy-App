@@ -10,6 +10,7 @@ import {
   isDraftRoomRoute,
 } from "./app-shell/navigation";
 import { useAuth } from "@/hooks/use-auth";
+import { useChatUnreadSummary } from "@/hooks/use-chat";
 import { clearPendingGuide, hasPendingGuide } from "@/lib/onboarding";
 
 interface LayoutProps {
@@ -20,12 +21,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isLoggedIn } = useAuth();
+  const { data: unreadChatSummary } = useChatUnreadSummary(isLoggedIn, location.pathname === "/chats");
   const [isGuideActive, setIsGuideActive] = useState(false);
   const mainScrollRef = useRef<HTMLElement | null>(null);
 
   const navItems = useMemo(
-    () => getShellNavItems(user, isLoggedIn),
-    [isLoggedIn, user],
+    () => getShellNavItems(user, isLoggedIn, unreadChatSummary?.total_unread ?? 0),
+    [isLoggedIn, unreadChatSummary?.total_unread, user],
   );
 
   const isDraftRoomPage = isDraftRoomRoute(location.pathname);

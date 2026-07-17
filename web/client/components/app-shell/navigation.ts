@@ -20,6 +20,7 @@ export type ShellNavItem = {
   path: string;
   icon: ComponentType<{ className?: string }>;
   kind?: "primary" | "auth" | "danger" | "admin";
+  badge?: string;
 };
 
 export const isDraftRoomRoute = (pathname: string) =>
@@ -32,7 +33,11 @@ export const isAuthFlowRoute = (pathname: string) =>
   pathname === "/signup" ||
   pathname === "/password-reset/confirm";
 
-export const getShellNavItems = (user: User | null, isLoggedIn: boolean): ShellNavItem[] => {
+export const getShellNavItems = (
+  user: User | null,
+  isLoggedIn: boolean,
+  chatUnreadCount = 0,
+): ShellNavItem[] => {
   if (!isLoggedIn) {
     return [
       { name: "HOME", path: "/", icon: Home },
@@ -46,7 +51,12 @@ export const getShellNavItems = (user: User | null, isLoggedIn: boolean): ShellN
   return [
     { name: "HOME", path: "/", icon: Home },
     { name: "LEAGUES", path: "/leagues", icon: Trophy },
-    { name: "CHATS", path: "/chats", icon: MessageSquare },
+    {
+      name: "CHATS",
+      path: "/chats",
+      icon: MessageSquare,
+      badge: chatUnreadCount > 99 ? "99+" : chatUnreadCount > 0 ? String(chatUnreadCount) : undefined,
+    },
     { name: "INJURY CENTER", path: "/injury-center", icon: ShieldAlert },
     { name: "ALERTS", path: "/alerts", icon: Bell },
     { name: "PLAYER COMPARE", path: "/player-compare", icon: Scale },
@@ -60,7 +70,7 @@ export const getShellNavItems = (user: User | null, isLoggedIn: boolean): ShellN
 };
 
 export const getMobileNavItems = (items: ShellNavItem[]) => {
-  const preferred = new Set(["HOME", "LEAGUES", "PLAYER COMPARE", "MOCK DRAFT", "SETTINGS"]);
+  const preferred = new Set(["HOME", "LEAGUES", "CHATS", "MOCK DRAFT", "SETTINGS"]);
   const filtered = items.filter((item) => preferred.has(item.name));
 
   if (filtered.length >= 4) {

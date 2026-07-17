@@ -52,11 +52,20 @@ describe("app shell navigation helpers", () => {
     ).toBe(true);
   });
 
-  it("keeps mobile navigation focused on the primary destinations", () => {
-    const items = getShellNavItems(user, true);
-    const mobile = getMobileNavItems(items).map((item) => item.name);
+  it("surfaces an unread badge for the chats sidebar item", () => {
+    const chats = getShellNavItems(user, true, 12).find((item) => item.name === "CHATS");
+    const cappedChats = getShellNavItems(user, true, 120).find((item) => item.name === "CHATS");
 
-    expect(mobile).toEqual(["HOME", "LEAGUES", "PLAYER COMPARE", "MOCK DRAFT", "SETTINGS"]);
+    expect(chats?.badge).toBe("12");
+    expect(cappedChats?.badge).toBe("99+");
+  });
+
+  it("keeps mobile navigation focused on the primary destinations", () => {
+    const mobileItems = getMobileNavItems(getShellNavItems(user, true, 1));
+    const mobile = mobileItems.map((item) => item.name);
+
+    expect(mobile).toEqual(["HOME", "LEAGUES", "CHATS", "MOCK DRAFT", "SETTINGS"]);
+    expect(mobileItems.find((item) => item.name === "CHATS")?.badge).toBe("1");
     expect(mobile).not.toContain("SIGN OUT");
   });
 

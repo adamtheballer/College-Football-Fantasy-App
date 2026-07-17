@@ -8,10 +8,10 @@ export default defineConfig({
   workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:4173",
     trace: "on-first-retry",
   },
-  webServer: {
+  webServer: process.env.E2E_REAL_STACK ? undefined : {
     command: "npm run dev -- --host 127.0.0.1 --port 4173 --strictPort",
     url: "http://127.0.0.1:4173",
     reuseExistingServer: !process.env.CI,
@@ -24,4 +24,3 @@ export default defineConfig({
     },
   ],
 });
-

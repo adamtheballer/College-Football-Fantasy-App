@@ -49,6 +49,7 @@ def enforce_auth_rate_limit(
     request: Request,
     limit: int,
     window_minutes: int | None = None,
+    include_ip: bool = True,
 ) -> None:
     now = utcnow()
     window_start = now - timedelta(minutes=window_minutes or settings.auth_rate_limit_window_minutes)
@@ -58,7 +59,7 @@ def enforce_auth_rate_limit(
     filters = []
     if identifier_hash:
         filters.append(AuthRateLimitEvent.identifier_hash == identifier_hash)
-    if ip_hash:
+    if include_ip and ip_hash:
         filters.append(AuthRateLimitEvent.ip_hash == ip_hash)
 
     if filters:

@@ -8,6 +8,7 @@ from collegefootballfantasy_api.app.db.base import Base
 from collegefootballfantasy_api.app.models import (
     auth_action_token,
     auth_rate_limit_event,
+    chat,
     cfb_standing_snapshot,
     college_team,
     defense_rating,
