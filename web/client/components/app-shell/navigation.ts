@@ -5,7 +5,6 @@ import {
   LogIn,
   LogOut,
   MessageSquare,
-  Scale,
   Settings,
   ShieldAlert,
   Timer,
@@ -42,7 +41,6 @@ export const getShellNavItems = (
     return [
       { name: "HOME", path: "/", icon: Home },
       { name: "LEAGUES", path: "/leagues", icon: Trophy },
-      { name: "PLAYER COMPARE", path: "/player-compare", icon: Scale },
       { name: "SETTINGS", path: "/settings", icon: Settings },
       { name: "SIGN IN", path: "/login", icon: LogIn, kind: "auth" },
     ];
@@ -59,7 +57,6 @@ export const getShellNavItems = (
     },
     { name: "INJURY CENTER", path: "/injury-center", icon: ShieldAlert },
     { name: "ALERTS", path: "/alerts", icon: Bell },
-    { name: "PLAYER COMPARE", path: "/player-compare", icon: Scale },
     { name: "MOCK DRAFT", path: "/draft", icon: Timer },
     ...(user?.isAdmin
       ? [{ name: "ADMIN SCORING", path: "/admin/scoring", icon: Wrench, kind: "admin" as const }]

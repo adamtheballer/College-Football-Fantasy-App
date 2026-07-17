@@ -294,16 +294,19 @@ def recalculate_player_week_scores(db: Session, league_id: int, season: int, wee
         score = score_by_player.get(player_id)
         if not stat_row:
             if score:
-                score.status = "stale"
-                score.breakdown_json = {
+                stale_breakdown = {
                     **(score.breakdown_json or {}),
                     "status": "stale",
                     "message": "No provider stat row was available for this recalculation; previous score retained.",
                 }
-                score.calculated_at = calculated_at
+                if score.status != "stale" or score.breakdown_json != stale_breakdown:
+                    score.status = "stale"
+                    score.breakdown_json = stale_breakdown
+                    score.calculated_at = calculated_at
             continue
         normalized_stats = normalize_player_stats(stat_row.stats)
         fantasy_points, breakdown = calculate_player_fantasy_points(normalized_stats, scoring_rules)
+        score_changed = False
         if not score:
             score = PlayerWeekScore(
                 league_id=league_id,
@@ -313,11 +316,20 @@ def recalculate_player_week_scores(db: Session, league_id: int, season: int, wee
             )
             db.add(score)
             score_by_player[player_id] = score
-        score.fantasy_points = fantasy_points
-        score.status = "live"
-        score.breakdown_json = breakdown
-        score.source_stat_id = stat_row.id if stat_row else None
-        score.calculated_at = calculated_at
+            score_changed = True
+        if (
+            score.fantasy_points != fantasy_points
+            or score.status != "live"
+            or score.breakdown_json != breakdown
+            or score.source_stat_id != stat_row.id
+        ):
+            score_changed = True
+        if score_changed:
+            score.fantasy_points = fantasy_points
+            score.status = "live"
+            score.breakdown_json = breakdown
+            score.source_stat_id = stat_row.id
+            score.calculated_at = calculated_at
         scored += 1
     if scored:
         db.flush()
@@ -383,7 +395,8 @@ def recalculate_team_week_score(db: Session, league_id: int, team_id: int, seaso
         )
         .first()
     )
-    if not team_score:
+    is_new = team_score is None
+    if team_score is None:
         team_score = TeamWeekScore(
             league_id=league_id,
             team_id=team_id,
@@ -391,28 +404,45 @@ def recalculate_team_week_score(db: Session, league_id: int, team_id: int, seaso
             week=week,
         )
         db.add(team_score)
-    team_score.starter_points = round(starter_points, 2)
-    team_score.bench_points = round(bench_points, 2)
-    team_score.total_points = round(starter_points, 2)
-    team_score.points_starters = team_score.starter_points
-    team_score.points_bench = team_score.bench_points
-    team_score.points_total = team_score.total_points
-    team_score.breakdown_json = {
+    starter_points = round(starter_points, 2)
+    bench_points = round(bench_points, 2)
+    breakdown = {
         "players": player_breakdown,
-        "starter_points": team_score.starter_points,
-        "bench_points": team_score.bench_points,
-        "total_points": team_score.total_points,
+        "starter_points": starter_points,
+        "bench_points": bench_points,
+        "total_points": starter_points,
         "missing_starter_scores": missing_starter_scores,
         "missing_bench_scores": missing_bench_scores,
     }
     if not snapshots:
-        team_score.status = "unavailable"
+        score_status = "unavailable"
     elif missing_starter_scores:
-        team_score.status = "delayed"
+        score_status = "delayed"
     else:
-        team_score.status = "live"
-    team_score.calculated_at = _now()
-    db.flush()
+        score_status = "live"
+    changed = is_new or any(
+        (
+            team_score.starter_points != starter_points,
+            team_score.bench_points != bench_points,
+            team_score.total_points != starter_points,
+            team_score.points_starters != starter_points,
+            team_score.points_bench != bench_points,
+            team_score.points_total != starter_points,
+            team_score.breakdown_json != breakdown,
+            team_score.status != score_status,
+        )
+    )
+    if changed:
+        team_score.starter_points = starter_points
+        team_score.bench_points = bench_points
+        team_score.total_points = starter_points
+        team_score.points_starters = starter_points
+        team_score.points_bench = bench_points
+        team_score.points_total = starter_points
+        team_score.breakdown_json = breakdown
+        team_score.status = score_status
+        team_score.calculated_at = _now()
+        db.flush()
     return team_score
 
 
@@ -453,17 +483,22 @@ def recalculate_matchup_scores(db: Session, league_id: int, season: int, week: i
     for matchup in matchups:
         home_score = score_by_team.get(matchup.home_team_id)
         away_score = score_by_team.get(matchup.away_team_id)
-        matchup.home_score = float(home_score.total_points if home_score else 0.0)
-        matchup.away_score = float(away_score.total_points if away_score else 0.0)
+        home_points = float(home_score.total_points if home_score else 0.0)
+        away_points = float(away_score.total_points if away_score else 0.0)
+        next_status = matchup.status
         if (matchup.status or "").lower() not in FINAL_MATCHUP_STATUSES:
             team_statuses = {home_score.status if home_score else "unavailable", away_score.status if away_score else "unavailable"}
             if "unavailable" in team_statuses:
-                matchup.status = "unavailable"
+                next_status = "unavailable"
             elif team_statuses.intersection(DELAYED_SCORE_STATUSES):
-                matchup.status = "delayed"
+                next_status = "delayed"
             else:
-                matchup.status = "live"
-        updated += 1
+                next_status = "live"
+        if matchup.home_score != home_points or matchup.away_score != away_points or matchup.status != next_status:
+            matchup.home_score = home_points
+            matchup.away_score = away_points
+            matchup.status = next_status
+            updated += 1
     if updated:
         db.flush()
     return updated

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock, Lock, Users, Zap } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, Clock, Copy, Link2, Lock, RefreshCw, Users, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,12 @@ import {
 } from "@/components/ui/dialog";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
-import { useLeagueDetail, useRescheduleDraft } from "@/hooks/use-leagues";
+import {
+  useLeagueDetail,
+  useRescheduleDraft,
+  useRevokeLeagueInvite,
+  useRotateLeagueInvite,
+} from "@/hooks/use-leagues";
 import { useDraftPlayerPool } from "@/hooks/use-players";
 import { CFB27_RATINGS } from "@/lib/cfb27Ratings";
 import {
@@ -43,11 +48,15 @@ export default function DraftLobby() {
     leagueId && !Number.isNaN(Number(leagueId)) ? Number(leagueId) : undefined;
   const { data: league, error, isLoading } = useLeagueDetail(parsedLeagueId);
   const rescheduleDraft = useRescheduleDraft(parsedLeagueId);
+  const rotateInvite = useRotateLeagueInvite(parsedLeagueId);
+  const revokeInvite = useRevokeLeagueInvite(parsedLeagueId);
   const [now, setNow] = useState(Date.now());
   const [showReschedule, setShowReschedule] = useState(false);
   const [draftDateTime, setDraftDateTime] = useState("");
   const [rescheduleError, setRescheduleError] = useState<string | null>(null);
   const [dismissedPoolWarning, setDismissedPoolWarning] = useState(false);
+  const [copiedInviteField, setCopiedInviteField] = useState<"code" | "link" | null>(null);
+  const [inviteActionError, setInviteActionError] = useState<string | null>(null);
   const playerPoolQuery = useDraftPlayerPool({
     limit: 100,
     offset: 0,
@@ -149,6 +158,37 @@ export default function DraftLobby() {
     }
   };
 
+  const activeInviteCode = isCommissioner ? league.invite_code : null;
+  const activeInviteLink = activeInviteCode ? `${window.location.origin}/join/${activeInviteCode}` : null;
+
+  const copyInviteValue = async (field: "code" | "link", value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedInviteField(field);
+      window.setTimeout(() => setCopiedInviteField(null), 2_000);
+    } catch {
+      setInviteActionError("Unable to copy the invite. Select the code or link and copy it manually.");
+    }
+  };
+
+  const handleRotateInvite = async () => {
+    setInviteActionError(null);
+    try {
+      await rotateInvite.mutateAsync();
+    } catch (inviteError) {
+      setInviteActionError(getErrorMessage(inviteError));
+    }
+  };
+
+  const handleRevokeInvite = async () => {
+    setInviteActionError(null);
+    try {
+      await revokeInvite.mutateAsync();
+    } catch (inviteError) {
+      setInviteActionError(getErrorMessage(inviteError));
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto py-12 space-y-10">
       <Dialog open={showPlayerPoolWarning} onOpenChange={(open) => setDismissedPoolWarning(!open)}>
@@ -246,6 +286,56 @@ export default function DraftLobby() {
           </div>
         </CardContent>
       </Card>
+
+      {isCommissioner ? (
+        <Card className="border-amber-300/20 bg-amber-300/[0.06] rounded-[2.5rem]">
+          <CardHeader className="px-10 pt-10">
+            <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">Invite Recovery</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 px-10 pb-10">
+            {activeInviteCode && activeInviteLink ? (
+              <>
+                <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Invite Code</p>
+                    <p className="mt-1 break-all font-mono text-lg font-black text-slate-50">{activeInviteCode}</p>
+                  </div>
+                  <Button type="button" variant="outline" className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.16em]" onClick={() => void copyInviteValue("code", activeInviteCode)}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    {copiedInviteField === "code" ? "Copied" : "Copy Code"}
+                  </Button>
+                </div>
+                <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Invite Link</p>
+                    <p className="mt-1 break-all font-mono text-xs font-bold text-slate-300">{activeInviteLink}</p>
+                  </div>
+                  <Button type="button" variant="outline" className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.16em]" onClick={() => void copyInviteValue("link", activeInviteLink)}>
+                    <Link2 className="mr-2 h-4 w-4" />
+                    {copiedInviteField === "link" ? "Copied" : "Copy Link"}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <p className="rounded-2xl border border-white/10 bg-black/15 p-4 text-sm font-semibold leading-6 text-slate-300">
+                This league does not have an active invite. Generate a new secure invite when you are ready to add a manager.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-3">
+              <Button type="button" variant="outline" className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.16em]" onClick={() => void handleRotateInvite()} disabled={rotateInvite.isPending}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {rotateInvite.isPending ? "Generating..." : activeInviteCode ? "Rotate Invite" : "Generate Invite"}
+              </Button>
+              {activeInviteCode ? (
+                <Button type="button" variant="outline" className="h-11 rounded-xl border-red-300/25 text-[10px] font-black uppercase tracking-[0.16em] text-red-200 hover:bg-red-400/10" onClick={() => void handleRevokeInvite()} disabled={revokeInvite.isPending}>
+                  {revokeInvite.isPending ? "Revoking..." : "Revoke Invite"}
+                </Button>
+              ) : null}
+            </div>
+            {inviteActionError ? <p className="text-[11px] font-bold text-red-300">{inviteActionError}</p> : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card
         className={[

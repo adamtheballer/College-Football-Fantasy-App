@@ -12,6 +12,7 @@ from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.notification import NotificationLog
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.trade_offer import TradeOffer
@@ -20,8 +21,8 @@ from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjec
 from collegefootballfantasy_api.app.schemas.trade import TradeOfferCreate, TradeOfferRead
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services import trade_service
+from collegefootballfantasy_api.app.services.trade_service import expire_trade_offers_once, process_trade_offers_once
 from collegefootballfantasy_api.app.services.chat_service import create_trade_finalized_chat_message
-from collegefootballfantasy_api.app.services.trade_service import process_trade_offers_once
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -136,6 +137,7 @@ def test_trade_offer_contract_uses_canonical_lifecycle_fields():
         "processed_at",
         "expires_at",
         "failure_reason",
+        "countered_from_trade_id",
     }
     model_columns = set(TradeOffer.__table__.columns.keys())
     schema_fields = set(TradeOfferRead.model_fields.keys())
@@ -229,6 +231,88 @@ def test_trade_analyze_uses_league_scoring_rules_for_projection_value(client, db
     assert global_response.json()["receive_value"] == 15.0
     assert league_response.status_code == 200
     assert league_response.json()["receive_value"] == 0.0
+
+
+def test_trade_analyzer_uses_cfb27_in_week_one_then_stored_performance(client, db_session):
+    token = create_user_and_token(client, "cfb27-trade-value")
+    league = create_league(client, token, "cfb27-trade-value", review_type="none")
+    higher_rated_player = Player(
+        name="Higher Rated Player",
+        position="WR",
+        school="Alpha",
+        cfb27_overall=99,
+    )
+    stronger_performer = Player(
+        name="Stronger Performer",
+        position="WR",
+        school="Bravo",
+        cfb27_overall=70,
+    )
+    db_session.add_all([higher_rated_player, stronger_performer])
+    db_session.flush()
+    db_session.add_all(
+        [
+            WeeklyProjection(
+                player_id=higher_rated_player.id,
+                season=2026,
+                week=1,
+                fantasy_points=10,
+            ),
+            WeeklyProjection(
+                player_id=stronger_performer.id,
+                season=2026,
+                week=1,
+                fantasy_points=10,
+            ),
+        ]
+    )
+    db_session.commit()
+    payload = {
+        "receive_ids": [higher_rated_player.id],
+        "give_ids": [stronger_performer.id],
+        "season": 2026,
+        "week": 1,
+        "league_id": league["id"],
+        "league_size": 2,
+        "roster_slots": {"WR": 1, "BE": 0, "IR": 0},
+    }
+
+    week_one_response = client.post("/trade/analyze", json=payload, headers=auth_headers(token))
+
+    assert week_one_response.status_code == 200
+    assert week_one_response.json()["receive_value"] == 99.0
+    assert week_one_response.json()["give_value"] == 70.0
+
+    db_session.add_all(
+        [
+            PlayerWeekScore(
+                league_id=league["id"],
+                player_id=higher_rated_player.id,
+                season=2026,
+                week=1,
+                fantasy_points=3,
+                status="final",
+            ),
+            PlayerWeekScore(
+                league_id=league["id"],
+                player_id=stronger_performer.id,
+                season=2026,
+                week=1,
+                fantasy_points=30,
+                status="final",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    later_week_response = client.post(
+        "/trade/analyze",
+        json={**payload, "week": 9},
+        headers=auth_headers(token),
+    )
+
+    assert later_week_response.status_code == 200
+    assert later_week_response.json()["give_value"] > later_week_response.json()["receive_value"]
 
 
 def test_normalize_roster_slots_uses_payload_values():
@@ -637,11 +721,21 @@ def test_trade_reject_cancel_counter_and_veto_endpoints(client, db_session):
     ).json()
     counter_response = client.post(
         f"/leagues/{league['id']}/trades/{countered['id']}/counter",
-        json={"reason": "Send a better one"},
+        json={
+            "proposing_team_id": seed["receiving"].id,
+            "receiving_team_id": seed["proposing"].id,
+            "give_items": [{"team_id": seed["receiving"].id, "player_id": seed["receive"].id}],
+            "receive_items": [{"team_id": seed["proposing"].id, "player_id": seed["give"].id}],
+            "message": "Send a better one",
+        },
         headers=auth_headers(receiving_token),
     )
-    assert counter_response.status_code == 409
-    assert "unavailable" in counter_response.json()["detail"]
+    assert counter_response.status_code == 200
+    replacement = counter_response.json()
+    assert replacement["status"] == "proposed"
+    assert replacement["countered_from_trade_id"] == countered["id"]
+    assert db_session.get(TradeOffer, countered["id"]).status == "countered"
+    assert db_session.query(TradeReview).filter_by(trade_offer_id=countered["id"], action="countered").one()
 
     seed = seed_trade_rosters(db_session, league["id"])
     vetoed = client.post(
@@ -682,16 +776,10 @@ def test_locked_player_cannot_be_traded(client, db_session):
         )
     )
     db_session.commit()
-    created = client.post(
+    response = client.post(
         f"/leagues/{league['id']}/trades",
         json=trade_offer_payload(seed),
         headers=auth_headers(proposing_token),
-    ).json()
-
-    response = client.post(
-        f"/leagues/{league['id']}/trades/{created['id']}/accept",
-        json={},
-        headers=auth_headers(receiving_token),
     )
     assert response.status_code == 409
     assert response.json()["detail"] == "locked player cannot be traded"
@@ -719,6 +807,77 @@ def test_expired_trade_cannot_be_accepted(client, db_session):
     )
     assert response.status_code == 409
     assert response.json()["detail"] == "trade offer has expired"
+
+
+def test_lifecycle_worker_marks_expired_trade_as_final(client, db_session):
+    proposing_token = create_user_and_token(client, "expire-worker-a")
+    receiving_token = create_user_and_token(client, "expire-worker-b")
+    league = create_league(client, proposing_token, "expire-worker")
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+    created = client.post(
+        f"/leagues/{league['id']}/trades",
+        json=trade_offer_payload(seed),
+        headers=auth_headers(proposing_token),
+    ).json()
+    offer = db_session.get(TradeOffer, created["id"])
+    offer.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    db_session.commit()
+
+    assert expire_trade_offers_once(db_session) == {"expired": 1}
+    assert db_session.get(TradeOffer, created["id"]).status == "expired"
+    assert db_session.query(TradeReview).filter_by(trade_offer_id=created["id"], action="expired").one()
+
+
+def test_counter_offer_must_reverse_the_original_participants(client, db_session):
+    proposing_token = create_user_and_token(client, "counter-reverse-a")
+    receiving_token = create_user_and_token(client, "counter-reverse-b")
+    league = create_league(client, proposing_token, "counter-reverse")
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+    original = client.post(
+        f"/leagues/{league['id']}/trades",
+        json=trade_offer_payload(seed),
+        headers=auth_headers(proposing_token),
+    ).json()
+
+    response = client.post(
+        f"/leagues/{league['id']}/trades/{original['id']}/counter",
+        json=trade_offer_payload(seed),
+        headers=auth_headers(receiving_token),
+    )
+
+    assert response.status_code == 400
+    assert db_session.get(TradeOffer, original["id"]).status == "proposed"
+
+
+def test_illegal_trade_plan_does_not_mutate_either_roster(client, db_session, monkeypatch):
+    monkeypatch.setattr(trade_service, "is_cfb_game_week_active", lambda now=None, timezone_name="UTC": False)
+    proposing_token = create_user_and_token(client, "atomic-a")
+    receiving_token = create_user_and_token(client, "atomic-b")
+    league = create_league(client, proposing_token, "atomic")
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+    created = client.post(
+        f"/leagues/{league['id']}/trades",
+        json=trade_offer_payload(seed),
+        headers=auth_headers(proposing_token),
+    ).json()
+    settings = db_session.query(LeagueSettings).filter_by(league_id=league["id"]).one()
+    settings.roster_slots_json = {"QB": 0, "RB": 0, "WR": 0, "TE": 0, "K": 0, "BENCH": 0}
+    db_session.commit()
+
+    response = client.post(
+        f"/leagues/{league['id']}/trades/{created['id']}/accept",
+        json={},
+        headers=auth_headers(receiving_token),
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "trade would create an illegal roster"
+    db_session.expire_all()
+    assert db_session.query(RosterEntry).filter_by(team_id=seed["proposing"].id, player_id=seed["give"].id).one()
+    assert db_session.query(RosterEntry).filter_by(team_id=seed["receiving"].id, player_id=seed["receive"].id).one()
 
 
 def test_trade_offer_list_and_invalid_paths(client, db_session):

@@ -87,7 +87,10 @@ const assignFromCounts = (
   limits: Record<RosterSlotKey, number>,
   options: RosterLegalityOptions = {}
 ): RosterSlotKey | null => {
-  const eligibleSlots = getEligibleSlotsForPosition(position, Boolean(options.superflexEnabled));
+  const eligibleSlots = getEligibleSlotsForPosition(
+    position,
+    Boolean(options.superflexEnabled) || Number(limits.SUPERFLEX ?? 0) > 0
+  );
   for (const slot of eligibleSlots) {
     if ((limits[slot] ?? 0) > (counts[slot] ?? 0)) {
       return slot;

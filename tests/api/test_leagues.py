@@ -458,6 +458,58 @@ def test_commissioner_settings_show_active_invite_until_draft_completion(client,
     assert invite["visible_until_draft_complete"] is True
 
 
+def test_commissioner_can_rotate_and_revoke_invite(client, db_session):
+    commissioner_token = create_user_and_token(client, "rotate-invite-commissioner")
+    member_token = create_user_and_token(client, "rotate-invite-member")
+    league = create_league(client, commissioner_token, name="Invite Lifecycle League", max_teams=4)
+    original_code = league["invite_code"]
+
+    joined = client.post(
+        f"/leagues/{league['id']}/join",
+        headers=auth_headers(member_token),
+    )
+    assert joined.status_code == 200
+
+    commissioner_detail = client.get(
+        f"/leagues/{league['id']}",
+        headers=auth_headers(commissioner_token),
+    )
+    member_detail = client.get(
+        f"/leagues/{league['id']}",
+        headers=auth_headers(member_token),
+    )
+    assert commissioner_detail.status_code == 200
+    assert commissioner_detail.json()["invite_code"] == original_code
+    assert member_detail.status_code == 200
+    assert member_detail.json()["invite_code"] is None
+
+    unauthorized = client.post(
+        f"/leagues/{league['id']}/invite/rotate",
+        headers=auth_headers(member_token),
+    )
+    assert unauthorized.status_code == 403
+
+    rotated = client.post(
+        f"/leagues/{league['id']}/invite/rotate",
+        headers=auth_headers(commissioner_token),
+    )
+    assert rotated.status_code == 200
+    new_code = rotated.json()["invite_code"]
+    assert new_code and new_code != original_code
+    assert client.post("/leagues/join-by-code", json={"invite_code": original_code}).status_code == 404
+    assert client.post("/leagues/join-by-code", json={"invite_code": new_code}).status_code == 200
+
+    revoked = client.post(
+        f"/leagues/{league['id']}/invite/revoke",
+        headers=auth_headers(commissioner_token),
+    )
+    assert revoked.status_code == 200
+    assert revoked.json()["invite_code"] is None
+    assert client.post("/leagues/join-by-code", json={"invite_code": new_code}).status_code == 404
+    db_session.expire_all()
+    assert db_session.query(LeagueInvite).filter(LeagueInvite.code == new_code, LeagueInvite.active.is_(True)).count() == 0
+
+
 def test_update_league_settings_persists_custom_roster_format_and_flags(client):
     token = create_user_and_token(client, "update-format")
     league = create_league(client, token)

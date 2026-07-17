@@ -5,6 +5,7 @@ import { ArrowLeft, Bot, ClipboardList, LocateFixed, Loader2, RefreshCcw, Search
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useDraftPlayerPool, usePlayerCard, usePlayerDetail } from "@/hooks/use-players";
 import { buildDraftBoard, type DraftPlayer } from "@/lib/draftRankings";
 import { mergeMockDraftMasterBoardPlayers } from "@/lib/mockDraftMasterBoard";
@@ -113,6 +114,7 @@ export default function SinglePlayerMockDraftRoom() {
   );
   const [now, setNow] = useState(Date.now());
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 150);
   const [position, setPosition] = useState("ALL");
   const [activeTab, setActiveTab] = useState<MockDraftTab>("draft");
   const [error, setError] = useState<string | null>(null);
@@ -138,6 +140,7 @@ export default function SinglePlayerMockDraftRoom() {
     () =>
       buildDraftBoard(mockPlayerPool, {
         leagueSize: mockSettings.leagueSize,
+        totalRosterSpots: mockSettings.rounds,
         rosterSlots: {
           QB: 1,
           RB: 2,
@@ -231,10 +234,6 @@ export default function SinglePlayerMockDraftRoom() {
     []
   );
 
-  useEffect(() => {
-    centerDraftCarouselOnPick(draftState.currentPick);
-  }, [centerDraftCarouselOnPick, draftState.currentPick, draftState.status]);
-
   const recenterDraftCarousel = () => {
     centerDraftCarouselOnPick(draftState.currentPick);
   };
@@ -258,7 +257,7 @@ export default function SinglePlayerMockDraftRoom() {
   );
 
   const availablePlayers = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
+    const normalizedSearch = debouncedSearch.trim().toLowerCase();
     const filteredPlayers = draftablePlayersForUserTeam.filter((player) => {
       const matchesPosition = position === "ALL" || player.pos === position;
       const matchesSearch =
@@ -283,7 +282,7 @@ export default function SinglePlayerMockDraftRoom() {
       }
       return left.name.localeCompare(right.name);
     });
-  }, [draftablePlayersForUserTeam, position, search]);
+  }, [draftablePlayersForUserTeam, position, debouncedSearch]);
 
   const queuedPlayers = useMemo(() => {
     const byId = new Map(draftBoard.map((player) => [player.id, player]));
@@ -472,7 +471,9 @@ export default function SinglePlayerMockDraftRoom() {
                   <p className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">{player.school}</p>
                 </div>
                 <span className={cn("w-fit rounded-full border px-4 py-2 text-xs font-black", positionClass)}>{player.pos}</span>
-                <p className="text-sm font-black tabular-nums text-foreground">{player.projectedPoints.toFixed(1)}</p>
+                <p className="text-sm font-black tabular-nums text-foreground">
+                  {player.hasWeeklyProjection ? player.projectedPoints.toFixed(1) : "—"}
+                </p>
                 <div className="flex justify-end gap-2">
                   <Button
                     variant="outline"

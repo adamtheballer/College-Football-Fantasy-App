@@ -38,6 +38,7 @@ export interface Player {
   rostered: number;
   status: "HEALTHY" | "OUT" | "QUESTIONABLE" | "DOUBTFUL" | "IR";
   projection: PlayerStats;
+  hasWeeklyProjection?: boolean;
   history: PlayerHistory[];
   analysis: string;
   sheetAdp?: number;

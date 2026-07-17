@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useNavigate } from "react-router-dom";
-import { apiGet, apiPost } from "@/lib/api";
+import { ApiError, apiGet, apiPost } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { restartGuide } from "@/lib/onboarding";
 import { useLeagues } from "@/hooks/use-leagues";
@@ -97,13 +97,13 @@ const CheckboxItem = ({ id, label, description, checked, onCheckedChange, disabl
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isBootstrapping, logoutAll } = useAuth();
   const { data: leagues = [] } = useLeagues(50, Boolean(user));
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [leaguePrefs, setLeaguePrefs] = useState<LeagueNotificationPreference[]>([]);
-  const [profileName, setProfileName] = useState("");
-  const [profileEmail, setProfileEmail] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [securityMessage, setSecurityMessage] = useState<string | null>(null);
   const [prefs, setPrefs] = useState({
     push_enabled: true,
     email_enabled: true,
@@ -118,12 +118,8 @@ export default function Settings() {
 
   useEffect(() => {
     if (!user) return;
-    setProfileName(user.firstName || "");
-    setProfileEmail(user.email || "");
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
+    let active = true;
+    setLoadError(null);
     apiGet<any>("/notifications/preferences")
       .then((payload) => {
         setPrefs({
@@ -138,14 +134,22 @@ export default function Settings() {
           lineup_reminders: payload.lineup_reminders ?? true,
         });
       })
-      .catch(() => {});
+      .catch((error) => {
+        if (active) setLoadError(error instanceof Error ? error.message : "Unable to load notification preferences.");
+      });
     apiGet<{ data: LeagueNotificationPreference[] }>("/notifications/league-preferences")
       .then((leaguePayload) => {
         setLeaguePrefs(leaguePayload?.data ?? []);
       })
-      .catch(() => {
-        setLeaguePrefs([]);
+      .catch((error) => {
+        if (active) {
+          setLeaguePrefs([]);
+          setLoadError(error instanceof Error ? error.message : "Unable to load league notification preferences.");
+        }
       });
+    return () => {
+      active = false;
+    };
   }, [user]);
 
   const handleSave = async () => {
@@ -164,7 +168,8 @@ export default function Settings() {
       });
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 1500);
-    } catch {
+    } catch (error) {
+      setLoadError(error instanceof ApiError ? error.message : "Unable to save notification preferences.");
       setSaveState("error");
     }
   };
@@ -183,6 +188,106 @@ export default function Settings() {
     restartGuide(user.id);
     navigate("/", { replace: true });
   };
+
+  const handleLogoutAll = async () => {
+    setSecurityMessage(null);
+    try {
+      await logoutAll();
+      navigate("/login", { replace: true });
+    } catch (error) {
+      setSecurityMessage(error instanceof Error ? error.message : "Unable to sign out of all devices.");
+    }
+  };
+
+  if (isBootstrapping) {
+    return (
+      <div className="flex min-h-[45vh] items-center justify-center">
+        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-sky-200">
+          Loading settings...
+        </p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-20 pt-12">
+        <div className="space-y-6 border-b border-border/40 pb-12">
+          <h1 className="text-5xl font-black uppercase italic tracking-tight text-foreground sm:text-7xl">
+            Settings
+          </h1>
+          <p className="max-w-2xl text-xl font-medium leading-relaxed text-muted-foreground">
+            Review app information and sign in to manage your account, notifications, and league preferences.
+          </p>
+        </div>
+
+        <SettingsSection
+          title="Account Settings"
+          description="Sign in to personalize your experience"
+          icon={User}
+        >
+          <div className="space-y-5">
+            <p className="text-sm font-medium leading-relaxed text-muted-foreground">
+              Account, notification, and league settings are saved to your manager profile after you sign in.
+            </p>
+            <Button
+              className="h-12 rounded-2xl bg-primary px-7 text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground"
+              onClick={() => navigate("/login", { state: { from: "/settings" } })}
+            >
+              Sign In To Manage Settings
+            </Button>
+          </div>
+        </SettingsSection>
+
+        <SettingsSection
+          title="Support & Policies"
+          description="Helpful links and account resources"
+          icon={Shield}
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            {privacyPolicyUrl ? (
+              <a
+                href={privacyPolicyUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
+              >
+                Privacy Policy
+              </a>
+            ) : null}
+            {termsUrl ? (
+              <a
+                href={termsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
+              >
+                Terms
+              </a>
+            ) : null}
+            {providerDisclosureUrl ? (
+              <a
+                href={providerDisclosureUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
+              >
+                Provider Disclosure
+              </a>
+            ) : null}
+            {supportEmail ? (
+              <a
+                href={`mailto:${supportEmail}`}
+                className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
+              >
+                Contact Support
+              </a>
+            ) : null}
+          </div>
+        </SettingsSection>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-20">
@@ -210,41 +315,22 @@ export default function Settings() {
         {/* PROFILE SECTION */}
         <SettingsSection 
           title="Account Profile" 
-          description="Personal information and public identity"
+          description="Your active manager identity"
           icon={User}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             <div className="space-y-4">
-              <Label className="text-[10px] font-black tracking-[0.2em] text-muted-foreground uppercase opacity-60">Full Name</Label>
-              <Input 
-                value={profileName}
-                onChange={(event) => setProfileName(event.target.value)}
-                placeholder="Your name"
-                className="bg-white/5 border-border rounded-2xl h-14 focus:ring-primary/20 focus:border-primary/40 transition-all text-xs font-bold tracking-wider"
-              />
+              <Label className="text-[10px] font-black tracking-[0.2em] text-muted-foreground uppercase opacity-60">Manager Name</Label>
+              <p className="rounded-2xl border border-border bg-white/5 px-4 py-4 text-xs font-bold tracking-wider text-foreground">
+                {user.firstName || "Manager"}
+              </p>
             </div>
             <div className="space-y-4">
               <Label className="text-[10px] font-black tracking-[0.2em] text-muted-foreground uppercase opacity-60">Email Address</Label>
-              <Input 
-                value={profileEmail}
-                onChange={(event) => setProfileEmail(event.target.value)}
-                placeholder="you@example.com"
-                className="bg-white/5 border-border rounded-2xl h-14 focus:ring-primary/20 focus:border-primary/40 transition-all text-xs font-bold tracking-wider"
-              />
+              <p className="rounded-2xl border border-border bg-white/5 px-4 py-4 text-xs font-bold tracking-wider text-foreground">
+                {user.email}
+              </p>
             </div>
-          </div>
-          <div className="flex items-center gap-8 p-6 rounded-3xl bg-primary/5 border border-primary/10">
-             <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-3xl font-black italic text-white shadow-2xl">
-                AB
-             </div>
-             <div className="space-y-2">
-                <h4 className="text-sm font-black italic uppercase tracking-tight text-foreground">Profile Picture</h4>
-                <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest">Recommended: 400x400px JPG or PNG</p>
-                <div className="flex gap-4 mt-4">
-                  <Button variant="outline" className="h-10 px-6 rounded-xl text-[9px] font-black uppercase tracking-widest border-primary/20 text-primary hover:bg-primary/10">Upload New</Button>
-                  <Button variant="ghost" className="h-10 px-6 rounded-xl text-[9px] font-black uppercase tracking-widest text-red-400 hover:text-red-500 hover:bg-red-500/10">Remove</Button>
-                </div>
-             </div>
           </div>
         </SettingsSection>
 
@@ -338,6 +424,7 @@ export default function Settings() {
               Unable to save preferences.
             </p>
           )}
+          {loadError ? <p role="alert" className="text-sm font-semibold text-red-300">{loadError}</p> : null}
           <div className="space-y-4 border-t border-border/40 pt-8">
             <h4 className="text-[10px] font-black tracking-[0.3em] text-primary uppercase">
               League Notification Controls
@@ -442,25 +529,6 @@ export default function Settings() {
               </Select>
             </SettingItem>
 
-            <SettingItem 
-              label="Theme Selection" 
-              description="Choose between different visual styles"
-            >
-               <div className="flex bg-white/5 p-1.5 rounded-2xl border border-border">
-                  <button className="px-6 py-3 rounded-xl bg-primary text-primary-foreground text-[9px] font-black uppercase tracking-[0.2em] shadow-lg transition-all">Modern</button>
-                  <button className="px-6 py-3 rounded-xl text-muted-foreground hover:text-foreground text-[9px] font-black uppercase tracking-[0.2em] transition-all">ESPN Style</button>
-               </div>
-            </SettingItem>
-
-            <SettingItem 
-              label="Auto-Update Scores" 
-              description="Automatically refresh live game data"
-            >
-               <div className="w-14 h-8 bg-primary/20 border border-primary/40 rounded-full relative cursor-pointer p-1 group">
-                  <div className="w-6 h-6 bg-primary rounded-full shadow-[0_0_15px_rgba(var(--primary),0.4)] absolute right-1 group-hover:scale-110 transition-all" />
-               </div>
-            </SettingItem>
-
             <SettingItem
               label="Replay App Guide"
               description="Start the onboarding walkthrough again at any time"
@@ -525,20 +593,13 @@ export default function Settings() {
               ) : null}
             </div>
 
-            <div className="flex items-center justify-between p-6 rounded-3xl bg-red-500/5 border border-red-500/10">
-              <div className="space-y-1">
-                <h4 className="text-sm font-black italic uppercase tracking-tight text-foreground">Danger Zone</h4>
-                <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest">Permanent actions that cannot be undone</p>
-              </div>
-              <Button variant="ghost" className="h-12 px-8 rounded-2xl text-[10px] font-black uppercase tracking-widest text-red-400 hover:text-white hover:bg-red-500 shadow-none border border-red-500/20">Delete Account</Button>
-            </div>
-            
             <div className="flex justify-center pt-8">
-               <Button variant="ghost" className="text-muted-foreground hover:text-red-400 gap-3 text-[11px] font-black uppercase tracking-[0.2em]">
+               <Button type="button" variant="ghost" onClick={() => void handleLogoutAll()} className="text-muted-foreground hover:text-red-400 gap-3 text-[11px] font-black uppercase tracking-[0.2em]">
                   <LogOut className="w-4 h-4" />
                   Sign Out of All Devices
                </Button>
             </div>
+            {securityMessage ? <p role="alert" className="text-sm font-semibold text-red-300">{securityMessage}</p> : null}
           </div>
         </SettingsSection>
       </div>

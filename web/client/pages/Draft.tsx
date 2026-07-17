@@ -5,12 +5,13 @@ import { ArrowLeft, Bot, ClipboardList, History, LocateFixed, Loader2, Lock, Sea
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useDraftAutoPick, useDraftPick, useDraftRoom } from "@/hooks/use-draft";
+import { useDraftPick, useDraftRoom, useStartDraft } from "@/hooks/use-draft";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useLeagueDetail } from "@/hooks/use-leagues";
 import { useDraftPlayerPool, usePlayerCard } from "@/hooks/use-players";
 import { ApiError } from "@/lib/api";
 import { buildDraftBoard, type DraftConfig, type DraftPlayer } from "@/lib/draftRankings";
-import { mergeMockDraftMasterBoardPlayers } from "@/lib/mockDraftMasterBoard";
+import { enrichCfb27DraftPlayers } from "@/lib/mockDraftMasterBoard";
 import { filterDraftablePlayers, getLegalPositionsForRoster } from "@/lib/rosterLegality";
 import { cn } from "@/lib/utils";
 import type { DraftRoomPick, DraftRoomTeam } from "@/types/draft";
@@ -92,6 +93,7 @@ const getDraftConfig = (
   rosterSlots: Record<string, number> | undefined
 ): DraftConfig => ({
   leagueSize,
+  totalRosterSpots: getTotalDraftSlots(rosterSlots),
   rosterSlots: {
     QB: getSlotCount(rosterSlots, "QB"),
     RB: getSlotCount(rosterSlots, "RB"),
@@ -137,6 +139,7 @@ const buildPreviewTeams = (teams: DraftRoomTeam[], maxTeams: number): PreviewTea
       name: `Open Team ${index + 1}`,
       owner_user_id: null,
       owner_name: "Waiting for manager",
+      is_cpu: false,
       isPlaceholder: true,
     };
   });
@@ -217,6 +220,7 @@ export default function Draft() {
   const { leagueId } = useParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 150);
   const [position, setPosition] = useState("ALL");
   const [activeTab, setActiveTab] = useState<DraftTab>("draft");
   const [queuedPlayerIds, setQueuedPlayerIds] = useState<number[]>([]);
@@ -226,7 +230,6 @@ export default function Draft() {
   const [now, setNow] = useState(Date.now());
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const pickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
-  const lastAutoPickKeyRef = useRef<string | null>(null);
 
   const parsedLeagueId =
     leagueId && !Number.isNaN(Number(leagueId)) ? Number(leagueId) : undefined;
@@ -239,7 +242,7 @@ export default function Draft() {
     dataUpdatedAt: draftRoomUpdatedAt,
   } = useDraftRoom(parsedLeagueId);
   const pickMutation = useDraftPick(parsedLeagueId);
-  const autoPickMutation = useDraftAutoPick(parsedLeagueId);
+  const startDraftMutation = useStartDraft(parsedLeagueId);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 250);
@@ -247,38 +250,36 @@ export default function Draft() {
   }, []);
 
   const draftStartsAt = useMemo(
-    () => (league?.draft?.draft_datetime_utc ? new Date(league.draft.draft_datetime_utc) : null),
-    [league?.draft?.draft_datetime_utc]
+    () => {
+      const value = draftRoom?.draft_starts_at ?? league?.draft?.draft_datetime_utc;
+      return value ? new Date(value) : null;
+    },
+    [draftRoom?.draft_starts_at, league?.draft?.draft_datetime_utc]
   );
-  const memberCount = league?.members.length ?? draftRoom?.teams.length ?? 0;
+  const memberCount = draftRoom?.teams.length ?? league?.members.length ?? 0;
   const maxTeams = league?.max_teams ?? draftRoom?.teams.length ?? 0;
   const isLeagueFull = Boolean(maxTeams > 0 && memberCount >= maxTeams);
-  const hasDraftTimePassed = Boolean(draftStartsAt && draftStartsAt.getTime() <= now);
-  const isScheduledPreview = Boolean(
-    draftRoom?.status === "scheduled" && (!hasDraftTimePassed || !isLeagueFull)
-  );
-  const isDraftActive = Boolean(
-    isLeagueFull &&
-      (draftRoom?.status === "live" ||
-        draftRoom?.status === "active" ||
-        (draftRoom?.status === "scheduled" && hasDraftTimePassed))
-  );
+  const isScheduledPreview = draftRoom?.status === "scheduled";
+  const isPreDraft = draftRoom?.status === "pre_draft";
+  const isTransition = draftRoom?.status === "transition";
+  const isDraftActive = draftRoom?.status === "on_clock";
   const serverNowAtFetchMs = draftRoom?.server_time ? Date.parse(draftRoom.server_time) : Number.NaN;
-  const fallbackFirstPickExpiresAtMs =
-    draftRoom && draftStartsAt && draftRoom.picks.length === 0
-      ? draftStartsAt.getTime() + Math.max(1, draftRoom.pick_timer_seconds) * 1000
-      : Number.NaN;
-  const pickExpiresAtMs = draftRoom?.pick_expires_at
-    ? Date.parse(draftRoom.pick_expires_at)
-    : fallbackFirstPickExpiresAtMs;
+  const countdownDeadline = isPreDraft
+    ? draftRoom?.draft_starts_at
+    : isDraftActive
+      ? draftRoom?.current_pick_deadline
+      : isTransition
+        ? draftRoom?.transition_ends_at
+        : null;
+  const countdownDeadlineMs = countdownDeadline ? Date.parse(countdownDeadline) : Number.NaN;
   const adjustedNowMs =
     Number.isFinite(serverNowAtFetchMs) && draftRoomUpdatedAt
       ? serverNowAtFetchMs + Math.max(0, now - draftRoomUpdatedAt)
       : now;
   const secondsRemaining =
-    isDraftActive && Number.isFinite(pickExpiresAtMs)
-      ? Math.max(0, Math.ceil((pickExpiresAtMs - adjustedNowMs) / 1000))
-      : 0;
+    Number.isFinite(countdownDeadlineMs)
+      ? Math.max(0, Math.ceil((countdownDeadlineMs - adjustedNowMs) / 1000))
+      : draftRoom?.seconds_remaining ?? 0;
   const timerDanger = isDraftActive && secondsRemaining > 0 && secondsRemaining <= 10;
   const leagueSize = Math.max(league?.max_teams ?? draftRoom?.teams.length ?? 12, draftRoom?.teams.length ?? 0, 1);
 
@@ -334,29 +335,20 @@ export default function Draft() {
   });
 
   const realDraftPlayerPool = useMemo(
-    () => mergeMockDraftMasterBoardPlayers(playersPayload?.data ?? []),
+    () => enrichCfb27DraftPlayers(playersPayload?.data ?? []),
     [playersPayload?.data]
   );
 
   const draftBoard = useMemo(() => {
-    const board = buildDraftBoard(realDraftPlayerPool, draftConfig);
-    return board
-      .map((player) => {
-        const stableRank =
-          player.sourceBoardRank ?? player.boardRank ?? player.sheetAdp ?? player.masterDraftRank ?? player.draftRank;
-        return {
-          ...player,
-          draftRank: stableRank,
-          masterDraftRank: stableRank,
-        };
-      })
-      .sort((left, right) => {
-        const leftRank = left.masterDraftRank ?? Number.POSITIVE_INFINITY;
-        const rightRank = right.masterDraftRank ?? Number.POSITIVE_INFINITY;
-        if (leftRank !== rightRank) return leftRank - rightRank;
-        if (left.projectedPoints !== right.projectedPoints) return right.projectedPoints - left.projectedPoints;
-        return left.name.localeCompare(right.name);
-      });
+    return [...buildDraftBoard(realDraftPlayerPool, draftConfig)].sort((left, right) => {
+      if (left.masterDraftRank !== right.masterDraftRank) {
+        return left.masterDraftRank - right.masterDraftRank;
+      }
+      if (left.projectedPoints !== right.projectedPoints) {
+        return right.projectedPoints - left.projectedPoints;
+      }
+      return left.name.localeCompare(right.name);
+    });
   }, [draftConfig, realDraftPlayerPool]);
 
   const draftablePlayers = useMemo(
@@ -374,7 +366,7 @@ export default function Draft() {
   );
 
   const visiblePlayers = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
+    const normalizedSearch = debouncedSearch.trim().toLowerCase();
     const filteredPlayers = draftablePlayers.filter((player) => {
       const matchesPosition = position === "ALL" || player.pos === position;
       const matchesSearch =
@@ -395,7 +387,7 @@ export default function Draft() {
       if (leftRank !== rightRank) return leftRank - rightRank;
       return left.name.localeCompare(right.name);
     });
-  }, [draftablePlayers, position, search]);
+  }, [draftablePlayers, position, debouncedSearch]);
 
   const queuedPlayers = useMemo(() => {
     const byId = new Map(draftBoard.map((player) => [player.id, player]));
@@ -494,40 +486,6 @@ export default function Draft() {
     []
   );
 
-  useEffect(() => {
-    centerDraftCarouselOnPick(draftRoom?.current_pick ?? 1);
-  }, [centerDraftCarouselOnPick, draftRoom?.current_pick, draftRoom?.status, totalPicks]);
-
-  useEffect(() => {
-    if (
-      !draftRoom ||
-      !isDraftActive ||
-      !Number.isFinite(pickExpiresAtMs) ||
-      !draftRoom.current_team_id ||
-      ["complete", "completed"].includes(draftRoom.status) ||
-      secondsRemaining > 0 ||
-      autoPickMutation.isPending
-    ) {
-      return;
-    }
-
-    const autoPickKey = `${draftRoom.draft_id}:${draftRoom.current_pick}:${draftRoom.pick_expires_at ?? pickExpiresAtMs}`;
-    if (lastAutoPickKeyRef.current === autoPickKey) return;
-
-    lastAutoPickKeyRef.current = autoPickKey;
-    autoPickMutation.mutate(undefined, {
-      onError: () => {
-        lastAutoPickKeyRef.current = null;
-      },
-    });
-  }, [
-    autoPickMutation,
-    draftRoom,
-    isDraftActive,
-    pickExpiresAtMs,
-    secondsRemaining,
-  ]);
-
   const recenterDraftCarousel = () => {
     centerDraftCarouselOnPick(draftRoom?.current_pick ?? 1);
   };
@@ -547,7 +505,11 @@ export default function Draft() {
     }
     setLocalError(null);
     try {
-      await pickMutation.mutateAsync(player.id);
+      await pickMutation.mutateAsync({
+        playerId: player.id,
+        pickNumber: draftRoom.current_pick,
+        draftVersion: draftRoom.draft_version,
+      });
     } catch {
       // Rendered below from mutation state.
     }
@@ -608,8 +570,8 @@ export default function Draft() {
   const currentTeamLabel = draftRoom.current_team_name || "Draft complete";
   const latestPick = draftRoom.picks[draftRoom.picks.length - 1];
   const currentPick = draftRoom.current_pick;
-  const canPick = isDraftActive && draftRoom.can_make_pick && !pickMutation.isPending && !autoPickMutation.isPending;
-  const actionLabel = isScheduledPreview ? "Locked" : draftRoom.can_make_pick ? "Draft" : "Wait";
+  const canPick = isDraftActive && draftRoom.can_make_pick && !pickMutation.isPending;
+  const actionLabel = isScheduledPreview || isPreDraft || isTransition ? "Locked" : draftRoom.can_make_pick ? "Draft" : "Wait";
   const completed = draftRoom.current_team_id === null || ["complete", "completed"].includes(draftRoom.status);
   const exitPath = completed ? `/league/${parsedLeagueId}/roster` : `/league/${parsedLeagueId}/lobby`;
   const backendPlayerCount = playersPayload?.total ?? 0;
@@ -811,7 +773,7 @@ export default function Draft() {
             </Button>
           </div>
 
-          {!isScheduledPreview && !completed ? (
+          {(isPreDraft || isDraftActive || isTransition) && !completed ? (
             <div className="pointer-events-none fixed left-1/2 top-3 z-[1250] -translate-x-1/2">
               <div
                 className={cn(
@@ -821,7 +783,9 @@ export default function Draft() {
                     : "border-cyan-200/20"
                 )}
               >
-                <p className="text-[9px] font-black uppercase tracking-[0.26em] text-muted-foreground">Pick Timer</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.26em] text-muted-foreground">
+                    {isPreDraft ? "Draft Starts In" : isTransition ? "Next Pick In" : "Pick Timer"}
+                  </p>
                 <p
                   className={cn(
                     "mt-1 text-4xl font-black tabular-nums leading-none tracking-tight",
@@ -842,10 +806,22 @@ export default function Draft() {
               )}
             >
               <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
-                {isScheduledPreview ? "Preview Mode" : "On Clock"}
+                {isScheduledPreview ? "Draft Lobby" : isPreDraft ? "Pre-Draft" : isTransition ? "Pick Recorded" : "On Clock"}
               </p>
               <p className="text-xl font-black uppercase text-cyan-100">
-                {isScheduledPreview ? (isLeagueFull ? "Locked" : "Need Managers") : completed ? "Complete" : currentTeamLabel}
+                {isScheduledPreview
+                  ? isLeagueFull
+                    ? draftRoom.can_start_draft
+                      ? "Ready To Start"
+                      : "Scheduled"
+                    : "Need Managers"
+                  : isPreDraft
+                    ? "Starting Soon"
+                    : isTransition
+                      ? "Updating Board"
+                      : completed
+                        ? "Complete"
+                        : currentTeamLabel}
               </p>
             </div>
             <Button asChild variant="outline" className="h-12 rounded-2xl border-white/15 bg-slate-950/65 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-white hover:bg-white/10">
@@ -864,12 +840,14 @@ export default function Draft() {
               {formatStatus(draftRoom.status)}
             </span>
             <span className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-              {league?.members.length ?? draftRoom.teams.length}/{league?.max_teams ?? draftRoom.teams.length} Managers
+              {draftRoom.teams.length}/{league?.max_teams ?? draftRoom.teams.length} Teams
             </span>
             {isScheduledPreview ? (
               <span className="rounded-full border border-amber-300/25 bg-amber-400/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-amber-100">
                 {isLeagueFull
-                  ? `Opens in ${formatCountdown(draftStartsAt, now)}`
+                  ? draftRoom.can_start_draft
+                    ? "Commissioner can start"
+                    : `Opens in ${formatCountdown(draftStartsAt, now)}`
                   : `${memberCount}/${maxTeams} Managers Joined`}
               </span>
             ) : null}
@@ -877,15 +855,27 @@ export default function Draft() {
           {isScheduledPreview ? (
             <p className="mt-5 max-w-3xl text-[11px] font-black uppercase leading-6 tracking-[0.18em] text-muted-foreground">
               {isLeagueFull
-                ? "Preview mode uses the real player board and real draft order shell. Picks are locked until the scheduled draft time."
-                : "Preview mode uses the real player board and real draft order shell. Picks are locked until every league slot is filled."}
+                ? "The commissioner starts the one-minute pre-draft countdown when the scheduled time arrives. Picks unlock only after the countdown ends."
+                : "Draft order remains locked until every league slot is filled. Invite more managers or reschedule the draft."}
             </p>
+          ) : null}
+          {draftRoom.can_start_draft ? (
+            <Button
+              className="mt-6 h-12 rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 px-6 text-[10px] font-black uppercase tracking-[0.18em] text-slate-950"
+              disabled={startDraftMutation.isPending}
+              onClick={() => {
+                setLocalError(null);
+                startDraftMutation.mutate();
+              }}
+            >
+              {startDraftMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Start Draft"}
+            </Button>
           ) : null}
         </header>
 
-        {(localError || pickMutation.error) && (
+        {(localError || pickMutation.error || startDraftMutation.error) && (
           <div className="rounded-2xl border border-red-300/20 bg-red-400/10 p-4 text-sm font-bold text-red-100">
-            {localError || formatApiError(pickMutation.error, "Unable to save draft pick.")}
+            {localError || formatApiError(pickMutation.error ?? startDraftMutation.error, "Unable to update the draft.")}
           </div>
         )}
 
@@ -938,7 +928,7 @@ export default function Draft() {
                   }}
                   className={cn(
                     "min-w-[178px] rounded-3xl border p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition",
-                    isCurrent && !isScheduledPreview
+                    isCurrent && isDraftActive
                       ? "border-cyan-200/80 bg-cyan-300/14 shadow-[0_0_52px_rgba(103,232,249,0.36),inset_0_1px_0_rgba(255,255,255,0.07)]"
                       : isCurrent
                         ? "border-amber-200/45 bg-amber-300/10 shadow-[0_0_42px_rgba(251,191,36,0.16)]"
@@ -951,7 +941,7 @@ export default function Draft() {
                   <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Pick {slot.overallPick}</p>
                   <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{slot.round}.{slot.roundPick}</p>
                   <div className="mt-3 flex h-8 w-8 items-center justify-center rounded-xl border border-cyan-200/30 bg-slate-950/55 text-cyan-100 shadow-[0_0_22px_rgba(103,232,249,0.24),inset_0_0_12px_rgba(103,232,249,0.08)]">
-                    {isUser ? <User className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" /> : <Bot className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" />}
+                    {slot.team?.is_cpu ? <Bot className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" /> : <User className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" />}
                   </div>
                   <p className="mt-3 truncate text-base font-black text-foreground">
                     {slot.pick?.player_name ?? slot.team?.name ?? `Team ${slot.roundPick}`}
@@ -961,7 +951,9 @@ export default function Draft() {
                       ? `${slot.pick.player_position} • ${slot.pick.player_school}`
                       : slot.team?.isPlaceholder
                         ? "Waiting for manager"
-                        : slot.team?.owner_name || "Manager"}
+                        : slot.team?.is_cpu
+                          ? "CPU manager"
+                          : slot.team?.owner_name || "Manager"}
                   </p>
                 </div>
               );
@@ -1082,7 +1074,9 @@ export default function Draft() {
                       <p className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">{player.school}</p>
                     </div>
                     <span className={cn("w-fit rounded-full border px-4 py-2 text-xs font-black", positionClass)}>{player.pos}</span>
-                    <p className="text-sm font-black tabular-nums text-foreground">{player.projectedPoints.toFixed(1)}</p>
+                    <p className="text-sm font-black tabular-nums text-foreground">
+                      {player.hasWeeklyProjection ? player.projectedPoints.toFixed(1) : "—"}
+                    </p>
                     <div className="flex justify-end gap-2">
                       <Button
                         variant="outline"
@@ -1107,9 +1101,9 @@ export default function Draft() {
                           makePick(player);
                         }}
                         title={
-                          isScheduledPreview
+                          isScheduledPreview || isPreDraft || isTransition
                             ? isLeagueFull
-                              ? "Draft picks unlock at the scheduled start time."
+                              ? "Draft picks unlock after the commissioner starts the draft and the countdown ends."
                               : "Draft picks unlock after the league is full."
                             : !isBackendPlayer
                               ? "This master-board player needs backend CFB27 sync before a real pick can be saved."
@@ -1120,7 +1114,7 @@ export default function Draft() {
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : !isBackendPlayer ? (
                           "Sync Req"
-                        ) : !canPick && isScheduledPreview ? (
+                        ) : !canPick && (isScheduledPreview || isPreDraft || isTransition) ? (
                           <><Lock className="mr-2 h-3.5 w-3.5" />{actionLabel}</>
                         ) : (
                           actionLabel

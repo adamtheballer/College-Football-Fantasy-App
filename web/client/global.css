@@ -149,6 +149,15 @@
     @apply border-border;
   }
 
+  *::-webkit-scrollbar:vertical {
+    width: 0;
+  }
+
+  *::-webkit-scrollbar-thumb:vertical,
+  *::-webkit-scrollbar-track:vertical {
+    background: transparent;
+  }
+
   body {
     @apply bg-background text-foreground;
     background:

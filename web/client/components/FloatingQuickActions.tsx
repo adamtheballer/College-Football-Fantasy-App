@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Plus, UserPlus, ArrowRightLeft, UserRoundSearch } from "lucide-react";
+import { Plus, UserPlus, ArrowRightLeft } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { cn } from "@/lib/utils";
@@ -31,12 +31,6 @@ export function FloatingQuickActions() {
         icon: ArrowRightLeft,
         onClick: () => navigate("/leagues/join"),
         styleClass: "from-emerald-500/90 to-teal-500/90",
-      },
-      {
-        label: "Player Compare",
-        icon: UserRoundSearch,
-        onClick: () => navigate("/player-compare"),
-        styleClass: "from-amber-500/90 to-orange-500/90",
       },
     ],
     [navigate]

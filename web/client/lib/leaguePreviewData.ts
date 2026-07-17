@@ -341,6 +341,8 @@ export function createDemoLeagueWaiverResponse(): LeagueWaiverTabResponse {
   return {
     league_id: DEMO_LEAGUE_ID,
     fantasy_team_id: DEMO_LEAGUE_ID - 100,
+    waiver_priority: 1,
+    faab_remaining: 100,
     total_available: availablePlayers.length,
     claims: [],
     roster: [],

@@ -41,14 +41,15 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     JoinByCodeRequest,
 )
 from collegefootballfantasy_api.app.services.draft_service import (
-    auto_pick_expired_draft_pick,
     build_draft_room_state,
     create_real_draft_pick,
+    start_draft,
 )
 from collegefootballfantasy_api.app.services.league_flow import (
     create_league,
     join_league as join_league_flow,
     regenerate_invite as regenerate_invite_flow,
+    revoke_invite as revoke_invite_flow,
     reschedule_draft as reschedule_draft_flow,
     update_league_settings as update_league_settings_flow,
 )
@@ -101,7 +102,7 @@ def list_leagues_endpoint(
         scope=scope,
     )
     return LeagueList(
-        data=[get_league_detail(db, league) for league in leagues],
+        data=[get_league_detail(db, league, viewer=current_user) for league in leagues],
         total=total,
         limit=limit,
         offset=offset,
@@ -116,7 +117,7 @@ def get_league_endpoint(
 ) -> LeagueDetailRead:
     league = get_league_or_404(db, league_id)
     require_league_member(db, league_id, current_user)
-    return get_league_detail(db, league)
+    return get_league_detail(db, league, viewer=current_user)
 
 
 @router.get("/{league_id}/workspace", response_model=LeagueWorkspaceRead)
@@ -240,6 +241,16 @@ def get_draft_room_endpoint(
     return build_draft_room_state(db, league, current_user)
 
 
+@router.post("/{league_id}/draft/start", response_model=DraftRoomRead)
+def start_draft_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> DraftRoomRead:
+    league, _ = require_commissioner(db, league_id, current_user)
+    return start_draft(db, league=league, current_user=current_user)
+
+
 @router.post("/{league_id}/draft-picks", response_model=DraftRoomRead, status_code=status.HTTP_201_CREATED)
 def create_draft_pick_endpoint(
     league_id: int,
@@ -250,17 +261,6 @@ def create_draft_pick_endpoint(
     league = get_league_or_404(db, league_id)
     require_league_member(db, league.id, current_user)
     return create_real_draft_pick(db, league=league, payload=payload, current_user=current_user)
-
-
-@router.post("/{league_id}/draft-picks/auto", response_model=DraftRoomRead)
-def auto_pick_draft_endpoint(
-    league_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> DraftRoomRead:
-    league = get_league_or_404(db, league_id)
-    require_league_member(db, league.id, current_user)
-    return auto_pick_expired_draft_pick(db, league=league, current_user=current_user)
 
 
 @router.get("/{league_id}/members", response_model=LeagueMembersList)
@@ -324,6 +324,26 @@ def regenerate_invite(
     return regenerate_invite_flow(db, league, current_user)
 
 
+@router.post("/{league_id}/invite/rotate", response_model=LeagueCreateResponse)
+def rotate_invite(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> LeagueCreateResponse:
+    league, _ = require_commissioner(db, league_id, current_user)
+    return regenerate_invite_flow(db, league, current_user)
+
+
+@router.post("/{league_id}/invite/revoke", response_model=LeagueDetailRead)
+def revoke_invite(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> LeagueDetailRead:
+    league, _ = require_commissioner(db, league_id, current_user)
+    return revoke_invite_flow(db, league, current_user)
+
+
 @router.patch("/{league_id}/settings", response_model=LeagueDetailRead)
 def update_league_settings(
     league_id: int,
@@ -332,7 +352,7 @@ def update_league_settings(
     current_user: User = Depends(require_verified_user),
 ) -> LeagueDetailRead:
     league, _ = require_commissioner(db, league_id, current_user)
-    return update_league_settings_flow(db, league, payload)
+    return update_league_settings_flow(db, league, payload, current_user)
 
 
 @router.patch("/{league_id}/draft", response_model=DraftRead)

@@ -6,6 +6,7 @@ from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.models.provider_sync_state import ProviderSyncState
 from collegefootballfantasy_api.app.models.scoring_admin_audit import ScoringAdminAudit
+from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.scoring_service import recalculate_league_week_scores
 from tests.api.scoring_helpers import create_scoring_fixture
@@ -158,6 +159,43 @@ def test_admin_preview_and_apply_stat_correction_recalculates_and_audits(client,
     history_response = client.get("/admin/scoring/corrections", headers=auth_headers(token))
     assert history_response.status_code == 200
     assert history_response.json()[0]["id"] == audit.id
+
+
+def test_stat_correction_can_flip_a_finalized_matchup_and_standings(client, db_session):
+    token, _admin_user_id = create_user_and_token(client, "correction-flip", admin=True)
+    league, home, away, players, matchup = create_scoring_fixture(db_session)
+
+    recalculate_league_week_scores(db_session, league.id, 2026, 1)
+    matchup.status = "final"
+    recalculate_league_week_scores(db_session, league.id, 2026, 1)
+    db_session.commit()
+
+    initial_home = db_session.query(Standing).filter_by(league_id=league.id, team_id=home.id, season=2026, week=1).one()
+    initial_away = db_session.query(Standing).filter_by(league_id=league.id, team_id=away.id, season=2026, week=1).one()
+    assert (initial_home.wins, initial_home.losses) == (1, 0)
+    assert (initial_away.wins, initial_away.losses) == (0, 1)
+
+    response = client.post(
+        "/admin/scoring/corrections/apply",
+        json={
+            "player_id": players["away_qb"].id,
+            "season": 2026,
+            "week": 1,
+            "stats": {"PassingYards": 1500},
+            "reason": "official stat correction changes the winner",
+        },
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    db_session.expire_all()
+    corrected_matchup = db_session.get(Matchup, matchup.id)
+    corrected_home = db_session.query(Standing).filter_by(league_id=league.id, team_id=home.id, season=2026, week=1).one()
+    corrected_away = db_session.query(Standing).filter_by(league_id=league.id, team_id=away.id, season=2026, week=1).one()
+    assert corrected_matchup.status == "final"
+    assert corrected_matchup.away_score == 60.0
+    assert (corrected_home.wins, corrected_home.losses) == (0, 1)
+    assert (corrected_away.wins, corrected_away.losses) == (1, 0)
 
 
 def test_admin_can_reconcile_finalize_and_reopen_week(client, db_session):

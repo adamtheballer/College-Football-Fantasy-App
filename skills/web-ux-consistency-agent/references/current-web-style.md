@@ -17,7 +17,6 @@ Short description:
 - `web/client/components/BackgroundEffects.tsx`
 - `web/client/pages/Index.tsx`
 - `web/client/pages/Leagues.tsx`
-- `web/client/pages/LeagueDetail.tsx`
 - `web/client/pages/Login.tsx`
 - `web/client/pages/Stats.tsx`
 

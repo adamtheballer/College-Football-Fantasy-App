@@ -37,7 +37,6 @@ describe("app shell navigation helpers", () => {
     expect(items.map((item) => item.name)).toEqual([
       "HOME",
       "LEAGUES",
-      "PLAYER COMPARE",
       "SETTINGS",
       "SIGN IN",
     ]);

@@ -3,6 +3,7 @@ export interface DraftRoomTeam {
   name: string;
   owner_user_id: number | null;
   owner_name: string | null;
+  is_cpu: boolean;
 }
 
 export interface DraftRoomPick {
@@ -17,6 +18,7 @@ export interface DraftRoomPick {
   player_position: string;
   player_school: string;
   made_by_user_id: number | null;
+  auto_pick: boolean;
   created_at: string;
 }
 
@@ -35,6 +37,14 @@ export interface DraftRoom {
   current_team_name: string | null;
   user_team_id: number | null;
   can_make_pick: boolean;
+  can_start_draft: boolean;
+  pre_draft_starts_at: string | null;
+  draft_starts_at: string | null;
+  current_pick_started_at: string | null;
+  current_pick_deadline: string | null;
+  transition_ends_at: string | null;
+  seconds_remaining: number;
+  draft_version: number;
   pick_started_at: string | null;
   pick_expires_at: string | null;
   server_time: string;

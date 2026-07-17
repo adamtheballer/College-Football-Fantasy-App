@@ -1,3 +1,5 @@
+name: cff_local
+
 services:
   db:
     image: postgres:16
@@ -15,37 +17,95 @@ services:
       timeout: 5s
       retries: 20
   api:
-    image: python:3.11-slim
+    build:
+      context: .
+      dockerfile: Dockerfile.api
     working_dir: /app
-    volumes:
-      - ./:/app
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/collegefootballfantasy
       API_HOST: 0.0.0.0
       API_PORT: 8000
       API_LOG_LEVEL: info
       UI_BASE_URL: http://localhost:8080
-      UV_PROJECT_ENVIRONMENT: /tmp/cff-api-venv
       PYTHONPATH: /app
+      # The real-stack E2E suite creates three isolated accounts from one container IP.
+      # Keep production limits in deployment configuration; this only prevents test setup throttling.
+      AUTH_SIGNUP_RATE_LIMIT: 20
+      ESPN_HISTORICAL_STATS_ENABLED: "${ESPN_HISTORICAL_STATS_ENABLED:-true}"
+      ESPN_HISTORICAL_STATS_BASE_URL: "${ESPN_HISTORICAL_STATS_BASE_URL:-https://site.web.api.espn.com/apis/common/v3/sports/football/college-football}"
+      ESPN_HISTORICAL_STATS_TIMEOUT_SECONDS: "${ESPN_HISTORICAL_STATS_TIMEOUT_SECONDS:-10}"
+      ESPN_HISTORICAL_STATS_MAX_RETRIES: "${ESPN_HISTORICAL_STATS_MAX_RETRIES:-3}"
+      ESPN_HISTORICAL_STATS_REQUESTS_PER_SECOND: "${ESPN_HISTORICAL_STATS_REQUESTS_PER_SECOND:-1}"
+      ESPN_HISTORICAL_STATS_CACHE_TTL_DAYS: "${ESPN_HISTORICAL_STATS_CACHE_TTL_DAYS:-30}"
+      ESPN_HISTORICAL_STATS_SEASONS_BACK: "${ESPN_HISTORICAL_STATS_SEASONS_BACK:-4}"
+      ESPN_HISTORICAL_STATS_USER_AGENT: "${ESPN_HISTORICAL_STATS_USER_AGENT:-CollegeFootballFantasy/0.1 historical-stats}"
+      ESPN_HISTORICAL_STATS_FAIL_OPEN: "${ESPN_HISTORICAL_STATS_FAIL_OPEN:-true}"
     ports:
       - "${API_PORT:-8000}:8000"
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     command: >-
-      sh -c "pip install uv && uv sync && cd api && PYTHONPATH=/app uv run alembic -c alembic.ini upgrade head && cd /app && uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port 8000"
+      sh -c "cd api && PYTHONPATH=/app uv run alembic -c alembic.ini upgrade head && cd /app && uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
   web:
-    image: node:20
+    build:
+      context: .
+      dockerfile: Dockerfile.web
     working_dir: /app/web
-    volumes:
-      - ./:/app
-      - /app/web/node_modules
     ports:
       - "${WEB_PORT:-8080}:8080"
+    restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    environment:
+      VITE_API_BASE_URL: /api
     command: >-
-      sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+      sh -c "npm ci && npm run dev:vite -- --host 0.0.0.0"
+
+  lifecycle_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    working_dir: /app
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/collegefootballfantasy
+      PYTHONPATH: /app
+      ESPN_HISTORICAL_STATS_ENABLED: "${ESPN_HISTORICAL_STATS_ENABLED:-true}"
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    command: >-
+      sh -c "PYTHONPATH=/app uv run python scripts/run_lifecycle_worker.py"
+
+  e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    profiles: ["e2e"]
+    working_dir: /app/web
+    environment:
+      E2E_BASE_URL: http://web:8080
+      REAL_STACK_E2E: "1"
+    depends_on:
+      web:
+        condition: service_started
+    command: >-
+      npm run test:e2e:real
 
 volumes:
   pgdata:

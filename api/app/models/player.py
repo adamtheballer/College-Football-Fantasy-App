@@ -31,6 +31,13 @@ class Player(TimestampMixin, Base):
     cfb27_overall: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cfb27_position_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cfb27_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    espn_height: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    espn_weight: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    espn_birthplace: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    espn_status: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    espn_jersey: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    espn_headshot_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    espn_profile_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     roster_entries = relationship("RosterEntry", back_populates="player", cascade="all, delete-orphan")
 

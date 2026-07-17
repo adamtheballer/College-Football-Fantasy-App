@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
+import { Lock } from "lucide-react";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
 import { WeekSelector } from "@/components/league/WeekSelector";
+import { ErrorState } from "@/components/states/ErrorState";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLeagueDetail, useLeagueRosterTab } from "@/hooks/use-leagues";
 import { useUpdateLineup } from "@/hooks/use-roster-actions";
+import { ApiError } from "@/lib/api";
 import {
   DEMO_LEAGUE_ID,
   createDemoLeagueRosterResponse,
@@ -29,6 +32,20 @@ const isRealRosterPlayer = (player: LeagueRosterPlayer) =>
       !player.is_placeholder &&
       !/\bpreview\b/i.test(player.player_name ?? ""),
   );
+
+export const formatRosterLoadError = (error: unknown, fallback: string) => {
+  if (error instanceof ApiError && error.message) return error.message;
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+};
+
+export const formatLineupLockMessage = (player: LeagueRosterPlayer) => {
+  if (!player.is_locked) return null;
+  if (!player.game_start_at) return "Locked at kickoff";
+  const gameStart = new Date(player.game_start_at);
+  if (Number.isNaN(gameStart.getTime())) return "Locked at kickoff";
+  return `Locked at kickoff (${gameStart.toLocaleString()})`;
+};
 
 function createEmptyRosterSlots(
   slotLimits: Record<string, number> | undefined,
@@ -70,6 +87,8 @@ function createEmptyRosterSlots(
         boom_prob: null,
         bust_prob: null,
         weekly_projected_fantasy_points: null,
+        game_start_at: null,
+        is_locked: false,
         is_placeholder: true,
       };
     });
@@ -96,7 +115,7 @@ export default function LeagueRoster() {
   const previewTeamId = rosterData?.owned_team?.id ?? rosterData?.fantasy_team_id ?? -100;
   const realRoster = useMemo(() => fetchedRoster.filter(isRealRosterPlayer), [fetchedRoster]);
   const hasRealRosterPlayers = realRoster.length > 0;
-  const isEmptyRoster = !isDemoLeague && !rosterQuery.isLoading && !hasRealRosterPlayers;
+  const isEmptyRoster = !isDemoLeague && !rosterQuery.isLoading && !rosterQuery.isError && !hasRealRosterPlayers;
   const roster = isEmptyRoster
     ? createEmptyRosterSlots(
         rosterData?.roster_slot_limits,
@@ -194,8 +213,34 @@ export default function LeagueRoster() {
     );
   }
 
+  if (!isDemoLeague && leagueQuery.isError) {
+    return (
+      <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
+        <ErrorState
+          title="Unable to load league"
+          message={formatRosterLoadError(leagueQuery.error, "The league could not be loaded. Please try again.")}
+          retryLabel="Retry"
+          onRetry={() => void leagueQuery.refetch()}
+        />
+      </main>
+    );
+  }
+
   if (!postDraft) {
     return <Navigate to={`/league/${parsedLeagueId}/lobby`} replace />;
+  }
+
+  if (!isDemoLeague && rosterQuery.isError) {
+    return (
+      <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
+        <ErrorState
+          title="Unable to load roster"
+          message={formatRosterLoadError(rosterQuery.error, "The roster could not be loaded. Please try again.")}
+          retryLabel="Retry"
+          onRetry={() => void rosterQuery.refetch()}
+        />
+      </main>
+    );
   }
 
   return (
@@ -239,7 +284,7 @@ export default function LeagueRoster() {
             <div>
               <h2 className="text-[11px] font-black uppercase tracking-[0.22em] text-cfb-brand">Lineup Editor</h2>
               <p className="mt-1 text-sm font-semibold text-cfb-text-secondary">
-                Move players between eligible starter, bench, and IR slots before lineup lock.
+                Move players between eligible starter, bench, and IR slots. A player locks at their actual kickoff.
               </p>
             </div>
             <button
@@ -256,6 +301,7 @@ export default function LeagueRoster() {
               const position = (player.position ?? player.player_position ?? "N/A").toUpperCase();
               const currentSlot = (player.slot ?? player.roster_slot ?? "BENCH").toUpperCase();
               const selectedSlot = lineupSlots[player.id] ?? currentSlot;
+              const lockMessage = formatLineupLockMessage(player);
               return (
                 <div key={player.id} className="rounded-2xl border border-cfb-border-subtle bg-cfb-canvas/60 p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -269,13 +315,19 @@ export default function LeagueRoster() {
                       {currentSlot}
                     </span>
                   </div>
+                  {lockMessage ? (
+                    <p className="mt-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-amber-200">
+                      <Lock className="h-3.5 w-3.5" />
+                      {lockMessage}
+                    </p>
+                  ) : null}
                   <Select
                     value={selectedSlot}
                     onValueChange={(slot) => {
                       setLineupSlots((previous) => ({ ...previous, [player.id]: slot }));
                       setLineupMessage(null);
                     }}
-                    disabled={isDemoLeague || updateLineupMutation.isPending}
+                    disabled={Boolean(player.is_locked) || isDemoLeague || updateLineupMutation.isPending}
                   >
                     <SelectTrigger className="mt-3 border-cfb-border-subtle bg-cfb-surface text-cfb-text-primary">
                       <SelectValue />

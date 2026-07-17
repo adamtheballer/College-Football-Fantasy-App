@@ -205,7 +205,6 @@ The result is that the app feels busy and indirect even when the backend contrac
 - `web/client/pages/Stats.tsx` is currently overloaded.
 - The research experience should be broken into clearer entry points such as:
   - team research
-  - player compare
   - player outlook
   - user leaderboard
 - If full route splitting is deferred, the page still needs a much clearer first decision and persistent filter memory.

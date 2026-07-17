@@ -36,6 +36,43 @@ def test_recalculate_league_week_scores_is_idempotent_and_sums_starters_only(cli
     assert all(row["status"] == "live" for row in home_score.breakdown_json["players"] if row["player_id"] != players["ir"].id)
 
 
+def test_unchanged_recalculation_does_not_rewrite_player_or_team_scores(client, db_session, monkeypatch):
+    league, home, _away, players, matchup = create_scoring_fixture(db_session)
+    first_calculation = datetime(2026, 8, 20, 12, 0, tzinfo=timezone.utc)
+    second_calculation = first_calculation + timedelta(minutes=10)
+    monkeypatch.setattr(scoring_service, "_now", lambda: first_calculation)
+
+    first = recalculate_league_week_scores(db_session, league.id, 2026, 1)
+    db_session.commit()
+    player_score = db_session.query(PlayerWeekScore).filter_by(
+        league_id=league.id,
+        player_id=players["qb"].id,
+        season=2026,
+        week=1,
+    ).one()
+    team_score = db_session.query(TeamWeekScore).filter_by(
+        league_id=league.id,
+        team_id=home.id,
+        season=2026,
+        week=1,
+    ).one()
+    first_player_calculated_at = player_score.calculated_at
+    first_team_calculated_at = team_score.calculated_at
+
+    monkeypatch.setattr(scoring_service, "_now", lambda: second_calculation)
+    second = recalculate_league_week_scores(db_session, league.id, 2026, 1)
+    db_session.commit()
+    db_session.refresh(player_score)
+    db_session.refresh(team_score)
+    db_session.refresh(matchup)
+
+    assert first.players_scored == second.players_scored == 6
+    assert second.matchups_updated == 0
+    assert player_score.calculated_at == first_player_calculated_at
+    assert team_score.calculated_at == first_team_calculated_at
+    assert matchup.status == "live"
+
+
 def test_lineup_snapshot_refreshes_before_kickoff_then_freezes(client, db_session, monkeypatch):
     league, home, _away, players, _matchup = create_scoring_fixture(db_session)
     before_kickoff = datetime(2026, 8, 20, 14, 0, tzinfo=timezone.utc)

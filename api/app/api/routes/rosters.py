@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
@@ -9,6 +11,7 @@ from collegefootballfantasy_api.app.api.deps import (
     require_verified_user,
 )
 from collegefootballfantasy_api.app.db.session import get_db
+from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
@@ -26,9 +29,13 @@ from collegefootballfantasy_api.app.schemas.roster import (
 )
 from collegefootballfantasy_api.app.schemas.transaction import TransactionList, TransactionRead
 from collegefootballfantasy_api.app.services.roster_legality import (
+    assign_best_roster_slot_for_position,
     eligible_slots_for_position,
     normalize_slot,
+    superflex_is_enabled,
 )
+from collegefootballfantasy_api.app.services.league_weeks import resolve_current_week
+from collegefootballfantasy_api.app.services.player_lock_service import locked_player_ids
 
 router = APIRouter()
 
@@ -89,14 +96,20 @@ def _validate_slot_counts(slot_limits: dict[str, int], slots: list[str]) -> None
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"lineup exceeds {slot} slots")
 
 
-def _validate_position_slot_eligibility(settings_row: LeagueSettings, entry: RosterEntry, slot: str) -> None:
+def _validate_position_slot_eligibility(settings_row: LeagueSettings, player_position: str | None, slot: str) -> None:
     normalized_slot = normalize_slot(slot)
     if normalized_slot is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"invalid roster slot: {slot}")
     if normalized_slot == "IR":
         return
-    position = (entry.player.position if entry.player else "").upper()
-    eligible_slots = eligible_slots_for_position(position, superflex_enabled=bool(settings_row.superflex_enabled))
+    position = (player_position or "").upper()
+    eligible_slots = eligible_slots_for_position(
+        position,
+        superflex_enabled=superflex_is_enabled(
+            _slot_limits(settings_row),
+            configured=bool(settings_row.superflex_enabled),
+        ),
+    )
     if normalized_slot not in eligible_slots:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -157,22 +170,19 @@ def _best_available_slot(
     settings_row = _league_settings(db, team.league_id)
     slot_limits = _slot_limits(settings_row)
     roster_entries = _load_roster_entry_rows(db, team.id)
-    counts: dict[str, int] = {}
-    for entry in roster_entries:
-        if exclude_entry_id is not None and entry.id == exclude_entry_id:
-            continue
-        slot = normalize_slot(entry.slot)
-        if not slot:
-            continue
-        counts[slot] = counts.get(slot, 0) + 1
-
-    primary_limit = int(slot_limits.get(player_position, 0))
-    if primary_limit and counts.get(player_position, 0) < primary_limit:
-        return player_position
-
-    bench_limit = int(slot_limits.get("BENCH", 0))
-    if counts.get("BENCH", 0) < bench_limit:
-        return "BENCH"
+    if exclude_entry_id is not None:
+        roster_entries = [entry for entry in roster_entries if entry.id != exclude_entry_id]
+    slot = assign_best_roster_slot_for_position(
+        player_position,
+        roster_entries,
+        slot_limits,
+        superflex_enabled=superflex_is_enabled(
+            slot_limits,
+            configured=bool(settings_row.superflex_enabled),
+        ),
+    )
+    if slot:
+        return slot
 
     raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="team roster is full")
 
@@ -196,8 +206,7 @@ def add_roster_entry_endpoint(
     slot_limits = _slot_limits(settings_row)
     slots = [entry.slot for entry in _load_roster_entry_rows(db, team.id)] + [entry_in.slot]
     _validate_slot_counts(slot_limits, slots)
-    candidate_entry = RosterEntry(player=player)
-    _validate_position_slot_eligibility(settings_row, candidate_entry, entry_in.slot)
+    _validate_position_slot_eligibility(settings_row, player.position, entry_in.slot)
 
     entry = RosterEntry(
         league_id=team.league_id,
@@ -291,13 +300,40 @@ def update_lineup_endpoint(
         next_slot = assignment.slot if assignment else entry.slot
         desired_slots.append(next_slot)
         if assignment and assignment.slot != entry.slot:
-            _validate_position_slot_eligibility(settings_row, entry, assignment.slot)
+            _validate_position_slot_eligibility(
+                settings_row,
+                entry.player.position if entry.player else None,
+                assignment.slot,
+            )
             changed_entries.append((entry, entry.slot))
 
     if any(entry_id not in roster_by_id for entry_id in requested_ids):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="roster entry not found")
 
     _validate_slot_counts(slot_limits, desired_slots)
+
+    if changed_entries:
+        league = db.get(League, team.league_id)
+        if not league:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
+        locked_ids = locked_player_ids(
+            db,
+            player_ids={entry.player_id for entry, _ in changed_entries},
+            season=league.season_year,
+            week=resolve_current_week(db, league),
+            now=datetime.now(timezone.utc),
+        )
+        if locked_ids:
+            locked_names = sorted(
+                entry.player.name
+                for entry, _ in changed_entries
+                if entry.player_id in locked_ids and entry.player is not None
+            )
+            detail = ", ".join(locked_names) or "the selected player"
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"lineup changes are locked after kickoff for: {detail}",
+            )
 
     for assignment in payload.assignments:
         roster_by_id[assignment.roster_entry_id].slot = assignment.slot

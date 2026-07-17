@@ -1,0 +1,51 @@
+[
+  {
+    "name": "flex accepts a running back when bench is full",
+    "roster_slots": { "QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 1, "K": 1, "BENCH": 0 },
+    "roster": [
+      { "position": "QB", "slot": "QB" },
+      { "position": "RB", "slot": "RB" },
+      { "position": "RB", "slot": "RB" },
+      { "position": "WR", "slot": "WR" },
+      { "position": "WR", "slot": "WR" },
+      { "position": "TE", "slot": "TE" },
+      { "position": "K", "slot": "K" }
+    ],
+    "candidate_position": "RB",
+    "expected_slot": "FLEX"
+  },
+  {
+    "name": "kicker cannot use an open quarterback slot",
+    "roster_slots": { "QB": 1, "RB": 0, "WR": 0, "TE": 0, "FLEX": 0, "K": 0, "BENCH": 0 },
+    "roster": [],
+    "candidate_position": "K",
+    "expected_slot": null
+  },
+  {
+    "name": "configured superflex accepts a second quarterback",
+    "roster_slots": { "QB": 1, "RB": 0, "WR": 0, "TE": 0, "FLEX": 0, "SUPERFLEX": 1, "K": 0, "BENCH": 0 },
+    "roster": [
+      { "position": "QB", "slot": "QB" }
+    ],
+    "candidate_position": "QB",
+    "expected_slot": "SUPERFLEX"
+  },
+  {
+    "name": "quarterback cannot use superflex when no slot is configured",
+    "roster_slots": { "QB": 1, "RB": 0, "WR": 0, "TE": 0, "FLEX": 0, "SUPERFLEX": 0, "K": 0, "BENCH": 0 },
+    "roster": [
+      { "position": "QB", "slot": "QB" }
+    ],
+    "candidate_position": "QB",
+    "expected_slot": null
+  },
+  {
+    "name": "bench is the fallback after starter slots fill",
+    "roster_slots": { "QB": 1, "RB": 0, "WR": 0, "TE": 0, "FLEX": 0, "K": 0, "BENCH": 1 },
+    "roster": [
+      { "position": "QB", "slot": "QB" }
+    ],
+    "candidate_position": "QB",
+    "expected_slot": "BENCH"
+  }
+]

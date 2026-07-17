@@ -57,6 +57,28 @@ const board = Array.from({ length: 180 }, (_, index) =>
   player(index + 1, ["QB", "RB", "WR", "TE", "K"][index % 5])
 );
 
+const selectRosterBalancedPlayer = (
+  state: SinglePlayerMockDraftState,
+  draftBoard: DraftPlayer[]
+) => {
+  const available = getDraftablePlayersForTeam(draftBoard, state);
+  const roster = state.picks.filter((pick) => pick.teamId === MOCK_USER_TEAM_ID);
+  const starterTargets: Record<string, number> = { QB: 1, RB: 2, WR: 2, TE: 1 };
+
+  for (const [position, target] of Object.entries(starterTargets)) {
+    const current = roster.filter((pick) => pick.assignedSlot === position).length;
+    if (current < target) {
+      return available.find((candidate) => candidate.pos === position) ?? available[0];
+    }
+  }
+
+  if (!roster.some((pick) => pick.assignedSlot === "FLEX")) {
+    return available.find((candidate) => ["RB", "WR", "TE"].includes(candidate.pos)) ?? available[0];
+  }
+
+  return available[0];
+};
+
 const pick = (
   id: number,
   position: string,
@@ -197,6 +219,101 @@ describe("single-player mock draft engine", () => {
     expect(afterBot.picks[0].draftRank).toBe(1);
   });
 
+  it("does not use an early pick on a backup quarterback when another starter is available", () => {
+    const start = 1_000;
+    const state = {
+      ...createSinglePlayerMockDraft(start),
+      status: "live" as const,
+      currentPick: 1,
+      pickStartedAt: start,
+      pickExpiresAt: start + MOCK_PICK_TIMER_SECONDS * 1000,
+      picks: [pick(9001, "QB", 1, "QB", 100)],
+    };
+    const candidates = [player(1, "QB"), player(2, "RB"), player(3, "WR")];
+
+    const advanced = advanceSinglePlayerMockDraft(
+      state,
+      candidates,
+      start + MOCK_BOT_PICK_DELAY_SECONDS * 1000
+    );
+
+    expect(advanced.picks).toHaveLength(2);
+    expect(advanced.picks[1].position).toBe("RB");
+  });
+
+  it("does not let a bot draft a kicker before its required non-kicker starters", () => {
+    const start = 1_000;
+    const state = {
+      ...createSinglePlayerMockDraft(start),
+      status: "live" as const,
+      currentPick: 1,
+      pickStartedAt: start,
+      pickExpiresAt: start + MOCK_PICK_TIMER_SECONDS * 1000,
+    };
+    const candidates = [player(1, "K"), player(2, "RB"), player(3, "WR")];
+
+    const advanced = advanceSinglePlayerMockDraft(
+      state,
+      candidates,
+      start + MOCK_BOT_PICK_DELAY_SECONDS * 1000
+    );
+
+    expect(advanced.picks).toHaveLength(1);
+    expect(advanced.picks[0].position).toBe("RB");
+  });
+
+  it("keeps kickers behind two RB, WR, or TE bench players after starters are filled", () => {
+    const start = 1_000;
+    const state = {
+      ...createSinglePlayerMockDraft(start),
+      status: "live" as const,
+      currentPick: 1,
+      pickStartedAt: start,
+      pickExpiresAt: start + MOCK_PICK_TIMER_SECONDS * 1000,
+      picks: [
+        pick(9001, "QB", 1, "QB", 100),
+        pick(9002, "RB", 1, "RB 1", 101),
+        pick(9003, "RB", 1, "RB 2", 102),
+        pick(9004, "WR", 1, "WR 1", 103),
+        pick(9005, "WR", 1, "WR 2", 104),
+        pick(9006, "TE", 1, "TE", 105),
+        pick(9007, "RB", 1, "FLEX", 106),
+      ],
+    };
+    const candidates = [player(1, "K"), player(2, "RB"), player(3, "WR")];
+
+    const advanced = advanceSinglePlayerMockDraft(
+      state,
+      candidates,
+      start + MOCK_BOT_PICK_DELAY_SECONDS * 1000
+    );
+
+    expect(advanced.picks).toHaveLength(8);
+    expect(advanced.picks[advanced.picks.length - 1]?.position).toBe("RB");
+  });
+
+  it("does not let a bot spend a bench slot on a second kicker while skill players remain", () => {
+    const start = 1_000;
+    const state = {
+      ...createSinglePlayerMockDraft(start),
+      status: "live" as const,
+      currentPick: 1,
+      pickStartedAt: start,
+      pickExpiresAt: start + MOCK_PICK_TIMER_SECONDS * 1000,
+      picks: [pick(9001, "K", 1, "K", 100)],
+    };
+    const candidates = [player(1, "K"), player(2, "RB")];
+
+    const advanced = advanceSinglePlayerMockDraft(
+      state,
+      candidates,
+      start + MOCK_BOT_PICK_DELAY_SECONDS * 1000
+    );
+
+    expect(advanced.picks).toHaveLength(2);
+    expect(advanced.picks[1].position).toBe("RB");
+  });
+
   it("keeps master board ranks stable after picks and filters", () => {
     const start = 1_000;
     const state = createSinglePlayerMockDraft(start);
@@ -305,27 +422,37 @@ describe("single-player mock draft engine", () => {
     }
 
     expect(getTeamIdForPick(state.currentPick)).toBe(MOCK_USER_TEAM_ID);
-    const picked = makeUserMockPick(state, board, board[state.picks.length].id, now + 100);
+    const bestAvailable = getDraftablePlayersForTeam(board, state)[0];
+    expect(bestAvailable).toBeDefined();
+    const picked = makeUserMockPick(state, board, bestAvailable!.id, now + 100);
     expect(picked.picks[picked.picks.length - 1]?.pickedBy).toBe("user");
   });
 
   it("can complete a full 12-team by 13-round mock without duplicate players", () => {
     const start = 1_000;
+    const draftBoard = board.map((player) =>
+      player.pos === "K"
+        ? {
+            ...player,
+            draftRank: player.draftRank + MOCK_TOTAL_PICKS,
+            masterDraftRank: player.masterDraftRank + MOCK_TOTAL_PICKS,
+          }
+        : player
+    );
     let state = createSinglePlayerMockDraft(start);
     let now = start + MOCK_INTERMISSION_SECONDS * 1000;
-    state = advanceSinglePlayerMockDraft(state, board, now);
+    state = advanceSinglePlayerMockDraft(state, draftBoard, now);
 
     while (state.status !== "complete") {
       if (isUserOnClock(state)) {
-        const bestAvailable = getDraftablePlayersForTeam(board, state)[0];
+        const bestAvailable = selectRosterBalancedPlayer(state, draftBoard);
         expect(bestAvailable).toBeDefined();
-        state = makeUserMockPick(state, board, bestAvailable!.id, now);
+        state = makeUserMockPick(state, draftBoard, bestAvailable!.id, now);
       } else {
         now += MOCK_BOT_PICK_DELAY_SECONDS * 1000;
-        state = advanceSinglePlayerMockDraft(state, board, now);
+        state = advanceSinglePlayerMockDraft(state, draftBoard, now);
       }
     }
-
     expect(state.picks).toHaveLength(MOCK_TOTAL_PICKS);
     expect(new Set(state.picks.map((pick) => pick.playerId)).size).toBe(MOCK_TOTAL_PICKS);
     expect(buildMockRoster(state).every((slot) => Boolean(slot.player))).toBe(true);

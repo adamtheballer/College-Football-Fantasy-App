@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 
-
 class AccoladesResponse(BaseModel):
     user_id: int
     first_name: str
@@ -51,27 +50,4 @@ class UserAnalyticsRow(BaseModel):
 class UserAnalyticsList(BaseModel):
     data: list[UserAnalyticsRow]
     total: int
-
-
-class PlayerCompareRequest(BaseModel):
-    player_a_id: int
-    player_b_id: int
-    season: int
-    week: int = 1
-
-
-class PlayerCompareSide(BaseModel):
-    player_id: int
-    player_name: str
-    school: str
-    position: str
-    fantasy_ppg: float
-    usage_rate: float
-    red_zone_touches: float
-    projected_matchup_difficulty: str
-
-
-class PlayerCompareResponse(BaseModel):
-    player_a: PlayerCompareSide
-    player_b: PlayerCompareSide
 

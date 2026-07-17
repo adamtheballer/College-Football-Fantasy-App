@@ -30,7 +30,12 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
 )
 
 
-def get_league_detail(db: Session, league: League) -> LeagueDetailRead:
+def get_league_detail(
+    db: Session,
+    league: League,
+    *,
+    viewer: User | None = None,
+) -> LeagueDetailRead:
     settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
     if not settings_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league settings not found")
@@ -45,7 +50,11 @@ def get_league_detail(db: Session, league: League) -> LeagueDetailRead:
         season_year=league.season_year,
         max_teams=league.max_teams,
         is_private=league.is_private,
-        invite_code=league.invite_code,
+        invite_code=(
+            league.invite_code
+            if viewer is not None and viewer.id == league.commissioner_user_id
+            else None
+        ),
         description=league.description,
         icon_url=league.icon_url,
         status=league.status,
@@ -419,7 +428,7 @@ def build_league_workspace(
         ]
 
     return LeagueWorkspaceRead(
-        league=get_league_detail(db, league),
+        league=get_league_detail(db, league, viewer=current_user),
         membership=LeagueMemberRead.model_validate(membership),
         owned_team=(
             LeagueWorkspaceTeamRead(
