@@ -1,12 +1,26 @@
 import React, { Component, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Calendar, Check, ChevronLeft, ChevronRight, Copy, Loader2, Minus, Plus } from "lucide-react";
+import {
+  Calendar,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Loader2,
+  Minus,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+  Trophy,
+  Zap,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { PlaybookDecor } from "@/components/fantasy/PlaybookDecor";
 import { cn } from "@/lib/utils";
 import { apiPost, getStoredAccessToken } from "@/lib/api";
 import { createLeagueScoringToApi } from "@/lib/scoringSettings";
@@ -139,6 +153,94 @@ const secondaryButtonClass =
   "h-12 rounded-[10px] border border-white/[0.08] bg-[#161E2E] bg-none px-6 text-sm font-semibold text-[#F8FAFC] shadow-none hover:border-white/15 hover:bg-[#1E293B] hover:text-white";
 const smallControlButtonClass =
   "flex h-8 w-8 items-center justify-center rounded-[8px] border border-white/[0.08] bg-[#0B1020] text-[#CBD5E1] transition hover:border-[#60A5FA]/35 hover:bg-[#60A5FA]/10 hover:text-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-35";
+
+function CreateLeagueBackdrop() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="absolute inset-x-0 top-0 h-[34rem] bg-[radial-gradient(circle_at_14%_10%,rgba(34,211,238,0.2),transparent_27%),radial-gradient(circle_at_78%_18%,rgba(59,130,246,0.22),transparent_26%),linear-gradient(180deg,#10274A_0%,#091426_58%,#070A12_100%)]" />
+      <div className="absolute -left-20 top-32 h-3 w-[30rem] rotate-[-17deg] rounded-full bg-[#67E8F9]/25 blur-[1px]" />
+      <div className="absolute right-[-8rem] top-44 h-3 w-[32rem] rotate-[20deg] rounded-full bg-[#FBBF24]/30 blur-[1px]" />
+      <div className="absolute right-[-5rem] top-64 h-2 w-[24rem] rotate-[20deg] rounded-full bg-[#F43F8E]/40 blur-[1px]" />
+      <div className="absolute left-[18%] top-[28rem] h-px w-[64%] bg-gradient-to-r from-transparent via-[#67E8F9]/30 to-transparent" />
+      <PlaybookDecor className="opacity-75" />
+    </div>
+  );
+}
+
+function CreateLeagueHero({ currentStep }: { currentStep: number }) {
+  return (
+    <header className="relative overflow-hidden rounded-[28px] border border-[#60A5FA]/25 bg-[#0C1830]/90 px-6 py-7 shadow-[0_20px_60px_rgba(2,8,23,0.32)] sm:px-8 md:px-10 md:py-9">
+      <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(116deg,transparent_0%,transparent_46%,rgba(59,130,246,0.16)_46%,transparent_47%,transparent_62%,rgba(251,191,36,0.12)_62%,transparent_63%)]" />
+      <div aria-hidden="true" className="absolute -right-8 top-8 h-2 w-48 rotate-[-18deg] rounded-full bg-[#67E8F9]/50" />
+      <div aria-hidden="true" className="absolute -right-10 top-14 h-2 w-36 rotate-[-18deg] rounded-full bg-[#F43F8E]/55" />
+      <PlaybookDecor className="opacity-55" />
+
+      <div className="relative z-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end">
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#67E8F9]/35 bg-[#67E8F9]/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.18em] text-[#CFFAFE]">
+            <Trophy className="h-3.5 w-3.5 text-[#FCD34D]" />
+            League Command Center
+          </div>
+          <p className="mt-5 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#7DD3FC]">
+            <Zap className="h-3.5 w-3.5" />
+            Step {currentStep + 1} of {steps.length} · {steps[currentStep]}
+          </p>
+          <h1 className="mt-3 max-w-3xl font-display text-4xl font-black italic uppercase leading-[0.9] tracking-[-0.055em] text-[#F8FAFC] sm:text-5xl md:text-6xl">
+            Build your <span className="text-[#67E8F9]">league.</span>
+          </h1>
+          <p className="mt-5 max-w-2xl text-sm leading-6 text-[#B8C7DF] sm:text-base">
+            Set the rules, schedule the draft, and send your managers an invite-ready league hub.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-2">
+            <span className="rounded-full border border-[#67E8F9]/25 bg-[#67E8F9]/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[#CFFAFE]">
+              Invite only
+            </span>
+            <span className="rounded-full border border-[#FCD34D]/25 bg-[#FCD34D]/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[#FEF3C7]">
+              Live draft room
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 rounded-[22px] border border-white/[0.1] bg-[#081325]/75 p-3 backdrop-blur-sm">
+          <div className="rounded-[16px] border border-[#67E8F9]/20 bg-[#67E8F9]/10 p-4">
+            <p className={fieldLabelClass}>Current phase</p>
+            <p className="mt-2 text-lg font-bold text-[#F8FAFC]">{steps[currentStep]}</p>
+          </div>
+          <div className="rounded-[16px] border border-[#FCD34D]/20 bg-[#FCD34D]/10 p-4">
+            <p className={fieldLabelClass}>Setup</p>
+            <p className="mt-2 text-lg font-bold text-[#F8FAFC]">{currentStep + 1}/4</p>
+          </div>
+          <div className="col-span-2 flex items-center gap-3 rounded-[16px] border border-white/[0.08] bg-[#111E34]/85 px-4 py-3">
+            <ShieldCheck className="h-5 w-5 shrink-0 text-[#86EFAC]" />
+            <p className="text-xs font-semibold leading-5 text-[#CBD5E1]">Your settings become the source of truth for the whole league.</p>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function LeagueCreationLoadingOverlay() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="absolute inset-0 z-30 flex min-h-full items-center justify-center bg-[#040A16]/80 px-5 backdrop-blur-sm"
+    >
+      <div className="relative w-full max-w-md overflow-hidden rounded-[26px] border border-[#67E8F9]/30 bg-[#0C1830] p-7 text-center shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+        <PlaybookDecor className="opacity-60" />
+        <div className="relative z-10">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] border border-[#67E8F9]/30 bg-[#67E8F9]/10">
+            <Loader2 className="h-7 w-7 animate-spin text-[#67E8F9]" />
+          </div>
+          <p className="mt-5 text-xs font-bold uppercase tracking-[0.2em] text-[#7DD3FC]">League setup</p>
+          <h2 className="mt-2 font-display text-3xl font-black italic uppercase tracking-[-0.04em] text-[#F8FAFC]">Building your league</h2>
+          <p className="mt-3 text-sm leading-6 text-[#B8C7DF]">Saving your rules, draft schedule, and private invite details. Keep this page open.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type FieldProps = {
   label: string;
@@ -461,15 +563,22 @@ function CreateLeagueForm() {
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-full bg-[#070A12] px-6 py-10 text-[#F8FAFC] md:px-10">
-        <div className="mx-auto max-w-2xl">
-          <div className={cn(cardClass, "p-8 text-center md:p-10")}>
+      <div className="relative isolate min-h-full overflow-hidden bg-[#070A12] px-6 py-10 text-[#F8FAFC] md:px-10">
+        <CreateLeagueBackdrop />
+        <div className="relative z-10 mx-auto max-w-2xl">
+          <div className={cn(cardClass, "relative overflow-hidden border-[#60A5FA]/20 p-8 text-center md:p-10")}>
+            <PlaybookDecor className="opacity-45" />
+            <div className="relative z-10">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[16px] border border-[#67E8F9]/30 bg-[#67E8F9]/10">
+                <ShieldCheck className="h-6 w-6 text-[#67E8F9]" />
+              </div>
             <p className="text-sm font-semibold text-[#60A5FA]">College Football Fantasy</p>
             <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.03em]">Sign in required</h1>
             <p className="mt-3 text-sm text-[#94A3B8]">You need an account before creating a league.</p>
             <Button type="button" onClick={() => navigate("/login")} className={cn(primaryButtonClass, "mt-8")}>
               Go to Login
             </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -478,12 +587,18 @@ function CreateLeagueForm() {
 
   if (success) {
     return (
-      <div className="min-h-full bg-[#070A12] px-6 py-8 text-[#F8FAFC] md:px-10">
-        <div className="mx-auto max-w-[1180px]">
-          <div className={cn(cardClass, "p-6 md:p-10")}>
+      <div className="relative isolate min-h-full overflow-hidden bg-[#070A12] px-6 py-8 text-[#F8FAFC] md:px-10">
+        <CreateLeagueBackdrop />
+        <div className="relative z-10 mx-auto max-w-[1180px]">
+          <div className={cn(cardClass, "relative overflow-hidden border-[#60A5FA]/20 p-6 md:p-10")}>
+            <PlaybookDecor className="opacity-30" />
+            <div className="relative z-10">
             <div className="flex flex-col gap-3 border-b border-white/[0.08] pb-8">
+              <div className="flex h-12 w-12 items-center justify-center rounded-[16px] border border-[#67E8F9]/30 bg-[#67E8F9]/10">
+                <Sparkles className="h-6 w-6 text-[#67E8F9]" />
+              </div>
               <p className="text-sm font-semibold text-[#60A5FA]">League created</p>
-              <h1 className="text-4xl font-extrabold tracking-[-0.03em] md:text-5xl">Invite managers</h1>
+              <h1 className="font-display text-4xl font-black italic uppercase tracking-[-0.04em] md:text-5xl">Invite managers</h1>
               <p className="max-w-2xl text-sm leading-6 text-[#94A3B8]">
                 Share the invite code or link. Managers can preview the league before joining.
               </p>
@@ -541,6 +656,7 @@ function CreateLeagueForm() {
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
+            </div>
           </div>
         </div>
       </div>
@@ -548,24 +664,10 @@ function CreateLeagueForm() {
   }
 
   return (
-    <div className="min-h-full bg-[#070A12] px-5 py-6 text-[#F8FAFC] sm:px-8 md:px-10" data-create-step={step}>
-      <div className="mx-auto max-w-[1180px] space-y-7">
-        <header className="space-y-3">
-          <p className="text-sm font-semibold text-[#60A5FA]">College Football Fantasy</p>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h1 className="text-4xl font-extrabold tracking-[-0.03em] text-[#F8FAFC] md:text-5xl">
-                Create League
-              </h1>
-              <p className="mt-2 text-base text-[#94A3B8]">
-                Step {step + 1} of {steps.length} · {steps[step]}
-              </p>
-            </div>
-            <p className="max-w-md text-sm leading-6 text-[#94A3B8]">
-              Configure the league shell, scoring, and draft schedule before inviting managers.
-            </p>
-          </div>
-        </header>
+    <div className="relative isolate min-h-full overflow-hidden bg-[#070A12] px-5 py-6 text-[#F8FAFC] sm:px-8 md:px-10" data-create-step={step}>
+      <CreateLeagueBackdrop />
+      <div className="relative z-10 mx-auto max-w-[1180px] space-y-7">
+        <CreateLeagueHero currentStep={step} />
 
         <Stepper currentStep={step} />
 
@@ -575,8 +677,10 @@ function CreateLeagueForm() {
           </div>
         )}
 
-        <section className={cn(cardClass, "overflow-hidden")}>
-          <div className="p-5 md:p-8 lg:p-10">
+        <section className={cn(cardClass, "relative overflow-hidden border-[#60A5FA]/15")}>
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#67E8F9] via-[#FCD34D] to-[#F43F8E]" />
+          <PlaybookDecor className="opacity-20" />
+          <div className="relative z-10 p-5 md:p-8 lg:p-10">
             {step === 0 && (
               <div className="space-y-8">
                 <SectionHeader
@@ -928,6 +1032,7 @@ function CreateLeagueForm() {
           </footer>
         </section>
       </div>
+      {loading ? <LeagueCreationLoadingOverlay /> : null}
     </div>
   );
 }
