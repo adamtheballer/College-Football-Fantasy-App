@@ -59,6 +59,9 @@ jobs:
       - name: Run backend tests
         run: PYTHONPATH=. uv run pytest -q tests
 
+      - name: Run PostgreSQL lifecycle concurrency stress test
+        run: PYTHONPATH=. uv run python scripts/stress_lifecycle_workers.py --workers 4
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -107,3 +110,12 @@ jobs:
       - name: Stop isolated stack
         if: always()
         run: COMPOSE_PROJECT_NAME=cff_ci docker compose down -v
+
+  real-stack-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run real Postgres/FastAPI/frontend/lifecycle E2E
+        run: ./scripts/run_real_stack_e2e.sh

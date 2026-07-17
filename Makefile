@@ -1,9 +1,12 @@
 SHELL := /bin/bash
+COMPOSE_PROJECT_NAME ?= cff_local
+COMPOSE := COMPOSE_PROJECT_NAME=$(COMPOSE_PROJECT_NAME) docker compose
 
-.PHONY: help db-up db-down migrate api web dev bootstrap test-backend test-web test-e2e
+.PHONY: help env db-up db-down migrate api web dev bootstrap test-backend test-web test-e2e
 
 help:
 	@echo "CollegeFootballFantasy local commands"
+	@echo "  make env            # create the ignored worktree-local .env and enable ESPN history imports"
 	@echo "  make bootstrap      # sync deps, install web deps, run db + migrations"
 	@echo "  make dev            # start DB + API + UI together"
 	@echo "  make api            # start API only (localhost:8000)"
@@ -13,11 +16,14 @@ help:
 	@echo "  make test-web       # run web typecheck + unit tests"
 	@echo "  make test-e2e       # run Playwright critical browser tests"
 
+env:
+	python3 scripts/ensure_local_env.py --enable-espn-historical-stats
+
 db-up:
-	docker compose up -d db
+	$(COMPOSE) up -d db
 
 db-down:
-	docker compose down
+	$(COMPOSE) down
 
 migrate:
 	uv run alembic -c api/alembic.ini upgrade head
@@ -31,7 +37,7 @@ web:
 dev:
 	./scripts/dev.sh
 
-bootstrap: db-up
+bootstrap: env db-up
 	uv sync
 	npm --prefix web ci
 	$(MAKE) migrate

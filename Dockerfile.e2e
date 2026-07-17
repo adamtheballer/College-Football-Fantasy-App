@@ -1,0 +1,12 @@
+FROM mcr.microsoft.com/playwright:v1.61.1-noble
+
+WORKDIR /app/web
+
+COPY web/package.json web/package-lock.json ./
+RUN npm install --global npm@10.9.3
+RUN npm ci
+
+COPY web ./
+
+ENV E2E_BASE_URL=http://web:8080 \
+    REAL_STACK_E2E=1

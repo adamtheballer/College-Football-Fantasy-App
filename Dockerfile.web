@@ -1,0 +1,11 @@
+FROM node:20
+
+WORKDIR /app/web
+
+COPY web/package.json web/package-lock.json ./
+RUN npm install --global npm@10.9.3
+RUN npm ci
+
+COPY web ./
+
+ENV VITE_API_BASE_URL=/api

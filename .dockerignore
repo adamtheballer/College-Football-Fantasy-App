@@ -1,0 +1,35 @@
+.git
+.worktrees
+.venv
+.pytest_cache
+__pycache__
+**/__pycache__
+*.py[cod]
+.DS_Store
+.env
+.env.*
+node_modules
+web/node_modules
+web/dist
+web/test-results
+web/playwright-report
+test-results
+playwright-report
+ui.log
+coverage
+htmlcov
+.mypy_cache
+.ruff_cache
+.coverage
+
+# The compose verification stack only needs application runtime source. Keep
+# local docs, tooling, and fixtures out of its immutable image contexts.
+bruno
+data
+docs
+fixtures
+requirements
+skills
+tests
+ui
+vendor
