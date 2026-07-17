@@ -10,6 +10,10 @@ if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
 from collegefootballfantasy_api.app.db.session import SessionLocal
+from collegefootballfantasy_api.app.core.config import settings
+# Register relationship targets for this standalone script before SQLAlchemy
+# configures Player.roster_entries.
+from collegefootballfantasy_api.app.models import league, roster, team, user  # noqa: F401
 from collegefootballfantasy_api.app.integrations.cfbd import CFBDClient
 from collegefootballfantasy_api.app.models.defense_rating import DefenseRating
 from collegefootballfantasy_api.app.models.injury import Injury
@@ -27,11 +31,29 @@ def main() -> None:
     parser.add_argument("--season", type=int, default=datetime.now().year)
     parser.add_argument("--week", type=int, required=True)
     parser.add_argument("--conference", type=str)
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="Build deterministic preseason baselines without calling the CFBD schedule endpoint.",
+    )
+    parser.add_argument(
+        "--only-if-missing",
+        action="store_true",
+        help="Leave an existing season/week projection set unchanged.",
+    )
     args = parser.parse_args()
 
     session = SessionLocal()
     try:
         players = session.scalars(select(Player)).all()
+        existing_count = session.scalar(
+            select(WeeklyProjection.id)
+            .where(WeeklyProjection.season == args.season, WeeklyProjection.week == args.week)
+            .limit(1)
+        )
+        if args.only_if_missing and existing_count is not None:
+            print(f"Weekly projections already exist for {args.season} Week {args.week}; leaving them unchanged.")
+            return
 
         stats_week = max(1, args.week - 1)
         stats_rows = session.scalars(
@@ -61,8 +83,17 @@ def main() -> None:
         ).all()
         injuries_by_player = {row.player_id: row for row in injuries_rows}
 
-        client = CFBDClient()
-        games_rows = client.get_games_teams(args.season, args.week, conference=args.conference)
+        games_rows = []
+        if args.offline:
+            print("Building deterministic preseason baselines without CFBD schedule data.")
+        elif not settings.cfbd_api_key:
+            print("CFBD_API_KEY is not configured; building deterministic preseason baselines.")
+        else:
+            try:
+                client = CFBDClient()
+                games_rows = client.get_games_teams(args.season, args.week, conference=args.conference)
+            except Exception as exc:
+                print(f"CFBD schedule lookup failed ({exc}); building deterministic preseason baselines.")
         opponent_by_team: dict[str, str] = {}
         for game in games_rows:
             teams = game.get("teams") or []

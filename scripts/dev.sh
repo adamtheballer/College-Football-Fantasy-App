@@ -52,6 +52,15 @@ fi
 echo "Running migrations..."
 PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head
 
+PROJECTION_SEASON="${PROJECTION_SEASON:-$(date +%Y)}"
+PROJECTION_WEEK="${PROJECTION_WEEK:-1}"
+echo "Ensuring Week ${PROJECTION_WEEK} projections..."
+PYTHONPATH=. uv run python scripts/build_weekly_projections.py \
+  --season "$PROJECTION_SEASON" \
+  --week "$PROJECTION_WEEK" \
+  --offline \
+  --only-if-missing
+
 echo "Starting API..."
 PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port "$API_PORT" &
 API_PID=$!

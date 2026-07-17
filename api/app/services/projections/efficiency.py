@@ -26,37 +26,36 @@ def compute_efficiency(stats: dict[str, Any], position: str) -> dict[str, float]
     passing_tds = _stat_value(stats, ["PassingTouchdowns", "PassTDs"])
     passing_ints = _stat_value(stats, ["Interceptions", "PassingInterceptions"])
 
-    ypc = rushing_yards / max(rushing_attempts, 1.0)
-    ypt = receiving_yards / max(targets, 1.0)
-    catch_rate = receptions / max(targets, 1.0)
-    ypa = passing_yards / max(passing_attempts, 1.0)
-    pass_td_rate = passing_tds / max(passing_attempts, 1.0)
-    int_rate = passing_ints / max(passing_attempts, 1.0)
-    comp_pct = passing_completions / max(passing_attempts, 1.0)
-
     if pos == "QB":
-        return {
-            "comp_pct": comp_pct,
-            "ypa": ypa,
-            "pass_td_rate": pass_td_rate,
-            "int_rate": int_rate,
-            "rush_ypc": ypc,
-        }
+        values: dict[str, float] = {}
+        if passing_attempts > 0:
+            values.update(
+                {
+                    "comp_pct": passing_completions / passing_attempts,
+                    "ypa": passing_yards / passing_attempts,
+                    "pass_td_rate": passing_tds / passing_attempts,
+                    "int_rate": passing_ints / passing_attempts,
+                }
+            )
+        if rushing_attempts > 0:
+            values["rush_ypc"] = rushing_yards / rushing_attempts
+        return values
     if pos == "RB":
-        return {
-            "ypc": ypc,
-            "ypt": ypt,
-            "catch_rate": catch_rate,
-        }
+        values = {}
+        if rushing_attempts > 0:
+            values["ypc"] = rushing_yards / rushing_attempts
+        if targets > 0:
+            values.update({"ypt": receiving_yards / targets, "catch_rate": receptions / targets})
+        return values
     if pos in {"WR", "TE"}:
-        return {
-            "ypt": ypt,
-            "catch_rate": catch_rate,
-        }
+        if targets <= 0:
+            return {}
+        return {"ypt": receiving_yards / targets, "catch_rate": receptions / targets}
     if pos == "K":
         return {}
-    return {
-        "ypc": ypc,
-        "ypt": ypt,
-        "catch_rate": catch_rate,
-    }
+    values = {}
+    if rushing_attempts > 0:
+        values["ypc"] = rushing_yards / rushing_attempts
+    if targets > 0:
+        values.update({"ypt": receiving_yards / targets, "catch_rate": receptions / targets})
+    return values
