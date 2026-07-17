@@ -6,11 +6,12 @@ import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDraftPick, useDraftRoom, useStartDraft } from "@/hooks/use-draft";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useLeagueDetail } from "@/hooks/use-leagues";
 import { useDraftPlayerPool, usePlayerCard } from "@/hooks/use-players";
 import { ApiError } from "@/lib/api";
 import { buildDraftBoard, type DraftConfig, type DraftPlayer } from "@/lib/draftRankings";
-import { mergeMockDraftMasterBoardPlayers } from "@/lib/mockDraftMasterBoard";
+import { enrichCfb27DraftPlayers } from "@/lib/mockDraftMasterBoard";
 import { filterDraftablePlayers, getLegalPositionsForRoster } from "@/lib/rosterLegality";
 import { cn } from "@/lib/utils";
 import type { DraftRoomPick, DraftRoomTeam } from "@/types/draft";
@@ -92,6 +93,7 @@ const getDraftConfig = (
   rosterSlots: Record<string, number> | undefined
 ): DraftConfig => ({
   leagueSize,
+  totalRosterSpots: getTotalDraftSlots(rosterSlots),
   rosterSlots: {
     QB: getSlotCount(rosterSlots, "QB"),
     RB: getSlotCount(rosterSlots, "RB"),
@@ -137,6 +139,7 @@ const buildPreviewTeams = (teams: DraftRoomTeam[], maxTeams: number): PreviewTea
       name: `Open Team ${index + 1}`,
       owner_user_id: null,
       owner_name: "Waiting for manager",
+      is_cpu: false,
       isPlaceholder: true,
     };
   });
@@ -217,6 +220,7 @@ export default function Draft() {
   const { leagueId } = useParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 150);
   const [position, setPosition] = useState("ALL");
   const [activeTab, setActiveTab] = useState<DraftTab>("draft");
   const [queuedPlayerIds, setQueuedPlayerIds] = useState<number[]>([]);
@@ -252,7 +256,7 @@ export default function Draft() {
     },
     [draftRoom?.draft_starts_at, league?.draft?.draft_datetime_utc]
   );
-  const memberCount = league?.members.length ?? draftRoom?.teams.length ?? 0;
+  const memberCount = draftRoom?.teams.length ?? league?.members.length ?? 0;
   const maxTeams = league?.max_teams ?? draftRoom?.teams.length ?? 0;
   const isLeagueFull = Boolean(maxTeams > 0 && memberCount >= maxTeams);
   const isScheduledPreview = draftRoom?.status === "scheduled";
@@ -331,29 +335,20 @@ export default function Draft() {
   });
 
   const realDraftPlayerPool = useMemo(
-    () => mergeMockDraftMasterBoardPlayers(playersPayload?.data ?? []),
+    () => enrichCfb27DraftPlayers(playersPayload?.data ?? []),
     [playersPayload?.data]
   );
 
   const draftBoard = useMemo(() => {
-    const board = buildDraftBoard(realDraftPlayerPool, draftConfig);
-    return board
-      .map((player) => {
-        const stableRank =
-          player.sourceBoardRank ?? player.boardRank ?? player.sheetAdp ?? player.masterDraftRank ?? player.draftRank;
-        return {
-          ...player,
-          draftRank: stableRank,
-          masterDraftRank: stableRank,
-        };
-      })
-      .sort((left, right) => {
-        const leftRank = left.masterDraftRank ?? Number.POSITIVE_INFINITY;
-        const rightRank = right.masterDraftRank ?? Number.POSITIVE_INFINITY;
-        if (leftRank !== rightRank) return leftRank - rightRank;
-        if (left.projectedPoints !== right.projectedPoints) return right.projectedPoints - left.projectedPoints;
-        return left.name.localeCompare(right.name);
-      });
+    return [...buildDraftBoard(realDraftPlayerPool, draftConfig)].sort((left, right) => {
+      if (left.masterDraftRank !== right.masterDraftRank) {
+        return left.masterDraftRank - right.masterDraftRank;
+      }
+      if (left.projectedPoints !== right.projectedPoints) {
+        return right.projectedPoints - left.projectedPoints;
+      }
+      return left.name.localeCompare(right.name);
+    });
   }, [draftConfig, realDraftPlayerPool]);
 
   const draftablePlayers = useMemo(
@@ -371,7 +366,7 @@ export default function Draft() {
   );
 
   const visiblePlayers = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
+    const normalizedSearch = debouncedSearch.trim().toLowerCase();
     const filteredPlayers = draftablePlayers.filter((player) => {
       const matchesPosition = position === "ALL" || player.pos === position;
       const matchesSearch =
@@ -392,7 +387,7 @@ export default function Draft() {
       if (leftRank !== rightRank) return leftRank - rightRank;
       return left.name.localeCompare(right.name);
     });
-  }, [draftablePlayers, position, search]);
+  }, [draftablePlayers, position, debouncedSearch]);
 
   const queuedPlayers = useMemo(() => {
     const byId = new Map(draftBoard.map((player) => [player.id, player]));
@@ -490,10 +485,6 @@ export default function Draft() {
     },
     []
   );
-
-  useEffect(() => {
-    centerDraftCarouselOnPick(draftRoom?.current_pick ?? 1);
-  }, [centerDraftCarouselOnPick, draftRoom?.current_pick, draftRoom?.status, totalPicks]);
 
   const recenterDraftCarousel = () => {
     centerDraftCarouselOnPick(draftRoom?.current_pick ?? 1);
@@ -849,7 +840,7 @@ export default function Draft() {
               {formatStatus(draftRoom.status)}
             </span>
             <span className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-              {league?.members.length ?? draftRoom.teams.length}/{league?.max_teams ?? draftRoom.teams.length} Managers
+              {draftRoom.teams.length}/{league?.max_teams ?? draftRoom.teams.length} Teams
             </span>
             {isScheduledPreview ? (
               <span className="rounded-full border border-amber-300/25 bg-amber-400/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-amber-100">
@@ -950,7 +941,7 @@ export default function Draft() {
                   <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Pick {slot.overallPick}</p>
                   <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{slot.round}.{slot.roundPick}</p>
                   <div className="mt-3 flex h-8 w-8 items-center justify-center rounded-xl border border-cyan-200/30 bg-slate-950/55 text-cyan-100 shadow-[0_0_22px_rgba(103,232,249,0.24),inset_0_0_12px_rgba(103,232,249,0.08)]">
-                    {isUser ? <User className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" /> : <Bot className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" />}
+                    {slot.team?.is_cpu ? <Bot className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" /> : <User className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" />}
                   </div>
                   <p className="mt-3 truncate text-base font-black text-foreground">
                     {slot.pick?.player_name ?? slot.team?.name ?? `Team ${slot.roundPick}`}
@@ -960,7 +951,9 @@ export default function Draft() {
                       ? `${slot.pick.player_position} • ${slot.pick.player_school}`
                       : slot.team?.isPlaceholder
                         ? "Waiting for manager"
-                        : slot.team?.owner_name || "Manager"}
+                        : slot.team?.is_cpu
+                          ? "CPU manager"
+                          : slot.team?.owner_name || "Manager"}
                   </p>
                 </div>
               );

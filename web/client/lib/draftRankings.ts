@@ -15,6 +15,7 @@ export type DraftRosterSlots = {
 export type DraftConfig = {
   leagueSize: number;
   rosterSlots: DraftRosterSlots;
+  totalRosterSpots?: number;
 };
 
 export type DraftPlayer = Player & {
@@ -180,7 +181,7 @@ const positionMultiplier: Record<string, number> = {
 
 const PROJECTION_ORDERED_POSITIONS = new Set(["RB", "WR", "TE", "K"]);
 const POSITION_BOARD_SLOT_ADJUSTMENT: Record<string, number> = {
-  QB: 4,
+  QB: 28,
   WR: -3,
   TE: 24,
 };
@@ -231,6 +232,14 @@ const computeReplacementIndex = (
   const benchShare = BENCH_DISTRIBUTION[pos] ? benchSlots * BENCH_DISTRIBUTION[pos] : 0;
 
   return Math.max(1, Math.round(starters + benchShare));
+};
+
+export const getEarliestKickerDraftRank = (config: DraftConfig) => {
+  const rounds =
+    config.totalRosterSpots ??
+    Object.values(config.rosterSlots).reduce((total, slots) => total + slots, 0);
+  const totalPicks = config.leagueSize * rounds;
+  return Math.max(1, totalPicks - config.leagueSize * 2);
 };
 
 const isLowProjectionQb = (
@@ -534,7 +543,10 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
     .map((entry, index) => ({
       entry,
       originalIndex: index + 1,
-      adjustedIndex: index + 1 + (POSITION_BOARD_SLOT_ADJUSTMENT[entry.player.pos] ?? 0),
+      adjustedIndex:
+        entry.player.pos === "K"
+          ? Math.max(index + 1, getEarliestKickerDraftRank(config))
+          : index + 1 + (POSITION_BOARD_SLOT_ADJUSTMENT[entry.player.pos] ?? 0),
     }))
     .sort((left, right) => {
       if (left.adjustedIndex !== right.adjustedIndex) {

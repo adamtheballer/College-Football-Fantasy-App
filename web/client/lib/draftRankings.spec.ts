@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { buildDraftBoard, type DraftConfig } from "./draftRankings";
+import {
+  buildDraftBoard,
+  getEarliestKickerDraftRank,
+  type DraftConfig,
+} from "./draftRankings";
 import type { Player } from "@/types/player";
 
 const config: DraftConfig = {
   leagueSize: 12,
+  totalRosterSpots: 13,
   rosterSlots: {
     QB: 1,
     RB: 2,
@@ -171,6 +176,49 @@ describe("buildDraftBoard", () => {
     expect(byName.get("Rank 14")?.masterDraftRank).toBeGreaterThanOrEqual(26);
   });
 
+  it("keeps even elite kickers in the late-round portion of the board", () => {
+    const players: Player[] = [
+      makePlayer(1, "K", 210, { name: "Elite Kicker", rank: 1, adp: 1, posRank: 1 }),
+      ...Array.from({ length: 160 }, (_, index) =>
+        makePlayer(index + 2, index % 2 === 0 ? "RB" : "WR", 300 - index, {
+          name: `Skill Player ${index + 1}`,
+          rank: index + 2,
+          adp: index + 2,
+        })
+      ),
+    ];
+
+    const eliteKicker = buildDraftBoard(players, config).find(
+      (player) => player.name === "Elite Kicker"
+    );
+
+    expect(eliteKicker?.masterDraftRank).toBeGreaterThanOrEqual(132);
+  });
+
+  it("moves the earliest kicker into the final two rounds for smaller leagues", () => {
+    const eightTeamConfig: DraftConfig = {
+      ...config,
+      leagueSize: 8,
+    };
+    const players: Player[] = [
+      makePlayer(1, "K", 210, { name: "Elite Kicker", rank: 1, adp: 1, posRank: 1 }),
+      ...Array.from({ length: 120 }, (_, index) =>
+        makePlayer(index + 2, index % 2 === 0 ? "RB" : "WR", 300 - index, {
+          name: `Skill Player ${index + 1}`,
+          rank: index + 2,
+          adp: index + 2,
+        })
+      ),
+    ];
+
+    const eliteKicker = buildDraftBoard(players, eightTeamConfig).find(
+      (player) => player.name === "Elite Kicker"
+    );
+
+    expect(getEarliestKickerDraftRank(eightTeamConfig)).toBe(88);
+    expect(eliteKicker?.masterDraftRank).toBeGreaterThanOrEqual(88);
+  });
+
   it("forces early-ranked low-projection backup QBs to the end of the draft board", () => {
     const players: Player[] = [
       makePlayer(1, "RB", 320, { name: "Elite RB", rank: 1, adp: 1 }),
@@ -236,7 +284,7 @@ describe("buildDraftBoard", () => {
 
     expect(sellersType?.sourceBoardRank).toBe(120);
     expect(sellersType?.projectedPoints).toBe(316);
-    expect(sellersType?.masterDraftRank).toBeLessThanOrEqual(20);
+    expect(sellersType?.masterDraftRank).toBeLessThanOrEqual(30);
     expect(backup?.masterDraftRank).toBe(board.length);
     expect(sellersType?.masterDraftRank).toBeLessThan(backup?.masterDraftRank ?? 0);
   });

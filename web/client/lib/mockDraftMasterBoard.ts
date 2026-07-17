@@ -28,11 +28,61 @@ const globalCfb27RankByKey = new Map(
     .map((rating, index) => [getDraftPlayerIdentityKey(rating), index + 1])
 );
 
+const cfb27RatingByKey = new Map(
+  CFB27_RATINGS.map((rating) => [getDraftPlayerIdentityKey(rating), rating])
+);
+
 const fallbackProjection = (position: string, overall: number) => {
   const base = baseProjectionByPosition[position] ?? 120;
   const step = projectionStepByPosition[position] ?? 2;
   return Number((base + Math.max(0, overall - 75) * step).toFixed(1));
 };
+
+const hasPositiveNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0;
+
+const enrichCfb27DraftPlayer = (player: Player): Player => {
+  const identityKey = getDraftPlayerIdentityKey(player);
+  const rating = cfb27RatingByKey.get(identityKey);
+  const masterRank = globalCfb27RankByKey.get(identityKey);
+
+  if (!rating || !masterRank) {
+    return player;
+  }
+
+  const existingProjection = player.projection?.fpts;
+  const projectedPoints = hasPositiveNumber(player.sheetProjectedSeasonPoints)
+    ? player.sheetProjectedSeasonPoints
+    : hasPositiveNumber(existingProjection)
+      ? existingProjection
+      : fallbackProjection(rating.pos, rating.ovr);
+  const floor = hasPositiveNumber(player.projection?.floor)
+    ? player.projection.floor
+    : Number((projectedPoints * 0.7).toFixed(1));
+  const ceiling = hasPositiveNumber(player.projection?.ceiling)
+    ? player.projection.ceiling
+    : Number((projectedPoints * 1.25).toFixed(1));
+
+  return {
+    ...player,
+    rank: masterRank,
+    boardRank: masterRank,
+    adp: masterRank,
+    posRank: rating.rank,
+    sheetAdp: masterRank,
+    sheetProjectedSeasonPoints: projectedPoints,
+    projection: {
+      ...player.projection,
+      fpts: projectedPoints,
+      floor,
+      ceiling,
+    },
+  };
+};
+
+export function enrichCfb27DraftPlayers(existingPlayers: Player[]): Player[] {
+  return existingPlayers.map(enrichCfb27DraftPlayer);
+}
 
 export function createMissingCfb27MockDraftPlayers(existingPlayers: Player[]): Player[] {
   const existingKeys = new Set(existingPlayers.map((player) => getDraftPlayerIdentityKey(player)));
@@ -68,5 +118,6 @@ export function createMissingCfb27MockDraftPlayers(existingPlayers: Player[]): P
 }
 
 export function mergeMockDraftMasterBoardPlayers(existingPlayers: Player[]): Player[] {
-  return [...existingPlayers, ...createMissingCfb27MockDraftPlayers(existingPlayers)];
+  const enrichedPlayers = enrichCfb27DraftPlayers(existingPlayers);
+  return [...enrichedPlayers, ...createMissingCfb27MockDraftPlayers(enrichedPlayers)];
 }

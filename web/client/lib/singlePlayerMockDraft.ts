@@ -313,7 +313,8 @@ export const getDraftablePlayersForTeam = (
 const getBestAvailablePlayer = (
   board: DraftPlayer[],
   state: SinglePlayerMockDraftState,
-  preferredPlayerIds: number[] = []
+  preferredPlayerIds: number[] = [],
+  useBotStrategy = false
 ) => {
   const available = getDraftablePlayersForTeam(board, state);
   const availableById = new Map(available.map((player) => [player.id, player]));
@@ -321,7 +322,67 @@ const getBestAvailablePlayer = (
     const queuedPlayer = availableById.get(playerId);
     if (queuedPlayer) return queuedPlayer;
   }
-  return available[0];
+
+  if (!useBotStrategy) {
+    return available[0];
+  }
+
+  const teamId = getTeamIdForPick(state.currentPick, getMockTeamCount(state));
+  const roster = getMockRosterPlayers(state, teamId);
+  const draftedQuarterbacks = roster.filter(
+    (player) => player.position === "QB"
+  ).length;
+  const draftedKickers = roster.filter((player) => player.position === "K").length;
+  const requiredStarterTargets: Record<PlayerPosition, number> = {
+    QB: 1,
+    RB: 2,
+    WR: 2,
+    TE: 1,
+  };
+  const hasOpenCoreStarter = Object.entries(requiredStarterTargets).some(
+    ([slot, target]) => roster.filter((player) => player.assignedSlot === slot).length < target
+  );
+  const hasOpenFlexStarter = !roster.some((player) => player.assignedSlot === "FLEX");
+  const draftedSkillBenchPlayers = roster.filter(
+    (player) =>
+      player.assignedSlot === "BENCH" && ["RB", "WR", "TE"].includes(player.position)
+  ).length;
+
+  return [...available].sort((left, right) => {
+    const getBotScore = (player: DraftPlayer) => {
+      let score = getPlayerBoardRank(player);
+      const coreStarterTarget = requiredStarterTargets[player.pos];
+      const needsCoreStarter =
+        coreStarterTarget !== undefined &&
+        roster.filter((rosterPlayer) => rosterPlayer.assignedSlot === player.pos).length <
+          coreStarterTarget;
+      if (needsCoreStarter) {
+        score -= 1_000;
+      } else if (hasOpenFlexStarter && ["RB", "WR", "TE"].includes(player.pos)) {
+        score -= 250;
+      }
+      if (player.pos === "QB" && draftedQuarterbacks > 0) {
+        score += 90;
+      }
+      if (player.pos === "K") {
+        if (draftedKickers > 0) {
+          score += 10_000;
+        }
+        if (hasOpenCoreStarter || hasOpenFlexStarter) {
+          score += 1_000;
+        } else if (draftedSkillBenchPlayers < 2) {
+          score += 150;
+        }
+      }
+      return score;
+    };
+    const leftScore = getBotScore(left);
+    const rightScore = getBotScore(right);
+    if (leftScore !== rightScore) {
+      return leftScore - rightScore;
+    }
+    return compareDraftBoardPlayers(left, right);
+  })[0];
 };
 
 const createPick = (
@@ -473,7 +534,8 @@ export const advanceSinglePlayerMockDraft = (
     const player = getBestAvailablePlayer(
       board,
       nextState,
-      userAutoPickReady ? nextState.queuedPlayerIds : []
+      userAutoPickReady ? nextState.queuedPlayerIds : [],
+      isBotTurn || userAutoPickReady
     );
     if (!player) {
       return {

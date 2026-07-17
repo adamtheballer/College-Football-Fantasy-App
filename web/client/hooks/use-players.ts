@@ -359,6 +359,8 @@ export function useDraftPlayerPool(
     league_id?: number;
     available_only?: boolean;
     sort?: string;
+    season?: number;
+    week?: number;
     limit?: number;
     offset?: number;
     pages?: number;
@@ -374,6 +376,8 @@ export function useDraftPlayerPool(
     league_id,
     available_only,
     sort,
+    season = new Date().getFullYear(),
+    week = 1,
     limit = 100,
     offset = 0,
     pages = 1,
@@ -394,6 +398,8 @@ export function useDraftPlayerPool(
         league_id: league_id || 0,
         available_only: available_only ? "true" : "false",
         sort: sort || "",
+        season,
+        week,
         limit,
         offset,
         pages,
@@ -417,10 +423,20 @@ export function useDraftPlayerPool(
           offset: pageOffset,
         });
 
-      const [firstPayload, teams] = await Promise.all([
+      const [firstPayload, projections, teams] = await Promise.all([
         fetchPage(offset),
+        apiGet<BackendProjectionListResponse>("/projections", {
+          season,
+          week,
+          limit: 2000,
+          offset: 0,
+        }).catch(
+          (): BackendProjectionListResponse => ({
+            data: [],
+          })
+        ),
         apiGet<BackendTeamSummaryResponse>("/stats/teams", {
-          season: new Date().getFullYear(),
+          season,
           conference: "ALL",
         }).catch(
           (): BackendTeamSummaryResponse => ({
@@ -445,6 +461,9 @@ export function useDraftPlayerPool(
       const conferenceBySchool = new Map(
         teams.data.map((row): [string, string] => [row.team.toUpperCase(), row.conference])
       );
+      const projectionByPlayerId = new Map<number, BackendProjectionRead>(
+        projections.data.map((row) => [row.player_id, row])
+      );
 
       return {
         ...firstPayload,
@@ -455,6 +474,7 @@ export function useDraftPlayerPool(
             rank: player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? 0,
             adp: player.sheet_adp ?? player.board_rank ?? 0,
             posRank: player.cfb27_position_rank ?? null,
+            projection: projectionByPlayerId.get(player.id),
           })
         ),
       };
