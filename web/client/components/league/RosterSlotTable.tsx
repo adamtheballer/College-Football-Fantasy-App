@@ -1,10 +1,20 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { usePlayerCard } from "@/hooks/use-players";
+import { useDropRosterPlayer, useUpdateLineup } from "@/hooks/use-roster-actions";
+import { getEligibleSlotsForPosition, normalizePosition } from "@/lib/rosterLegality";
 import type { LeagueRosterPlayer } from "@/types/league";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const slotRank = (slot?: string | null) => {
   const order = ["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "BENCH", "IR"];
@@ -16,6 +26,33 @@ const slotLabel = (slot?: string | null) => (slot || "BENCH").toUpperCase();
 
 const positionLabel = (player: LeagueRosterPlayer) =>
   (player.position ?? player.player_position ?? "FLEX").toUpperCase();
+
+const schoolAcronyms = new Set(["BYU", "LSU", "SMU", "TCU", "UCF", "UCLA", "USC"]);
+
+const displaySchoolName = (school?: string | null) => {
+  const value = school?.trim();
+  if (!value || value !== value.toUpperCase()) return value ?? "";
+  return value
+    .split(/(\s+)/)
+    .map((part) => {
+      if (!part.trim() || schoolAcronyms.has(part) || /[&()]/.test(part)) return part;
+      return `${part.slice(0, 1)}${part.slice(1).toLowerCase()}`;
+    })
+    .join("");
+};
+
+const weeklyProjectionLabel = (player: LeagueRosterPlayer) => {
+  const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
+  return typeof projection === "number" && Number.isFinite(projection) ? projection.toFixed(1) : "—";
+};
+
+const isRealRosterPlayer = (player: LeagueRosterPlayer) =>
+  Boolean(
+    player.player_id !== null &&
+      player.player_id !== undefined &&
+      !player.is_placeholder &&
+      !/\bpreview\b/i.test(player.player_name ?? ""),
+  );
 
 const positionStyles: Record<
   string,
@@ -99,6 +136,22 @@ const getPositionStyle = (position?: string | null) =>
 
 type RosterSlotTableTone = "default" | "bench";
 
+type OwnedRosterActions = {
+  teamId: number;
+  roster: LeagueRosterPlayer[];
+  superflexEnabled: boolean;
+};
+
+const isUnavailableForSwap = (player: LeagueRosterPlayer) => {
+  const status = (player.status ?? "").toUpperCase();
+  return Boolean(player.is_locked || player.is_ir || ["OUT", "IR", "INJURED", "PUP"].includes(status));
+};
+
+const playerCanFillSlot = (player: LeagueRosterPlayer, slot: string, superflexEnabled: boolean) => {
+  const position = normalizePosition(player.position ?? player.player_position);
+  return Boolean(position && getEligibleSlotsForPosition(position, superflexEnabled).includes(slot as never));
+};
+
 export function RosterSlotTable({
   title,
   players,
@@ -106,6 +159,7 @@ export function RosterSlotTable({
   showPositionColumn = true,
   tone = "default",
   leagueId,
+  ownedRosterActions,
 }: {
   title: string;
   players: LeagueRosterPlayer[];
@@ -113,9 +167,12 @@ export function RosterSlotTable({
   showPositionColumn?: boolean;
   tone?: RosterSlotTableTone;
   leagueId?: number | string;
+  ownedRosterActions?: OwnedRosterActions;
 }) {
   const navigate = useNavigate();
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueRosterPlayer | null>(null);
+  const [swapPlayer, setSwapPlayer] = useState<LeagueRosterPlayer | null>(null);
+  const [swapError, setSwapError] = useState<string | null>(null);
   const isBenchTone = tone === "bench";
   const sorted = [...players].sort((left, right) => {
     const slotDelta = slotRank(left.roster_slot || left.slot) - slotRank(right.roster_slot || right.slot);
@@ -130,6 +187,10 @@ export function RosterSlotTable({
     selectedPlayer?.player_id,
     Boolean(selectedPlayer?.player_id)
   );
+  const ownedTeamId = ownedRosterActions?.teamId;
+  const numericLeagueId = typeof leagueId === "number" ? leagueId : Number(leagueId);
+  const updateLineupMutation = useUpdateLineup(ownedTeamId, Number.isFinite(numericLeagueId) ? numericLeagueId : undefined);
+  const dropPlayerMutation = useDropRosterPlayer(ownedTeamId, Number.isFinite(numericLeagueId) ? numericLeagueId : undefined);
   const tableColumns = showPositionColumn
     ? "md:grid-cols-[0.55fr_1.45fr_0.75fr_0.45fr_0.55fr_0.5fr]"
     : "md:grid-cols-[0.55fr_1.6fr_0.9fr_0.65fr_0.5fr]";
@@ -138,6 +199,48 @@ export function RosterSlotTable({
     const teamId = selectedPlayer.team_id ?? selectedPlayer.fantasy_team_id;
     const query = teamId ? `?teamId=${teamId}` : "";
     navigate(`/trade/${leagueId}/${selectedPlayer.player_id}${query}`);
+  };
+  const swapCandidates = useMemo(() => {
+    if (!swapPlayer || !ownedRosterActions) return [];
+    const selectedSlot = slotLabel(swapPlayer.slot ?? swapPlayer.roster_slot);
+    return ownedRosterActions.roster.filter((candidate) => {
+      if (candidate.id === swapPlayer.id || !isRealRosterPlayer(candidate) || isUnavailableForSwap(candidate)) return false;
+      const candidateSlot = slotLabel(candidate.slot ?? candidate.roster_slot);
+      return (
+        candidateSlot !== selectedSlot &&
+        playerCanFillSlot(candidate, selectedSlot, ownedRosterActions.superflexEnabled) &&
+        playerCanFillSlot(swapPlayer, candidateSlot, ownedRosterActions.superflexEnabled)
+      );
+    });
+  }, [ownedRosterActions, swapPlayer]);
+  const beginSwap = () => {
+    if (!selectedPlayer || !ownedRosterActions || isUnavailableForSwap(selectedPlayer)) return;
+    setSwapError(null);
+    setSwapPlayer(selectedPlayer);
+    setSelectedPlayer(null);
+  };
+  const confirmSwap = async (candidate: LeagueRosterPlayer) => {
+    if (!swapPlayer) return;
+    setSwapError(null);
+    try {
+      await updateLineupMutation.mutateAsync([
+        { roster_entry_id: swapPlayer.id, slot: slotLabel(candidate.slot ?? candidate.roster_slot) },
+        { roster_entry_id: candidate.id, slot: slotLabel(swapPlayer.slot ?? swapPlayer.roster_slot) },
+      ]);
+      setSwapPlayer(null);
+    } catch (error) {
+      setSwapError(error instanceof Error ? error.message : "Unable to swap players.");
+    }
+  };
+  const dropSelectedPlayer = async () => {
+    if (!selectedPlayer || !ownedRosterActions || isUnavailableForSwap(selectedPlayer)) return;
+    if (!window.confirm(`Drop ${selectedPlayer.player_name}? This cannot be undone.`)) return;
+    try {
+      await dropPlayerMutation.mutateAsync(selectedPlayer.id);
+      setSelectedPlayer(null);
+    } catch (error) {
+      setSwapError(error instanceof Error ? error.message : "Unable to drop player.");
+    }
   };
 
   return (
@@ -186,12 +289,7 @@ export function RosterSlotTable({
           {sorted.map((player) => {
             const position = positionLabel(player);
             const style = getPositionStyle(position);
-            const isRealPlayer = Boolean(
-              player.player_id !== null &&
-                player.player_id !== undefined &&
-                !player.is_placeholder &&
-                !/\bpreview\b/i.test(player.player_name ?? "")
-            );
+            const isRealPlayer = isRealRosterPlayer(player);
             const projection = isRealPlayer
               ? player.projected_points ?? player.weekly_projected_fantasy_points ?? null
               : null;
@@ -233,7 +331,7 @@ export function RosterSlotTable({
                     {position}
                   </span>
                 </span>
-                <span className="text-cfb-text-muted">{isRealPlayer ? player.school ?? player.player_school ?? "N/A" : "N/A"}</span>
+                <span className="text-cfb-text-muted">{isRealPlayer ? displaySchoolName(player.school ?? player.player_school) || "N/A" : "N/A"}</span>
                 {showPositionColumn ? (
                   <span className={cn("font-black", style.text)}>{position}</span>
                 ) : null}
@@ -255,6 +353,14 @@ export function RosterSlotTable({
                   onClick: openTradeBuilder,
                 }
               : null
+          }
+          actions={
+            ownedRosterActions && !isUnavailableForSwap(selectedPlayer)
+              ? [
+                  { label: "Swap Player", onClick: beginSwap },
+                  { label: "Drop Player", onClick: () => void dropSelectedPlayer() },
+                ]
+              : []
           }
           card={selectedPlayerCard}
           loading={selectedPlayerCardLoading}
@@ -278,9 +384,57 @@ export function RosterSlotTable({
             },
           }}
           title="Roster Player Card"
-          note="Roster cards use the linked ESPN profile when available and show cached historical stat rows already attached to this player."
         />
       ) : null}
+      <Dialog open={Boolean(swapPlayer)} onOpenChange={(open) => !open && setSwapPlayer(null)}>
+        <DialogContent
+          className="max-w-2xl border-white/10 bg-slate-950 text-slate-50"
+          overlayClassName="bg-slate-950/45 backdrop-blur-[2px]"
+        >
+          <DialogHeader>
+            <DialogTitle className="pr-8 text-2xl font-black italic">Swap {swapPlayer?.player_name}</DialogTitle>
+            <DialogDescription className="text-slate-300">
+              Choose an unlocked, healthy teammate eligible for {slotLabel(swapPlayer?.slot ?? swapPlayer?.roster_slot)}. Both lineup slots update together.
+            </DialogDescription>
+          </DialogHeader>
+          {swapCandidates.length ? (
+            <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
+              {swapCandidates.map((candidate) => (
+                <button
+                  key={candidate.id}
+                  type="button"
+                  disabled={updateLineupMutation.isPending}
+                  onClick={() => void confirmSwap(candidate)}
+                  className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/[0.045] p-4 text-left transition hover:border-cyan-200/40 hover:bg-cyan-200/10 disabled:opacity-60"
+                >
+                  <span>
+                    <span className="block font-black text-white">{candidate.player_name}</span>
+                    <span className="mt-1 block text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
+                      {positionLabel(candidate)} • {displaySchoolName(candidate.school ?? candidate.player_school)}
+                    </span>
+                    <span className="mt-2 block text-[10px] font-black uppercase tracking-[0.14em] text-cyan-100/70">
+                      Opp {candidate.opponent ?? "TBD"} • Proj {weeklyProjectionLabel(candidate)}
+                    </span>
+                  </span>
+                  <span className="rounded-full border border-white/15 px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-white/70">
+                    {slotLabel(candidate.slot ?? candidate.roster_slot)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-slate-300">
+              No eligible, unlocked teammates can make this swap.
+            </p>
+          )}
+          {swapError ? <p className="text-sm font-bold text-red-300">{swapError}</p> : null}
+          <DialogFooter>
+            <button type="button" onClick={() => setSwapPlayer(null)} className="rounded-xl border border-white/15 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-white/75">
+              Cancel
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

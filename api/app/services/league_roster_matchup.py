@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from collegefootballfantasy_api.app.core.config import settings as app_settings
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
+from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
@@ -42,6 +43,7 @@ from collegefootballfantasy_api.app.services.matchup_probability import (
     is_starting_slot,
 )
 from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_starts_for_players
+from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
 from collegefootballfantasy_api.app.services.waiver_service import serialize_claims
 
 DEFAULT_ROSTER_SLOTS = {
@@ -136,6 +138,39 @@ def _roster_rows(db: Session, team_id: int) -> list[RosterEntry]:
     )
 
 
+def _school_schedule_key(school: str | None) -> str | None:
+    if not school:
+        return None
+    return canonical_school_name(school) or normalize_school(school)
+
+
+def _opponents_for_players(
+    db: Session,
+    *,
+    player_schools: dict[int, str | None],
+    season: int,
+    week: int,
+) -> dict[int, str | None]:
+    school_keys = {key for school in player_schools.values() if (key := _school_schedule_key(school))}
+    if not school_keys:
+        return {player_id: None for player_id in player_schools}
+
+    games = db.query(Game).filter(Game.season == season, Game.week == week).all()
+    opponent_by_school: dict[str, str] = {}
+    for game in games:
+        home_key = _school_schedule_key(game.home_team)
+        away_key = _school_schedule_key(game.away_team)
+        if home_key in school_keys and away_key:
+            opponent_by_school.setdefault(home_key, game.away_team)
+        if away_key in school_keys and home_key:
+            opponent_by_school.setdefault(away_key, game.home_team)
+
+    return {
+        player_id: opponent_by_school.get(_school_schedule_key(school))
+        for player_id, school in player_schools.items()
+    }
+
+
 def _rosters_for_teams(db: Session, team_ids: set[int]) -> dict[int, list[RosterEntry]]:
     rosters = {team_id: [] for team_id in team_ids}
     if not team_ids:
@@ -197,7 +232,6 @@ def _serialize_team_roster(
     league: League,
     team: Team,
     week: int,
-    opponent: str | None = None,
 ) -> list[RosterTabEntryRead]:
     entries = _roster_rows(db, team.id)
     player_ids = {entry.player_id for entry in entries}
@@ -214,12 +248,18 @@ def _serialize_team_roster(
         week=week,
         player_schools={entry.player_id: entry.player.school if entry.player else None for entry in entries},
     )
+    opponents = _opponents_for_players(
+        db,
+        player_schools={entry.player_id: entry.player.school if entry.player else None for entry in entries},
+        season=league.season_year,
+        week=week,
+    )
     current_time = datetime.now(timezone.utc)
     return [
         _serialize_roster_entry(
             entry,
             projection_by_player.get(entry.player_id),
-            opponent,
+            opponents.get(entry.player_id),
             game_start_at=game_starts.get(entry.player_id),
             is_locked=(
                 game_starts.get(entry.player_id) is not None
@@ -235,7 +275,6 @@ def _serialize_team_rosters(
     league: League,
     teams: dict[int, Team],
     week: int,
-    opponents: dict[int, str | None],
 ) -> dict[int, list[RosterTabEntryRead]]:
     entries_by_team = _rosters_for_teams(db, set(teams))
     player_ids = {entry.player_id for entries in entries_by_team.values() for entry in entries}
@@ -251,13 +290,23 @@ def _serialize_team_rosters(
             for entry in entries
         },
     )
+    opponents = _opponents_for_players(
+        db,
+        player_schools={
+            entry.player_id: entry.player.school if entry.player else None
+            for entries in entries_by_team.values()
+            for entry in entries
+        },
+        season=league.season_year,
+        week=week,
+    )
     current_time = datetime.now(timezone.utc)
     return {
         team_id: [
             _serialize_roster_entry(
                 entry,
                 projection_by_player.get(entry.player_id),
-                opponents.get(team_id),
+                opponents.get(entry.player_id),
                 game_start_at=game_starts.get(entry.player_id),
                 is_locked=(
                     game_starts.get(entry.player_id) is not None
@@ -304,23 +353,7 @@ def build_roster_tab_view(
             message="No team found for your user in this league.",
         )
 
-    matchup = (
-        db.query(Matchup)
-        .filter(
-            Matchup.league_id == league.id,
-            Matchup.season == league.season_year,
-            Matchup.week == week,
-            (Matchup.home_team_id == team.id) | (Matchup.away_team_id == team.id),
-        )
-        .first()
-    )
-    opponent_name = None
-    if matchup:
-        opponent_id = matchup.away_team_id if matchup.home_team_id == team.id else matchup.home_team_id
-        opponent = db.get(Team, opponent_id)
-        opponent_name = opponent.name if opponent else None
-
-    roster = _serialize_team_roster(db, league, team, week, opponent_name)
+    roster = _serialize_team_roster(db, league, team, week)
     team_read = _team_read(db, league, team)
     return LeagueRosterTabRead(
         league_id=league.id,
@@ -401,7 +434,6 @@ def build_matchup_tab_view(
         league,
         {team.id: team, **({opponent.id: opponent} if opponent else {})},
         week,
-        {team.id: opponent_name, **({opponent.id: team.name} if opponent else {})},
     )
     my_roster = roster_by_team[team.id]
     opponent_roster = roster_by_team.get(opponent.id, []) if opponent else []

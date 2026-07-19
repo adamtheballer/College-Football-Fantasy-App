@@ -15,6 +15,7 @@ from collegefootballfantasy_api.app.core.security import (
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.email_service import ConsoleEmailService, EmailPayload
+from collegefootballfantasy_api.app.services import password_change
 
 
 STRONG_PASSWORD = "StrongPass123!"
@@ -187,6 +188,175 @@ def test_login_succeeds_only_with_exact_password(client):
     )
     assert bad.status_code == 401
     assert bad.json()["detail"] == "invalid credentials"
+
+
+def test_direct_password_reset_replaces_password_revokes_sessions_and_access_token(client, db_session):
+    signup_payload = signup_user(client, "direct-reset")
+    old_access_token = signup_payload["access_token"]
+    client.post(
+        "/auth/login",
+        json={"email": "coach-direct-reset@example.com", "password": STRONG_PASSWORD},
+    )
+    user = db_session.get(User, signup_payload["user"]["id"])
+    assert user is not None
+    assert user.auth_version == 1
+
+    response = client.post(
+        "/auth/reset-password-with-current-password",
+        json={
+            "email": " COACH-DIRECT-RESET@example.com ",
+            "current_password": STRONG_PASSWORD,
+            "new_password": "ReplacementPass123!",
+            "confirm_new_password": "ReplacementPass123!",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"success": True, "message": "password reset complete"}
+    assert settings.refresh_cookie_name not in client.cookies
+    db_session.expire_all()
+    updated_user = db_session.get(User, signup_payload["user"]["id"])
+    assert updated_user is not None
+    assert updated_user.auth_version == 2
+    assert updated_user.failed_login_attempts == 0
+    assert updated_user.locked_until is None
+    assert verify_password("ReplacementPass123!", updated_user.password_hash) is True
+    assert verify_password(STRONG_PASSWORD, updated_user.password_hash) is False
+    assert all(session.revoked_at is not None for session in db_session.query(RefreshSession).all())
+
+    assert client.get("/auth/me", headers=auth_headers(old_access_token)).status_code == 401
+    assert client.post(
+        "/auth/login",
+        json={"email": "coach-direct-reset@example.com", "password": STRONG_PASSWORD},
+    ).status_code == 401
+    fresh_login = client.post(
+        "/auth/login",
+        json={"email": "coach-direct-reset@example.com", "password": "ReplacementPass123!"},
+    )
+    assert fresh_login.status_code == 200
+    assert client.get("/auth/me", headers=auth_headers(fresh_login.json()["access_token"])).status_code == 200
+
+
+def test_direct_password_reset_hides_missing_user_and_wrong_current_password(client):
+    signup_user(client, "reset-generic")
+    payload = {
+        "email": "coach-reset-generic@example.com",
+        "current_password": "WrongPass123!",
+        "new_password": "ReplacementPass123!",
+        "confirm_new_password": "ReplacementPass123!",
+    }
+    wrong_password = client.post("/auth/reset-password-with-current-password", json=payload)
+    missing_user = client.post(
+        "/auth/reset-password-with-current-password",
+        json={**payload, "email": "missing@example.com", "current_password": STRONG_PASSWORD},
+    )
+
+    assert wrong_password.status_code == missing_user.status_code == 400
+    assert wrong_password.json() == missing_user.json() == {
+        "detail": "Unable to reset password with the provided credentials."
+    }
+
+
+def test_direct_password_reset_validates_policy_confirmation_and_password_reuse(client):
+    signup_user(client, "reset-validation")
+    original_limit = settings.auth_password_change_rate_limit
+    settings.auth_password_change_rate_limit = 20
+    base = {
+        "email": "coach-reset-validation@example.com",
+        "current_password": STRONG_PASSWORD,
+        "new_password": "ReplacementPass123!",
+        "confirm_new_password": "ReplacementPass123!",
+    }
+    cases = [
+        ({"new_password": "lowercase123!", "confirm_new_password": "lowercase123!"}, "uppercase"),
+        ({"new_password": "UPPERCASE123!", "confirm_new_password": "UPPERCASE123!"}, "lowercase"),
+        ({"new_password": "NoNumberPassword!", "confirm_new_password": "NoNumberPassword!"}, "number"),
+        ({"new_password": "NoSpecialPassword123", "confirm_new_password": "NoSpecialPassword123"}, "special"),
+        ({"new_password": "A" * 130 + "a1!", "confirm_new_password": "A" * 130 + "a1!"}, "Password must"),
+        ({"confirm_new_password": "DifferentPass123!"}, "match"),
+        ({"new_password": STRONG_PASSWORD, "confirm_new_password": STRONG_PASSWORD}, "differ"),
+    ]
+    try:
+        for patch, expected_detail in cases:
+            response = client.post("/auth/reset-password-with-current-password", json={**base, **patch})
+            assert response.status_code == 422
+            assert expected_detail.lower() in response.json()["detail"].lower()
+    finally:
+        settings.auth_password_change_rate_limit = original_limit
+
+
+def test_authenticated_password_change_uses_session_user_and_clears_lockout(client, db_session):
+    signup_payload = signup_user(client, "authenticated-change")
+    user = db_session.get(User, signup_payload["user"]["id"])
+    assert user is not None
+    user.failed_login_attempts = 4
+    user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=5)
+    db_session.commit()
+
+    response = client.post(
+        "/auth/change-password",
+        headers=auth_headers(signup_payload["access_token"]),
+        json={
+            "current_password": STRONG_PASSWORD,
+            "new_password": "AuthenticatedPass123!",
+            "confirm_new_password": "AuthenticatedPass123!",
+        },
+    )
+    assert response.status_code == 200
+    db_session.expire_all()
+    changed_user = db_session.get(User, signup_payload["user"]["id"])
+    assert changed_user is not None
+    assert changed_user.auth_version == 2
+    assert changed_user.failed_login_attempts == 0
+    assert changed_user.locked_until is None
+    assert client.get("/auth/me", headers=auth_headers(signup_payload["access_token"])).status_code == 401
+
+
+def test_password_change_rolls_back_when_session_revocation_fails(client, db_session, monkeypatch):
+    signup_payload = signup_user(client, "reset-rollback")
+    user_id = signup_payload["user"]["id"]
+
+    def fail_revocation(*_args, **_kwargs):
+        raise RuntimeError("session storage unavailable")
+
+    monkeypatch.setattr(password_change, "revoke_user_sessions", fail_revocation)
+    response = client.post(
+        "/auth/reset-password-with-current-password",
+        json={
+            "email": "coach-reset-rollback@example.com",
+            "current_password": STRONG_PASSWORD,
+            "new_password": "ReplacementPass123!",
+            "confirm_new_password": "ReplacementPass123!",
+        },
+    )
+    assert response.status_code == 500
+    db_session.expire_all()
+    user = db_session.get(User, user_id)
+    assert user is not None
+    assert user.auth_version == 1
+    assert verify_password(STRONG_PASSWORD, user.password_hash) is True
+
+
+def test_password_change_rate_limit(client):
+    signup_user(client, "reset-rate-limit")
+    original_limit = settings.auth_password_change_rate_limit
+    settings.auth_password_change_rate_limit = 1
+    try:
+        payload = {
+            "email": "coach-reset-rate-limit@example.com",
+            "current_password": "WrongPass123!",
+            "new_password": "ReplacementPass123!",
+            "confirm_new_password": "ReplacementPass123!",
+        }
+        assert client.post("/auth/reset-password-with-current-password", json=payload).status_code == 400
+        assert client.post("/auth/reset-password-with-current-password", json=payload).status_code == 429
+    finally:
+        settings.auth_password_change_rate_limit = original_limit
+
+
+def test_legacy_token_password_reset_routes_are_disabled(client):
+    assert client.post("/auth/password-reset/request", json={"email": "coach@example.com"}).status_code == 404
+    assert client.post("/auth/password-reset/confirm", json={"token": "unused", "new_password": STRONG_PASSWORD}).status_code == 404
 
 
 def test_login_with_missing_user_returns_invalid_credentials(client):

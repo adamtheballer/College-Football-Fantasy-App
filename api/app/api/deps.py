@@ -34,6 +34,12 @@ def get_current_user(
         user = db.get(User, user_id)
         if not user or not user.is_active:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid access token")
+        try:
+            token_auth_version = int(payload["av"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid access token") from exc
+        if token_auth_version != user.auth_version:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid access token")
         return user
 
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing auth token")

@@ -28,7 +28,7 @@ class LeagueSettingsInput(BaseModel):
     waiver_type: str
     waiver_period_hours: int = 24
     waiver_process_day: int = 2
-    waiver_process_hour: int = 3
+    waiver_process_hour: int = 8
     faab_budget: int = 100
     allow_zero_dollar_bids: bool = True
     waiver_tiebreaker: str = "priority"
@@ -58,8 +58,8 @@ class LeagueSettingsInput(BaseModel):
     @field_validator("waiver_process_hour")
     @classmethod
     def validate_waiver_process_hour(cls, value: int) -> int:
-        if value < 0 or value > 23:
-            raise ValueError("waiver_process_hour must be between 0 and 23")
+        if value < 8 or value > 22:
+            raise ValueError("waiver_process_hour must be between 8 AM and 10 PM")
         return value
 
     @field_validator("trade_review_type")

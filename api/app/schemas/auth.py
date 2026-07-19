@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 PASSWORD_POLICY_MESSAGE = (
     "Password must be at least 12 characters and include one uppercase letter, "
-    "one number, and one special character."
+    "one lowercase letter, one number, and one special character."
 )
 SPECIAL_CHARACTER_PATTERN = re.compile(r"[^A-Za-z0-9]")
 
@@ -22,7 +22,9 @@ def normalize_email(value: str) -> str:
 def validate_password_strength(value: str) -> str:
     if (
         len(value) < 12
+        or len(value) > 128
         or not any(character.isupper() for character in value)
+        or not any(character.islower() for character in value)
         or not any(character.isdigit() for character in value)
         or not SPECIAL_CHARACTER_PATTERN.search(value)
     ):
@@ -138,6 +140,32 @@ class PasswordResetConfirm(BaseModel):
     @classmethod
     def validate_new_password(cls, value: str) -> str:
         return validate_password_strength(value)
+
+
+class PasswordChangeFields(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_new_password: str
+
+    @field_validator("current_password", "new_password", "confirm_new_password")
+    @classmethod
+    def require_password_value(cls, value: str) -> str:
+        if not value:
+            raise ValueError("password is required")
+        return value
+
+
+class PasswordResetWithCurrentPassword(PasswordChangeFields):
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email_field(cls, value: str) -> str:
+        return normalize_email(value)
+
+
+class AuthenticatedPasswordChange(PasswordChangeFields):
+    pass
 
 
 class SessionRead(BaseModel):

@@ -25,6 +25,7 @@ class DefenseRating(TimestampMixin, Base):
     pass_catch_multiplier: Mapped[float] = mapped_column(Float, default=1.0)
     pass_td_multiplier: Mapped[float] = mapped_column(Float, default=1.0)
     pass_turnover_multiplier: Mapped[float] = mapped_column(Float, default=1.0)
+    pass_pressure_multiplier: Mapped[float] = mapped_column(Float, default=1.0)
 
     rush_yards_multiplier: Mapped[float] = mapped_column(Float, default=1.0)
     rush_success_multiplier: Mapped[float] = mapped_column(Float, default=1.0)

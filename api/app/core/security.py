@@ -99,12 +99,18 @@ def generate_refresh_token() -> str:
     return secrets.token_urlsafe(64)
 
 
-def create_access_token(*, user_id: int, email: str | None = None) -> tuple[str, datetime]:
+def create_access_token(
+    *,
+    user_id: int,
+    email: str | None = None,
+    auth_version: int = 1,
+) -> tuple[str, datetime]:
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(minutes=settings.jwt_access_token_ttl_minutes)
     payload: dict[str, str | int] = {
         "sub": str(user_id),
         "jti": secrets.token_hex(8),
+        "av": auth_version,
         "iat": int(now.timestamp()),
         "exp": int(expires_at.timestamp()),
     }

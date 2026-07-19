@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { setPendingGuide } from "@/lib/onboarding";
 import { ApiError, apiUnavailableMessage } from "@/lib/api";
+import { PASSWORD_POLICY_MESSAGE, passwordMeetsPolicy, passwordPolicyChecks } from "@/lib/password-policy";
 import {
   Trophy,
   Mail,
@@ -34,21 +35,14 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const passwordPolicyMessage =
-    "Password must be at least 12 characters and include one uppercase letter, one number, and one special character.";
-  const passwordChecks = [
-    { label: "12+ characters", isValid: password.length >= 12 },
-    { label: "One uppercase letter", isValid: /[A-Z]/.test(password) },
-    { label: "One number", isValid: /\d/.test(password) },
-    { label: "One special character", isValid: /[^A-Za-z0-9]/.test(password) },
-  ];
-  const isPasswordStrong = passwordChecks.every((check) => check.isValid);
+  const passwordChecks = passwordPolicyChecks(password);
+  const isPasswordStrong = passwordMeetsPolicy(password);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (!isPasswordStrong) {
-      setError(passwordPolicyMessage);
+      setError(PASSWORD_POLICY_MESSAGE);
       return;
     }
     setIsLoading(true);

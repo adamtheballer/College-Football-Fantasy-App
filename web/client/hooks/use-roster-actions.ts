@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, apiPatch, apiPost } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import type { AddDropResponse, Transaction } from "@/types/roster";
 
 type TransactionListResponse = {
@@ -38,7 +38,10 @@ export function useAddDrop(teamId?: number, leagueId?: number) {
         queryClient.invalidateQueries({ queryKey: ["team", teamId, "roster"] });
       }
       if (typeof leagueId === "number") {
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "roster"] });
         queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "matchup"] });
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "scoreboard"] });
         queryClient.invalidateQueries({ queryKey: ["league", leagueId, "transactions"] });
       }
     },
@@ -59,7 +62,35 @@ export function useUpdateLineup(teamId?: number, leagueId?: number) {
         queryClient.invalidateQueries({ queryKey: ["team", teamId, "roster"] });
       }
       if (typeof leagueId === "number") {
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "roster"] });
         queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "matchup"] });
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "scoreboard"] });
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "transactions"] });
+      }
+    },
+  });
+}
+
+export function useDropRosterPlayer(teamId?: number, leagueId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (rosterEntryId: number) => {
+      if (typeof teamId !== "number") {
+        throw new Error("Missing team id for roster drop.");
+      }
+      return apiDelete<void>(`/teams/${teamId}/roster/${rosterEntryId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["players"] });
+      if (typeof teamId === "number") {
+        queryClient.invalidateQueries({ queryKey: ["team", teamId, "roster"] });
+      }
+      if (typeof leagueId === "number") {
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "roster"] });
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "matchup"] });
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "scoreboard"] });
         queryClient.invalidateQueries({ queryKey: ["league", leagueId, "transactions"] });
       }
     },

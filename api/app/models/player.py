@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import JSON, DateTime, Float, Index, Integer, String
+from sqlalchemy import JSON, Date, DateTime, Float, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -32,12 +32,45 @@ class Player(TimestampMixin, Base):
     cfb27_position_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cfb27_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     espn_height: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    espn_height_inches: Mapped[int | None] = mapped_column(Integer, nullable=True)
     espn_weight: Mapped[str | None] = mapped_column(String(40), nullable=True)
     espn_birthplace: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    espn_birthplace_city: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    espn_birthplace_state: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    espn_birthplace_country: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    espn_hometown: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    espn_date_of_birth: Mapped[date | None] = mapped_column(Date, nullable=True)
     espn_status: Mapped[str | None] = mapped_column(String(80), nullable=True)
     espn_jersey: Mapped[str | None] = mapped_column(String(20), nullable=True)
     espn_headshot_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    espn_source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     espn_profile_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    depth_chart_position: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    depth_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    bio_source: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    bio_source_sheet_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    bio_source_row: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    bio_imported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def height(self) -> str | None:
+        return self.espn_height
+
+    @property
+    def formatted_height(self) -> str | None:
+        return self.espn_height
+
+    @property
+    def weight(self) -> str | None:
+        return self.espn_weight
+
+    @property
+    def formatted_weight(self) -> str | None:
+        return self.espn_weight
+
+    @property
+    def birthplace(self) -> str | None:
+        return self.espn_birthplace
 
     roster_entries = relationship("RosterEntry", back_populates="player", cascade="all, delete-orphan")
 

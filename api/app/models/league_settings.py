@@ -21,7 +21,7 @@ class LeagueSettings(TimestampMixin, Base):
     waiver_type: Mapped[str] = mapped_column(String(50), default="FAAB")
     waiver_period_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24)
     waiver_process_day: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
-    waiver_process_hour: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    waiver_process_hour: Mapped[int] = mapped_column(Integer, nullable=False, default=8)
     next_waiver_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     faab_budget: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     allow_zero_dollar_bids: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

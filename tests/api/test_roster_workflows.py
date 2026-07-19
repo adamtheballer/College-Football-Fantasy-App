@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from conftest import TestingSessionLocal, admin_headers
 import pytest
@@ -201,6 +202,46 @@ def test_add_drop_lineup_and_transactions_workflow(client, db_session):
     assert "add_drop" in types
 
 
+def test_lineup_swap_updates_both_roster_entries_atomically(client, db_session):
+    token = create_user_and_token(client, "atomic-lineup-swap")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    starter_player_id, bench_player_id = create_players(client)
+
+    starter_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": starter_player_id, "slot": "RB", "status": "active"},
+        headers=auth_headers(token),
+    )
+    bench_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": bench_player_id, "slot": "BENCH", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert starter_response.status_code == 201
+    assert bench_response.status_code == 201
+
+    swap_response = client.patch(
+        f"/teams/{team.id}/lineup",
+        json={
+            "assignments": [
+                {"roster_entry_id": starter_response.json()["id"], "slot": "BENCH"},
+                {"roster_entry_id": bench_response.json()["id"], "slot": "RB"},
+            ]
+        },
+        headers=auth_headers(token),
+    )
+
+    assert swap_response.status_code == 200
+    slots_by_id = {entry["id"]: entry["slot"] for entry in swap_response.json()["data"]}
+    assert slots_by_id[starter_response.json()["id"]] == "BENCH"
+    assert slots_by_id[bench_response.json()["id"]] == "RB"
+
+    db_session.expire_all()
+    assert db_session.get(RosterEntry, starter_response.json()["id"]).slot == "BENCH"
+    assert db_session.get(RosterEntry, bench_response.json()["id"]).slot == "RB"
+
+
 def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, db_session):
     token = create_user_and_token(client, "waiver-owner")
     league = create_league(client, token)
@@ -240,7 +281,9 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
     process_after = parse_api_datetime(body["process_after"])
     settings = db_session.query(LeagueSettings).filter_by(league_id=league["id"]).one()
     assert settings.next_waiver_run_at is not None
+    assert settings.waiver_process_hour == 8
     assert process_after == parse_api_datetime(settings.next_waiver_run_at.isoformat())
+    assert process_after.astimezone(ZoneInfo("America/Los_Angeles")).hour == 8
     assert process_after > submitted_at
 
     list_response = client.get(f"/leagues/{league['id']}/waivers", headers=auth_headers(token))
@@ -627,6 +670,39 @@ def test_lineup_move_is_allowed_before_kickoff_then_locked_after_kickoff(client,
     locked_player = next(row for row in roster_tab_response.json()["roster"] if row["id"] == roster_entry_id)
     assert locked_player["is_locked"] is True
     assert locked_player["game_start_at"] is not None
+
+
+def test_direct_drop_is_rejected_after_kickoff(client, db_session):
+    token = create_user_and_token(client, "drop-kickoff-lock")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    player_id, _ = create_players(client)
+    roster_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": player_id, "slot": "RB", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert roster_response.status_code == 201
+    roster_entry_id = roster_response.json()["id"]
+
+    week_state = current_cfb_week_state(2026, now=datetime.now(timezone.utc), timezone_name="America/Los_Angeles")
+    db_session.add(
+        Game(
+            external_id="drop-kickoff-lock-game",
+            season=2026,
+            week=week_state.week,
+            home_team="Texas",
+            away_team="Oregon",
+            start_date=datetime.now(timezone.utc) - timedelta(minutes=1),
+        )
+    )
+    db_session.commit()
+
+    response = client.delete(f"/teams/{team.id}/roster/{roster_entry_id}", headers=auth_headers(token))
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "player cannot be dropped after kickoff"
+    assert db_session.get(RosterEntry, roster_entry_id) is not None
 
 
 def test_add_drop_uses_open_flex_slot_when_primary_position_is_full(client, db_session):

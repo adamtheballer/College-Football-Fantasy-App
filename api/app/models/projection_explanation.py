@@ -17,4 +17,5 @@ class ProjectionExplanation(TimestampMixin, Base):
     season: Mapped[int] = mapped_column(Integer)
     week: Mapped[int] = mapped_column(Integer)
     reasons: Mapped[list[dict]] = mapped_column(JSON)
+    components: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     model_version: Mapped[str] = mapped_column(String(50), default="v1")

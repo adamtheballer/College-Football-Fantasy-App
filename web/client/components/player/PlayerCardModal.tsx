@@ -24,7 +24,7 @@ export type PlayerCardModalPlayer = {
   sheetProjectionStats?: Record<string, number | null | undefined> | null;
 };
 
-type PlayerCardAction = {
+export type PlayerCardAction = {
   label: string;
   onClick: () => void;
 };
@@ -200,6 +200,7 @@ export const visiblePlayerCardAboutMessage = (message?: string | null) => {
 
 export function PlayerCardModal({
   action,
+  actions = [],
   card,
   loading = false,
   note,
@@ -208,6 +209,7 @@ export function PlayerCardModal({
   title = "Player Card",
 }: {
   action?: PlayerCardAction | null;
+  actions?: PlayerCardAction[];
   card?: PlayerCardResponse | null;
   loading?: boolean;
   note?: string | null;
@@ -228,6 +230,7 @@ export function PlayerCardModal({
   const latestStats = useMemo(() => getLatestStats(card ?? undefined), [card]);
   const projectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
   const aboutMessage = visiblePlayerCardAboutMessage(card?.about.message);
+  const cardActions = [...(action ? [action] : []), ...actions];
   const projectionHighlights = [
     ["Fantasy", projectionStats?.fpts ?? player.projectedPoints],
     ["Floor", projectionStats?.floor],
@@ -341,14 +344,19 @@ export function PlayerCardModal({
                     {note}
                   </p>
                 ) : null}
-                {action ? (
-                  <button
-                    type="button"
-                    onClick={action.onClick}
-                    className="mt-4 inline-flex w-full items-center justify-center rounded-2xl border border-white/15 bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-950 transition hover:bg-cyan-100"
-                  >
-                    {action.label}
-                  </button>
+                {cardActions.length ? (
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    {cardActions.map((cardAction) => (
+                      <button
+                        key={cardAction.label}
+                        type="button"
+                        onClick={cardAction.onClick}
+                        className="inline-flex w-full items-center justify-center rounded-2xl border border-white/15 bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-950 transition hover:bg-cyan-100"
+                      >
+                        {cardAction.label}
+                      </button>
+                    ))}
+                  </div>
                 ) : null}
               </section>
               <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">

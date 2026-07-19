@@ -71,8 +71,13 @@ type AuthContextValue = {
   login: (email: string, password: string) => Promise<User>;
   signup: (firstName: string, email: string, password: string) => Promise<User>;
   logout: () => void;
-  requestPasswordReset: (email: string) => Promise<void>;
-  confirmPasswordReset: (token: string, newPassword: string) => Promise<void>;
+  resetPasswordWithCurrentPassword: (
+    email: string,
+    currentPassword: string,
+    newPassword: string,
+    confirmNewPassword: string,
+  ) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string, confirmNewPassword: string) => Promise<void>;
   listSessions: () => Promise<AuthSession[]>;
   revokeSession: (sessionId: number) => Promise<void>;
   logoutAll: () => Promise<void>;
@@ -252,17 +257,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatchAuthChanged();
   }, [queryClient]);
 
-  const requestPasswordReset = useCallback(async (email: string) => {
-    await apiPost("/auth/password-reset/request", { email });
-  }, []);
-
-  const confirmPasswordReset = useCallback(async (token: string, newPassword: string) => {
-    await apiPost("/auth/password-reset/confirm", { token, new_password: newPassword });
+  const clearPasswordChangeAuth = useCallback(() => {
     clearStoredAuth();
     queryClient.clear();
     setUser(null);
     dispatchAuthChanged();
   }, [queryClient]);
+
+  const resetPasswordWithCurrentPassword = useCallback(async (
+    email: string,
+    currentPassword: string,
+    newPassword: string,
+    confirmNewPassword: string,
+  ) => {
+    await apiPost("/auth/reset-password-with-current-password", {
+      email,
+      current_password: currentPassword,
+      new_password: newPassword,
+      confirm_new_password: confirmNewPassword,
+    });
+    clearPasswordChangeAuth();
+  }, [clearPasswordChangeAuth]);
+
+  const changePassword = useCallback(async (
+    currentPassword: string,
+    newPassword: string,
+    confirmNewPassword: string,
+  ) => {
+    await apiPost("/auth/change-password", {
+      current_password: currentPassword,
+      new_password: newPassword,
+      confirm_new_password: confirmNewPassword,
+    });
+    clearPasswordChangeAuth();
+  }, [clearPasswordChangeAuth]);
 
   const listSessions = useCallback(async () => {
     const payload = await apiGet<SessionsPayload>("/auth/sessions");
@@ -287,8 +315,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       signup,
       logout,
-      requestPasswordReset,
-      confirmPasswordReset,
+      resetPasswordWithCurrentPassword,
+      changePassword,
       listSessions,
       revokeSession,
       logoutAll,
@@ -296,13 +324,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isBootstrapping,
     }),
     [
-      confirmPasswordReset,
+      changePassword,
       isBootstrapping,
       listSessions,
       login,
       logout,
       logoutAll,
-      requestPasswordReset,
+      resetPasswordWithCurrentPassword,
       revokeSession,
       signup,
       user,

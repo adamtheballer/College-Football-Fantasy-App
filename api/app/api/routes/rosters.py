@@ -184,7 +184,7 @@ def _best_available_slot(
     if slot:
         return slot
 
-    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="team roster is full")
+    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Team roster is full.")
 
 
 @router.post(
@@ -262,6 +262,18 @@ def delete_roster_entry_endpoint(
     entry = db.get(RosterEntry, roster_entry_id)
     if not entry or entry.team_id != team_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="roster entry not found")
+
+    league = db.get(League, team.league_id)
+    if not league:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
+    if entry.player_id in locked_player_ids(
+        db,
+        player_ids={entry.player_id},
+        season=league.season_year,
+        week=resolve_current_week(db, league),
+        now=datetime.now(timezone.utc),
+    ):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player cannot be dropped after kickoff")
 
     dropped_player_id = entry.player_id
     db.delete(entry)

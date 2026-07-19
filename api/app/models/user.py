@@ -27,3 +27,4 @@ class User(TimestampMixin, Base):
     last_failed_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    auth_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")

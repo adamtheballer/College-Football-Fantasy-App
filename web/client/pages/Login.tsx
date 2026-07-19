@@ -73,7 +73,7 @@ export const loginErrorMessage = (error: unknown): string => {
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isLoggedIn, requestPasswordReset } = useAuth();
+  const { login, isLoggedIn } = useAuth();
   const redirectTarget =
     typeof location.state === "object" &&
     location.state &&
@@ -93,39 +93,16 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [recoveryNotice, setRecoveryNotice] = useState<string | null>(null);
-  const [isRequestingReset, setIsRequestingReset] = useState(false);
-
-  const handleForgotPassword = async () => {
-    setError(null);
-    setRecoveryNotice(null);
-    const normalizedEmail = email.trim();
-    if (!normalizedEmail) {
-      setRecoveryNotice("Enter your email address first, then request a password reset link.");
-      return;
-    }
-    setIsRequestingReset(true);
-    try {
-      await requestPasswordReset(normalizedEmail);
-      setRecoveryNotice("If an account exists for that email, a password reset link has been sent.");
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 429) {
-        setRecoveryNotice("Too many reset requests. Wait a few minutes and try again.");
-      } else if (err instanceof ApiError && err.status === 0) {
-        setRecoveryNotice("Unable to reach the backend API. Start FastAPI and try again.");
-      } else {
-        setRecoveryNotice("Unable to request a password reset right now. Try again or contact support.");
-      }
-    } finally {
-      setIsRequestingReset(false);
-    }
-  };
+  const resetSuccess =
+    typeof location.state === "object" &&
+    location.state &&
+    "passwordResetSuccess" in location.state &&
+    location.state.passwordResetSuccess === true;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    setRecoveryNotice(null);
     try {
       const signedInUser = await login(email, password);
       if (signedInUser) {
@@ -244,14 +221,12 @@ export default function Login() {
                   <label htmlFor="login-password" className="text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">
                     Password
                   </label>
-                  <button
-                    type="button"
-                    onClick={handleForgotPassword}
-                    disabled={isRequestingReset}
+                  <Link
+                    to="/reset-password"
                     className="text-[9px] font-black uppercase tracking-widest text-cfb-gold transition hover:text-yellow-100 disabled:cursor-not-allowed disabled:opacity-45"
                   >
-                    {isRequestingReset ? "Sending..." : "Forgot password?"}
-                  </button>
+                    Reset Password
+                  </Link>
                 </span>
                 <span className="group relative block">
                   <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted transition-colors group-focus-within:text-cfb-cyan" />
@@ -280,9 +255,9 @@ export default function Login() {
                 </span>
               </div>
 
-              {recoveryNotice ? (
+              {resetSuccess ? (
                 <div className="rounded-2xl border border-cfb-gold/35 bg-cfb-gold/[0.12] px-4 py-3 text-xs font-bold text-yellow-100">
-                  {recoveryNotice}
+                  Password reset successfully. Sign in with your new password.
                 </div>
               ) : null}
 
@@ -311,7 +286,7 @@ export default function Login() {
               <div className="flex items-center gap-3">
                 <CalendarClock className="h-5 w-5 text-cfb-gold" aria-hidden="true" />
                 <p className="text-sm font-semibold text-cfb-text-secondary">
-                  New commissioner? Create an account, verify your email, then start a league.
+                  New commissioner? Create an account, then start a league.
                 </p>
               </div>
             </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { User, Bell, Sliders, Shield, Save, LogOut } from "lucide-react";
+import { User, Bell, Sliders, Shield, Save, LogOut, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { restartGuide } from "@/lib/onboarding";
 import { useLeagues } from "@/hooks/use-leagues";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
+import { PasswordChangeForm } from "@/components/auth/PasswordChangeForm";
 
 type LeagueNotificationPreference = {
   league_id: number;
@@ -30,7 +31,7 @@ type LeagueNotificationPreference = {
   projection_alerts: boolean;
 };
 
-const supportEmail = import.meta.env.VITE_SUPPORT_EMAIL as string | undefined;
+const supportEmail = (import.meta.env.VITE_SUPPORT_EMAIL as string | undefined) || "absportscfb@gmail.com";
 const privacyPolicyUrl = import.meta.env.VITE_PRIVACY_POLICY_URL as string | undefined;
 const termsUrl = import.meta.env.VITE_TERMS_URL as string | undefined;
 const providerDisclosureUrl = import.meta.env.VITE_PROVIDER_DISCLOSURE_URL as string | undefined;
@@ -104,6 +105,7 @@ export default function Settings() {
   const [leaguePrefs, setLeaguePrefs] = useState<LeagueNotificationPreference[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
+  const [supportCopyState, setSupportCopyState] = useState<"idle" | "copied" | "error">("idle");
   const [prefs, setPrefs] = useState({
     push_enabled: true,
     email_enabled: true,
@@ -199,6 +201,15 @@ export default function Settings() {
     }
   };
 
+  const copySupportEmail = async () => {
+    try {
+      await navigator.clipboard.writeText(supportEmail);
+      setSupportCopyState("copied");
+    } catch {
+      setSupportCopyState("error");
+    }
+  };
+
   if (isBootstrapping) {
     return (
       <div className="flex min-h-[45vh] items-center justify-center">
@@ -244,6 +255,27 @@ export default function Settings() {
           description="Helpful links and account resources"
           icon={Shield}
         >
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Email Support</p>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <a
+                href={`mailto:${supportEmail}`}
+                className="break-all text-sm font-black text-foreground underline decoration-primary/50 underline-offset-4 transition hover:text-primary"
+              >
+                {supportEmail}
+              </a>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void copySupportEmail()}
+                className="shrink-0 rounded-xl border-primary/25 text-[10px] font-black uppercase tracking-[0.16em]"
+                aria-live="polite"
+              >
+                <Copy className="mr-2 h-3.5 w-3.5" />
+                {supportCopyState === "copied" ? "Copied" : supportCopyState === "error" ? "Copy Failed" : "Copy Email"}
+              </Button>
+            </div>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {privacyPolicyUrl ? (
               <a
@@ -273,14 +305,6 @@ export default function Settings() {
                 className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
               >
                 Provider Disclosure
-              </a>
-            ) : null}
-            {supportEmail ? (
-              <a
-                href={`mailto:${supportEmail}`}
-                className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
-              >
-                Contact Support
               </a>
             ) : null}
           </div>
@@ -552,6 +576,18 @@ export default function Settings() {
           icon={Shield}
         >
           <div className="space-y-8">
+            <div className="rounded-3xl border border-primary/15 bg-primary/[0.04] p-6">
+              <h3 className="text-sm font-black uppercase tracking-[0.16em] text-foreground">Change Password</h3>
+              <p className="mt-2 text-sm font-medium text-muted-foreground">
+                Enter your current password, then choose a new password. You will be signed out on every device.
+              </p>
+              <div className="mt-5">
+                <PasswordChangeForm
+                  mode="authenticated"
+                  onSuccess={() => navigate("/login", { replace: true, state: { passwordResetSuccess: true } })}
+                />
+              </div>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {privacyPolicyUrl ? (
                 <a

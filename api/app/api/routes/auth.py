@@ -25,9 +25,9 @@ from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.auth import (
     AuthMessageResponse,
     AuthResponse,
+    AuthenticatedPasswordChange,
     LogoutResponse,
-    PasswordResetConfirm,
-    PasswordResetRequest,
+    PasswordResetWithCurrentPassword,
     RefreshResponse,
     SessionRead,
     SessionsResponse,
@@ -36,9 +36,6 @@ from collegefootballfantasy_api.app.schemas.auth import (
     UserRead,
 )
 from collegefootballfantasy_api.app.services.auth_security import (
-    PASSWORD_RESET_TOKEN,
-    consume_auth_action_token,
-    create_auth_action_token,
     enforce_auth_rate_limit,
     ensure_aware,
     is_account_locked,
@@ -48,10 +45,15 @@ from collegefootballfantasy_api.app.services.auth_security import (
     revoke_user_sessions,
     utcnow,
 )
-from collegefootballfantasy_api.app.services.email_service import get_email_service
+from collegefootballfantasy_api.app.services.password_change import (
+    PasswordChangeCredentialError,
+    PasswordChangeValidationError,
+    change_user_password,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+PASSWORD_CHANGE_CREDENTIAL_ERROR = "Unable to reset password with the provided credentials."
 
 
 def _normalize_username(value: str | None, *, fallback: str) -> str:
@@ -131,17 +133,6 @@ def _current_refresh_session(db: Session, request: Request) -> RefreshSession | 
     return db.query(RefreshSession).filter(RefreshSession.token_hash == hash_token(refresh_token)).first()
 
 
-def _send_password_reset_email(db: Session, *, user: User, request: Request) -> None:
-    token = create_auth_action_token(
-        db,
-        user=user,
-        token_type=PASSWORD_RESET_TOKEN,
-        ttl=timedelta(minutes=settings.auth_password_reset_ttl_minutes),
-        request=request,
-    )
-    get_email_service().send_password_reset(user.email, token)
-
-
 def _log_login_failure(request: Request, *, email: str, reason: str) -> None:
     local, separator, domain = email.partition("@")
     redacted_email = f"{local[:1]}***{separator}{domain}" if separator else "***"
@@ -175,7 +166,11 @@ def _complete_successful_login(
     db.commit()
     db.refresh(user)
 
-    access_token, access_expires_at = create_access_token(user_id=user.id, email=user.email)
+    access_token, access_expires_at = create_access_token(
+        user_id=user.id,
+        email=user.email,
+        auth_version=user.auth_version,
+    )
     _set_refresh_cookie(response, refresh_token)
     return AuthResponse(
         access_token=access_token,
@@ -225,7 +220,11 @@ def signup(payload: UserCreate, response: Response, request: Request, db: Sessio
     db.commit()
     db.refresh(user)
 
-    access_token, access_expires_at = create_access_token(user_id=user.id, email=user.email)
+    access_token, access_expires_at = create_access_token(
+        user_id=user.id,
+        email=user.email,
+        auth_version=user.auth_version,
+    )
     _set_refresh_cookie(response, refresh_token)
     return AuthResponse(
         access_token=access_token,
@@ -341,7 +340,11 @@ def refresh_session(response: Response, request: Request, db: Session = Depends(
     db.add(session)
     db.add(user)
     db.commit()
-    access_token, access_expires_at = create_access_token(user_id=user.id, email=user.email)
+    access_token, access_expires_at = create_access_token(
+        user_id=user.id,
+        email=user.email,
+        auth_version=user.auth_version,
+    )
     _set_refresh_cookie(response, new_refresh_token)
     return RefreshResponse(access_token=access_token, access_token_expires_at=access_expires_at)
 
@@ -359,53 +362,105 @@ def logout(response: Response, request: Request, db: Session = Depends(get_db)) 
     return LogoutResponse(success=True)
 
 
-@router.post("/password-reset/request", response_model=AuthMessageResponse)
-def request_password_reset(
-    payload: PasswordResetRequest,
+def _active_user_for_normalized_email(db: Session, normalized_email: str) -> User | None:
+    users = (
+        db.query(User)
+        .filter(func.lower(User.email) == normalized_email, User.is_active.is_(True))
+        .limit(2)
+        .all()
+    )
+    return users[0] if len(users) == 1 else None
+
+
+def _password_change_validation_error(error: PasswordChangeValidationError) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error))
+
+
+@router.post("/reset-password-with-current-password", response_model=AuthMessageResponse)
+def reset_password_with_current_password(
+    payload: PasswordResetWithCurrentPassword,
+    response: Response,
     request: Request,
     db: Session = Depends(get_db),
 ) -> AuthMessageResponse:
     enforce_auth_rate_limit(
         db,
-        action="password_reset_request",
+        action="password_reset_with_current_password",
         identifier=payload.email,
         request=request,
-        limit=settings.auth_password_reset_rate_limit,
+        limit=settings.auth_password_change_rate_limit,
     )
-    user = db.query(User).filter(func.lower(User.email) == payload.email).first()
-    if user and user.is_active:
-        _send_password_reset_email(db, user=user, request=request)
-    db.commit()
-    return AuthMessageResponse(message="if an account exists, a password reset email was sent")
+    user = _active_user_for_normalized_email(db, payload.email)
+    if not user:
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PASSWORD_CHANGE_CREDENTIAL_ERROR)
+
+    try:
+        change_user_password(
+            db,
+            user=user,
+            current_password=payload.current_password,
+            new_password=payload.new_password,
+            confirm_new_password=payload.confirm_new_password,
+        )
+        db.commit()
+    except PasswordChangeCredentialError:
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PASSWORD_CHANGE_CREDENTIAL_ERROR)
+    except PasswordChangeValidationError as exc:
+        db.commit()
+        raise _password_change_validation_error(exc) from exc
+    except Exception as exc:
+        db.rollback()
+        logger.exception("password_reset_with_current_password_failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to reset password right now.",
+        ) from exc
+
+    _clear_refresh_cookie(response)
+    return AuthMessageResponse(message="password reset complete")
 
 
-@router.post("/password-reset/confirm", response_model=AuthMessageResponse)
-def confirm_password_reset(
-    payload: PasswordResetConfirm,
+@router.post("/change-password", response_model=AuthMessageResponse)
+def change_password(
+    payload: AuthenticatedPasswordChange,
+    response: Response,
     request: Request,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AuthMessageResponse:
     enforce_auth_rate_limit(
         db,
-        action="password_reset_confirm",
-        identifier=payload.token,
+        action="authenticated_password_change",
+        identifier=f"user:{current_user.id}",
         request=request,
-        limit=settings.auth_password_reset_rate_limit,
+        limit=settings.auth_password_change_rate_limit,
     )
-    token_row = consume_auth_action_token(db, token_type=PASSWORD_RESET_TOKEN, token=payload.token)
-    user = db.get(User, token_row.user_id)
-    if not user or not user.is_active:
+    try:
+        change_user_password(
+            db,
+            user=current_user,
+            current_password=payload.current_password,
+            new_password=payload.new_password,
+            confirm_new_password=payload.confirm_new_password,
+        )
+        db.commit()
+    except PasswordChangeCredentialError:
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PASSWORD_CHANGE_CREDENTIAL_ERROR)
+    except PasswordChangeValidationError as exc:
+        db.commit()
+        raise _password_change_validation_error(exc) from exc
+    except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid or expired token")
+        logger.exception("authenticated_password_change_failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to reset password right now.",
+        ) from exc
 
-    now = utcnow()
-    user.password_hash = hash_password(payload.new_password)
-    user.password_changed_at = now
-    user.email_verified_at = user.email_verified_at or now
-    reset_failed_login_state(user)
-    revoke_user_sessions(db, user_id=user.id, now=now)
-    db.add(user)
-    db.commit()
+    _clear_refresh_cookie(response)
     return AuthMessageResponse(message="password reset complete")
 
 

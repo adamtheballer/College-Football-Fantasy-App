@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     auth_login_rate_limit: int = 10
     auth_refresh_rate_limit: int = 30
     auth_password_reset_rate_limit: int = 5
+    auth_password_change_rate_limit: int = 5
     provider_refresh_rate_limit: int = 30
     chat_message_rate_limit: int = 30
     chat_message_rate_limit_window_minutes: int = 1
