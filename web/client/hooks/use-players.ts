@@ -84,6 +84,38 @@ export type PlayerSeasonStatsResponse = {
   message?: string | null;
 };
 
+export type PlayerGameLogResponse = {
+  player_id: number;
+  player_name: string;
+  season: number;
+  team_name?: string | null;
+  position: string;
+  message?: string | null;
+  games: Array<{
+    schedule_id: number;
+    game_id?: number | null;
+    week: number;
+    date?: string | null;
+    kickoff_at?: string | null;
+    opponent_name?: string | null;
+    location: "home" | "away" | "neutral" | "bye";
+    location_label: string;
+    neutral_site: boolean;
+    conference_game: boolean;
+    venue?: string | null;
+    tv_network?: string | null;
+    game_status: "bye" | "scheduled" | "active" | "final";
+    stat_status: "not_available" | "scheduled" | "active" | "final" | "missing";
+    result?: string | null;
+    stats?: {
+      source: string;
+      stats: Record<string, unknown>;
+      fantasy_points?: number | null;
+      updated_at: string;
+    } | null;
+  }>;
+};
+
 export type PlayerCardResponse = {
   player: BackendPlayerRead;
   about: {
@@ -576,6 +608,15 @@ export function usePlayerCard(playerId?: number | null, enabled = true) {
     enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
     staleTime: 60_000,
     queryFn: () => apiGet<PlayerCardResponse>(`/players/${playerId}/card`),
+  });
+}
+
+export function usePlayerGameLog(playerId?: number | null, season = 2026, enabled = true) {
+  return useQuery({
+    queryKey: ["player-game-log", playerId, season],
+    enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
+    staleTime: 60_000,
+    queryFn: () => apiGet<PlayerGameLogResponse>(`/players/${playerId}/game-log`, { season }),
   });
 }
 

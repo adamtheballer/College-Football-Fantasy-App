@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import { statValue } from "@/lib/playerProjectionStats";
 
 import {
+  formatGameLogDate,
+  gameLogColumnsForPosition,
+  gameLogOpponentLabel,
   buildHistoricalStatsTableRows,
   formatPlayerCardValue,
   getPlayerCardPalette,
@@ -11,6 +14,13 @@ import {
 } from "./PlayerCardModal";
 
 describe("PlayerCardModal helpers", () => {
+  it("uses position-specific Game Log columns and full school names", () => {
+    expect(gameLogColumnsForPosition("TE").map(([label]) => label)).toEqual([
+      "FPTS", "REC", "TAR", "REC YDS", "REC TD",
+    ]);
+    expect(gameLogOpponentLabel({ location: "away", opponent_name: "Ohio State" })).toBe("at Ohio State");
+    expect(formatGameLogDate("2026-09-05")).toBe("Sep 5, 2026");
+  });
   it("formats empty player-card fields with an em dash fallback", () => {
     expect(formatPlayerCardValue(null)).toBe("—");
     expect(formatPlayerCardValue(undefined)).toBe("—");

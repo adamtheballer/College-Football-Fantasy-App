@@ -25,6 +25,7 @@ from collegefootballfantasy_api.app.schemas.player import (
     PlayerRead,
 )
 from collegefootballfantasy_api.app.schemas.historical_stats import PlayerHistoricalStatsResponse
+from collegefootballfantasy_api.app.schemas.game_log import PlayerGameLogRead
 from collegefootballfantasy_api.app.schemas.player_stat import PlayerStatResponse
 from collegefootballfantasy_api.app.services.espn_player_lookup import (
     persist_espn_player_profile,
@@ -35,6 +36,7 @@ from collegefootballfantasy_api.app.services.historical_stats import (
     get_player_historical_stats_response,
     resolve_espn_player_id,
 )
+from collegefootballfantasy_api.app.services.player_game_log import build_player_game_log
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
 from collegefootballfantasy_api.app.services.auth_security import enforce_auth_rate_limit
 
@@ -315,6 +317,18 @@ def get_player_card_endpoint(
         ],
         historical_stats=historical_stats,
     )
+
+
+@router.get("/{player_id}/game-log", response_model=PlayerGameLogRead)
+def get_player_game_log_endpoint(
+    player_id: int,
+    season: int = Query(2026, ge=2000, le=2100),
+    db: Session = Depends(get_db),
+) -> PlayerGameLogRead:
+    player = get_player(db, player_id)
+    if not player:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
+    return build_player_game_log(db, player, season=season)
 
 
 @router.get("/{player_id}/historical-stats", response_model=PlayerHistoricalStatsResponse)

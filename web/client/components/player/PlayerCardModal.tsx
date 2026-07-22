@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, BarChart3, Info, Loader2 } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, CalendarDays, Info, Loader2 } from "lucide-react";
 
-import type { PlayerCardResponse } from "@/hooks/use-players";
+import { usePlayerGameLog, type PlayerCardResponse } from "@/hooks/use-players";
 import { buildProjectedStats, formatStat, statRowsForPosition, statValue } from "@/lib/playerProjectionStats";
 import { cn } from "@/lib/utils";
 import type { PlayerStats } from "@/types/player";
 
 import { PlayerCardHeader } from "./PlayerCardHeader";
 
-type PlayerCardTab = "summary" | "stats" | "alerts" | "projections";
+type PlayerCardTab = "summary" | "stats" | "game-log" | "alerts" | "projections";
 
 export type PlayerCardModalPlayer = {
   id: number;
@@ -39,6 +39,7 @@ type HistoricalStatTableRow = {
 const tabConfig: Array<{ id: PlayerCardTab; label: string; icon: typeof Info }> = [
   { id: "summary", label: "Summary", icon: Info },
   { id: "stats", label: "Stats", icon: BarChart3 },
+  { id: "game-log", label: "Game Log", icon: CalendarDays },
   { id: "alerts", label: "Alerts", icon: AlertTriangle },
   { id: "projections", label: "Projections", icon: Activity },
 ];
@@ -154,6 +155,91 @@ const getStatValue = (stats: Record<string, unknown> | null | undefined, keys: r
 const getLatestStats = (card?: PlayerCardResponse) =>
   card?.season_stats.find((row) => row.week === 0)?.stats ?? card?.season_stats[0]?.stats ?? null;
 
+const gameLogStatValue = (stats: Record<string, unknown> | null | undefined, keys: readonly string[]) =>
+  getStatValue(stats, keys);
+
+type GameLogColumn = readonly [label: string, keys: readonly string[]];
+
+export const gameLogColumnsForPosition = (position: string): readonly GameLogColumn[] => {
+  switch (position.toUpperCase()) {
+    case "QB":
+      return [
+        ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
+        ["CMP", ["completions", "passing_completions", "PassingCompletions"]],
+        ["ATT", ["attempts", "passing_attempts", "PassingAttempts"]],
+        ["PASS YDS", ["pass_yards", "passing_yards", "PassingYards"]],
+        ["PASS TD", ["pass_tds", "passing_touchdowns", "PassingTouchdowns"]],
+        ["INT", ["interceptions", "Interceptions"]],
+        ["RUSH ATT", ["rushing_attempts", "rush_attempts", "RushingAttempts"]],
+        ["RUSH YDS", ["rush_yards", "rushing_yards", "RushingYards"]],
+        ["RUSH TD", ["rush_tds", "rushing_touchdowns", "RushingTouchdowns"]],
+      ] as const;
+    case "RB":
+      return [
+        ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
+        ["RUSH ATT", ["rushing_attempts", "rush_attempts", "RushingAttempts"]],
+        ["RUSH YDS", ["rush_yards", "rushing_yards", "RushingYards"]],
+        ["RUSH TD", ["rush_tds", "rushing_touchdowns", "RushingTouchdowns"]],
+        ["REC", ["receptions", "Receptions"]],
+        ["TAR", ["targets", "receiving_targets", "ReceivingTargets"]],
+        ["REC YDS", ["rec_yards", "receiving_yards", "ReceivingYards"]],
+        ["REC TD", ["rec_tds", "receiving_touchdowns", "ReceivingTouchdowns"]],
+      ] as const;
+    case "WR":
+      return [
+        ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
+        ["REC", ["receptions", "Receptions"]],
+        ["TAR", ["targets", "receiving_targets", "ReceivingTargets"]],
+        ["REC YDS", ["rec_yards", "receiving_yards", "ReceivingYards"]],
+        ["REC TD", ["rec_tds", "receiving_touchdowns", "ReceivingTouchdowns"]],
+        ["RUSH ATT", ["rushing_attempts", "rush_attempts", "RushingAttempts"]],
+        ["RUSH YDS", ["rush_yards", "rushing_yards", "RushingYards"]],
+        ["RUSH TD", ["rush_tds", "rushing_touchdowns", "RushingTouchdowns"]],
+      ] as const;
+    case "TE":
+      return [
+        ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
+        ["REC", ["receptions", "Receptions"]],
+        ["TAR", ["targets", "receiving_targets", "ReceivingTargets"]],
+        ["REC YDS", ["rec_yards", "receiving_yards", "ReceivingYards"]],
+        ["REC TD", ["rec_tds", "receiving_touchdowns", "ReceivingTouchdowns"]],
+      ] as const;
+    case "K":
+      return [
+        ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
+        ["FGM", ["field_goals_made", "fieldGoalsMade", "FieldGoalsMade"]],
+        ["FGA", ["field_goals_attempted", "fieldGoalsAttempted", "FieldGoalsAttempted"]],
+        ["XPM", ["extra_points_made", "extraPointsMade", "ExtraPointsMade"]],
+        ["XPA", ["extra_points_attempted", "extraPointsAttempted", "ExtraPointsAttempted"]],
+      ] as const;
+    default:
+      return [
+        ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
+        ["RUSH YDS", ["rush_yards", "rushing_yards", "RushingYards"]],
+        ["RUSH TD", ["rush_tds", "rushing_touchdowns", "RushingTouchdowns"]],
+        ["REC", ["receptions", "Receptions"]],
+        ["REC YDS", ["rec_yards", "receiving_yards", "ReceivingYards"]],
+        ["REC TD", ["rec_tds", "receiving_touchdowns", "ReceivingTouchdowns"]],
+      ] as const;
+  }
+};
+
+export const gameLogOpponentLabel = (row: { location: string; opponent_name?: string | null }) => {
+  if (row.location === "bye") return "BYE";
+  if (!row.opponent_name) return "TBD";
+  if (row.location === "away") return `at ${row.opponent_name}`;
+  if (row.location === "neutral") return `Neutral vs. ${row.opponent_name}`;
+  return `vs. ${row.opponent_name}`;
+};
+
+export const formatGameLogDate = (value?: string | null) => {
+  if (!value) return "Date TBD";
+  const date = new Date(`${value}T12:00:00Z`);
+  return Number.isNaN(date.getTime())
+    ? "Date TBD"
+    : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date);
+};
+
 export const resolvePlayerCardProjectionStats = (
   player: PlayerCardModalPlayer,
   card?: PlayerCardResponse | null
@@ -220,6 +306,7 @@ export function PlayerCardModal({
   const [activeTab, setActiveTab] = useState<PlayerCardTab>("summary");
   const [selectedHistoricalSeason, setSelectedHistoricalSeason] = useState<number | null>(null);
   const position = (card?.about.position ?? player.position ?? "").toUpperCase();
+  const gameLogQuery = usePlayerGameLog(player.id, 2026, activeTab === "game-log");
   const palette = getPlayerCardPalette(position);
   const historicalStats = card?.historical_stats;
   const historicalSeasons = historicalStats?.seasons ?? [];
@@ -477,6 +564,103 @@ export function PlayerCardModal({
                 <p className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
                   {historicalStats?.message ??
                     "No imported historical season stats are linked to this player yet."}
+                </p>
+              )}
+            </section>
+          ) : activeTab === "game-log" ? (
+            <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>2026 Game Log</p>
+                  <p className="mt-2 text-sm font-bold leading-6 text-white/55">
+                    {gameLogQuery.data?.team_name ?? card?.about.team ?? player.school} schedule. Completed game stats appear here after they are verified.
+                  </p>
+                </div>
+                <p className="rounded-full border border-white/15 bg-white/[0.05] px-3 py-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/55">
+                  {position || "Player"}
+                </p>
+              </div>
+              {gameLogQuery.isLoading ? (
+                <div className="mt-5 flex min-h-40 items-center justify-center gap-3 rounded-2xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading schedule
+                </div>
+              ) : gameLogQuery.isError ? (
+                <p className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm font-bold leading-6 text-amber-100">
+                  The Game Log is unavailable right now. Please try again shortly.
+                </p>
+              ) : gameLogQuery.data?.games.length ? (
+                <>
+                <div className="mt-5 hidden overflow-x-auto rounded-2xl border border-white/10 bg-black/20 md:block">
+                  <table className="min-w-[940px] w-full border-collapse text-left">
+                    <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
+                      <tr>
+                        <th className="px-4 py-3">Wk</th>
+                        <th className="px-4 py-3">Opponent</th>
+                        <th className="px-4 py-3">Location</th>
+                        <th className="px-4 py-3">Result</th>
+                        {gameLogColumnsForPosition(position).map(([label]) => (
+                          <th key={label} className="whitespace-nowrap px-4 py-3 text-right">{label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {gameLogQuery.data.games.map((row) => {
+                        const stats = row.stats?.stats;
+                        return (
+                          <tr key={row.schedule_id} className="text-sm font-bold text-white/75">
+                            <td className="px-4 py-4 font-black tabular-nums text-white">{row.week}</td>
+                            <td className="px-4 py-4">
+                              <p className="font-black text-white">{gameLogOpponentLabel(row)}</p>
+                              <p className="mt-1 text-[10px] font-bold text-white/40">{formatGameLogDate(row.date)}</p>
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-white/55">{row.location_label}</td>
+                            <td className="whitespace-nowrap px-4 py-4 text-xs font-black tabular-nums text-white/70">{row.result ?? "—"}</td>
+                            {gameLogColumnsForPosition(position).map(([label, keys]) => {
+                              const value = row.location === "bye" ? null : gameLogStatValue(stats, keys);
+                              return (
+                                <td key={label} className="whitespace-nowrap px-4 py-4 text-right font-black tabular-nums text-white">
+                                  {formatPlayerCardValue(value)}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-5 space-y-3 md:hidden">
+                  {gameLogQuery.data.games.map((row) => {
+                    const stats = row.stats?.stats;
+                    return (
+                      <article key={row.schedule_id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/45">Week {row.week}</p>
+                            <p className="mt-1 font-black text-white">{gameLogOpponentLabel(row)}</p>
+                            <p className="mt-1 text-xs font-bold text-white/45">{formatGameLogDate(row.date)} • {row.location_label}</p>
+                          </div>
+                          <p className="text-right text-xs font-black tabular-nums text-white/70">{row.result ?? "—"}</p>
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+                          {gameLogColumnsForPosition(position).map(([label, keys]) => {
+                            const value = row.location === "bye" ? null : gameLogStatValue(stats, keys);
+                            return (
+                              <div key={label} className="flex items-center justify-between gap-3 text-xs">
+                                <span className="font-black uppercase tracking-[0.12em] text-white/45">{label}</span>
+                                <span className="font-black tabular-nums text-white">{formatPlayerCardValue(value)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+                </>
+              ) : (
+                <p className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
+                  {gameLogQuery.data?.message ?? "No 2026 schedule has been imported for this player's team yet."}
                 </p>
               )}
             </section>
