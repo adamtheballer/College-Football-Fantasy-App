@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session, joinedload
 from collegefootballfantasy_api.app.core.config import settings as app_settings
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
-from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
@@ -42,8 +41,7 @@ from collegefootballfantasy_api.app.services.matchup_probability import (
     estimate_player_std_dev,
     is_starting_slot,
 )
-from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_starts_for_players
-from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
+from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_context_for_players
 from collegefootballfantasy_api.app.services.waiver_service import serialize_claims
 
 DEFAULT_ROSTER_SLOTS = {
@@ -138,39 +136,6 @@ def _roster_rows(db: Session, team_id: int) -> list[RosterEntry]:
     )
 
 
-def _school_schedule_key(school: str | None) -> str | None:
-    if not school:
-        return None
-    return canonical_school_name(school) or normalize_school(school)
-
-
-def _opponents_for_players(
-    db: Session,
-    *,
-    player_schools: dict[int, str | None],
-    season: int,
-    week: int,
-) -> dict[int, str | None]:
-    school_keys = {key for school in player_schools.values() if (key := _school_schedule_key(school))}
-    if not school_keys:
-        return {player_id: None for player_id in player_schools}
-
-    games = db.query(Game).filter(Game.season == season, Game.week == week).all()
-    opponent_by_school: dict[str, str] = {}
-    for game in games:
-        home_key = _school_schedule_key(game.home_team)
-        away_key = _school_schedule_key(game.away_team)
-        if home_key in school_keys and away_key:
-            opponent_by_school.setdefault(home_key, game.away_team)
-        if away_key in school_keys and home_key:
-            opponent_by_school.setdefault(away_key, game.home_team)
-
-    return {
-        player_id: opponent_by_school.get(_school_schedule_key(school))
-        for player_id, school in player_schools.items()
-    }
-
-
 def _rosters_for_teams(db: Session, team_ids: set[int]) -> dict[int, list[RosterEntry]]:
     rosters = {team_id: [] for team_id in team_ids}
     if not team_ids:
@@ -241,18 +206,16 @@ def _serialize_team_roster(
         week,
         player_ids,
     )
-    game_starts = game_starts_for_players(
+    player_schools = {
+        entry.player_id: entry.player.school if entry.player else None
+        for entry in entries
+    }
+    game_starts, opponents = game_context_for_players(
         db,
         player_ids=player_ids,
         season=league.season_year,
         week=week,
-        player_schools={entry.player_id: entry.player.school if entry.player else None for entry in entries},
-    )
-    opponents = _opponents_for_players(
-        db,
-        player_schools={entry.player_id: entry.player.school if entry.player else None for entry in entries},
-        season=league.season_year,
-        week=week,
+        player_schools=player_schools,
     )
     current_time = datetime.now(timezone.utc)
     return [
@@ -279,26 +242,17 @@ def _serialize_team_rosters(
     entries_by_team = _rosters_for_teams(db, set(teams))
     player_ids = {entry.player_id for entries in entries_by_team.values() for entry in entries}
     projection_by_player = _projection_map(db, league.season_year, week, player_ids)
-    game_starts = game_starts_for_players(
+    player_schools = {
+        entry.player_id: entry.player.school if entry.player else None
+        for entries in entries_by_team.values()
+        for entry in entries
+    }
+    game_starts, opponents = game_context_for_players(
         db,
         player_ids=player_ids,
         season=league.season_year,
         week=week,
-        player_schools={
-            entry.player_id: entry.player.school if entry.player else None
-            for entries in entries_by_team.values()
-            for entry in entries
-        },
-    )
-    opponents = _opponents_for_players(
-        db,
-        player_schools={
-            entry.player_id: entry.player.school if entry.player else None
-            for entries in entries_by_team.values()
-            for entry in entries
-        },
-        season=league.season_year,
-        week=week,
+        player_schools=player_schools,
     )
     current_time = datetime.now(timezone.utc)
     return {
