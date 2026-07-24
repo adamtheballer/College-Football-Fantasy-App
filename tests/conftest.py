@@ -115,8 +115,11 @@ def client_fixture() -> Generator[TestClient, None, None]:
 
 @pytest.fixture(name="db_session")
 def db_session_fixture() -> Generator[Session, None, None]:
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
     session = TestingSessionLocal()
     try:
         yield session
     finally:
         session.close()
+        Base.metadata.drop_all(bind=engine)

@@ -51,6 +51,7 @@ from collegefootballfantasy_api.app.models import (
     team_environment,
     team_stats_snapshot,
     team_game_stat,
+    team_schedule,
     team_week_score,
     transaction,
     trade_offer,
