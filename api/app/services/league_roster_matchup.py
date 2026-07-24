@@ -529,7 +529,7 @@ def build_waivers_view(
             .first()
         )
         waiver_priority = priority_row.priority if priority_row else None
-        faab_remaining = priority_row.faab_remaining if priority_row else (settings.faab_budget if settings else 100)
+        faab_remaining = priority_row.faab_remaining if priority_row else (settings.faab_starting_budget if settings else 100)
         claim_rows = (
             db.query(WaiverClaim)
             .filter(WaiverClaim.league_id == league.id, WaiverClaim.team_id == team.id)
@@ -575,7 +575,7 @@ def build_waivers_view(
         waiver_rules={
             "waiver_type": settings.waiver_type if settings else "FAAB",
             "waiver_period_hours": settings.waiver_period_hours if settings else 24,
-            "faab_budget": settings.faab_budget if settings else 100,
+            "faab_budget": settings.faab_starting_budget if settings else 100,
         },
         total_available=total,
         message=None if team else "No team found for your user in this league.",

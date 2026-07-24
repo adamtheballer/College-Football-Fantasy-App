@@ -1,15 +1,15 @@
 """Add canonical team-week schedules for player game logs.
 
-Revision ID: 0052_team_schedule_game_logs
-Revises: 0051_auth_version
+Revision ID: 0055_team_schedule_game_logs
+Revises: 0054_add_reveal_all_waiver_bids
 """
 
 from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0052_team_schedule_game_logs"
-down_revision = "0051_auth_version"
+revision = "0055_team_schedule_game_logs"
+down_revision = "0054_add_reveal_all_waiver_bids"
 branch_labels = None
 depends_on = None
 

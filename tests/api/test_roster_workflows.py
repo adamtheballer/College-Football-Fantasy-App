@@ -316,7 +316,7 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
     db_session.expire_all()
     assert db_session.query(RosterEntry).filter_by(team_id=team.id, player_id=drop_player_id).first() is None
     assert db_session.query(RosterEntry).filter_by(team_id=team.id, player_id=add_player_id).one()
-    assert db_session.get(WaiverClaim, body["id"]).status == "processed"
+    assert db_session.get(WaiverClaim, body["id"]).status == "won"
 
 
 def test_waiver_claim_uses_configured_waiver_period_hours(client, db_session):
@@ -494,7 +494,7 @@ def test_waiver_processing_deducts_faab_and_requires_commissioner(client, db_ses
 def test_waiver_priority_processing_moves_winner_to_bottom(client, db_session):
     owner_token = create_user_and_token(client, "waiver-priority-owner")
     member_token = create_user_and_token(client, "waiver-priority-member")
-    league = create_league(client, owner_token, waiver_type="rolling")
+    league = create_league(client, owner_token, waiver_type="priority")
     join_response = client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token))
     assert join_response.status_code == 200
     team = (
