@@ -236,10 +236,12 @@ def create_league(
             playoff_teams=payload.settings.playoff_teams,
             waiver_type=payload.settings.waiver_type,
             waiver_period_hours=payload.settings.waiver_period_hours,
-            waiver_process_day=payload.settings.waiver_process_day,
-            waiver_process_hour=payload.settings.waiver_process_hour,
-            faab_budget=payload.settings.faab_budget,
-            allow_zero_dollar_bids=payload.settings.allow_zero_dollar_bids,
+            waiver_processing_weekday=payload.settings.waiver_processing_weekday,
+            waiver_processing_hour=payload.settings.waiver_processing_hour,
+            waiver_timezone=payload.settings.waiver_timezone,
+            faab_starting_budget=payload.settings.faab_starting_budget,
+            allow_zero_faab_bids=payload.settings.allow_zero_faab_bids,
+            reveal_all_waiver_bids=payload.settings.reveal_all_waiver_bids,
             waiver_tiebreaker=payload.settings.waiver_tiebreaker,
             initial_waiver_priority_method=payload.settings.initial_waiver_priority_method,
             post_drop_waiver_hours=payload.settings.post_drop_waiver_hours,
@@ -369,14 +371,18 @@ def update_league_settings(
     settings_row.waiver_type = payload.waiver_type
     if payload.waiver_period_hours is not None:
         settings_row.waiver_period_hours = payload.waiver_period_hours
-    if payload.waiver_process_day is not None:
-        settings_row.waiver_process_day = payload.waiver_process_day
-    if payload.waiver_process_hour is not None:
-        settings_row.waiver_process_hour = payload.waiver_process_hour
-    if payload.faab_budget is not None:
-        settings_row.faab_budget = payload.faab_budget
-    if payload.allow_zero_dollar_bids is not None:
-        settings_row.allow_zero_dollar_bids = payload.allow_zero_dollar_bids
+    if payload.waiver_processing_weekday is not None:
+        settings_row.waiver_processing_weekday = payload.waiver_processing_weekday
+    if payload.waiver_processing_hour is not None:
+        settings_row.waiver_processing_hour = payload.waiver_processing_hour
+    if payload.waiver_timezone is not None:
+        settings_row.waiver_timezone = payload.waiver_timezone
+    if payload.faab_starting_budget is not None:
+        settings_row.faab_starting_budget = payload.faab_starting_budget
+    if payload.allow_zero_faab_bids is not None:
+        settings_row.allow_zero_faab_bids = payload.allow_zero_faab_bids
+    if payload.reveal_all_waiver_bids is not None:
+        settings_row.reveal_all_waiver_bids = payload.reveal_all_waiver_bids
     if payload.waiver_tiebreaker is not None:
         settings_row.waiver_tiebreaker = payload.waiver_tiebreaker
     if payload.initial_waiver_priority_method is not None:

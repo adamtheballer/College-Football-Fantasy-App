@@ -144,7 +144,7 @@ def test_create_league_persists_custom_roster_format_and_flags(client):
                 "IR": 2,
             },
             "playoff_teams": 6,
-            "waiver_type": "rolling",
+            "waiver_type": "priority",
             "trade_review_type": "commissioner",
             "superflex_enabled": True,
             "kicker_enabled": False,
@@ -177,7 +177,7 @@ def test_create_league_persists_custom_roster_format_and_flags(client):
     assert settings["kicker_enabled"] is False
     assert settings["defense_enabled"] is True
     assert settings["playoff_teams"] == 6
-    assert settings["waiver_type"] == "rolling"
+    assert settings["waiver_type"] == "priority"
     assert settings["trade_review_type"] == "commissioner"
 
 
@@ -527,7 +527,7 @@ def test_update_league_settings_persists_custom_roster_format_and_flags(client):
             "IR": 3,
         },
         "playoff_teams": 8,
-        "waiver_type": "reverse",
+        "waiver_type": "priority",
         "trade_review_type": "none",
         "superflex_enabled": False,
         "kicker_enabled": True,

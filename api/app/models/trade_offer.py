@@ -36,3 +36,6 @@ class TradeOffer(TimestampMixin, Base):
     items = relationship("TradeOfferItem", back_populates="trade_offer", cascade="all, delete-orphan")
     reviews = relationship("TradeReview", back_populates="trade_offer", cascade="all, delete-orphan")
     countered_from_trade = relationship("TradeOffer", remote_side="TradeOffer.id", uselist=False)
+
+
+from collegefootballfantasy_api.app.models.trade_review import TradeReview  # noqa: E402,F401

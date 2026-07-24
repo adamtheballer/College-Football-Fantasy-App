@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from collegefootballfantasy_api.app.schemas.waiver import WaiverClaimRead, WaiverDropCandidateRead
 
@@ -27,12 +27,26 @@ class LeagueSettingsInput(BaseModel):
     playoff_teams: int
     waiver_type: str
     waiver_period_hours: int = 24
-    waiver_process_day: int = 2
-    waiver_process_hour: int = 8
-    faab_budget: int = 100
-    allow_zero_dollar_bids: bool = True
+    waiver_processing_weekday: int = Field(
+        default=1,
+        validation_alias=AliasChoices("waiver_processing_weekday", "waiver_process_day"),
+    )
+    waiver_processing_hour: int = Field(
+        default=8,
+        validation_alias=AliasChoices("waiver_processing_hour", "waiver_process_hour"),
+    )
+    waiver_timezone: str = "America/New_York"
+    faab_starting_budget: int = Field(
+        default=100,
+        validation_alias=AliasChoices("faab_starting_budget", "faab_budget"),
+    )
+    allow_zero_faab_bids: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("allow_zero_faab_bids", "allow_zero_dollar_bids"),
+    )
     waiver_tiebreaker: str = "priority"
     initial_waiver_priority_method: str = "reverse_draft"
+    reveal_all_waiver_bids: bool = False
     post_drop_waiver_hours: int = 24
     trade_review_type: str
     trade_deadline_week: int | None = None
@@ -48,18 +62,26 @@ class LeagueSettingsInput(BaseModel):
             raise ValueError("waiver_period_hours must be between 1 and 168")
         return value
 
-    @field_validator("waiver_process_day")
+    @field_validator("waiver_type")
     @classmethod
-    def validate_waiver_process_day(cls, value: int) -> int:
+    def validate_waiver_type(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"faab", "priority"}:
+            raise ValueError("waiver_type must be faab or priority")
+        return normalized
+
+    @field_validator("waiver_processing_weekday")
+    @classmethod
+    def validate_waiver_processing_weekday(cls, value: int) -> int:
         if value < 0 or value > 6:
-            raise ValueError("waiver_process_day must be between 0 and 6")
+            raise ValueError("waiver_processing_weekday must be between 0 and 6")
         return value
 
-    @field_validator("waiver_process_hour")
+    @field_validator("waiver_processing_hour")
     @classmethod
-    def validate_waiver_process_hour(cls, value: int) -> int:
-        if value < 8 or value > 22:
-            raise ValueError("waiver_process_hour must be between 8 AM and 10 PM")
+    def validate_waiver_processing_hour(cls, value: int) -> int:
+        if value < 0 or value > 23:
+            raise ValueError("waiver_processing_hour must be between 0 and 23")
         return value
 
     @field_validator("trade_review_type")
@@ -120,13 +142,19 @@ class LeagueSettingsRead(BaseModel):
     playoff_teams: int
     waiver_type: str
     waiver_period_hours: int
+    waiver_processing_weekday: int
+    waiver_processing_hour: int
+    waiver_timezone: str
     waiver_process_day: int
     waiver_process_hour: int
     next_waiver_run_at: datetime | None
+    faab_starting_budget: int
+    allow_zero_faab_bids: bool
     faab_budget: int
     allow_zero_dollar_bids: bool
     waiver_tiebreaker: str
     initial_waiver_priority_method: str
+    reveal_all_waiver_bids: bool
     post_drop_waiver_hours: int
     trade_review_type: str
     trade_deadline_week: int | None
@@ -142,12 +170,26 @@ class LeagueSettingsUpdate(BaseModel):
     playoff_teams: int
     waiver_type: str
     waiver_period_hours: int | None = None
-    waiver_process_day: int | None = None
-    waiver_process_hour: int | None = None
-    faab_budget: int | None = None
-    allow_zero_dollar_bids: bool | None = None
+    waiver_processing_weekday: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("waiver_processing_weekday", "waiver_process_day"),
+    )
+    waiver_processing_hour: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("waiver_processing_hour", "waiver_process_hour"),
+    )
+    waiver_timezone: str | None = None
+    faab_starting_budget: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("faab_starting_budget", "faab_budget"),
+    )
+    allow_zero_faab_bids: bool | None = Field(
+        default=None,
+        validation_alias=AliasChoices("allow_zero_faab_bids", "allow_zero_dollar_bids"),
+    )
     waiver_tiebreaker: str | None = None
     initial_waiver_priority_method: str | None = None
+    reveal_all_waiver_bids: bool | None = None
     post_drop_waiver_hours: int | None = None
     trade_review_type: str
     trade_deadline_week: int | None = None
@@ -164,6 +206,14 @@ class LeagueSettingsUpdate(BaseModel):
         if value < 1 or value > 168:
             raise ValueError("waiver_period_hours must be between 1 and 168")
         return value
+
+    @field_validator("waiver_type")
+    @classmethod
+    def validate_updated_waiver_type(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"faab", "priority"}:
+            raise ValueError("waiver_type must be faab or priority")
+        return normalized
 
     @field_validator("trade_review_type")
     @classmethod

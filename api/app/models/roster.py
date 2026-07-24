@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Index, String, UniqueConstraint, event, func, inspect, select
+from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, String, UniqueConstraint, event, func, inspect, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -10,6 +10,7 @@ class RosterEntry(TimestampMixin, Base):
         UniqueConstraint("team_id", "player_id", name="uq_roster_team_player"),
         UniqueConstraint("league_id", "player_id", name="uq_roster_league_player"),
         UniqueConstraint("team_id", "slot", "slot_index", name="uq_roster_team_slot_index"),
+        CheckConstraint("slot_index > 0", name="ck_roster_entries_slot_index_positive"),
         Index("ix_roster_entries_league_id", "league_id"),
         Index("ix_roster_entries_league_player", "league_id", "player_id"),
         Index("ix_roster_entries_team_id", "team_id"),
@@ -21,7 +22,7 @@ class RosterEntry(TimestampMixin, Base):
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"))
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"))
     slot: Mapped[str] = mapped_column(String(50))
-    slot_index: Mapped[int] = mapped_column(default=1)
+    slot_index: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(50))
 
     team = relationship("Team", back_populates="roster_entries")

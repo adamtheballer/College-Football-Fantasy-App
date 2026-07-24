@@ -28,7 +28,7 @@ from collegefootballfantasy_api.app.services.player_lock_service import is_playe
 
 WAIVER_STATUS_PENDING = "pending"
 WAIVER_STATUS_CANCELLED = "cancelled"
-WAIVER_STATUS_PROCESSED = "processed"
+WAIVER_STATUS_PROCESSED = "won"
 WAIVER_STATUS_FAILED = "failed"
 TERMINAL_WAIVER_STATUSES = {WAIVER_STATUS_CANCELLED, WAIVER_STATUS_PROCESSED, WAIVER_STATUS_FAILED}
 DEFAULT_WAIVER_PERIOD_HOURS = 24
@@ -86,9 +86,9 @@ def _next_waiver_process_time(
     if settings.next_waiver_run_at is not None and _as_utc(settings.next_waiver_run_at) > current:
         return _as_utc(settings.next_waiver_run_at)
     local_now = current.astimezone(_league_timezone(db, league))
-    weekday_offset = (int(settings.waiver_process_day) - local_now.weekday()) % 7
+    weekday_offset = (int(settings.waiver_processing_weekday) - local_now.weekday()) % 7
     candidate = (local_now + timedelta(days=weekday_offset)).replace(
-        hour=int(settings.waiver_process_hour), minute=0, second=0, microsecond=0
+        hour=int(settings.waiver_processing_hour), minute=0, second=0, microsecond=0
     )
     if candidate <= local_now:
         candidate += timedelta(days=7)
@@ -230,7 +230,7 @@ def _ensure_priorities_for_league(
             league_id=league_id,
             team_id=team.id,
             priority=next_priority,
-            faab_budget=settings.faab_budget,
+            faab_budget=settings.faab_starting_budget,
             faab_spent=0,
         )
         db.add(row)
@@ -407,7 +407,7 @@ def submit_waiver_claim(
 
     priorities = _ensure_priorities_for_league(db, league.id, settings)
     priority = priorities[team.id]
-    if _waiver_type(settings) == "faab" and not settings.allow_zero_dollar_bids and payload.faab_bid == 0:
+    if _waiver_type(settings) == "faab" and not settings.allow_zero_faab_bids and payload.faab_bid == 0:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="zero-dollar FAAB bids are disabled")
     if _waiver_type(settings) == "faab" and payload.faab_bid > _remaining_faab(priority):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="insufficient FAAB budget")
