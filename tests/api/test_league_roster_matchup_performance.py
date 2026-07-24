@@ -43,6 +43,6 @@ def test_matchup_tab_uses_a_bounded_number_of_selects(client, db_session):
 
     assert response.my_team is not None
     assert response.opponent_team is not None
-    assert len(response.my_roster) == 5
-    assert len(response.opponent_roster) == 1
-    assert select_count <= 7
+    assert len(response.my_roster) == 8
+    assert len(response.opponent_roster) == 8
+    assert select_count <= 8

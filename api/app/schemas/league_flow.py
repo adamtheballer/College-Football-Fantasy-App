@@ -346,13 +346,16 @@ class RosterTabTeamRead(BaseModel):
 
 
 class RosterTabEntryRead(BaseModel):
-    id: int
+    id: int | None = None
     league_id: int | None = None
     team_id: int
     fantasy_team_id: int | None = None
     fantasy_team_name: str | None = None
-    player_id: int
+    player_id: int | None = None
     slot: str
+    slot_id: str
+    slot_index: int
+    display_label: str
     roster_slot: str | None = None
     status: str
     is_starter: bool
@@ -387,6 +390,7 @@ class LeagueRosterTabRead(BaseModel):
     fantasy_team_id: int | None = None
     fantasy_team_name: str | None = None
     data: list[RosterTabEntryRead] = []
+    slots: list[RosterTabEntryRead] = []
 
 
 class MatchupTeamRead(BaseModel):

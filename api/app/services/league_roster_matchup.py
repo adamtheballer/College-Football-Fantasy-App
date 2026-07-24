@@ -39,9 +39,9 @@ from collegefootballfantasy_api.app.services.league_workspace import build_stand
 from collegefootballfantasy_api.app.services.matchup_probability import (
     calculate_matchup_win_probability,
     estimate_player_std_dev,
-    is_starting_slot,
 )
 from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_context_for_players
+from collegefootballfantasy_api.app.services.roster_slots import CanonicalRosterSlot, build_team_roster_slots
 from collegefootballfantasy_api.app.services.waiver_service import serialize_claims
 
 DEFAULT_ROSTER_SLOTS = {
@@ -153,33 +153,38 @@ def _rosters_for_teams(db: Session, team_ids: set[int]) -> dict[int, list[Roster
 
 
 def _serialize_roster_entry(
-    entry: RosterEntry,
+    roster_slot: CanonicalRosterSlot,
+    league: League,
+    team: Team,
     projection: WeeklyProjection | None,
     opponent: str | None = None,
     game_start_at: datetime | None = None,
     is_locked: bool = False,
 ) -> RosterTabEntryRead:
-    slot = (entry.slot or "BENCH").upper()
+    entry = roster_slot.entry
     projected = float(projection.fantasy_points or 0.0) if projection else 0.0
     floor = float(projection.floor or 0.0) if projection else 0.0
     ceiling = float(projection.ceiling or 0.0) if projection else 0.0
     return RosterTabEntryRead(
-        id=entry.id,
-        league_id=entry.league_id,
-        team_id=entry.team_id,
-        fantasy_team_id=entry.team_id,
-        fantasy_team_name=entry.team.name if entry.team else None,
-        player_id=entry.player_id,
-        slot=slot,
-        roster_slot=slot,
-        status=entry.status,
-        is_starter=is_starting_slot(slot),
-        is_ir=slot == "IR",
-        player_name=entry.player.name if entry.player else None,
-        player_school=entry.player.school if entry.player else None,
-        player_position=entry.player.position if entry.player else None,
-        school=entry.player.school if entry.player else None,
-        position=entry.player.position if entry.player else None,
+        id=entry.id if entry else None,
+        league_id=league.id,
+        team_id=team.id,
+        fantasy_team_id=team.id,
+        fantasy_team_name=team.name,
+        player_id=entry.player_id if entry else None,
+        slot=roster_slot.slot_type,
+        slot_id=roster_slot.slot_id,
+        slot_index=roster_slot.slot_index,
+        display_label=roster_slot.display_label,
+        roster_slot=roster_slot.slot_type,
+        status=entry.status if entry else "EMPTY",
+        is_starter=roster_slot.is_starter,
+        is_ir=roster_slot.is_ir,
+        player_name=entry.player.name if entry and entry.player else None,
+        player_school=entry.player.school if entry and entry.player else None,
+        player_position=entry.player.position if entry and entry.player else None,
+        school=entry.player.school if entry and entry.player else None,
+        position=entry.player.position if entry and entry.player else None,
         projected_points=projected,
         floor=floor,
         ceiling=ceiling,
@@ -218,18 +223,22 @@ def _serialize_team_roster(
         player_schools=player_schools,
     )
     current_time = datetime.now(timezone.utc)
+    slots = build_team_roster_slots(team.id, _slot_limits(db, league), entries)
     return [
         _serialize_roster_entry(
-            entry,
-            projection_by_player.get(entry.player_id),
-            opponents.get(entry.player_id),
-            game_start_at=game_starts.get(entry.player_id),
+            roster_slot,
+            league,
+            team,
+            projection_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+            opponents.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+            game_start_at=game_starts.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             is_locked=(
-                game_starts.get(entry.player_id) is not None
-                and as_utc(game_starts[entry.player_id]) <= current_time
+                roster_slot.entry is not None
+                and game_starts.get(roster_slot.entry.player_id) is not None
+                and as_utc(game_starts[roster_slot.entry.player_id]) <= current_time
             ),
         )
-        for entry in entries
+        for roster_slot in slots
     ]
 
 
@@ -255,21 +264,29 @@ def _serialize_team_rosters(
         player_schools=player_schools,
     )
     current_time = datetime.now(timezone.utc)
+    slot_limits = _slot_limits(db, league)
     return {
         team_id: [
             _serialize_roster_entry(
-                entry,
-                projection_by_player.get(entry.player_id),
-                opponents.get(entry.player_id),
-                game_start_at=game_starts.get(entry.player_id),
+                roster_slot,
+                league,
+                team,
+                projection_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+                opponents.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+                game_start_at=game_starts.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 is_locked=(
-                    game_starts.get(entry.player_id) is not None
-                    and as_utc(game_starts[entry.player_id]) <= current_time
+                    roster_slot.entry is not None
+                    and game_starts.get(roster_slot.entry.player_id) is not None
+                    and as_utc(game_starts[roster_slot.entry.player_id]) <= current_time
                 ),
             )
-            for entry in entries_by_team.get(team_id, [])
+            for roster_slot in build_team_roster_slots(
+                team_id,
+                slot_limits,
+                entries_by_team.get(team_id, []),
+            )
         ]
-        for team_id in teams
+        for team_id, team in teams.items()
     }
 
 
@@ -302,6 +319,7 @@ def build_roster_tab_view(
             owned_team=None,
             roster=[],
             data=[],
+            slots=[],
             roster_slot_limits=slot_limits,
             ir_slots=int(slot_limits.get("IR", 0)),
             message="No team found for your user in this league.",
@@ -318,6 +336,7 @@ def build_roster_tab_view(
         fantasy_team_name=team.name,
         roster=roster,
         data=roster,
+        slots=roster,
         roster_slot_limits=slot_limits,
         ir_slots=int(slot_limits.get("IR", 0)),
         message=None if roster else "Roster is empty. It will populate after the draft.",
@@ -567,22 +586,13 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
     settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
     members = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).all()
     teams = db.query(Team).filter(Team.league_id == league.id).order_by(Team.id.asc()).all()
-    roster_entries = (
-        db.query(RosterEntry)
-        .filter(RosterEntry.league_id == league.id)
-        .order_by(RosterEntry.team_id.asc(), RosterEntry.slot.asc(), RosterEntry.id.asc())
-        .all()
-    )
-    projection_by_player = _projection_map(
+    roster_by_team = _serialize_team_rosters(
         db,
-        league.season_year,
+        league,
+        {team.id: team for team in teams},
         resolve_current_week(db, league),
-        {entry.player_id for entry in roster_entries},
     )
-    roster_rows = [
-        _serialize_roster_entry(entry, projection_by_player.get(entry.player_id))
-        for entry in roster_entries
-    ]
+    roster_rows = [entry for roster in roster_by_team.values() for entry in roster]
     standings = [
         row.model_dump()
         for row in build_standings_summary(db, league)

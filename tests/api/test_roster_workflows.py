@@ -189,7 +189,10 @@ def test_add_drop_lineup_and_transactions_workflow(client, db_session):
     assert body["transaction"]["transaction_type"] == "add_drop"
     assert body["transaction"]["player_id"] == swap_player_id
     assert body["transaction"]["related_player_id"] == add_player_id
-    assert body["roster"][0]["player"]["id"] == swap_player_id
+    assert any(
+        slot["player"] and slot["player"]["id"] == swap_player_id
+        for slot in body["roster"]
+    )
 
     transaction_response = client.get(
         f"/leagues/{league['id']}/transactions",
@@ -703,6 +706,52 @@ def test_direct_drop_is_rejected_after_kickoff(client, db_session):
     assert response.status_code == 409
     assert response.json()["detail"] == "player cannot be dropped after kickoff"
     assert db_session.get(RosterEntry, roster_entry_id) is not None
+
+
+def test_drop_preserves_canonical_slot_across_team_and_league_roster_views(client, db_session):
+    token = create_user_and_token(client, "canonical-slot-drop")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    player_id = create_position_players(client)["QB"]
+
+    add_response = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": player_id, "slot": "QB", "status": "active"},
+        headers=auth_headers(token),
+    )
+    assert add_response.status_code == 201
+    roster_entry_id = add_response.json()["id"]
+
+    before_response = client.get(f"/teams/{team.id}/roster", headers=auth_headers(token))
+    assert before_response.status_code == 200
+    before_slots = before_response.json()["slots"]
+    qb_slot_before = next(slot for slot in before_slots if slot["slot_id"] == f"team-{team.id}-QB-1")
+    assert qb_slot_before["player"]["id"] == player_id
+
+    drop_response = client.delete(
+        f"/teams/{team.id}/roster/{roster_entry_id}",
+        headers=auth_headers(token),
+    )
+    assert drop_response.status_code == 204
+
+    after_response = client.get(f"/teams/{team.id}/roster", headers=auth_headers(token))
+    assert after_response.status_code == 200
+    after_slots = after_response.json()["slots"]
+    assert len(after_slots) == len(before_slots)
+    qb_slot_after = next(slot for slot in after_slots if slot["slot_id"] == f"team-{team.id}-QB-1")
+    assert qb_slot_after["player"] is None
+    assert qb_slot_after["projection"] == 0.0
+
+    league_roster_response = client.get(f"/leagues/{league['id']}/roster", headers=auth_headers(token))
+    assert league_roster_response.status_code == 200
+    league_qb_slot = next(
+        slot
+        for slot in league_roster_response.json()["slots"]
+        if slot["slot_id"] == f"team-{team.id}-QB-1"
+    )
+    assert league_qb_slot["player_id"] is None
+    assert league_qb_slot["player_name"] is None
+    assert league_qb_slot["projected_points"] == 0.0
 
 
 def test_add_drop_uses_open_flex_slot_when_primary_position_is_full(client, db_session):
