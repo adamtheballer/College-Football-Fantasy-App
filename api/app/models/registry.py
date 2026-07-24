@@ -70,6 +70,7 @@ MODEL_MODULES = (
     "waiver_claim_audit",
     "waiver_priority",
     "waiver_processing_run",
+    "waiver_period",
     "watchlist",
     "weekly_projection",
     "worker_heartbeat",

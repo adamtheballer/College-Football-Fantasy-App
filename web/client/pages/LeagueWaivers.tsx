@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
-import { Search, Sparkles, UserPlus, Zap } from "lucide-react";
+import { ArrowDown, ArrowUp, Pencil, Search, Sparkles, UserPlus, Zap } from "lucide-react";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
@@ -17,7 +17,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/components/ui/use-toast";
 import { useLeagueDetail, useLeagueWaiverTab } from "@/hooks/use-leagues";
 import { usePlayerCard } from "@/hooks/use-players";
-import { useCancelWaiverClaim, useSubmitWaiverClaim } from "@/hooks/use-waivers";
+import {
+  useAddFreeAgent,
+  useCancelWaiverClaim,
+  useEditWaiverClaim,
+  useReorderWaiverClaims,
+  useSubmitWaiverClaim,
+} from "@/hooks/use-waivers";
 import {
   useCreateWatchlist,
   useToggleWatchlistPlayer,
@@ -34,6 +40,8 @@ type AvailablePlayerRow = {
   school: string | null;
   position: string | null;
   weekly_projected_fantasy_points: number;
+  availability_state: string;
+  available_at: string | null;
   rank: number;
   projection?: PlayerStats | null;
 };
@@ -91,10 +99,33 @@ const positionTone = (position?: string | null) => {
   }
 };
 
-const formatProcessTime = (value?: string | null) => {
+const formatProcessTime = (value?: string | null, timezone?: string | number | boolean) => {
   if (!value) return "the next waiver processing window";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "the next waiver processing window" : date.toLocaleString();
+  if (Number.isNaN(date.getTime())) return "the next waiver processing window";
+  const timeZone = typeof timezone === "string" ? timezone : undefined;
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone,
+  }).format(date);
+};
+
+const canClaimAvailability = (value?: string | null) => !value || value === "waivers" || value === "free_agent";
+
+const availabilityLabel = (value?: string | null) => {
+  switch (value) {
+    case "free_agent":
+      return "Free agent";
+    case "waiver_locked":
+      return "Waiver lock";
+    case "claim_pending":
+      return "Claim pending";
+    case "game_locked":
+      return "Game locked";
+    default:
+      return "On waivers";
+  }
 };
 
 export default function LeagueWaivers() {
@@ -107,6 +138,8 @@ export default function LeagueWaivers() {
   const [claimPlayer, setClaimPlayer] = useState<AvailablePlayerRow | null>(null);
   const [dropRosterEntryId, setDropRosterEntryId] = useState("none");
   const [faabBid, setFaabBid] = useState("0");
+  const [preferenceOrder, setPreferenceOrder] = useState("1");
+  const [editingClaimId, setEditingClaimId] = useState<number | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
   const leagueQuery = useLeagueDetail(parsedLeagueId, !isDemoLeague);
   const postDraft = isDemoLeague || isLeaguePostDraft({
@@ -115,8 +148,11 @@ export default function LeagueWaivers() {
   });
   const waiverQuery = useLeagueWaiverTab(parsedLeagueId, 50, 0, !isDemoLeague && postDraft);
   const waiverData = isDemoLeague ? createDemoLeagueWaiverResponse() : waiverQuery.data;
+  const addFreeAgent = useAddFreeAgent(parsedLeagueId);
   const submitWaiverClaim = useSubmitWaiverClaim(parsedLeagueId);
   const cancelWaiverClaim = useCancelWaiverClaim(parsedLeagueId);
+  const editWaiverClaim = useEditWaiverClaim(parsedLeagueId);
+  const reorderWaiverClaims = useReorderWaiverClaims(parsedLeagueId);
   const watchlistsQuery = useWatchlists(
     parsedLeagueId,
     !isDemoLeague && postDraft && typeof parsedLeagueId === "number" && !Number.isNaN(parsedLeagueId)
@@ -227,6 +263,26 @@ export default function LeagueWaivers() {
     setClaimPlayer(player);
     setDropRosterEntryId("none");
     setFaabBid("0");
+    setPreferenceOrder(String((waiverData?.claims.filter((claim) => claim.status === "pending").length ?? 0) + 1));
+    setEditingClaimId(null);
+    setClaimError(null);
+  };
+
+  const openEditClaimDialog = (claim: NonNullable<typeof waiverData>["claims"][number]) => {
+    setClaimPlayer({
+      id: claim.add_player_id,
+      name: claim.add_player_name,
+      school: null,
+      position: null,
+      weekly_projected_fantasy_points: 0,
+      availability_state: "waivers",
+      available_at: null,
+      rank: claim.preference_order,
+    });
+    setDropRosterEntryId(claim.drop_roster_entry_id ? String(claim.drop_roster_entry_id) : "none");
+    setFaabBid(String(claim.faab_bid));
+    setPreferenceOrder(String(claim.preference_order));
+    setEditingClaimId(claim.id);
     setClaimError(null);
   };
 
@@ -235,24 +291,48 @@ export default function LeagueWaivers() {
       setClaimError("Your team is not available for this waiver claim.");
       return;
     }
-    const usesFaab = waiverData?.waiver_rules.waiver_type === "faab";
+    const isFreeAgentAdd = claimPlayer.availability_state === "free_agent";
+    const usesFaab = !isFreeAgentAdd && waiverData?.waiver_rules.waiver_type === "faab";
     const bid = usesFaab ? Number(faabBid) : 0;
     if (usesFaab && (!Number.isInteger(bid) || bid < 0)) {
       setClaimError("Enter a whole-dollar FAAB bid of $0 or more.");
       return;
     }
     try {
-      const claim = await submitWaiverClaim.mutateAsync({
+      if (isFreeAgentAdd) {
+        await addFreeAgent.mutateAsync({
+          playerId: claimPlayer.id,
+          payload: {
+            team_id: waiverData.fantasy_team_id,
+            drop_roster_entry_id: dropRosterEntryId === "none" ? undefined : Number(dropRosterEntryId),
+          },
+        });
+        toast({
+          title: "Free agent added",
+          description: `${claimPlayer.name} was added to your roster immediately.`,
+        });
+        setClaimPlayer(null);
+        return;
+      }
+      const payload = {
         team_id: waiverData.fantasy_team_id,
         add_player_id: claimPlayer.id,
         drop_roster_entry_id: dropRosterEntryId === "none" ? undefined : Number(dropRosterEntryId),
         faab_bid: bid,
-      });
+        preference_order: Number(preferenceOrder),
+      };
+      const claim = editingClaimId
+        ? await editWaiverClaim.mutateAsync({ claimId: editingClaimId, payload })
+        : await submitWaiverClaim.mutateAsync(payload);
       toast({
-        title: "Waiver claim submitted",
-        description: `${claim.add_player_name} will process ${formatProcessTime(claim.process_after)}.`,
+        title: editingClaimId ? "Waiver claim updated" : "Waiver claim submitted",
+        description: `${claim.add_player_name} will process ${formatProcessTime(
+          claim.process_after,
+          waiverData?.waiver_rules.timezone
+        )}.`,
       });
       setClaimPlayer(null);
+      setEditingClaimId(null);
     } catch (error) {
       setClaimError(error instanceof Error ? error.message : "Unable to submit waiver claim.");
     }
@@ -265,6 +345,27 @@ export default function LeagueWaivers() {
     } catch (error) {
       toast({
         title: "Unable to cancel waiver claim",
+        description: error instanceof Error ? error.message : "Try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const moveClaim = async (claimId: number, direction: -1 | 1) => {
+    const pendingClaims = (waiverData?.claims ?? [])
+      .filter((claim) => claim.status === "pending")
+      .sort((left, right) => left.preference_order - right.preference_order || left.id - right.id);
+    const currentIndex = pendingClaims.findIndex((claim) => claim.id === claimId);
+    const targetIndex = currentIndex + direction;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= pendingClaims.length) return;
+    const reordered = [...pendingClaims];
+    [reordered[currentIndex], reordered[targetIndex]] = [reordered[targetIndex], reordered[currentIndex]];
+    try {
+      await reorderWaiverClaims.mutateAsync(reordered.map((claim) => claim.id));
+      toast({ title: "Claim order updated" });
+    } catch (error) {
+      toast({
+        title: "Unable to reorder claims",
         description: error instanceof Error ? error.message : "Try again.",
         variant: "destructive",
       });
@@ -287,12 +388,21 @@ export default function LeagueWaivers() {
 
   return (
     <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
-      <Dialog open={Boolean(claimPlayer)} onOpenChange={(open) => !open && setClaimPlayer(null)}>
+      <Dialog open={Boolean(claimPlayer)} onOpenChange={(open) => {
+        if (!open) {
+          setClaimPlayer(null);
+          setEditingClaimId(null);
+        }
+      }}>
         <DialogContent className="max-w-xl border-sky-300/20 bg-[#101928]">
           <DialogHeader>
-            <DialogTitle className="pr-8 text-2xl font-black uppercase italic text-slate-50">Submit Waiver Claim</DialogTitle>
+            <DialogTitle className="pr-8 text-2xl font-black uppercase italic text-slate-50">
+              {editingClaimId ? "Edit Waiver Claim" : claimPlayer?.availability_state === "free_agent" ? "Add Free Agent" : "Submit Waiver Claim"}
+            </DialogTitle>
             <DialogDescription className="text-sm font-semibold leading-6 text-slate-300">
-              Add {claimPlayer?.name ?? "this player"} and choose an optional roster drop. The backend verifies player availability, lineup locks, FAAB, and roster legality before saving the claim.
+              {claimPlayer?.availability_state === "free_agent"
+                ? `Add ${claimPlayer?.name ?? "this player"} immediately and choose an optional roster drop. The backend verifies availability, lineup locks, and roster legality before completing the transaction.`
+                : `Add ${claimPlayer?.name ?? "this player"} and choose an optional roster drop. The backend verifies player availability, lineup locks, FAAB, and roster legality before saving the claim.`}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
@@ -316,7 +426,11 @@ export default function LeagueWaivers() {
                 </SelectContent>
               </Select>
             </label>
-            {waiverData?.waiver_rules.waiver_type === "faab" ? (
+            {claimPlayer?.availability_state === "free_agent" ? (
+              <p className="rounded-2xl border border-emerald-300/15 bg-emerald-300/[0.06] p-3 text-xs font-semibold text-emerald-100">
+                This player cleared waivers and can be added immediately. No FAAB bid or waiver priority is used.
+              </p>
+            ) : waiverData?.waiver_rules.waiver_type === "faab" ? (
               <label className="grid gap-2">
                 <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">FAAB Bid</span>
                 <Input type="number" min="0" step="1" value={faabBid} onChange={(event) => setFaabBid(event.target.value)} className="h-12 rounded-2xl border-white/10 bg-slate-950/45 text-sm font-bold text-slate-50" />
@@ -329,12 +443,34 @@ export default function LeagueWaivers() {
                 Your waiver priority is #{waiverData?.waiver_priority ?? "pending"}. Successful claims move your team to the back of the order.
               </p>
             )}
-            <p className="rounded-2xl border border-white/10 bg-black/15 p-3 text-xs font-semibold leading-5 text-slate-300">
-              Processing is scheduled by the league waiver window. The confirmed claim shows its exact processing time.
-            </p>
+            {claimPlayer?.availability_state !== "free_agent" ? (
+              <>
+                <label className="grid gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Claim Order</span>
+                  <Input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={preferenceOrder}
+                    onChange={(event) => setPreferenceOrder(event.target.value)}
+                    className="h-12 rounded-2xl border-white/10 bg-slate-950/45 text-sm font-bold text-slate-50"
+                  />
+                  <p className="text-xs font-semibold text-slate-400">Lower numbers process first for your team.</p>
+                </label>
+                <p className="rounded-2xl border border-white/10 bg-black/15 p-3 text-xs font-semibold leading-5 text-slate-300">
+                  Processing is scheduled by the league waiver window. The confirmed claim shows its exact processing time.
+                </p>
+              </>
+            ) : null}
             {claimError ? <p className="text-xs font-bold text-red-300">{claimError}</p> : null}
-            <Button type="button" className="h-12 rounded-2xl bg-sky-300 text-[10px] font-black uppercase tracking-[0.2em] text-slate-950 hover:bg-sky-200" onClick={() => void submitClaim()} disabled={submitWaiverClaim.isPending || !claimPlayer}>
-              {submitWaiverClaim.isPending ? "Submitting..." : "Confirm Waiver Claim"}
+            <Button type="button" className="h-12 rounded-2xl bg-sky-300 text-[10px] font-black uppercase tracking-[0.2em] text-slate-950 hover:bg-sky-200" onClick={() => void submitClaim()} disabled={submitWaiverClaim.isPending || editWaiverClaim.isPending || addFreeAgent.isPending || !claimPlayer}>
+              {submitWaiverClaim.isPending || editWaiverClaim.isPending || addFreeAgent.isPending
+                ? "Saving..."
+                : editingClaimId
+                  ? "Save Waiver Claim"
+                  : claimPlayer?.availability_state === "free_agent"
+                    ? "Add Free Agent"
+                    : "Confirm Waiver Claim"}
             </Button>
           </div>
         </DialogContent>
@@ -440,7 +576,9 @@ export default function LeagueWaivers() {
                   <th className="px-4 py-4">Player</th>
                   <th className="w-44 px-4 py-4">School</th>
                   <th className="w-24 px-4 py-4">POS</th>
-                  <th className="w-32 px-4 py-4 text-right">Week 1 Proj</th>
+                  <th className="w-32 px-4 py-4 text-right">
+                    Week {waiverData?.current_period?.week ?? 1} Proj
+                  </th>
                   <th className="w-56 px-5 py-4 text-right">Action</th>
                 </tr>
               </thead>
@@ -448,6 +586,7 @@ export default function LeagueWaivers() {
                 {filteredPlayers.map((player) => {
                   const tone = positionTone(player.position);
                   const projected = Number(player.weekly_projected_fantasy_points ?? 0);
+                  const claimable = canClaimAvailability(player.availability_state);
                   return (
                     <tr
                       key={player.id}
@@ -477,7 +616,7 @@ export default function LeagueWaivers() {
                           </p>
                         </div>
                       </td>
-                      <td className="px-4 py-4 align-middle text-sm font-bold uppercase tracking-[0.08em] text-slate-400">
+                      <td className="px-4 py-4 align-middle text-sm font-bold text-slate-400">
                         {player.school ?? "-"}
                       </td>
                       <td className="px-4 py-4 align-middle">
@@ -513,7 +652,7 @@ export default function LeagueWaivers() {
                           </Button>
                           <Button
                             type="button"
-                            disabled={!waiverData?.fantasy_team_id}
+                            disabled={!waiverData?.fantasy_team_id || !claimable}
                             onClick={(event) => {
                               event.stopPropagation();
                               openClaimDialog(player);
@@ -521,7 +660,11 @@ export default function LeagueWaivers() {
                             className="h-10 rounded-xl bg-sky-300 px-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-950 shadow-none hover:bg-sky-200 disabled:opacity-50"
                           >
                             <UserPlus className="mr-2 h-3.5 w-3.5" />
-                            Claim
+                            {claimable
+                              ? player.availability_state === "free_agent"
+                                ? "Add"
+                                : "Claim"
+                              : availabilityLabel(player.availability_state)}
                           </Button>
                         </div>
                       </td>
@@ -565,7 +708,7 @@ export default function LeagueWaivers() {
                           {claim.status}
                         </p>
                         <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                          FAAB {claim.faab_bid}
+                          {waiverData?.waiver_rules.waiver_type === "faab" ? `FAAB $${claim.faab_bid}` : `Order ${claim.preference_order}`}
                         </p>
                       </div>
                     </div>
@@ -576,19 +719,50 @@ export default function LeagueWaivers() {
                     ) : null}
                     <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                       {claim.status.toLowerCase() === "pending"
-                        ? `Processes ${formatProcessTime(claim.process_after)}`
-                        : `Updated ${formatProcessTime(claim.processed_at)}`}
+                        ? `Order ${claim.preference_order} · Processes ${formatProcessTime(claim.process_after, waiverData?.waiver_rules.timezone)}`
+                        : `Updated ${formatProcessTime(claim.processed_at, waiverData?.waiver_rules.timezone)}`}
                     </p>
                     {claim.status.toLowerCase() === "pending" ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="mt-3 h-9 rounded-xl border-red-300/25 px-3 text-[9px] font-black uppercase tracking-[0.14em] text-red-100 hover:bg-red-500/10"
-                        disabled={cancelWaiverClaim.isPending}
-                        onClick={() => void cancelClaim(claim.id)}
-                      >
-                        {cancelWaiverClaim.isPending ? "Cancelling..." : "Cancel Claim"}
-                      </Button>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-9 rounded-xl border-sky-300/25 px-3 text-[9px] font-black uppercase tracking-[0.14em] text-sky-100 hover:bg-sky-500/10"
+                          disabled={editWaiverClaim.isPending}
+                          onClick={() => openEditClaimDialog(claim)}
+                        >
+                          <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-9 rounded-xl border-white/15 px-2.5 text-slate-200 hover:bg-white/10"
+                          disabled={reorderWaiverClaims.isPending || claim.preference_order <= 1}
+                          onClick={() => void moveClaim(claim.id, -1)}
+                          aria-label={`Move ${claim.add_player_name} claim up`}
+                        >
+                          <ArrowUp className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-9 rounded-xl border-white/15 px-2.5 text-slate-200 hover:bg-white/10"
+                          disabled={reorderWaiverClaims.isPending}
+                          onClick={() => void moveClaim(claim.id, 1)}
+                          aria-label={`Move ${claim.add_player_name} claim down`}
+                        >
+                          <ArrowDown className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-9 rounded-xl border-red-300/25 px-3 text-[9px] font-black uppercase tracking-[0.14em] text-red-100 hover:bg-red-500/10"
+                          disabled={cancelWaiverClaim.isPending}
+                          onClick={() => void cancelClaim(claim.id)}
+                        >
+                          {cancelWaiverClaim.isPending ? "Cancelling..." : "Cancel Claim"}
+                        </Button>
+                      </div>
                     ) : null}
                   </div>
                 ))}
@@ -616,6 +790,38 @@ export default function LeagueWaivers() {
               </div>
             )}
           </div>
+        </section>
+      ) : null}
+
+      {!isDemoLeague ? (
+        <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-5">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">
+              {waiverData?.waiver_rules.waiver_type === "faab"
+                ? `Top FAAB Bids — Week ${waiverData?.results_period?.week ?? "Recent"}`
+                : `Successful Waiver Claims — Week ${waiverData?.results_period?.week ?? "Recent"}`}
+            </p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Completed only</p>
+          </div>
+          {(waiverData?.results ?? []).length === 0 ? (
+            <p className="mt-4 text-sm font-semibold text-slate-500">No completed waiver awards yet.</p>
+          ) : (
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {waiverData?.results.map((claim) => (
+                <div key={claim.id} className="rounded-2xl border border-amber-300/15 bg-amber-300/[0.04] p-4">
+                  <p className="text-sm font-black text-slate-50">{claim.add_player_name}</p>
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                    {waiverData?.waiver_rules.waiver_type === "faab"
+                      ? `Won for $${claim.winning_bid ?? claim.faab_bid} FAAB`
+                      : `Priority #${claim.prior_priority ?? "—"} → #${claim.resulting_priority ?? "—"}`}
+                  </p>
+                  <p className="mt-2 text-xs font-semibold text-slate-500">
+                    Processed {formatProcessTime(claim.processed_at, waiverData?.waiver_rules.timezone)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       ) : null}
 

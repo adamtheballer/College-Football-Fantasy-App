@@ -12,12 +12,14 @@ from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_waiver_availability import PlayerWaiverAvailability
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
+from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.league_flow import (
@@ -28,6 +30,7 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueScheduleRowRead,
     LeagueSettingsViewRead,
     LeagueWaiverPlayerRead,
+    LeagueWaiverPeriodRead,
     LeagueWaiversRead,
     MatchupTeamRead,
     RosterTabEntryRead,
@@ -61,6 +64,21 @@ def _slot_limits(db: Session, league: League) -> dict[str, int]:
     if settings and settings.roster_slots_json:
         slot_limits.update(settings.roster_slots_json)
     return slot_limits
+
+
+def _serialize_waiver_period(period: WaiverPeriod | None) -> LeagueWaiverPeriodRead | None:
+    if period is None:
+        return None
+    return LeagueWaiverPeriodRead(
+        id=period.id,
+        season=period.season,
+        week=period.week,
+        window_key=period.window_key,
+        opens_at=period.opens_at,
+        closes_at=period.closes_at,
+        processes_at=period.processes_at,
+        status=period.status,
+    )
 
 
 def _owned_team(db: Session, league: League, user: User) -> Team | None:
@@ -501,6 +519,15 @@ def build_waivers_view(
     total = query.count()
     players = query.offset(max(0, offset)).limit(max(1, min(limit, 100))).all()
     player_ids = {player.id for player in players}
+    availability_by_player = {
+        row.player_id: row
+        for row in db.query(PlayerWaiverAvailability)
+        .filter(
+            PlayerWaiverAvailability.league_id == league.id,
+            PlayerWaiverAvailability.player_id.in_(player_ids or {0}),
+        )
+        .all()
+    }
     projection_by_player = _projection_map(db, league.season_year, week, player_ids)
     score_by_player = {
         row.player_id: row
@@ -518,6 +545,37 @@ def build_waivers_view(
     waiver_priority = None
     faab_remaining = None
     settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
+    current_period = (
+        db.query(WaiverPeriod)
+        .filter(
+            WaiverPeriod.league_id == league.id,
+            WaiverPeriod.status.in_(("scheduled", "open", "locked")),
+        )
+        .order_by(WaiverPeriod.processes_at.asc(), WaiverPeriod.id.asc())
+        .first()
+    )
+    results_period = (
+        db.query(WaiverPeriod)
+        .filter(
+            WaiverPeriod.league_id == league.id,
+            WaiverPeriod.status == "completed",
+        )
+        .order_by(WaiverPeriod.processed_at.desc(), WaiverPeriod.processes_at.desc(), WaiverPeriod.id.desc())
+        .first()
+    )
+    completed_claim_rows = (
+        db.query(WaiverClaim)
+        .filter(
+            WaiverClaim.league_id == league.id,
+            WaiverClaim.waiver_period_id == results_period.id if results_period else False,
+            WaiverClaim.status == "won",
+        )
+        .order_by(WaiverClaim.processed_at.desc(), WaiverClaim.id.desc())
+        .limit(12)
+        .all()
+        if results_period
+        else []
+    )
     if team:
         priority_row = (
             db.query(WaiverPriority)
@@ -550,6 +608,23 @@ def build_waivers_view(
             )
             for entry in _roster_rows(db, team.id)
         ]
+    now = datetime.now(timezone.utc)
+
+    def availability_for_player(player_id: int) -> tuple[str, datetime | None]:
+        availability = availability_by_player.get(player_id)
+        if availability is None:
+            if results_period is not None:
+                return "free_agent", results_period.processed_at
+            return "waivers", None
+        available_at = availability.available_at
+        if (
+            availability.state in {"waiver_locked", "waivers"}
+            and available_at is not None
+            and as_utc(available_at) <= now
+        ):
+            return "free_agent", available_at
+        return availability.state, available_at
+
     return LeagueWaiversRead(
         league_id=league.id,
         fantasy_team_id=team.id if team else None,
@@ -568,15 +643,26 @@ def build_waivers_view(
                     if player.id in projection_by_player
                     else 0.0
                 ),
+                availability_state=availability_for_player(player.id)[0],
+                available_at=availability_for_player(player.id)[1],
             )
             for player in players
         ],
         claims=claims,
+        current_period=_serialize_waiver_period(current_period),
+        results_period=_serialize_waiver_period(results_period),
+        results=serialize_claims(db, completed_claim_rows),
         roster=roster,
         waiver_rules={
-            "waiver_type": settings.waiver_type if settings else "FAAB",
+            "waiver_type": settings.waiver_type if settings else "faab",
             "waiver_period_hours": settings.waiver_period_hours if settings else 24,
             "faab_budget": settings.faab_starting_budget if settings else 100,
+            "allow_zero_faab_bids": settings.allow_zero_faab_bids if settings else True,
+            "reveal_all_waiver_bids": settings.reveal_all_waiver_bids if settings else False,
+            "processing_weekday": settings.waiver_processing_weekday if settings else 1,
+            "processing_hour": settings.waiver_processing_hour if settings else 8,
+            "timezone": settings.waiver_timezone if settings else "America/New_York",
+            "post_drop_waiver_hours": settings.post_drop_waiver_hours if settings else 24,
         },
         total_available=total,
         message=None if team else "No team found for your user in this league.",

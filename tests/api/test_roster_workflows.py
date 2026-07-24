@@ -6,6 +6,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from collegefootballfantasy_api.app.models.game import Game
+from collegefootballfantasy_api.app.models.draft import Draft
+from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
@@ -14,6 +16,7 @@ from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
+from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
 from collegefootballfantasy_api.app.services.league_weeks import current_cfb_week_state
 from collegefootballfantasy_api.app.services import waiver_service
 
@@ -128,6 +131,29 @@ def create_position_players(client) -> dict[str, int]:
     )
     assert response.status_code == 201
     return {row["position"]: row["id"] for row in response.json()}
+
+
+def complete_official_draft(db_session, league_id: int, player_ids: list[int]) -> list[Team]:
+    """Create the minimum finalized official draft needed for waiver lifecycle tests."""
+
+    teams = db_session.query(Team).filter(Team.league_id == league_id).order_by(Team.id.asc()).all()
+    assert len(player_ids) >= len(teams)
+    draft = db_session.query(Draft).filter(Draft.league_id == league_id).one()
+    draft.status = "completed"
+    draft.completed_at = datetime.now(timezone.utc)
+    for overall_pick, (team, player_id) in enumerate(zip(teams, player_ids, strict=True), start=1):
+        db_session.add(
+            DraftPick(
+                draft_id=draft.id,
+                team_id=team.id,
+                player_id=player_id,
+                round_number=1,
+                round_pick=overall_pick,
+                overall_pick=overall_pick,
+            )
+        )
+    db_session.commit()
+    return teams
 
 
 def test_team_and_roster_routes_require_membership_and_ownership(client, db_session):
@@ -250,6 +276,7 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
     league = create_league(client, token)
     team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
     drop_player_id, add_player_id = create_players(client)
+    complete_official_draft(db_session, league["id"], [drop_player_id])
 
     roster_response = client.post(
         f"/teams/{team.id}/roster",
@@ -286,7 +313,7 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
     assert settings.next_waiver_run_at is not None
     assert settings.waiver_process_hour == 8
     assert process_after == parse_api_datetime(settings.next_waiver_run_at.isoformat())
-    assert process_after.astimezone(ZoneInfo("America/Los_Angeles")).hour == 8
+    assert process_after.astimezone(ZoneInfo(settings.waiver_timezone)).hour == 8
     assert process_after > submitted_at
 
     list_response = client.get(f"/leagues/{league['id']}/waivers", headers=auth_headers(token))
@@ -298,8 +325,8 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
     assert immediate_process_response.json() == {"processed": 0, "failed": 0, "pending": 1}
     assert db_session.query(RosterEntry).filter_by(id=drop_entry_id, player_id=drop_player_id).one()
 
-    claim = db_session.get(WaiverClaim, body["id"])
-    claim.process_after = datetime.now(timezone.utc) + timedelta(days=1)
+    period = db_session.get(WaiverPeriod, body["waiver_period_id"])
+    period.processes_at = datetime.now(timezone.utc) + timedelta(days=1)
     db_session.commit()
 
     not_due_response = client.post(f"/leagues/{league['id']}/waivers/process", headers=auth_headers(token))
@@ -307,7 +334,7 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
     assert not_due_response.json() == {"processed": 0, "failed": 0, "pending": 1}
     assert db_session.query(RosterEntry).filter_by(id=drop_entry_id, player_id=drop_player_id).one()
 
-    claim.process_after = datetime.now(timezone.utc) - timedelta(minutes=1)
+    period.processes_at = datetime.now(timezone.utc) - timedelta(minutes=1)
     db_session.commit()
 
     due_response = client.post(f"/leagues/{league['id']}/waivers/process", headers=auth_headers(token))
@@ -319,11 +346,12 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
     assert db_session.get(WaiverClaim, body["id"]).status == "won"
 
 
-def test_waiver_claim_uses_configured_waiver_period_hours(client, db_session):
+def test_waiver_claim_uses_configured_waiver_schedule(client, db_session):
     token = create_user_and_token(client, "waiver-window")
     league = create_league(client, token, waiver_period_hours=48)
     team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
     _drop_player_id, add_player_id = create_players(client)
+    complete_official_draft(db_session, league["id"], [add_player_id])
 
     submitted_at = datetime.now(timezone.utc)
     submit_response = client.post(
@@ -351,6 +379,7 @@ def test_waiver_claim_allows_same_day_before_player_school_kickoff(client, db_se
     league = create_league(client, token)
     team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
     _drop_player_id, add_player_id = create_players(client)
+    complete_official_draft(db_session, league["id"], [add_player_id])
     db_session.add(
         Game(
             season=2026,
@@ -380,6 +409,7 @@ def test_waiver_claim_rejects_player_school_after_kickoff(client, db_session, mo
     league = create_league(client, token)
     team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
     _drop_player_id, add_player_id = create_players(client)
+    complete_official_draft(db_session, league["id"], [add_player_id])
     db_session.add(
         Game(
             season=2026,
@@ -407,6 +437,7 @@ def test_waiver_claim_cancel_endpoint_marks_pending_claim_cancelled(client, db_s
     league = create_league(client, token)
     team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
     _drop_player_id, add_player_id = create_players(client)
+    complete_official_draft(db_session, league["id"], [add_player_id])
 
     submit_response = client.post(
         f"/leagues/{league['id']}/waivers/claims",
@@ -462,6 +493,7 @@ def test_waiver_processing_deducts_faab_and_requires_commissioner(client, db_ses
         .one()
     )
     _drop_player_id, add_player_id = create_players(client)
+    complete_official_draft(db_session, league["id"], [add_player_id, _drop_player_id])
 
     submit_response = client.post(
         f"/leagues/{league['id']}/waivers/claims",
@@ -469,8 +501,8 @@ def test_waiver_processing_deducts_faab_and_requires_commissioner(client, db_ses
         headers=auth_headers(owner_token),
     )
     assert submit_response.status_code == 201
-    claim = db_session.get(WaiverClaim, submit_response.json()["id"])
-    claim.process_after = datetime.now(timezone.utc) - timedelta(minutes=1)
+    period = db_session.get(WaiverPeriod, submit_response.json()["waiver_period_id"])
+    period.processes_at = datetime.now(timezone.utc) - timedelta(minutes=1)
     db_session.commit()
 
     forbidden_response = client.post(
@@ -503,6 +535,7 @@ def test_waiver_priority_processing_moves_winner_to_bottom(client, db_session):
         .one()
     )
     _drop_player_id, add_player_id = create_players(client)
+    complete_official_draft(db_session, league["id"], [add_player_id, _drop_player_id])
 
     submit_response = client.post(
         f"/leagues/{league['id']}/waivers/claims",
@@ -510,8 +543,8 @@ def test_waiver_priority_processing_moves_winner_to_bottom(client, db_session):
         headers=auth_headers(owner_token),
     )
     assert submit_response.status_code == 201
-    claim = db_session.get(WaiverClaim, submit_response.json()["id"])
-    claim.process_after = datetime.now(timezone.utc) - timedelta(minutes=1)
+    period = db_session.get(WaiverPeriod, submit_response.json()["waiver_period_id"])
+    period.processes_at = datetime.now(timezone.utc) - timedelta(minutes=1)
     db_session.commit()
 
     process_response = client.post(
@@ -532,6 +565,7 @@ def test_waiver_locked_drop_player_is_rejected_after_kickoff(client, db_session)
     league = create_league(client, token)
     team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
     drop_player_id, add_player_id = create_players(client)
+    complete_official_draft(db_session, league["id"], [drop_player_id])
     roster_response = client.post(
         f"/teams/{team.id}/roster",
         json={"player_id": drop_player_id, "slot": "RB", "status": "active"},
@@ -577,6 +611,7 @@ def test_waiver_claim_rejects_unavailable_add_player(client, db_session):
     owner_team = next(team for team in teams if team.owner_name == "Coachwaiver-unavailable-owner")
     member_team = next(team for team in teams if team.owner_name == "Coachwaiver-unavailable-member")
     add_player_id, _drop_player_id = create_players(client)
+    complete_official_draft(db_session, league["id"], [add_player_id, _drop_player_id])
     roster_response = client.post(
         f"/teams/{member_team.id}/roster",
         json={"player_id": add_player_id, "slot": "RB", "status": "active"},

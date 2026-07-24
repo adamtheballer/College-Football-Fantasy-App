@@ -21,6 +21,8 @@ DEFAULT_ROSTER_SLOTS = {
 
 
 def finalize_draft_rosters_and_matchups(db: Session, league: League) -> dict[str, int]:
+    db.flush()
+
     draft = db.query(Draft).filter(Draft.league_id == league.id).first()
     if not draft:
         return {"rosters_backfilled": 0, "matchups_created": 0}
@@ -77,5 +79,12 @@ def finalize_draft_rosters_and_matchups(db: Session, league: League) -> dict[str
     if draft.status == "completed":
         league.status = "post_draft"
         db.add(league)
+        # Waiver order and FAAB balances derive only from this finalized official
+        # draft order. Mock or incomplete drafts never enter this path.
+        from collegefootballfantasy_api.app.services.waiver_service import (
+            initialize_waiver_state_after_official_draft,
+        )
+
+        initialize_waiver_state_after_official_draft(db, league)
 
     return {"rosters_backfilled": rosters_backfilled, "matchups_created": matchups_created}

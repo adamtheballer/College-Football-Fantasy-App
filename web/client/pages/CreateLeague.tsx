@@ -33,9 +33,16 @@ const leagueSizes = [4, 6, 8, 10, 12, 14, 16];
 const playoffOptions = [2, 4, 6, 8];
 const MIN_DRAFT_LEAD_TIME_MS = 5 * 60 * 1000;
 const waiverOptions = [
-  { label: "FAAB (future claims)", value: "faab" },
-  { label: "Rolling Priority (future claims)", value: "rolling" },
-  { label: "Reverse Standings (future claims)", value: "reverse" },
+  {
+    label: "FAAB",
+    value: "faab",
+    description: "Managers submit hidden bids from a season-long budget. The highest valid bid wins.",
+  },
+  {
+    label: "Waiver Priority",
+    value: "priority",
+    description: "Claims process in waiver order. A successful claim moves the team to the back.",
+  },
 ];
 const tradeReviewOptions = [
   { label: "Commissioner", value: "commissioner" },
@@ -414,6 +421,13 @@ function CreateLeagueForm() {
     playoff_teams: 4,
     waiver_type: "faab",
     waiver_period_hours: 24,
+    waiver_processing_weekday: 1,
+    waiver_processing_hour: 8,
+    waiver_timezone: timezone,
+    faab_starting_budget: 100,
+    allow_zero_faab_bids: true,
+    reveal_all_waiver_bids: false,
+    post_drop_waiver_hours: 24,
     trade_review_type: "commissioner",
   });
 
@@ -535,6 +549,13 @@ function CreateLeagueForm() {
           playoff_teams: settings.playoff_teams,
           waiver_type: settings.waiver_type,
           waiver_period_hours: settings.waiver_period_hours,
+          waiver_processing_weekday: settings.waiver_processing_weekday,
+          waiver_processing_hour: settings.waiver_processing_hour,
+          waiver_timezone: settings.waiver_timezone,
+          faab_starting_budget: settings.faab_starting_budget,
+          allow_zero_faab_bids: settings.allow_zero_faab_bids,
+          reveal_all_waiver_bids: settings.reveal_all_waiver_bids,
+          post_drop_waiver_hours: settings.post_drop_waiver_hours,
           trade_review_type: settings.trade_review_type,
           superflex_enabled: false,
           kicker_enabled: true,
@@ -837,7 +858,7 @@ function CreateLeagueForm() {
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field label="Claims policy (not enabled yet)">
+                  <Field label="Waiver system">
                     <Select
                       value={settings.waiver_type}
                       onValueChange={(value) => setSettings((prev) => ({ ...prev, waiver_type: value }))}
@@ -871,6 +892,97 @@ function CreateLeagueForm() {
                       </SelectContent>
                     </Select>
                   </Field>
+                </div>
+
+                <div className="rounded-[1.25rem] border border-sky-300/15 bg-sky-300/[0.04] p-5">
+                  <div className="flex flex-col gap-2 border-b border-white/[0.08] pb-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className={fieldLabelClass}>Waiver processing</p>
+                      <p className="mt-2 max-w-2xl text-sm leading-6 text-[#94A3B8]">
+                        {waiverOptions.find((option) => option.value === settings.waiver_type)?.description}
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-sky-300/25 bg-sky-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-sky-100">
+                      {settings.waiver_type === "faab" ? "FAAB" : "Priority"}
+                    </span>
+                  </div>
+                  <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <Field label="Processing day">
+                      <Select
+                        value={String(settings.waiver_processing_weekday)}
+                        onValueChange={(value) => setSettings((prev) => ({ ...prev, waiver_processing_weekday: Number(value) }))}
+                      >
+                        <SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger>
+                        <SelectContent className={selectContentClass}>
+                          {[
+                            [0, "Monday"], [1, "Tuesday"], [2, "Wednesday"], [3, "Thursday"],
+                            [4, "Friday"], [5, "Saturday"], [6, "Sunday"],
+                          ].map(([value, label]) => <SelectItem key={value} value={String(value)}>{label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Processing time (local hour)">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="23"
+                        value={settings.waiver_processing_hour}
+                        onChange={(event) => setSettings((prev) => ({ ...prev, waiver_processing_hour: clampNumber(Number(event.target.value), 0, 23) }))}
+                        className={inputClass}
+                      />
+                    </Field>
+                    <Field label="League time zone">
+                      <Select
+                        value={settings.waiver_timezone}
+                        onValueChange={(value) => setSettings((prev) => ({ ...prev, waiver_timezone: value }))}
+                      >
+                        <SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger>
+                        <SelectContent className={selectContentClass}>
+                          {timezoneOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Dropped-player waiver hours" helper="How long a dropped player remains on waivers.">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="168"
+                        value={settings.post_drop_waiver_hours}
+                        onChange={(event) => setSettings((prev) => ({ ...prev, post_drop_waiver_hours: clampNumber(Number(event.target.value), 0, 168) }))}
+                        className={inputClass}
+                      />
+                    </Field>
+                    {settings.waiver_type === "faab" ? (
+                      <>
+                        <Field label="Starting FAAB budget">
+                          <Input
+                            type="number"
+                            min="0"
+                            value={settings.faab_starting_budget}
+                            onChange={(event) => setSettings((prev) => ({ ...prev, faab_starting_budget: Math.max(0, Number(event.target.value) || 0) }))}
+                            className={inputClass}
+                          />
+                        </Field>
+                        <Field label="FAAB options">
+                          <div className="grid gap-3 rounded-[10px] border border-white/[0.08] bg-[#161E2E] p-3">
+                            <label className="flex items-center justify-between gap-3 text-sm font-medium text-[#CBD5E1]">
+                              Allow $0 bids
+                              <Switch checked={settings.allow_zero_faab_bids} onCheckedChange={(value) => setSettings((prev) => ({ ...prev, allow_zero_faab_bids: value }))} />
+                            </label>
+                            <label className="flex items-center justify-between gap-3 text-sm font-medium text-[#CBD5E1]">
+                              Reveal all bids after processing
+                              <Switch checked={settings.reveal_all_waiver_bids} onCheckedChange={(value) => setSettings((prev) => ({ ...prev, reveal_all_waiver_bids: value }))} />
+                            </label>
+                          </div>
+                        </Field>
+                      </>
+                    ) : (
+                      <div className="rounded-[10px] border border-violet-300/20 bg-violet-300/[0.06] p-4 text-sm leading-6 text-violet-100">
+                        <p className="font-bold">Initial priority: Reverse Draft Order</p>
+                        <p className="mt-1 text-violet-100/70">The official draft initializes the order. Successful claims move teams to the back.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-4">

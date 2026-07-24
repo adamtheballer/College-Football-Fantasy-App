@@ -13,6 +13,7 @@ from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
+from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.schemas.draft_room import DraftPickCreate
 from collegefootballfantasy_api.app.services.draft_service import (
     create_real_draft_pick,
@@ -375,6 +376,16 @@ def test_two_managers_complete_the_full_server_authoritative_draft_lifecycle(cli
     assert completed["status"] == "completed"
     assert [pick["player_id"] for pick in completed["picks"]] == [first_player_id, second_player_id]
     assert db_session.query(RosterEntry).filter(RosterEntry.league_id == league["id"]).count() == 2
+    priorities = (
+        db_session.query(WaiverPriority)
+        .filter(WaiverPriority.league_id == league["id"])
+        .order_by(WaiverPriority.priority.asc())
+        .all()
+    )
+    assert [priority.team_id for priority in priorities] == [
+        completed["teams"][1]["id"],
+        completed["teams"][0]["id"],
+    ]
 
 
 def test_cpu_seats_pick_individually_after_their_server_delay(client, db_session, monkeypatch):
