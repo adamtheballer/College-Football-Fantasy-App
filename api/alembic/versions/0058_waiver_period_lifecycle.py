@@ -77,7 +77,8 @@ def _backfill_periods() -> None:
         opens_at = scheduled_for - timedelta(days=7) if hasattr(scheduled_for, "__sub__") else scheduled_for
         status = "scheduled" if row["has_pending"] else "completed"
         inserted = bind.execute(
-            periods.insert().values(
+            periods.insert()
+            .values(
                 league_id=row["league_id"],
                 season=row["season"],
                 week=row["week"],
@@ -88,8 +89,9 @@ def _backfill_periods() -> None:
                 status=status,
                 processed_at=None if status == "scheduled" else scheduled_for,
             )
+            .returning(periods.c.id)
         )
-        period_ids[key] = int(inserted.inserted_primary_key[0])
+        period_ids[key] = int(inserted.scalar_one())
 
     claim_rows = bind.execute(
         sa.text("SELECT id, league_id, season, processing_week, processing_window_id FROM waiver_claims")
