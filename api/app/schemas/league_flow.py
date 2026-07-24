@@ -84,6 +84,13 @@ class LeagueSettingsInput(BaseModel):
             raise ValueError("waiver_processing_hour must be between 0 and 23")
         return value
 
+    @field_validator("faab_starting_budget", "post_drop_waiver_hours")
+    @classmethod
+    def validate_nonnegative_waiver_values(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("waiver configuration values cannot be negative")
+        return value
+
     @field_validator("trade_review_type")
     @classmethod
     def validate_trade_review_type(cls, value: str) -> str:
@@ -156,6 +163,8 @@ class LeagueSettingsRead(BaseModel):
     initial_waiver_priority_method: str
     reveal_all_waiver_bids: bool
     post_drop_waiver_hours: int
+    waivers_enabled: bool
+    free_agent_mode: str
     trade_review_type: str
     trade_deadline_week: int | None
     trade_deadline_at: datetime | None
@@ -205,6 +214,31 @@ class LeagueSettingsUpdate(BaseModel):
             return value
         if value < 1 or value > 168:
             raise ValueError("waiver_period_hours must be between 1 and 168")
+        return value
+
+    @field_validator("waiver_processing_weekday")
+    @classmethod
+    def validate_updated_waiver_processing_weekday(cls, value: int | None) -> int | None:
+        if value is None:
+            return value
+        if value < 0 or value > 6:
+            raise ValueError("waiver_processing_weekday must be between 0 and 6")
+        return value
+
+    @field_validator("waiver_processing_hour")
+    @classmethod
+    def validate_updated_waiver_processing_hour(cls, value: int | None) -> int | None:
+        if value is None:
+            return value
+        if value < 0 or value > 23:
+            raise ValueError("waiver_processing_hour must be between 0 and 23")
+        return value
+
+    @field_validator("faab_starting_budget", "post_drop_waiver_hours")
+    @classmethod
+    def validate_updated_nonnegative_waiver_values(cls, value: int | None) -> int | None:
+        if value is not None and value < 0:
+            raise ValueError("waiver configuration values cannot be negative")
         return value
 
     @field_validator("waiver_type")
@@ -476,6 +510,19 @@ class LeagueWaiverPlayerRead(BaseModel):
     school: str | None = None
     position: str | None = None
     weekly_projected_fantasy_points: float = 0.0
+    availability_state: str = "waivers"
+    available_at: datetime | None = None
+
+
+class LeagueWaiverPeriodRead(BaseModel):
+    id: int
+    season: int
+    week: int
+    window_key: str
+    opens_at: datetime
+    closes_at: datetime
+    processes_at: datetime
+    status: str
 
 
 class LeagueWaiversRead(BaseModel):
@@ -485,6 +532,9 @@ class LeagueWaiversRead(BaseModel):
     faab_remaining: int | None = None
     available_players: list[LeagueWaiverPlayerRead]
     claims: list[WaiverClaimRead] = []
+    current_period: LeagueWaiverPeriodRead | None = None
+    results_period: LeagueWaiverPeriodRead | None = None
+    results: list[WaiverClaimRead] = []
     roster: list[WaiverDropCandidateRead] = []
     waiver_rules: dict = {}
     total_available: int

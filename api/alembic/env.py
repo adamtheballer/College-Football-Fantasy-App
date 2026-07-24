@@ -62,6 +62,7 @@ from collegefootballfantasy_api.app.models import (
     usage_share,
     waiver_claim,
     waiver_claim_audit,
+    waiver_period,
     waiver_processing_run,
     waiver_priority,
     player_waiver_availability,

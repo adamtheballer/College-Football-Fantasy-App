@@ -15,6 +15,7 @@ class LeagueSettings(TimestampMixin, Base):
         CheckConstraint("waiver_processing_weekday BETWEEN 0 AND 6", name="ck_league_settings_waiver_processing_weekday"),
         CheckConstraint("waiver_processing_hour BETWEEN 0 AND 23", name="ck_league_settings_waiver_processing_hour"),
         CheckConstraint("post_drop_waiver_hours >= 0", name="ck_league_settings_post_drop_waiver_hours"),
+        CheckConstraint("free_agent_mode IN ('after_waivers_clear')", name="ck_league_settings_free_agent_mode"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -37,6 +38,8 @@ class LeagueSettings(TimestampMixin, Base):
     reveal_all_waiver_bids: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     post_drop_waiver_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24)
     waiver_initialized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    waivers_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    free_agent_mode: Mapped[str] = mapped_column(String(40), nullable=False, default="after_waivers_clear")
     trade_review_type: Mapped[str] = mapped_column(String(50), default="commissioner")
     trade_deadline_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     trade_deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

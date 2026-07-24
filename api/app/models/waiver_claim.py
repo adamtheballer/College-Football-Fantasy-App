@@ -13,36 +13,37 @@ class WaiverClaim(TimestampMixin, Base):
         Index("ix_waiver_claims_team_status", "team_id", "status"),
         Index("ix_waiver_claims_add_player", "league_id", "add_player_id"),
         Index("ix_waiver_claims_process_after", "process_after"),
+        Index("ix_waiver_claims_period_status", "waiver_period_id", "status"),
         Index("ix_waiver_claims_window_status", "league_id", "processing_window_id", "status"),
         CheckConstraint("faab_bid >= 0", name="ck_waiver_claims_faab_bid_nonnegative"),
         CheckConstraint("preference_order > 0", name="ck_waiver_claims_preference_order_positive"),
-        CheckConstraint("status IN ('pending', 'won', 'lost', 'cancelled', 'invalid', 'insufficient_budget', 'roster_full', 'player_unavailable', 'failed')", name="ck_waiver_claims_status"),
+        CheckConstraint("status IN ('pending', 'won', 'lost', 'cancelled', 'invalid', 'insufficient_budget', 'roster_full', 'player_unavailable', 'skipped', 'failed')", name="ck_waiver_claims_status"),
         Index(
-            "uq_waiver_claims_player_window_winner",
-            "league_id",
-            "add_player_id",
-            "processing_window_id",
-            unique=True,
-            postgresql_where=text("status = 'won'"),
-            sqlite_where=text("status = 'won'"),
-        ),
-        Index(
-            "uq_waiver_claims_pending_team_window_preference",
+            "uq_waiver_claims_pending_team_period_preference",
             "team_id",
-            "processing_window_id",
+            "waiver_period_id",
             "preference_order",
             unique=True,
             postgresql_where=text("status = 'pending'"),
             sqlite_where=text("status = 'pending'"),
         ),
         Index(
-            "uq_waiver_claims_pending_team_player_window",
+            "uq_waiver_claims_pending_team_period_player",
             "team_id",
+            "waiver_period_id",
             "add_player_id",
-            "processing_window_id",
             unique=True,
             postgresql_where=text("status = 'pending'"),
             sqlite_where=text("status = 'pending'"),
+        ),
+        Index(
+            "uq_waiver_claims_player_period_winner",
+            "league_id",
+            "add_player_id",
+            "waiver_period_id",
+            unique=True,
+            postgresql_where=text("status = 'won'"),
+            sqlite_where=text("status = 'won'"),
         ),
     )
 
@@ -57,6 +58,7 @@ class WaiverClaim(TimestampMixin, Base):
     season: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     processing_week: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     processing_window_id: Mapped[str] = mapped_column(String(120), nullable=False, default="legacy")
+    waiver_period_id: Mapped[int] = mapped_column(ForeignKey("waiver_periods.id", ondelete="RESTRICT"), nullable=False)
     processing_run_id: Mapped[int | None] = mapped_column(ForeignKey("waiver_processing_runs.id", ondelete="SET NULL"), nullable=True)
     preference_order: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     priority_snapshot: Mapped[int | None] = mapped_column(Integer, nullable=True)

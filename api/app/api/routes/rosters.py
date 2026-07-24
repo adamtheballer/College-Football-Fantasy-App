@@ -43,6 +43,10 @@ from collegefootballfantasy_api.app.services.roster_slots import (
 )
 from collegefootballfantasy_api.app.services.league_weeks import resolve_current_week
 from collegefootballfantasy_api.app.services.player_lock_service import locked_player_ids
+from collegefootballfantasy_api.app.services.waiver_service import (
+    record_player_dropped_for_waivers,
+    record_player_rostered_for_waivers,
+)
 
 router = APIRouter()
 
@@ -351,13 +355,20 @@ def delete_roster_entry_endpoint(
 
     dropped_player_id = entry.player_id
     db.delete(entry)
-    _record_transaction(
+    transaction = _record_transaction(
         db,
         league_id=team.league_id,
         team_id=team.id,
         transaction_type="drop",
         created_by_user_id=current_user.id,
         player_id=dropped_player_id,
+    )
+    record_player_dropped_for_waivers(
+        db,
+        league=league,
+        player_id=dropped_player_id,
+        team_id=team.id,
+        transaction_id=transaction.id,
     )
     db.commit()
 
@@ -510,6 +521,17 @@ def add_drop_endpoint(
         player_id=add_player.id,
         related_player_id=dropped_player_id,
         reason=payload.reason,
+    )
+    league = db.get(League, team.league_id)
+    if not league:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
+    record_player_rostered_for_waivers(db, league_id=team.league_id, player_id=add_player.id)
+    record_player_dropped_for_waivers(
+        db,
+        league=league,
+        player_id=dropped_player_id,
+        team_id=team.id,
+        transaction_id=transaction.id,
     )
     db.commit()
 

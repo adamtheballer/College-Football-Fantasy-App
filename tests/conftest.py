@@ -54,6 +54,7 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     waiver_claim,
     waiver_claim_audit,
     waiver_processing_run,
+    waiver_period,
     waiver_priority,
     watchlist,
     weekly_projection,

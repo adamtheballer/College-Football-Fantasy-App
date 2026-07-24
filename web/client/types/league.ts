@@ -6,14 +6,22 @@ export interface LeagueSettings {
   playoff_teams: number;
   waiver_type: string;
   waiver_period_hours: number;
+  waiver_processing_weekday?: number;
+  waiver_processing_hour?: number;
+  waiver_timezone?: string;
   waiver_process_day?: number;
   waiver_process_hour?: number;
   next_waiver_run_at?: string | null;
+  faab_starting_budget?: number;
+  allow_zero_faab_bids?: boolean;
+  reveal_all_waiver_bids?: boolean;
   faab_budget?: number;
   allow_zero_dollar_bids?: boolean;
   waiver_tiebreaker?: string;
   initial_waiver_priority_method?: string;
   post_drop_waiver_hours?: number;
+  waivers_enabled?: boolean;
+  free_agent_mode?: string;
   trade_review_type: string;
   trade_deadline_week?: number | null;
   trade_deadline_at?: string | null;
@@ -280,6 +288,8 @@ export interface LeagueWaiverPlayer {
   school: string | null;
   position: string | null;
   weekly_projected_fantasy_points: number;
+  availability_state: string;
+  available_at: string | null;
 }
 
 export interface LeagueWaiverClaim {
@@ -296,9 +306,31 @@ export interface LeagueWaiverClaim {
   faab_bid: number;
   status: string;
   failure_reason: string | null;
+  failure_code: string | null;
+  season: number;
+  processing_week: number;
+  processing_window_id: string;
+  waiver_period_id: number;
+  processing_run_id: number | null;
+  preference_order: number;
+  winning_bid: number | null;
+  prior_priority: number | null;
+  resulting_priority: number | null;
   process_after: string | null;
   created_at: string;
+  updated_at: string;
   processed_at: string | null;
+}
+
+export interface LeagueWaiverPeriod {
+  id: number;
+  season: number;
+  week: number;
+  window_key: string;
+  opens_at: string;
+  closes_at: string;
+  processes_at: string;
+  status: string;
 }
 
 export interface LeagueWaiverDropCandidate {
@@ -317,6 +349,9 @@ export interface LeagueWaiverTabResponse {
   faab_remaining: number | null;
   available_players: LeagueWaiverPlayer[];
   claims: LeagueWaiverClaim[];
+  current_period: LeagueWaiverPeriod | null;
+  results_period: LeagueWaiverPeriod | null;
+  results: LeagueWaiverClaim[];
   roster: LeagueWaiverDropCandidate[];
   waiver_rules: Record<string, string | number | boolean>;
   total_available: number;

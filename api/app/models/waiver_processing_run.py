@@ -10,6 +10,7 @@ class WaiverProcessingRun(TimestampMixin, Base):
     __tablename__ = "waiver_processing_runs"
     __table_args__ = (
         UniqueConstraint("league_id", "season", "week", "window_key", name="uq_waiver_processing_runs_window"),
+        UniqueConstraint("waiver_period_id", name="uq_waiver_processing_runs_period"),
         UniqueConstraint("idempotency_key", name="uq_waiver_processing_runs_idempotency_key"),
         CheckConstraint("waiver_type IN ('faab', 'priority')", name="ck_waiver_processing_runs_waiver_type"),
         CheckConstraint("status IN ('pending', 'running', 'completed', 'failed')", name="ck_waiver_processing_runs_status"),
@@ -18,6 +19,7 @@ class WaiverProcessingRun(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     league_id: Mapped[int] = mapped_column(ForeignKey("leagues.id", ondelete="CASCADE"), nullable=False)
+    waiver_period_id: Mapped[int] = mapped_column(ForeignKey("waiver_periods.id", ondelete="CASCADE"), nullable=False)
     season: Mapped[int] = mapped_column(Integer, nullable=False)
     week: Mapped[int] = mapped_column(Integer, nullable=False)
     window_key: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -29,4 +31,5 @@ class WaiverProcessingRun(TimestampMixin, Base):
     idempotency_key: Mapped[str] = mapped_column(String(160), nullable=False)
     claims_processed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     claims_won: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failure_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
