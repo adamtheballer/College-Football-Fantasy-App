@@ -490,14 +490,10 @@ def build_waivers_view(
         .filter(RosterEntry.league_id == league.id)
         .all()
     }
-    draft = db.query(Draft).filter(Draft.league_id == league.id).first()
-    if draft:
-        unavailable_player_ids.update(
-            player_id
-            for (player_id,) in db.query(DraftPick.player_id)
-            .filter(DraftPick.draft_id == draft.id)
-            .all()
-        )
+    # Availability is league-roster scoped. A drafted player is unavailable only
+    # while they are still rostered; once dropped, they re-enter the league's
+    # waiver/free-agent lifecycle. Excluding every DraftPick here made the UI
+    # show a different pool than the claim service validates.
     query = db.query(Player).filter(~Player.id.in_(unavailable_player_ids)).order_by(
         Player.sheet_projected_season_points.desc().nullslast(),
         Player.name.asc(),
@@ -533,7 +529,12 @@ def build_waivers_view(
         claim_rows = (
             db.query(WaiverClaim)
             .filter(WaiverClaim.league_id == league.id, WaiverClaim.team_id == team.id)
-            .order_by(WaiverClaim.created_at.desc(), WaiverClaim.id.desc())
+            .order_by(
+                (WaiverClaim.status == "pending").desc(),
+                WaiverClaim.preference_order.asc(),
+                WaiverClaim.created_at.desc(),
+                WaiverClaim.id.desc(),
+            )
             .limit(25)
             .all()
         )

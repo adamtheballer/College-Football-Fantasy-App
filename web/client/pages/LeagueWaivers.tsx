@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import { useLeagueDetail, useLeagueWaiverTab } from "@/hooks/use-leagues";
-import { useDraftPlayerPool, usePlayerCard } from "@/hooks/use-players";
+import { usePlayerCard } from "@/hooks/use-players";
 import { useCancelWaiverClaim, useSubmitWaiverClaim } from "@/hooks/use-waivers";
 import {
   useCreateWatchlist,
@@ -24,24 +24,10 @@ import {
   useWatchlists,
 } from "@/hooks/use-watchlists";
 import { DEMO_LEAGUE_ID, createDemoLeagueWaiverResponse } from "@/lib/leaguePreviewData";
-import { buildDraftBoard } from "@/lib/draftRankings";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import type { PlayerStats } from "@/types/player";
 
 const positions = ["ALL", "QB", "RB", "WR", "TE", "K"] as const;
-const availablePlayersDraftConfig = {
-  leagueSize: 12,
-  rosterSlots: {
-    QB: 1,
-    RB: 2,
-    WR: 2,
-    TE: 1,
-    K: 1,
-    BE: 5,
-    IR: 0,
-  },
-};
-
 type AvailablePlayerRow = {
   id: number;
   name: string;
@@ -49,10 +35,7 @@ type AvailablePlayerRow = {
   position: string | null;
   weekly_projected_fantasy_points: number;
   rank: number;
-  playerClass?: string | null;
-  status?: string | null;
   projection?: PlayerStats | null;
-  sheetProjectionStats?: Record<string, number | null | undefined> | null;
 };
 
 const positionTone = (position?: string | null) => {
@@ -134,15 +117,6 @@ export default function LeagueWaivers() {
   const waiverData = isDemoLeague ? createDemoLeagueWaiverResponse() : waiverQuery.data;
   const submitWaiverClaim = useSubmitWaiverClaim(parsedLeagueId);
   const cancelWaiverClaim = useCancelWaiverClaim(parsedLeagueId);
-  const playerPoolQuery = useDraftPlayerPool({
-    league_id: parsedLeagueId,
-    available_only: !isDemoLeague && Number.isFinite(parsedLeagueId),
-    limit: 200,
-    offset: 0,
-    fetchAll: true,
-    sort: "draft_rank",
-    enabled: !isDemoLeague && postDraft && Number.isFinite(parsedLeagueId),
-  });
   const watchlistsQuery = useWatchlists(
     parsedLeagueId,
     !isDemoLeague && postDraft && typeof parsedLeagueId === "number" && !Number.isNaN(parsedLeagueId)
@@ -161,24 +135,11 @@ export default function LeagueWaivers() {
       }));
     }
 
-    return buildDraftBoard(playerPoolQuery.data?.data ?? [], availablePlayersDraftConfig)
-      .map((player) => ({
-        id: player.id,
-        name: player.name,
-        school: player.school,
-        position: player.pos,
-        weekly_projected_fantasy_points: player.projectedPoints,
-        rank: player.masterDraftRank ?? player.draftRank,
-        playerClass: player.playerClass,
-        status: player.status,
-        projection: player.projection,
-        sheetProjectionStats: player.sheetProjectionStats,
-      }))
-      .sort((left, right) => {
-        if (left.rank !== right.rank) return left.rank - right.rank;
-        return left.name.localeCompare(right.name);
-      });
-  }, [isDemoLeague, playerPoolQuery.data?.data, waiverData?.available_players]);
+    return (waiverData?.available_players ?? []).map((player, index) => ({
+      ...player,
+      rank: index + 1,
+    }));
+  }, [isDemoLeague, waiverData?.available_players]);
   const watchlists = watchlistsQuery.data?.data ?? [];
   const primaryWatchlist = watchlists[0] ?? null;
   const watchedPlayerIds = useMemo(
@@ -274,8 +235,9 @@ export default function LeagueWaivers() {
       setClaimError("Your team is not available for this waiver claim.");
       return;
     }
-    const bid = Number(faabBid);
-    if (!Number.isInteger(bid) || bid < 0) {
+    const usesFaab = waiverData?.waiver_rules.waiver_type === "faab";
+    const bid = usesFaab ? Number(faabBid) : 0;
+    if (usesFaab && (!Number.isInteger(bid) || bid < 0)) {
       setClaimError("Enter a whole-dollar FAAB bid of $0 or more.");
       return;
     }
@@ -354,13 +316,19 @@ export default function LeagueWaivers() {
                 </SelectContent>
               </Select>
             </label>
-            <label className="grid gap-2">
-              <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">FAAB Bid</span>
-              <Input type="number" min="0" step="1" value={faabBid} onChange={(event) => setFaabBid(event.target.value)} className="h-12 rounded-2xl border-white/10 bg-slate-950/45 text-sm font-bold text-slate-50" />
-              <p className="text-xs font-semibold text-slate-400">
-                {waiverData?.faab_remaining ?? waiverData?.waiver_rules.faab_budget ?? 0} FAAB remaining · priority {waiverData?.waiver_priority ?? "pending"}
+            {waiverData?.waiver_rules.waiver_type === "faab" ? (
+              <label className="grid gap-2">
+                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">FAAB Bid</span>
+                <Input type="number" min="0" step="1" value={faabBid} onChange={(event) => setFaabBid(event.target.value)} className="h-12 rounded-2xl border-white/10 bg-slate-950/45 text-sm font-bold text-slate-50" />
+                <p className="text-xs font-semibold text-slate-400">
+                  ${waiverData?.faab_remaining ?? waiverData?.waiver_rules.faab_budget ?? 0} remaining. Your bid stays hidden until waivers process.
+                </p>
+              </label>
+            ) : (
+              <p className="rounded-2xl border border-violet-300/15 bg-violet-300/[0.06] p-3 text-xs font-semibold text-violet-100">
+                Your waiver priority is #{waiverData?.waiver_priority ?? "pending"}. Successful claims move your team to the back of the order.
               </p>
-            </label>
+            )}
             <p className="rounded-2xl border border-white/10 bg-black/15 p-3 text-xs font-semibold leading-5 text-slate-300">
               Processing is scheduled by the league waiver window. The confirmed claim shows its exact processing time.
             </p>
@@ -450,14 +418,14 @@ export default function LeagueWaivers() {
             </div>
           </div>
         </div>
-        {!isDemoLeague && playerPoolQuery.isLoading ? (
+        {!isDemoLeague && waiverQuery.isLoading ? (
           <p className="px-5 py-6 text-sm text-slate-400">
-            Loading the full master-board player pool…
+            Loading league-specific available players…
           </p>
-        ) : !isDemoLeague && playerPoolQuery.isError ? (
+        ) : !isDemoLeague && waiverQuery.isError ? (
           <p className="px-5 py-6 text-sm font-black uppercase tracking-[0.16em] text-red-300">
-            Unable to load the full available-player board
-            {playerPoolQuery.error instanceof Error ? `: ${playerPoolQuery.error.message}` : "."}
+            Unable to load the league waiver pool
+            {waiverQuery.error instanceof Error ? `: ${waiverQuery.error.message}` : "."}
           </p>
         ) : filteredPlayers.length === 0 ? (
           <p className="px-5 py-6 text-sm text-slate-400">
@@ -685,12 +653,12 @@ export default function LeagueWaivers() {
             name: selectedPlayer.name,
             school: selectedPlayer.school,
             position: selectedPlayer.position,
-            rankLabel: `Master Rank #${selectedPlayer.rank}`,
+            rankLabel: undefined,
             projectedPoints: selectedPlayer.weekly_projected_fantasy_points,
-            playerClass: selectedPlayer.playerClass,
-            status: selectedPlayer.status,
+            playerClass: null,
+            status: null,
             projection: selectedPlayer.projection,
-            sheetProjectionStats: selectedPlayer.sheetProjectionStats,
+            sheetProjectionStats: null,
           }}
           title="Available Player"
           note="Week projection uses the app's current projection formula for the selected week. Schedule-strength adjustments should come from the league schedule data when available."
