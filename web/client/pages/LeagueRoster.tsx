@@ -19,8 +19,6 @@ const starterSlot = (slot?: string | null) => {
   return normalized !== "BENCH" && normalized !== "IR";
 };
 
-const rosterSlotOrder = ["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "BENCH", "IR"];
-
 const isRealRosterPlayer = (player: LeagueRosterPlayer) =>
   Boolean(
     player.player_id !== null &&
@@ -43,54 +41,6 @@ export const formatLineupLockMessage = (player: LeagueRosterPlayer) => {
   return `Locked at kickoff (${gameStart.toLocaleString()})`;
 };
 
-function createEmptyRosterSlots(
-  slotLimits: Record<string, number> | undefined,
-  teamId: number,
-  teamName: string,
-): LeagueRosterPlayer[] {
-  const limits = slotLimits && Object.keys(slotLimits).length > 0
-    ? slotLimits
-    : { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, K: 1, BENCH: 4, IR: 1 };
-  let rowIndex = 0;
-
-  return rosterSlotOrder.flatMap((slot) => {
-    const count = Math.max(0, Number(limits[slot] ?? 0));
-    return Array.from({ length: count }, () => {
-      rowIndex += 1;
-      return {
-        id: -rowIndex,
-        league_id: null,
-        team_id: teamId,
-        fantasy_team_id: teamId,
-        fantasy_team_name: teamName,
-        player_id: null,
-        player_name: "N/A",
-        player_school: null,
-        player_position: slot === "BENCH" || slot === "IR" ? slot : slot,
-        school: null,
-        position: slot === "BENCH" || slot === "IR" ? slot : slot,
-        slot,
-        roster_slot: slot,
-        status: "EMPTY",
-        acquisition_type: "EMPTY",
-        draft_pick_id: null,
-        is_starter: starterSlot(slot),
-        is_ir: slot === "IR",
-        opponent: null,
-        projected_points: null,
-        floor: null,
-        ceiling: null,
-        boom_prob: null,
-        bust_prob: null,
-        weekly_projected_fantasy_points: null,
-        game_start_at: null,
-        is_locked: false,
-        is_placeholder: true,
-      };
-    });
-  });
-}
-
 export default function LeagueRoster() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
@@ -104,19 +54,13 @@ export default function LeagueRoster() {
   const rosterQuery = useLeagueRosterTab(parsedLeagueId, selectedWeek ?? undefined, !isDemoLeague && postDraft);
   const demoData = isDemoLeague ? createDemoLeagueRosterResponse() : null;
   const rosterData = demoData ?? rosterQuery.data;
-  const fetchedRoster = rosterData?.roster ?? rosterData?.data ?? [];
+  const fetchedRoster = rosterData?.slots ?? rosterData?.roster ?? rosterData?.data ?? [];
   const previewTeamName = rosterData?.owned_team?.name ?? rosterData?.fantasy_team_name ?? "Your Team";
   const previewTeamId = rosterData?.owned_team?.id ?? rosterData?.fantasy_team_id ?? -100;
   const realRoster = useMemo(() => fetchedRoster.filter(isRealRosterPlayer), [fetchedRoster]);
-  const hasRealRosterPlayers = realRoster.length > 0;
-  const isEmptyRoster = !isDemoLeague && !rosterQuery.isLoading && !rosterQuery.isError && !hasRealRosterPlayers;
-  const roster = isEmptyRoster
-    ? createEmptyRosterSlots(
-        rosterData?.roster_slot_limits,
-        previewTeamId ?? -100,
-        previewTeamName ?? "Your Team",
-      )
-    : realRoster;
+  const hasRosterSlots = fetchedRoster.length > 0;
+  const isEmptyRoster = !isDemoLeague && !rosterQuery.isLoading && !rosterQuery.isError && !hasRosterSlots;
+  const roster = fetchedRoster;
   const starters = useMemo(
     () => roster.filter((player) => starterSlot(player.slot ?? player.roster_slot)),
     [roster]
@@ -129,7 +73,7 @@ export default function LeagueRoster() {
     () => roster.filter((player) => (player.slot ?? player.roster_slot ?? "").toUpperCase() === "IR"),
     [roster]
   );
-  const starterTotal = hasRealRosterPlayers
+  const starterTotal = hasRosterSlots
     ? starters.reduce(
         (total, player) => total + Number(player.projected_points ?? player.weekly_projected_fantasy_points ?? 0),
         0
@@ -143,7 +87,7 @@ export default function LeagueRoster() {
       }
     : undefined;
 
-  const benchTotal = hasRealRosterPlayers
+  const benchTotal = hasRosterSlots
     ? bench.reduce(
         (total, player) => total + Number(player.projected_points ?? player.weekly_projected_fantasy_points ?? 0),
         0

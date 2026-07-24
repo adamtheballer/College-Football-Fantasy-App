@@ -179,18 +179,21 @@ export interface LeagueNewsResponse {
 }
 
 export interface LeagueRosterPlayer {
-  id: number;
+  id: number | null;
   league_id?: number | null;
   team_id?: number | null;
-  fantasy_team_id: number;
-  fantasy_team_name: string;
+  fantasy_team_id: number | null;
+  fantasy_team_name: string | null;
   player_id: number | null;
-  player_name: string;
+  player_name: string | null;
   player_school?: string | null;
   player_position?: string | null;
   school?: string | null;
   position?: string | null;
   slot?: string | null;
+  slot_id?: string;
+  slot_index?: number;
+  display_label?: string;
   roster_slot?: string | null;
   status?: string;
   acquisition_type?: string;
@@ -217,6 +220,7 @@ export interface LeagueRosterTabResponse {
   owned_team?: LeagueWorkspaceTeam | null;
   week: number;
   roster?: LeagueRosterPlayer[];
+  slots?: LeagueRosterPlayer[];
   roster_slot_limits?: Record<string, number>;
   ir_slots?: number;
   message?: string | null;

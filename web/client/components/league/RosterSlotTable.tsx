@@ -22,10 +22,13 @@ const slotRank = (slot?: string | null) => {
   return index === -1 ? order.length : index;
 };
 
-const slotLabel = (slot?: string | null) => (slot || "BENCH").toUpperCase();
+const slotType = (player: LeagueRosterPlayer) =>
+  (player.slot ?? player.roster_slot ?? "BENCH").toUpperCase();
+
+const slotLabel = (player: LeagueRosterPlayer) => player.display_label ?? slotType(player);
 
 const positionLabel = (player: LeagueRosterPlayer) =>
-  (player.position ?? player.player_position ?? "FLEX").toUpperCase();
+  (player.position ?? player.player_position ?? "—").toUpperCase();
 
 const schoolAcronyms = new Set(["BYU", "LSU", "SMU", "TCU", "UCF", "UCLA", "USC"]);
 
@@ -43,7 +46,7 @@ const displaySchoolName = (school?: string | null) => {
 
 const weeklyProjectionLabel = (player: LeagueRosterPlayer) => {
   const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
-  return typeof projection === "number" && Number.isFinite(projection) ? projection.toFixed(1) : "—";
+  return typeof projection === "number" && Number.isFinite(projection) ? projection.toFixed(1) : "0.0";
 };
 
 const isRealRosterPlayer = (player: LeagueRosterPlayer) =>
@@ -177,7 +180,7 @@ export function RosterSlotTable({
   const sorted = [...players].sort((left, right) => {
     const slotDelta = slotRank(left.roster_slot || left.slot) - slotRank(right.roster_slot || right.slot);
     if (slotDelta !== 0) return slotDelta;
-    return left.player_name.localeCompare(right.player_name);
+    return (left.slot_index ?? 0) - (right.slot_index ?? 0);
   });
 
   const selectedPosition = selectedPlayer ? positionLabel(selectedPlayer) : null;
@@ -202,10 +205,10 @@ export function RosterSlotTable({
   };
   const swapCandidates = useMemo(() => {
     if (!swapPlayer || !ownedRosterActions) return [];
-    const selectedSlot = slotLabel(swapPlayer.slot ?? swapPlayer.roster_slot);
+    const selectedSlot = slotType(swapPlayer);
     return ownedRosterActions.roster.filter((candidate) => {
       if (candidate.id === swapPlayer.id || !isRealRosterPlayer(candidate) || isUnavailableForSwap(candidate)) return false;
-      const candidateSlot = slotLabel(candidate.slot ?? candidate.roster_slot);
+      const candidateSlot = slotType(candidate);
       return (
         candidateSlot !== selectedSlot &&
         playerCanFillSlot(candidate, selectedSlot, ownedRosterActions.superflexEnabled) &&
@@ -220,12 +223,20 @@ export function RosterSlotTable({
     setSelectedPlayer(null);
   };
   const confirmSwap = async (candidate: LeagueRosterPlayer) => {
-    if (!swapPlayer) return;
+    if (!swapPlayer || !swapPlayer.id || !candidate.id || !swapPlayer.slot_index || !candidate.slot_index) return;
     setSwapError(null);
     try {
       await updateLineupMutation.mutateAsync([
-        { roster_entry_id: swapPlayer.id, slot: slotLabel(candidate.slot ?? candidate.roster_slot) },
-        { roster_entry_id: candidate.id, slot: slotLabel(swapPlayer.slot ?? swapPlayer.roster_slot) },
+        {
+          roster_entry_id: swapPlayer.id,
+          slot: slotType(candidate),
+          slot_index: candidate.slot_index,
+        },
+        {
+          roster_entry_id: candidate.id,
+          slot: slotType(swapPlayer),
+          slot_index: swapPlayer.slot_index,
+        },
       ]);
       setSwapPlayer(null);
     } catch (error) {
@@ -233,8 +244,8 @@ export function RosterSlotTable({
     }
   };
   const dropSelectedPlayer = async () => {
-    if (!selectedPlayer || !ownedRosterActions || isUnavailableForSwap(selectedPlayer)) return;
-    if (!window.confirm(`Drop ${selectedPlayer.player_name}? This cannot be undone.`)) return;
+    if (!selectedPlayer || !selectedPlayer.id || !ownedRosterActions || isUnavailableForSwap(selectedPlayer)) return;
+    if (!window.confirm(`Drop ${selectedPlayer.player_name}? You can add them again if they are available.`)) return;
     try {
       await dropPlayerMutation.mutateAsync(selectedPlayer.id);
       setSelectedPlayer(null);
@@ -288,14 +299,14 @@ export function RosterSlotTable({
           </div>
           {sorted.map((player) => {
             const position = positionLabel(player);
-            const style = getPositionStyle(position);
             const isRealPlayer = isRealRosterPlayer(player);
+            const style = getPositionStyle(isRealPlayer ? position : slotType(player));
             const projection = isRealPlayer
               ? player.projected_points ?? player.weekly_projected_fantasy_points ?? null
-              : null;
+              : 0;
             return (
               <button
-                key={`${player.team_id ?? player.fantasy_team_id}-${player.player_id}-${player.slot ?? player.roster_slot}`}
+                key={player.slot_id ?? `${player.team_id ?? player.fantasy_team_id}-${slotType(player)}-${player.slot_index ?? 0}`}
                 type="button"
                 onClick={() => {
                   if (!isRealPlayer) return;
@@ -316,7 +327,7 @@ export function RosterSlotTable({
                       style.pill
                     )}
                   >
-                    {slotLabel(player.slot ?? player.roster_slot)}
+                    {slotLabel(player)}
                   </span>
                   <span className={cn("h-2.5 w-2.5 rounded-full", style.dot)} />
                 </span>
@@ -331,13 +342,13 @@ export function RosterSlotTable({
                     {position}
                   </span>
                 </span>
-                <span className="text-cfb-text-muted">{isRealPlayer ? displaySchoolName(player.school ?? player.player_school) || "N/A" : "N/A"}</span>
+                <span className="text-cfb-text-muted">{isRealPlayer ? displaySchoolName(player.school ?? player.player_school) || "—" : "—"}</span>
                 {showPositionColumn ? (
                   <span className={cn("font-black", style.text)}>{position}</span>
                 ) : null}
-                <span className="text-cfb-text-muted">{isRealPlayer ? player.opponent ?? "TBD" : "N/A"}</span>
+                <span className="text-cfb-text-muted">{isRealPlayer ? player.opponent ?? "TBD" : "—"}</span>
                 <span className={cn("text-right font-black", style.text)}>
-                  {typeof projection === "number" && Number.isFinite(projection) ? projection.toFixed(1) : "-"}
+                  {typeof projection === "number" && Number.isFinite(projection) ? projection.toFixed(1) : "0.0"}
                 </span>
               </button>
             );
@@ -366,11 +377,11 @@ export function RosterSlotTable({
           loading={selectedPlayerCardLoading}
           onClose={() => setSelectedPlayer(null)}
           player={{
-            id: selectedPlayer.player_id,
-            name: selectedPlayer.player_name,
+            id: selectedPlayer.player_id ?? 0,
+            name: selectedPlayer.player_name ?? "Unknown player",
             school: selectedPlayer.school ?? selectedPlayer.player_school,
             position: selectedPosition,
-            rankLabel: `${selectedPosition ?? "N/A"} • ${slotLabel(selectedPlayer.slot ?? selectedPlayer.roster_slot)}`,
+            rankLabel: selectedPosition ?? "N/A",
             projectedPoints: selectedProjection,
             opponent: selectedPlayer.opponent,
             playerClass: null,
@@ -394,7 +405,7 @@ export function RosterSlotTable({
           <DialogHeader>
             <DialogTitle className="pr-8 text-2xl font-black italic">Swap {swapPlayer?.player_name}</DialogTitle>
             <DialogDescription className="text-slate-300">
-              Choose an unlocked, healthy teammate eligible for {slotLabel(swapPlayer?.slot ?? swapPlayer?.roster_slot)}. Both lineup slots update together.
+              Choose an unlocked, healthy teammate eligible for {swapPlayer ? slotLabel(swapPlayer) : "this slot"}. Both lineup slots update together.
             </DialogDescription>
           </DialogHeader>
           {swapCandidates.length ? (
@@ -417,7 +428,7 @@ export function RosterSlotTable({
                     </span>
                   </span>
                   <span className="rounded-full border border-white/15 px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-white/70">
-                    {slotLabel(candidate.slot ?? candidate.roster_slot)}
+                    {slotLabel(candidate)}
                   </span>
                 </button>
               ))}

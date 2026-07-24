@@ -18,6 +18,7 @@ from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
+from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.roster import (
     AddDropRequest,
     AddDropResponse,
@@ -26,13 +27,19 @@ from collegefootballfantasy_api.app.schemas.roster import (
     RosterEntryCreate,
     RosterEntryList,
     RosterEntryRead,
+    RosterSlotRead,
 )
+from collegefootballfantasy_api.app.schemas.player import PlayerRead
 from collegefootballfantasy_api.app.schemas.transaction import TransactionList, TransactionRead
 from collegefootballfantasy_api.app.services.roster_legality import (
-    assign_best_roster_slot_for_position,
     eligible_slots_for_position,
     normalize_slot,
     superflex_is_enabled,
+)
+from collegefootballfantasy_api.app.services.roster_slots import (
+    RosterSlotIntegrityError,
+    build_team_roster_slots,
+    first_open_eligible_slot,
 )
 from collegefootballfantasy_api.app.services.league_weeks import resolve_current_week
 from collegefootballfantasy_api.app.services.player_lock_service import locked_player_ids
@@ -60,8 +67,55 @@ def _load_roster_entry_rows(db: Session, team_id: int) -> list[RosterEntry]:
     )
 
 
-def _serialize_roster(db: Session, team_id: int) -> list[RosterEntryRead]:
-    return [RosterEntryRead.model_validate(entry) for entry in _load_roster_entry_rows(db, team_id)]
+def _serialize_roster(db: Session, team: Team) -> list[RosterSlotRead]:
+    settings_row = _league_settings(db, team.league_id)
+    entries = _load_roster_entry_rows(db, team.id)
+    try:
+        slots = build_team_roster_slots(
+            team.id,
+            _slot_limits(settings_row),
+            entries,
+        )
+    except RosterSlotIntegrityError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+
+    league = db.get(League, team.league_id)
+    player_ids = {entry.player_id for entry in entries}
+    projections_by_player: dict[int, float] = {}
+    if league and player_ids:
+        week = resolve_current_week(db, league)
+        projections_by_player = {
+            row.player_id: float(row.fantasy_points or 0.0)
+            for row in (
+                db.query(WeeklyProjection)
+                .filter(
+                    WeeklyProjection.season == league.season_year,
+                    WeeklyProjection.week == week,
+                    WeeklyProjection.player_id.in_(player_ids),
+                )
+                .all()
+            )
+        }
+
+    return [
+        RosterSlotRead(
+            slot_id=slot.slot_id,
+            slot_type=slot.slot_type,
+            slot_index=slot.slot_index,
+            display_label=slot.display_label,
+            is_starter=slot.is_starter,
+            is_ir=slot.is_ir,
+            id=slot.entry.id if slot.entry else None,
+            team_id=team.id,
+            league_id=team.league_id,
+            player_id=slot.entry.player_id if slot.entry else None,
+            slot=slot.slot_type,
+            status=slot.entry.status if slot.entry else "EMPTY",
+            player=PlayerRead.model_validate(slot.entry.player) if slot.entry and slot.entry.player else None,
+            projection=projections_by_player.get(slot.entry.player_id, 0.0) if slot.entry else 0.0,
+        )
+        for slot in slots
+    ]
 
 
 def _league_settings(db: Session, league_id: int) -> LeagueSettings:
@@ -166,16 +220,17 @@ def _best_available_slot(
     team: Team,
     player_position: str,
     exclude_entry_id: int | None = None,
-) -> str:
+) -> tuple[str, int]:
     settings_row = _league_settings(db, team.league_id)
     slot_limits = _slot_limits(settings_row)
     roster_entries = _load_roster_entry_rows(db, team.id)
     if exclude_entry_id is not None:
         roster_entries = [entry for entry in roster_entries if entry.id != exclude_entry_id]
-    slot = assign_best_roster_slot_for_position(
+    slot = first_open_eligible_slot(
+        team.id,
         player_position,
-        roster_entries,
         slot_limits,
+        roster_entries,
         superflex_enabled=superflex_is_enabled(
             slot_limits,
             configured=bool(settings_row.superflex_enabled),
@@ -204,15 +259,34 @@ def add_roster_entry_endpoint(
 
     settings_row = _league_settings(db, team.league_id)
     slot_limits = _slot_limits(settings_row)
-    slots = [entry.slot for entry in _load_roster_entry_rows(db, team.id)] + [entry_in.slot]
-    _validate_slot_counts(slot_limits, slots)
+    current_entries = _load_roster_entry_rows(db, team.id)
     _validate_position_slot_eligibility(settings_row, player.position, entry_in.slot)
+    normalized_slot = normalize_slot(entry_in.slot)
+    if normalized_slot is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"invalid roster slot: {entry_in.slot}")
+    try:
+        canonical_slots = build_team_roster_slots(team.id, slot_limits, current_entries)
+    except RosterSlotIntegrityError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    target_slot = next(
+        (
+            slot
+            for slot in canonical_slots
+            if slot.slot_type == normalized_slot
+            and (entry_in.slot_index is None or slot.slot_index == entry_in.slot_index)
+            and slot.entry is None
+        ),
+        None,
+    )
+    if target_slot is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"no open {normalized_slot} roster slot")
 
     entry = RosterEntry(
         league_id=team.league_id,
         team_id=team.id,
         player_id=entry_in.player_id,
-        slot=entry_in.slot,
+        slot=normalized_slot,
+        slot_index=target_slot.slot_index,
         status=entry_in.status,
     )
     db.add(entry)
@@ -244,9 +318,9 @@ def list_roster_entries_endpoint(
     current_user: User = Depends(get_current_user),
 ) -> RosterEntryList:
     team = require_team_member(db, team_id, current_user)
-    entries = _serialize_roster(db, team.id)
-    paged = entries[offset : offset + limit]
-    return RosterEntryList(data=paged, total=len(entries), limit=limit, offset=offset)
+    slots = _serialize_roster(db, team)
+    paged = slots[offset : offset + limit]
+    return RosterEntryList(data=paged, slots=slots, total=len(slots), limit=limit, offset=offset)
 
 
 @router.delete(
@@ -305,24 +379,44 @@ def update_lineup_endpoint(
     if len(requested_ids) != len(set(requested_ids)):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="duplicate roster entry in lineup update")
 
-    desired_slots = []
-    changed_entries: list[tuple[RosterEntry, str]] = []
+    desired_slots: dict[int, tuple[str, int]] = {}
+    changed_entries: list[tuple[RosterEntry, str, int]] = []
+    assignments_by_entry_id = {assignment.roster_entry_id: assignment for assignment in payload.assignments}
+    try:
+        canonical_slots = build_team_roster_slots(team.id, slot_limits, roster_entries)
+    except RosterSlotIntegrityError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
     for entry in roster_entries:
-        assignment = next((item for item in payload.assignments if item.roster_entry_id == entry.id), None)
-        next_slot = assignment.slot if assignment else entry.slot
-        desired_slots.append(next_slot)
-        if assignment and assignment.slot != entry.slot:
+        assignment = assignments_by_entry_id.get(entry.id)
+        next_slot = normalize_slot(assignment.slot) if assignment else normalize_slot(entry.slot)
+        if next_slot is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid roster slot")
+        next_slot_index = assignment.slot_index if assignment and assignment.slot_index is not None else entry.slot_index
+        if assignment and assignment.slot_index is None and next_slot != entry.slot:
+            open_slot = next(
+                (slot for slot in canonical_slots if slot.slot_type == next_slot and slot.entry is None),
+                None,
+            )
+            if open_slot is None:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"no open {next_slot} roster slot")
+            next_slot_index = open_slot.slot_index
+        if next_slot_index is None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="roster entry has no slot index")
+        desired_slots[entry.id] = (next_slot, next_slot_index)
+        if assignment and (next_slot != entry.slot or next_slot_index != entry.slot_index):
             _validate_position_slot_eligibility(
                 settings_row,
                 entry.player.position if entry.player else None,
-                assignment.slot,
+                next_slot,
             )
-            changed_entries.append((entry, entry.slot))
+            changed_entries.append((entry, entry.slot, entry.slot_index))
 
     if any(entry_id not in roster_by_id for entry_id in requested_ids):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="roster entry not found")
 
-    _validate_slot_counts(slot_limits, desired_slots)
+    target_keys = list(desired_slots.values())
+    if len(target_keys) != len(set(target_keys)):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="multiple players cannot occupy the same roster slot")
 
     if changed_entries:
         league = db.get(League, team.league_id)
@@ -330,7 +424,7 @@ def update_lineup_endpoint(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
         locked_ids = locked_player_ids(
             db,
-            player_ids={entry.player_id for entry, _ in changed_entries},
+            player_ids={entry.player_id for entry, _, _ in changed_entries},
             season=league.season_year,
             week=resolve_current_week(db, league),
             now=datetime.now(timezone.utc),
@@ -338,7 +432,7 @@ def update_lineup_endpoint(
         if locked_ids:
             locked_names = sorted(
                 entry.player.name
-                for entry, _ in changed_entries
+                for entry, _, _ in changed_entries
                 if entry.player_id in locked_ids and entry.player is not None
             )
             detail = ", ".join(locked_names) or "the selected player"
@@ -347,10 +441,15 @@ def update_lineup_endpoint(
                 detail=f"lineup changes are locked after kickoff for: {detail}",
             )
 
-    for assignment in payload.assignments:
-        roster_by_id[assignment.roster_entry_id].slot = assignment.slot
+    for entry, _, _ in changed_entries:
+        entry.slot_index = 100000 + entry.id
+    if changed_entries:
+        db.flush()
+    for entry_id, (slot, slot_index) in desired_slots.items():
+        roster_by_id[entry_id].slot = slot
+        roster_by_id[entry_id].slot_index = slot_index
 
-    for entry, previous_slot in changed_entries:
+    for entry, previous_slot, previous_slot_index in changed_entries:
         _record_transaction(
             db,
             league_id=team.league_id,
@@ -358,11 +457,13 @@ def update_lineup_endpoint(
             transaction_type="lineup",
             created_by_user_id=current_user.id,
             player_id=entry.player_id,
-            reason=f"{previous_slot} -> {entry.slot}",
+            reason=f"{previous_slot}{previous_slot_index} -> {entry.slot}{entry.slot_index}",
         )
 
     db.commit()
-    return LineupUpdateResponse(data=_serialize_roster(db, team.id))
+    return LineupUpdateResponse(
+        data=[RosterEntryRead.model_validate(entry) for entry in _load_roster_entry_rows(db, team.id)]
+    )
 
 
 @router.post("/teams/{team_id}/add-drop", response_model=AddDropResponse, status_code=status.HTTP_201_CREATED)
@@ -380,7 +481,12 @@ def add_drop_endpoint(
     if not drop_entry or drop_entry.team_id != team.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="roster entry not found")
 
-    new_slot = _best_available_slot(db, team, add_player.position, exclude_entry_id=drop_entry.id)
+    new_slot, new_slot_index = _best_available_slot(
+        db,
+        team,
+        add_player.position,
+        exclude_entry_id=drop_entry.id,
+    )
     dropped_player_id = drop_entry.player_id
     db.delete(drop_entry)
     db.flush()
@@ -391,6 +497,7 @@ def add_drop_endpoint(
             team_id=team.id,
             player_id=add_player.id,
             slot=new_slot,
+            slot_index=new_slot_index,
             status="active",
         )
     )
@@ -407,7 +514,7 @@ def add_drop_endpoint(
     db.commit()
 
     return AddDropResponse(
-        roster=_serialize_roster(db, team.id),
+        roster=_serialize_roster(db, team),
         transaction=TransactionRead.model_validate(transaction),
     )
 

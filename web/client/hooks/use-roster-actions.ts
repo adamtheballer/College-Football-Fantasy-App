@@ -51,7 +51,7 @@ export function useAddDrop(teamId?: number, leagueId?: number) {
 export function useUpdateLineup(teamId?: number, leagueId?: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (assignments: Array<{ roster_entry_id: number; slot: string }>) => {
+    mutationFn: (assignments: Array<{ roster_entry_id: number; slot: string; slot_index?: number }>) => {
       if (typeof teamId !== "number") {
         throw new Error("Missing team id for lineup update.");
       }

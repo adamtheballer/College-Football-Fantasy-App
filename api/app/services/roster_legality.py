@@ -37,6 +37,7 @@ def normalize_roster_slot_limits(roster_slots: Mapping[str, int] | None) -> dict
         "SUPERFLEX": int(roster_slots.get("SUPERFLEX", 0) or 0),
         "K": int(roster_slots.get("K", 0) or 0),
         "BENCH": int(roster_slots.get("BENCH", roster_slots.get("BE", 0)) or 0),
+        "IR": int(roster_slots.get("IR", 0) or 0),
     }
 
 
