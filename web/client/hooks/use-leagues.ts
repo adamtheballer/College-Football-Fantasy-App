@@ -208,6 +208,11 @@ export function useLeagueWaiverTab(
         limit,
         offset,
       }),
+    refetchInterval: (query) =>
+      query.state.data?.claims.some((claim) => claim.status.toLowerCase() === "pending")
+        ? 15_000
+        : false,
+    refetchIntervalInBackground: true,
   });
 }
 

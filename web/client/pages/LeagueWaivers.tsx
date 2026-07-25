@@ -31,6 +31,11 @@ import {
 } from "@/hooks/use-watchlists";
 import { DEMO_LEAGUE_ID, createDemoLeagueWaiverResponse } from "@/lib/leaguePreviewData";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
+import {
+  isWaiverClaimEditable,
+  isWaiverClaimProcessingOverdue,
+  scheduledTimeForWaiverClaim,
+} from "@/lib/waiverTiming";
 import type { PlayerStats } from "@/types/player";
 
 const positions = ["ALL", "QB", "RB", "WR", "TE", "K"] as const;
@@ -324,12 +329,10 @@ export default function LeagueWaivers() {
       const claim = editingClaimId
         ? await editWaiverClaim.mutateAsync({ claimId: editingClaimId, payload })
         : await submitWaiverClaim.mutateAsync(payload);
+      const scheduledFor = scheduledTimeForWaiverClaim(claim, waiverData?.current_period);
       toast({
         title: editingClaimId ? "Waiver claim updated" : "Waiver claim submitted",
-        description: `${claim.add_player_name} will process ${formatProcessTime(
-          claim.process_after,
-          waiverData?.waiver_rules.timezone
-        )}.`,
+        description: `${claim.add_player_name} will process ${formatProcessTime(scheduledFor, waiverData?.waiver_rules.timezone)}.`,
       });
       setClaimPlayer(null);
       setEditingClaimId(null);
@@ -694,8 +697,16 @@ export default function LeagueWaivers() {
               </p>
             ) : (
               <div className="mt-4 space-y-3">
-                {waiverData?.claims.map((claim) => (
-                  <div key={claim.id} className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                {waiverData?.claims.map((claim) => {
+                  const scheduledFor = scheduledTimeForWaiverClaim(claim, waiverData?.current_period);
+                  const processingOverdue = isWaiverClaimProcessingOverdue(
+                    claim,
+                    waiverData?.current_period
+                  );
+                  const editable = isWaiverClaimEditable(claim, waiverData?.current_period);
+
+                  return (
+                    <div key={claim.id} className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-black text-slate-50">{claim.add_player_name}</p>
@@ -719,10 +730,12 @@ export default function LeagueWaivers() {
                     ) : null}
                     <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                       {claim.status.toLowerCase() === "pending"
-                        ? `Order ${claim.preference_order} · Processes ${formatProcessTime(claim.process_after, waiverData?.waiver_rules.timezone)}`
+                        ? processingOverdue
+                          ? `Order ${claim.preference_order} · Processing delayed — awaiting lifecycle worker`
+                          : `Order ${claim.preference_order} · Processes ${formatProcessTime(scheduledFor, waiverData?.waiver_rules.timezone)}`
                         : `Updated ${formatProcessTime(claim.processed_at, waiverData?.waiver_rules.timezone)}`}
                     </p>
-                    {claim.status.toLowerCase() === "pending" ? (
+                    {claim.status.toLowerCase() === "pending" && editable ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         <Button
                           type="button"
@@ -764,8 +777,9 @@ export default function LeagueWaivers() {
                         </Button>
                       </div>
                     ) : null}
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
