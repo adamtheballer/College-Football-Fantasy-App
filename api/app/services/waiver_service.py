@@ -281,6 +281,19 @@ def _set_priority_order(db: Session, league_id: int, ordered_team_ids: list[int]
     return rows_by_team
 
 
+def _is_complete_legacy_priority_state(
+    rows: list[WaiverPriority],
+    active_team_ids: list[int],
+) -> bool:
+    """Return whether migrated priorities can safely become initialized state."""
+
+    if len(rows) != len(active_team_ids) or {row.team_id for row in rows} != set(active_team_ids):
+        return False
+    if sorted(row.priority for row in rows) != list(range(1, len(active_team_ids) + 1)):
+        return False
+    return all(0 <= row.faab_spent <= row.faab_budget for row in rows)
+
+
 def initialize_waiver_state_after_official_draft(
     db: Session,
     league: League,
@@ -305,7 +318,16 @@ def initialize_waiver_state_after_official_draft(
         return {row.team_id: row for row in existing}
 
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="waiver priorities exist before official initialization")
+        # Migration 0052 could preserve a valid legacy priority order without
+        # recording the initialization marker introduced in that revision. Once
+        # the official draft is complete, adopt only a fully coherent state;
+        # never reorder teams or reset FAAB during this reconciliation.
+        if not _is_complete_legacy_priority_state(existing, active_team_ids):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="waiver priority state is incomplete")
+        settings.waiver_initialized_at = _as_utc(now or _now())
+        db.add(settings)
+        db.flush()
+        return {row.team_id: row for row in existing}
     for priority, team_id in enumerate(reversed(draft_order), start=1):
         db.add(
             WaiverPriority(

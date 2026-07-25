@@ -17,7 +17,11 @@ from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.services.league_roster_matchup import build_waivers_view
 from collegefootballfantasy_api.app.schemas.waiver import FreeAgentAdd
-from collegefootballfantasy_api.app.services.waiver_service import add_free_agent, process_waiver_claims_once
+from collegefootballfantasy_api.app.services.waiver_service import (
+    add_free_agent,
+    initialize_waiver_state_after_official_draft,
+    process_waiver_claims_once,
+)
 
 
 def test_due_waiver_processing_is_idempotent_with_league_serialization(client, db_session):
@@ -101,6 +105,82 @@ def test_due_waiver_processing_is_idempotent_with_league_serialization(client, d
     assert waiver_view.waiver_priority == 1
     assert waiver_view.faab_remaining == 93
     assert waiver_view.waiver_rules["faab_budget"] == 100
+
+
+def test_completed_draft_adopts_valid_legacy_priorities_without_reordering(db_session):
+    user = User(
+        email="legacy-priority-owner@example.com",
+        first_name="Legacy",
+        password_hash="test",
+        api_token="legacy-priority-owner-token",
+    )
+    db_session.add(user)
+    db_session.flush()
+    league = League(name="Legacy Priority League", season_year=2026, commissioner_user_id=user.id, max_teams=2)
+    db_session.add(league)
+    db_session.flush()
+    settings = LeagueSettings(league_id=league.id, roster_slots_json={"QB": 1}, waiver_type="faab")
+    first_team = Team(league_id=league.id, name="First Team", owner_user_id=user.id, owner_name="Legacy")
+    second_team = Team(league_id=league.id, name="Second Team", owner_name="Second")
+    first_player = Player(name="First Drafted QB", position="QB", school="Texas")
+    second_player = Player(name="Second Drafted QB", position="QB", school="Oregon")
+    db_session.add_all((settings, first_team, second_team, first_player, second_player))
+    db_session.flush()
+    draft = Draft(league_id=league.id, draft_datetime_utc=datetime.now(timezone.utc), status="completed")
+    db_session.add(draft)
+    db_session.flush()
+    db_session.add_all(
+        (
+            DraftPick(
+                draft_id=draft.id,
+                team_id=first_team.id,
+                player_id=first_player.id,
+                made_by_user_id=user.id,
+                round_number=1,
+                round_pick=1,
+                overall_pick=1,
+            ),
+            DraftPick(
+                draft_id=draft.id,
+                team_id=second_team.id,
+                player_id=second_player.id,
+                made_by_user_id=user.id,
+                round_number=1,
+                round_pick=2,
+                overall_pick=2,
+            ),
+        )
+    )
+    # These rows represent a pre-marker migration backfill. Their order and
+    # FAAB balances must be preserved when the marker is reconciled.
+    db_session.add_all(
+        (
+            WaiverPriority(
+                league_id=league.id,
+                team_id=second_team.id,
+                priority=1,
+                faab_budget=100,
+                faab_spent=0,
+            ),
+            WaiverPriority(
+                league_id=league.id,
+                team_id=first_team.id,
+                priority=2,
+                faab_budget=100,
+                faab_spent=17,
+            ),
+        )
+    )
+    db_session.commit()
+
+    priorities = initialize_waiver_state_after_official_draft(db_session, league)
+    db_session.commit()
+    db_session.refresh(settings)
+
+    assert settings.waiver_initialized_at is not None
+    assert priorities[second_team.id].priority == 1
+    assert priorities[first_team.id].priority == 2
+    assert priorities[first_team.id].faab_spent == 17
 
 
 def test_waiver_pool_includes_a_dropped_drafted_player(client, db_session):
