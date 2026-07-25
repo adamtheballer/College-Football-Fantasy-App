@@ -41,6 +41,8 @@ class WeeklyProjection(TimestampMixin, Base):
     rush_tds: Mapped[float] = mapped_column(Float, default=0.0)
     rec_tds: Mapped[float] = mapped_column(Float, default=0.0)
     interceptions: Mapped[float] = mapped_column(Float, default=0.0)
+    field_goals_made_0_to_39: Mapped[float] = mapped_column(Float, default=0.0)
+    field_goals_made_40_to_49: Mapped[float] = mapped_column(Float, default=0.0)
     field_goals_made_0_to_49: Mapped[float] = mapped_column(Float, default=0.0)
     field_goals_made_50_plus: Mapped[float] = mapped_column(Float, default=0.0)
     extra_points_made: Mapped[float] = mapped_column(Float, default=0.0)
