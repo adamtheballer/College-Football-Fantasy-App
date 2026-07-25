@@ -51,6 +51,12 @@ class Player(TimestampMixin, Base):
     bio_source_sheet_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
     bio_source_row: Mapped[int | None] = mapped_column(Integer, nullable=True)
     bio_imported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sheet_bio_height: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    sheet_bio_weight: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    sheet_bio_class: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    sheet_bio_birthplace: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    sheet_bio_source_sheet_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    sheet_bio_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     @property
     def height(self) -> str | None:

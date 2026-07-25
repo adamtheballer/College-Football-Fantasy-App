@@ -7,7 +7,7 @@ from collegefootballfantasy_api.app.models import Base, TimestampMixin
 class ProjectionExplanation(TimestampMixin, Base):
     __tablename__ = "projection_explanations"
     __table_args__ = (
-        UniqueConstraint("player_id", "season", "week", name="uq_projection_explanations_player_season_week"),
+        UniqueConstraint("player_id", "season", "week", "projection_version", name="uq_projection_explanations_player_season_week_version"),
         Index("ix_projection_explanations_player_id", "player_id"),
         Index("ix_projection_explanations_season_week", "season", "week"),
     )
@@ -16,6 +16,7 @@ class ProjectionExplanation(TimestampMixin, Base):
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"))
     season: Mapped[int] = mapped_column(Integer)
     week: Mapped[int] = mapped_column(Integer)
+    projection_version: Mapped[str] = mapped_column(String(20), default="FINAL")
     reasons: Mapped[list[dict]] = mapped_column(JSON)
     components: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     model_version: Mapped[str] = mapped_column(String(50), default="v1")

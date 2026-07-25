@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Index, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, JSON, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -17,4 +17,5 @@ class PlayerStat(TimestampMixin, Base):
     season: Mapped[int] = mapped_column(Integer)
     week: Mapped[int] = mapped_column(Integer)
     source: Mapped[str] = mapped_column(String(50), default="sportsdata")
+    verified: Mapped[bool] = mapped_column(Boolean, default=True)
     stats: Mapped[dict] = mapped_column(JSON)
