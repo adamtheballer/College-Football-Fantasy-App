@@ -405,12 +405,18 @@ def _ensure_player_available(db: Session, league_id: int, player_id: int, *, now
         )
         .first()
     )
-    if not availability:
+    if availability is None:
+        if _has_completed_waiver_period(db, league_id):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player is currently a free agent")
         return
-    if availability.state in {"rostered", "game_locked"}:
+
+    if availability.state in {"waivers", "claim_pending"}:
+        return
+    if availability.state == "free_agent":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player is currently a free agent")
+    if availability.state in {"rostered", "game_locked", "waiver_locked"}:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player is not currently available on waivers")
-    if availability.available_at and _as_utc(availability.available_at) > now:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player is not currently available on waivers")
+    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player is not currently available on waivers")
 
 
 def _has_completed_waiver_period(db: Session, league_id: int) -> bool:

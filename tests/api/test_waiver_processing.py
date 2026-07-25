@@ -16,11 +16,12 @@ from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.services.league_roster_matchup import build_waivers_view
-from collegefootballfantasy_api.app.schemas.waiver import FreeAgentAdd
+from collegefootballfantasy_api.app.schemas.waiver import FreeAgentAdd, WaiverClaimCreate
 from collegefootballfantasy_api.app.services.waiver_service import (
     add_free_agent,
     initialize_waiver_state_after_official_draft,
     process_waiver_claims_once,
+    submit_waiver_claim,
 )
 
 
@@ -230,6 +231,61 @@ def test_waiver_pool_includes_a_dropped_drafted_player(client, db_session):
     waiver_view = build_waivers_view(db_session, league, user)
 
     assert [candidate.id for candidate in waiver_view.available_players] == [player.id]
+
+
+def test_waiver_listing_state_accepts_claim_before_free_agent_release(db_session):
+    user = User(
+        email="scheduled-waiver-owner@example.com",
+        first_name="Scheduled",
+        password_hash="test",
+        api_token="scheduled-waiver-owner-token",
+    )
+    db_session.add(user)
+    db_session.flush()
+    league = League(name="Scheduled Waiver League", season_year=2026, commissioner_user_id=user.id, max_teams=1)
+    team = Team(league=league, name="Scheduled Team", owner_user_id=user.id, owner_name="Scheduled")
+    drafted_player = Player(name="Scheduled Draft QB", position="QB", school="Texas")
+    waiver_player = Player(name="Scheduled Waiver QB", position="QB", school="Oregon")
+    db_session.add_all((league, team, drafted_player, waiver_player))
+    db_session.flush()
+    db_session.add(LeagueSettings(league_id=league.id, roster_slots_json={"QB": 1}, waiver_type="faab"))
+    draft = Draft(league_id=league.id, draft_datetime_utc=datetime.now(timezone.utc), status="completed")
+    db_session.add(draft)
+    db_session.flush()
+    db_session.add(
+        DraftPick(
+            draft_id=draft.id,
+            team_id=team.id,
+            player_id=drafted_player.id,
+            made_by_user_id=user.id,
+            round_number=1,
+            round_pick=1,
+            overall_pick=1,
+        )
+    )
+    db_session.add(
+        PlayerWaiverAvailability(
+            league_id=league.id,
+            player_id=waiver_player.id,
+            state="waivers",
+            available_at=datetime.now(timezone.utc) + timedelta(hours=6),
+        )
+    )
+    db_session.commit()
+
+    waiver_view = build_waivers_view(db_session, league, user)
+    listing = next(player for player in waiver_view.available_players if player.id == waiver_player.id)
+    assert listing.availability_state == "waivers"
+
+    claim = submit_waiver_claim(
+        db_session,
+        league=league,
+        current_user=user,
+        payload=WaiverClaimCreate(team_id=team.id, add_player_id=waiver_player.id, faab_bid=0),
+    )
+
+    assert claim.status == "pending"
+    assert claim.add_player_id == waiver_player.id
 
 
 def test_waiver_results_are_scoped_to_the_latest_completed_period(client, db_session):
