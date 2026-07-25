@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Index, String
+from sqlalchemy import ForeignKey, Index, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -18,6 +18,7 @@ class TradeOfferItem(TimestampMixin, Base):
     player_id: Mapped[int | None] = mapped_column(ForeignKey("players.id", ondelete="SET NULL"), nullable=True)
     draft_pick_id: Mapped[int | None] = mapped_column(ForeignKey("draft_picks.id", ondelete="SET NULL"), nullable=True)
     item_type: Mapped[str] = mapped_column(String(30), default="player")
+    snapshot_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     trade_offer = relationship("TradeOffer", back_populates="items")
     player = relationship("Player")

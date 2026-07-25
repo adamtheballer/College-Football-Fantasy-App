@@ -13,6 +13,7 @@ from importlib import import_module
 MODEL_MODULES = (
     "auth_action_token",
     "auth_rate_limit_event",
+    "application_instance",
     "chat",
     "cfb_standing_snapshot",
     "college_team",
@@ -43,6 +44,7 @@ MODEL_MODULES = (
     "player_stat",
     "player_waiver_availability",
     "player_week_score",
+    "postseason",
     "preseason_prior",
     "projection_explanation",
     "projection_input_audit",

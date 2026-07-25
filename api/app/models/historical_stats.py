@@ -36,7 +36,14 @@ class ProviderStatCache(TimestampMixin, Base):
 class PlayerHistoricalSeasonStat(TimestampMixin, Base):
     __tablename__ = "player_historical_season_stats"
     __table_args__ = (
-        UniqueConstraint("player_id", "provider", "season", "season_type", name="uq_player_historical_stats_player_provider_season"),
+        UniqueConstraint(
+            "player_id",
+            "provider",
+            "season",
+            "season_type",
+            "team_name",
+            name="uq_player_historical_stats_player_provider_season_team",
+        ),
         Index("ix_player_historical_stats_player_id", "player_id"),
         Index("ix_player_historical_stats_provider_player", "provider", "provider_player_id"),
         Index("ix_player_historical_stats_season", "season"),
@@ -49,9 +56,17 @@ class PlayerHistoricalSeasonStat(TimestampMixin, Base):
     season: Mapped[int] = mapped_column(Integer, nullable=False)
     season_type: Mapped[str] = mapped_column(String(30), nullable=False, default="regular")
     team_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    historical_team_id: Mapped[int | None] = mapped_column(
+        ForeignKey("college_teams.id", ondelete="SET NULL"), nullable=True
+    )
+    current_team_at_import_id: Mapped[int | None] = mapped_column(
+        ForeignKey("college_teams.id", ondelete="SET NULL"), nullable=True
+    )
     provider_team_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     team_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     position: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    source_depth_position: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    canonical_position: Mapped[str | None] = mapped_column(String(20), nullable=True)
     games_played: Mapped[int | None] = mapped_column(Integer, nullable=True)
     games_started: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
@@ -89,6 +104,7 @@ class PlayerHistoricalSeasonStat(TimestampMixin, Base):
     field_goals_50_plus: Mapped[float | None] = mapped_column(Float, nullable=True)
     extra_points_made: Mapped[float | None] = mapped_column(Float, nullable=True)
     extra_points_attempted: Mapped[float | None] = mapped_column(Float, nullable=True)
+    kick_points: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     fumbles: Mapped[float | None] = mapped_column(Float, nullable=True)
     fumbles_lost: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -97,6 +113,11 @@ class PlayerHistoricalSeasonStat(TimestampMixin, Base):
     fantasy_points_per_game: Mapped[float | None] = mapped_column(Float, nullable=True)
     scoring_rules_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
     source_response_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_external_player_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_modified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    import_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
     parser_version: Mapped[str] = mapped_column(String(40), nullable=False)
     imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     provider_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

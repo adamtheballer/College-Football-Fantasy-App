@@ -6,6 +6,7 @@ from sqlalchemy import engine_from_config, pool
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.base import Base
 from collegefootballfantasy_api.app.models import (
+    application_instance,
     auth_action_token,
     auth_rate_limit_event,
     chat,
@@ -36,6 +37,7 @@ from collegefootballfantasy_api.app.models import (
     player_news_event,
     player_season_context,
     player_weekly_context,
+    postseason,
     player_game_stat,
     player_role_snapshot,
     player_season_rank,

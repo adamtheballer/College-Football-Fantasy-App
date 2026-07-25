@@ -1,6 +1,4 @@
-from datetime import datetime
-
-from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint, func
+from sqlalchemy import Float, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -25,9 +23,3 @@ class TeamSeasonRating(TimestampMixin, Base):
     defensive_percentile: Mapped[float] = mapped_column(Float)
     opponent_defense_multiplier: Mapped[float] = mapped_column(Float, default=1.0)
     source: Mapped[str] = mapped_column(String(100), default="manual_import")
-    created_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=True
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=True
-    )

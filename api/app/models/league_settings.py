@@ -40,6 +40,10 @@ class LeagueSettings(TimestampMixin, Base):
     waiver_initialized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     waivers_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     free_agent_mode: Mapped[str] = mapped_column(String(40), nullable=False, default="after_waivers_clear")
+    waiver_process_day: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+    waiver_process_hour: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    faab_budget: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    allow_zero_dollar_bids: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     trade_review_type: Mapped[str] = mapped_column(String(50), default="commissioner")
     trade_deadline_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     trade_deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -51,19 +55,3 @@ class LeagueSettings(TimestampMixin, Base):
     @property
     def waiver_mode(self) -> str:
         return self.waiver_type
-
-    @property
-    def waiver_process_day(self) -> int:
-        return self.waiver_processing_weekday
-
-    @property
-    def waiver_process_hour(self) -> int:
-        return self.waiver_processing_hour
-
-    @property
-    def faab_budget(self) -> int:
-        return self.faab_starting_budget
-
-    @property
-    def allow_zero_dollar_bids(self) -> bool:
-        return self.allow_zero_faab_bids

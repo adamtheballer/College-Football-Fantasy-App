@@ -1,6 +1,4 @@
-from datetime import datetime
-
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint, func
+from sqlalchemy import Boolean, Float, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -32,9 +30,3 @@ class PlayerSeasonContext(TimestampMixin, Base):
     manual_review_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
     manual_review_status: Mapped[str] = mapped_column(String(40), default="unreviewed")
     notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
-    created_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=True
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=True
-    )
