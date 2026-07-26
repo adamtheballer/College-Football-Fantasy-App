@@ -12,7 +12,7 @@ class WaiverProcessingRun(TimestampMixin, Base):
         UniqueConstraint("league_id", "season", "week", "window_key", name="uq_waiver_processing_runs_window"),
         UniqueConstraint("waiver_period_id", name="uq_waiver_processing_runs_period"),
         UniqueConstraint("idempotency_key", name="uq_waiver_processing_runs_idempotency_key"),
-        CheckConstraint("waiver_type IN ('faab', 'priority')", name="ck_waiver_processing_runs_waiver_type"),
+        CheckConstraint("waiver_type IN ('faab', 'priority', 'rolling')", name="ck_waiver_processing_runs_waiver_type"),
         CheckConstraint("status IN ('pending', 'running', 'completed', 'failed')", name="ck_waiver_processing_runs_status"),
         Index("ix_waiver_processing_runs_due", "scheduled_for", "status"),
     )

@@ -10,7 +10,7 @@ class LeagueSettings(TimestampMixin, Base):
     __tablename__ = "league_settings"
     __table_args__ = (
         Index("ix_league_settings_league_id", "league_id"),
-        CheckConstraint("waiver_type IN ('faab', 'priority')", name="ck_league_settings_waiver_type"),
+        CheckConstraint("waiver_type IN ('faab', 'priority', 'rolling')", name="ck_league_settings_waiver_type"),
         CheckConstraint("faab_starting_budget >= 0", name="ck_league_settings_faab_starting_budget"),
         CheckConstraint("waiver_processing_weekday BETWEEN 0 AND 6", name="ck_league_settings_waiver_processing_weekday"),
         CheckConstraint("waiver_processing_hour BETWEEN 0 AND 23", name="ck_league_settings_waiver_processing_hour"),

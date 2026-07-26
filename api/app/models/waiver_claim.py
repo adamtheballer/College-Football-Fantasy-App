@@ -17,7 +17,7 @@ class WaiverClaim(TimestampMixin, Base):
         Index("ix_waiver_claims_window_status", "league_id", "processing_window_id", "status"),
         CheckConstraint("faab_bid >= 0", name="ck_waiver_claims_faab_bid_nonnegative"),
         CheckConstraint("preference_order > 0", name="ck_waiver_claims_preference_order_positive"),
-        CheckConstraint("status IN ('pending', 'won', 'lost', 'cancelled', 'invalid', 'insufficient_budget', 'roster_full', 'player_unavailable', 'skipped', 'failed')", name="ck_waiver_claims_status"),
+        CheckConstraint("status IN ('pending', 'won', 'lost', 'cancelled', 'invalid', 'insufficient_budget', 'roster_full', 'player_unavailable', 'skipped', 'processed', 'failed')", name="ck_waiver_claims_status"),
         Index(
             "uq_waiver_claims_pending_team_period_preference",
             "team_id",
