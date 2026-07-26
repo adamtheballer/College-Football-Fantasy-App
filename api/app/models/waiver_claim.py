@@ -58,7 +58,6 @@ class WaiverClaim(TimestampMixin, Base):
     season: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     processing_week: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     processing_window_id: Mapped[str] = mapped_column(String(120), nullable=False, default="legacy")
-    waiver_period_id: Mapped[int] = mapped_column(ForeignKey("waiver_periods.id", ondelete="RESTRICT"), nullable=False)
     processing_run_id: Mapped[int | None] = mapped_column(ForeignKey("waiver_processing_runs.id", ondelete="SET NULL"), nullable=True)
     preference_order: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     priority_snapshot: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -70,3 +69,6 @@ class WaiverClaim(TimestampMixin, Base):
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     failure_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
     failure_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    waiver_period_id: Mapped[int | None] = mapped_column(
+        ForeignKey("waiver_periods.id", ondelete="RESTRICT"), nullable=True
+    )
