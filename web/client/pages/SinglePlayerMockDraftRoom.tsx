@@ -27,6 +27,7 @@ import {
   isPickTimerDanger,
   isUserOnClock,
   makeUserMockPick,
+  reconcileSinglePlayerMockDraftState,
   resolveInitialSinglePlayerMockDraftState,
   toggleQueuedMockPlayer,
   type MockDraftPick,
@@ -197,6 +198,14 @@ export default function SinglePlayerMockDraftRoom() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(draftState));
   }, [draftState]);
+
+  useEffect(() => {
+    if (!draftBoard.length) return;
+    setDraftState((current) => {
+      const reconciliation = reconcileSinglePlayerMockDraftState(current, draftBoard);
+      return reconciliation.state;
+    });
+  }, [draftBoard]);
 
   useEffect(() => {
     if (draftState.status === "complete") {

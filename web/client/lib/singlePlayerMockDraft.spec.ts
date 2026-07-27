@@ -20,6 +20,7 @@ import {
   MOCK_TOTAL_PICKS,
   MOCK_USER_TEAM_ID,
   parseMockDraftSettings,
+  reconcileSinglePlayerMockDraftState,
   resolveInitialSinglePlayerMockDraftState,
 } from "./singlePlayerMockDraft";
 import type { DraftPlayer } from "./draftRankings";
@@ -166,6 +167,72 @@ describe("single-player mock draft engine", () => {
     expect(resolved.shouldClearStoredDraft).toBe(false);
     expect(resolved.shouldReplaceUrl).toBe(false);
     expect(resolved.state).toBe(stored);
+  });
+
+  it("reconciles a legacy school alias to the approved player and prevents a duplicate board entry", () => {
+    const canonicalIan = {
+      ...player(101, "WR"),
+      name: "Ian Strong",
+      school: "California",
+      projectedPoints: 190.2,
+      draftRank: 136,
+      masterDraftRank: 136,
+    };
+    const legacyIanPick: MockDraftPick = {
+      ...pick(-101, "WR", 1, "WR"),
+      playerName: "Ian Strong",
+      school: "Cal",
+      projectedPoints: 191,
+      draftRank: 15,
+      masterDraftRank: 15,
+    };
+    const state = {
+      ...createSinglePlayerMockDraft(1_000),
+      picks: [legacyIanPick],
+    };
+
+    const reconciled = reconcileSinglePlayerMockDraftState(state, [canonicalIan], 2_000);
+
+    expect(reconciled.wasReset).toBe(false);
+    expect(reconciled.didChange).toBe(true);
+    expect(reconciled.state.picks[0]).toMatchObject({
+      playerId: 101,
+      playerName: "Ian Strong",
+      school: "California",
+      projectedPoints: 190.2,
+      draftRank: 136,
+    });
+    expect(getAvailablePlayers([canonicalIan], reconciled.state)).toEqual([]);
+  });
+
+  it("resets a persisted mock that contains an excluded or duplicate legacy player", () => {
+    const approvedIan = {
+      ...player(101, "WR"),
+      name: "Ian Strong",
+      school: "California",
+    };
+    const invalidEaston: MockDraftPick = {
+      ...pick(-102, "WR", 1, "WR"),
+      playerName: "Easton Messer",
+      school: "FAU",
+    };
+    const state = {
+      ...createSinglePlayerMockDraft(1_000),
+      settings: { leagueSize: 10, rounds: MOCK_ROUNDS, pickTimerSeconds: 45 },
+      picks: [invalidEaston],
+    };
+
+    const reconciled = reconcileSinglePlayerMockDraftState(state, [approvedIan], 2_000);
+
+    expect(reconciled.wasReset).toBe(true);
+    expect(reconciled.didChange).toBe(true);
+    expect(reconciled.state.picks).toEqual([]);
+    expect(reconciled.state.id).toBe("local-2000");
+    expect(reconciled.state.settings).toEqual({
+      leagueSize: 10,
+      rounds: MOCK_ROUNDS,
+      pickTimerSeconds: 45,
+    });
   });
 
   it("starts after intermission and bot auto-picks first overall", () => {

@@ -73,6 +73,12 @@ export type MockDraftInitialStateResolution = {
   shouldReplaceUrl: boolean;
 };
 
+export type MockDraftStateReconciliation = {
+  state: SinglePlayerMockDraftState;
+  didChange: boolean;
+  wasReset: boolean;
+};
+
 export type CarouselScrollInput = {
   overallPick: number;
   cardOffsetLeft: number;
@@ -249,6 +255,127 @@ const draftedPlayerIds = (state: SinglePlayerMockDraftState) =>
 
 const draftedPlayerIdentityKeys = (state: SinglePlayerMockDraftState) =>
   new Set(state.picks.map((pick) => getDraftPlayerIdentityKey(pick)));
+
+// Earlier mock-draft versions stored fabricated CFB27 players and a few school
+// aliases (for example, "Cal"). The live board is now spreadsheet-backed and
+// canonical. Name + position is only used to reconcile a legacy pick when it
+// points to exactly one approved board player; normal draft availability still
+// uses the full player identity (name, school, position).
+const getNamePositionIdentityKey = (player: {
+  name?: string | null;
+  playerName?: string | null;
+  pos?: string | null;
+  position?: string | null;
+}) => getDraftPlayerIdentityKey({ ...player, school: "" });
+
+const toCanonicalMockPick = (pick: MockDraftPick, player: DraftPlayer): MockDraftPick => ({
+  ...pick,
+  playerId: player.id,
+  playerName: player.name,
+  position: player.pos,
+  school: player.school,
+  projectedPoints: player.projectedPoints,
+  draftRank: player.masterDraftRank ?? player.draftRank,
+  masterDraftRank: player.masterDraftRank ?? player.draftRank,
+});
+
+/**
+ * Reconciles persisted mock-draft state to the approved API board.
+ *
+ * If a saved draft contains an excluded player (such as a legacy non-P4
+ * synthetic entry) or a duplicate canonical identity, we reset the mock. A
+ * mock draft is disposable, and retaining an invalid pick would otherwise
+ * corrupt pick history and allow duplicate players on the board.
+ */
+export const reconcileSinglePlayerMockDraftState = (
+  state: SinglePlayerMockDraftState,
+  board: DraftPlayer[],
+  now = Date.now()
+): MockDraftStateReconciliation => {
+  if (!state.picks.length || !board.length) {
+    return { state, didChange: false, wasReset: false };
+  }
+
+  const boardById = new Map(board.map((player) => [player.id, player]));
+  const boardByIdentity = new Map(board.map((player) => [getDraftPlayerIdentityKey(player), player]));
+  const boardByNamePosition = new Map<string, DraftPlayer[]>();
+  for (const player of board) {
+    const key = getNamePositionIdentityKey(player);
+    boardByNamePosition.set(key, [...(boardByNamePosition.get(key) ?? []), player]);
+  }
+
+  const seenCanonicalIdentities = new Set<string>();
+  const playerIdRemap = new Map<number, number>();
+  let didChange = false;
+  const picks: MockDraftPick[] = [];
+
+  for (const pick of state.picks) {
+    const namePositionMatches = boardByNamePosition.get(getNamePositionIdentityKey(pick)) ?? [];
+    const canonicalPlayer =
+      boardById.get(pick.playerId) ??
+      boardByIdentity.get(getDraftPlayerIdentityKey(pick)) ??
+      (namePositionMatches.length === 1 ? namePositionMatches[0] : undefined);
+
+    if (!canonicalPlayer) {
+      return {
+        state: createSinglePlayerMockDraft(now, getMockDraftSettings(state)),
+        didChange: true,
+        wasReset: true,
+      };
+    }
+
+    const canonicalIdentity = getDraftPlayerIdentityKey(canonicalPlayer);
+    if (seenCanonicalIdentities.has(canonicalIdentity)) {
+      return {
+        state: createSinglePlayerMockDraft(now, getMockDraftSettings(state)),
+        didChange: true,
+        wasReset: true,
+      };
+    }
+    seenCanonicalIdentities.add(canonicalIdentity);
+    playerIdRemap.set(pick.playerId, canonicalPlayer.id);
+
+    const canonicalPick = toCanonicalMockPick(pick, canonicalPlayer);
+    if (
+      canonicalPick.playerId !== pick.playerId ||
+      canonicalPick.playerName !== pick.playerName ||
+      canonicalPick.position !== pick.position ||
+      canonicalPick.school !== pick.school ||
+      canonicalPick.projectedPoints !== pick.projectedPoints ||
+      canonicalPick.draftRank !== pick.draftRank ||
+      canonicalPick.masterDraftRank !== pick.masterDraftRank
+    ) {
+      didChange = true;
+    }
+    picks.push(canonicalPick);
+  }
+
+  const approvedPlayerIds = new Set(board.map((player) => player.id));
+  const queuedPlayerIds = [...new Set(
+    state.queuedPlayerIds
+      .map((playerId) => playerIdRemap.get(playerId) ?? playerId)
+      .filter((playerId) => {
+        const player = boardById.get(playerId);
+        return Boolean(
+          approvedPlayerIds.has(playerId) &&
+            player &&
+            !seenCanonicalIdentities.has(getDraftPlayerIdentityKey(player))
+        );
+      })
+  )];
+  if (
+    queuedPlayerIds.length !== state.queuedPlayerIds.length ||
+    queuedPlayerIds.some((playerId, index) => playerId !== state.queuedPlayerIds[index])
+  ) {
+    didChange = true;
+  }
+
+  return {
+    state: didChange ? { ...state, picks, queuedPlayerIds } : state,
+    didChange,
+    wasReset: false,
+  };
+};
 
 const getPlayerBoardRank = (player: DraftPlayer) => player.masterDraftRank ?? player.draftRank;
 

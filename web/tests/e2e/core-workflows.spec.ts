@@ -1372,6 +1372,94 @@ test.describe("critical browser workflows", () => {
     expect(blockedMutations).toEqual([]);
   });
 
+  test("mock draft reconciles a legacy alias so a drafted player cannot remain on the board", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+    await page.addInitScript(() => {
+      const now = Date.now();
+      const teams = Array.from({ length: 8 }, (_, index) => ({
+        id: index + 1,
+        name: index === 3 ? "Your Team" : `Bot Team ${index + 1}`,
+        managerType: index === 3 ? "user" : "bot",
+      }));
+      window.localStorage.setItem(
+        "cfb_single_player_mock_draft",
+        JSON.stringify({
+          id: "legacy-mock",
+          settings: { leagueSize: 8, rounds: 13, pickTimerSeconds: 30 },
+          status: "intermission",
+          createdAt: now,
+          intermissionEndsAt: now + 30_000,
+          currentPick: 2,
+          pickStartedAt: null,
+          pickExpiresAt: null,
+          userTeamId: 4,
+          teams,
+          queuedPlayerIds: [],
+          picks: [
+            {
+              overallPick: 1,
+              round: 1,
+              roundPick: 1,
+              teamId: 1,
+              teamName: "Bot Team 1",
+              playerId: -101,
+              playerName: "Ian Strong",
+              position: "WR",
+              school: "Cal",
+              projectedPoints: 191,
+              draftRank: 15,
+              masterDraftRank: 15,
+              assignedSlot: "WR",
+              pickedBy: "bot",
+              madeAt: now,
+            },
+          ],
+        })
+      );
+    });
+
+    await page.route("**/players?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: [
+            {
+              id: 101,
+              name: "Ian Strong",
+              position: "WR",
+              school: "California",
+              image_url: null,
+              board_rank: 136,
+              sheet_adp: 136,
+              sheet_projected_season_points: 190.2,
+            },
+          ],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }),
+      });
+    });
+    await page.route("**/stats/teams?**", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [] }) });
+    });
+
+    await page.goto("/draft/mock/single-player");
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const stored = JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}");
+          return stored.picks?.map((pick: { playerId: number; school: string }) => [pick.playerId, pick.school]);
+        })
+      )
+      .toEqual([[101, "California"]]);
+
+    // Ian remains in historical pick UI only; the live available board is empty.
+    await expect(page.getByTestId("draft-player-row")).toHaveCount(0);
+    await expect(page.getByText("Cal", { exact: true })).toHaveCount(0);
+  });
+
   test("watchlist create/add/remove persists through backend contracts", async ({ page }) => {
     await seedAuthenticatedSession(page);
 
