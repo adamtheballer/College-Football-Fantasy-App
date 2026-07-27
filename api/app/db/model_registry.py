@@ -29,6 +29,7 @@ def ensure_models_registered() -> None:
         league,
         league_invite,
         league_member,
+        league_player_event,
         league_message,
         league_settings,
         lineup_week_snapshot,

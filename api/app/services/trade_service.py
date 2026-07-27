@@ -32,6 +32,7 @@ from collegefootballfantasy_api.app.services.chat_service import (
     create_trade_finalized_chat_message,
     mark_trade_finalized_chat_message_processed,
 )
+from collegefootballfantasy_api.app.services.league_player_history import EVENT_TRADED, EVENT_TRADE_FAILED, append_league_player_event
 from collegefootballfantasy_api.app.services.league_weeks import (
     current_cfb_week_state,
     is_cfb_game_week_active,
@@ -397,10 +398,14 @@ def _plan_roster_swap(db: Session, offer: TradeOffer) -> tuple[list[RosterEntry]
 
 def _process_roster_swap(db: Session, offer: TradeOffer, actor_user_id: int | None = None) -> None:
     outgoing_entries, moves = _plan_roster_swap(db, offer)
+    player_by_id = {entry.player_id: entry.player for entry in outgoing_entries}
+    source_team_by_id = {entry.player_id: db.get(Team, entry.team_id) for entry in outgoing_entries}
     for entry in outgoing_entries:
         db.delete(entry)
     db.flush()
     for move in moves:
+        target_team = db.get(Team, move.target_team_id)
+        player = player_by_id[move.player_id]
         db.add(
             RosterEntry(
                 league_id=offer.league_id,
@@ -410,15 +415,29 @@ def _process_roster_swap(db: Session, offer: TradeOffer, actor_user_id: int | No
                 status="active",
             )
         )
-        db.add(
-            Transaction(
-                league_id=offer.league_id,
-                team_id=move.target_team_id,
-                transaction_type="trade_processed",
-                player_id=move.player_id,
-                created_by_user_id=actor_user_id,
-                reason=f"Trade offer #{offer.id} processed",
-            )
+        transaction = Transaction(
+            league_id=offer.league_id,
+            team_id=move.target_team_id,
+            transaction_type="trade_processed",
+            player_id=move.player_id,
+            created_by_user_id=actor_user_id,
+            reason=f"Trade offer #{offer.id} processed",
+        )
+        db.add(transaction)
+        db.flush()
+        append_league_player_event(
+            db,
+            league=db.get(League, offer.league_id),
+            player=player,
+            event_type=EVENT_TRADED,
+            event_key=f"trade:{offer.id}:player:{move.player_id}",
+            occurred_at=_utcnow(),
+            from_team=source_team_by_id[move.player_id],
+            to_team=target_team,
+            manager=db.get(User, actor_user_id) if actor_user_id else None,
+            trade_id=offer.id,
+            transaction_id=transaction.id,
+            metadata={"status": "processed"},
         )
 
 
@@ -823,6 +842,20 @@ def process_trade_offers_once(db: Session, now: datetime | None = None) -> dict[
         except Exception as exc:
             offer.status = TRADE_STATUS_FAILED
             offer.failure_reason = str(exc.detail) if isinstance(exc, HTTPException) else "trade processing failed"
+            for item in offer.items:
+                if item.player is None:
+                    continue
+                append_league_player_event(
+                    db,
+                    league=league,
+                    player=item.player,
+                    event_type=EVENT_TRADE_FAILED,
+                    event_key=f"trade-failed:{offer.id}:player:{item.player.id}",
+                    occurred_at=current,
+                    fantasy_team=_team_or_404(db, league.id, item.team_id),
+                    trade_id=offer.id,
+                    metadata={"reason": offer.failure_reason},
+                )
             _add_review(db, offer, "failed", None, offer.failure_reason)
             _notify_participants(db, offer, "TRADE_FAILED", "Trade Failed", offer.failure_reason)
             failed += 1

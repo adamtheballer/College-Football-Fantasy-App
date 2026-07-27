@@ -846,6 +846,7 @@ export default function LeagueWaivers() {
       {selectedPlayer ? (
         <PlayerCardModal
           card={selectedPlayerCard}
+          leagueId={Number.isFinite(parsedLeagueId) ? parsedLeagueId : undefined}
           loading={selectedPlayerCardLoading}
           onClose={() => setSelectedPlayer(null)}
           player={{

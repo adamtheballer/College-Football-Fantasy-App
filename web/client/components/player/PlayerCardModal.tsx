@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, BarChart3, CalendarDays, Info, Loader2 } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, CalendarDays, History, Info, Loader2 } from "lucide-react";
 
-import { usePlayerGameLog, type PlayerCardResponse } from "@/hooks/use-players";
+import { useLeaguePlayerHistory, usePlayerGameLog, type PlayerCardResponse } from "@/hooks/use-players";
 import { buildProjectedStats, formatStat, statRowsForPosition, statValue } from "@/lib/playerProjectionStats";
 import { cn } from "@/lib/utils";
 import type { PlayerStats } from "@/types/player";
 
 import { PlayerCardHeader } from "./PlayerCardHeader";
 
-type PlayerCardTab = "summary" | "stats" | "game-log" | "alerts" | "projections";
+type PlayerCardTab = "summary" | "stats" | "game-log" | "alerts" | "projections" | "history";
 
 export type PlayerCardModalPlayer = {
   id: number;
@@ -42,7 +42,11 @@ const tabConfig: Array<{ id: PlayerCardTab; label: string; icon: typeof Info }> 
   { id: "game-log", label: "Game Log", icon: CalendarDays },
   { id: "alerts", label: "Alerts", icon: AlertTriangle },
   { id: "projections", label: "Projections", icon: Activity },
+  { id: "history", label: "History", icon: History },
 ];
+
+export const visiblePlayerCardTabs = (hasLeagueContext: boolean) =>
+  tabConfig.filter((tab) => tab.id !== "history" || hasLeagueContext);
 
 const statDisplayKeys = [
   ["Pass Yds", ["pass_yards", "PassingYards", "passingYards"]],
@@ -289,6 +293,7 @@ export function PlayerCardModal({
   actions = [],
   card,
   loading = false,
+  leagueId,
   note,
   onClose,
   player,
@@ -298,6 +303,7 @@ export function PlayerCardModal({
   actions?: PlayerCardAction[];
   card?: PlayerCardResponse | null;
   loading?: boolean;
+  leagueId?: number | null;
   note?: string | null;
   onClose: () => void;
   player: PlayerCardModalPlayer;
@@ -305,8 +311,10 @@ export function PlayerCardModal({
 }) {
   const [activeTab, setActiveTab] = useState<PlayerCardTab>("summary");
   const [selectedHistoricalSeason, setSelectedHistoricalSeason] = useState<number | null>(null);
+  const hasLeagueContext = typeof leagueId === "number" && Number.isFinite(leagueId) && leagueId > 0;
   const position = (card?.about.position ?? player.position ?? "").toUpperCase();
   const gameLogQuery = usePlayerGameLog(player.id, 2026, activeTab === "game-log");
+  const historyQuery = useLeaguePlayerHistory(leagueId ?? undefined, player.id, activeTab === "history" && hasLeagueContext);
   const palette = getPlayerCardPalette(position);
   const historicalStats = card?.historical_stats;
   const historicalSeasons = historicalStats?.seasons ?? [];
@@ -375,7 +383,7 @@ export function PlayerCardModal({
         <PlayerCardHeader card={card} onClose={onClose} palette={palette} player={player} position={position} title={title} />
 
         <nav className="flex gap-2 overflow-x-auto border-b border-white/10 bg-black/18 px-5 py-3 sm:px-8">
-          {tabConfig.map((tab) => {
+          {visiblePlayerCardTabs(hasLeagueContext).map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
             return (
@@ -691,7 +699,7 @@ export function PlayerCardModal({
                 </p>
               )}
             </section>
-          ) : (
+          ) : activeTab === "projections" ? (
             <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
               <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Fantasy Projection</p>
               {projectionStats ? (
@@ -728,6 +736,28 @@ export function PlayerCardModal({
                   No projection object is linked to this card yet.
                 </p>
               )}
+            </section>
+          ) : (
+            <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
+              <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>League History</p>
+              {historyQuery.isLoading ? (
+                <div className="mt-5 flex min-h-40 items-center justify-center gap-3 rounded-2xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55"><Loader2 className="h-4 w-4 animate-spin" /> Loading league history</div>
+              ) : historyQuery.isError ? (
+                <p className="mt-5 rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4 text-sm font-bold text-rose-100">League history is unavailable right now. Please try again shortly.</p>
+              ) : historyQuery.data ? (
+                <div className="mt-5 space-y-3">
+                  <div className="rounded-2xl border border-cyan-200/20 bg-cyan-200/10 p-4">
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-100/70">Current status</p>
+                    <p className="mt-1 text-lg font-black text-white">{historyQuery.data.current_status.status.replace(/_/g, " ")}{historyQuery.data.current_status.fantasy_team_name ? ` by ${historyQuery.data.current_status.fantasy_team_name}` : ""}</p>
+                  </div>
+                  {historyQuery.data.events.length ? historyQuery.data.events.map((event) => (
+                    <article key={event.id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-black text-white">{event.event_type.replace(/_/g, " ")}</p><p className="mt-1 text-xs font-bold text-white/55">{event.from_team?.name ? `${event.from_team.name} → ` : ""}{event.to_team?.name ?? event.fantasy_team?.name ?? "League transaction"}</p></div><p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">{new Date(event.occurred_at).toLocaleString()}</p></div>
+                      <p className="mt-2 text-xs font-bold text-white/55">{event.position} • {event.school}{event.manager?.name ? ` • ${event.manager.name}` : ""}{typeof event.player_value_at_event === "number" ? ` • Value ${event.player_value_at_event.toFixed(1)}` : ""}</p>
+                    </article>
+                  )) : <p className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">No league history yet. This player has not been drafted, added, traded, or rostered in this league.</p>}
+                </div>
+              ) : null}
             </section>
           )}
         </div>

@@ -8,6 +8,11 @@ from sqlalchemy.orm import Session
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
+from collegefootballfantasy_api.app.services.league_player_history import (
+    EVENT_AUTO_DRAFTED,
+    EVENT_DRAFTED,
+    append_league_player_event,
+)
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
@@ -323,18 +328,17 @@ def _record_draft_pick(
     if not roster_slot:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="no open legal roster slot for this position")
 
-    db.add(
-        DraftPick(
-            draft_id=draft_row.id,
-            team_id=current_team.id,
-            player_id=player.id,
-            made_by_user_id=current_user.id if current_user else None,
-            round_number=round_number,
-            round_pick=round_pick,
-            overall_pick=draft_row.current_pick_number,
-            auto_pick=auto_pick,
-        )
+    draft_pick = DraftPick(
+        draft_id=draft_row.id,
+        team_id=current_team.id,
+        player_id=player.id,
+        made_by_user_id=current_user.id if current_user else None,
+        round_number=round_number,
+        round_pick=round_pick,
+        overall_pick=draft_row.current_pick_number,
+        auto_pick=auto_pick,
     )
+    db.add(draft_pick)
     db.add(
         RosterEntry(
             league_id=league.id,
@@ -343,6 +347,26 @@ def _record_draft_pick(
             slot=roster_slot,
             status="active",
         )
+    )
+    db.flush()
+    append_league_player_event(
+        db,
+        league=league,
+        player=player,
+        event_type=EVENT_AUTO_DRAFTED if auto_pick else EVENT_DRAFTED,
+        event_key=f"draft-pick:{draft_pick.id}",
+        occurred_at=now,
+        fantasy_team=current_team,
+        to_team=current_team,
+        manager=current_user,
+        draft_id=draft_row.id,
+        draft_pick_id=draft_pick.id,
+        metadata={
+            "round": round_number,
+            "pick_in_round": round_pick,
+            "overall_pick": draft_row.current_pick_number,
+            "auto_pick": auto_pick,
+        },
     )
     total_picks = _draft_total_picks(settings_row, teams)
     if draft_row.current_pick_number >= total_picks:

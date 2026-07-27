@@ -347,6 +347,13 @@ export const apiGet = async <T>(
   return apiRequest<T>({ method: "GET", path, params, signal });
 };
 
+/** League-scoped player ownership and transaction ledger. */
+export const getLeaguePlayerHistory = async <T>(
+  leagueId: number,
+  playerId: number,
+  params?: { limit?: number; offset?: number }
+): Promise<T> => apiGet<T>(`/leagues/${leagueId}/players/${playerId}/history`, params);
+
 export const apiPost = async <T>(
   path: string,
   body: unknown,

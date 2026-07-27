@@ -47,6 +47,14 @@ from collegefootballfantasy_api.app.services.waiver_service import (
     record_player_dropped_for_waivers,
     record_player_rostered_for_waivers,
 )
+from collegefootballfantasy_api.app.services.league_player_history import (
+    EVENT_ACTIVATED_FROM_IR,
+    EVENT_COMMISSIONER_ADJUSTMENT,
+    EVENT_DROPPED,
+    EVENT_FREE_AGENT_ADDED,
+    EVENT_PLACED_ON_IR,
+    append_league_player_event,
+)
 
 router = APIRouter()
 
@@ -294,7 +302,7 @@ def add_roster_entry_endpoint(
         status=entry_in.status,
     )
     db.add(entry)
-    _record_transaction(
+    transaction = _record_transaction(
         db,
         league_id=team.league_id,
         team_id=team.id,
@@ -302,6 +310,13 @@ def add_roster_entry_endpoint(
         created_by_user_id=current_user.id,
         player_id=entry.player_id,
     )
+    league = db.get(League, team.league_id)
+    if league:
+        append_league_player_event(
+            db, league=league, player=player, event_type=EVENT_COMMISSIONER_ADJUSTMENT,
+            event_key=f"roster-add:{transaction.id}:{player.id}", fantasy_team=team, to_team=team,
+            manager=current_user, transaction_id=transaction.id, metadata={"reason": "direct roster add"},
+        )
     db.commit()
     db.refresh(entry)
     refreshed = (
@@ -369,6 +384,12 @@ def delete_roster_entry_endpoint(
         player_id=dropped_player_id,
         team_id=team.id,
         transaction_id=transaction.id,
+    )
+    dropped_player = _ensure_player_exists(db, dropped_player_id)
+    append_league_player_event(
+        db, league=league, player=dropped_player, event_type=EVENT_DROPPED,
+        event_key=f"roster-drop:{transaction.id}:{dropped_player_id}", fantasy_team=team, from_team=team,
+        manager=current_user, transaction_id=transaction.id,
     )
     db.commit()
 
@@ -461,7 +482,7 @@ def update_lineup_endpoint(
         roster_by_id[entry_id].slot_index = slot_index
 
     for entry, previous_slot, previous_slot_index in changed_entries:
-        _record_transaction(
+        transaction = _record_transaction(
             db,
             league_id=team.league_id,
             team_id=team.id,
@@ -470,6 +491,16 @@ def update_lineup_endpoint(
             player_id=entry.player_id,
             reason=f"{previous_slot}{previous_slot_index} -> {entry.slot}{entry.slot_index}",
         )
+        if entry.player and (previous_slot == "IR") != (entry.slot == "IR"):
+            league = db.get(League, team.league_id)
+            if league:
+                append_league_player_event(
+                    db, league=league, player=entry.player,
+                    event_type=EVENT_PLACED_ON_IR if entry.slot == "IR" else EVENT_ACTIVATED_FROM_IR,
+                    event_key=f"ir-move:{transaction.id}:{entry.player_id}", fantasy_team=team,
+                    manager=current_user, transaction_id=transaction.id,
+                    metadata={"from_slot": previous_slot, "to_slot": entry.slot},
+                )
 
     db.commit()
     return LineupUpdateResponse(
@@ -532,6 +563,17 @@ def add_drop_endpoint(
         player_id=dropped_player_id,
         team_id=team.id,
         transaction_id=transaction.id,
+    )
+    dropped_player = _ensure_player_exists(db, dropped_player_id)
+    append_league_player_event(
+        db, league=league, player=add_player, event_type=EVENT_FREE_AGENT_ADDED,
+        event_key=f"roster-add-drop-add:{transaction.id}:{add_player.id}", fantasy_team=team, to_team=team,
+        manager=current_user, transaction_id=transaction.id, metadata={"drop_player_id": dropped_player_id},
+    )
+    append_league_player_event(
+        db, league=league, player=dropped_player, event_type=EVENT_DROPPED,
+        event_key=f"roster-add-drop-drop:{transaction.id}:{dropped_player_id}", fantasy_team=team, from_team=team,
+        manager=current_user, transaction_id=transaction.id, metadata={"added_player_id": add_player.id},
     )
     db.commit()
 

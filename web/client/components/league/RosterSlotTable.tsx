@@ -374,6 +374,7 @@ export function RosterSlotTable({
               : []
           }
           card={selectedPlayerCard}
+          leagueId={Number.isFinite(numericLeagueId) ? numericLeagueId : undefined}
           loading={selectedPlayerCardLoading}
           onClose={() => setSelectedPlayer(null)}
           player={{

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { apiGet } from "@/lib/api";
+import { apiGet, getLeaguePlayerHistory } from "@/lib/api";
 import type { Player } from "@/types/player";
 
 export const PLAYER_API_MAX_LIMIT = 100;
@@ -115,6 +115,47 @@ export type PlayerGameLogResponse = {
     } | null;
   }>;
 };
+
+export type LeaguePlayerHistoryResponse = {
+  league_id: number;
+  player_id: number;
+  current_status: { status: string; fantasy_team_id?: number | null; fantasy_team_name?: string | null; manager_name?: string | null };
+  events: Array<{
+    id: number;
+    event_type: string;
+    occurred_at: string;
+    fantasy_team?: { id?: number | null; name?: string | null } | null;
+    from_team?: { id?: number | null; name?: string | null } | null;
+    to_team?: { id?: number | null; name?: string | null } | null;
+    manager?: { id?: number | null; name?: string | null } | null;
+    draft_id?: number | null;
+    draft_pick_id?: number | null;
+    trade_id?: number | null;
+    waiver_claim_id?: number | null;
+    transaction_id?: number | null;
+    player_value_at_event?: number | null;
+    player_name: string;
+    position: string;
+    school: string;
+    metadata?: Record<string, unknown> | null;
+  }>;
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export function useLeaguePlayerHistory(
+  leagueId: number | undefined,
+  playerId: number | undefined,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ["league-player-history", leagueId, playerId],
+    queryFn: () => getLeaguePlayerHistory<LeaguePlayerHistoryResponse>(leagueId as number, playerId as number),
+    enabled: enabled && Number.isFinite(leagueId) && Number.isFinite(playerId),
+    retry: false,
+  });
+}
 
 export type PlayerCardResponse = {
   player: BackendPlayerRead;

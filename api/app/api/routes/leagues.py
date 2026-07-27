@@ -20,6 +20,7 @@ from collegefootballfantasy_api.app.schemas.draft_room import (
     DraftRoomRead,
 )
 from collegefootballfantasy_api.app.schemas.league import LeagueList
+from collegefootballfantasy_api.app.schemas.league_player_history import LeaguePlayerHistoryRead
 from collegefootballfantasy_api.app.schemas.league_flow import (
     DraftRead,
     DraftUpdate,
@@ -60,6 +61,7 @@ from collegefootballfantasy_api.app.services.league_workspace import (
     build_league_workspace,
     get_league_detail,
 )
+from collegefootballfantasy_api.app.services.league_player_history import get_league_player_history
 from collegefootballfantasy_api.app.services.league_roster_matchup import (
     build_matchup_tab_view,
     build_roster_tab_view,
@@ -153,6 +155,20 @@ def get_league_matchup_tab_endpoint(
     league = get_league_or_404(db, league_id)
     require_league_member(db, league.id, current_user)
     return build_matchup_tab_view(db, league, current_user, selected_week=week)
+
+
+@router.get("/{league_id}/players/{player_id}/history", response_model=LeaguePlayerHistoryRead)
+def get_league_player_history_endpoint(
+    league_id: int,
+    player_id: int,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeaguePlayerHistoryRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return get_league_player_history(db, league=league, player_id=player_id, limit=max(1, min(limit, 100)), offset=max(0, offset))
 
 
 @router.get("/{league_id}/settings-view", response_model=LeagueSettingsViewRead)

@@ -23,6 +23,12 @@ from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
+from collegefootballfantasy_api.app.services.league_player_history import (
+    EVENT_DROPPED,
+    EVENT_FREE_AGENT_ADDED,
+    EVENT_WAIVER_CLAIMED,
+    append_league_player_event,
+)
 from collegefootballfantasy_api.app.models.waiver_claim_audit import WaiverClaimAudit
 from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
@@ -766,6 +772,35 @@ def add_free_agent(
     )
     db.add(transaction)
     db.flush()
+    append_league_player_event(
+        db,
+        league=league,
+        player=player,
+        event_type=EVENT_FREE_AGENT_ADDED,
+        event_key=f"free-agent-add:{transaction.id}:{player.id}",
+        occurred_at=now,
+        fantasy_team=team,
+        to_team=team,
+        manager=current_user,
+        transaction_id=transaction.id,
+        metadata={"drop_player_id": dropped_player_id} if dropped_player_id else None,
+    )
+    if dropped_player_id is not None:
+        dropped_player = db.get(Player, dropped_player_id)
+        if dropped_player:
+            append_league_player_event(
+                db,
+                league=league,
+                player=dropped_player,
+                event_type=EVENT_DROPPED,
+                event_key=f"free-agent-drop:{transaction.id}:{dropped_player_id}",
+                occurred_at=now,
+                fantasy_team=team,
+                from_team=team,
+                manager=current_user,
+                transaction_id=transaction.id,
+                metadata={"added_player_id": player.id},
+            )
     _mark_player_rostered(db, league.id, player.id)
     if dropped_player_id is not None:
         _mark_player_dropped(
@@ -1114,6 +1149,37 @@ def _apply_claim_award(
     )
     db.add(transaction)
     db.flush()
+    append_league_player_event(
+        db,
+        league=league,
+        player=add_player,
+        event_type=EVENT_WAIVER_CLAIMED,
+        event_key=f"waiver-claim:{claim.id}:{add_player.id}",
+        occurred_at=now,
+        fantasy_team=team,
+        to_team=team,
+        manager=db.get(User, claim.created_by_user_id) if claim.created_by_user_id else None,
+        waiver_claim_id=claim.id,
+        transaction_id=transaction.id,
+        metadata={"winning_bid": claim.faab_bid, "priority": priority.priority},
+    )
+    if dropped_player_id:
+        dropped_player = db.get(Player, dropped_player_id)
+        if dropped_player:
+            append_league_player_event(
+                db,
+                league=league,
+                player=dropped_player,
+                event_type=EVENT_DROPPED,
+                event_key=f"waiver-drop:{claim.id}:{dropped_player_id}",
+                occurred_at=now,
+                fantasy_team=team,
+                from_team=team,
+                manager=db.get(User, claim.created_by_user_id) if claim.created_by_user_id else None,
+                waiver_claim_id=claim.id,
+                transaction_id=transaction.id,
+                metadata={"added_player_id": add_player.id},
+            )
     if _waiver_type(settings) == "faab":
         priority.faab_spent += int(claim.faab_bid or 0)
         claim.winning_bid = int(claim.faab_bid or 0)

@@ -1145,6 +1145,7 @@ export default function Draft() {
       {selectedPlayer ? (
         <PlayerCardModal
           card={playerCard}
+          leagueId={parsedLeagueId}
           loading={playerCardLoading}
           onClose={() => setSelectedPlayerId(null)}
           player={{
