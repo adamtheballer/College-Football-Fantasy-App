@@ -89,4 +89,3 @@ class SaturdayPickContestRead(BaseModel):
 class SaturdayPickRotationRead(BaseModel):
     default_rotation: list[SaturdayPickPosition]
     recommended_position: SaturdayPickPosition
-

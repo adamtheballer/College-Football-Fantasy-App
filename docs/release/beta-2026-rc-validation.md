@@ -1,7 +1,7 @@
 # Beta 2026 Release-Candidate Validation
 
-Release branch: `release/beta-2026-runtime`  
-Candidate commit: record the final `HEAD` immediately before the merge  
+Release branch: `release/beta-2026-runtime`
+Candidate commit: record the final `HEAD` immediately before the merge
 Validation date: 2026-07-26
 
 ## Verified in the candidate
