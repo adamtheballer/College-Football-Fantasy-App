@@ -13,6 +13,7 @@ Validation date: 2026-07-26
 | Full backend suite | `PYTHONPATH=. uv run pytest -q tests --disable-warnings` | Passed; no cached failures remained |
 | Critical workflow suite | `tests/api/test_waiver_processing.py`, `test_roster_workflows.py`, `test_leagues.py`, and `test_trades.py` | Passed: 77 tests |
 | Waiver lifecycle | Regression coverage verifies bid phase, post-clear instant adds, per-player kickoff locks, and the next-week return to bid phase | Passed |
+| Lifecycle concurrency | Four concurrent workers against a clean PostgreSQL database; verifies one draft auto-pick, one waiver award/FAAB charge, isolated trade outcomes, and scoring rollback | Passed |
 | Migration graph | `alembic heads` | One head: `0076_saturday_pick_6` |
 | Upgrade path | Isolated empty PostgreSQL database upgraded through `0075_processed_waiver_claims` and then `head` | Passed |
 | Migration drift | `alembic check` against the beta database | Passed: no new upgrade operations |
