@@ -11,9 +11,11 @@ from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.trade_offer import TradeOffer
+from collegefootballfantasy_api.app.models.trade_offer_item import TradeOfferItem
 from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
-from collegefootballfantasy_api.app.services.league_schedule import ensure_league_schedule
+from collegefootballfantasy_api.app.services.league_schedule import REGULAR_SEASON_WEEKS, ensure_league_schedule
 from collegefootballfantasy_api.app.services.scoring_service import normalize_scoring_rules
 
 
@@ -87,6 +89,47 @@ def test_create_and_list_leagues(client):
     assert data["data"][0]["max_teams"] == created["max_teams"]
     assert len(data["data"][0]["members"]) == 1
     assert data["data"][0]["draft"]["draft_type"] == "snake"
+
+
+def test_settings_trade_history_shows_completed_trade_parties_assets_and_time(client, db_session):
+    owner_token = create_user_and_token(client, "settings-trade-owner")
+    member_token = create_user_and_token(client, "settings-trade-member")
+    league = create_league(client, owner_token, name="Settings Trade History", max_teams=2)
+    assert client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token)).status_code == 200
+
+    teams = db_session.query(Team).filter(Team.league_id == league["id"]).order_by(Team.id.asc()).all()
+    outgoing = Player(name="Trade History QB", position="QB", school="Alpha")
+    incoming = Player(name="Trade History RB", position="RB", school="Bravo")
+    db_session.add_all([outgoing, incoming])
+    db_session.flush()
+    completed_at = datetime.now(timezone.utc)
+    offer = TradeOffer(
+        league_id=league["id"],
+        proposing_team_id=teams[0].id,
+        receiving_team_id=teams[1].id,
+        status="processed",
+        accepted_at=completed_at,
+        processed_at=completed_at,
+    )
+    db_session.add(offer)
+    db_session.flush()
+    db_session.add_all([
+        TradeOfferItem(trade_offer_id=offer.id, team_id=teams[0].id, player_id=outgoing.id, item_type="player"),
+        TradeOfferItem(trade_offer_id=offer.id, team_id=teams[1].id, player_id=incoming.id, item_type="player"),
+    ])
+    db_session.commit()
+
+    response = client.get(f"/leagues/{league['id']}/settings-view", headers=auth_headers(owner_token))
+
+    assert response.status_code == 200
+    history = response.json()["trade_history"]
+    assert len(history) == 1
+    assert history[0]["id"] == offer.id
+    assert history[0]["proposing_party"]["team_name"] == teams[0].name
+    assert history[0]["receiving_party"]["team_name"] == teams[1].name
+    assert history[0]["proposing_team_sends"] == [{"player_id": outgoing.id, "name": "Trade History QB", "position": "QB", "school": "Alpha"}]
+    assert history[0]["receiving_team_sends"] == [{"player_id": incoming.id, "name": "Trade History RB", "position": "RB", "school": "Bravo"}]
+    assert history[0]["processed_at"] is not None
 
 
 def test_scoring_rules_normalize_create_form_aliases():
@@ -330,6 +373,50 @@ def test_schedule_generation_rejects_legacy_odd_team_count(client, db_session):
         ensure_league_schedule(db_session, league_row)
 
 
+def test_schedule_generation_creates_and_backfills_a_fair_13_week_regular_season(client, db_session):
+    token = create_user_and_token(client, "schedule-fairness")
+    league = create_league(client, token, name="Fair Schedule League", max_teams=4)
+    league_row = db_session.get(League, league["id"])
+    assert league_row is not None
+    db_session.add_all(
+        [
+            Team(league_id=league_row.id, name="Team Two"),
+            Team(league_id=league_row.id, name="Team Three"),
+            Team(league_id=league_row.id, name="Team Four"),
+        ]
+    )
+    db_session.commit()
+
+    teams = db_session.query(Team).filter(Team.league_id == league_row.id).order_by(Team.id.asc()).all()
+    team_ids = {team.id for team in teams}
+    assert len(team_ids) == 4
+
+    assert ensure_league_schedule(db_session, league_row, regular_season_weeks=12) == 24
+    assert ensure_league_schedule(db_session, league_row) == 2
+    db_session.flush()
+
+    matchups = (
+        db_session.query(Matchup)
+        .filter(Matchup.league_id == league_row.id, Matchup.season == league_row.season_year)
+        .order_by(Matchup.week.asc(), Matchup.id.asc())
+        .all()
+    )
+    assert len(matchups) == (len(team_ids) // 2) * REGULAR_SEASON_WEEKS
+    assert {matchup.week for matchup in matchups} == set(range(1, REGULAR_SEASON_WEEKS + 1))
+
+    matchup_counts_by_pair: dict[tuple[int, int], int] = {}
+    for week in range(1, REGULAR_SEASON_WEEKS + 1):
+        weekly_matchups = [matchup for matchup in matchups if matchup.week == week]
+        assert len(weekly_matchups) == len(team_ids) // 2
+        assert {team_id for matchup in weekly_matchups for team_id in (matchup.home_team_id, matchup.away_team_id)} == team_ids
+        for matchup in weekly_matchups:
+            pair = tuple(sorted((matchup.home_team_id, matchup.away_team_id)))
+            matchup_counts_by_pair[pair] = matchup_counts_by_pair.get(pair, 0) + 1
+
+    assert len(matchup_counts_by_pair) == 6
+    assert max(matchup_counts_by_pair.values()) - min(matchup_counts_by_pair.values()) <= 1
+
+
 def test_create_invite_join_assigns_one_team_per_user_and_enforces_max_teams(client, db_session):
     owner_token = create_user_and_token(client, "invite-owner")
     member_token = create_user_and_token(client, "invite-member")
@@ -456,6 +543,41 @@ def test_commissioner_settings_show_active_invite_until_draft_completion(client,
     assert invite["code"] == invite_code
     assert invite["link"].endswith(f"/join/{invite_code}")
     assert invite["visible_until_draft_complete"] is True
+
+
+def test_settings_view_shows_every_team_at_zero_zero_before_scoring(client, db_session):
+    owner_token = create_user_and_token(client, "standings-owner")
+    member_token = create_user_and_token(client, "standings-member")
+    league = create_league(client, owner_token, name="Preseason Standings League", max_teams=2)
+
+    join_response = client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token))
+    assert join_response.status_code == 200
+
+    teams = (
+        db_session.query(Team)
+        .filter(Team.league_id == league["id"])
+        .order_by(Team.id.asc())
+        .all()
+    )
+    assert len(teams) == 2
+
+    settings_response = client.get(f"/leagues/{league['id']}/settings-view", headers=auth_headers(owner_token))
+    assert settings_response.status_code == 200
+    payload = settings_response.json()
+
+    assert payload["teams"] == [
+        {
+            "id": team.id,
+            "league_id": league["id"],
+            "name": team.name,
+            "owner_user_id": team.owner_user_id,
+        }
+        for team in teams
+    ]
+    assert {
+        (row["team_id"], row["wins"], row["losses"], row["ties"])
+        for row in payload["standings"]
+    } == {(team.id, 0, 0, 0) for team in teams}
 
 
 def test_commissioner_can_rotate_and_revoke_invite(client, db_session):
@@ -697,6 +819,57 @@ def test_league_workspace_requires_membership(client):
     )
     assert response.status_code == 403
     assert response.json()["detail"] == "league membership required"
+
+
+def test_league_roster_tab_includes_every_team_current_roster(client, db_session):
+    owner_token = create_user_and_token(client, "all-rosters-owner")
+    member_token = create_user_and_token(client, "all-rosters-member")
+    league = create_league(client, owner_token, name="All Rosters League", max_teams=2)
+    join_response = client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token))
+    assert join_response.status_code == 200
+
+    teams = db_session.query(Team).filter(Team.league_id == league["id"]).order_by(Team.id.asc()).all()
+    assert len(teams) == 2
+    owner_team, member_team = teams
+    owner_player = Player(name="Owner Quarterback", position="QB", school="Alabama")
+    member_player = Player(name="Member Quarterback", position="QB", school="Georgia")
+    db_session.add_all([owner_player, member_player])
+    db_session.flush()
+    db_session.add_all(
+        [
+            RosterEntry(
+                league_id=league["id"],
+                team_id=owner_team.id,
+                player_id=owner_player.id,
+                slot="QB",
+                status="active",
+            ),
+            RosterEntry(
+                league_id=league["id"],
+                team_id=member_team.id,
+                player_id=member_player.id,
+                slot="QB",
+                status="active",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(f"/leagues/{league['id']}/roster?week=1", headers=auth_headers(owner_token))
+    assert response.status_code == 200
+    body = response.json()
+
+    assert [team_roster["team"]["id"] for team_roster in body["team_rosters"]] == [owner_team.id, member_team.id]
+    assert [
+        player["player_name"]
+        for player in next(team_roster for team_roster in body["team_rosters"] if team_roster["team"]["id"] == owner_team.id)["roster"]
+        if player["player_id"] is not None
+    ] == ["Owner Quarterback"]
+    assert [
+        player["player_name"]
+        for player in next(team_roster for team_roster in body["team_rosters"] if team_roster["team"]["id"] == member_team.id)["roster"]
+        if player["player_id"] is not None
+    ] == ["Member Quarterback"]
 
 
 def test_league_hub_endpoints_return_scoreboard_rankings_and_news(client, db_session):

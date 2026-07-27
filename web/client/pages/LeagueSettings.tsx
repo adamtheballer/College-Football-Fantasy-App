@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
+  ArrowRightLeft,
   CalendarDays,
   ClipboardList,
   Copy,
   History,
   Link2,
+  ListOrdered,
   Medal,
   Settings2,
   ShieldCheck,
@@ -18,8 +20,8 @@ import { RosterSlotTable } from "@/components/league/RosterSlotTable";
 import { ErrorState } from "@/components/states";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLeagueDetail, useLeagueSettingsTab } from "@/hooks/use-leagues";
-import { useLeagueTransactions } from "@/hooks/use-roster-actions";
-import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
+import { getLeagueScheduleWeeks } from "@/lib/leagueSchedule";
+import { tradeOfferPath } from "@/lib/trade-links";
 import type { LeagueRosterPlayer, LeagueSettingsTabResponse } from "@/types/league";
 
 type SettingsPanel = "standings" | "scoring" | "schedule" | "rosters" | "trades" | "draft";
@@ -86,6 +88,45 @@ const groupRostersByTeam = (rosters: LeagueRosterPlayer[]) =>
     return groups;
   }, {});
 
+type StandingsRow = Record<string, string | number>;
+
+const buildStandingsRows = (data?: LeagueSettingsTabResponse): StandingsRow[] => {
+  if ((data?.standings ?? []).length > 0) return data?.standings ?? [];
+
+  return (data?.teams ?? []).map((team, index) => ({
+    team_id: team.id,
+    team_name: team.name,
+    wins: 0,
+    losses: 0,
+    ties: 0,
+    points_for: 0,
+    points_against: 0,
+    rank: index + 1,
+  }));
+};
+
+const formatRecord = (row: StandingsRow) => {
+  const wins = Number(row.wins ?? 0);
+  const losses = Number(row.losses ?? 0);
+  const ties = Number(row.ties ?? 0);
+
+  return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
+};
+
+const formatWaiverSystem = (waiverType: unknown) =>
+  String(waiverType ?? "faab").trim().toLowerCase() === "faab" ? "FAAB" : "Waiver Wire Order";
+
+export const formatDateTime = (value?: string | null) => {
+  if (!value) return "Unknown time";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? "Unknown time" : parsed.toLocaleString();
+};
+
+export const formatTradeAssets = (assets: Array<{ name: string; position: string | null; school: string | null }>) =>
+  assets.length
+    ? assets.map((asset) => [asset.name, asset.position, asset.school].filter(Boolean).join(" · "))
+    : ["No players listed"];
+
 export default function LeagueSettings() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
@@ -94,16 +135,9 @@ export default function LeagueSettings() {
   const [selectedScheduleWeek, setSelectedScheduleWeek] = useState<number | null>(null);
   const [copiedInviteField, setCopiedInviteField] = useState<"code" | "link" | null>(null);
   const leagueQuery = useLeagueDetail(parsedLeagueId);
-  const postDraft = isLeaguePostDraft({
-    draftStatus: leagueQuery.data?.draft?.status,
-    leagueStatus: leagueQuery.data?.status,
-  });
-  const settingsQuery = useLeagueSettingsTab(parsedLeagueId, postDraft);
-  const transactionsQuery = useLeagueTransactions(parsedLeagueId, postDraft);
+  const settingsQuery = useLeagueSettingsTab(parsedLeagueId);
   const data = settingsQuery.data;
-  const tradeTransactions = (transactionsQuery.data?.data ?? []).filter((transaction) =>
-    transaction.transaction_type.toLowerCase().includes("trade")
-  );
+  const tradeHistory = data?.trade_history ?? [];
   const rosterGroups = useMemo(() => groupRostersByTeam(data?.rosters ?? []), [data?.rosters]);
   const rosterTeamNames = useMemo(() => Object.keys(rosterGroups), [rosterGroups]);
   useEffect(() => {
@@ -118,11 +152,10 @@ export default function LeagueSettings() {
   }, [rosterGroups, rosterTeamNames, selectedRosterTeam]);
   const selectedRosterPlayers = selectedRosterTeam ? rosterGroups[selectedRosterTeam] ?? [] : [];
   const scheduleWeeks = useMemo(
-    () =>
-      Array.from(new Set((data?.schedule ?? []).map((row) => Number(row.week)).filter((week) => Number.isFinite(week))))
-        .sort((first, second) => first - second),
+    () => getLeagueScheduleWeeks(data?.schedule ?? []),
     [data?.schedule]
   );
+  const regularSeasonFinalWeek = scheduleWeeks[scheduleWeeks.length - 1] ?? 0;
   useEffect(() => {
     if (scheduleWeeks.length === 0) {
       if (selectedScheduleWeek !== null) setSelectedScheduleWeek(null);
@@ -140,6 +173,11 @@ export default function LeagueSettings() {
   const scoringEntries = Object.entries(data?.scoring_settings ?? {});
   const rosterEntries = Object.entries(data?.roster_settings ?? {}).sort(
     ([first], [second]) => slotOrder.indexOf(first) - slotOrder.indexOf(second)
+  );
+  const standingsRows = useMemo(() => buildStandingsRows(data), [data]);
+  const waiverSystem = formatWaiverSystem(data?.waiver_rules?.waiver_type);
+  const waiverRuleEntries = Object.entries(data?.waiver_rules ?? {}).filter(
+    ([key]) => key !== "waiver_type" && key !== "trade_review_type"
   );
   const leagueInfo = data?.league_info ?? {};
 
@@ -173,10 +211,6 @@ export default function LeagueSettings() {
     );
   }
 
-  if (!postDraft) {
-    return <Navigate to={`/league/${parsedLeagueId}/lobby`} replace />;
-  }
-
   return (
     <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[460px] rounded-[3rem] bg-[radial-gradient(circle_at_18%_8%,rgba(56,189,248,0.2),transparent_34%),radial-gradient(circle_at_76%_0%,rgba(99,102,241,0.18),transparent_38%)] blur-2xl" />
@@ -206,7 +240,7 @@ export default function LeagueSettings() {
             </div>
             <div className="rounded-[1.25rem] border border-violet-300/20 bg-violet-400/10 p-4 shadow-[0_0_34px_rgba(167,139,250,0.10)]">
               <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Trades</p>
-              <p className="mt-1 text-2xl font-black text-violet-100">{tradeTransactions.length}</p>
+              <p className="mt-1 text-2xl font-black text-violet-100">{tradeHistory.length}</p>
             </div>
           </div>
         </div>
@@ -253,11 +287,11 @@ export default function LeagueSettings() {
       {activePanel === "standings" ? (
         <section className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[#0b1424]/92 shadow-[0_18px_70px_rgba(14,165,233,0.10)]">
           <PanelHeader title="Standings" subtitle="Current league records and points leaderboard." icon={Medal} />
-          {(data?.standings ?? []).length === 0 ? (
-            <EmptyState message="Standings are not available yet." />
+          {standingsRows.length === 0 ? (
+            <EmptyState message="No league teams are available yet." />
           ) : (
             <div className="divide-y divide-sky-300/10">
-              {data?.standings.map((row, index) => {
+              {standingsRows.map((row, index) => {
                 const teamName = formatValue(row.team_name ?? row.name ?? `Team ${index + 1}`);
                 return (
                   <div
@@ -267,7 +301,7 @@ export default function LeagueSettings() {
                     <span className="text-2xl font-black italic text-sky-200">#{formatValue(row.rank ?? index + 1)}</span>
                     <span className="font-black text-slate-50">{teamName}</span>
                     <span className="text-sm font-bold text-slate-400">
-                      {formatValue(row.wins ?? 0)}-{formatValue(row.losses ?? 0)}-{formatValue(row.ties ?? 0)}
+                      {formatRecord(row)}
                     </span>
                     <span className="text-sm font-bold text-slate-400">PF {formatValue(row.points_for ?? 0)}</span>
                     <span className="text-sm font-bold text-slate-400">PA {formatValue(row.points_against ?? 0)}</span>
@@ -280,7 +314,7 @@ export default function LeagueSettings() {
       ) : null}
 
       {activePanel === "scoring" ? (
-        <section className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
+        <section className="grid gap-5 xl:grid-cols-[1.2fr_0.9fr_0.9fr]">
           <div className="rounded-[2rem] border border-sky-300/20 bg-[#0b1424]/92 shadow-[0_18px_70px_rgba(14,165,233,0.10)]">
             <PanelHeader title="Point System" subtitle="League-specific fantasy scoring values." icon={Settings2} />
             <div className="grid gap-3 p-5 sm:grid-cols-2">
@@ -299,7 +333,7 @@ export default function LeagueSettings() {
             </div>
           </div>
           <div className="rounded-[2rem] border border-sky-300/20 bg-[#0b1424]/92 shadow-[0_18px_70px_rgba(14,165,233,0.10)]">
-            <PanelHeader title="Roster Rules" subtitle="Slots and waiver rules for this league." icon={ShieldCheck} />
+            <PanelHeader title="Roster System" subtitle="Starting, bench, and IR slots for every team." icon={ShieldCheck} />
             <div className="grid gap-3 p-5">
               {rosterEntries.map(([slot, count]) => (
                 <div key={slot} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] p-4">
@@ -309,7 +343,21 @@ export default function LeagueSettings() {
                   <span className="text-xl font-black text-slate-50">{formatValue(count)}</span>
                 </div>
               ))}
-              {Object.entries(data?.waiver_rules ?? {}).map(([key, value]) => (
+            </div>
+          </div>
+          <div className="rounded-[2rem] border border-sky-300/20 bg-[#0b1424]/92 shadow-[0_18px_70px_rgba(14,165,233,0.10)]">
+            <PanelHeader title="Waiver System" subtitle="How unrostered players are claimed in this league." icon={ListOrdered} />
+            <div className="grid gap-3 p-5">
+              <div className="rounded-2xl border border-sky-300/30 bg-sky-300/[0.11] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-200">Claim format</p>
+                <p className="mt-2 text-2xl font-black text-slate-50">{waiverSystem}</p>
+                <p className="mt-2 text-xs font-semibold leading-5 text-slate-400">
+                  {waiverSystem === "FAAB"
+                    ? "Managers submit blind bids from their league FAAB budget."
+                    : "Claims are awarded using the league waiver wire order."}
+                </p>
+              </div>
+              {waiverRuleEntries.map(([key, value]) => (
                 <div key={key} className="flex items-center justify-between rounded-2xl border border-sky-300/15 bg-sky-300/[0.05] p-4">
                   <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
                     {key.replace(/_/g, " ")}
@@ -324,15 +372,17 @@ export default function LeagueSettings() {
 
       {activePanel === "schedule" ? (
         <section className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[#0b1424]/92 shadow-[0_18px_70px_rgba(14,165,233,0.10)]">
-          <PanelHeader title="Manager Schedules" subtitle="Choose a week to view every matchup scheduled for that week." icon={CalendarDays} />
+          <PanelHeader title="Manager Schedules" subtitle="The regular-season schedule is generated when the draft completes. Choose any week to see every league matchup." icon={CalendarDays} />
           {(data?.schedule ?? []).length === 0 ? (
             <EmptyState message="Schedule has not been generated yet." />
           ) : (
             <div className="space-y-5 p-5">
               <div className="flex flex-col gap-3 rounded-2xl border border-sky-300/15 bg-sky-300/[0.045] p-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-300">Select Week</p>
-                  <p className="mt-1 text-xs font-bold text-slate-500">Showing all league matchups for one week at a time.</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-300">Regular Season</p>
+                  <p className="mt-1 text-xs font-bold text-slate-500">
+                    Weeks 1–{regularSeasonFinalWeek} · every team has one matchup each week.
+                  </p>
                 </div>
                 <Select
                   value={selectedScheduleWeek === null ? undefined : String(selectedScheduleWeek)}
@@ -349,6 +399,28 @@ export default function LeagueSettings() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-7" role="group" aria-label="Regular season week">
+                {scheduleWeeks.map((week) => {
+                  const active = selectedScheduleWeek === week;
+                  return (
+                    <button
+                      key={week}
+                      type="button"
+                      onClick={() => setSelectedScheduleWeek(week)}
+                      aria-pressed={active}
+                      className={[
+                        "rounded-xl border px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.12em] transition",
+                        active
+                          ? "border-sky-300/65 bg-sky-300/20 text-sky-50 shadow-[0_0_20px_rgba(56,189,248,0.18)]"
+                          : "border-white/10 bg-white/[0.035] text-slate-400 hover:border-sky-300/35 hover:bg-sky-300/[0.08] hover:text-slate-100",
+                      ].join(" ")}
+                    >
+                      Week {week}
+                    </button>
+                  );
+                })}
               </div>
 
               {selectedScheduleRows.length === 0 ? (
@@ -416,20 +488,54 @@ export default function LeagueSettings() {
 
       {activePanel === "trades" ? (
         <section className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[#0b1424]/92 shadow-[0_18px_70px_rgba(14,165,233,0.10)]">
-          <PanelHeader title="Trade History" subtitle="League-specific trade history. This does not mix transactions from other leagues." icon={History} />
-          {tradeTransactions.length === 0 ? (
+          <PanelHeader title="Trade History" subtitle="Completed league trades, including both managers, exchanged players, and the completion time." icon={History} />
+          {tradeHistory.length === 0 ? (
             <EmptyState message="No completed league trades have been recorded yet." />
           ) : (
-            <div className="divide-y divide-sky-300/10">
-              {tradeTransactions.map((transaction) => (
-                <div key={transaction.id} className="grid gap-3 px-5 py-4 md:grid-cols-[1fr_150px_180px]">
-                  <p className="font-black uppercase text-slate-50">{transaction.transaction_type.replace(/_/g, " ")}</p>
-                  <p className="text-sm font-bold text-slate-400">Team #{transaction.team_id}</p>
-                  <p className="text-sm font-bold text-slate-500">
-                    {new Date(transaction.created_at).toLocaleString()}
-                  </p>
-                </div>
-              ))}
+            <div className="space-y-4 p-5">
+              {tradeHistory.map((trade) => {
+                const tradePath = tradeOfferPath(parsedLeagueId, trade.id);
+                return (
+                  <article key={trade.id} className="rounded-[1.4rem] border border-sky-300/15 bg-sky-300/[0.035] p-4">
+                    <div className="flex flex-col gap-3 border-b border-sky-300/10 pb-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2 text-sm font-black text-slate-50">
+                          <span>{trade.proposing_party.team_name}</span>
+                          <ArrowRightLeft className="h-4 w-4 text-sky-300" aria-hidden="true" />
+                          <span>{trade.receiving_party.team_name}</span>
+                        </div>
+                        <p className="mt-2 text-xs font-semibold text-slate-400">
+                          Managers: {trade.proposing_party.manager_name ?? "Unavailable"} and {trade.receiving_party.manager_name ?? "Unavailable"}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+                        <p className="text-right text-xs font-bold text-slate-500">
+                          Completed {formatDateTime(trade.processed_at ?? trade.accepted_at ?? trade.created_at)}
+                        </p>
+                        {tradePath ? (
+                          <Link to={tradePath} className="rounded-lg border border-primary/50 bg-primary/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-primary transition hover:bg-primary/20">
+                            View trade
+                          </Link>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <div className="rounded-xl border border-rose-300/20 bg-rose-500/10 p-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-rose-100">{trade.proposing_party.team_name} sent</p>
+                        <ul className="mt-2 space-y-1 text-sm font-semibold text-slate-100">
+                          {formatTradeAssets(trade.proposing_team_sends).map((asset) => <li key={asset}>{asset}</li>)}
+                        </ul>
+                      </div>
+                      <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 p-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100">{trade.receiving_party.team_name} sent</p>
+                        <ul className="mt-2 space-y-1 text-sm font-semibold text-slate-100">
+                          {formatTradeAssets(trade.receiving_team_sends).map((asset) => <li key={asset}>{asset}</li>)}
+                        </ul>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>
@@ -437,9 +543,9 @@ export default function LeagueSettings() {
 
       {activePanel === "draft" ? (
         <section className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[#0b1424]/92 shadow-[0_18px_70px_rgba(14,165,233,0.10)]">
-          <PanelHeader title="Draft Results" subtitle="Every pick imported into this league." icon={ClipboardList} />
+          <PanelHeader title="Draft Results" subtitle="Every completed pick in this league appears here automatically." icon={ClipboardList} />
           {(data?.draft_results ?? []).length === 0 ? (
-            <EmptyState message="Draft results are not available yet." />
+            <EmptyState message="No completed draft picks yet. Results will appear here as soon as the draft begins." />
           ) : (
             <div className="divide-y divide-sky-300/10">
               {data?.draft_results.map((pick, index) => (

@@ -1,11 +1,16 @@
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.services.player_trade_value import (
+    MAX_TRADE_VALUE,
     VALUE_POLICY_VERSION,
     calculate_player_trade_value,
     calculate_weekly_trade_values,
+    get_player_trade_values,
+    value_tier,
     weekly_value_weights,
 )
+from collegefootballfantasy_api.app.models.player_trade_value import PlayerTradeValue
+from datetime import datetime, timezone
 
 
 def test_preseason_value_is_rating_only_and_post_week_one_blends_performance(db_session):
@@ -35,5 +40,39 @@ def test_value_weights_bounds_ranks_and_repeat_generation(db_session):
     assert first_run["calculated"] == second_run["calculated"] == 2
     value_rows = db_session.query(__import__("collegefootballfantasy_api.app.models.player_trade_value", fromlist=["PlayerTradeValue"]).PlayerTradeValue).all()
     assert len(value_rows) == 2
-    assert all(0 <= row.value <= 100 for row in value_rows)
+    assert all(0 <= row.value <= MAX_TRADE_VALUE for row in value_rows)
     assert min(row.positional_value_rank for row in value_rows) == 1
+
+
+def test_trade_value_tiers_and_serialized_legacy_values_use_the_0_to_99_scale(db_session):
+    player = Player(name="Tier Receiver", position="WR", school="Miami", cfb27_overall=88)
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        PlayerTradeValue(
+            player_id=player.id,
+            season=2026,
+            week=0,
+            value=100.0,
+            tier="ELITE",
+            confidence=0.9,
+            policy_version=VALUE_POLICY_VERSION,
+            calculated_at=datetime.now(timezone.utc),
+            input_version="legacy",
+        )
+    )
+    db_session.commit()
+
+    assert [value_tier(value) for value in (96, 90, 85, 80, 78, 70, 69)] == [
+        "UNTOUCHABLE",
+        "FRANCHISE_STAR",
+        "EFFECTIVE_STARTER",
+        "GREAT_OPTION",
+        "GOOD_BENCH_OPTION",
+        "GREAT_DEPTH_ROLE",
+        "SPECULATIVE",
+    ]
+    history = get_player_trade_values(db_session, player_id=player.id, season=2026)
+    assert history.current is not None
+    assert history.current.value == 99.0
+    assert history.current.tier == "UNTOUCHABLE"

@@ -214,7 +214,7 @@ describe("TradeFinalizedCard", () => {
     expect(screen.getByText(/Jeremiah Smith/)).toBeTruthy();
     expect(screen.getByText(/Ahmad Hardy/)).toBeTruthy();
     expect(screen.getByText(/Roster transfer pending/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: "View trade" }).getAttribute("href")).toBe("/leagues/4/trades/18");
+    expect(screen.getByRole("link", { name: "View trade" }).getAttribute("href")).toBe("/leagues/4/trades/18?returnTo=%2Fchats%3FleagueId%3D4");
 
     rerender(<MemoryRouter><TradeFinalizedCard message={{ ...message, metadata: { ...message.metadata, processing_status: "processed" } }} /></MemoryRouter>);
     expect(screen.getByText("Roster transfer complete")).toBeTruthy();

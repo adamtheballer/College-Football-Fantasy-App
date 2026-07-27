@@ -27,6 +27,11 @@ CFB27_SOURCE_PATH = Path(__file__).resolve().parents[1] / "data" / "cfb27_rating
 CFB27_EXTERNAL_PREFIX = "cfb27:"
 CFB27_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 CFB27_SCHOOL_ALIASES = {"california": "cal"}
+# The imported CFB27 source only contains real game overalls.  A board rank
+# (for example, 33) is never a player overall and must not be allowed through
+# this import path as an OVR value.
+CFB27_MIN_OVERALL = 70
+CFB27_MAX_OVERALL = 99
 
 
 @dataclass(frozen=True)
@@ -63,17 +68,24 @@ def cfb27_identity_key(*, name: str | None, school: str | None, position: str | 
 @lru_cache(maxsize=1)
 def load_cfb27_ratings() -> tuple[Cfb27Rating, ...]:
     source = json.loads(CFB27_SOURCE_PATH.read_text(encoding="utf-8"))
-    normalized_rows = [
-        {
-            "source_order": index,
-            "position_rank": int(row["rank"]),
-            "name": str(row["name"]),
-            "school": str(row["school"]),
-            "position": str(row["position"]).upper(),
-            "overall": int(row["overall"]),
-        }
-        for index, row in enumerate(source)
-    ]
+    normalized_rows = []
+    for index, row in enumerate(source, start=1):
+        overall = int(row["overall"])
+        if not CFB27_MIN_OVERALL <= overall <= CFB27_MAX_OVERALL:
+            raise ValueError(
+                f"CFB27 row {index} has invalid overall {overall}; "
+                f"expected {CFB27_MIN_OVERALL}-{CFB27_MAX_OVERALL}"
+            )
+        normalized_rows.append(
+            {
+                "source_order": index - 1,
+                "position_rank": int(row["rank"]),
+                "name": str(row["name"]),
+                "school": str(row["school"]),
+                "position": str(row["position"]).upper(),
+                "overall": overall,
+            }
+        )
     global_rank_by_key = {
         cfb27_identity_key(name=row["name"], school=row["school"], position=row["position"]): index + 1
         for index, row in enumerate(

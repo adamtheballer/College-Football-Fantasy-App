@@ -9,6 +9,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_PATH = PROJECT_ROOT / "api" / "app" / "data" / "cfb27_ratings.json"
 TARGET_PATH = PROJECT_ROOT / "web" / "client" / "lib" / "cfb27Ratings.ts"
 VALID_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
+# This is an OVR contract, not a board-rank contract.  A value such as 33 may
+# be a valid player rank but can never be emitted as a CFB27 overall rating.
+MIN_CFB27_OVERALL = 70
+MAX_CFB27_OVERALL = 99
 
 
 def _json_string(value: object) -> str:
@@ -31,8 +35,11 @@ def load_rating_rows(source_path: Path = SOURCE_PATH) -> list[tuple[int, str, st
             raise ValueError(f"CFB27 row {index} has unsupported position {position!r}")
         if rank < 1:
             raise ValueError(f"CFB27 row {index} has invalid rank {rank}")
-        if not 0 <= overall <= 99:
-            raise ValueError(f"CFB27 row {index} has invalid overall {overall}")
+        if not MIN_CFB27_OVERALL <= overall <= MAX_CFB27_OVERALL:
+            raise ValueError(
+                f"CFB27 row {index} has invalid overall {overall}; "
+                f"expected {MIN_CFB27_OVERALL}-{MAX_CFB27_OVERALL}"
+            )
         key = (name.lower(), school.lower(), position)
         if key in seen_keys:
             raise ValueError(f"Duplicate CFB27 identity in source: {name} / {school} / {position}")

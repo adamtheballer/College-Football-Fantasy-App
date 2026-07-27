@@ -142,7 +142,7 @@ See `.env.example` for the full list.
 - `PROVIDER_DISCLOSURE_URL`
 - `SECURITY_HEADERS_ENABLED`
 
-`UI_BASE_URL` should match your local web origin (`http://localhost:5173` for Vite dev).
+`UI_BASE_URL` should match your local web origin (`http://localhost:8080` for the supported local stack).
 
 Production must use:
 
@@ -261,6 +261,23 @@ the container network URL:
 ```bash
 DB_PORT=55433 docker compose up --build
 ```
+
+### Local runtime integrity
+
+Use one browser URL and one API channel: `http://localhost:8080` and its
+same-origin `/api` proxy. Vite runs with `--strictPort`, so a second UI cannot
+silently move to another port while Chrome continues showing a stale build.
+
+After API or Docker configuration changes, rebuild the running stack from the
+current checkout and verify the browser-facing API path:
+
+```bash
+make refresh
+```
+
+`make refresh` recreates the API, lifecycle worker, and Vite UI from the current
+checkout, then requires `http://localhost:8080/api/health/ready` to report ready.
+Run it after any backend or frontend change when using the Docker runtime.
 
 ## Deployment configuration
 

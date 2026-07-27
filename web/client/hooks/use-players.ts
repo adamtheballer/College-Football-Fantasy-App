@@ -158,8 +158,8 @@ export type PlayerTrajectoryResponse = {
   player_id: number;
   season: number;
   league_id?: number | null;
-  projection: Array<{ week: number; points: number; source: "published" | "modeled" | "bye" }>;
-  value: Array<{ week: number; value: number; source: "published" | "modeled" }>;
+  projection: Array<{ week: number; points: number; source: "preseason" | "published" | "bye" }>;
+  value: Array<{ week: number; value: number; source: "preseason" | "published" }>;
 };
 
 export function useLeaguePlayerHistory(

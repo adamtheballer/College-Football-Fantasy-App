@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Check, Clock3, Copy, Lock, Radio, Trophy, UserRound } from "lucide-react";
+import { Check, CircleX, Clock3, Copy, Lock, Radio, Trophy, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { type SaturdayPickPlayer, useSaveSaturdayPick, useSaturdayPickContest } from "@/hooks/use-saturday-pick";
 import { getSaturdayPickRewardMessage, getSaturdayPickSponsorLogo } from "@/lib/saturday-pick-sponsor";
 
@@ -28,6 +29,16 @@ export const positionLabel = (position: SaturdayPickPlayer["canonical_position"]
 export const pickConfirmationMessage = (playerName: string) =>
   `Your pick is in. Follow ${playerName} this Saturday.`;
 
+export const lockDeadlineMessage = (playerName: string, lockAt: string) => {
+  const parsed = new Date(lockAt);
+  if (Number.isNaN(parsed.getTime())) {
+    return `Your pick can be changed until ${playerName}'s game begins. Submit before kickoff; then it will lock.`;
+  }
+  const time = parsed.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const date = parsed.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  return `Your pick can be changed until ${playerName}'s game starts at ${time} on ${date}. Pick before kickoff; then it will lock.`;
+};
+
 export const displayPoints = (player: SaturdayPickPlayer, contestStatus: string) => {
   if (contestStatus === "FINAL") return player.final_points;
   return player.live_points ?? player.projected_points;
@@ -43,7 +54,10 @@ function useCountdown(lockAt: string | undefined) {
   const hours = Math.floor(remaining / 3_600_000);
   const minutes = Math.floor((remaining % 3_600_000) / 60_000);
   const seconds = Math.floor((remaining % 60_000) / 1_000);
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  return {
+    value: `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
+    expired: Boolean(lockAt) && remaining === 0,
+  };
 }
 
 export default function SaturdayPick6() {
@@ -51,9 +65,11 @@ export default function SaturdayPick6() {
   const savePick = useSaveSaturdayPick();
   const contest = contestQuery.data;
   const [pendingPickId, setPendingPickId] = useState<number | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [resultDialogOpen, setResultDialogOpen] = useState(false);
   const countdown = useCountdown(contest?.lock_at);
   const selectedPickId = pendingPickId ?? contest?.entry?.selected_pick_player_id ?? null;
-  const isOpen = contest?.status === "OPEN";
+  const isOpen = contest?.status === "OPEN" && !countdown.expired;
   const isResults = Boolean(contest && ["SCORING", "PROVISIONAL", "FINAL"].includes(contest.status));
   const winnerIds = useMemo(() => new Set(contest?.winning_player_ids ?? []), [contest?.winning_player_ids]);
   const players = useMemo(() => {
@@ -63,6 +79,18 @@ export default function SaturdayPick6() {
       ? rows.sort((left, right) => (displayPoints(right, contest.status) ?? -1) - (displayPoints(left, contest.status) ?? -1))
       : rows;
   }, [contest, isResults]);
+
+  useEffect(() => {
+    if (contest?.status === "OPEN" && countdown.expired) {
+      void contestQuery.refetch();
+    }
+  }, [contest?.status, contestQuery, countdown.expired]);
+
+  useEffect(() => {
+    if (contest?.status === "FINAL" && contest.entry) {
+      setResultDialogOpen(true);
+    }
+  }, [contest?.entry?.id, contest?.id, contest?.status]);
 
   if (contestQuery.isLoading) {
     return <div className="mx-auto max-w-7xl py-20 text-center text-sm font-black uppercase tracking-[0.2em] text-cfb-text-muted">Loading Saturday Pick 6…</div>;
@@ -80,11 +108,20 @@ export default function SaturdayPick6() {
 
   const selectedPlayer = contest.players.find((player) => player.id === selectedPickId) ?? null;
   const savedPlayer = contest.players.find((player) => player.id === contest.entry?.selected_pick_player_id) ?? null;
+  const firstGamePlayer = contest.first_game_player ?? [...contest.players].sort(
+    (left, right) => new Date(left.game_time).getTime() - new Date(right.game_time).getTime() || left.sort_order - right.sort_order
+  )[0];
+  const lockPlayerName = firstGamePlayer?.player_name ?? "the first featured player";
   const sponsorLogo = getSaturdayPickSponsorLogo(contest.sponsor);
   const submit = async () => {
     if (!selectedPickId || !isOpen) return;
-    await savePick.mutateAsync({ contestId: contest.id, selectedPickPlayerId: selectedPickId });
-    setPendingPickId(null);
+    setSubmitError(null);
+    try {
+      await savePick.mutateAsync({ contestId: contest.id, selectedPickPlayerId: selectedPickId });
+      setPendingPickId(null);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Unable to save your pick. Please try again.");
+    }
   };
   const copySponsorCode = async () => {
     if (contest.sponsor?.code) await navigator.clipboard?.writeText(contest.sponsor.code);
@@ -101,17 +138,17 @@ export default function SaturdayPick6() {
               <span className="inline-flex items-center gap-2 rounded-full border border-cfb-gold/45 bg-cfb-gold/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.2em] text-yellow-100"><Trophy className="h-4 w-4" /> Saturday Pick 6</span>
               <span className="cfb-micro-label text-cyan-200">Week {contest.week_number} · {contest.contest_position} Week</span>
             </div>
-            <h1 className="mt-5 font-display text-4xl font-black italic tracking-[-0.05em] text-cfb-text-primary sm:text-6xl">{isResults ? "LIVE RESULTS" : "MAKE YOUR PICK"}</h1>
+            <h1 className="mt-5 font-display text-4xl font-black italic tracking-[-0.05em] text-cfb-text-primary sm:text-6xl">{isResults ? "LIVE RESULTS" : isOpen ? "MAKE YOUR PICK" : "PICKS LOCKED"}</h1>
             <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-cfb-text-secondary sm:text-lg">Which featured {positionLabel(contest.contest_position)} will score the most fantasy points this week?</p>
           </div>
           <div className="flex flex-wrap items-stretch gap-3">
             {contest.sponsor ? <div className="flex max-w-sm items-center gap-4 rounded-2xl border border-cyan-200/35 bg-slate-950/55 p-4 shadow-[0_0_28px_rgba(34,211,238,0.10)]"><div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-white p-1.5 text-xs font-black text-cyan-900">{sponsorLogo ? <img src={sponsorLogo} alt={`${contest.sponsor.name} logo`} className="h-full w-full object-contain" /> : contest.sponsor.name.slice(0, 2).toUpperCase()}</div><div><p className="cfb-micro-label text-cyan-200">Presented by</p><p className="mt-1 text-lg font-black leading-tight text-white">{contest.sponsor.name}</p><p className="mt-1 text-xs font-bold leading-5 text-cyan-100/80">{getSaturdayPickRewardMessage(contest.sponsor)}</p></div></div> : null}
-            <div className="rounded-2xl border border-cfb-border-strong bg-slate-950/55 px-5 py-3 text-right"><p className="cfb-micro-label text-cfb-text-muted">{isOpen ? "Locks in" : "Contest status"}</p><p className="mt-1 font-display text-2xl font-black tabular-nums text-cyan-100">{isOpen ? countdown : statusLabel(contest.status)}</p></div>
+            <div className="rounded-2xl border border-cfb-border-strong bg-slate-950/55 px-5 py-3 text-right"><p className="cfb-micro-label text-cfb-text-muted">{isOpen ? "Locks in" : "Contest status"}</p><p className="mt-1 font-display text-2xl font-black tabular-nums text-cyan-100">{isOpen ? countdown.value : statusLabel(contest.status)}</p></div>
           </div>
         </div>
       </section>
 
-      {contest.entry && contest.status !== "FINAL" ? <section className="rounded-3xl border border-cyan-200/40 bg-cyan-300/[0.10] p-6 shadow-[0_0_28px_rgba(34,211,238,0.10)]"><p className="cfb-micro-label text-cyan-100">Your pick is in</p><h2 className="mt-2 text-2xl font-black text-cfb-text-primary">{savedPlayer?.player_name ?? "Your Saturday Pick 6 selection"}</h2><p className="mt-2 font-bold text-cfb-text-secondary">{savedPlayer ? pickConfirmationMessage(savedPlayer.player_name) : "Follow your pick this Saturday."}</p><p className="mt-3 text-sm font-bold text-cfb-text-secondary">You can still update your selection until {formatKickoff(contest.lock_at)}.</p></section> : null}
+      {contest.entry && contest.status !== "FINAL" ? <section className="rounded-3xl border border-cyan-200/40 bg-cyan-300/[0.10] p-6 shadow-[0_0_28px_rgba(34,211,238,0.10)]"><p className="cfb-micro-label text-cyan-100">Your pick is in</p><h2 className="mt-2 text-2xl font-black text-cfb-text-primary">{savedPlayer?.player_name ?? "Your Saturday Pick 6 selection"}</h2><p className="mt-2 font-bold text-cfb-text-secondary">{savedPlayer ? pickConfirmationMessage(savedPlayer.player_name) : "Follow your pick this Saturday."}</p><p className="mt-3 text-sm font-bold text-cfb-text-secondary">{isOpen ? lockDeadlineMessage(lockPlayerName, contest.lock_at) : `${lockPlayerName}'s game has started. Your pick is fully locked.`}</p></section> : null}
 
       {contest.status === "FINAL" ? <section className="rounded-3xl border border-cfb-gold/35 bg-cfb-gold/[0.08] p-5 text-cfb-text-primary"><p className="cfb-micro-label text-yellow-100">Saturday Pick 6 winner</p><p className="mt-2 text-2xl font-black">{winnerIds.size > 1 ? "Two or more players tied for the top score" : `${players[0]?.player_name ?? "Winner"} led the field`}</p>{contest.entry ? <p className="mt-2 font-bold text-cfb-text-secondary">{contest.entry.is_winner ? "YOU GOT IT RIGHT" : `Your pick finished ${Math.max(1, players.findIndex((player) => player.id === contest.entry?.selected_pick_player_id) + 1)}${"th"}.`}</p> : null}</section> : null}
 
@@ -123,20 +160,28 @@ export default function SaturdayPick6() {
           const pointLabel = contest.status === "FINAL" ? "Final points" : isResults ? "Live points" : "Projected points";
           return (
             <article key={player.id} className={`relative overflow-hidden rounded-3xl border p-5 transition ${selected ? "border-cyan-200 bg-cyan-300/[0.12] shadow-[0_0_30px_rgba(34,211,238,0.18)]" : "border-cfb-border-subtle bg-cfb-surface"}`}>
+              {contest.status === "FINAL" && contest.entry?.selected_pick_player_id === player.id && !contest.entry.is_winner ? <div className="absolute inset-0 z-10 flex items-center justify-center bg-rose-950/35" aria-label="Your pick did not win"><CircleX className="h-28 w-28 text-rose-200 drop-shadow-[0_0_18px_rgba(251,113,133,0.8)]" /></div> : null}
               {isResults ? <span className="absolute right-4 top-4 text-xs font-black tabular-nums text-cyan-100">#{index + 1}</span> : null}
               <div className="flex min-w-0 items-center gap-3 pr-8"><div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/12 bg-cfb-surface-raised text-cfb-brand">{player.image_url ? <img src={player.image_url} alt={player.player_name} className="h-full w-full object-cover" /> : <UserRound className="h-7 w-7" />}</div><div className="min-w-0"><h2 className="truncate text-xl font-black text-cfb-text-primary">{player.player_name}</h2><p className="mt-1 text-xs font-black uppercase tracking-[0.14em] text-cfb-text-muted">{player.school} · {player.canonical_position}</p></div></div>
               {isWinner ? <Trophy className="absolute right-4 top-4 h-5 w-5 text-cfb-gold" aria-label="Weekly winner" /> : null}
               <div className="mt-5 grid grid-cols-2 gap-3 text-sm"><div><p className="cfb-micro-label">Opponent</p><p className="mt-1 font-black text-cfb-text-primary">vs. {player.opponent}</p></div><div><p className="cfb-micro-label">{pointLabel}</p><p className="mt-1 text-xl font-black tabular-nums text-cyan-100">{formatPoints(shownPoints)}</p></div></div>
               <div className="mt-4 flex items-center justify-between gap-3 text-xs font-bold text-cfb-text-secondary"><span>{formatKickoff(player.game_time)}</span><span className={player.scoring_status === "DATA_DELAYED" ? "text-amber-200" : "text-cyan-100"}>{player.scoring_status === "LIVE" ? <Radio className="mr-1 inline h-3.5 w-3.5" /> : null}{statusLabel(player.scoring_status)}</span></div>
-              {isOpen ? <Button className="mt-5 w-full" variant={selected ? "default" : "outline"} onClick={() => setPendingPickId(player.id)}>{selected ? <><Check className="mr-2 h-4 w-4" /> Your Pick</> : "Choose player"}</Button> : null}
+              {isOpen ? <Button type="button" className="mt-5 w-full" variant={selected ? "default" : "outline"} onClick={() => setPendingPickId(player.id)}>{selected ? <><Check className="mr-2 h-4 w-4" /> Your Pick</> : "Choose player"}</Button> : null}
             </article>
           );
         })}
       </section>
 
-      {isOpen ? <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-cfb-border-subtle bg-cfb-surface p-5"><div><p className="text-sm font-black text-cfb-text-primary">{selectedPlayer ? `You selected ${selectedPlayer.player_name}. Lock it in to follow them this Saturday.` : `Choose one featured ${positionLabel(contest.contest_position)}.`}</p><p className="mt-1 text-sm font-bold text-cfb-text-secondary">You can change your choice until the published lock time.</p></div><Button disabled={!selectedPickId || savePick.isPending} onClick={submit}>{savePick.isPending ? "Saving…" : contest.entry ? "Update Pick" : "Lock In Pick"}</Button></section> : null}
+      {isOpen ? <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-cfb-border-subtle bg-cfb-surface p-5"><div><p className="text-sm font-black text-cfb-text-primary">{selectedPlayer ? `You selected ${selectedPlayer.player_name}. Lock it in to follow them this Saturday.` : `Choose one featured ${positionLabel(contest.contest_position)}.`}</p><p className="mt-1 text-sm font-bold text-cfb-text-secondary">{lockDeadlineMessage(lockPlayerName, contest.lock_at)}</p>{submitError ? <p role="alert" className="mt-3 text-sm font-bold text-red-300">{submitError}</p> : null}</div><Button type="button" disabled={!selectedPickId || savePick.isPending} onClick={submit}>{savePick.isPending ? "Saving…" : contest.entry ? "Update Pick" : "Lock In Pick"}</Button></section> : null}
 
-      {contest.entry && contest.sponsor ? <section className={`rounded-3xl border p-6 ${contest.sponsor.reward_unlocked ? "border-cfb-success/40 bg-cfb-success/[0.10]" : "border-cyan-200/20 bg-cyan-200/[0.06]"}`}><p className="cfb-micro-label text-cyan-100">{contest.sponsor.reward_unlocked ? "Discount code unlocked" : "This week’s prize"}</p><h2 className="mt-2 text-2xl font-black text-cfb-text-primary">{contest.sponsor.name} discount code</h2><p className="mt-2 font-bold text-cfb-text-secondary">{contest.sponsor.offer_text ?? getSaturdayPickRewardMessage(contest.sponsor)}</p>{contest.sponsor.reward_unlocked && contest.sponsor.code ? <div className="mt-5 flex flex-wrap items-center gap-3"><code className="rounded-xl border border-white/15 bg-slate-950/55 px-4 py-3 font-black tracking-[0.16em] text-cyan-100">{contest.sponsor.code}</code><Button variant="outline" onClick={copySponsorCode}><Copy className="mr-2 h-4 w-4" /> Copy Code</Button>{contest.sponsor.url ? <Button asChild><a href={contest.sponsor.url} target="_blank" rel="noreferrer">Visit Sponsor</a></Button> : null}</div> : <p className="mt-4 text-sm font-bold text-cfb-text-secondary">Make your pick before kickoff. The correct pick receives the discount code after final scoring.</p>}</section> : null}
+      {contest.entry && contest.sponsor ? <section className={`rounded-3xl border p-6 ${contest.sponsor.reward_unlocked ? "border-cfb-success/40 bg-cfb-success/[0.10]" : "border-cyan-200/20 bg-cyan-200/[0.06]"}`}><p className="cfb-micro-label text-cyan-100">{contest.sponsor.reward_unlocked ? "Discount code unlocked" : "This week’s prize"}</p><h2 className="mt-2 text-2xl font-black text-cfb-text-primary">{contest.sponsor.name} discount code</h2><p className="mt-2 font-bold text-cfb-text-secondary">{contest.sponsor.offer_text ?? getSaturdayPickRewardMessage(contest.sponsor)}</p>{contest.sponsor.reward_unlocked && contest.sponsor.code ? <div className="mt-5 flex flex-wrap items-center gap-3"><code className="rounded-xl border border-white/15 bg-slate-950/55 px-4 py-3 font-black tracking-[0.16em] text-cyan-100">{contest.sponsor.code}</code><Button variant="outline" onClick={copySponsorCode}><Copy className="mr-2 h-4 w-4" /> Copy Code</Button>{contest.sponsor.url ? <Button asChild><a href={contest.sponsor.url} target="_blank" rel="noreferrer">Visit Sponsor</a></Button> : null}</div> : contest.sponsor.reward_unlocked ? <p className="mt-4 text-sm font-bold text-cfb-text-secondary">Your single-use discount code will appear here when the sponsor provides it.</p> : <p className="mt-4 text-sm font-bold text-cfb-text-secondary">Make your pick before kickoff. The correct pick receives the discount code after final scoring.</p>}</section> : null}
+
+      <Dialog open={resultDialogOpen} onOpenChange={setResultDialogOpen}>
+        <DialogContent className="max-w-lg border-cyan-300/35 bg-[#081321] text-cfb-text-primary">
+          {contest.entry?.is_winner ? <><DialogHeader><DialogTitle className="pr-8 text-3xl font-black uppercase italic text-cfb-gold">You got it right</DialogTitle><DialogDescription className="text-base font-semibold leading-6 text-cfb-text-secondary">{savedPlayer?.player_name ?? "Your pick"} finished with the most fantasy points.</DialogDescription></DialogHeader><div className="rounded-2xl border border-cfb-gold/30 bg-cfb-gold/[0.10] p-4"><p className="cfb-micro-label text-yellow-100">Single-use discount code</p>{contest.sponsor?.code ? <div className="mt-3 flex flex-wrap items-center gap-3"><code className="rounded-xl border border-white/15 bg-slate-950/55 px-4 py-3 font-black tracking-[0.16em] text-cyan-100">{contest.sponsor.code}</code><Button variant="outline" onClick={copySponsorCode}><Copy className="mr-2 h-4 w-4" /> Copy Code</Button></div> : <p className="mt-2 text-sm font-bold text-cfb-text-secondary">Your code will appear here when the sponsor provides it.</p>}</div></> : <><DialogHeader><DialogTitle className="pr-8 text-3xl font-black uppercase italic text-rose-200">Not this week</DialogTitle><DialogDescription className="text-base font-semibold leading-6 text-cfb-text-secondary">{savedPlayer?.player_name ?? "Your pick"} did not finish first. Try again next week.</DialogDescription></DialogHeader><div className="flex justify-center rounded-2xl border border-rose-300/25 bg-rose-500/[0.10] p-5"><CircleX className="h-20 w-20 text-rose-200" aria-label="Pick did not win" /></div></>}
+          <DialogFooter><Button onClick={() => setResultDialogOpen(false)}>Close</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

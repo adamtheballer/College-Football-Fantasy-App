@@ -89,6 +89,35 @@ def test_admin_rejects_mixed_position_and_wrong_field_size(client, db_session):
     assert "exactly six" in short.json()["detail"]
 
 
+def test_contest_lock_is_the_first_featured_player_kickoff_and_identifies_that_player(client, db_session):
+    players, kickoff = _featured_players(db_session)
+    headers = admin_headers(client)
+
+    early_lock = client.post(
+        "/admin/saturday-pick-6",
+        json=_create_payload(players, kickoff - timedelta(minutes=1)),
+        headers=headers,
+    )
+    assert early_lock.status_code == 422
+    assert "locks exactly" in early_lock.json()["detail"]
+
+    created = client.post("/admin/saturday-pick-6", json=_create_payload(players, kickoff), headers=headers)
+    assert created.status_code == 201
+    payload = created.json()
+    assert datetime.fromisoformat(payload["lock_at"].replace("Z", "+00:00")).replace(tzinfo=timezone.utc) == kickoff
+    assert payload["first_game_player"] == {
+        "id": payload["players"][0]["id"],
+        "player_id": players[0].id,
+        "player_name": players[0].name,
+        "opponent": "Opponent 0",
+        "game_time": payload["lock_at"],
+    }
+
+    published = client.post(f"/admin/saturday-pick-6/{payload['id']}/publish", json={}, headers=headers)
+    assert published.status_code == 200
+    assert datetime.fromisoformat(published.json()["lock_at"].replace("Z", "+00:00")).replace(tzinfo=timezone.utc) == kickoff
+
+
 def test_public_entry_can_change_before_lock_and_rejects_after_lock(client, db_session, monkeypatch):
     _enable_pick_6(monkeypatch)
     players, kickoff = _featured_players(db_session)

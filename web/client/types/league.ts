@@ -220,6 +220,16 @@ export interface LeagueRosterPlayer {
   is_placeholder?: boolean;
 }
 
+export interface LeagueRosterTeam {
+  team: {
+    id: number;
+    name: string;
+    owner_user_id: number | null;
+    record: string | null;
+  };
+  roster: LeagueRosterPlayer[];
+}
+
 export interface LeagueRosterTabResponse {
   league_id: number;
   season?: number;
@@ -233,6 +243,7 @@ export interface LeagueRosterTabResponse {
   ir_slots?: number;
   message?: string | null;
   data: LeagueRosterPlayer[];
+  team_rosters?: LeagueRosterTeam[];
 }
 
 export interface LeagueMatchupTeam {
@@ -288,6 +299,7 @@ export interface LeagueWaiverPlayer {
   school: string | null;
   position: string | null;
   weekly_projected_fantasy_points: number;
+  projection_status: string;
   availability_state: string;
   available_at: string | null;
 }
@@ -369,12 +381,47 @@ export interface LeagueSettingsTabResponse {
     visible_until_draft_complete: boolean;
   } | null;
   members: LeagueMemberSettings[];
+  teams?: Array<{
+    id: number;
+    league_id: number;
+    name: string;
+    owner_user_id: number | null;
+  }>;
   scoring_settings: Record<string, number | string | boolean>;
   roster_settings: Record<string, number>;
   waiver_rules: Record<string, string | number | boolean>;
   standings: Array<Record<string, string | number>>;
   schedule: LeagueScheduleRow[];
   rosters: LeagueRosterPlayer[];
+  trade_history: Array<{
+    id: number;
+    status: string;
+    proposing_party: {
+      team_id: number;
+      team_name: string;
+      manager_name: string | null;
+    };
+    receiving_party: {
+      team_id: number;
+      team_name: string;
+      manager_name: string | null;
+    };
+    proposing_team_sends: Array<{
+      player_id: number | null;
+      name: string;
+      position: string | null;
+      school: string | null;
+    }>;
+    receiving_team_sends: Array<{
+      player_id: number | null;
+      name: string;
+      position: string | null;
+      school: string | null;
+    }>;
+    created_at: string;
+    accepted_at: string | null;
+    processed_at: string | null;
+  }>;
   draft_results: Array<Record<string, string | number | null>>;
   commissioner_controls: string[];
 }

@@ -17,6 +17,8 @@ from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekSc
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.trade_offer import TradeOffer
+from collegefootballfantasy_api.app.models.trade_offer_item import TradeOfferItem
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
@@ -27,8 +29,13 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueInviteSettingsRead,
     LeagueMemberRead,
     LeagueRosterTabRead,
+    LeagueRosterTeamRead,
     LeagueScheduleRowRead,
     LeagueSettingsViewRead,
+    LeagueTradeHistoryAssetRead,
+    LeagueTradeHistoryPartyRead,
+    LeagueTradeHistoryRead,
+    LeagueWorkspaceTeamRead,
     LeagueWaiverPlayerRead,
     LeagueWaiverPeriodRead,
     LeagueWaiversRead,
@@ -140,9 +147,20 @@ def _projection_map(
             WeeklyProjection.week == week,
             WeeklyProjection.player_id.in_(player_ids),
         )
+        .order_by(
+            WeeklyProjection.is_published.desc(),
+            WeeklyProjection.projection_version.desc(),
+            WeeklyProjection.id.desc(),
+        )
         .all()
     )
-    return {row.player_id: row for row in rows}
+    projections: dict[int, WeeklyProjection] = {}
+    for row in rows:
+        # One published projection is the source of truth.  The versioned
+        # history remains queryable without allowing an older row to win based
+        # on database iteration order.
+        projections.setdefault(row.player_id, row)
+    return projections
 
 
 def _roster_rows(db: Session, team_id: int) -> list[RosterEntry]:
@@ -330,6 +348,27 @@ def build_roster_tab_view(
     week = resolve_current_week(db, league, selected_week)
     team = _owned_team(db, league, user)
     slot_limits = _slot_limits(db, league)
+    teams = (
+        db.query(Team)
+        .filter(Team.league_id == league.id)
+        .order_by(Team.id.asc())
+        .all()
+    )
+    teams_by_id = {league_team.id: league_team for league_team in teams}
+    rosters_by_team = _serialize_team_rosters(db, league, teams_by_id, week)
+    team_records = _team_records(db, league, set(teams_by_id))
+    team_rosters = [
+        LeagueRosterTeamRead(
+            team=RosterTabTeamRead(
+                id=league_team.id,
+                name=league_team.name,
+                owner_user_id=league_team.owner_user_id,
+                record=team_records.get(league_team.id, "0-0-0"),
+            ),
+            roster=rosters_by_team.get(league_team.id, []),
+        )
+        for league_team in teams
+    ]
     if not team:
         return LeagueRosterTabRead(
             league_id=league.id,
@@ -341,11 +380,14 @@ def build_roster_tab_view(
             slots=[],
             roster_slot_limits=slot_limits,
             ir_slots=int(slot_limits.get("IR", 0)),
+            team_rosters=team_rosters,
             message="No team found for your user in this league.",
         )
 
-    roster = _serialize_team_roster(db, league, team, week)
-    team_read = _team_read(db, league, team)
+    roster = rosters_by_team.get(team.id, [])
+    team_read = next((row.team for row in team_rosters if row.team.id == team.id), None)
+    if team_read is None:
+        team_read = _team_read(db, league, team)
     return LeagueRosterTabRead(
         league_id=league.id,
         season=league.season_year,
@@ -358,6 +400,7 @@ def build_roster_tab_view(
         slots=roster,
         roster_slot_limits=slot_limits,
         ir_slots=int(slot_limits.get("IR", 0)),
+        team_rosters=team_rosters,
         message=None if roster else "Roster is empty. It will populate after the draft.",
     )
 
@@ -650,6 +693,13 @@ def build_waivers_view(
                     if player.id in projection_by_player
                     else 0.0
                 ),
+                projection_status=(
+                    "SCORED"
+                    if player.id in score_by_player
+                    else projection_by_player[player.id].projection_status
+                    if player.id in projection_by_player
+                    else "UNAVAILABLE"
+                ),
                 availability_state=availability_for_player(player.id)[0],
                 available_at=availability_for_player(player.id)[1],
             )
@@ -683,6 +733,7 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
     settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
     members = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).all()
     teams = db.query(Team).filter(Team.league_id == league.id).order_by(Team.id.asc()).all()
+    teams_by_id = {team.id: team for team in teams}
     roster_by_team = _serialize_team_rosters(
         db,
         league,
@@ -759,6 +810,52 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
             for pick, team, player in pick_rows
         ]
 
+    completed_trades = (
+        db.query(TradeOffer)
+        .options(joinedload(TradeOffer.items).joinedload(TradeOfferItem.player))
+        .filter(
+            TradeOffer.league_id == league.id,
+            TradeOffer.status == "processed",
+        )
+        .order_by(TradeOffer.processed_at.desc().nullslast(), TradeOffer.id.desc())
+        .all()
+    )
+
+    def trade_party(team_id: int) -> LeagueTradeHistoryPartyRead:
+        team = teams_by_id.get(team_id)
+        return LeagueTradeHistoryPartyRead(
+            team_id=team_id,
+            team_name=team.name if team else "Unknown team",
+            manager_name=team.owner_name if team else None,
+        )
+
+    def trade_assets(offer: TradeOffer, team_id: int) -> list[LeagueTradeHistoryAssetRead]:
+        return [
+            LeagueTradeHistoryAssetRead(
+                player_id=item.player_id,
+                name=(item.player.name if item.player else "Draft pick"),
+                position=item.player.position if item.player else None,
+                school=item.player.school if item.player else None,
+            )
+            for item in sorted(offer.items, key=lambda row: row.id)
+            if item.team_id == team_id
+        ]
+
+    trade_history = [
+        LeagueTradeHistoryRead(
+            id=offer.id,
+            status=offer.status,
+            proposing_party=trade_party(offer.proposing_team_id),
+            receiving_party=trade_party(offer.receiving_team_id),
+            proposing_team_sends=trade_assets(offer, offer.proposing_team_id),
+            receiving_team_sends=trade_assets(offer, offer.receiving_team_id),
+            created_at=offer.created_at,
+            accepted_at=offer.accepted_at,
+            processed_at=offer.processed_at,
+        )
+        for offer in completed_trades
+    ]
+
     return LeagueSettingsViewRead(
         league_id=league.id,
         league_name=league.name,
@@ -772,6 +869,15 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
         },
         invite=invite,
         members=[LeagueMemberRead.model_validate(member) for member in members],
+        teams=[
+            LeagueWorkspaceTeamRead(
+                id=team.id,
+                league_id=team.league_id,
+                name=team.name,
+                owner_user_id=team.owner_user_id,
+            )
+            for team in teams
+        ],
         scoring_settings=settings.scoring_json if settings else {},
         roster_settings=settings.roster_slots_json if settings and settings.roster_slots_json else DEFAULT_ROSTER_SLOTS.copy(),
         waiver_rules={
@@ -782,6 +888,7 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
         standings=standings,
         schedule=schedule,
         rosters=roster_rows,
+        trade_history=trade_history,
         draft_results=draft_results,
         commissioner_controls=(
             ["reschedule_draft", "update_settings", "regenerate_invite"]

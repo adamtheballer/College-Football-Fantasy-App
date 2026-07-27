@@ -40,6 +40,7 @@ type AvailablePlayerRow = {
   school: string | null;
   position: string | null;
   weekly_projected_fantasy_points: number;
+  projection_status: string;
   availability_state: string;
   available_at: string | null;
   rank: number;
@@ -126,6 +127,17 @@ const availabilityLabel = (value?: string | null) => {
     default:
       return "On waivers";
   }
+};
+
+export const waiverProjectionLabel = (
+  points: number | null | undefined,
+  projectionStatus: string | null | undefined,
+) => {
+  if (projectionStatus?.toUpperCase() === "BYE") return "BYE";
+  if (projectionStatus?.toUpperCase() === "OUT") return "OUT";
+  if (projectionStatus?.toUpperCase() === "UNAVAILABLE") return "—";
+  const value = Number(points);
+  return Number.isFinite(value) ? value.toFixed(1) : "—";
 };
 
 export default function LeagueWaivers() {
@@ -256,6 +268,7 @@ export default function LeagueWaivers() {
       school: null,
       position: null,
       weekly_projected_fantasy_points: 0,
+      projection_status: "UNAVAILABLE",
       availability_state: "waivers",
       available_at: null,
       rank: claim.preference_order,
@@ -567,10 +580,10 @@ export default function LeagueWaivers() {
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-[920px] w-full table-fixed text-left">
+            <table className="min-w-[980px] w-full table-fixed text-left">
               <thead className="border-b border-sky-300/10 bg-slate-950/35">
                 <tr className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                  <th className="w-20 px-5 py-4">RK</th>
+                  <th className="w-[7rem] min-w-[7rem] whitespace-nowrap px-5 py-4 text-right">RK</th>
                   <th className="px-4 py-4">Player</th>
                   <th className="w-44 px-4 py-4">School</th>
                   <th className="w-24 px-4 py-4">POS</th>
@@ -584,6 +597,7 @@ export default function LeagueWaivers() {
                 {filteredPlayers.map((player) => {
                   const tone = positionTone(player.position);
                   const projected = Number(player.weekly_projected_fantasy_points ?? 0);
+                  const projectionLabel = waiverProjectionLabel(projected, player.projection_status);
                   const claimable = canClaimAvailability(player.availability_state);
                   return (
                     <tr
@@ -599,8 +613,11 @@ export default function LeagueWaivers() {
                       }}
                       className="group cursor-pointer text-sm text-slate-200 transition-colors hover:bg-sky-300/[0.045] focus:outline-none focus-visible:bg-sky-300/[0.065]"
                     >
-                      <td className="px-5 py-4 align-middle">
-                        <span className="text-xl font-black italic text-slate-500 transition-colors group-hover:text-sky-200">
+                      <td className="w-[7rem] min-w-[7rem] whitespace-nowrap px-5 py-4 text-right align-middle">
+                        <span
+                          data-testid={`waiver-rank-${player.id}`}
+                          className="inline-flex min-w-[4ch] justify-end whitespace-nowrap text-xl font-black italic tabular-nums text-slate-500 transition-colors group-hover:text-sky-200"
+                        >
                           {player.rank}
                         </span>
                       </td>
@@ -625,8 +642,8 @@ export default function LeagueWaivers() {
                         </span>
                       </td>
                       <td className="px-4 py-4 text-right align-middle">
-                        <span className="text-lg font-black tabular-nums text-sky-100">
-                          {projected.toFixed(1)}
+                        <span className={`text-lg font-black tabular-nums ${projectionLabel === "BYE" ? "text-amber-200" : projectionLabel === "OUT" ? "text-rose-200" : "text-sky-100"}`}>
+                          {projectionLabel}
                         </span>
                       </td>
                       <td className="px-5 py-4 align-middle">

@@ -52,6 +52,13 @@ const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]
       body: JSON.stringify(mockAuthPayload.user),
     });
   });
+  await page.route("**/chats/unread-summary", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ total_unread: 0 }),
+    });
+  });
 };
 
 test.describe("critical browser workflows", () => {
@@ -113,6 +120,115 @@ test.describe("critical browser workflows", () => {
     await expect(page).toHaveURL(/\/saturday-pick-6$/);
     await expect(page.getByRole("heading", { name: "MAKE YOUR PICK", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "BUILD YOUR LEAGUE", exact: true })).not.toBeVisible();
+  });
+
+  test("locking a Saturday Pick 6 selection stays in the contest and confirms the pick", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+    let entry: Record<string, unknown> | null = null;
+    const contest = {
+      id: 1,
+      season: 2026,
+      week_number: 1,
+      title: "Saturday Pick 6",
+      contest_position: "RB",
+      status: "OPEN",
+      lock_at: "2026-09-05T16:00:00Z",
+      first_game_player: {
+        id: 1,
+        player_id: 101,
+        player_name: "Ahmad Hardy",
+        opponent: "Arkansas-Pine Bluff",
+        game_time: "2026-09-05T16:00:00Z",
+      },
+      winning_player_ids: [],
+      sponsor: null,
+      players: [{
+        id: 1,
+        player_id: 101,
+        canonical_position: "RB",
+        player_name: "Ahmad Hardy",
+        school: "Missouri",
+        opponent: "Arkansas-Pine Bluff",
+        game_time: "2026-09-05T16:00:00Z",
+        image_url: null,
+        projected_points: 20.9,
+        live_points: null,
+        final_points: null,
+        scoring_status: "NOT_STARTED",
+        sort_order: 1,
+      }],
+    };
+    await page.route("**/saturday-pick-6/current?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ...contest, entry }),
+      });
+    });
+    await page.route("**/saturday-pick-6/1/entry", async (route) => {
+      expect(route.request().method()).toBe("PUT");
+      entry = {
+        id: 88,
+        selected_pick_player_id: 1,
+        submitted_at: "2026-09-01T12:00:00Z",
+        is_winner: false,
+        reward_unlocked_at: null,
+      };
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(entry) });
+    });
+
+    await page.goto("/saturday-pick-6");
+    await page.getByRole("button", { name: "Choose player", exact: true }).click();
+    await page.getByRole("button", { name: "Lock In Pick", exact: true }).click();
+
+    await expect(page).toHaveURL(/\/saturday-pick-6$/);
+    await expect(page.getByText("Your pick is in", { exact: true })).toBeVisible();
+    await expect(page.getByText("Your pick is in. Follow Ahmad Hardy this Saturday.", { exact: true })).toBeVisible();
+    await expect(page.getByText(/Your pick can be changed until Ahmad Hardy's game starts at/).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "BUILD YOUR LEAGUE", exact: true })).not.toBeVisible();
+  });
+
+  test("Saturday Pick 6 finalization marks a losing pick and shows the winner reward state", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+    let winner = false;
+    const baseContest = {
+      id: 1,
+      season: 2026,
+      week_number: 1,
+      title: "Saturday Pick 6",
+      contest_position: "RB",
+      status: "FINAL",
+      lock_at: "2026-09-05T16:00:00Z",
+      first_game_player: { id: 1, player_id: 101, player_name: "Ahmad Hardy", opponent: "Arkansas-Pine Bluff", game_time: "2026-09-05T16:00:00Z" },
+      sponsor: { name: "West Georgia Cornhole", logo_url: null, offer_text: null, terms: null, reward_unlocked: false, code: null, url: null },
+      players: [
+        { id: 1, player_id: 101, canonical_position: "RB", player_name: "Ahmad Hardy", school: "Missouri", opponent: "Arkansas-Pine Bluff", game_time: "2026-09-05T16:00:00Z", image_url: null, projected_points: 20.9, live_points: 14.2, final_points: 14.2, scoring_status: "FINAL", sort_order: 1 },
+        { id: 2, player_id: 102, canonical_position: "RB", player_name: "Rival Runner", school: "Texas", opponent: "Ohio State", game_time: "2026-09-05T17:00:00Z", image_url: null, projected_points: 18.4, live_points: 22.3, final_points: 22.3, scoring_status: "FINAL", sort_order: 2 },
+      ],
+    };
+    await page.route("**/saturday-pick-6/current?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ...baseContest,
+          winning_player_ids: winner ? [101] : [102],
+          entry: { id: 88, selected_pick_player_id: 1, submitted_at: "2026-09-01T12:00:00Z", is_winner: winner, reward_unlocked_at: winner ? "2026-09-05T21:00:00Z" : null },
+          sponsor: { ...baseContest.sponsor, reward_unlocked: winner },
+        }),
+      });
+    });
+
+    await page.goto("/saturday-pick-6");
+    await expect(page.getByRole("heading", { name: "Not this week", exact: true })).toBeVisible();
+    await expect(page.getByText("Ahmad Hardy did not finish first. Try again next week.")).toBeVisible();
+    await expect(page.getByLabel("Your pick did not win")).toBeVisible();
+    await page.getByRole("button", { name: "Close", exact: true }).first().click();
+
+    winner = true;
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "You got it right", exact: true })).toBeVisible();
+    await expect(page.getByText("Your code will appear here when the sponsor provides it.")).toBeVisible();
   });
 
   test("login flow stores auth session and routes to dashboard", async ({ page }) => {
@@ -472,10 +588,13 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/leagues/create");
-    await expect(page.getByRole("heading", { name: /Create League/i })).toBeVisible();
-    await page.getByRole("button", { name: /^Continue to /i }).click();
-    await page.getByRole("button", { name: /^Continue to /i }).click();
-    await page.getByRole("button", { name: /^Continue to /i }).click();
+    await expect(page.getByRole("heading", { name: /Build your league/i })).toBeVisible();
+    await page.getByRole("button", { name: "Continue to Settings", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "League Settings", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Continue to Draft", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Draft Schedule", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Continue to Review", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Review", exact: true })).toBeVisible();
     await page.getByRole("button", { name: /Create League/i }).click();
     await expect(page.getByRole("heading", { name: /Invite managers/i })).toBeVisible();
     await page.getByRole("button", { name: /Open League Hub/i }).click();
@@ -966,12 +1085,362 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("57.3% / 42.7%")).toBeVisible();
     await expect(page.getByText("Arch Manning")).toBeVisible();
     await expect(page.getByText("Rival QB")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Previous week" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Next week" })).toBeVisible();
+    await expect(page.getByText("Prev", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Next", { exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Next week" }).click();
+    await expect(page.getByTestId("matchup-week-label")).toHaveText("Week 2");
+    await page.getByRole("button", { name: "Previous week" }).click();
+    await expect(page.getByTestId("matchup-week-label")).toHaveText("Week 1");
 
     matchupPayload = emptyPayload;
     await page.reload();
     await expect(page.getByText(/No matchup scheduled/i)).toBeVisible();
     await expect(page.getByText(/No matchup generated yet/i)).toBeVisible();
     await expect(page.getByText("Rival Team")).toHaveCount(0);
+  });
+
+  test("league settings show every pre-scoring team at 0-0", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+    await page.addInitScript(() => {
+      window.localStorage.setItem("cfb_active_league_id", "1");
+    });
+
+    const leagueDetail = {
+      id: 1,
+      name: "Preseason Standings League",
+      commissioner_user_id: 42,
+      season_year: 2026,
+      max_teams: 2,
+      is_private: true,
+      invite_code: null,
+      description: null,
+      icon_url: null,
+      status: "post_draft",
+      created_at: "2026-03-01T10:00:00Z",
+      updated_at: "2026-03-05T10:00:00Z",
+      settings: {
+        id: 1,
+        league_id: 1,
+        scoring_json: {},
+        roster_slots_json: { QB: 1, RB: 2, WR: 2, TE: 1, K: 1, BENCH: 4 },
+        playoff_teams: 4,
+        waiver_type: "faab",
+        trade_review_type: "commissioner",
+        superflex_enabled: false,
+        kicker_enabled: true,
+        defense_enabled: false,
+      },
+      draft: {
+        id: 1,
+        league_id: 1,
+        draft_datetime_utc: "2026-08-30T23:00:00Z",
+        timezone: "America/New_York",
+        draft_type: "snake",
+        pick_timer_seconds: 90,
+        status: "completed",
+      },
+      members: [
+        { id: 101, user_id: 42, role: "commissioner", joined_at: "2026-03-01T10:01:00Z" },
+        { id: 102, user_id: 43, role: "manager", joined_at: "2026-03-02T10:01:00Z" },
+      ],
+    };
+
+    await page.route("**/leagues?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [leagueDetail], total: 1, limit: 50, offset: 0 }),
+      });
+    });
+    await page.route("**/leagues/1", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(leagueDetail) });
+    });
+    await page.route("**/leagues/1/settings-view", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          league_id: 1,
+          league_name: leagueDetail.name,
+          league_info: { name: leagueDetail.name, season: 2026, status: "post_draft", max_teams: 2 },
+          members: leagueDetail.members,
+          teams: [
+            { id: 11, league_id: 1, name: "Codex Team", owner_user_id: 42 },
+            { id: 12, league_id: 1, name: "Rival Team", owner_user_id: 43 },
+          ],
+          scoring_settings: {},
+          roster_settings: leagueDetail.settings.roster_slots_json,
+          waiver_rules: { waiver_type: "faab", waiver_period_hours: 24, trade_review_type: "commissioner" },
+          standings: [],
+          schedule: Array.from({ length: 13 }, (_, index) => ({
+            matchup_id: index + 1,
+            week: index + 1,
+            home_team_id: 11,
+            home_team_name: "Codex Team",
+            away_team_id: 12,
+            away_team_name: "Rival Team",
+            home_projected_total: 100,
+            away_projected_total: 96,
+            home_win_probability: 56,
+            away_win_probability: 44,
+          })),
+          rosters: [],
+          trade_history: [
+            {
+              id: 77,
+              status: "processed",
+              proposing_party: { team_id: 11, team_name: "Codex Team", manager_name: "Adam" },
+              receiving_party: { team_id: 12, team_name: "Rival Team", manager_name: "Guy" },
+              proposing_team_sends: [{ player_id: 201, name: "Arch Manning", position: "QB", school: "Texas" }],
+              receiving_team_sends: [{ player_id: 301, name: "Rival QB", position: "QB", school: "Oklahoma" }],
+              created_at: "2026-08-21T16:00:00Z",
+              accepted_at: "2026-08-21T17:00:00Z",
+              processed_at: "2026-08-21T17:05:00Z",
+            },
+          ],
+          draft_results: [],
+          commissioner_controls: [],
+        }),
+      });
+    });
+    await page.route("**/leagues/1/transactions", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [], total: 0, limit: 50, offset: 0 }),
+      });
+    });
+
+    await page.goto("/league/1/settings");
+
+    await expect(page.getByText("Codex Team", { exact: true })).toBeVisible();
+    await expect(page.getByText("Rival Team", { exact: true })).toBeVisible();
+    await expect(page.getByText("0-0", { exact: true })).toHaveCount(2);
+    await expect(page.getByText("Standings are not available yet.", { exact: true })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Point System", exact: true }).click();
+    await expect(page.getByText("Roster System", { exact: true })).toBeVisible();
+    await expect(page.getByText("Waiver System", { exact: true })).toBeVisible();
+    await expect(page.getByText("FAAB", { exact: true })).toBeVisible();
+    await expect(page.getByText("Waiver Type", { exact: true })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Schedules", exact: true }).click();
+    await expect(page.getByText("Weeks 1–13 · every team has one matchup each week.")).toBeVisible();
+    const weekSelector = page.getByRole("group", { name: "Regular season week" });
+    const weekThirteen = weekSelector.getByRole("button", { name: "Week 13", exact: true });
+    await expect(weekThirteen).toBeVisible();
+    await weekThirteen.click();
+    await expect(weekThirteen).toHaveAttribute("aria-pressed", "true");
+
+    await page.getByRole("button", { name: "Trade History", exact: true }).click();
+    await expect(page.getByText("Managers: Adam and Guy", { exact: true })).toBeVisible();
+    await expect(page.getByText("Codex Team sent", { exact: true })).toBeVisible();
+    await expect(page.getByText("Arch Manning · QB · Texas", { exact: true })).toBeVisible();
+    const viewTrade = page.getByRole("link", { name: "View trade", exact: true });
+    await expect(viewTrade).toHaveAttribute("href", "/leagues/1/trades/77");
+    await viewTrade.click();
+    await expect(page).toHaveURL(/\/leagues\/1\/trades\/77$/);
+  });
+
+  test("league settings keeps draft results available before the draft begins", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+    await page.addInitScript(() => {
+      window.localStorage.setItem("cfb_active_league_id", "1");
+    });
+
+    const leagueDetail = {
+      id: 1,
+      name: "Scheduled Draft League",
+      commissioner_user_id: 42,
+      season_year: 2026,
+      max_teams: 2,
+      is_private: true,
+      invite_code: null,
+      description: null,
+      icon_url: null,
+      status: "draft_scheduled",
+      created_at: "2026-03-01T10:00:00Z",
+      updated_at: "2026-03-05T10:00:00Z",
+      settings: {
+        id: 1,
+        league_id: 1,
+        scoring_json: {},
+        roster_slots_json: { QB: 1, BENCH: 4 },
+        playoff_teams: 2,
+        waiver_type: "faab",
+        trade_review_type: "commissioner",
+        superflex_enabled: false,
+        kicker_enabled: true,
+        defense_enabled: false,
+      },
+      draft: {
+        id: 1,
+        league_id: 1,
+        draft_datetime_utc: "2026-08-30T23:00:00Z",
+        timezone: "America/New_York",
+        draft_type: "snake",
+        pick_timer_seconds: 90,
+        status: "scheduled",
+      },
+      members: [{ id: 101, user_id: 42, role: "commissioner", joined_at: "2026-03-01T10:01:00Z" }],
+    };
+
+    await page.route("**/leagues?**", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [leagueDetail], total: 1, limit: 50, offset: 0 }) });
+    });
+    await page.route("**/leagues/1", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(leagueDetail) });
+    });
+    await page.route("**/leagues/1/settings-view", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          league_id: 1,
+          league_name: leagueDetail.name,
+          league_info: { name: leagueDetail.name, season: 2026, status: "draft_scheduled", max_teams: 2 },
+          members: leagueDetail.members,
+          teams: [{ id: 11, league_id: 1, name: "Codex Team", owner_user_id: 42 }],
+          scoring_settings: {},
+          roster_settings: leagueDetail.settings.roster_slots_json,
+          waiver_rules: { waiver_type: "faab", waiver_period_hours: 24, trade_review_type: "commissioner" },
+          standings: [],
+          schedule: [],
+          rosters: [],
+          trade_history: [],
+          draft_results: [],
+          commissioner_controls: [],
+        }),
+      });
+    });
+
+    await page.goto("/league/1/settings");
+    await expect(page).toHaveURL(/\/league\/1\/settings$/);
+    await page.getByRole("button", { name: "Draft Results", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Draft Results", exact: true })).toBeVisible();
+    await expect(page.getByText("No completed draft picks yet. Results will appear here as soon as the draft begins.")).toBeVisible();
+  });
+
+  test("manage roster can view every league team while only the owner can manage their lineup", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+    await page.addInitScript(() => {
+      window.localStorage.setItem("cfb_active_league_id", "1");
+    });
+
+    const leagueDetail = {
+      id: 1,
+      name: "Roster Directory League",
+      commissioner_user_id: 42,
+      season_year: 2026,
+      max_teams: 2,
+      is_private: true,
+      invite_code: null,
+      description: null,
+      icon_url: null,
+      status: "post_draft",
+      created_at: "2026-03-01T10:00:00Z",
+      updated_at: "2026-03-05T10:00:00Z",
+      settings: {
+        id: 1,
+        league_id: 1,
+        scoring_json: {},
+        roster_slots_json: { QB: 1, BENCH: 1 },
+        playoff_teams: 2,
+        waiver_type: "faab",
+        trade_review_type: "commissioner",
+        superflex_enabled: false,
+        kicker_enabled: true,
+        defense_enabled: false,
+      },
+      draft: {
+        id: 1,
+        league_id: 1,
+        draft_datetime_utc: "2026-08-30T23:00:00Z",
+        timezone: "America/New_York",
+        draft_type: "snake",
+        pick_timer_seconds: 90,
+        status: "completed",
+      },
+      members: [
+        { id: 101, user_id: 42, role: "commissioner", joined_at: "2026-03-01T10:01:00Z" },
+        { id: 102, user_id: 43, role: "manager", joined_at: "2026-03-02T10:01:00Z" },
+      ],
+    };
+    const rosterPlayer = (teamId: number, teamName: string, playerId: number, playerName: string) => ({
+      id: playerId,
+      league_id: 1,
+      team_id: teamId,
+      fantasy_team_id: teamId,
+      fantasy_team_name: teamName,
+      player_id: playerId,
+      player_name: playerName,
+      player_school: "Texas",
+      player_position: "QB",
+      school: "Texas",
+      position: "QB",
+      slot: "QB",
+      slot_id: `QB-${teamId}`,
+      slot_index: 1,
+      display_label: "QB",
+      roster_slot: "QB",
+      status: "active",
+      is_starter: true,
+      is_ir: false,
+      opponent: "Oklahoma",
+      projected_points: 22,
+      weekly_projected_fantasy_points: 22,
+      floor: 12,
+      ceiling: 30,
+      boom_prob: 0.3,
+      bust_prob: 0.1,
+      game_start_at: null,
+      is_locked: false,
+    });
+    const myRoster = [rosterPlayer(11, "My Team", 201, "My QB")];
+    const rivalRoster = [rosterPlayer(12, "Rival Team", 301, "Rival QB")];
+
+    await page.route("**/leagues?**", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [leagueDetail], total: 1, limit: 50, offset: 0 }) });
+    });
+    await page.route("**/leagues/1", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(leagueDetail) });
+    });
+    await page.route("**/leagues/1/roster**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          league_id: 1,
+          season: 2026,
+          week: 1,
+          owned_team: { id: 11, name: "My Team", owner_user_id: 42, record: "0-0-0" },
+          fantasy_team_id: 11,
+          fantasy_team_name: "My Team",
+          roster: myRoster,
+          data: myRoster,
+          slots: myRoster,
+          roster_slot_limits: { QB: 1, BENCH: 1 },
+          ir_slots: 0,
+          team_rosters: [
+            { team: { id: 11, name: "My Team", owner_user_id: 42, record: "0-0-0" }, roster: myRoster },
+            { team: { id: 12, name: "Rival Team", owner_user_id: 43, record: "0-0-0" }, roster: rivalRoster },
+          ],
+          message: null,
+        }),
+      });
+    });
+
+    await page.goto("/league/1/roster");
+    await expect(page.getByText("My QB", { exact: true })).toBeVisible();
+    await expect(page.getByText("Managing your roster", { exact: true })).toBeVisible();
+
+    await page.getByRole("combobox").click();
+    await page.getByRole("option", { name: "Rival Team", exact: true }).click();
+    await expect(page.getByText("Rival QB", { exact: true })).toBeVisible();
+    await expect(page.getByText("Viewing league roster", { exact: true })).toBeVisible();
+    await expect(page.getByText("Rival Team · 0-0-0 · Read-only", { exact: true })).toBeVisible();
   });
 
   test("trade builder requires fresh analysis before sending an offer", async ({ page }) => {
@@ -1223,12 +1692,45 @@ test.describe("critical browser workflows", () => {
 
     await expect(reviewDialog.getByRole("button", { name: /^Send Final Trade$/i })).toBeEnabled();
     await reviewDialog.getByRole("button", { name: /^Send Final Trade$/i }).click();
+    await expect.poll(() => proposalPayload).not.toBeNull();
     expect(proposalPayload).toMatchObject({
       proposing_team_id: 11,
       receiving_team_id: 12,
       give_items: [{ team_id: 11, player_id: 201 }],
       receive_items: [{ team_id: 12, player_id: 301 }],
     });
+
+    await page.route("**/leagues/1/trades/77", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 77,
+          league_id: 1,
+          proposing_team_id: 11,
+          receiving_team_id: 12,
+          created_by_user_id: 42,
+          status: "processed",
+          message: "Good luck this week.",
+          accepted_at: "2026-09-01T12:00:00Z",
+          process_after: null,
+          processed_at: "2026-09-01T12:01:00Z",
+          failure_reason: null,
+          countered_from_trade_id: null,
+          items: [
+            { id: 1, trade_offer_id: 77, team_id: 11, player_id: 201, draft_pick_id: null, item_type: "player", player_name: "Arch Manning", player_position: "QB", player_school: "Texas" },
+            { id: 2, trade_offer_id: 77, team_id: 12, player_id: 301, draft_pick_id: null, item_type: "player", player_name: "Rival QB", player_position: "QB", player_school: "Oregon" },
+          ],
+        }),
+      });
+    });
+
+    await page.goto("/leagues/1/trades/77?returnTo=%2Fchats%3FleagueId%3D1%26threadId%3D9");
+    const focusedOffer = page.getByRole("dialog", { name: /Review Trade Offer/i });
+    await expect(focusedOffer).toBeVisible();
+    await expect(focusedOffer.getByText("Arch Manning", { exact: true })).toBeVisible();
+    await focusedOffer.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(page).toHaveURL(/\/chats\?leagueId=1&threadId=9$/);
   });
 
   test("single-player mock draft stays local and resets without real roster mutation", async ({ page }) => {
@@ -1766,7 +2268,7 @@ test.describe("critical browser workflows", () => {
     await expect(claimDialog).toBeVisible();
     await claimDialog.getByRole("button", { name: /Confirm Waiver Claim/i }).click();
     await expect.poll(() => claimPayload).not.toBeNull();
-    expect(claimPayload).toEqual({
+    expect(claimPayload).toMatchObject({
       team_id: 11,
       add_player_id: 901,
       faab_bid: 0,

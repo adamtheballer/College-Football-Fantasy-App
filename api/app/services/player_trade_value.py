@@ -14,13 +14,22 @@ from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjec
 from collegefootballfantasy_api.app.schemas.player_trade_value import PlayerTradeValueHistoryRead, PlayerTradeValueRead
 
 VALUE_POLICY_VERSION = "universal_v1"
+MAX_TRADE_VALUE = 99.0
 WEIGHT_POLICY: dict[int, tuple[float, float, float]] = {
     0: (1.00, 0.00, 0.00), 1: (0.75, 0.15, 0.10), 2: (0.65, 0.25, 0.10),
     3: (0.55, 0.35, 0.10), 4: (0.45, 0.45, 0.10), 5: (0.375, 0.50, 0.125),
     6: (0.30, 0.55, 0.15), 7: (0.275, 0.60, 0.125), 8: (0.25, 0.625, 0.125),
     9: (0.20, 0.65, 0.15), 10: (1 / 6, 41 / 60, 0.15), 11: (2 / 15, 43 / 60, 0.15),
 }
-TIER_LABELS = ((90, "UNTOUCHABLE"), (80, "ELITE"), (70, "HIGH_VALUE"), (60, "STRONG_STARTER"), (50, "SOLID_ASSET"), (40, "DEPTH_VALUE"), (25, "SPECULATIVE"), (0, "LOW_VALUE"))
+TIER_LABELS = (
+    (96, "UNTOUCHABLE"),
+    (90, "FRANCHISE_STAR"),
+    (85, "EFFECTIVE_STARTER"),
+    (80, "GREAT_OPTION"),
+    (75, "GOOD_BENCH_OPTION"),
+    (70, "GREAT_DEPTH_ROLE"),
+    (0, "SPECULATIVE"),
+)
 
 
 def weekly_value_weights(week: int) -> tuple[float, float, float]:
@@ -28,7 +37,13 @@ def weekly_value_weights(week: int) -> tuple[float, float, float]:
 
 
 def value_tier(value: float) -> str:
-    return next(label for threshold, label in TIER_LABELS if value >= threshold)
+    normalized_value = max(0.0, min(float(value), MAX_TRADE_VALUE))
+    return next(label for threshold, label in TIER_LABELS if normalized_value >= threshold)
+
+
+def _normalized_trade_value(value: float) -> float:
+    """Keep all value consumers on the user-facing 0–99 scale."""
+    return round(max(0.0, min(float(value), MAX_TRADE_VALUE)), 1)
 
 
 def _utcnow() -> datetime:
@@ -66,7 +81,8 @@ def _availability_score(db: Session, player_id: int, season: int, week: int) -> 
 def _serialize(row: PlayerTradeValue | None) -> PlayerTradeValueRead | None:
     if row is None:
         return None
-    return PlayerTradeValueRead(week=row.week, value=row.value, tier=row.tier, positional_value_rank=row.positional_value_rank, weekly_change=row.weekly_change, confidence=row.confidence, policy_version=row.policy_version, calculated_at=row.calculated_at, factor_breakdown=row.factor_breakdown_json, explanations=row.explanation_json or [])
+    value = _normalized_trade_value(row.value)
+    return PlayerTradeValueRead(week=row.week, value=value, tier=value_tier(value), positional_value_rank=row.positional_value_rank, weekly_change=row.weekly_change, confidence=row.confidence, policy_version=row.policy_version, calculated_at=row.calculated_at, factor_breakdown=row.factor_breakdown_json, explanations=row.explanation_json or [])
 
 
 def get_player_trade_values(db: Session, *, player_id: int, season: int, policy_version: str = VALUE_POLICY_VERSION) -> PlayerTradeValueHistoryRead:
@@ -79,7 +95,10 @@ def current_trade_value_snapshot(db: Session, *, player_id: int, season: int | N
     if season is not None:
         query = query.filter(PlayerTradeValue.season == season)
     row = query.order_by(PlayerTradeValue.season.desc(), PlayerTradeValue.week.desc()).first()
-    return None if row is None else {"value": row.value, "tier": row.tier, "policy_version": row.policy_version, "week": row.week, "calculated_at": row.calculated_at.isoformat()}
+    if row is None:
+        return None
+    value = _normalized_trade_value(row.value)
+    return {"value": value, "tier": value_tier(value), "policy_version": row.policy_version, "week": row.week, "calculated_at": row.calculated_at.isoformat()}
 
 
 def calculate_player_trade_value(db: Session, *, player_id: int, season: int, week: int, policy_version: str = VALUE_POLICY_VERSION) -> PlayerTradeValue:
@@ -113,7 +132,7 @@ def calculate_player_trade_value(db: Session, *, player_id: int, season: int, we
         "availability": round(future_weight * 0.1 * availability, 2),
         "positionalScarcity": round(future_weight * 0.05 * scarcity, 2),
     }
-    value = round(max(0.0, min(100.0, sum(factors.values()))), 1)
+    value = _normalized_trade_value(sum(factors.values()))
     prior = db.query(PlayerTradeValue).filter(PlayerTradeValue.player_id == player.id, PlayerTradeValue.season == season, PlayerTradeValue.policy_version == policy_version, PlayerTradeValue.week < week).order_by(PlayerTradeValue.week.desc()).first()
     explanation = []
     if performance_raw is not None and performance_score >= 70: explanation.append({"direction": "UP", "reason": "SEASON_PERFORMANCE", "label": "Strong current-season production", "impact": round(performance_weight * performance_score / 100, 1)})

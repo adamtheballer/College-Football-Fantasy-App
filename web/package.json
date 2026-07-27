@@ -11,6 +11,7 @@
     "test:e2e": "playwright test",
     "test:e2e:real": "REAL_STACK_E2E=1 playwright test tests/e2e/real-stack-*.spec.ts",
     "test:live-draft": "node scripts/verify-live-draft.mjs",
+    "verify:runtime": "node scripts/verify-runtime-proxy.mjs",
     "format.fix": "prettier --write .",
     "typecheck": "tsc"
   },

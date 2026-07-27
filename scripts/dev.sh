@@ -26,7 +26,12 @@ export WEB_PORT
 export COMPOSE_PROJECT_NAME
 export DATABASE_URL="${DATABASE_URL:-postgresql+psycopg://postgres:postgres@localhost:${DB_PORT}/collegefootballfantasy}"
 export UI_BASE_URL="${UI_BASE_URL:-http://localhost:${WEB_PORT}}"
-export VITE_API_BASE_URL="${VITE_API_BASE_URL:-http://localhost:${API_PORT}}"
+# Keep every browser request on the UI origin. Vite forwards /api to this
+# process, so a healthy UI proves the exact API channel the browser will use.
+export VITE_API_BASE_URL="/api"
+export VITE_API_PROXY_TARGET="http://127.0.0.1:${API_PORT}"
+API_READINESS_URL="http://127.0.0.1:${API_PORT}/health/ready"
+UI_PROXY_READINESS_URL="http://127.0.0.1:${WEB_PORT}/api/health/ready"
 
 echo "Starting postgres..."
 "${COMPOSE_BIN[@]}" up -d db --remove-orphans
@@ -66,7 +71,7 @@ PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0
 API_PID=$!
 
 for attempt in {1..60}; do
-  if curl --fail --silent --max-time 2 "${VITE_API_BASE_URL}/health/ready" >/dev/null; then
+  if curl --fail --silent --max-time 2 "$API_READINESS_URL" >/dev/null; then
     break
   fi
   if ! kill -0 "$API_PID" 2>/dev/null; then
@@ -76,14 +81,30 @@ for attempt in {1..60}; do
   sleep 1
 done
 
-if ! curl --fail --silent --max-time 2 "${VITE_API_BASE_URL}/health/ready" >/dev/null; then
-  echo "FastAPI did not become ready at ${VITE_API_BASE_URL}/health/ready." >&2
+if ! curl --fail --silent --max-time 2 "$API_READINESS_URL" >/dev/null; then
+  echo "FastAPI did not become ready at $API_READINESS_URL." >&2
   exit 1
 fi
 
-echo "FastAPI is ready. Starting UI..."
-npm --prefix web run dev:vite -- --host 0.0.0.0 --port "$WEB_PORT" &
+echo "FastAPI is ready. Starting UI on one fixed port..."
+npm --prefix web run dev:vite -- --host 0.0.0.0 --port "$WEB_PORT" --strictPort &
 UI_PID=$!
+
+for attempt in {1..60}; do
+  if curl --fail --silent --max-time 2 "$UI_PROXY_READINESS_URL" >/dev/null; then
+    break
+  fi
+  if ! kill -0 "$UI_PID" 2>/dev/null; then
+    echo "UI could not bind http://localhost:${WEB_PORT}; refusing to use another port or stale UI." >&2
+    exit 1
+  fi
+  sleep 1
+done
+
+if ! curl --fail --silent --max-time 2 "$UI_PROXY_READINESS_URL" >/dev/null; then
+  echo "UI started but its /api proxy cannot reach FastAPI at $API_READINESS_URL." >&2
+  exit 1
+fi
 
 echo "API -> http://localhost:${API_PORT}"
 echo "UI  -> http://localhost:${WEB_PORT}"

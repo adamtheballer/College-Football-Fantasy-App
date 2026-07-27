@@ -2,7 +2,10 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
-const apiProxyTarget = process.env.VITE_API_PROXY_TARGET ?? "http://api:8000";
+// Host development and the Docker stack use different API hostnames. The
+// supported browser contract is always same-origin `/api`; only this internal
+// Vite proxy target changes by environment.
+const apiProxyTarget = process.env.VITE_API_PROXY_TARGET ?? "http://127.0.0.1:8000";
 const configuredDevPort = Number(process.env.WEB_PORT ?? "8080");
 const devServerPort = Number.isInteger(configuredDevPort) && configuredDevPort > 0 ? configuredDevPort : 8080;
 
@@ -12,6 +15,9 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: devServerPort,
+    // Never silently move to another port. If 8080 is occupied, Chrome could
+    // remain on an older UI while a new Vite server starts elsewhere.
+    strictPort: true,
     allowedHosts: ["web"],
     proxy: {
       "/api": {

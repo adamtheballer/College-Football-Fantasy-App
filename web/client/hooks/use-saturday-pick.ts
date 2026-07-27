@@ -26,6 +26,13 @@ export type SaturdayPickContest = {
   contest_position: "QB" | "RB" | "WR" | "TE";
   status: string;
   lock_at: string;
+  first_game_player?: {
+    id: number;
+    player_id: number;
+    player_name: string;
+    opponent: string;
+    game_time: string;
+  };
   winning_player_ids: number[];
   players: SaturdayPickPlayer[];
   entry: {
@@ -53,7 +60,11 @@ export function useSaturdayPickContest(enabled = true) {
   return useQuery({
     queryKey: ["saturday-pick-6", SATURDAY_PICK_6_SEASON, SATURDAY_PICK_6_WEEK],
     enabled,
-    staleTime: 15_000,
+    staleTime: 5_000,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status && ["OPEN", "LOCKED", "SCORING", "PROVISIONAL"].includes(status) ? 5_000 : false;
+    },
     queryFn: () => apiGet<SaturdayPickContest>("/saturday-pick-6/current", {
       season: SATURDAY_PICK_6_SEASON,
       week: SATURDAY_PICK_6_WEEK,
@@ -65,7 +76,13 @@ export function useSaveSaturdayPick() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ contestId, selectedPickPlayerId }: { contestId: number; selectedPickPlayerId: number }) =>
-      apiPut(`/saturday-pick-6/${contestId}/entry`, { selected_pick_player_id: selectedPickPlayerId }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["saturday-pick-6"] }),
+      apiPut<NonNullable<SaturdayPickContest["entry"]>>(`/saturday-pick-6/${contestId}/entry`, { selected_pick_player_id: selectedPickPlayerId }),
+    onSuccess: (entry) => {
+      queryClient.setQueriesData<SaturdayPickContest>(
+        { queryKey: ["saturday-pick-6"] },
+        (contest) => contest ? { ...contest, entry } : contest
+      );
+      void queryClient.invalidateQueries({ queryKey: ["saturday-pick-6"] });
+    },
   });
 }

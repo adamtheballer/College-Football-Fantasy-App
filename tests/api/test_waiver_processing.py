@@ -15,6 +15,7 @@ from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
+from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.services.league_roster_matchup import build_waivers_view
 from collegefootballfantasy_api.app.schemas.waiver import FreeAgentAdd
 from collegefootballfantasy_api.app.services.waiver_service import (
@@ -271,6 +272,40 @@ def test_waiver_pool_remains_available_when_a_legacy_claim_has_no_period(db_sess
     assert {player.id for player in waiver_view.available_players} == {available_player.id, legacy_claim_player.id}
     assert len(waiver_view.claims) == 1
     assert waiver_view.claims[0].waiver_period_id is None
+
+
+def test_waiver_pool_surfaces_bye_status_instead_of_an_ambiguous_zero(db_session):
+    user = User(
+        email="bye-projection-owner@example.com",
+        first_name="Bye",
+        password_hash="test",
+        api_token="bye-projection-owner-token",
+    )
+    db_session.add(user)
+    db_session.flush()
+    league = League(name="Bye Projection League", season_year=2026, commissioner_user_id=user.id, max_teams=1)
+    team = Team(league=league, name="Bye Projection Team", owner_user_id=user.id, owner_name="Bye")
+    player = Player(name="Week One Bye RB", position="RB", school="North Carolina")
+    db_session.add_all((league, team, player))
+    db_session.flush()
+    db_session.add(
+        WeeklyProjection(
+            player_id=player.id,
+            season=2026,
+            week=1,
+            projection_version="FINAL",
+            is_published=True,
+            projection_status="BYE",
+            fantasy_points=0.0,
+        )
+    )
+    db_session.commit()
+
+    waiver_view = build_waivers_view(db_session, league, user, selected_week=1)
+
+    assert len(waiver_view.available_players) == 1
+    assert waiver_view.available_players[0].weekly_projected_fantasy_points == 0.0
+    assert waiver_view.available_players[0].projection_status == "BYE"
 
 
 def test_waiver_pool_returns_the_complete_beta_player_universe(db_session):

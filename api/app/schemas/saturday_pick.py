@@ -50,6 +50,14 @@ class SaturdayPickPlayerRead(BaseModel):
     sort_order: int
 
 
+class SaturdayPickLockPlayerRead(BaseModel):
+    id: int
+    player_id: int
+    player_name: str
+    opponent: str
+    game_time: datetime
+
+
 class SaturdayPickEntryRead(BaseModel):
     id: int
     selected_pick_player_id: int
@@ -83,6 +91,7 @@ class SaturdayPickContestRead(BaseModel):
     published_at: datetime | None = None
     locked_at: datetime | None = None
     finalized_at: datetime | None = None
+    first_game_player: SaturdayPickLockPlayerRead
     players: list[SaturdayPickPlayerRead]
     entry: SaturdayPickEntryRead | None = None
     sponsor: SaturdayPickSponsorRead | None = None

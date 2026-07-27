@@ -462,6 +462,11 @@ class RosterTabEntryRead(BaseModel):
     draft_pick_id: int | None = None
 
 
+class LeagueRosterTeamRead(BaseModel):
+    team: RosterTabTeamRead
+    roster: list[RosterTabEntryRead]
+
+
 class LeagueRosterTabRead(BaseModel):
     league_id: int
     season: int
@@ -475,6 +480,7 @@ class LeagueRosterTabRead(BaseModel):
     fantasy_team_name: str | None = None
     data: list[RosterTabEntryRead] = []
     slots: list[RosterTabEntryRead] = []
+    team_rosters: list[LeagueRosterTeamRead] = []
 
 
 class MatchupTeamRead(BaseModel):
@@ -510,6 +516,7 @@ class LeagueWaiverPlayerRead(BaseModel):
     school: str | None = None
     position: str | None = None
     weekly_projected_fantasy_points: float = 0.0
+    projection_status: str = "UNAVAILABLE"
     availability_state: str = "waivers"
     available_at: datetime | None = None
 
@@ -571,17 +578,44 @@ class LeagueInviteSettingsRead(BaseModel):
     visible_until_draft_complete: bool = True
 
 
+class LeagueTradeHistoryPartyRead(BaseModel):
+    team_id: int
+    team_name: str
+    manager_name: str | None = None
+
+
+class LeagueTradeHistoryAssetRead(BaseModel):
+    player_id: int | None = None
+    name: str
+    position: str | None = None
+    school: str | None = None
+
+
+class LeagueTradeHistoryRead(BaseModel):
+    id: int
+    status: str
+    proposing_party: LeagueTradeHistoryPartyRead
+    receiving_party: LeagueTradeHistoryPartyRead
+    proposing_team_sends: list[LeagueTradeHistoryAssetRead]
+    receiving_team_sends: list[LeagueTradeHistoryAssetRead]
+    created_at: datetime
+    accepted_at: datetime | None = None
+    processed_at: datetime | None = None
+
+
 class LeagueSettingsViewRead(BaseModel):
     league_id: int
     league_name: str
     league_info: dict
     invite: LeagueInviteSettingsRead | None = None
     members: list[LeagueMemberRead]
+    teams: list[LeagueWorkspaceTeamRead]
     scoring_settings: dict
     roster_settings: dict[str, int]
     waiver_rules: dict
     standings: list[dict]
     schedule: list[LeagueScheduleRowRead]
     rosters: list[RosterTabEntryRead]
+    trade_history: list[LeagueTradeHistoryRead]
     draft_results: list[dict]
     commissioner_controls: list[str]

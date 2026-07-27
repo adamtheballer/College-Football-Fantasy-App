@@ -30,6 +30,7 @@ import {
 } from "@/hooks/use-leagues";
 import { useLeagueTeams, useTeamRoster } from "@/hooks/use-teams";
 import { ApiError, apiGet, apiPost } from "@/lib/api";
+import { resolveTradeOfferReturnPath } from "@/lib/trade-links";
 import { cn } from "@/lib/utils";
 import type { LeagueRosterPlayer } from "@/types/league";
 import type { RosterEntry } from "@/types/roster";
@@ -375,6 +376,7 @@ export default function Trade() {
     targetTeamIdParam && /^\d+$/.test(targetTeamIdParam)
       ? Number(targetTeamIdParam)
       : null;
+  const focusedOfferReturnPath = resolveTradeOfferReturnPath(searchParams.get("returnTo"));
 
   useEffect(() => {
     if (!leagueId) return;
@@ -514,7 +516,7 @@ export default function Trade() {
     queryFn: () => apiGet<TradeOffer>(`/leagues/${leagueId}/trades/${requestedTradeId}`),
   });
 
-  const closeFocusedOffer = () => navigate("/trade", { replace: true });
+  const closeFocusedOffer = () => navigate(focusedOfferReturnPath, { replace: true });
 
   const createOfferMutation = useMutation({
     mutationFn: (counterTradeId: number | null) =>
@@ -896,7 +898,7 @@ export default function Trade() {
               Review Trade Offer
             </DialogTitle>
             <DialogDescription className="text-sm font-semibold leading-6 text-muted-foreground">
-              Week 1 is weighted entirely to CFB27 ratings. As the season progresses, the model increases the weight of actual fantasy output and performance against weekly projections.
+              Review the selected players and the current trade outlook before sending the offer.
             </DialogDescription>
           </DialogHeader>
 
@@ -943,13 +945,13 @@ export default function Trade() {
       </Dialog>
 
       <Dialog open={isTradeOfferRoute} onOpenChange={(open) => { if (!open) closeFocusedOffer(); }}>
-        <DialogContent className="max-w-2xl border-cfb-brand/30 bg-[#081321] text-foreground">
+        <DialogContent className="max-w-4xl border-cfb-brand/30 bg-[#081321] text-foreground">
           <DialogHeader>
             <DialogTitle className="pr-8 text-3xl font-black uppercase italic tracking-tight">
-              Trade Offer
+              Review Trade Offer
             </DialogTitle>
             <DialogDescription className="text-sm font-semibold leading-6 text-muted-foreground">
-              Review this league trade without leaving the chat context.
+              Review the complete league trade without leaving the conversation that shared it.
             </DialogDescription>
           </DialogHeader>
 
@@ -974,26 +976,35 @@ export default function Trade() {
             const receivingSends = offer.items.filter((item) => item.team_id === offer.receiving_team_id);
             return (
               <div className="space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  <p className="text-sm font-black text-foreground">
-                    {proposingTeam?.name ?? "Proposing Team"} <span className="px-1 text-primary">→</span> {receivingTeam?.name ?? "Receiving Team"}
-                  </p>
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">League trade</p>
+                    <p className="mt-2 text-xl font-black text-foreground">
+                      {proposingTeam?.name ?? "Proposing Team"} <span className="px-1 text-primary">→</span> {receivingTeam?.name ?? "Receiving Team"}
+                    </p>
+                  </div>
                   <span className="rounded-full border border-primary/35 bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-primary">
                     {formatTradeStatus(offer.status)}
                   </span>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-red-300/20 bg-red-500/10 p-4">
+                  <div className="rounded-2xl border border-red-300/20 bg-red-500/10 p-5">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-100">{proposingTeam?.name ?? "Proposing Team"} gives</p>
-                    <p className="mt-3 text-sm font-bold leading-6 text-foreground">
-                      {proposingSends.map((item) => item.player_name ?? `Player ${item.player_id ?? ""}`).join(", ") || "No players listed"}
-                    </p>
+                    <div className="mt-4 space-y-3">{proposingSends.length ? proposingSends.map((item) => (
+                      <div key={item.id} className="rounded-xl border border-white/10 bg-black/10 px-4 py-3">
+                        <p className="font-black text-foreground">{item.player_name ?? `Player ${item.player_id ?? ""}`}</p>
+                        <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{[item.player_position, item.player_school].filter(Boolean).join(" · ") || "League asset"}</p>
+                      </div>
+                    )) : <p className="text-sm font-bold text-muted-foreground">No players listed</p>}</div>
                   </div>
-                  <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/10 p-4">
+                  <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/10 p-5">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">{receivingTeam?.name ?? "Receiving Team"} gives</p>
-                    <p className="mt-3 text-sm font-bold leading-6 text-foreground">
-                      {receivingSends.map((item) => item.player_name ?? `Player ${item.player_id ?? ""}`).join(", ") || "No players listed"}
-                    </p>
+                    <div className="mt-4 space-y-3">{receivingSends.length ? receivingSends.map((item) => (
+                      <div key={item.id} className="rounded-xl border border-white/10 bg-black/10 px-4 py-3">
+                        <p className="font-black text-foreground">{item.player_name ?? `Player ${item.player_id ?? ""}`}</p>
+                        <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{[item.player_position, item.player_school].filter(Boolean).join(" · ") || "League asset"}</p>
+                      </div>
+                    )) : <p className="text-sm font-bold text-muted-foreground">No players listed</p>}</div>
                   </div>
                 </div>
                 {offer.message ? (
@@ -1007,7 +1018,9 @@ export default function Trade() {
           })() : null}
 
           <DialogFooter>
-            <Button variant="outline" onClick={closeFocusedOffer}>Close</Button>
+            <Button variant="outline" onClick={closeFocusedOffer}>
+              {focusedOfferReturnPath.startsWith("/chats") ? "Back to league chat" : "Close"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

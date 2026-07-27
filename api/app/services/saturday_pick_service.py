@@ -29,6 +29,7 @@ from collegefootballfantasy_api.app.schemas.saturday_pick import (
     SaturdayPickContestCreate,
     SaturdayPickContestRead,
     SaturdayPickEntryRead,
+    SaturdayPickLockPlayerRead,
     SaturdayPickPlayerRead,
     SaturdayPickSponsorRead,
 )
@@ -151,9 +152,9 @@ def create_contest(db: Session, payload: SaturdayPickContestCreate, actor: User)
         raise ValueError("A Saturday Pick 6 contest already exists for this season and week.")
     featured = _validate_featured_players(db, payload=payload)
     earliest_kickoff = min(as_utc(schedule.kickoff_at) for _, schedule in featured)
-    lock_at = as_utc(payload.lock_at) if payload.lock_at else earliest_kickoff
-    if lock_at > earliest_kickoff:
-        raise ValueError("Lock time cannot be later than the earliest featured kickoff.")
+    if payload.lock_at is not None and as_utc(payload.lock_at) != earliest_kickoff:
+        raise ValueError("Saturday Pick 6 locks exactly at the first featured player's kickoff.")
+    lock_at = earliest_kickoff
     if payload.position_overridden and not payload.override_reason:
         raise ValueError("A manual position override requires an audit reason.")
     contest = SaturdayPickContest(
@@ -204,8 +205,9 @@ def publish_contest(db: Session, contest: SaturdayPickContest) -> SaturdayPickCo
     players = db.query(SaturdayPickPlayer).filter(SaturdayPickPlayer.contest_id == contest.id).all()
     if len(players) != 6 or {player.canonical_position for player in players} != {contest.contest_position}:
         raise ValueError("Publication requires exactly six players at the contest position.")
-    if min(as_utc(player.game_time) for player in players) < as_utc(contest.lock_at):
-        raise ValueError("Contest lock time cannot be after a featured kickoff.")
+    first_kickoff = min(as_utc(player.game_time) for player in players)
+    if as_utc(contest.lock_at) != first_kickoff:
+        raise ValueError("Saturday Pick 6 locks exactly at the first featured player's kickoff.")
     contest.status = "OPEN" if utc_now() < as_utc(contest.lock_at) else "LOCKED"
     contest.published_at = utc_now()
     contest.locked_at = utc_now() if contest.status == "LOCKED" else None
@@ -417,6 +419,9 @@ def contest_read(db: Session, contest: SaturdayPickContest, viewer: User | None 
         .order_by(SaturdayPickPlayer.sort_order.asc())
         .all()
     )
+    if not rows:
+        raise ValueError("Saturday Pick 6 contest has no featured players.")
+    first_game_player = min(rows, key=lambda row: (as_utc(row.game_time), row.sort_order, row.id))
     player_images = {
         player.id: player.image_url or player.espn_headshot_url
         for player in db.query(Player).filter(Player.id.in_([row.player_id for row in rows] or [-1])).all()
@@ -461,6 +466,13 @@ def contest_read(db: Session, contest: SaturdayPickContest, viewer: User | None 
         published_at=contest.published_at,
         locked_at=contest.locked_at,
         finalized_at=contest.finalized_at,
+        first_game_player=SaturdayPickLockPlayerRead(
+            id=first_game_player.id,
+            player_id=first_game_player.player_id,
+            player_name=first_game_player.player_name_snapshot,
+            opponent=first_game_player.opponent_snapshot,
+            game_time=first_game_player.game_time,
+        ),
         players=[
             SaturdayPickPlayerRead(
                 id=row.id,

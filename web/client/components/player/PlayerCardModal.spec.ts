@@ -10,7 +10,9 @@ import {
   draftHistorySummary,
   formatPlayerCardValue,
   getPlayerCardPalette,
+  normalizeTradeValueMeter,
   resolvePlayerCardProjectionStats,
+  tradeValueMeterDegrees,
   visiblePlayerCardAboutMessage,
   visiblePlayerCardTabs,
 } from "./PlayerCardModal";
@@ -39,6 +41,14 @@ describe("PlayerCardModal helpers", () => {
   it("formats finite numeric player-card fields for display", () => {
     expect(formatPlayerCardValue(1305)).toBe("1,305");
     expect(formatPlayerCardValue(Number.NaN)).toBe("—");
+  });
+
+  it("fills the trade-value meter only at 99 out of 99", () => {
+    expect(normalizeTradeValueMeter(78)).toBe(78);
+    expect(tradeValueMeterDegrees(78)).toBeCloseTo((78 / 99) * 360);
+    expect(tradeValueMeterDegrees(98)).toBeLessThan(360);
+    expect(tradeValueMeterDegrees(99)).toBe(360);
+    expect(normalizeTradeValueMeter(100)).toBe(99);
   });
 
   it("shows a drafted player's round, pick, and overall selection in league history", () => {

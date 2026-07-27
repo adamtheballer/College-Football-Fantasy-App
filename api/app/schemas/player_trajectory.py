@@ -4,15 +4,15 @@ from pydantic import BaseModel, Field
 
 
 class PlayerProjectionTrajectoryPointRead(BaseModel):
-    week: int = Field(ge=1, le=13)
+    week: int = Field(ge=0, le=13)
     points: float = Field(ge=0)
-    source: Literal["published", "modeled", "bye"]
+    source: Literal["preseason", "published", "bye"]
 
 
 class PlayerValueTrajectoryPointRead(BaseModel):
-    week: int = Field(ge=1, le=13)
+    week: int = Field(ge=0, le=13)
     value: float = Field(ge=0, le=100)
-    source: Literal["published", "modeled"]
+    source: Literal["preseason", "published"]
 
 
 class PlayerTrajectoryRead(BaseModel):

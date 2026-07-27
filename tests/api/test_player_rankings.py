@@ -1,7 +1,11 @@
 from datetime import datetime, timezone
 import importlib.util
+import json
 from pathlib import Path
 
+import pytest
+
+from collegefootballfantasy_api.app.services import cfb27_player_sync
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league import League
@@ -107,6 +111,41 @@ def test_cfb27_source_contains_critical_compare_players():
     ahmad = ratings[("Ahmad Hardy", "Missouri", "RB")]
     assert jeremiah.overall == 99
     assert ahmad.overall == 96
+
+
+def test_cfb27_source_overalls_are_not_board_ranks():
+    ratings = load_cfb27_ratings()
+
+    assert min(rating.overall for rating in ratings) >= 70
+    assert max(rating.overall for rating in ratings) <= 99
+    ian_strong = next(rating for rating in ratings if rating.name == "Ian Strong" and rating.position == "WR")
+    assert ian_strong.rank == 33
+    assert ian_strong.overall == 90
+
+
+def test_cfb27_sync_rejects_a_board_rank_as_an_overall_rating(tmp_path, monkeypatch):
+    source_path = tmp_path / "ratings.json"
+    source_path.write_text(
+        json.dumps(
+            [
+                {
+                    "rank": 33,
+                    "name": "Example Receiver",
+                    "school": "Ohio State",
+                    "position": "WR",
+                    "overall": 33,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cfb27_player_sync, "CFB27_SOURCE_PATH", source_path)
+    cfb27_player_sync.load_cfb27_ratings.cache_clear()
+
+    with pytest.raises(ValueError, match="expected 70-99"):
+        cfb27_player_sync.load_cfb27_ratings()
+
+    cfb27_player_sync.load_cfb27_ratings.cache_clear()
 
 
 def test_cfb27_seed_migration_uses_backend_rating_source():

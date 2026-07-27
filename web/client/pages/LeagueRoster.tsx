@@ -1,14 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
 import { WeekSelector } from "@/components/league/WeekSelector";
 import { ErrorState } from "@/components/states/ErrorState";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLeagueDetail, useLeagueRosterTab } from "@/hooks/use-leagues";
 import { ApiError } from "@/lib/api";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
-import type { LeagueRosterPlayer } from "@/types/league";
+import type { LeagueRosterPlayer, LeagueRosterTabResponse, LeagueRosterTeam } from "@/types/league";
 
 const starterSlot = (slot?: string | null) => {
   const normalized = (slot || "").toUpperCase();
@@ -37,10 +38,30 @@ export const formatLineupLockMessage = (player: LeagueRosterPlayer) => {
   return `Locked at kickoff (${gameStart.toLocaleString()})`;
 };
 
+export const getLeagueRosterTeams = (rosterData?: LeagueRosterTabResponse): LeagueRosterTeam[] => {
+  if (rosterData?.team_rosters?.length) return rosterData.team_rosters;
+
+  const ownedTeamId = rosterData?.owned_team?.id ?? rosterData?.fantasy_team_id ?? null;
+  if (!rosterData?.owned_team && !ownedTeamId) return [];
+
+  return [
+    {
+      team: {
+          id: ownedTeamId ?? -100,
+          name: rosterData?.owned_team?.name ?? rosterData?.fantasy_team_name ?? "Your Team",
+          owner_user_id: rosterData?.owned_team?.owner_user_id ?? null,
+          record: null,
+      },
+      roster: rosterData?.slots ?? rosterData?.roster ?? rosterData?.data ?? [],
+    },
+  ];
+};
+
 export default function LeagueRoster() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(1);
+  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const leagueQuery = useLeagueDetail(parsedLeagueId);
   const postDraft = isLeaguePostDraft({
     draftStatus: leagueQuery.data?.draft?.status,
@@ -48,9 +69,20 @@ export default function LeagueRoster() {
   });
   const rosterQuery = useLeagueRosterTab(parsedLeagueId, selectedWeek ?? undefined, postDraft);
   const rosterData = rosterQuery.data;
-  const fetchedRoster = rosterData?.slots ?? rosterData?.roster ?? rosterData?.data ?? [];
-  const previewTeamName = rosterData?.owned_team?.name ?? rosterData?.fantasy_team_name ?? "Your Team";
-  const previewTeamId = rosterData?.owned_team?.id ?? rosterData?.fantasy_team_id ?? -100;
+  const ownedTeamId = rosterData?.owned_team?.id ?? rosterData?.fantasy_team_id ?? null;
+  const ownedRoster = rosterData?.slots ?? rosterData?.roster ?? rosterData?.data ?? [];
+  const teamRosters = useMemo(() => getLeagueRosterTeams(rosterData), [rosterData]);
+  useEffect(() => {
+    const defaultTeamId = ownedTeamId ?? teamRosters[0]?.team.id ?? null;
+    if (selectedTeamId === null || !teamRosters.some((teamRoster) => teamRoster.team.id === selectedTeamId)) {
+      setSelectedTeamId(defaultTeamId);
+    }
+  }, [ownedTeamId, selectedTeamId, teamRosters]);
+  const selectedTeamRoster = teamRosters.find((teamRoster) => teamRoster.team.id === selectedTeamId) ?? teamRosters[0];
+  const fetchedRoster = selectedTeamRoster?.roster ?? ownedRoster;
+  const previewTeamName = selectedTeamRoster?.team.name ?? rosterData?.owned_team?.name ?? rosterData?.fantasy_team_name ?? "Your Team";
+  const previewTeamId = selectedTeamRoster?.team.id ?? ownedTeamId ?? -100;
+  const viewingOwnedTeam = Boolean(ownedTeamId && previewTeamId === ownedTeamId);
   const realRoster = useMemo(() => fetchedRoster.filter(isRealRosterPlayer), [fetchedRoster]);
   const hasRosterSlots = fetchedRoster.length > 0;
   const isEmptyRoster = !rosterQuery.isLoading && !rosterQuery.isError && !hasRosterSlots;
@@ -73,7 +105,7 @@ export default function LeagueRoster() {
         0
       )
     : null;
-  const ownedRosterActions = typeof previewTeamId === "number" && previewTeamId > 0
+  const ownedRosterActions = viewingOwnedTeam && typeof previewTeamId === "number" && previewTeamId > 0
     ? {
         teamId: previewTeamId,
         roster: realRoster,
@@ -139,14 +171,33 @@ export default function LeagueRoster() {
           <div>
             <h1 className="text-4xl font-black italic text-slate-50">Roster</h1>
             <p className="mt-2 text-sm text-slate-400">
-              League-scoped Week 1 roster for {previewTeamName ?? "your team"}.
+              Manage your lineup or inspect every league team&apos;s current roster.
             </p>
           </div>
-          <WeekSelector
-            week={rosterData?.week}
-            selectedWeek={selectedWeek}
-            onChange={setSelectedWeek}
-          />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            {teamRosters.length > 1 ? (
+              <div className="min-w-[240px]">
+                <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">View team roster</p>
+                <Select value={selectedTeamId === null ? undefined : String(selectedTeamId)} onValueChange={(value) => setSelectedTeamId(Number(value))}>
+                  <SelectTrigger className="h-11 rounded-xl border-sky-300/25 bg-slate-950/45 text-sm font-black text-slate-100">
+                    <SelectValue placeholder="Choose a team" />
+                  </SelectTrigger>
+                  <SelectContent className="border-sky-300/20 bg-slate-950 text-slate-100">
+                    {teamRosters.map((teamRoster) => (
+                      <SelectItem key={teamRoster.team.id} value={String(teamRoster.team.id)}>
+                        {teamRoster.team.name}{teamRoster.team.id === ownedTeamId ? " (You)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+            <WeekSelector
+              week={rosterData?.week}
+              selectedWeek={selectedWeek}
+              onChange={setSelectedWeek}
+            />
+          </div>
         </div>
         <LeagueTabs
           leagueId={parsedLeagueId}
@@ -162,6 +213,16 @@ export default function LeagueRoster() {
           </p>
         </section>
       ) : null}
+
+      <section className="rounded-[1.25rem] border border-sky-300/20 bg-sky-300/[0.055] px-5 py-4">
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-300">
+          {viewingOwnedTeam ? "Managing your roster" : "Viewing league roster"}
+        </p>
+        <p className="mt-1 text-sm font-bold text-slate-200">
+          {previewTeamName}{selectedTeamRoster?.team.record ? ` · ${selectedTeamRoster.team.record}` : ""}
+          {!viewingOwnedTeam ? " · Read-only" : ""}
+        </p>
+      </section>
 
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-[1.35rem] border border-cfb-brand/30 bg-[linear-gradient(135deg,hsl(var(--brand-primary)/0.16),hsl(var(--background-surface-raised)/0.94))] p-5 shadow-[0_18px_60px_hsl(var(--brand-primary)/0.12)]">
