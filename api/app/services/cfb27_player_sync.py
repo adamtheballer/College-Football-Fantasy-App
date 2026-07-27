@@ -22,6 +22,7 @@ _MODEL_REGISTRY = (League, Player, RosterEntry, Team, User)
 CFB27_SOURCE_PATH = Path(__file__).resolve().parents[1] / "data" / "cfb27_ratings.json"
 CFB27_EXTERNAL_PREFIX = "cfb27:"
 CFB27_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
+CFB27_SCHOOL_ALIASES = {"california": "cal"}
 
 
 @dataclass(frozen=True)
@@ -40,11 +41,16 @@ def normalize_cfb27_identity_text(value: str | None) -> str:
     return re.sub(r"[^a-z0-9]+", "", normalized).strip()
 
 
+def normalize_cfb27_school(value: str | None) -> str:
+    normalized = normalize_cfb27_identity_text(value)
+    return CFB27_SCHOOL_ALIASES.get(normalized, normalized)
+
+
 def cfb27_identity_key(*, name: str | None, school: str | None, position: str | None) -> str:
     return "|".join(
         [
             normalize_cfb27_identity_text(name),
-            normalize_cfb27_identity_text(school),
+            normalize_cfb27_school(school),
             (position or "").strip().upper(),
         ]
     )
@@ -99,9 +105,17 @@ def _update_canonical_player(player: Player, rating: Cfb27Rating) -> bool:
     if player.name != rating.name:
         player.name = rating.name
         changed = True
+    # The player-ID sheet owns the display school. Rating data identifies the
+    # same program as both "Cal" and "California"; matching that alias must
+    # not create a second player or overwrite the canonical card label.
     if player.school != rating.school:
-        player.school = rating.school
-        changed = True
+        if normalize_cfb27_identity_text(player.school) == normalize_cfb27_identity_text(rating.school):
+            # Normalize casing for the same literal school name.
+            player.school = rating.school
+            changed = True
+        elif normalize_cfb27_school(player.school) != normalize_cfb27_school(rating.school):
+            player.school = rating.school
+            changed = True
     if player.position != rating.position:
         player.position = rating.position
         changed = True

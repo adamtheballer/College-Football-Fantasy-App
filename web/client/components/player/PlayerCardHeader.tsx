@@ -22,8 +22,6 @@ const playbookMarks = [
   { label: "12", className: "left-[87%] bottom-7 text-[18px]" },
 ];
 
-const sourceLabel = (source?: string | null) => (source ? source.toUpperCase() : "Local");
-
 export function PlayerCardHeader({
   card,
   onClose,
@@ -41,7 +39,7 @@ export function PlayerCardHeader({
 }) {
   const metricCards = [
     ["Proj", typeof player.projectedPoints === "number" ? player.projectedPoints.toFixed(1) : "—"],
-    ["Rank", player.rankLabel ?? "—"],
+    ["Rating", card?.player.cfb27_overall?.toString() ?? player.cfb27Overall?.toString() ?? "—"],
     ["Class", card?.about.player_class ?? player.playerClass ?? "—"],
     ["Status", card?.about.status ?? player.status ?? "—"],
   ];
@@ -115,9 +113,6 @@ export function PlayerCardHeader({
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
               <span className={cn("rounded-full border px-4 py-2 text-xs font-black", palette.pill)}>{position || "N/A"}</span>
-              <span className="rounded-full border border-white/18 bg-black/20 px-4 py-2 text-xs font-black text-white/80">
-                {sourceLabel(card?.about.source)} PROFILE
-              </span>
               {player.rankLabel ? (
                 <span className="rounded-full border border-white/18 bg-black/20 px-4 py-2 text-xs font-black text-white/80">
                   {player.rankLabel}

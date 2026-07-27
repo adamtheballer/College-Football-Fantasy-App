@@ -151,6 +151,21 @@ def test_cfb27_sync_preserves_duplicates_but_updates_ranked_canonical_row(client
     assert ranked.cfb27_overall == 96
 
 
+def test_cfb27_sync_matches_california_alias_without_creating_a_duplicate(client, db_session):
+    canonical = Player(name="Ian Strong", position="WR", school="California", sheet_adp=42.0)
+    db_session.add(canonical)
+    db_session.commit()
+
+    result = sync_cfb27_players(db_session)
+
+    db_session.refresh(canonical)
+    assert result["created"] == 249
+    assert db_session.query(Player).filter_by(name="Ian Strong", position="WR").count() == 1
+    assert canonical.school == "California"
+    assert canonical.cfb27_rank == 33
+    assert canonical.cfb27_overall == 90
+
+
 def test_players_rank_sort_uses_cfb27_compare_board(client, db_session):
     sync_cfb27_players(db_session)
 

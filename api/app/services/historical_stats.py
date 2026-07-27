@@ -440,35 +440,40 @@ def get_player_historical_stats_response(
             message="Historical stats are disabled for player cards.",
         )
 
-    provider_player_id = resolve_espn_player_id(db, player)
-    if not provider_player_id:
-        return PlayerHistoricalStatsResponse(
-            player_id=player.id,
-            status="no_provider_mapping",
-            message="No trusted ESPN provider mapping is linked to this player.",
-        )
-
-    query = db.query(PlayerHistoricalSeasonStat).filter(
-        PlayerHistoricalSeasonStat.player_id == player.id,
-        PlayerHistoricalSeasonStat.provider == "espn",
-    )
+    # Historical seasons can arrive through the verified season-stat import as
+    # well as the provider cache.  The old card query only selected `espn`,
+    # which made already-imported Google season rows invisible to users.
+    # Treat the player-history table as canonical and select one authoritative
+    # row for each recorded season/team rather than binding the UI to a source.
+    query = db.query(PlayerHistoricalSeasonStat).filter(PlayerHistoricalSeasonStat.player_id == player.id)
     if season:
         query = query.filter(PlayerHistoricalSeasonStat.season == season)
-    rows = query.order_by(PlayerHistoricalSeasonStat.season.desc()).all()
+    rows = query.order_by(PlayerHistoricalSeasonStat.season.desc(), PlayerHistoricalSeasonStat.id.desc()).all()
     if not rows:
+        provider_player_id = resolve_espn_player_id(db, player)
         return PlayerHistoricalStatsResponse(
             player_id=player.id,
-            status="not_available",
-            message="No imported ESPN historical stats are available for this player yet.",
+            status="not_available" if provider_player_id else "no_provider_mapping",
+            message="No verified historical season statistics are available for this player yet.",
             available_seasons=[],
             seasons=[],
         )
-    seasons = [_season_read(row) for row in rows]
+
+    provider_priority = {"google_season_stats": 0, "espn": 1, "google_preseason_sheet": 2}
+    canonical_rows: dict[tuple[int, str, str | None], PlayerHistoricalSeasonStat] = {}
+    for row in rows:
+        key = (row.season, row.season_type, row.team_name)
+        existing = canonical_rows.get(key)
+        if existing is None or provider_priority.get(row.provider, 99) < provider_priority.get(existing.provider, 99):
+            canonical_rows[key] = row
+    selected_rows = sorted(canonical_rows.values(), key=lambda row: (row.season, row.id), reverse=True)
+    seasons = [_season_read(row) for row in selected_rows]
     return PlayerHistoricalStatsResponse(
         player_id=player.id,
+        provider="verified_import",
         status="available",
         selected_season=seasons[0].season,
-        available_seasons=[row.season for row in rows],
+        available_seasons=sorted({row.season for row in selected_rows}, reverse=True),
         seasons=seasons,
     )
 

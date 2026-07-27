@@ -7,6 +7,7 @@ import {
   gameLogColumnsForPosition,
   gameLogOpponentLabel,
   buildHistoricalStatsTableRows,
+  draftHistorySummary,
   formatPlayerCardValue,
   getPlayerCardPalette,
   resolvePlayerCardProjectionStats,
@@ -38,6 +39,12 @@ describe("PlayerCardModal helpers", () => {
   it("formats finite numeric player-card fields for display", () => {
     expect(formatPlayerCardValue(1305)).toBe("1,305");
     expect(formatPlayerCardValue(Number.NaN)).toBe("—");
+  });
+
+  it("shows a drafted player's round, pick, and overall selection in league history", () => {
+    expect(draftHistorySummary({ event_type: "AUTO_DRAFTED", metadata: { round: 4, pick_in_round: 4, overall_pick: 16 } })).toBe(
+      "Round 4 • Pick 4 • Overall 16"
+    );
   });
 
   it("uses a position-specific palette when available and a default otherwise", () => {

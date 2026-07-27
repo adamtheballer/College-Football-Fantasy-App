@@ -22,6 +22,7 @@ export type PlayerCardModalPlayer = {
   status?: string | null;
   projection?: PlayerStats | null;
   sheetProjectionStats?: Record<string, number | null | undefined> | null;
+  cfb27Overall?: number | null;
 };
 
 export type PlayerCardAction = {
@@ -143,7 +144,19 @@ export const formatPlayerCardValue = (value: unknown, fallback = "—") => {
   return String(value);
 };
 
-const formatProviderLabel = (provider?: string | null) => (provider ? provider.toUpperCase() : "Provider");
+export const draftHistorySummary = (event: { event_type: string; metadata?: Record<string, unknown> | null }) => {
+  if (event.event_type !== "DRAFTED" && event.event_type !== "AUTO_DRAFTED") return null;
+  const metadata = event.metadata ?? {};
+  const round = metadata.round ?? metadata.round_number;
+  const pick = metadata.pick_in_round ?? metadata.round_pick;
+  const overall = metadata.overall_pick;
+  const segments = [
+    round !== undefined && round !== null ? `Round ${round}` : null,
+    pick !== undefined && pick !== null ? `Pick ${pick}` : null,
+    overall !== undefined && overall !== null ? `Overall ${overall}` : null,
+  ].filter(Boolean);
+  return segments.length ? segments.join(" • ") : null;
+};
 
 export const getPlayerCardPalette = (position?: string | null) =>
   positionPalettes[(position ?? "").toUpperCase()] ?? defaultPalette;
@@ -484,7 +497,7 @@ export function PlayerCardModal({
                     Historical Season Stats
                   </p>
                   <p className="mt-2 text-sm font-bold leading-6 text-white/55">
-                    ESPN stats are resolved by exact player identity and imported into a clean season table.
+                    Verified historical season totals are matched to the player’s canonical identity and imported into a clean season table.
                   </p>
                 </div>
                 {historicalSeasons.length > 1 ? (
@@ -520,7 +533,7 @@ export function PlayerCardModal({
                         </p>
                       </div>
                       <p className="rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/55">
-                        {formatProviderLabel(activeHistoricalSeason.freshness.provider)} import
+                        Verified import
                       </p>
                     </div>
                     <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -601,13 +614,13 @@ export function PlayerCardModal({
               ) : gameLogQuery.data?.games.length ? (
                 <>
                 <div className="mt-5 hidden overflow-x-auto rounded-2xl border border-white/10 bg-black/20 md:block">
-                  <table className="min-w-[940px] w-full border-collapse text-left">
+                  <table className="min-w-max border-collapse text-left">
                     <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
                       <tr>
-                        <th className="px-4 py-3">Wk</th>
-                        <th className="px-4 py-3">Opponent</th>
-                        <th className="px-4 py-3">Location</th>
-                        <th className="px-4 py-3">Result</th>
+                        <th className="min-w-[4.5rem] whitespace-nowrap px-4 py-3">Week</th>
+                        <th className="min-w-[15rem] whitespace-nowrap px-4 py-3">Opponent</th>
+                        <th className="min-w-[8rem] whitespace-nowrap px-4 py-3">Location</th>
+                        <th className="min-w-[5.5rem] whitespace-nowrap px-4 py-3">Result</th>
                         {gameLogColumnsForPosition(position).map(([label]) => (
                           <th key={label} className="whitespace-nowrap px-4 py-3 text-right">{label}</th>
                         ))}
@@ -755,7 +768,7 @@ export function PlayerCardModal({
                   {historyQuery.data.events.length ? historyQuery.data.events.map((event) => (
                     <article key={event.id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-black text-white">{event.event_type.replace(/_/g, " ")}</p><p className="mt-1 text-xs font-bold text-white/55">{event.from_team?.name ? `${event.from_team.name} → ` : ""}{event.to_team?.name ?? event.fantasy_team?.name ?? "League transaction"}</p></div><p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">{new Date(event.occurred_at).toLocaleString()}</p></div>
-                      <p className="mt-2 text-xs font-bold text-white/55">{event.position} • {event.school}{event.manager?.name ? ` • ${event.manager.name}` : ""}{typeof event.player_value_at_event === "number" ? ` • Value ${event.player_value_at_event.toFixed(1)}` : ""}</p>
+                      <p className="mt-2 text-xs font-bold text-white/55">{draftHistorySummary(event) ? `${draftHistorySummary(event)} • ` : ""}{event.position} • {event.school}{event.manager?.name ? ` • ${event.manager.name}` : ""}{typeof event.player_value_at_event === "number" ? ` • Value ${event.player_value_at_event.toFixed(1)}` : ""}</p>
                     </article>
                   )) : <p className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">No league history yet. This player has not been drafted, added, traded, or rostered in this league.</p>}
                 </div>

@@ -1161,7 +1161,7 @@ export default function Draft() {
             sheetProjectionStats: selectedPlayer.sheetProjectionStats,
           }}
           title="Player Card"
-          note="Player profiles use the linked ESPN profile when an ESPN player ID exists, plus cached stat rows already stored for this player."
+          note="Player cards use the linked player profile and verified stat rows already stored for this player."
         />
       ) : null}
 

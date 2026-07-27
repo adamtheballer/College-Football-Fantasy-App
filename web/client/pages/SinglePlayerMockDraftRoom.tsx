@@ -525,7 +525,7 @@ export default function SinglePlayerMockDraftRoom() {
           sheetProjectionStats: selectedPlayer.sheetProjectionStats,
         }}
         title="Scouting Card"
-        note="Mock draft cards use the same linked ESPN profile and cached stat endpoint as the real draft room when data is available."
+        note="Mock draft cards use the same linked player profile and verified stat data as the real draft room when available."
       />
     );
   };

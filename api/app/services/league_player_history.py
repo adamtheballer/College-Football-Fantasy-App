@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.models.draft import Draft
+from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_player_event import LeaguePlayerEvent
 from collegefootballfantasy_api.app.models.player import Player
@@ -171,35 +173,77 @@ def get_league_player_history(
     query = db.query(LeaguePlayerEvent).filter(
         LeaguePlayerEvent.league_id == league.id, LeaguePlayerEvent.player_id == player_id
     )
-    total = query.count()
-    rows = query.order_by(LeaguePlayerEvent.occurred_at.desc(), LeaguePlayerEvent.id.desc()).offset(offset).limit(limit).all()
+    rows = query.order_by(LeaguePlayerEvent.occurred_at.desc(), LeaguePlayerEvent.id.desc()).all()
+    events = [
+        LeaguePlayerHistoryEvent(
+            id=row.id,
+            event_type=row.event_type,
+            occurred_at=row.occurred_at,
+            fantasy_team=_team_read(row.fantasy_team_id, row.fantasy_team_name_snapshot),
+            from_team=_team_read(row.from_fantasy_team_id, row.from_team_name_snapshot),
+            to_team=_team_read(row.to_fantasy_team_id, row.to_team_name_snapshot),
+            manager=LeaguePlayerHistoryManager(id=row.manager_user_id, name=row.manager_name_snapshot)
+            if row.manager_user_id is not None or row.manager_name_snapshot else None,
+            draft_id=row.draft_id,
+            draft_pick_id=row.draft_pick_id,
+            trade_id=row.trade_id,
+            waiver_claim_id=row.waiver_claim_id,
+            transaction_id=row.transaction_id,
+            player_value_at_event=row.player_value_snapshot,
+            player_name=row.player_name_snapshot,
+            position=row.position_snapshot,
+            school=row.school_snapshot,
+            metadata=row.event_metadata_json,
+        )
+        for row in rows
+    ]
+    recorded_draft_pick_ids = {event.draft_pick_id for event in events if event.draft_pick_id is not None}
+    legacy_draft_rows = (
+        db.query(DraftPick, Team)
+        .join(Draft, Draft.id == DraftPick.draft_id)
+        .join(Team, Team.id == DraftPick.team_id)
+        .filter(Draft.league_id == league.id, DraftPick.player_id == player.id)
+        .all()
+    )
+    for draft_pick, team in legacy_draft_rows:
+        if draft_pick.id in recorded_draft_pick_ids:
+            continue
+        manager = db.get(User, draft_pick.made_by_user_id) if draft_pick.made_by_user_id else (
+            db.get(User, team.owner_user_id) if team.owner_user_id else None
+        )
+        events.append(
+            LeaguePlayerHistoryEvent(
+                # Negative IDs are display-only compatibility rows. New draft
+                # picks are captured by the append-only ledger at write time.
+                id=-draft_pick.id,
+                event_type=EVENT_AUTO_DRAFTED if draft_pick.auto_pick else EVENT_DRAFTED,
+                occurred_at=_utc(draft_pick.created_at),
+                fantasy_team=_team_read(team.id, team.name),
+                to_team=_team_read(team.id, team.name),
+                manager=LeaguePlayerHistoryManager(id=manager.id, name=_manager_name(manager, team)) if manager else None,
+                draft_id=draft_pick.draft_id,
+                draft_pick_id=draft_pick.id,
+                player_value_at_event=player.sheet_projected_season_points,
+                player_name=player.name,
+                position=player.position,
+                school=player.school,
+                metadata={
+                    "round": draft_pick.round_number,
+                    "pick_in_round": draft_pick.round_pick,
+                    "overall_pick": draft_pick.overall_pick,
+                    "auto_pick": draft_pick.auto_pick,
+                    "legacy_backfill": True,
+                },
+            )
+        )
+    events.sort(key=lambda event: (event.occurred_at, event.id), reverse=True)
+    total = len(events)
+    page = events[offset : offset + limit]
     return LeaguePlayerHistoryRead(
         league_id=league.id,
         player_id=player.id,
         current_status=current_player_status(db, league_id=league.id, player_id=player.id),
-        events=[
-            LeaguePlayerHistoryEvent(
-                id=row.id,
-                event_type=row.event_type,
-                occurred_at=row.occurred_at,
-                fantasy_team=_team_read(row.fantasy_team_id, row.fantasy_team_name_snapshot),
-                from_team=_team_read(row.from_fantasy_team_id, row.from_team_name_snapshot),
-                to_team=_team_read(row.to_fantasy_team_id, row.to_team_name_snapshot),
-                manager=LeaguePlayerHistoryManager(id=row.manager_user_id, name=row.manager_name_snapshot)
-                if row.manager_user_id is not None or row.manager_name_snapshot else None,
-                draft_id=row.draft_id,
-                draft_pick_id=row.draft_pick_id,
-                trade_id=row.trade_id,
-                waiver_claim_id=row.waiver_claim_id,
-                transaction_id=row.transaction_id,
-                player_value_at_event=row.player_value_snapshot,
-                player_name=row.player_name_snapshot,
-                position=row.position_snapshot,
-                school=row.school_snapshot,
-                metadata=row.event_metadata_json,
-            )
-            for row in rows
-        ],
+        events=page,
         total=total,
         limit=limit,
         offset=offset,

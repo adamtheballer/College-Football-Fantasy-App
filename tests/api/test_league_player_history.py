@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 
 from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.models.draft import Draft
+from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.team import Team
@@ -57,3 +59,32 @@ def test_history_is_league_scoped_idempotent_and_authorized(client, db_session):
     assert forbidden.status_code == 403
     missing = client.get(f"/leagues/{league.id}/players/999999/history", headers=_headers(user))
     assert missing.status_code == 404
+
+
+def test_history_backfills_legacy_draft_pick_with_selection_details(client, db_session):
+    user, league, team, player = _seed(db_session)
+    draft = Draft(league_id=league.id, draft_datetime_utc=datetime.now(timezone.utc), status="completed")
+    db_session.add(draft); db_session.flush()
+    db_session.add(
+        DraftPick(
+            draft_id=draft.id,
+            team_id=team.id,
+            player_id=player.id,
+            made_by_user_id=user.id,
+            round_number=4,
+            round_pick=4,
+            overall_pick=16,
+            auto_pick=True,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/leagues/{league.id}/players/{player.id}/history", headers=_headers(user))
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert payload["events"][0]["event_type"] == "AUTO_DRAFTED"
+    assert payload["events"][0]["to_team"]["name"] == "History Team"
+    assert payload["events"][0]["metadata"] == {
+        "round": 4, "pick_in_round": 4, "overall_pick": 16, "auto_pick": True, "legacy_backfill": True,
+    }

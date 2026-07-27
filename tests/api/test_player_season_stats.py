@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from conftest import admin_headers
 
 from collegefootballfantasy_api.app.api.routes import players as players_route
@@ -5,6 +7,7 @@ from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
+from collegefootballfantasy_api.app.models.historical_stats import PlayerHistoricalSeasonStat
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.schemas.historical_stats import (
     HistoricalStatsCategory,
@@ -45,6 +48,40 @@ def test_player_season_stats_returns_cached_week_zero_stats(client, db_session):
     assert body["week"] == 0
     assert body["cached"] is True
     assert body["stats"]["RushingYards"] == 1100
+
+
+def test_player_card_exposes_verified_sheet_history_without_an_espn_row(client, db_session):
+    player = Player(name="Verified History", position="WR", school="Alabama")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        PlayerHistoricalSeasonStat(
+            player_id=player.id,
+            provider="google_season_stats",
+            provider_player_id="canonical-player-1",
+            season=2025,
+            season_type="regular",
+            team_name="Alabama",
+            position="WR",
+            games_played=12,
+            receptions=64,
+            receiving_yards=880,
+            receiving_touchdowns=8,
+            parser_version="sheet-v1",
+            imported_at=datetime.now(timezone.utc),
+            is_final=True,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/players/{player.id}/card")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["historical_stats"]["status"] == "available"
+    assert body["historical_stats"]["seasons"][0]["season"] == 2025
+    assert {item["label"] for item in body["historical_stats"]["seasons"][0]["summary"]} >= {"Games", "Rec Yds", "TD"}
+    assert 64 in [stat["value"] for category in body["historical_stats"]["seasons"][0]["categories"] for stat in category["stats"]]
 
 
 def test_player_season_stats_missing_sportsdata_key_returns_nullable_response(
