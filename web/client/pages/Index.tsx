@@ -14,11 +14,13 @@ import {
 
 import { EmptyState } from "@/components/states";
 import { Button } from "@/components/ui/button";
-import { PlaybookDecor, PositionBadge, StatCard, StatusBadge, SurfaceCard } from "@/components/fantasy";
+import { PlaybookDecor, PositionBadge, StatusBadge, SurfaceCard } from "@/components/fantasy";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagueWorkspace, useLeagues } from "@/hooks/use-leagues";
+import { useSaturdayPickContest } from "@/hooks/use-saturday-pick";
 import { apiGet } from "@/lib/api";
+import type { LeagueDetail } from "@/types/league";
 
 type AlertItem = {
   id: number;
@@ -50,6 +52,14 @@ export const formatDraftTime = (value: string | null | undefined) => {
 
 export const formatDashboardPoints = (value: number | null | undefined) =>
   typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "—";
+
+export const isUpcomingDraft = (league: LeagueDetail, now = Date.now()) => {
+  const scheduledAt = league.draft?.draft_datetime_utc;
+  if (!scheduledAt) return false;
+
+  const timestamp = new Date(scheduledAt).getTime();
+  return Number.isFinite(timestamp) && timestamp > now;
+};
 
 function GuestHome() {
   return (
@@ -130,6 +140,7 @@ export default function Index() {
   const { data: leagues = [], isLoading: leaguesLoading } = useLeagues(20, isLoggedIn);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [alertsLoaded, setAlertsLoaded] = useState(false);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
 
   const selectedLeague = useMemo(() => {
     if (!leagues.length) return null;
@@ -144,6 +155,7 @@ export default function Index() {
     selectedLeague?.id,
     Boolean(isLoggedIn && selectedLeague?.id),
   );
+  const saturdayPickQuery = useSaturdayPickContest(isLoggedIn);
 
   useEffect(() => {
     if (!isLoggedIn || !leagues.length) return;
@@ -168,24 +180,23 @@ export default function Index() {
     return () => controller.abort();
   }, [isLoggedIn]);
 
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setCurrentTime(Date.now()), 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const rosterSize = workspace?.roster?.length ?? 0;
-  const draftReadyCount = leagues.filter(
-    (league) =>
-      league.status === "draft_live" ||
-      league.status === "draft_pre_draft" ||
-      league.status === "draft_scheduled",
-  ).length;
   const upcomingDrafts = useMemo(
     () =>
       [...leagues]
-        .filter((league) => Boolean(league.draft?.draft_datetime_utc))
+        .filter((league) => isUpcomingDraft(league, currentTime))
         .sort((left, right) => {
           const l = new Date(left.draft?.draft_datetime_utc ?? "").getTime();
           const r = new Date(right.draft?.draft_datetime_utc ?? "").getTime();
           return l - r;
         })
         .slice(0, 4),
-    [leagues],
+    [currentTime, leagues],
   );
 
   if (!isLoggedIn) {
@@ -300,12 +311,38 @@ export default function Index() {
         </SurfaceCard>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Active Leagues" value={leagues.length} tone="brand" />
-        <StatCard label="Rostered Players" value={rosterSize} tone="success" />
-        <StatCard label="Draft Windows" value={draftReadyCount} tone="gold" />
-        <StatCard label="Open Alerts" value={alertsLoaded ? alerts.length : "—"} tone="pink" />
-      </section>
+      <SurfaceCard
+        variant="scoreboard"
+        padding="spacious"
+        className="min-h-[270px] border-cfb-brand/50 shadow-[0_0_64px_rgba(37,99,235,0.22)]"
+      >
+        <PlaybookDecor className="opacity-45" />
+        <div aria-hidden="true" className="absolute -left-16 -top-20 h-64 w-96 rotate-[-20deg] rounded-full bg-cfb-brand/30 blur-3xl" />
+        <div aria-hidden="true" className="absolute -bottom-24 right-0 h-72 w-96 rounded-full bg-cfb-pink/20 blur-3xl" />
+        <div className="relative flex h-full flex-col justify-between gap-8 lg:flex-row lg:items-end">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cfb-gold/45 bg-cfb-gold/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.2em] text-yellow-100">
+              <Trophy className="h-4 w-4" aria-hidden="true" />
+              Saturday Pick 6
+            </div>
+            <p className="mt-6 cfb-micro-label text-cfb-brand">The weekly college football challenge</p>
+            <h2 className="mt-2 cfb-display-title text-4xl sm:text-5xl lg:text-6xl">
+              {saturdayPickQuery.data ? `${saturdayPickQuery.data.contest_position} Week` : "Coming next week"}
+            </h2>
+            <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-cfb-text-secondary sm:text-lg">
+              {saturdayPickQuery.data
+                ? `Pick which featured ${saturdayPickQuery.data.contest_position} will score the most fantasy points and own your weekly call.`
+    : "Six featured players. One weekly prediction. One prize. Make your call before kickoff."}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col gap-3 lg:items-end">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-cfb-text-muted">Six players. One winner.</p>
+            <Button asChild variant={saturdayPickQuery.data ? "default" : "outline"} className="h-13 rounded-xl px-7 text-[11px] font-black uppercase tracking-[0.16em]">
+              <Link to="/saturday-pick-6">{saturdayPickQuery.data?.entry ? "View Your Pick" : saturdayPickQuery.data ? "Make Your Pick" : "Learn More"}</Link>
+            </Button>
+          </div>
+        </div>
+      </SurfaceCard>
 
       <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
         <SurfaceCard variant="default" padding="none">

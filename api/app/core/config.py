@@ -112,6 +112,9 @@ class Settings(BaseSettings):
     privacy_policy_url: str | None = None
     terms_url: str | None = None
     provider_disclosure_url: str | None = None
+    saturday_pick_6_enabled: bool = False
+    saturday_pick_6_public_enabled: bool = False
+    saturday_pick_6_sponsors_enabled: bool = False
     security_headers_enabled: bool = True
 
     model_config = SettingsConfigDict(

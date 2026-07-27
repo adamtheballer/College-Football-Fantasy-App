@@ -1,6 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
+
+# Register every relationship target before a request can flush an ORM model.
+# This prevents the first waiver claim from failing when compatibility models
+# were not incidentally imported by a route.
+ensure_models_registered()
+
 from collegefootballfantasy_api.app.api.routes import (
     auth,
     admin_trades,
@@ -16,6 +23,7 @@ from collegefootballfantasy_api.app.api.routes import (
     projections,
     provider_identity,
     rosters,
+    saturday_pick,
     schedule,
     stats,
     teams,
@@ -51,6 +59,8 @@ app.include_router(chats.league_router, tags=["chat"])
 app.include_router(chats.router, tags=["chat"])
 app.include_router(teams.router, tags=["teams"])
 app.include_router(players.router, prefix="/players", tags=["players"])
+app.include_router(saturday_pick.router, prefix="/saturday-pick-6", tags=["saturday-pick-6"])
+app.include_router(saturday_pick.admin_router, prefix="/admin/saturday-pick-6", tags=["admin-saturday-pick-6"])
 app.include_router(rosters.router, tags=["rosters"])
 app.include_router(projections.router, prefix="/projections", tags=["projections"])
 app.include_router(provider_identity.router, prefix="/provider-identity", tags=["provider-identity"])
