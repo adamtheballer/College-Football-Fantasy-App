@@ -17,6 +17,7 @@ import {
 describe("PlayerCardModal helpers", () => {
   it("shows league History only when a valid league context is provided", () => {
     expect(visiblePlayerCardTabs(false).map((tab) => tab.label)).not.toContain("History");
+    expect(visiblePlayerCardTabs(false).map((tab) => tab.label)).toContain("Value");
     expect(visiblePlayerCardTabs(true).map((tab) => tab.label)).toEqual([
       "Summary", "Stats", "Game Log", "Alerts", "Projections", "History", "Value",
     ]);

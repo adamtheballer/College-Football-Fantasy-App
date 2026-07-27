@@ -384,7 +384,7 @@ export function PlayerCardModal({
       >
         <PlayerCardHeader card={card} onClose={onClose} palette={palette} player={player} position={position} title={title} />
 
-        <nav className="flex gap-2 overflow-x-auto border-b border-white/10 bg-black/18 px-5 py-3 sm:px-8">
+        <nav className="flex gap-2 overflow-x-auto border-b border-white/10 bg-black/18 px-5 py-3 sm:flex-wrap sm:overflow-visible sm:px-8">
           {visiblePlayerCardTabs(hasLeagueContext).map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
