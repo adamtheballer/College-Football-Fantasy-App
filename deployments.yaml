@@ -121,24 +121,33 @@ environments:
       - REFRESH_COOKIE_SECURE
       - REFRESH_COOKIE_SAMESITE
       - EMAIL_DELIVERY_MODE
+      - SMTP_HOST
+      - SMTP_FROM_EMAIL
+      - SMTP_USE_TLS
+      - SUPPORT_EMAIL
+      - PRIVACY_POLICY_URL
+      - TERMS_URL
+      - PROVIDER_DISCLOSURE_URL
+      - SCORING_PROVIDER
+      - SPORTSDATA_API_KEY
+      - SPORTSDATA_ENABLED
       - SCORING_SEASON
       - SCORING_WEEK
     optional_env:
       - CORS_ORIGIN_REGEX
-      - SPORTSDATA_API_KEY
-      - SPORTSDATA_ENABLED
-      - SMTP_HOST
       - SMTP_PORT
       - SMTP_USERNAME
       - SMTP_PASSWORD
-      - SMTP_FROM_EMAIL
-      - SMTP_USE_TLS
     safety_gates:
       environment_must_equal: production
       reject_default_jwt_secret: true
       cors_origins_must_be_explicit: true
       cors_origin_regex_must_be_unset_or_production_safe: true
       refresh_cookie_secure_must_be_true: true
+      ui_base_url_must_be_non_local_https: true
+      email_delivery_must_be_smtp: true
+      smtp_tls_must_be_true: true
+      sportsdata_credentials_required: true
       migrations_before_api: true
       verify_alembic_head_before_promotion: true
       require_health_ready_before_traffic: true

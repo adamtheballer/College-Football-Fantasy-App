@@ -23,13 +23,17 @@ def make_settings(**overrides):
 
 def production_required_settings() -> dict[str, object]:
     return {
+        "ui_base_url": "https://app.example.com",
         "email_delivery_mode": "smtp",
         "smtp_host": "smtp.example.com",
         "smtp_from_email": "no-reply@example.com",
+        "smtp_use_tls": True,
         "support_email": "support@example.com",
         "privacy_policy_url": "https://app.example.com/privacy",
         "terms_url": "https://app.example.com/terms",
         "provider_disclosure_url": "https://app.example.com/provider-disclosure",
+        "sportsdata_enabled": True,
+        "sportsdata_api_key": "sportsdata-production-key",
     }
 
 
@@ -128,6 +132,8 @@ def test_production_rejects_insecure_refresh_cookie():
 
 
 def test_production_rejects_missing_public_policy_urls():
+    required = production_required_settings()
+    required.pop("support_email")
     with pytest.raises(ValidationError, match="SUPPORT_EMAIL is required"):
         make_settings(
             environment="production",
@@ -135,14 +141,12 @@ def test_production_rejects_missing_public_policy_urls():
             cors_origins="https://app.example.com",
             cors_origin_regex=None,
             refresh_cookie_secure=True,
-            email_delivery_mode="smtp",
-            smtp_host="smtp.example.com",
-            smtp_from_email="no-reply@example.com",
+            **required,
         )
 
 
 def test_production_rejects_console_email_delivery():
-    with pytest.raises(ValidationError, match="EMAIL_DELIVERY_MODE cannot be console"):
+    with pytest.raises(ValidationError, match="EMAIL_DELIVERY_MODE must be smtp"):
         make_settings(
             environment="production",
             jwt_secret_key="safe-production-secret",
@@ -154,6 +158,53 @@ def test_production_rejects_console_email_delivery():
                 for key, value in production_required_settings().items()
                 if key not in {"email_delivery_mode", "smtp_host", "smtp_from_email"}
             },
+        )
+
+
+def test_email_delivery_mode_rejects_unknown_value():
+    with pytest.raises(ValidationError, match="EMAIL_DELIVERY_MODE must be one of"):
+        make_settings(email_delivery_mode="resend")
+
+
+def test_production_rejects_non_https_or_local_ui_base_url():
+    required = production_required_settings()
+    required["ui_base_url"] = "http://localhost:8080"
+    with pytest.raises(ValidationError, match="UI_BASE_URL must be a non-local HTTPS URL"):
+        make_settings(
+            environment="production",
+            jwt_secret_key="safe-production-secret",
+            cors_origins="https://app.example.com",
+            cors_origin_regex=None,
+            refresh_cookie_secure=True,
+            **required,
+        )
+
+
+def test_production_rejects_missing_sportsdata_credentials():
+    required = production_required_settings()
+    required.pop("sportsdata_api_key")
+    with pytest.raises(ValidationError, match="SPORTSDATA_ENABLED=true and SPORTSDATA_API_KEY"):
+        make_settings(
+            environment="production",
+            jwt_secret_key="safe-production-secret",
+            cors_origins="https://app.example.com",
+            cors_origin_regex=None,
+            refresh_cookie_secure=True,
+            **required,
+        )
+
+
+def test_production_rejects_insecure_smtp():
+    required = production_required_settings()
+    required["smtp_use_tls"] = False
+    with pytest.raises(ValidationError, match="SMTP_USE_TLS must be true"):
+        make_settings(
+            environment="production",
+            jwt_secret_key="safe-production-secret",
+            cors_origins="https://app.example.com",
+            cors_origin_regex=None,
+            refresh_cookie_secure=True,
+            **required,
         )
 
 

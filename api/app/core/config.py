@@ -130,6 +130,14 @@ class Settings(BaseSettings):
             raise ValueError("DRAFT_CPU_PICK_DELAY_SECONDS must be between 2 and 8")
         return value
 
+    @field_validator("email_delivery_mode")
+    @classmethod
+    def validate_email_delivery_mode(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"console", "smtp"}:
+            raise ValueError("EMAIL_DELIVERY_MODE must be one of: console, smtp")
+        return normalized
+
     @property
     def is_production(self) -> bool:
         return self.environment.strip().lower() == "production"
@@ -179,13 +187,17 @@ class Settings(BaseSettings):
         if not self.refresh_cookie_secure:
             raise ValueError("REFRESH_COOKIE_SECURE must be true when ENVIRONMENT=production")
 
-        if self.email_delivery_mode.strip().lower() == "console":
-            raise ValueError("EMAIL_DELIVERY_MODE cannot be console when ENVIRONMENT=production")
+        if not self.ui_base_url.strip().lower().startswith("https://") or self._is_local_origin(self.ui_base_url):
+            raise ValueError("UI_BASE_URL must be a non-local HTTPS URL when ENVIRONMENT=production")
 
-        if self.email_delivery_mode.strip().lower() == "smtp" and (
-            not self.smtp_host or not self.smtp_from_email
-        ):
+        if self.email_delivery_mode != "smtp":
+            raise ValueError("EMAIL_DELIVERY_MODE must be smtp when ENVIRONMENT=production")
+
+        if not self.smtp_host or not self.smtp_from_email:
             raise ValueError("SMTP_HOST and SMTP_FROM_EMAIL are required when ENVIRONMENT=production")
+
+        if not self.smtp_use_tls:
+            raise ValueError("SMTP_USE_TLS must be true when ENVIRONMENT=production")
 
         if not self.support_email:
             raise ValueError("SUPPORT_EMAIL is required when ENVIRONMENT=production")
@@ -199,8 +211,12 @@ class Settings(BaseSettings):
         if not self.provider_disclosure_url:
             raise ValueError("PROVIDER_DISCLOSURE_URL is required when ENVIRONMENT=production")
 
-        if self.scoring_provider.strip().lower() in {"espn", "cache", "mock"} and not self.scoring_allow_unofficial_providers:
+        scoring_provider = self.scoring_provider.strip().lower()
+        if scoring_provider in {"espn", "cache", "mock"} and not self.scoring_allow_unofficial_providers:
             raise ValueError("Unofficial SCORING_PROVIDER requires SCORING_ALLOW_UNOFFICIAL_PROVIDERS=true")
+
+        if scoring_provider == "sportsdata" and (not self.sportsdata_enabled or not self.sportsdata_api_key):
+            raise ValueError("SPORTSDATA_ENABLED=true and SPORTSDATA_API_KEY are required for production sportsdata scoring")
 
         if self.scoring_worker_interval_live_seconds < 30:
             raise ValueError("SCORING_WORKER_INTERVAL_LIVE_SECONDS must be at least 30 in production")
