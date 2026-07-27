@@ -5,6 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.base import Base
+from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
 from collegefootballfantasy_api.app.models import (
     application_instance,
     auth_action_token,
@@ -53,6 +54,7 @@ from collegefootballfantasy_api.app.models import (
     scheduled_notification,
     scoring_admin_audit,
     scoring_run,
+    saturday_pick,
     standing,
     team,
     team_environment,
@@ -80,6 +82,11 @@ from collegefootballfantasy_api.app.models import (
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
+
+# Keep Alembic metadata in lockstep with the runtime model registry. Without
+# this, a migration-created table can be absent from ``target_metadata`` and
+# a schema-drift check will incorrectly propose dropping it.
+ensure_models_registered()
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
