@@ -144,6 +144,16 @@ export type LeaguePlayerHistoryResponse = {
   offset: number;
 };
 
+export type PlayerTradeValueResponse = {
+  current: {
+    week: number; value: number; tier: string; positional_value_rank?: number | null;
+    weekly_change?: number | null; confidence: number; policy_version: string; calculated_at: string;
+    factor_breakdown?: Record<string, number> | null; explanations: Array<{ direction: string; reason: string; label: string; impact: number }>;
+    history?: Array<{ week: number; value: number; tier: string; calculated_at: string }>;
+  } | null;
+  history: Array<{ week: number; value: number; tier: string; calculated_at: string }>;
+};
+
 export function useLeaguePlayerHistory(
   leagueId: number | undefined,
   playerId: number | undefined,
@@ -154,6 +164,18 @@ export function useLeaguePlayerHistory(
     queryFn: () => getLeaguePlayerHistory<LeaguePlayerHistoryResponse>(leagueId as number, playerId as number),
     enabled: enabled && Number.isFinite(leagueId) && Number.isFinite(playerId),
     retry: false,
+  });
+}
+
+export function usePlayerTradeValues(playerId?: number | null, season = 2026, enabled = true) {
+  return useQuery({
+    queryKey: ["player-trade-values", playerId, season],
+    enabled: enabled && typeof playerId === "number" && Number.isFinite(playerId),
+    retry: false,
+    queryFn: async () => {
+      const payload = await apiGet<PlayerTradeValueResponse>(`/players/${playerId}/trade-values`, { season });
+      return payload.current ? { ...payload, current: { ...payload.current, history: payload.history } } : payload;
+    },
   });
 }
 

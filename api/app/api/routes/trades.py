@@ -26,6 +26,7 @@ from collegefootballfantasy_api.app.schemas.trade import (
 )
 from collegefootballfantasy_api.app.services.matchup_grades import build_matchup_row
 from collegefootballfantasy_api.app.services.scoring_service import calculate_player_fantasy_points
+from collegefootballfantasy_api.app.services.player_trade_value import current_trade_value_snapshot
 from collegefootballfantasy_api.app.services.trade_service import (
     accept_trade_offer,
     cancel_trade_offer,
@@ -397,10 +398,20 @@ def analyze_trade(
         scoring_rules,
     )
 
+    published_values = {
+        player_id: current_trade_value_snapshot(db, player_id=player_id, season=payload.season)
+        for player_id in set(payload.receive_ids + payload.give_ids)
+    }
+    # Published canonical values are the shared beta source of truth. Legacy
+    # analysis remains only as a safe transitional fallback until the weekly job
+    # has published the first value set for an existing season.
     receive_value = 0.0
     for pid in payload.receive_ids:
         player = player_by_id.get(pid)
         if player:
+            if published_values.get(pid):
+                receive_value += float(published_values[pid]["value"])
+                continue
             injury_status = injury_by_id.get(pid).status if injury_by_id.get(pid) else None
             schedule_mult = _schedule_multiplier(db, player, payload.season, payload.week)
             receive_value += _player_value(
@@ -418,6 +429,9 @@ def analyze_trade(
     for pid in payload.give_ids:
         player = player_by_id.get(pid)
         if player:
+            if published_values.get(pid):
+                give_value += float(published_values[pid]["value"])
+                continue
             injury_status = injury_by_id.get(pid).status if injury_by_id.get(pid) else None
             schedule_mult = _schedule_multiplier(db, player, payload.season, payload.week)
             give_value += _player_value(

@@ -33,6 +33,7 @@ from collegefootballfantasy_api.app.services.chat_service import (
     mark_trade_finalized_chat_message_processed,
 )
 from collegefootballfantasy_api.app.services.league_player_history import EVENT_TRADED, EVENT_TRADE_FAILED, append_league_player_event
+from collegefootballfantasy_api.app.services.player_trade_value import current_trade_value_snapshot
 from collegefootballfantasy_api.app.services.league_weeks import (
     current_cfb_week_state,
     is_cfb_game_week_active,
@@ -531,6 +532,7 @@ def _create_trade_offer_record(
     db.add(offer)
     db.flush()
     for item in [*payload.give_items, *payload.receive_items]:
+        player_snapshot = current_trade_value_snapshot(db, player_id=item.player_id, season=league.season_year) if item.player_id is not None else None
         db.add(
             TradeOfferItem(
                 trade_offer=offer,
@@ -538,6 +540,7 @@ def _create_trade_offer_record(
                 player_id=item.player_id,
                 draft_pick_id=item.draft_pick_id,
                 item_type="player" if item.player_id is not None else "draft_pick",
+                snapshot_json={"trade_value": player_snapshot} if player_snapshot else None,
             )
         )
     _add_review(db, offer, "proposed", current_user.id, payload.message)

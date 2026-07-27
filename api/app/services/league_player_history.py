@@ -15,6 +15,7 @@ from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.trade_offer import TradeOffer
 from collegefootballfantasy_api.app.models.trade_offer_item import TradeOfferItem
 from collegefootballfantasy_api.app.models.user import User
+from collegefootballfantasy_api.app.services.player_trade_value import current_trade_value_snapshot
 from collegefootballfantasy_api.app.schemas.league_player_history import (
     LeaguePlayerCurrentStatus,
     LeaguePlayerHistoryEvent,
@@ -103,7 +104,7 @@ def append_league_player_event(
         player_name_snapshot=player.name,
         position_snapshot=player.position,
         school_snapshot=player.school,
-        player_value_snapshot=player.sheet_projected_season_points,
+        player_value_snapshot=(current_trade_value_snapshot(db, player_id=player.id, season=league.season_year) or {}).get("value", player.sheet_projected_season_points),
         fantasy_team_name_snapshot=chosen_team.name if chosen_team else None,
         from_team_name_snapshot=from_team.name if from_team else None,
         to_team_name_snapshot=to_team.name if to_team else None,

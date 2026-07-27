@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, BarChart3, CalendarDays, History, Info, Loader2 } from "lucide-react";
 
-import { useLeaguePlayerHistory, usePlayerGameLog, type PlayerCardResponse } from "@/hooks/use-players";
+import { useLeaguePlayerHistory, usePlayerGameLog, usePlayerTradeValues, type PlayerCardResponse } from "@/hooks/use-players";
 import { buildProjectedStats, formatStat, statRowsForPosition, statValue } from "@/lib/playerProjectionStats";
 import { cn } from "@/lib/utils";
 import type { PlayerStats } from "@/types/player";
 
 import { PlayerCardHeader } from "./PlayerCardHeader";
 
-type PlayerCardTab = "summary" | "stats" | "game-log" | "alerts" | "projections" | "history";
+type PlayerCardTab = "summary" | "stats" | "game-log" | "alerts" | "projections" | "history" | "value";
 
 export type PlayerCardModalPlayer = {
   id: number;
@@ -43,6 +43,7 @@ const tabConfig: Array<{ id: PlayerCardTab; label: string; icon: typeof Info }> 
   { id: "alerts", label: "Alerts", icon: AlertTriangle },
   { id: "projections", label: "Projections", icon: Activity },
   { id: "history", label: "History", icon: History },
+  { id: "value", label: "Value", icon: Activity },
 ];
 
 export const visiblePlayerCardTabs = (hasLeagueContext: boolean) =>
@@ -315,6 +316,7 @@ export function PlayerCardModal({
   const position = (card?.about.position ?? player.position ?? "").toUpperCase();
   const gameLogQuery = usePlayerGameLog(player.id, 2026, activeTab === "game-log");
   const historyQuery = useLeaguePlayerHistory(leagueId ?? undefined, player.id, activeTab === "history" && hasLeagueContext);
+  const valueQuery = usePlayerTradeValues(player.id, 2026, activeTab === "value");
   const palette = getPlayerCardPalette(position);
   const historicalStats = card?.historical_stats;
   const historicalSeasons = historicalStats?.seasons ?? [];
@@ -737,7 +739,7 @@ export function PlayerCardModal({
                 </p>
               )}
             </section>
-          ) : (
+          ) : activeTab === "history" ? (
             <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
               <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>League History</p>
               {historyQuery.isLoading ? (
@@ -758,6 +760,13 @@ export function PlayerCardModal({
                   )) : <p className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">No league history yet. This player has not been drafted, added, traded, or rostered in this league.</p>}
                 </div>
               ) : null}
+            </section>
+          ) : (
+            <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
+              <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Trade Value</p>
+              {valueQuery.isLoading ? <div className="mt-5 flex min-h-40 items-center justify-center gap-3 rounded-2xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55"><Loader2 className="h-4 w-4 animate-spin" /> Loading value</div>
+              : valueQuery.isError ? <p className="mt-5 rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4 text-sm font-bold text-rose-100">Value update delayed. Please try again shortly.</p>
+              : valueQuery.data?.current ? (() => { const value = valueQuery.data.current; const trend = value.history ?? []; const change = value.weekly_change; const meterColor = value.value >= 80 ? "from-emerald-300 via-cyan-300 to-blue-500" : value.value >= 60 ? "from-cyan-300 via-blue-400 to-violet-500" : value.value >= 40 ? "from-yellow-300 via-amber-400 to-orange-500" : "from-rose-400 via-orange-400 to-amber-400"; return <div className="mt-5 space-y-5"><div className="grid gap-5 md:grid-cols-[220px_1fr]"><div className={cn("flex aspect-square w-full max-w-[220px] items-center justify-center rounded-full bg-gradient-to-br p-3", meterColor)} aria-label={`Trade value ${value.value} out of 100, ${value.tier.replace(/_/g, " ")}`}><div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-slate-950 text-center"><p className="text-5xl font-black tabular-nums text-white">{value.value.toFixed(0)}</p><p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">out of 100</p><p className="mt-3 text-xs font-black uppercase tracking-[0.15em] text-cyan-200">{value.tier.replace(/_/g, " ")}</p></div></div><div className="grid content-center gap-3 sm:grid-cols-3"><div className="rounded-2xl border border-white/10 bg-black/20 p-3"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/45">Weekly change</p><p className="mt-2 text-xl font-black text-white">{change === null || change === undefined ? "NEW" : change > 0 ? `UP ${change}` : change < 0 ? `DOWN ${Math.abs(change)}` : "NO CHANGE"}</p></div><div className="rounded-2xl border border-white/10 bg-black/20 p-3"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/45">Value rank</p><p className="mt-2 text-xl font-black text-white">{position || "Player"} #{value.positional_value_rank ?? "—"}</p></div><div className="rounded-2xl border border-white/10 bg-black/20 p-3"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/45">Updated</p><p className="mt-2 text-sm font-black text-white">{new Date(value.calculated_at).toLocaleString()}</p></div></div></div><div className="rounded-2xl border border-cyan-200/15 bg-cyan-200/10 p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100">Why value changed</p><div className="mt-3 space-y-2">{value.explanations.length ? value.explanations.map((item, index) => <p key={`${item.reason}-${index}`} className="text-sm font-bold text-white">{item.direction === "DOWN" ? "−" : "+"} {item.label}</p>) : <p className="text-sm font-bold text-white/65">Published preseason rating and current context remain stable.</p>}</div></div><div className="grid gap-3 md:grid-cols-2"><div className="rounded-2xl border border-white/10 bg-black/20 p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Value breakdown</p><div className="mt-3 space-y-2">{Object.entries(value.factor_breakdown ?? {}).map(([label, amount]) => <div key={label} className="flex justify-between gap-3 text-sm"><span className="font-bold text-white/65">{label.replace(/([A-Z])/g, " $1")}</span><span className="font-black text-white">{Number(amount).toFixed(1)}</span></div>)}</div></div><div className="rounded-2xl border border-white/10 bg-black/20 p-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Value trend</p><div className="mt-4 flex items-end gap-2" aria-label="Weekly value trend">{trend.map((item) => <div key={item.week} className="flex flex-1 flex-col items-center gap-2"><div className="w-full rounded-t bg-cyan-300/80" style={{ height: `${Math.max(8, item.value)}px` }} title={`Week ${item.week}: ${item.value}`} /><span className="text-[9px] font-black text-white/45">{item.week === 0 ? "PRE" : `W${item.week}`}</span></div>)}</div></div></div></div> })() : <p className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">Value unavailable. A published canonical value has not been generated for this player yet.</p>}
             </section>
           )}
         </div>
