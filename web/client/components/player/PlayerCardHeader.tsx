@@ -43,6 +43,11 @@ export function PlayerCardHeader({
     ["Class", card?.about.player_class ?? player.playerClass ?? "—"],
     ["Status", card?.about.status ?? player.status ?? "—"],
   ];
+  const playerPills = [
+    card?.about.jersey ? `#${card.about.jersey}` : null,
+    position || player.position || null,
+    card?.about.team ?? player.school ?? null,
+  ].filter(Boolean);
   const headerStreakStyle: CSSProperties = {
     backgroundImage: [
       `repeating-linear-gradient(168deg, transparent 0 18px, ${palette.markerA} 19px 27px, transparent 29px 54px)`,
@@ -64,7 +69,7 @@ export function PlayerCardHeader({
         <X className="h-5 w-5" />
       </button>
 
-      <header className={cn("relative overflow-hidden px-5 py-6 pr-20 sm:px-8 sm:pr-24", palette.headerBase)}>
+      <header className={cn("relative shrink-0 overflow-hidden px-5 py-6 pr-20 sm:px-8 sm:pr-24", palette.headerBase)}>
         <div className="absolute inset-0 opacity-75 mix-blend-screen" style={headerStreakStyle} />
         <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent_0_28px,rgba(255,255,255,0.07)_29px,transparent_31px_58px)] opacity-30" />
         <div
@@ -87,7 +92,7 @@ export function PlayerCardHeader({
             </span>
           ))}
         </div>
-        <div className="relative z-10 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,440px)] xl:items-start">
+        <div className="relative z-10 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,440px)] xl:items-end">
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/70">{title}</p>
             <div className="mt-4 flex min-w-0 items-center gap-4">
@@ -112,17 +117,25 @@ export function PlayerCardHeader({
               </div>
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
-              <span className={cn("rounded-full border px-4 py-2 text-xs font-black", palette.pill)}>{position || "N/A"}</span>
-              {player.rankLabel ? (
-                <span className="rounded-full border border-white/18 bg-black/20 px-4 py-2 text-xs font-black text-white/80">
-                  {player.rankLabel}
+              {playerPills.map((value, index) => (
+                <span
+                  key={`${value}-${index}`}
+                  className={cn(
+                    "max-w-full truncate rounded-full border px-4 py-2 text-xs font-black",
+                    index === 1 ? palette.pill : "border-white/18 bg-black/20 text-white/85",
+                  )}
+                >
+                  {value}
                 </span>
-              ) : null}
+              ))}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-2 xl:pt-24 2xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-2 xl:self-end 2xl:grid-cols-4">
             {metricCards.map(([label, value]) => (
-              <div key={label} className="min-w-0 rounded-2xl border border-white/15 bg-black/25 p-3 backdrop-blur">
+              <div
+                key={label}
+                className="flex min-h-[5.75rem] min-w-0 flex-col justify-center rounded-2xl border border-white/15 bg-black/25 p-3 backdrop-blur"
+              >
                 <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/55">{label}</p>
                 <p className="mt-2 truncate text-xl font-black tabular-nums text-white">{value}</p>
               </div>
