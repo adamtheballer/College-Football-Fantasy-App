@@ -20,6 +20,7 @@ Validation date: 2026-07-26
 | Database readiness | `scripts/check_alembic_head.py` against the beta database | Passed at `0076_saturday_pick_6` |
 | Real-stack browser gate | Isolated Docker stack: signup, session persistence, draft-pool load, two-manager draft synchronization, countdown, and auto-picks | Passed: 2 Playwright tests |
 | Production configuration contract | Runtime validator and deployment manifest require HTTPS UI origin, secure cookies, SMTP/TLS, legal/support URLs, and SportsData scoring credentials | Passed: 19 tests |
+| League route data integrity | Removed the hard-coded demo league and its roster, matchup, waiver, settings, and watchlist responses; supported league routes now require real API data and show retryable errors instead of fictional league state | Passed: typecheck, 129 frontend tests, production build |
 
 ## Waiver timing contract
 

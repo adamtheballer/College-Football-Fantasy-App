@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { useLeagueDetail } from "@/hooks/use-leagues";
 import { useToggleWatchlistPlayer, useWatchlists } from "@/hooks/use-watchlists";
 import { ApiError } from "@/lib/api";
-import { DEMO_LEAGUE_ID } from "@/lib/leaguePreviewData";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import type { Player } from "@/types/player";
 
@@ -32,15 +31,14 @@ const positionTone = (position?: string | null) => {
 export default function LeagueWatchlist() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
-  const isDemoLeague = parsedLeagueId === DEMO_LEAGUE_ID;
-  const leagueQuery = useLeagueDetail(parsedLeagueId, !isDemoLeague);
-  const postDraft = isDemoLeague || isLeaguePostDraft({
+  const leagueQuery = useLeagueDetail(parsedLeagueId);
+  const postDraft = isLeaguePostDraft({
     draftStatus: leagueQuery.data?.draft?.status,
     leagueStatus: leagueQuery.data?.status,
   });
   const watchlistsQuery = useWatchlists(
     parsedLeagueId,
-    !isDemoLeague && postDraft && typeof parsedLeagueId === "number" && !Number.isNaN(parsedLeagueId)
+    postDraft && typeof parsedLeagueId === "number" && !Number.isNaN(parsedLeagueId)
   );
   const toggleWatchlistPlayer = useToggleWatchlistPlayer();
   const watchlists = watchlistsQuery.data?.data ?? [];
@@ -65,12 +63,25 @@ export default function LeagueWatchlist() {
     );
   }, [watchlists]);
 
-  if (!isDemoLeague && leagueQuery.isLoading) {
+  if (leagueQuery.isLoading) {
     return (
       <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
         <div className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface-raised/80 p-8 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cfb-text-muted">
           Loading league...
         </div>
+      </main>
+    );
+  }
+
+  if (leagueQuery.isError) {
+    return (
+      <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
+        <ErrorState
+          title="Unable to load league"
+          message="The league could not be loaded. Confirm the backend is available, then try again."
+          retryLabel="Try Again"
+          onRetry={() => void leagueQuery.refetch()}
+        />
       </main>
     );
   }
@@ -115,12 +126,7 @@ export default function LeagueWatchlist() {
           </p>
         </div>
 
-        {isDemoLeague ? (
-          <div className="px-5 py-12 text-center">
-            <Bookmark className="mx-auto h-10 w-10 text-sky-300/70" />
-            <p className="mt-4 text-sm font-bold text-slate-300">Watchlists are saved to your account in real leagues.</p>
-          </div>
-        ) : watchlistsQuery.isLoading ? (
+        {watchlistsQuery.isLoading ? (
           <div className="px-5 py-12 text-center text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
             Loading watchlist...
           </div>

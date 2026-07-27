@@ -15,10 +15,10 @@ import {
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
+import { ErrorState } from "@/components/states";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLeagueDetail, useLeagueSettingsTab } from "@/hooks/use-leagues";
 import { useLeagueTransactions } from "@/hooks/use-roster-actions";
-import { DEMO_LEAGUE_ID, createDemoLeagueSettingsResponse } from "@/lib/leaguePreviewData";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import type { LeagueRosterPlayer, LeagueSettingsTabResponse } from "@/types/league";
 
@@ -89,19 +89,18 @@ const groupRostersByTeam = (rosters: LeagueRosterPlayer[]) =>
 export default function LeagueSettings() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
-  const isDemoLeague = parsedLeagueId === DEMO_LEAGUE_ID;
   const [activePanel, setActivePanel] = useState<SettingsPanel>("standings");
   const [selectedRosterTeam, setSelectedRosterTeam] = useState<string>("");
   const [selectedScheduleWeek, setSelectedScheduleWeek] = useState<number | null>(null);
   const [copiedInviteField, setCopiedInviteField] = useState<"code" | "link" | null>(null);
-  const leagueQuery = useLeagueDetail(parsedLeagueId, !isDemoLeague);
-  const postDraft = isDemoLeague || isLeaguePostDraft({
+  const leagueQuery = useLeagueDetail(parsedLeagueId);
+  const postDraft = isLeaguePostDraft({
     draftStatus: leagueQuery.data?.draft?.status,
     leagueStatus: leagueQuery.data?.status,
   });
-  const settingsQuery = useLeagueSettingsTab(parsedLeagueId, !isDemoLeague && postDraft);
-  const transactionsQuery = useLeagueTransactions(parsedLeagueId, !isDemoLeague && postDraft);
-  const data = isDemoLeague ? createDemoLeagueSettingsResponse() : settingsQuery.data;
+  const settingsQuery = useLeagueSettingsTab(parsedLeagueId, postDraft);
+  const transactionsQuery = useLeagueTransactions(parsedLeagueId, postDraft);
+  const data = settingsQuery.data;
   const tradeTransactions = (transactionsQuery.data?.data ?? []).filter((transaction) =>
     transaction.transaction_type.toLowerCase().includes("trade")
   );
@@ -151,12 +150,25 @@ export default function LeagueSettings() {
     window.setTimeout(() => setCopiedInviteField(null), 1800);
   };
 
-  if (!isDemoLeague && leagueQuery.isLoading) {
+  if (leagueQuery.isLoading) {
     return (
       <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
         <div className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface-raised/80 p-8 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cfb-text-muted">
           Loading league...
         </div>
+      </main>
+    );
+  }
+
+  if (leagueQuery.isError) {
+    return (
+      <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
+        <ErrorState
+          title="Unable to load league"
+          message="The league could not be loaded. Confirm the backend is available, then try again."
+          retryLabel="Try Again"
+          onRetry={() => void leagueQuery.refetch()}
+        />
       </main>
     );
   }

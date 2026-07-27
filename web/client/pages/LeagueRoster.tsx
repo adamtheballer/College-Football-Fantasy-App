@@ -7,10 +7,6 @@ import { WeekSelector } from "@/components/league/WeekSelector";
 import { ErrorState } from "@/components/states/ErrorState";
 import { useLeagueDetail, useLeagueRosterTab } from "@/hooks/use-leagues";
 import { ApiError } from "@/lib/api";
-import {
-  DEMO_LEAGUE_ID,
-  createDemoLeagueRosterResponse,
-} from "@/lib/leaguePreviewData";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import type { LeagueRosterPlayer } from "@/types/league";
 
@@ -44,22 +40,20 @@ export const formatLineupLockMessage = (player: LeagueRosterPlayer) => {
 export default function LeagueRoster() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
-  const isDemoLeague = parsedLeagueId === DEMO_LEAGUE_ID;
   const [selectedWeek, setSelectedWeek] = useState<number | null>(1);
-  const leagueQuery = useLeagueDetail(parsedLeagueId, !isDemoLeague);
-  const postDraft = isDemoLeague || isLeaguePostDraft({
+  const leagueQuery = useLeagueDetail(parsedLeagueId);
+  const postDraft = isLeaguePostDraft({
     draftStatus: leagueQuery.data?.draft?.status,
     leagueStatus: leagueQuery.data?.status,
   });
-  const rosterQuery = useLeagueRosterTab(parsedLeagueId, selectedWeek ?? undefined, !isDemoLeague && postDraft);
-  const demoData = isDemoLeague ? createDemoLeagueRosterResponse() : null;
-  const rosterData = demoData ?? rosterQuery.data;
+  const rosterQuery = useLeagueRosterTab(parsedLeagueId, selectedWeek ?? undefined, postDraft);
+  const rosterData = rosterQuery.data;
   const fetchedRoster = rosterData?.slots ?? rosterData?.roster ?? rosterData?.data ?? [];
   const previewTeamName = rosterData?.owned_team?.name ?? rosterData?.fantasy_team_name ?? "Your Team";
   const previewTeamId = rosterData?.owned_team?.id ?? rosterData?.fantasy_team_id ?? -100;
   const realRoster = useMemo(() => fetchedRoster.filter(isRealRosterPlayer), [fetchedRoster]);
   const hasRosterSlots = fetchedRoster.length > 0;
-  const isEmptyRoster = !isDemoLeague && !rosterQuery.isLoading && !rosterQuery.isError && !hasRosterSlots;
+  const isEmptyRoster = !rosterQuery.isLoading && !rosterQuery.isError && !hasRosterSlots;
   const roster = fetchedRoster;
   const starters = useMemo(
     () => roster.filter((player) => starterSlot(player.slot ?? player.roster_slot)),
@@ -79,7 +73,7 @@ export default function LeagueRoster() {
         0
       )
     : null;
-  const ownedRosterActions = !isDemoLeague && typeof previewTeamId === "number" && previewTeamId > 0
+  const ownedRosterActions = typeof previewTeamId === "number" && previewTeamId > 0
     ? {
         teamId: previewTeamId,
         roster: realRoster,
@@ -94,7 +88,7 @@ export default function LeagueRoster() {
       )
     : null;
 
-  if (!isDemoLeague && leagueQuery.isLoading) {
+  if (leagueQuery.isLoading) {
     return (
       <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
         <div className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface-raised/80 p-8 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cfb-text-muted">
@@ -104,7 +98,7 @@ export default function LeagueRoster() {
     );
   }
 
-  if (!isDemoLeague && leagueQuery.isError) {
+  if (leagueQuery.isError) {
     return (
       <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
         <ErrorState
@@ -121,7 +115,7 @@ export default function LeagueRoster() {
     return <Navigate to={`/league/${parsedLeagueId}/lobby`} replace />;
   }
 
-  if (!isDemoLeague && rosterQuery.isError) {
+  if (rosterQuery.isError) {
     return (
       <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
         <ErrorState

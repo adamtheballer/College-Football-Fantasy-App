@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Pencil, Search, Sparkles, UserPlus, Zap } from "luc
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
+import { ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,7 +30,6 @@ import {
   useToggleWatchlistPlayer,
   useWatchlists,
 } from "@/hooks/use-watchlists";
-import { DEMO_LEAGUE_ID, createDemoLeagueWaiverResponse } from "@/lib/leaguePreviewData";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import type { PlayerStats } from "@/types/player";
 
@@ -131,7 +131,6 @@ const availabilityLabel = (value?: string | null) => {
 export default function LeagueWaivers() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
-  const isDemoLeague = parsedLeagueId === DEMO_LEAGUE_ID;
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState<(typeof positions)[number]>("ALL");
   const [selectedPlayer, setSelectedPlayer] = useState<AvailablePlayerRow | null>(null);
@@ -141,13 +140,13 @@ export default function LeagueWaivers() {
   const [preferenceOrder, setPreferenceOrder] = useState("1");
   const [editingClaimId, setEditingClaimId] = useState<number | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
-  const leagueQuery = useLeagueDetail(parsedLeagueId, !isDemoLeague);
-  const postDraft = isDemoLeague || isLeaguePostDraft({
+  const leagueQuery = useLeagueDetail(parsedLeagueId);
+  const postDraft = isLeaguePostDraft({
     draftStatus: leagueQuery.data?.draft?.status,
     leagueStatus: leagueQuery.data?.status,
   });
-  const waiverQuery = useLeagueWaiverTab(parsedLeagueId, 50, 0, !isDemoLeague && postDraft);
-  const waiverData = isDemoLeague ? createDemoLeagueWaiverResponse() : waiverQuery.data;
+  const waiverQuery = useLeagueWaiverTab(parsedLeagueId, 50, 0, postDraft);
+  const waiverData = waiverQuery.data;
   const isFreeAgentPhase = waiverData?.waiver_rules.phase === "free_agents";
   const nextWaiverProcessAt = typeof waiverData?.waiver_rules.next_process_at === "string"
     ? waiverData.waiver_rules.next_process_at
@@ -159,7 +158,7 @@ export default function LeagueWaivers() {
   const reorderWaiverClaims = useReorderWaiverClaims(parsedLeagueId);
   const watchlistsQuery = useWatchlists(
     parsedLeagueId,
-    !isDemoLeague && postDraft && typeof parsedLeagueId === "number" && !Number.isNaN(parsedLeagueId)
+    postDraft && typeof parsedLeagueId === "number" && !Number.isNaN(parsedLeagueId)
   );
   const createWatchlist = useCreateWatchlist();
   const toggleWatchlistPlayer = useToggleWatchlistPlayer();
@@ -167,19 +166,12 @@ export default function LeagueWaivers() {
     selectedPlayer?.id,
     Boolean(selectedPlayer?.id)
   );
-  const players = useMemo<AvailablePlayerRow[]>(() => {
-    if (isDemoLeague) {
-      return (waiverData?.available_players ?? []).map((player, index) => ({
+  const players = useMemo<AvailablePlayerRow[]>(() =>
+    (waiverData?.available_players ?? []).map((player, index) => ({
         ...player,
         rank: index + 1,
-      }));
-    }
-
-    return (waiverData?.available_players ?? []).map((player, index) => ({
-      ...player,
-      rank: index + 1,
-    }));
-  }, [isDemoLeague, waiverData?.available_players]);
+    })),
+  [waiverData?.available_players]);
   const watchlists = watchlistsQuery.data?.data ?? [];
   const primaryWatchlist = watchlists[0] ?? null;
   const watchedPlayerIds = useMemo(
@@ -209,14 +201,6 @@ export default function LeagueWaivers() {
   }, {});
 
   const handleWatchPlayer = async (playerId: number) => {
-    if (isDemoLeague) {
-      toast({
-        title: "Demo league watchlist",
-        description: "Watchlists persist in real leagues after signing in.",
-      });
-      return;
-    }
-
     if (watchlistsQuery.isError) {
       toast({
         title: "Unable to update watchlist",
@@ -257,13 +241,6 @@ export default function LeagueWaivers() {
   };
 
   const openClaimDialog = (player: AvailablePlayerRow) => {
-    if (isDemoLeague) {
-      toast({
-        title: "Demo league waiver claim",
-        description: "Create or join a real league to submit waiver claims.",
-      });
-      return;
-    }
     setClaimPlayer(player);
     setDropRosterEntryId("none");
     setFaabBid("0");
@@ -376,12 +353,25 @@ export default function LeagueWaivers() {
     }
   };
 
-  if (!isDemoLeague && leagueQuery.isLoading) {
+  if (leagueQuery.isLoading) {
     return (
       <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
         <div className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface-raised/80 p-8 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cfb-text-muted">
           Loading league...
         </div>
+      </main>
+    );
+  }
+
+  if (leagueQuery.isError) {
+    return (
+      <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
+        <ErrorState
+          title="Unable to load league"
+          message="The league could not be loaded. Confirm the backend is available, then try again."
+          retryLabel="Try Again"
+          onRetry={() => void leagueQuery.refetch()}
+        />
       </main>
     );
   }
@@ -562,11 +552,11 @@ export default function LeagueWaivers() {
             </div>
           </div>
         </div>
-        {!isDemoLeague && waiverQuery.isLoading ? (
+        {waiverQuery.isLoading ? (
           <p className="px-5 py-6 text-sm text-slate-400">
             Loading league-specific available players…
           </p>
-        ) : !isDemoLeague && waiverQuery.isError ? (
+        ) : waiverQuery.isError ? (
           <p className="px-5 py-6 text-sm font-black uppercase tracking-[0.16em] text-red-300">
             Unable to load the league waiver pool
             {waiverQuery.error instanceof Error ? `: ${waiverQuery.error.message}` : "."}
@@ -685,8 +675,7 @@ export default function LeagueWaivers() {
         )}
       </section>
 
-      {!isDemoLeague ? (
-        <section className="grid gap-4 lg:grid-cols-2">
+      <section className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-5">
             <div className="flex items-center justify-between gap-3">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-300">
@@ -798,11 +787,9 @@ export default function LeagueWaivers() {
               </div>
             )}
           </div>
-        </section>
-      ) : null}
+      </section>
 
-      {!isDemoLeague ? (
-        <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-5">
+      <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-5">
           <div className="flex items-center justify-between gap-3">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">
               {waiverData?.waiver_rules.waiver_type === "faab"
@@ -830,8 +817,7 @@ export default function LeagueWaivers() {
               ))}
             </div>
           )}
-        </section>
-      ) : null}
+      </section>
 
       <section className="grid gap-4 md:grid-cols-5">
         {positions

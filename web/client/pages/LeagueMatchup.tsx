@@ -9,10 +9,6 @@ import { WinChanceMeter } from "@/components/league/WinChanceMeter";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { StatCard, StatusBadge, SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
 import { useLeagueDetail, useLeagueMatchupTab } from "@/hooks/use-leagues";
-import {
-  DEMO_LEAGUE_ID,
-  createDemoLeagueMatchupResponse,
-} from "@/lib/leaguePreviewData";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import type { LeagueMatchupTabResponse, LeagueMatchupTeam } from "@/types/league";
 
@@ -108,15 +104,14 @@ function TeamScorePanel({
 export default function LeagueMatchup() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
-  const isDemoLeague = parsedLeagueId === DEMO_LEAGUE_ID;
   const [selectedWeek, setSelectedWeek] = useState<number | null>(1);
-  const leagueQuery = useLeagueDetail(parsedLeagueId, !isDemoLeague);
-  const postDraft = isDemoLeague || isLeaguePostDraft({
+  const leagueQuery = useLeagueDetail(parsedLeagueId);
+  const postDraft = isLeaguePostDraft({
     draftStatus: leagueQuery.data?.draft?.status,
     leagueStatus: leagueQuery.data?.status,
   });
-  const matchupQuery = useLeagueMatchupTab(parsedLeagueId, selectedWeek ?? undefined, !isDemoLeague && postDraft);
-  const data = isDemoLeague ? createDemoLeagueMatchupResponse() : matchupQuery.data;
+  const matchupQuery = useLeagueMatchupTab(parsedLeagueId, selectedWeek ?? undefined, postDraft);
+  const data = matchupQuery.data;
   const myTeam = data?.my_team ?? data?.user_team ?? null;
   const opponentTeam = data?.opponent_team ?? null;
   const displayWeek = selectedWeek ?? data?.week ?? 1;
@@ -125,12 +120,25 @@ export default function LeagueMatchup() {
   const statusVariant = matchupStatusVariant(data?.status);
   const shouldShowScorePanels = shouldShowMatchupScorePanels(data?.status);
 
-  if (!isDemoLeague && leagueQuery.isLoading) {
+  if (leagueQuery.isLoading) {
     return (
       <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
         <div className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface-raised/80 p-8 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cfb-text-muted">
           Loading league...
         </div>
+      </main>
+    );
+  }
+
+  if (leagueQuery.isError) {
+    return (
+      <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
+        <ErrorState
+          title="Unable to load league"
+          message="The league could not be loaded. Confirm the backend is available, then try again."
+          retryLabel="Try Again"
+          onRetry={() => void leagueQuery.refetch()}
+        />
       </main>
     );
   }
@@ -162,14 +170,14 @@ export default function LeagueMatchup() {
         />
       </div>
 
-      {matchupQuery.isError && !isDemoLeague ? (
+      {matchupQuery.isError ? (
         <ErrorState
           title="Unable to load matchup"
           message="The matchup API did not return a usable response for this league and week."
           retryLabel="Try Again"
           onRetry={() => void matchupQuery.refetch()}
         />
-      ) : matchupQuery.isLoading && !isDemoLeague ? (
+      ) : matchupQuery.isLoading ? (
         <SurfaceCard variant="default" padding="spacious">
           <SkeletonState rows={5} />
         </SurfaceCard>

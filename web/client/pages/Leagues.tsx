@@ -3,27 +3,21 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   Trophy,
   ChevronRight,
-  CalendarDays,
-  Send,
-  BellRing,
   Lock,
   Globe2,
   Users,
   Copy,
   Link2,
   LockKeyhole,
-  UsersRound,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/use-toast";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagues } from "@/hooks/use-leagues";
 import { formatDraftCountdown, hasDraftStarted } from "@/lib/draftStatus";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
-import { DEMO_LEAGUE_DETAIL, DEMO_LEAGUE_ID } from "@/lib/leaguePreviewData";
 
 const LeagueCard = ({
   id,
@@ -230,11 +224,7 @@ export default function Leagues() {
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
   const { setActiveLeagueId } = useActiveLeagueId();
-  const { data: leagueRows = [], isLoading, isError } = useLeagues(20, isLoggedIn);
-  const displayLeagues =
-    !isLoading && isLoggedIn && !leagueRows.some((league) => league.id === DEMO_LEAGUE_ID)
-      ? [...leagueRows, DEMO_LEAGUE_DETAIL]
-      : leagueRows;
+  const { data: leagueRows = [], isLoading, isError, refetch } = useLeagues(20, isLoggedIn);
 
   return (
     <div className="relative z-10 mx-auto max-w-6xl space-y-12 pb-20 pt-1 animate-in fade-in duration-1000">
@@ -245,20 +235,6 @@ export default function Leagues() {
           </h1>
           {isLoggedIn && (
             <div className="flex items-center gap-3">
-              <Button
-                type="button"
-                variant="ghost"
-                aria-label="Quick Join is coming soon"
-                className="h-10 rounded-xl border border-dashed border-white/15 px-3 text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground hover:bg-white/5 hover:text-foreground"
-                onClick={() => toast({
-                  title: "Quick Join coming soon",
-                  description: "Leagues are invite-only for now. Quick Join will help you find a public league in a future release.",
-                })}
-              >
-                <UsersRound className="mr-1.5 h-3.5 w-3.5 text-primary" />
-                Quick Join
-                <span className="ml-1 rounded-full border border-amber-300/30 bg-amber-300/10 px-1.5 py-0.5 text-[8px] text-amber-100">Coming soon</span>
-              </Button>
               <Button
                 variant="outline"
                 className="border-primary/30 text-primary text-[10px] font-black uppercase tracking-widest rounded-2xl h-12 px-8 hover:bg-primary/10 transition-all"
@@ -295,12 +271,12 @@ export default function Leagues() {
               <p className="text-[11px] font-bold uppercase tracking-widest text-red-300">
                 Unable to load leagues. Confirm the backend is running and your session is valid.
               </p>
-              <p className="mt-3 text-xs font-semibold text-sky-200">
-                Showing the local 10-team placeholder league below so the roster and matchup flow can still be reviewed.
-              </p>
+              <Button variant="outline" onClick={() => void refetch()} className="mt-5 rounded-xl border-sky-300/25 text-sky-100">
+                Try Again
+              </Button>
             </Card>
           )}
-          {displayLeagues.map((league) => (
+          {leagueRows.map((league) => (
             <LeagueCard
               key={league.id}
               id={league.id}
@@ -338,63 +314,16 @@ export default function Leagues() {
           {!isLoading && leagueRows.length === 0 && (
             <Card className="bg-card/40 backdrop-blur-md border-border/40 rounded-[3rem] p-12 space-y-8">
               <div className="space-y-3 text-center">
-                <h3 className="text-2xl font-black uppercase text-foreground">Placeholder league loaded</h3>
+                <h3 className="text-2xl font-black uppercase text-foreground">No leagues yet</h3>
                 <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">
-                  Open Alpha Demo League to inspect the 10-manager Roster, Matchup, Draft Room, Watchlist, and Settings flow.
+                  Create a league or join one with an invite code to get started.
                 </p>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 space-y-4">
-                  <div className="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center text-primary">
-                    <CalendarDays className="w-5 h-5" />
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-black uppercase tracking-[0.14em] text-foreground">Set the Draft</h4>
-                    <p className="text-xs font-medium leading-6 text-muted-foreground/75">
-                      The demo uses a completed 10-team league with Week 1 matchup projections.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 space-y-4">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 flex items-center justify-center text-emerald-400">
-                    <Send className="w-5 h-5" />
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-black uppercase tracking-[0.14em] text-foreground">Invite Your League</h4>
-                    <p className="text-xs font-medium leading-6 text-muted-foreground/75">
-                      The Draft Room opens from the league hub and unlocks when the scheduled draft time arrives.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 space-y-4">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500/15 flex items-center justify-center text-amber-300">
-                    <BellRing className="w-5 h-5" />
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-black uppercase tracking-[0.14em] text-foreground">Stay Ready</h4>
-                    <p className="text-xs font-medium leading-6 text-muted-foreground/75">
-                      Create or join a real league when the backend is running. The placeholder does not mutate data.
-                    </p>
-                  </div>
-                </div>
+              <div className="flex flex-wrap justify-center gap-3">
+                <Button onClick={() => navigate("/leagues/create")}>Create League</Button>
+                <Button variant="outline" onClick={() => navigate("/leagues/join")}>Join League</Button>
               </div>
             </Card>
-          )}
-          {!isLoading && leagueRows.length === 0 && (
-            <Button
-              type="button"
-              className="mx-auto flex h-12 rounded-2xl bg-primary px-8 text-[11px] font-black uppercase tracking-[0.16em] text-primary-foreground"
-              onClick={() => {
-                setActiveLeagueId(DEMO_LEAGUE_ID);
-                navigate(`/league/${DEMO_LEAGUE_ID}/roster`);
-              }}
-            >
-              Open Placeholder League
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
           )}
         </div>
       ) : (
