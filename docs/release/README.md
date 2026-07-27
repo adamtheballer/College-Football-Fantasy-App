@@ -10,5 +10,6 @@ These checklists track implementation and acceptance gates for the open producti
 - `issue-9-checklist.md` Persisted draft workflow
 - `issue-10-checklist.md` Complete league hub pages
 - `issue-11-checklist.md` Persistent roster actions, waivers, watchlists
+- `beta-2026-rc-validation.md` Consolidated beta release-candidate evidence and production promotion gates
 
 Each file should be updated alongside implementation PRs.
