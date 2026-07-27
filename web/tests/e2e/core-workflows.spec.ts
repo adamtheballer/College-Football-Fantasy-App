@@ -55,6 +55,66 @@ const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]
 };
 
 test.describe("critical browser workflows", () => {
+  test("Saturday Pick 6 dashboard action opens the contest instead of league creation", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+    await page.route("**/leagues?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [], total: 0, limit: 20, offset: 0 }),
+      });
+    });
+    await page.route("**/notifications/alerts?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [] }),
+      });
+    });
+    await page.route("**/saturday-pick-6/current?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 1,
+          season: 2026,
+          week_number: 1,
+          title: "Saturday Pick 6",
+          contest_position: "RB",
+          status: "OPEN",
+          lock_at: "2026-09-05T16:00:00Z",
+          winning_player_ids: [],
+          entry: null,
+          sponsor: null,
+          players: [
+            {
+              id: 1,
+              player_id: 101,
+              canonical_position: "RB",
+              player_name: "Ahmad Hardy",
+              school: "Missouri",
+              opponent: "Arkansas-Pine Bluff",
+              game_time: "2026-09-05T16:00:00Z",
+              image_url: null,
+              projected_points: 20.9,
+              live_points: null,
+              final_points: null,
+              scoring_status: "NOT_STARTED",
+              sort_order: 1,
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.goto("/");
+    await page.getByRole("link", { name: "Make Your Pick", exact: true }).click();
+
+    await expect(page).toHaveURL(/\/saturday-pick-6$/);
+    await expect(page.getByRole("heading", { name: "MAKE YOUR PICK", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "BUILD YOUR LEAGUE", exact: true })).not.toBeVisible();
+  });
+
   test("login flow stores auth session and routes to dashboard", async ({ page }) => {
     await page.route("**/auth/login", async (route) => {
       await route.fulfill({
