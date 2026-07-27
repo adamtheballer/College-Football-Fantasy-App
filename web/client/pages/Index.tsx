@@ -20,6 +20,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLeagueWorkspace, useLeagues } from "@/hooks/use-leagues";
 import { useSaturdayPickContest } from "@/hooks/use-saturday-pick";
 import { apiGet } from "@/lib/api";
+import { getSaturdayPickRewardMessage, getSaturdayPickSponsorLogo } from "@/lib/saturday-pick-sponsor";
 import type { LeagueDetail } from "@/types/league";
 
 type AlertItem = {
@@ -325,14 +326,14 @@ export default function Index() {
               <Trophy className="h-4 w-4" aria-hidden="true" />
               Saturday Pick 6
             </div>
-            <p className="mt-6 cfb-micro-label text-cfb-brand">The weekly college football challenge</p>
-            {saturdayPickQuery.data?.sponsor ? <p className="mt-2 text-sm font-black text-cyan-100">Presented by {saturdayPickQuery.data.sponsor.name}</p> : null}
+            <p className="mt-6 cfb-micro-label text-cfb-brand">{saturdayPickQuery.data ? `${saturdayPickQuery.data.contest_position} Week` : "The weekly college football challenge"}</p>
+            {saturdayPickQuery.data?.sponsor ? <div className="mt-3 flex items-center gap-3"><div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-cyan-100/35 bg-white p-1.5 shadow-[0_0_20px_rgba(34,211,238,0.16)]">{getSaturdayPickSponsorLogo(saturdayPickQuery.data.sponsor) ? <img src={getSaturdayPickSponsorLogo(saturdayPickQuery.data.sponsor) ?? undefined} alt={`${saturdayPickQuery.data.sponsor.name} logo`} className="h-full w-full object-contain" /> : <span className="text-xs font-black text-cfb-brand">{saturdayPickQuery.data.sponsor.name.slice(0, 2).toUpperCase()}</span>}</div><p className="font-display text-3xl font-black italic tracking-[-0.04em] text-cyan-100 sm:text-4xl">Presented by {saturdayPickQuery.data.sponsor.name}</p></div> : null}
             <h2 className="mt-2 cfb-display-title text-4xl sm:text-5xl lg:text-6xl">
-              {saturdayPickQuery.data ? `${saturdayPickQuery.data.contest_position} Week` : "Coming next week"}
+              {saturdayPickQuery.data?.sponsor ? "Pick the winner" : "Coming next week"}
             </h2>
             <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-cfb-text-secondary sm:text-lg">
               {saturdayPickQuery.data
-                ? `Pick which featured ${saturdayPickQuery.data.contest_position} will score the most fantasy points and own your weekly call.`
+                ? `${getSaturdayPickRewardMessage(saturdayPickQuery.data.sponsor)} Choose which featured ${saturdayPickQuery.data.contest_position} will score the most fantasy points.`
     : "Six featured players. One weekly prediction. One prize. Make your call before kickoff."}
             </p>
           </div>

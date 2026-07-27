@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SaturdayPickPlayer } from "@/hooks/use-saturday-pick";
+import { getSaturdayPickRewardMessage, getSaturdayPickSponsorLogo } from "@/lib/saturday-pick-sponsor";
 
 import { displayPoints, pickConfirmationMessage, positionLabel, statusLabel } from "./SaturdayPick6";
 
@@ -39,5 +40,11 @@ describe("SaturdayPick6 state helpers", () => {
     expect(positionLabel("RB")).toBe("running back");
     expect(positionLabel("TE")).toBe("tight end");
     expect(pickConfirmationMessage("Ahmad Hardy")).toBe("Your pick is in. Follow Ahmad Hardy this Saturday.");
+  });
+
+  it("uses the West Georgia Cornhole logo fallback and makes the discount-code prize explicit", () => {
+    const sponsor = { name: "West Georgia Cornhole", logo_url: null };
+    expect(getSaturdayPickSponsorLogo(sponsor)).toBe("/west-georgia-cornhole.png");
+    expect(getSaturdayPickRewardMessage(sponsor)).toContain("discount code");
   });
 });

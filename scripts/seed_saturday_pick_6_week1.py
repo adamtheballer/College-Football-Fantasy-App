@@ -31,6 +31,8 @@ WEEK_ONE_RB_NAMES = (
     "Cam Cook",
 )
 
+WEST_GEORGIA_CORNHOLE_LOGO_URL = "/west-georgia-cornhole.png"
+
 # These four kickoff times were absent from the initial spreadsheet import.
 # They come from the linked official athletic-department schedules and are kept
 # here only as a tightly scoped launch-data correction.  The seed refuses to
@@ -128,6 +130,7 @@ def main() -> None:
             title="Saturday Pick 6",
             featured_player_ids=[by_name[name].id for name in WEEK_ONE_RB_NAMES],
             sponsor_name="West Georgia Cornhole",
+            sponsor_logo_url=WEST_GEORGIA_CORNHOLE_LOGO_URL,
             sponsor_offer_text=args.sponsor_offer,
             sponsor_code=args.sponsor_code,
             sponsor_url=args.sponsor_url,
