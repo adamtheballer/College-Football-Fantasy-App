@@ -9,10 +9,12 @@ Run production as separate processes:
 1. **API**: FastAPI via `collegefootballfantasy_api.app.main:app`.
 2. **Web**: static Vite build from `web/dist/spa`.
 3. **Scoring worker**: `scripts/run_scoring_worker.py`.
-4. **Trade processor**: `scripts/process_due_trades.py`.
+4. **Lifecycle worker**: `scripts/run_lifecycle_worker.py`; processes expired draft picks, due waiver windows, and due or expired trade offers.
 5. **Notification worker**: `scripts/send_scheduled_notifications.py`, when scheduled notifications are enabled.
 
 Do not run scoring inside the web process. Scoring must survive API deploys, retry safely, and expose failures in `scoring_runs`.
+
+Do not omit the lifecycle worker in production. Without it, draft clocks do not auto-pick, approved waiver windows do not clear, and due trades do not advance.
 
 ## Scoring Provider Policy
 
@@ -28,7 +30,7 @@ Recommended schedules:
 - Game window: every 30–90 seconds with `--mode live`.
 - Postgame reconciliation: every 10–30 minutes with `--mode postgame`.
 - Next-day correction sweep: hourly or once after provider finalization with `--mode correction`.
-- Due trade processing: every 5–15 minutes, and once shortly after Monday reset, with `scripts/process_due_trades.py`.
+- Lifecycle processing: every 5–15 minutes (or the configured lifecycle interval) with `scripts/run_lifecycle_worker.py`. It must remain active through draft windows, waiver-clear windows, and trade review windows.
 
 Examples:
 
@@ -36,7 +38,7 @@ Examples:
 PYTHONPATH=. uv run python scripts/run_scoring_worker.py --season 2026 --week 1 --mode live
 PYTHONPATH=. uv run python scripts/run_scoring_worker.py --season 2026 --week 1 --mode postgame
 PYTHONPATH=. uv run python scripts/run_scoring_worker.py --season 2026 --week 1 --mode correction --once
-PYTHONPATH=. uv run python scripts/process_due_trades.py
+PYTHONPATH=. uv run python scripts/run_lifecycle_worker.py
 ```
 
 Retry controls:
