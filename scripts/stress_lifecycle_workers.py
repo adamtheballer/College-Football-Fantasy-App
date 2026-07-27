@@ -107,14 +107,18 @@ def _seed_due_work() -> dict[str, int | datetime]:
         db.add_all([proposing_team, receiving_team])
         db.flush()
 
-        giving_player = Player(name=f"Stress QB {suffix}", school="Stress U", position="QB")
-        receiving_player = Player(name=f"Stress RB {suffix}", school="Stress U", position="RB")
-        stale_giving_player = Player(name=f"Stress Stale WR {suffix}", school="Stress U", position="WR")
-        stale_receiving_player = Player(name=f"Stress Stale QB {suffix}", school="Stress U", position="QB")
-        waiver_player = Player(name=f"Stress WR {suffix}", school="Stress U", position="WR")
-        draft_player = Player(name=f"Stress Draft RB {suffix}", school="Stress U", position="RB", sheet_adp=1)
-        official_proposing_player = Player(name=f"Stress Official RB {suffix}", school="Stress U", position="RB")
-        official_receiving_player = Player(name=f"Stress Official WR {suffix}", school="Stress U", position="WR")
+        # The production draft pool accepts only the canonical Power 4 + Notre
+        # Dame universe. Use an approved school here so this stress fixture
+        # exercises the worker locking path, rather than its eligibility guard.
+        stress_school = "Alabama"
+        giving_player = Player(name=f"Stress QB {suffix}", school=stress_school, position="QB")
+        receiving_player = Player(name=f"Stress RB {suffix}", school=stress_school, position="RB")
+        stale_giving_player = Player(name=f"Stress Stale WR {suffix}", school=stress_school, position="WR")
+        stale_receiving_player = Player(name=f"Stress Stale QB {suffix}", school=stress_school, position="QB")
+        waiver_player = Player(name=f"Stress WR {suffix}", school=stress_school, position="WR")
+        draft_player = Player(name=f"Stress Draft RB {suffix}", school=stress_school, position="RB", sheet_adp=1)
+        official_proposing_player = Player(name=f"Stress Official RB {suffix}", school=stress_school, position="RB")
+        official_receiving_player = Player(name=f"Stress Official WR {suffix}", school=stress_school, position="WR")
         db.add_all(
             [
                 giving_player,
@@ -444,10 +448,11 @@ def _seed_trade_transition_races() -> dict[str, int | datetime]:
         db.add_all([proposing_team, receiving_team])
         db.flush()
 
-        accept_give = Player(name=f"Stress Accept QB {suffix}", school="Stress U", position="QB")
-        accept_receive = Player(name=f"Stress Accept RB {suffix}", school="Stress U", position="RB")
-        veto_give = Player(name=f"Stress Veto WR {suffix}", school="Stress U", position="WR")
-        veto_receive = Player(name=f"Stress Veto TE {suffix}", school="Stress U", position="TE")
+        stress_school = "Alabama"
+        accept_give = Player(name=f"Stress Accept QB {suffix}", school=stress_school, position="QB")
+        accept_receive = Player(name=f"Stress Accept RB {suffix}", school=stress_school, position="RB")
+        veto_give = Player(name=f"Stress Veto WR {suffix}", school=stress_school, position="WR")
+        veto_receive = Player(name=f"Stress Veto TE {suffix}", school=stress_school, position="TE")
         db.add_all([accept_give, accept_receive, veto_give, veto_receive])
         db.flush()
         db.add_all(
@@ -621,7 +626,7 @@ def _assert_scoring_rollback() -> dict[str, int]:
             owner_user_id=user.id,
             owner_name="Stress Scoring",
         )
-        player = Player(name=f"Stress Scoring QB {suffix}", school="Stress U", position="QB")
+        player = Player(name=f"Stress Scoring QB {suffix}", school="Alabama", position="QB")
         db.add_all([team, player])
         db.flush()
         db.add(

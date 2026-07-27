@@ -1,8 +1,8 @@
 # Beta 2026 Release Branch Inventory
 
-Inventory date: 2026-07-26
+Inventory date: 2026-07-27
 
-Release candidate: `release/beta-2026-runtime` at the commit recorded immediately before the final PR.
+Release candidate: `release/beta-2026` at the commit containing the final validation record. The earlier `release/beta-2026-runtime` branch is a legacy integration baseline, not the branch to deploy.
 
 This inventory is an ancestry classification, not a quality approval. A branch is included only when it is already an ancestor of the release candidate. Branches outside the candidate must not be merged into `main` for this beta without a separate review, conflict resolution, and validation pass.
 
@@ -49,7 +49,7 @@ These branches have commits not present in the candidate. They are not release-a
 
 ## Working directories
 
-Only `release/beta-2026-runtime` is the validated candidate. The other local worktrees at the time of the inventory point to `main` and are audit/reference worktrees, not integration sources.
+Only `release/beta-2026` is the validated candidate. The other local worktrees at the time of the inventory point to `main` or legacy/audit branches and are not integration sources.
 
 Before publication, re-run:
 
