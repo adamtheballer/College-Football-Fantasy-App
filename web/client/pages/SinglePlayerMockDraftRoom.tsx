@@ -608,7 +608,18 @@ export default function SinglePlayerMockDraftRoom() {
         >
           <div className={cn("absolute right-4 top-4 h-2.5 w-2.5 rounded-full shadow-[0_0_18px_currentColor]", style.dot)} />
           <p className="text-[9px] font-black uppercase tracking-[0.2em]">{slot.label}</p>
-          <p className="mt-2 truncate text-base font-black text-foreground">{slot.player?.playerName ?? "Open Slot"}</p>
+          {slot.player ? (
+            <button
+              type="button"
+              onClick={() => setSelectedPlayerId(slot.player?.playerId ?? null)}
+              className="mt-2 block max-w-full truncate text-left text-base font-black text-foreground transition-colors hover:text-cyan-100 focus:outline-none focus-visible:text-cyan-100 focus-visible:underline"
+              aria-label={`Open ${slot.player.playerName} player card`}
+            >
+              {slot.player.playerName}
+            </button>
+          ) : (
+            <p className="mt-2 truncate text-base font-black text-foreground">Open Slot</p>
+          )}
           <p className="mt-1 truncate text-[9px] font-black uppercase tracking-[0.16em] opacity-80">
             {slot.player
               ? `${slot.player.school} • ${slot.player.projectedPoints.toFixed(1)}`
@@ -639,7 +650,18 @@ export default function SinglePlayerMockDraftRoom() {
         >
           <p className="text-[9px] font-black uppercase tracking-[0.2em]">{slot.label}</p>
           <div className="min-w-0">
-            <p className="truncate text-base font-black text-foreground">{slot.player?.playerName ?? "Open Slot"}</p>
+            {slot.player ? (
+              <button
+                type="button"
+                onClick={() => setSelectedPlayerId(slot.player?.playerId ?? null)}
+                className="block max-w-full truncate text-left text-base font-black text-foreground transition-colors hover:text-cyan-100 focus:outline-none focus-visible:text-cyan-100 focus-visible:underline"
+                aria-label={`Open ${slot.player.playerName} player card`}
+              >
+                {slot.player.playerName}
+              </button>
+            ) : (
+              <p className="truncate text-base font-black text-foreground">Open Slot</p>
+            )}
             <p className="mt-1 truncate text-[9px] font-black uppercase tracking-[0.16em] opacity-75">
               {slot.player ? `${slot.player.position} • ${slot.player.school} • ${slot.player.projectedPoints.toFixed(1)}` : "Bench reserve"}
             </p>

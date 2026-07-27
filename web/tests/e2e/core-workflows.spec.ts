@@ -1347,6 +1347,12 @@ test.describe("critical browser workflows", () => {
     const afterCpuPick = await page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}"));
     expect(afterCpuPick.picks[4].pickedBy).toBe("bot");
 
+    const rosterPlayerName = afterUserPick.picks[3].playerName;
+    await page.getByRole("button", { name: /^Roster$/ }).click();
+    await page.getByRole("button", { name: `Open ${rosterPlayerName} player card` }).click();
+    await expect(page.getByRole("dialog", { name: `${rosterPlayerName} player card` })).toBeVisible();
+    await page.getByRole("button", { name: "Close player card" }).click();
+
     await page.getByRole("button", { name: /Reset/i }).first().click();
 
     await expect
