@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -53,6 +54,22 @@ TERMINAL_WAIVER_STATUSES = {
     WAIVER_STATUS_FAILED,
 }
 DEFAULT_WAIVER_PERIOD_HOURS = 24
+
+
+@dataclass(frozen=True)
+class WaiverWindowState:
+    """The league-wide acquisition mode for the current college-football week.
+
+    A completed Tuesday processing run opens free agency only for that same
+    game week.  It must not permanently convert the pool to free agents: the
+    following week's scheduled window is once again a bid/priority window.
+    Individual player kickoff checks remain a separate, stricter lock.
+    """
+
+    mode: str
+    week: int
+    next_process_at: datetime
+    last_processed_at: datetime | None
 
 
 def _now() -> datetime:
@@ -108,8 +125,6 @@ def _next_waiver_process_time(
     """Return the next future league-local processing timestamp in UTC."""
 
     current = _as_utc(now or _now())
-    if settings.next_waiver_run_at is not None and _as_utc(settings.next_waiver_run_at) > current:
-        return _as_utc(settings.next_waiver_run_at)
     local_now = current.astimezone(_league_timezone(db, league, settings))
     weekday_offset = (int(settings.waiver_processing_weekday) - local_now.weekday()) % 7
     candidate = (local_now + timedelta(days=weekday_offset)).replace(
@@ -120,6 +135,51 @@ def _next_waiver_process_time(
     settings.next_waiver_run_at = candidate.astimezone(timezone.utc)
     db.add(settings)
     return settings.next_waiver_run_at
+
+
+def waiver_window_state(
+    db: Session,
+    league: League,
+    settings: LeagueSettings | None = None,
+    *,
+    now: datetime | None = None,
+) -> WaiverWindowState:
+    """Return whether the weekly shared pool is in bids or instant-add mode.
+
+    The period ledger is the authority.  A completed processing run switches
+    only its own CFB week to ``free_agents``; when the calendar advances to a
+    new week, unrostered players are back in that week's waiver window until
+    its scheduled process time.  The calculation deliberately derives the
+    next timestamp from the current settings rather than trusting a stale
+    cached value after a commissioner changes the schedule.
+    """
+
+    current = _as_utc(now or _now())
+    settings = settings or _league_settings(db, league.id)
+    week_state = current_cfb_week_state(
+        league.season_year,
+        now=current,
+        timezone_name=_league_timezone_name(db, league, settings),
+    )
+    last_period = (
+        db.query(WaiverPeriod)
+        .filter(
+            WaiverPeriod.league_id == league.id,
+            WaiverPeriod.season == league.season_year,
+            WaiverPeriod.status == "completed",
+            WaiverPeriod.processed_at.isnot(None),
+            WaiverPeriod.processed_at <= current,
+        )
+        .order_by(WaiverPeriod.processed_at.desc(), WaiverPeriod.id.desc())
+        .first()
+    )
+    free_agent_phase = last_period is not None and last_period.week == week_state.week
+    return WaiverWindowState(
+        mode="free_agents" if free_agent_phase else "waivers",
+        week=week_state.week,
+        next_process_at=_next_waiver_process_time(db, league, settings, now=current),
+        last_processed_at=_as_utc(last_period.processed_at) if last_period and last_period.processed_at else None,
+    )
 
 
 def _owned_team(db: Session, league_id: int, user_id: int) -> Team:
@@ -436,6 +496,12 @@ def _ensure_player_is_free_agent(
     )
     if rostered:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player already on a league roster")
+
+    league = db.get(League, league_id)
+    if league is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
+    if waiver_window_state(db, league, now=now).mode != "free_agents":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player is currently available on waivers")
 
     availability = _availability_row(db, league_id, player_id, for_update=True)
     if availability is None:

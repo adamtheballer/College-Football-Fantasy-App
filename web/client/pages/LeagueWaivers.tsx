@@ -148,6 +148,10 @@ export default function LeagueWaivers() {
   });
   const waiverQuery = useLeagueWaiverTab(parsedLeagueId, 50, 0, !isDemoLeague && postDraft);
   const waiverData = isDemoLeague ? createDemoLeagueWaiverResponse() : waiverQuery.data;
+  const isFreeAgentPhase = waiverData?.waiver_rules.phase === "free_agents";
+  const nextWaiverProcessAt = typeof waiverData?.waiver_rules.next_process_at === "string"
+    ? waiverData.waiver_rules.next_process_at
+    : null;
   const addFreeAgent = useAddFreeAgent(parsedLeagueId);
   const submitWaiverClaim = useSubmitWaiverClaim(parsedLeagueId);
   const cancelWaiverClaim = useCancelWaiverClaim(parsedLeagueId);
@@ -484,7 +488,9 @@ export default function LeagueWaivers() {
           <div>
             <h1 className="text-4xl font-black italic text-slate-50">Available Players</h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              League-scoped available players only. Review the waiver pool, current claims, and roster drop candidates from the live league API.
+              {isFreeAgentPhase
+                ? "This week’s waivers have cleared. Remaining unrostered players are instant adds with no FAAB or priority; each player locks at their own kickoff."
+                : `Waiver bids are open until ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}. After processing, remaining unrostered players become instant adds until their own kickoff.`}
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3 sm:min-w-[430px]">
@@ -517,7 +523,9 @@ export default function LeagueWaivers() {
                 Available Players
               </h2>
               <p className="mt-2 text-xs font-semibold text-slate-500">
-                Only players not owned on league rosters appear here. Claims are processed by the backend waiver lifecycle.
+                {isFreeAgentPhase
+                  ? "Waivers cleared for this week. Add eligible players immediately; no bid or priority is used."
+                  : `Claims process at ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}. Eligible players become instant adds only after the clear.`}
               </p>
             </div>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">

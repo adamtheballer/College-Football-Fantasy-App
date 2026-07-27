@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { apiGet, clearAccessTokenSession, storeAccessTokenSession } from "./api";
+import { apiGet, apiPut, clearAccessTokenSession, storeAccessTokenSession } from "./api";
 
 const originalFetch = globalThis.fetch;
 
@@ -70,6 +70,28 @@ describe("api client", () => {
       message:
         "basics.max_teams: Value error, max_teams must be an even number of at least 2; draft.draft_datetime_utc: Input should be a valid datetime",
     });
+  });
+
+  it("sends JSON PUT requests for APIs that update a single resource", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: 14, selected_pick_player_id: 9 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    await expect(apiPut("/saturday-pick-6/14/entry", { selected_pick_player_id: 9 })).resolves.toMatchObject({
+      id: 14,
+      selected_pick_player_id: 9,
+    });
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/saturday-pick-6/14/entry"),
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ selected_pick_player_id: 9 }),
+        headers: expect.objectContaining({ "Content-Type": "application/json" }),
+      })
+    );
   });
 
   it("refreshes an expired access token for auth bootstrap instead of dropping the session", async () => {

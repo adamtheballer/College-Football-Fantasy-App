@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
+from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
@@ -311,7 +312,7 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
     process_after = parse_api_datetime(body["process_after"])
     settings = db_session.query(LeagueSettings).filter_by(league_id=league["id"]).one()
     assert settings.next_waiver_run_at is not None
-    assert settings.waiver_process_hour == 8
+    assert settings.waiver_processing_hour == 8
     assert process_after == parse_api_datetime(settings.next_waiver_run_at.isoformat())
     assert process_after.astimezone(ZoneInfo(settings.waiver_timezone)).hour == 8
     assert process_after > submitted_at
@@ -344,6 +345,81 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
     assert db_session.query(RosterEntry).filter_by(team_id=team.id, player_id=drop_player_id).first() is None
     assert db_session.query(RosterEntry).filter_by(team_id=team.id, player_id=add_player_id).one()
     assert db_session.get(WaiverClaim, body["id"]).status == "won"
+
+
+def test_weekly_waiver_clear_opens_instant_adds_only_for_that_game_week(client, db_session, monkeypatch):
+    """A completed Tuesday run opens free agency for its week, not permanently."""
+
+    cleared_at = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(waiver_service, "_now", lambda: cleared_at)
+    token = create_user_and_token(client, "weekly-free-agency")
+    league = create_league(client, token)
+    drafted_player_id, free_agent_id = create_players(client)
+    complete_official_draft(db_session, league["id"], [drafted_player_id])
+    db_session.add(
+        WaiverPeriod(
+            league_id=league["id"],
+            season=2026,
+            week=1,
+            window_key="2026-week-1-tuesday-clear",
+            opens_at=cleared_at - timedelta(days=1),
+            closes_at=cleared_at,
+            processes_at=cleared_at,
+            status="completed",
+            processed_at=cleared_at,
+        )
+    )
+    db_session.commit()
+
+    settings = db_session.query(LeagueSettings).filter(LeagueSettings.league_id == league["id"]).one()
+    state_after_clear = waiver_service.waiver_window_state(
+        db_session,
+        db_session.get(League, league["id"]),
+        settings,
+        now=cleared_at,
+    )
+    assert state_after_clear.mode == "free_agents"
+
+    instant_add_after_clear = client.post(
+        f"/leagues/{league['id']}/waivers/free-agents/{free_agent_id}/add",
+        json={"team_id": db_session.query(Team).filter(Team.league_id == league["id"]).one().id},
+        headers=auth_headers(token),
+    )
+    assert instant_add_after_clear.status_code == 201
+
+    next_free_agent = client.post(
+        "/players",
+        json=[
+            {
+                "external_id": None,
+                "name": "Runner Three",
+                "position": "RB",
+                "school": "Georgia",
+                "image_url": None,
+            }
+        ],
+        headers=admin_headers(client),
+    )
+    assert next_free_agent.status_code == 201
+    next_free_agent_id = next_free_agent.json()[0]["id"]
+
+    next_week = datetime(2026, 8, 31, 15, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(waiver_service, "_now", lambda: next_week)
+    state_next_week = waiver_service.waiver_window_state(
+        db_session,
+        db_session.get(League, league["id"]),
+        settings,
+        now=next_week,
+    )
+    assert state_next_week.mode == "waivers"
+
+    instant_add = client.post(
+        f"/leagues/{league['id']}/waivers/free-agents/{next_free_agent_id}/add",
+        json={"team_id": db_session.query(Team).filter(Team.league_id == league["id"]).one().id},
+        headers=auth_headers(token),
+    )
+    assert instant_add.status_code == 409
+    assert instant_add.json()["detail"] == "player is currently available on waivers"
 
 
 def test_waiver_claim_uses_configured_waiver_schedule(client, db_session):

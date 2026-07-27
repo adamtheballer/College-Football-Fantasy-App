@@ -234,7 +234,7 @@ const parseJson = async <T>(res: Response): Promise<T> => {
 };
 
 type RequestOptions = {
-  method: "GET" | "POST" | "PATCH" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   path: string;
   params?: Record<string, string | number | boolean | undefined>;
   body?: unknown;
@@ -353,6 +353,14 @@ export const apiPost = async <T>(
   params?: Record<string, string | number | boolean | undefined>
 ): Promise<T> => {
   return apiRequest<T>({ method: "POST", path, body, params });
+};
+
+export const apiPut = async <T>(
+  path: string,
+  body: unknown,
+  params?: Record<string, string | number | boolean | undefined>
+): Promise<T> => {
+  return apiRequest<T>({ method: "PUT", path, body, params });
 };
 
 export const apiPatch = async <T>(

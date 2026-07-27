@@ -73,7 +73,7 @@ export default function SaturdayPick6() {
               </div>
               <div className="mt-5 grid grid-cols-2 gap-3 text-sm"><div><p className="cfb-micro-label">Opponent</p><p className="mt-1 font-black text-cfb-text-primary">vs. {player.opponent}</p></div><div><p className="cfb-micro-label">{contest.status === "FINAL" ? "Final" : "Projection"}</p><p className="mt-1 text-xl font-black tabular-nums text-cfb-brand">{formatPoints(contest.status === "FINAL" ? player.final_points : player.projected_points)}</p></div></div>
               <p className="mt-4 text-xs font-bold text-cfb-text-secondary">{formatKickoff(player.game_time)} • {player.scoring_status.replace(/_/g, " ")}</p>
-              {isOpen ? <Button className="mt-5 w-full" variant={selected ? "default" : "outline"} onClick={() => setPendingPickId(player.id)}>{selected ? <><Check className="mr-2 h-4 w-4" /> Your Pick</> : `Pick ${player.player_name.split(" ").at(-1)}`}</Button> : null}
+              {isOpen ? <Button className="mt-5 w-full" variant={selected ? "default" : "outline"} onClick={() => setPendingPickId(player.id)}>{selected ? <><Check className="mr-2 h-4 w-4" /> Your Pick</> : `Pick ${player.player_name.split(" ").slice(-1)[0]}`}</Button> : null}
             </article>
           );
         })}

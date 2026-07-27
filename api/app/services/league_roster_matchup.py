@@ -45,7 +45,7 @@ from collegefootballfantasy_api.app.services.matchup_probability import (
 )
 from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_context_for_players
 from collegefootballfantasy_api.app.services.roster_slots import CanonicalRosterSlot, build_team_roster_slots
-from collegefootballfantasy_api.app.services.waiver_service import serialize_claims
+from collegefootballfantasy_api.app.services.waiver_service import serialize_claims, waiver_window_state
 
 DEFAULT_ROSTER_SLOTS = {
     "QB": 1,
@@ -545,10 +545,13 @@ def build_waivers_view(
     waiver_priority = None
     faab_remaining = None
     settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
+    now = datetime.now(timezone.utc)
+    waiver_state = waiver_window_state(db, league, settings, now=now) if settings else None
     current_period = (
         db.query(WaiverPeriod)
         .filter(
             WaiverPeriod.league_id == league.id,
+            WaiverPeriod.season == league.season_year,
             WaiverPeriod.status.in_(("scheduled", "open", "locked")),
         )
         .order_by(WaiverPeriod.processes_at.asc(), WaiverPeriod.id.asc())
@@ -608,21 +611,21 @@ def build_waivers_view(
             )
             for entry in _roster_rows(db, team.id)
         ]
-    now = datetime.now(timezone.utc)
-
     def availability_for_player(player_id: int) -> tuple[str, datetime | None]:
         availability = availability_by_player.get(player_id)
         if availability is None:
-            if results_period is not None:
-                return "free_agent", results_period.processed_at
-            return "waivers", None
+            return ("free_agent", waiver_state.last_processed_at) if waiver_state and waiver_state.mode == "free_agents" else ("waivers", None)
         available_at = availability.available_at
+        if availability.state == "free_agent" and waiver_state and waiver_state.mode != "free_agents":
+            return "waivers", None
+        if availability.state == "waivers" and waiver_state and waiver_state.mode == "free_agents":
+            return "free_agent", waiver_state.last_processed_at
         if (
             availability.state in {"waiver_locked", "waivers"}
             and available_at is not None
             and as_utc(available_at) <= now
         ):
-            return "free_agent", available_at
+            return ("free_agent", available_at) if waiver_state and waiver_state.mode == "free_agents" else ("waivers", available_at)
         return availability.state, available_at
 
     return LeagueWaiversRead(
@@ -663,6 +666,9 @@ def build_waivers_view(
             "processing_hour": settings.waiver_processing_hour if settings else 8,
             "timezone": settings.waiver_timezone if settings else "America/New_York",
             "post_drop_waiver_hours": settings.post_drop_waiver_hours if settings else 24,
+            "phase": waiver_state.mode if waiver_state else "waivers",
+            "next_process_at": waiver_state.next_process_at.isoformat() if waiver_state else None,
+            "last_processed_at": waiver_state.last_processed_at.isoformat() if waiver_state and waiver_state.last_processed_at else None,
         },
         total_available=total,
         message=None if team else "No team found for your user in this league.",
