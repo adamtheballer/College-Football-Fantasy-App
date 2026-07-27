@@ -28,6 +28,7 @@ from collegefootballfantasy_api.app.schemas.historical_stats import PlayerHistor
 from collegefootballfantasy_api.app.schemas.game_log import PlayerGameLogRead
 from collegefootballfantasy_api.app.schemas.player_stat import PlayerStatResponse
 from collegefootballfantasy_api.app.schemas.player_trade_value import PlayerTradeValueHistoryRead
+from collegefootballfantasy_api.app.schemas.player_trajectory import PlayerTrajectoryRead
 from collegefootballfantasy_api.app.services.espn_player_lookup import (
     persist_espn_player_profile,
     resolve_espn_player_by_name,
@@ -39,6 +40,7 @@ from collegefootballfantasy_api.app.services.historical_stats import (
 )
 from collegefootballfantasy_api.app.services.player_game_log import build_player_game_log
 from collegefootballfantasy_api.app.services.player_trade_value import get_player_trade_values
+from collegefootballfantasy_api.app.services.player_trajectory import build_player_trajectory
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
 from collegefootballfantasy_api.app.services.auth_security import enforce_auth_rate_limit
 
@@ -54,6 +56,19 @@ def get_player_trade_values_endpoint(
     if db.get(Player, player_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
     return get_player_trade_values(db, player_id=player_id, season=season)
+
+
+@router.get("/{player_id}/trajectory", response_model=PlayerTrajectoryRead)
+def get_player_trajectory_endpoint(
+    player_id: int,
+    season: int = Query(default=2026, ge=2020, le=2100),
+    league_id: int | None = Query(default=None, ge=1),
+    db: Session = Depends(get_db),
+) -> PlayerTrajectoryRead:
+    try:
+        return build_player_trajectory(db, player_id=player_id, season=season, league_id=league_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 def _espn_player_id(external_id: str | None) -> str | None:

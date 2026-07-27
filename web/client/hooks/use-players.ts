@@ -154,6 +154,14 @@ export type PlayerTradeValueResponse = {
   history: Array<{ week: number; value: number; tier: string; calculated_at: string }>;
 };
 
+export type PlayerTrajectoryResponse = {
+  player_id: number;
+  season: number;
+  league_id?: number | null;
+  projection: Array<{ week: number; points: number; source: "published" | "modeled" | "bye" }>;
+  value: Array<{ week: number; value: number; source: "published" | "modeled" }>;
+};
+
 export function useLeaguePlayerHistory(
   leagueId: number | undefined,
   playerId: number | undefined,
@@ -176,6 +184,24 @@ export function usePlayerTradeValues(playerId?: number | null, season = 2026, en
       const payload = await apiGet<PlayerTradeValueResponse>(`/players/${playerId}/trade-values`, { season });
       return payload.current ? { ...payload, current: { ...payload.current, history: payload.history } } : payload;
     },
+  });
+}
+
+export function usePlayerTrajectory(
+  playerId?: number | null,
+  season = 2026,
+  leagueId?: number | null,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ["player-trajectory", playerId, season, leagueId ?? null],
+    enabled: enabled && typeof playerId === "number" && Number.isFinite(playerId),
+    staleTime: 60_000,
+    retry: false,
+    queryFn: () => apiGet<PlayerTrajectoryResponse>(`/players/${playerId}/trajectory`, {
+      season,
+      ...(typeof leagueId === "number" && Number.isFinite(leagueId) ? { league_id: leagueId } : {}),
+    }),
   });
 }
 
