@@ -1250,7 +1250,7 @@ test.describe("critical browser workflows", () => {
         sheet_projected_season_points: 300 - rank,
       };
     });
-    const playerRequests: Array<{ limit: number; offset: number }> = [];
+    const playerRequests: Array<{ limit: number; offset: number; draftEligible: string | null }> = [];
 
     await page.route("**/leagues/**/draft-picks", async (route) => {
       blockedMutations.push(route.request().url());
@@ -1280,7 +1280,11 @@ test.describe("critical browser workflows", () => {
       const url = new URL(route.request().url());
       const offset = Number(url.searchParams.get("offset") ?? 0);
       const limit = Number(url.searchParams.get("limit") ?? 100);
-      playerRequests.push({ limit, offset });
+      playerRequests.push({
+        limit,
+        offset,
+        draftEligible: url.searchParams.get("draft_eligible"),
+      });
       if (limit > 100) {
         await route.fulfill({
           status: 422,
@@ -1308,10 +1312,11 @@ test.describe("critical browser workflows", () => {
     expect(playerRequests.some((request) => request.limit > 100)).toBe(false);
     expect(playerRequests).toEqual(
       expect.arrayContaining([
-        { limit: 100, offset: 0 },
-        { limit: 100, offset: 100 },
+        expect.objectContaining({ limit: 100, offset: 0, draftEligible: "true" }),
+        expect.objectContaining({ limit: 100, offset: 100, draftEligible: "true" }),
       ])
     );
+    expect(playerRequests.every((request) => request.draftEligible === "true")).toBe(true);
 
     await expect
       .poll(
