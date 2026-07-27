@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Clock, Radio, ShieldAlert, Trophy } from "lucide-react";
+import { Clock, ShieldAlert, Trophy } from "lucide-react";
 import { Navigate, useParams } from "react-router-dom";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
@@ -7,7 +7,7 @@ import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
 import { WeekSelector } from "@/components/league/WeekSelector";
 import { WinChanceMeter } from "@/components/league/WinChanceMeter";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
-import { StatCard, StatusBadge, SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
+import { StatusBadge, SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
 import { useLeagueDetail, useLeagueMatchupTab } from "@/hooks/use-leagues";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import type { LeagueMatchupTabResponse, LeagueMatchupTeam } from "@/types/league";
@@ -242,32 +242,6 @@ export default function LeagueMatchup() {
               </div>
             ) : null}
           </SurfaceCard>
-
-          <section className="grid gap-4 md:grid-cols-3">
-            <StatCard
-              label="Status"
-              value={statusLabel}
-              helper="Scoring state"
-              tone={statusVariant === "live" ? "success" : statusVariant === "delayed" ? "gold" : "brand"}
-            />
-            <StatCard
-              label="Win Chance"
-              value={`${formatMatchupPoints(myTeam?.win_probability)}%`}
-              helper={myTeam?.fantasy_team_name ?? "Your Team"}
-              tone="success"
-            />
-            <StatCard
-              label="Projection Gap"
-              value={formatMatchupPoints((teamTotal(myTeam) ?? 0) - (teamTotal(opponentTeam) ?? 0))}
-              helper="Your projected margin"
-              tone={(teamTotal(myTeam) ?? 0) >= (teamTotal(opponentTeam) ?? 0) ? "brand" : "danger"}
-            />
-          </section>
-
-          <div className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface/70 px-5 py-4 text-sm font-bold text-cfb-text-secondary">
-            <Radio className="mr-2 inline h-4 w-4 text-cfb-brand" aria-hidden="true" />
-            Live values refresh automatically only when the backend marks this matchup as live.
-          </div>
 
           <div className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-cfb-gold" aria-hidden="true" />
