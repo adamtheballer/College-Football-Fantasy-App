@@ -29,3 +29,24 @@ export const shouldRestrictLeagueToDraft = ({
   draftStatus?: string | null;
   leagueStatus?: string | null;
 }) => !isLeaguePostDraft({ draftStatus, leagueStatus });
+
+export const shouldShowLeagueDraftRoomAction = ({
+  draftStatus,
+  leagueStatus,
+  draftDateTime,
+}: {
+  draftStatus?: string | null;
+  leagueStatus?: string | null;
+  draftDateTime?: string | null;
+}) => {
+  if (isLeaguePostDraft({ draftStatus, leagueStatus })) return false;
+
+  const normalizedDraftStatus = normalizeLifecycleStatus(draftStatus);
+  const normalizedLeagueStatus = normalizeLifecycleStatus(leagueStatus);
+  const draftScheduled =
+    normalizedDraftStatus === "scheduled" ||
+    normalizedDraftStatus === "draft_scheduled" ||
+    normalizedLeagueStatus === "draft_scheduled";
+  const draftLive = normalizedDraftStatus === "live" || normalizedDraftStatus === "draft_live";
+  return draftLive || draftScheduled || Boolean(draftDateTime);
+};

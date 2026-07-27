@@ -17,7 +17,7 @@ import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagues } from "@/hooks/use-leagues";
 import { formatDraftCountdown, hasDraftStarted } from "@/lib/draftStatus";
-import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
+import { isLeaguePostDraft, shouldShowLeagueDraftRoomAction } from "@/lib/leagueLifecycle";
 
 const LeagueCard = ({
   id,
@@ -51,13 +51,13 @@ const LeagueCard = ({
   const openLeague = () => onOpen(id);
   const normalizedDraftStatus = (draftStatus || "").toLowerCase();
   const normalizedLeagueStatus = (status || "").toLowerCase();
-  const draftScheduled =
-    normalizedDraftStatus === "scheduled" ||
-    normalizedDraftStatus === "draft_scheduled" ||
-    normalizedLeagueStatus === "draft_scheduled";
   const draftLive = normalizedDraftStatus === "live" || normalizedDraftStatus === "draft_live";
   const draftUnlocked = draftLive || hasDraftStarted(draftDateTime, now);
-  const shouldShowDraftAction = draftLive || draftScheduled || Boolean(draftDateTime);
+  const shouldShowDraftAction = shouldShowLeagueDraftRoomAction({
+    draftStatus,
+    leagueStatus: status,
+    draftDateTime,
+  });
   const completeStatuses = ["completed", "complete", "draft_completed", "final", "closed", "post_draft"];
   const inviteShouldBeVisible =
     Boolean(inviteCode) &&
