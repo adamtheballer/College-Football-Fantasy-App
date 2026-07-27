@@ -214,6 +214,7 @@ def list_players_endpoint(
     search: str | None = None,
     league_id: int | None = None,
     available_only: bool = False,
+    draft_eligible: bool = False,
     sort: str | None = None,
     db: Session = Depends(get_db),
 ) -> PlayerList:
@@ -226,6 +227,7 @@ def list_players_endpoint(
         search=search,
         league_id=league_id,
         available_only=available_only,
+        draft_eligible=draft_eligible,
         sort=sort,
     )
     return PlayerList(data=players, total=total, limit=limit, offset=offset)

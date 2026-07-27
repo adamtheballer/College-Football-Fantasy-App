@@ -37,6 +37,7 @@ from collegefootballfantasy_api.app.schemas.waiver import FreeAgentAdd, FreeAgen
 from collegefootballfantasy_api.app.services.chat_service import create_system_chat_message
 from collegefootballfantasy_api.app.services.league_weeks import current_cfb_week_state
 from collegefootballfantasy_api.app.services.player_lock_service import is_player_locked
+from collegefootballfantasy_api.app.services.player_pool_filters import is_approved_fantasy_school
 from collegefootballfantasy_api.app.services.roster_slots import first_open_eligible_slot
 
 WAIVER_STATUS_PENDING = "pending"
@@ -646,6 +647,8 @@ def submit_waiver_claim(
     add_player = db.get(Player, payload.add_player_id)
     if not add_player:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
+    if not is_approved_fantasy_school(add_player.school):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="player is not eligible for this league")
     _ensure_player_available(db, league.id, add_player.id, now=now)
     drop_entry = _drop_entry_for_payload(db, team, payload.drop_roster_entry_id)
     _validate_no_kicked_off_players(db, league, {add_player.id, drop_entry.player_id if drop_entry else 0} - {0}, now=now)
@@ -734,6 +737,8 @@ def add_free_agent(
     player = db.get(Player, player_id)
     if player is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
+    if not is_approved_fantasy_school(player.school):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="player is not eligible for this league")
 
     _ensure_player_is_free_agent(db, league.id, player.id, now=now)
     drop_entry = _drop_entry_for_payload(db, team, payload.drop_roster_entry_id)
@@ -903,6 +908,8 @@ def edit_waiver_claim(
     add_player = db.get(Player, payload.add_player_id)
     if not add_player:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
+    if not is_approved_fantasy_school(add_player.school):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="player is not eligible for this league")
     _ensure_player_available(db, league.id, add_player.id, now=now)
     drop_entry = _drop_entry_for_payload(db, team, payload.drop_roster_entry_id)
     _best_slot_after_drop(

@@ -11,7 +11,7 @@ from collegefootballfantasy_api.app.services.cfb27_player_sync import sync_cfb27
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Sync CFB27-rated fantasy players into the local player pool.")
+    parser = argparse.ArgumentParser(description="Sync CFB27 ratings onto existing approved Power 4 player records.")
     parser.add_argument("--dry-run", action="store_true", help="Report what would change without committing.")
     args = parser.parse_args()
 

@@ -11,7 +11,6 @@ import { useLeagueDetail } from "@/hooks/use-leagues";
 import { useDraftPlayerPool, usePlayerCard } from "@/hooks/use-players";
 import { ApiError } from "@/lib/api";
 import { buildDraftBoard, type DraftConfig, type DraftPlayer } from "@/lib/draftRankings";
-import { enrichCfb27DraftPlayers } from "@/lib/mockDraftMasterBoard";
 import { filterDraftablePlayers, getLegalPositionsForRoster } from "@/lib/rosterLegality";
 import { cn } from "@/lib/utils";
 import type { DraftRoomPick, DraftRoomTeam } from "@/types/draft";
@@ -335,7 +334,7 @@ export default function Draft() {
   });
 
   const realDraftPlayerPool = useMemo(
-    () => enrichCfb27DraftPlayers(playersPayload?.data ?? []),
+    () => playersPayload?.data ?? [],
     [playersPayload?.data]
   );
 

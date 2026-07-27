@@ -61,6 +61,42 @@ def test_player_rank_requests_do_not_run_cfb27_sync(client, db_session):
     assert db_session.query(Player).count() == 0
 
 
+def test_player_list_excludes_non_power4_rows_and_draft_pool_requires_sheet_projection(client, db_session):
+    approved = Player(
+        name="Approved Receiver",
+        position="WR",
+        school="Ohio State",
+        sheet_source_sheet_id="snapshot:2026:Big10",
+        sheet_projected_season_points=250.0,
+    )
+    missing_projection = Player(
+        name="No Projection Receiver",
+        position="WR",
+        school="Ohio State",
+        sheet_source_sheet_id="snapshot:2026:Big10",
+    )
+    generated_non_power4 = Player(
+        external_id="cfb27:eastonmesser|fau|WR",
+        name="Easton Messer",
+        position="WR",
+        school="FAU",
+        cfb27_rank=31,
+    )
+    db_session.add_all([approved, missing_projection, generated_non_power4])
+    db_session.commit()
+
+    all_players = client.get("/players", params={"sort": "rank", "limit": 10})
+    draft_pool = client.get("/players", params={"draft_eligible": "true", "sort": "rank", "limit": 10})
+
+    assert all_players.status_code == 200
+    assert [row["name"] for row in all_players.json()["data"]] == [
+        "Approved Receiver",
+        "No Projection Receiver",
+    ]
+    assert draft_pool.status_code == 200
+    assert [row["name"] for row in draft_pool.json()["data"]] == ["Approved Receiver"]
+
+
 def test_cfb27_source_contains_critical_compare_players():
     ratings = {
         (rating.name, rating.school, rating.position): rating
@@ -100,36 +136,59 @@ def test_cfb27_fields_migration_computes_global_and_position_ranks():
     assert rows[("Ahmad Hardy", "Missouri", "RB")]["position_rank"] == 1
 
 
-def test_cfb27_sync_creates_missing_compare_players(client, db_session):
+def test_cfb27_sync_enriches_existing_approved_players_without_creating_player_rows(client, db_session):
+    ahmad = Player(
+        name="Ahmad Hardy",
+        position="RB",
+        school="Missouri",
+        sheet_source_sheet_id="snapshot:2026:SEC",
+        sheet_projected_season_points=300.0,
+    )
+    jeremiah = Player(
+        name="Jeremiah Smith",
+        position="WR",
+        school="Ohio State",
+        sheet_source_sheet_id="snapshot:2026:Big10",
+        sheet_projected_season_points=350.0,
+    )
+    non_power4 = Player(name="Easton Messer", position="WR", school="FAU")
+    db_session.add_all([ahmad, jeremiah, non_power4])
+    db_session.commit()
+
     result = sync_cfb27_players(db_session)
 
+    db_session.refresh(ahmad)
+    db_session.refresh(jeremiah)
+    db_session.refresh(non_power4)
     assert result["total"] == 250
-    assert result["created"] == 250
-    assert result["missing"] == 250
-    ahmad = db_session.query(Player).filter_by(name="Ahmad Hardy", school="Missouri", position="RB").one()
-    jeremiah = db_session.query(Player).filter_by(name="Jeremiah Smith", school="Ohio State", position="WR").one()
-    assert ahmad.sheet_adp is None
-    assert jeremiah.sheet_adp is None
-    assert ahmad.cfb27_rank is not None
-    assert jeremiah.cfb27_rank == 1
-    assert ahmad.cfb27_position_rank == 1
-    assert jeremiah.cfb27_position_rank == 1
+    assert result["created"] == 0
+    assert result["matched"] == 2
+    assert result["skipped_non_power4"] > 0
+    assert db_session.query(Player).count() == 3
     assert ahmad.cfb27_overall == 96
-    assert jeremiah.cfb27_overall == 99
-    assert ahmad.cfb27_synced_at is not None
-    assert jeremiah.cfb27_synced_at is not None
-    assert ahmad.external_id.startswith("cfb27:")
-    assert jeremiah.external_id.startswith("cfb27:")
+    assert jeremiah.cfb27_rank == 1
+    assert non_power4.cfb27_rank is None
 
 
-def test_cfb27_sync_is_idempotent(client, db_session):
+def test_cfb27_sync_is_idempotent_for_existing_approved_players(client, db_session):
+    player = Player(
+        name="Jeremiah Smith",
+        position="WR",
+        school="Ohio State",
+        sheet_source_sheet_id="snapshot:2026:Big10",
+        sheet_projected_season_points=350.0,
+    )
+    db_session.add(player)
+    db_session.commit()
+
     first = sync_cfb27_players(db_session)
     second = sync_cfb27_players(db_session)
 
-    assert first["created"] == 250
+    assert first["created"] == 0
+    assert first["updated"] == 1
     assert second["created"] == 0
     assert second["updated"] == 0
-    assert second["already_present"] == 250
+    assert second["already_present"] == 1
     assert db_session.query(Player).filter_by(name="Jeremiah Smith", school="Ohio State", position="WR").count() == 1
 
 
@@ -159,7 +218,7 @@ def test_cfb27_sync_matches_california_alias_without_creating_a_duplicate(client
     result = sync_cfb27_players(db_session)
 
     db_session.refresh(canonical)
-    assert result["created"] == 249
+    assert result["created"] == 0
     assert db_session.query(Player).filter_by(name="Ian Strong", position="WR").count() == 1
     assert canonical.school == "California"
     assert canonical.cfb27_rank == 33
@@ -167,6 +226,13 @@ def test_cfb27_sync_matches_california_alias_without_creating_a_duplicate(client
 
 
 def test_players_rank_sort_uses_cfb27_compare_board(client, db_session):
+    db_session.add_all(
+        [
+            Player(name="Jeremiah Smith", position="WR", school="Ohio State"),
+            Player(name="Ahmad Hardy", position="RB", school="Missouri"),
+        ]
+    )
+    db_session.commit()
     sync_cfb27_players(db_session)
 
     response = client.get("/players", params={"sort": "rank", "limit": 100})
@@ -184,6 +250,13 @@ def test_players_rank_sort_uses_cfb27_compare_board(client, db_session):
 
 
 def test_players_search_returns_seeded_cfb27_compare_board(client, db_session):
+    db_session.add_all(
+        [
+            Player(name="Jeremiah Smith", position="WR", school="Ohio State"),
+            Player(name="Ahmad Hardy", position="RB", school="Missouri"),
+        ]
+    )
+    db_session.commit()
     sync_cfb27_players(db_session)
 
     jeremiah_response = client.get("/players", params={"search": "Jeremiah Smith", "limit": 10})
@@ -312,12 +385,12 @@ def test_players_search_runs_before_draft_pool_pagination(client, db_session):
         ]
     )
     db_session.add(
-        Player(
-            name="Hidden Deep Board Quarterback",
-            position="QB",
-            school="Needle State",
-            sheet_adp=999.0,
-        )
+            Player(
+                name="Hidden Deep Board Quarterback",
+                position="QB",
+                school="Texas",
+                sheet_adp=999.0,
+            )
     )
     db_session.commit()
 

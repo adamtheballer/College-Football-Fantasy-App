@@ -14,7 +14,11 @@ from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
-from collegefootballfantasy_api.app.services.player_pool_filters import generated_test_player_filter
+from collegefootballfantasy_api.app.services.player_pool_filters import (
+    approved_school_player_filter,
+    generated_test_player_filter,
+    is_approved_fantasy_school,
+)
 
 _MODEL_REGISTRY = (League, Player, RosterEntry, Team, User)
 
@@ -146,7 +150,7 @@ def sync_cfb27_players(db: Session, *, dry_run: bool = False) -> dict[str, int]:
     ratings = load_cfb27_ratings()
     existing_players = (
         db.query(Player)
-        .filter(generated_test_player_filter())
+        .filter(generated_test_player_filter(), approved_school_player_filter())
         .filter(Player.position.in_(CFB27_POSITIONS))
         .all()
     )
@@ -155,12 +159,15 @@ def sync_cfb27_players(db: Session, *, dry_run: bool = False) -> dict[str, int]:
         key = cfb27_identity_key(name=player.name, school=player.school, position=player.position)
         players_by_key.setdefault(key, []).append(player)
 
-    created = 0
     updated = 0
     matched = 0
     duplicate_matches = 0
-    missing = 0
+    unmatched_approved = 0
+    skipped_non_power4 = 0
     for rating in ratings:
+        if not is_approved_fantasy_school(rating.school):
+            skipped_non_power4 += 1
+            continue
         key = cfb27_identity_key(name=rating.name, school=rating.school, position=rating.position)
         candidates = players_by_key.get(key)
         if candidates:
@@ -172,32 +179,20 @@ def sync_cfb27_players(db: Session, *, dry_run: bool = False) -> dict[str, int]:
                 updated += 1
             continue
 
-        missing += 1
-        if not dry_run:
-            player = Player(
-                external_id=f"{CFB27_EXTERNAL_PREFIX}{key}",
-                name=rating.name,
-                school=rating.school,
-                position=rating.position,
-                cfb27_rank=rating.rank,
-                cfb27_overall=rating.overall,
-                cfb27_position_rank=rating.position_rank,
-                cfb27_synced_at=datetime.now(timezone.utc),
-            )
-            db.add(player)
-            players_by_key[key] = [player]
-        created += 1
+        unmatched_approved += 1
 
     if dry_run:
         db.rollback()
-    elif created or updated:
+    elif updated:
         db.commit()
     return {
-        "created": created,
+        "created": 0,
         "updated": updated,
         "already_present": matched,
         "matched": matched,
-        "missing": missing,
+        "missing": unmatched_approved,
+        "unmatched_approved": unmatched_approved,
+        "skipped_non_power4": skipped_non_power4,
         "duplicate_matches": duplicate_matches,
         "total": len(ratings),
     }
