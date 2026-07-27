@@ -31,6 +31,13 @@ services:
       # The real-stack E2E suite creates three isolated accounts from one container IP.
       # Keep production limits in deployment configuration; this only prevents test setup throttling.
       AUTH_SIGNUP_RATE_LIMIT: 20
+      # The local beta is the public-feature acceptance environment. Keep all
+      # three flags on here so a published contest cannot be hidden behind a
+      # stale local .env value while production retains its explicit deploy
+      # configuration.
+      SATURDAY_PICK_6_ENABLED: "true"
+      SATURDAY_PICK_6_PUBLIC_ENABLED: "true"
+      SATURDAY_PICK_6_SPONSORS_ENABLED: "true"
       ESPN_HISTORICAL_STATS_ENABLED: "${ESPN_HISTORICAL_STATS_ENABLED:-true}"
       ESPN_HISTORICAL_STATS_BASE_URL: "${ESPN_HISTORICAL_STATS_BASE_URL:-https://site.web.api.espn.com/apis/common/v3/sports/football/college-football}"
       ESPN_HISTORICAL_STATS_TIMEOUT_SECONDS: "${ESPN_HISTORICAL_STATS_TIMEOUT_SECONDS:-10}"

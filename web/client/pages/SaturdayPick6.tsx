@@ -17,6 +17,16 @@ const formatKickoff = (value: string) => {
 
 export const statusLabel = (status: string) => status.replace(/_/g, " ");
 
+export const positionLabel = (position: SaturdayPickPlayer["canonical_position"]) => ({
+  QB: "quarterback",
+  RB: "running back",
+  WR: "wide receiver",
+  TE: "tight end",
+}[position]);
+
+export const pickConfirmationMessage = (playerName: string) =>
+  `Your pick is in. Follow ${playerName} this Saturday.`;
+
 export const displayPoints = (player: SaturdayPickPlayer, contestStatus: string) => {
   if (contestStatus === "FINAL") return player.final_points;
   return player.live_points ?? player.projected_points;
@@ -68,6 +78,7 @@ export default function SaturdayPick6() {
   }
 
   const selectedPlayer = contest.players.find((player) => player.id === selectedPickId) ?? null;
+  const savedPlayer = contest.players.find((player) => player.id === contest.entry?.selected_pick_player_id) ?? null;
   const submit = async () => {
     if (!selectedPickId || !isOpen) return;
     await savePick.mutateAsync({ contestId: contest.id, selectedPickPlayerId: selectedPickId });
@@ -89,7 +100,7 @@ export default function SaturdayPick6() {
               <span className="cfb-micro-label text-cyan-200">Week {contest.week_number} · {contest.contest_position} Week</span>
             </div>
             <h1 className="mt-5 font-display text-4xl font-black italic tracking-[-0.05em] text-cfb-text-primary sm:text-6xl">{isResults ? "LIVE RESULTS" : "MAKE YOUR PICK"}</h1>
-            <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-cfb-text-secondary sm:text-lg">Which featured running back will score the most fantasy points this week?</p>
+            <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-cfb-text-secondary sm:text-lg">Which featured {positionLabel(contest.contest_position)} will score the most fantasy points this week?</p>
           </div>
           <div className="flex flex-wrap items-stretch gap-3">
             {contest.sponsor ? <div className="flex max-w-xs items-center gap-3 rounded-2xl border border-cyan-200/25 bg-slate-950/45 p-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-cyan-100/10 text-xs font-black text-cyan-100">{contest.sponsor.logo_url ? <img src={contest.sponsor.logo_url} alt={`${contest.sponsor.name} logo`} className="h-full w-full object-contain" /> : contest.sponsor.name.slice(0, 2).toUpperCase()}</div><div><p className="cfb-micro-label text-cyan-200">Presented by</p><p className="mt-1 text-sm font-black text-white">{contest.sponsor.name}</p></div></div> : null}
@@ -97,6 +108,8 @@ export default function SaturdayPick6() {
           </div>
         </div>
       </section>
+
+      {contest.entry && contest.status !== "FINAL" ? <section className="rounded-3xl border border-cyan-200/40 bg-cyan-300/[0.10] p-6 shadow-[0_0_28px_rgba(34,211,238,0.10)]"><p className="cfb-micro-label text-cyan-100">Your pick is in</p><h2 className="mt-2 text-2xl font-black text-cfb-text-primary">{savedPlayer?.player_name ?? "Your Saturday Pick 6 selection"}</h2><p className="mt-2 font-bold text-cfb-text-secondary">{savedPlayer ? pickConfirmationMessage(savedPlayer.player_name) : "Follow your pick this Saturday."}</p><p className="mt-3 text-sm font-bold text-cfb-text-secondary">You can still update your selection until {formatKickoff(contest.lock_at)}.</p></section> : null}
 
       {contest.status === "FINAL" ? <section className="rounded-3xl border border-cfb-gold/35 bg-cfb-gold/[0.08] p-5 text-cfb-text-primary"><p className="cfb-micro-label text-yellow-100">Saturday Pick 6 winner</p><p className="mt-2 text-2xl font-black">{winnerIds.size > 1 ? "Two or more players tied for the top score" : `${players[0]?.player_name ?? "Winner"} led the field`}</p>{contest.entry ? <p className="mt-2 font-bold text-cfb-text-secondary">{contest.entry.is_winner ? "YOU GOT IT RIGHT" : `Your pick finished ${Math.max(1, players.findIndex((player) => player.id === contest.entry?.selected_pick_player_id) + 1)}${"th"}.`}</p> : null}</section> : null}
 
@@ -119,7 +132,7 @@ export default function SaturdayPick6() {
         })}
       </section>
 
-      {isOpen ? <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-cfb-border-subtle bg-cfb-surface p-5"><div><p className="text-sm font-black text-cfb-text-primary">{selectedPlayer ? `You selected ${selectedPlayer.player_name}.` : "Choose one featured running back."}</p><p className="mt-1 text-sm font-bold text-cfb-text-secondary">You can change your choice until the published lock time.</p></div><Button disabled={!selectedPickId || savePick.isPending} onClick={submit}>{savePick.isPending ? "Saving…" : contest.entry ? "Update Pick" : "Lock In Pick"}</Button></section> : null}
+      {isOpen ? <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-cfb-border-subtle bg-cfb-surface p-5"><div><p className="text-sm font-black text-cfb-text-primary">{selectedPlayer ? `You selected ${selectedPlayer.player_name}. Lock it in to follow them this Saturday.` : `Choose one featured ${positionLabel(contest.contest_position)}.`}</p><p className="mt-1 text-sm font-bold text-cfb-text-secondary">You can change your choice until the published lock time.</p></div><Button disabled={!selectedPickId || savePick.isPending} onClick={submit}>{savePick.isPending ? "Saving…" : contest.entry ? "Update Pick" : "Lock In Pick"}</Button></section> : null}
 
       {contest.entry && contest.sponsor ? <section className={`rounded-3xl border p-6 ${contest.sponsor.reward_unlocked ? "border-cfb-success/40 bg-cfb-success/[0.10]" : "border-cyan-200/20 bg-cyan-200/[0.06]"}`}><p className="cfb-micro-label text-cyan-100">{contest.sponsor.reward_unlocked ? "Reward unlocked" : "This week’s reward"}</p><h2 className="mt-2 text-2xl font-black text-cfb-text-primary">{contest.sponsor.name}</h2><p className="mt-2 font-bold text-cfb-text-secondary">{contest.sponsor.offer_text ?? "Make your pick to compete for this week’s sponsor reward."}</p>{contest.sponsor.reward_unlocked && contest.sponsor.code ? <div className="mt-5 flex flex-wrap items-center gap-3"><code className="rounded-xl border border-white/15 bg-slate-950/55 px-4 py-3 font-black tracking-[0.16em] text-cyan-100">{contest.sponsor.code}</code><Button variant="outline" onClick={copySponsorCode}><Copy className="mr-2 h-4 w-4" /> Copy Code</Button>{contest.sponsor.url ? <Button asChild><a href={contest.sponsor.url} target="_blank" rel="noreferrer">Visit Sponsor</a></Button> : null}</div> : <p className="mt-4 text-sm font-bold text-cfb-text-secondary">Winner-only reward details are revealed after final scoring.</p>}</section> : null}
     </div>

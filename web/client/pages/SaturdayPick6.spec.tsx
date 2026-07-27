@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SaturdayPickPlayer } from "@/hooks/use-saturday-pick";
 
-import { displayPoints, statusLabel } from "./SaturdayPick6";
+import { displayPoints, pickConfirmationMessage, positionLabel, statusLabel } from "./SaturdayPick6";
 
 const player: SaturdayPickPlayer = {
   id: 1,
@@ -33,5 +33,11 @@ describe("SaturdayPick6 state helpers", () => {
   it("renders provider states as readable labels", () => {
     expect(statusLabel("DATA_DELAYED")).toBe("DATA DELAYED");
     expect(statusLabel("NOT_STARTED")).toBe("NOT STARTED");
+  });
+
+  it("uses the featured position and saved player in the player-facing pick confirmation", () => {
+    expect(positionLabel("RB")).toBe("running back");
+    expect(positionLabel("TE")).toBe("tight end");
+    expect(pickConfirmationMessage("Ahmad Hardy")).toBe("Your pick is in. Follow Ahmad Hardy this Saturday.");
   });
 });
