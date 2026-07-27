@@ -10,7 +10,9 @@ export type SaturdayPickPlayer = {
   school: string;
   opponent: string;
   game_time: string;
+  image_url: string | null;
   projected_points: number | null;
+  live_points: number | null;
   final_points: number | null;
   scoring_status: string;
   sort_order: number;
@@ -35,6 +37,7 @@ export type SaturdayPickContest = {
   } | null;
   sponsor: {
     name: string;
+    logo_url: string | null;
     offer_text: string | null;
     terms: string | null;
     reward_unlocked: boolean;

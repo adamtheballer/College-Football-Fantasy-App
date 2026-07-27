@@ -246,15 +246,14 @@ def save_entry(db: Session, contest: SaturdayPickContest, user: User, selected_p
     return entry
 
 
-def _score_featured_player(db: Session, contest: SaturdayPickContest, featured: SaturdayPickPlayer) -> float | None:
+def _featured_stat(db: Session, contest: SaturdayPickContest, featured: SaturdayPickPlayer) -> PlayerGameStat | PlayerStat | None:
     game = db.get(Game, featured.game_id) if featured.game_id else None
-    game_final = bool(game and game.home_points is not None and game.away_points is not None)
-    if not game_final:
-        return None
     stat = (
         db.query(PlayerGameStat)
         .filter(PlayerGameStat.player_id == featured.player_id, PlayerGameStat.game_id == game.id)
         .one_or_none()
+        if game
+        else None
     )
     stat = stat or (
         db.query(PlayerStat)
@@ -266,20 +265,107 @@ def _score_featured_player(db: Session, contest: SaturdayPickContest, featured: 
         )
         .one_or_none()
     )
-    if not stat:
+    return stat
+
+
+def _score_stat(stat: PlayerGameStat | PlayerStat | None, position: str) -> float | None:
+    if stat is None:
         return None
     points, _ = calculate_player_fantasy_points(
-        normalize_player_stats(stat.stats, featured.canonical_position),
+        normalize_player_stats(stat.stats, position),
         default_rules_bundle(),
-        featured.canonical_position,
+        position,
     )
     return points
+
+
+def _is_final_game(game: Game | None) -> bool:
+    return bool(game and game.home_points is not None and game.away_points is not None)
+
+
+def _featured_scoring_status(*, featured: SaturdayPickPlayer, game: Game | None, has_stats: bool, now: datetime) -> str:
+    if _is_final_game(game):
+        return "FINAL" if has_stats else "DATA_DELAYED"
+    if as_utc(featured.game_time) > now:
+        return "NOT_STARTED"
+    if has_stats:
+        return "LIVE"
+    return "DATA_DELAYED"
+
+
+def refresh_contest_live_scores(db: Session, contest: SaturdayPickContest) -> dict[str, int]:
+    """Refresh live Pick 6 scoring from the canonical game-stat records.
+
+    Missing provider data is intentionally represented as ``DATA_DELAYED`` and
+    never converted to a zero-point score.  Finalization remains a separate,
+    explicitly-administered operation after every featured game is final.
+    """
+
+    if contest.status == "FINAL":
+        return {"updated": 0, "live": 0, "final": 6}
+
+    synchronize_lock(contest)
+    now = utc_now()
+    rows = (
+        db.query(SaturdayPickPlayer)
+        .filter(SaturdayPickPlayer.contest_id == contest.id)
+        .order_by(SaturdayPickPlayer.sort_order.asc())
+        .all()
+    )
+    updated = 0
+    live = 0
+    final = 0
+    for row in rows:
+        game = db.get(Game, row.game_id) if row.game_id else None
+        stat = _featured_stat(db, contest, row)
+        points = _score_stat(stat, row.canonical_position)
+        next_status = _featured_scoring_status(featured=row, game=game, has_stats=points is not None, now=now)
+        if points is not None and row.live_points != points:
+            row.live_points = points
+            updated += 1
+        if _is_final_game(game) and points is not None and row.final_points != points:
+            row.final_points = points
+            updated += 1
+        if row.scoring_status != next_status:
+            row.scoring_status = next_status
+            updated += 1
+        if next_status == "LIVE":
+            live += 1
+        if next_status == "FINAL":
+            final += 1
+
+    if contest.status in {"LOCKED", "SCORING"} and (live or final):
+        contest.status = "SCORING"
+    db.flush()
+    return {"updated": updated, "live": live, "final": final}
+
+
+def refresh_open_pick_contests(db: Session) -> dict[str, int]:
+    contests = (
+        db.query(SaturdayPickContest)
+        .filter(SaturdayPickContest.status.in_(("OPEN", "LOCKED", "SCORING")))
+        .all()
+    )
+    totals = {"contests": len(contests), "updated": 0, "live": 0, "final": 0}
+    for contest in contests:
+        result = refresh_contest_live_scores(db, contest)
+        for key in ("updated", "live", "final"):
+            totals[key] += result[key]
+    db.commit()
+    return totals
+
+
+def _score_featured_player(db: Session, contest: SaturdayPickContest, featured: SaturdayPickPlayer) -> float | None:
+    game = db.get(Game, featured.game_id) if featured.game_id else None
+    if not _is_final_game(game):
+        return None
+    return _score_stat(_featured_stat(db, contest, featured), featured.canonical_position)
 
 
 def finalize_contest(db: Session, contest: SaturdayPickContest) -> SaturdayPickContest:
     if contest.status == "FINAL":
         return contest
-    synchronize_lock(contest)
+    refresh_contest_live_scores(db, contest)
     featured = (
         db.query(SaturdayPickPlayer)
         .filter(SaturdayPickPlayer.contest_id == contest.id)
@@ -294,6 +380,7 @@ def finalize_contest(db: Session, contest: SaturdayPickContest) -> SaturdayPickC
         if points is None:
             raise ValueError("Cannot finalize until every featured game and verified stat line is resolved.")
         row.final_points = points
+        row.live_points = points
         row.scoring_status = "FINAL"
         final_points.append(points)
     highest = max(final_points)
@@ -330,6 +417,10 @@ def contest_read(db: Session, contest: SaturdayPickContest, viewer: User | None 
         .order_by(SaturdayPickPlayer.sort_order.asc())
         .all()
     )
+    player_images = {
+        player.id: player.image_url or player.espn_headshot_url
+        for player in db.query(Player).filter(Player.id.in_([row.player_id for row in rows] or [-1])).all()
+    }
     entry = None
     if viewer:
         entry = db.query(SaturdayPickEntry).filter(
@@ -380,7 +471,9 @@ def contest_read(db: Session, contest: SaturdayPickContest, viewer: User | None 
                 opponent=row.opponent_snapshot,
                 game_id=row.game_id,
                 game_time=row.game_time,
+                image_url=player_images.get(row.player_id),
                 projected_points=row.projected_points,
+                live_points=row.live_points,
                 final_points=row.final_points,
                 scoring_status=row.scoring_status,
                 sort_order=row.sort_order,

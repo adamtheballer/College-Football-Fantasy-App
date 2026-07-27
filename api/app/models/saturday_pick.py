@@ -56,6 +56,7 @@ class SaturdayPickPlayer(TimestampMixin, Base):
     game_id: Mapped[int | None] = mapped_column(ForeignKey("games.id", ondelete="SET NULL"), nullable=True)
     game_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     projected_points: Mapped[float | None] = mapped_column(Float, nullable=True)
+    live_points: Mapped[float | None] = mapped_column(Float, nullable=True)
     final_points: Mapped[float | None] = mapped_column(Float, nullable=True)
     scoring_status: Mapped[str] = mapped_column(String(20), nullable=False, default="SCHEDULED")
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -25,6 +25,7 @@ from collegefootballfantasy_api.app.services.saturday_pick_service import (
     create_contest,
     finalize_contest,
     publish_contest,
+    refresh_contest_live_scores,
     recommended_position,
     save_entry,
 )
@@ -68,8 +69,30 @@ def get_current_contest(
     return contest_read(db, contest, current_user)
 
 
+@router.get("/active", response_model=SaturdayPickContestRead)
+def get_active_contest(
+    season: int = Query(default_factory=lambda: datetime.now().year, ge=2000, le=2100),
+    week: int = Query(1, ge=1, le=30),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> SaturdayPickContestRead:
+    """Compatibility alias for the public active-contest contract."""
+
+    return get_current_contest(season=season, week=week, db=db, current_user=current_user)
+
+
 @router.get("/{contest_id}", response_model=SaturdayPickContestRead)
 def get_contest(
+    contest_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> SaturdayPickContestRead:
+    _require_public_enabled()
+    return contest_read(db, _contest_or_404(db, contest_id), current_user)
+
+
+@router.get("/{contest_id}/results", response_model=SaturdayPickContestRead)
+def get_results(
     contest_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -156,4 +179,16 @@ def finalize_contest_endpoint(
     except ValueError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return contest_read(db, contest, current_user)
+
+
+@admin_router.post("/{contest_id}/refresh", response_model=SaturdayPickContestRead)
+def refresh_contest_endpoint(
+    contest_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_user),
+) -> SaturdayPickContestRead:
+    contest = _contest_or_404(db, contest_id)
+    refresh_contest_live_scores(db, contest)
+    db.commit()
     return contest_read(db, contest, current_user)

@@ -326,6 +326,7 @@ export default function Index() {
               Saturday Pick 6
             </div>
             <p className="mt-6 cfb-micro-label text-cfb-brand">The weekly college football challenge</p>
+            {saturdayPickQuery.data?.sponsor ? <p className="mt-2 text-sm font-black text-cyan-100">Presented by {saturdayPickQuery.data.sponsor.name}</p> : null}
             <h2 className="mt-2 cfb-display-title text-4xl sm:text-5xl lg:text-6xl">
               {saturdayPickQuery.data ? `${saturdayPickQuery.data.contest_position} Week` : "Coming next week"}
             </h2>

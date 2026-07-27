@@ -42,7 +42,9 @@ class SaturdayPickPlayerRead(BaseModel):
     opponent: str
     game_id: int | None = None
     game_time: datetime
+    image_url: str | None = None
     projected_points: float | None = None
+    live_points: float | None = None
     final_points: float | None = None
     scoring_status: str
     sort_order: int
