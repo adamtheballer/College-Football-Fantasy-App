@@ -517,7 +517,7 @@ def build_waivers_view(
         Player.name.asc(),
     )
     total = query.count()
-    players = query.offset(max(0, offset)).limit(max(1, min(limit, 100))).all()
+    players = query.offset(max(0, offset)).limit(max(1, min(limit, 1000))).all()
     player_ids = {player.id for player in players}
     availability_by_player = {
         row.player_id: row

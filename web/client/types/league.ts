@@ -310,7 +310,7 @@ export interface LeagueWaiverClaim {
   season: number;
   processing_week: number;
   processing_window_id: string;
-  waiver_period_id: number;
+  waiver_period_id: number | null;
   processing_run_id: number | null;
   preference_order: number;
   winning_bid: number | null;

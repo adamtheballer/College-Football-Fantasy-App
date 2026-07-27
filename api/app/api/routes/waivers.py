@@ -48,7 +48,10 @@ def get_league_waiver_tab_endpoint(
         db,
         league,
         current_user,
-        limit=max(1, min(limit, 100)),
+        # The waiver wire is the complete league-scoped free-agent pool.  The
+        # beta player universe is comfortably below this bound, and truncating
+        # at a single 50/100-player page hides valid available players.
+        limit=max(1, min(limit, 1000)),
         offset=max(0, offset),
         selected_week=week,
     )

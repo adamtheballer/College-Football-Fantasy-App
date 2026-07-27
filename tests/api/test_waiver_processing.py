@@ -101,7 +101,7 @@ def test_due_waiver_processing_is_idempotent_with_league_serialization(client, d
     assert awarded_entry.slot_index == 1
     assert db_session.query(WaiverPriority).filter_by(league_id=league.id, team_id=team.id).one().faab_spent == 7
 
-    waiver_view = build_waivers_view(db_session, league, user)
+    waiver_view = build_waivers_view(db_session, league, user, limit=1000)
     assert waiver_view.waiver_priority == 1
     assert waiver_view.faab_remaining == 93
     assert waiver_view.waiver_rules["faab_budget"] == 100
@@ -230,6 +230,70 @@ def test_waiver_pool_includes_a_dropped_drafted_player(client, db_session):
     waiver_view = build_waivers_view(db_session, league, user)
 
     assert [candidate.id for candidate in waiver_view.available_players] == [player.id]
+
+
+def test_waiver_pool_remains_available_when_a_legacy_claim_has_no_period(db_session):
+    """A pre-ledger claim cannot be allowed to hide every available player."""
+    user = User(
+        email="legacy-claim-owner@example.com",
+        first_name="Legacy",
+        password_hash="test",
+        api_token="legacy-claim-owner-token",
+    )
+    db_session.add(user)
+    db_session.flush()
+    league = League(name="Legacy Claim Waiver League", season_year=2026, commissioner_user_id=user.id, max_teams=1)
+    team = Team(league=league, name="Legacy Team", owner_user_id=user.id, owner_name="Legacy")
+    available_player = Player(name="Still Available QB", position="QB", school="Texas")
+    legacy_claim_player = Player(name="Legacy Claim QB", position="QB", school="Oregon")
+    db_session.add_all((league, team, available_player, legacy_claim_player))
+    db_session.flush()
+    db_session.add(LeagueSettings(league_id=league.id, roster_slots_json={"QB": 1}, waiver_type="faab"))
+    db_session.add(
+        WaiverClaim(
+            league_id=league.id,
+            team_id=team.id,
+            add_player_id=legacy_claim_player.id,
+            created_by_user_id=user.id,
+            status="cancelled",
+            season=2026,
+            processing_week=1,
+            processing_window_id="legacy",
+            # Intentionally omitted: historical claims predate WaiverPeriod.
+            preference_order=1,
+            faab_bid=0,
+        )
+    )
+    db_session.commit()
+
+    waiver_view = build_waivers_view(db_session, league, user)
+
+    assert {player.id for player in waiver_view.available_players} == {available_player.id, legacy_claim_player.id}
+    assert len(waiver_view.claims) == 1
+    assert waiver_view.claims[0].waiver_period_id is None
+
+
+def test_waiver_pool_returns_the_complete_beta_player_universe(db_session):
+    user = User(
+        email="full-waiver-pool-owner@example.com",
+        first_name="Full Pool",
+        password_hash="test",
+        api_token="full-waiver-pool-owner-token",
+    )
+    db_session.add(user)
+    db_session.flush()
+    league = League(name="Full Waiver Pool League", season_year=2026, commissioner_user_id=user.id, max_teams=1)
+    db_session.add(league)
+    db_session.flush()
+    db_session.add(Team(league_id=league.id, name="Full Pool Team", owner_user_id=user.id, owner_name="Full Pool"))
+    players = [Player(name=f"Complete Pool Player {index}", position="QB", school="Texas") for index in range(101)]
+    db_session.add_all(players)
+    db_session.commit()
+
+    waiver_view = build_waivers_view(db_session, league, user, limit=1000)
+
+    assert waiver_view.total_available == 101
+    assert len(waiver_view.available_players) == 101
 
 
 def test_waiver_results_are_scoped_to_the_latest_completed_period(client, db_session):

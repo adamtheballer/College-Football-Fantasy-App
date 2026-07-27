@@ -47,7 +47,11 @@ class WaiverClaimRead(BaseModel):
     season: int
     processing_week: int
     processing_window_id: str
-    waiver_period_id: int
+    # Claims created before the waiver-period ledger existed are still valid
+    # historical records.  The database model intentionally permits this
+    # field to be null, so the read contract must preserve that value rather
+    # than failing the entire waiver-pool response.
+    waiver_period_id: int | None = None
     processing_run_id: int | None = None
     preference_order: int
     winning_bid: int | None = None

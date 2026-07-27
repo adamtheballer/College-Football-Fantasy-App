@@ -145,7 +145,7 @@ export default function LeagueWaivers() {
     draftStatus: leagueQuery.data?.draft?.status,
     leagueStatus: leagueQuery.data?.status,
   });
-  const waiverQuery = useLeagueWaiverTab(parsedLeagueId, 50, 0, postDraft);
+  const waiverQuery = useLeagueWaiverTab(parsedLeagueId, 1000, 0, postDraft);
   const waiverData = waiverQuery.data;
   const isFreeAgentPhase = waiverData?.waiver_rules.phase === "free_agents";
   const nextWaiverProcessAt = typeof waiverData?.waiver_rules.next_process_at === "string"

@@ -189,7 +189,7 @@ export function useLeagueSettingsTab(leagueId?: number, enabled = true) {
 
 export function useLeagueWaiverTab(
   leagueId?: number,
-  limit = 50,
+  limit = 1000,
   offset = 0,
   enabled = true
 ) {
