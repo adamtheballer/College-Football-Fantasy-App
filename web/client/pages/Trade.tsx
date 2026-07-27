@@ -113,19 +113,25 @@ export const formatTradeError = (error: unknown, fallback: string) => {
   return fallback;
 };
 
-const toTradeRows = (entries: RosterEntry[] | undefined): TradeRow[] => {
+export const toTradeRows = (entries: RosterEntry[] | undefined): TradeRow[] => {
   if (!entries?.length) return [];
   return entries
-    .filter((entry) => OFFENSE_POSITIONS.has((entry.player.position ?? "").toUpperCase()))
-    .map((entry) => ({
-      rosterEntryId: entry.id,
-      playerId: entry.player.id,
-      teamId: entry.team_id,
-      name: entry.player.name,
-      position: entry.player.position.toUpperCase(),
-      school: entry.player.school,
-      slot: (entry.slot || "BENCH").toUpperCase(),
-    }))
+    .flatMap((entry) => {
+      // Empty roster placeholders intentionally have no player. They must stay
+      // visible in lineup views, but they are never valid trade assets.
+      const player = entry.player;
+      const position = player?.position?.toUpperCase() ?? "";
+      if (!player || !OFFENSE_POSITIONS.has(position)) return [];
+      return [{
+        rosterEntryId: entry.id,
+        playerId: player.id,
+        teamId: entry.team_id,
+        name: player.name,
+        position,
+        school: player.school ?? "",
+        slot: (entry.slot || "BENCH").toUpperCase(),
+      }];
+    })
     .sort((a, b) => {
       const starterA = a.slot !== "BENCH" ? 0 : 1;
       const starterB = b.slot !== "BENCH" ? 0 : 1;
@@ -309,7 +315,7 @@ const TradeList = ({
 };
 
 export default function Trade() {
-  const { leagueId: leagueIdParam, playerId: playerIdParam } = useParams();
+  const { leagueId: leagueIdParam, playerId: playerIdParam, tradeId: tradeIdParam } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -319,6 +325,9 @@ export default function Trade() {
 
   const parsedLeagueId =
     leagueIdParam && /^\d+$/.test(leagueIdParam) ? Number(leagueIdParam) : undefined;
+  const requestedTradeId =
+    tradeIdParam && /^\d+$/.test(tradeIdParam) ? Number(tradeIdParam) : undefined;
+  const isTradeOfferRoute = tradeIdParam !== undefined;
   const fallbackLeagueId = activeLeagueId ?? leagues[0]?.id;
   const leagueId = parsedLeagueId ?? fallbackLeagueId;
 
@@ -498,6 +507,14 @@ export default function Trade() {
     enabled: Boolean(leagueId),
     queryFn: () => apiGet<TradeOfferListResponse>(`/leagues/${leagueId}/trades`),
   });
+
+  const focusedOfferQuery = useQuery({
+    queryKey: ["league", leagueId, "trade-offer", requestedTradeId],
+    enabled: Boolean(isTradeOfferRoute && leagueId && requestedTradeId),
+    queryFn: () => apiGet<TradeOffer>(`/leagues/${leagueId}/trades/${requestedTradeId}`),
+  });
+
+  const closeFocusedOffer = () => navigate("/trade", { replace: true });
 
   const createOfferMutation = useMutation({
     mutationFn: (counterTradeId: number | null) =>
@@ -921,6 +938,76 @@ export default function Trade() {
                   ? "Send Final Counter"
                   : "Send Final Trade"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isTradeOfferRoute} onOpenChange={(open) => { if (!open) closeFocusedOffer(); }}>
+        <DialogContent className="max-w-2xl border-cfb-brand/30 bg-[#081321] text-foreground">
+          <DialogHeader>
+            <DialogTitle className="pr-8 text-3xl font-black uppercase italic tracking-tight">
+              Trade Offer
+            </DialogTitle>
+            <DialogDescription className="text-sm font-semibold leading-6 text-muted-foreground">
+              Review this league trade without leaving the chat context.
+            </DialogDescription>
+          </DialogHeader>
+
+          {focusedOfferQuery.isLoading ? (
+            <p className="py-8 text-center text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/70">
+              Loading trade offer...
+            </p>
+          ) : null}
+          {focusedOfferQuery.isError || !requestedTradeId ? (
+            <div className="rounded-2xl border border-red-300/25 bg-red-500/10 p-5">
+              <p className="text-sm font-black text-red-100">This trade is unavailable.</p>
+              <p className="mt-2 text-xs font-semibold leading-5 text-red-100/80">
+                The offer may have been removed, belong to another league, or the link is invalid. Your league was not changed.
+              </p>
+            </div>
+          ) : null}
+          {focusedOfferQuery.data ? (() => {
+            const offer = focusedOfferQuery.data;
+            const proposingTeam = teams.find((team) => team.id === offer.proposing_team_id);
+            const receivingTeam = teams.find((team) => team.id === offer.receiving_team_id);
+            const proposingSends = offer.items.filter((item) => item.team_id === offer.proposing_team_id);
+            const receivingSends = offer.items.filter((item) => item.team_id === offer.receiving_team_id);
+            return (
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <p className="text-sm font-black text-foreground">
+                    {proposingTeam?.name ?? "Proposing Team"} <span className="px-1 text-primary">→</span> {receivingTeam?.name ?? "Receiving Team"}
+                  </p>
+                  <span className="rounded-full border border-primary/35 bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-primary">
+                    {formatTradeStatus(offer.status)}
+                  </span>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-red-300/20 bg-red-500/10 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-100">{proposingTeam?.name ?? "Proposing Team"} gives</p>
+                    <p className="mt-3 text-sm font-bold leading-6 text-foreground">
+                      {proposingSends.map((item) => item.player_name ?? `Player ${item.player_id ?? ""}`).join(", ") || "No players listed"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/10 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">{receivingTeam?.name ?? "Receiving Team"} gives</p>
+                    <p className="mt-3 text-sm font-bold leading-6 text-foreground">
+                      {receivingSends.map((item) => item.player_name ?? `Player ${item.player_id ?? ""}`).join(", ") || "No players listed"}
+                    </p>
+                  </div>
+                </div>
+                {offer.message ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">Manager note</p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-muted-foreground">{offer.message}</p>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })() : null}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeFocusedOffer}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

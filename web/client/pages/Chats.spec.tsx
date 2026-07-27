@@ -2,6 +2,7 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 
 import type { ChatMessage, ChatThread } from "@/types/chat";
 
@@ -207,14 +208,21 @@ describe("TradeFinalizedCard", () => {
         players_process_at: "2026-09-07T04:00:00Z",
       },
     };
-    const { rerender } = render(<TradeFinalizedCard message={message} />);
+    const { rerender } = render(<MemoryRouter><TradeFinalizedCard message={message} /></MemoryRouter>);
 
     expect(screen.getByText("Trade Finalized")).toBeTruthy();
     expect(screen.getByText(/Jeremiah Smith/)).toBeTruthy();
     expect(screen.getByText(/Ahmad Hardy/)).toBeTruthy();
     expect(screen.getByText(/Roster transfer pending/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "View trade" }).getAttribute("href")).toBe("/leagues/4/trades/18");
 
-    rerender(<TradeFinalizedCard message={{ ...message, metadata: { ...message.metadata, processing_status: "processed" } }} />);
+    rerender(<MemoryRouter><TradeFinalizedCard message={{ ...message, metadata: { ...message.metadata, processing_status: "processed" } }} /></MemoryRouter>);
     expect(screen.getByText("Roster transfer complete")).toBeTruthy();
+  });
+
+  it("does not render a trade link when a malformed system message cannot identify one offer", () => {
+    render(<MemoryRouter><TradeFinalizedCard message={{ league_id: 4, body: null, metadata: { trade_id: "18" } }} /></MemoryRouter>);
+
+    expect(screen.queryByRole("link", { name: "View trade" })).toBeNull();
   });
 });

@@ -1,4 +1,5 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { ArrowRightLeft, ChevronUp, CircleAlert, LoaderCircle, MessageCircleMore, MessageSquare, Plus, RefreshCw, RotateCcw, Send, Users } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,7 @@ import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagues } from "@/hooks/use-leagues";
 import { ApiError } from "@/lib/api";
+import { tradeOfferPath } from "@/lib/trade-links";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, ChatThread } from "@/types/chat";
 
@@ -87,7 +89,7 @@ export function TradeFinalizedCard({ message }: { message: { league_id: number; 
   const receivingSends = tradeAssets(metadata.receiving_team_sends);
   const processingStatus = metadata.processing_status === "processed" ? "processed" : "pending_transfer";
   const processAt = typeof metadata.players_process_at === "string" ? metadata.players_process_at : null;
-  const tradeId = typeof metadata.trade_id === "number" ? metadata.trade_id : null;
+  const tradePath = tradeOfferPath(message.league_id, metadata.trade_id);
   const playerList = (assets: TradeAsset[]) => assets.length
     ? assets.map((asset) => <li key={`${asset.player_id ?? asset.name}-${asset.position ?? ""}`}>{asset.name}{asset.position ? ` · ${asset.position}` : ""}{asset.school ? ` · ${asset.school}` : ""}</li>)
     : <li>No players listed</li>;
@@ -109,7 +111,11 @@ export function TradeFinalizedCard({ message }: { message: { league_id: number; 
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
         <span>{processingStatus === "processed" ? "Roster transfer complete" : processAt ? `Roster transfer pending · Players process ${formatTime(processAt)}` : "Roster transfer pending"}</span>
-        {tradeId ? <a href={`/leagues/${message.league_id}/trades/${tradeId}`} className="rounded-lg border border-primary/50 bg-primary/10 px-3 py-2 text-primary transition hover:bg-primary/20">View trade</a> : null}
+        {tradePath ? (
+          <Link to={tradePath} className="rounded-lg border border-primary/50 bg-primary/10 px-3 py-2 text-primary transition hover:bg-primary/20">
+            View trade
+          </Link>
+        ) : null}
       </div>
     </div>
   );
