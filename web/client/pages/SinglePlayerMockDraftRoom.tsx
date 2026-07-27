@@ -829,25 +829,23 @@ export default function SinglePlayerMockDraftRoom() {
         ) : null}
 
         <section className="overflow-hidden rounded-[2rem] border border-cyan-200/15 bg-card/50 shadow-[0_0_70px_rgba(14,165,233,0.13),inset_0_1px_0_rgba(255,255,255,0.04)]">
-          <div className="flex items-center justify-between gap-4 border-b border-cyan-100/10 px-5 py-4">
+          <div className="relative flex min-h-[76px] items-center justify-between gap-4 border-b border-cyan-100/10 px-5 py-4">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.26em] text-cyan-200 drop-shadow-[0_0_14px_rgba(103,232,249,0.32)]">Draft Order</p>
               <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">Scroll every pick left to right</p>
             </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={recenterDraftCarousel}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-200/20 bg-slate-950/60 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.14)] transition hover:border-cyan-200/50 hover:bg-cyan-300/12 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70"
-                aria-label="Center draft order on the current pick"
-                title="Center current pick"
-              >
-                <LocateFixed className="h-4 w-4" />
-              </button>
-              <div className="text-right">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{totalPicks} Picks</p>
-                <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">{totalPicks - draftedCount} Unlocked</p>
-              </div>
+            <button
+              type="button"
+              onClick={recenterDraftCarousel}
+              className="absolute left-1/2 top-1/2 inline-flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[1.15rem] border border-cyan-200/30 bg-slate-950/75 text-cyan-100 shadow-[0_0_32px_rgba(34,211,238,0.2)] transition hover:border-cyan-200/60 hover:bg-cyan-300/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70"
+              aria-label="Center draft order on the current pick"
+              title="Center current pick"
+            >
+              <LocateFixed className="h-5 w-5" />
+            </button>
+            <div className="ml-auto text-right">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{totalPicks} Picks</p>
+              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">{totalPicks - draftedCount} Unlocked</p>
             </div>
           </div>
           <div ref={carouselRef} className="flex gap-4 overflow-x-auto px-5 py-5 scroll-smooth">
