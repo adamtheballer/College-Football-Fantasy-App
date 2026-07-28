@@ -9,6 +9,7 @@ from collegefootballfantasy_api.app.services.readiness import (
     check_alembic_readiness,
     get_alembic_heads,
 )
+from collegefootballfantasy_api.app.core.config import settings
 
 
 def _reset_alembic_version(db_session, revision: str | None = None) -> None:
@@ -47,7 +48,7 @@ def test_readiness_returns_200_when_database_matches_alembic_head(client, db_ses
 def test_runtime_diagnostics_exposes_build_identity_and_migration_state(client, db_session, monkeypatch):
     head = get_alembic_heads()[0]
     _reset_alembic_version(db_session, head)
-    monkeypatch.setenv("APP_BUILD_SHA", "release-audit-sha")
+    monkeypatch.setattr(settings, "app_build_sha", "release-audit-sha")
 
     response = client.get("/health/runtime")
 

@@ -32,8 +32,6 @@ jobs:
       JWT_SECRET_KEY: ci-only-secret
       UI_BASE_URL: http://localhost:8080
       CORS_ORIGINS: http://localhost:8080
-      APP_BUILD_SHA: ${{ github.sha }}
-      VITE_BUILD_SHA: ${{ github.sha }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -84,6 +82,8 @@ jobs:
         run: npm --prefix web test
 
       - name: Build frontend
+        env:
+          VITE_BUILD_SHA: ${{ github.sha }}
         run: npm --prefix web run build
 
       - name: Install Playwright browser

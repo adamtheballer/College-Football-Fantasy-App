@@ -52,7 +52,10 @@ def test_production_rejects_default_jwt_secret():
         )
 
 
-def test_production_rejects_missing_build_identity():
+def test_production_rejects_missing_build_identity(monkeypatch):
+    for variable in ("APP_BUILD_SHA", "VERCEL_GIT_COMMIT_SHA", "GITHUB_SHA", "SOURCE_VERSION"):
+        monkeypatch.delenv(variable, raising=False)
+
     with pytest.raises(ValidationError, match="APP_BUILD_SHA"):
         make_settings(
             environment="production",
