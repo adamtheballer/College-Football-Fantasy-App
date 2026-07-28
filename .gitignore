@@ -54,6 +54,8 @@ Thumbs.db
 /output/
 /tmp/
 /reports/draft-board-integrity-*/
+/reports/real-stack-e2e/
+/reports/docker-clean-boot/
 /test-results/
 /web/test-results/
 

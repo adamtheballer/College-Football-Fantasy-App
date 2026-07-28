@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from pydantic import field_validator, model_validator
@@ -19,6 +20,7 @@ DEFAULT_CORS_ORIGIN_REGEX = r"https?://(localhost|127\.0\.0\.1):[0-9]+"
 
 class Settings(BaseSettings):
     environment: str = "development"
+    app_build_sha: str | None = None
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5433/collegefootballfantasy"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
@@ -132,6 +134,21 @@ class Settings(BaseSettings):
         return self.environment.strip().lower() == "production"
 
     @property
+    def runtime_build_sha(self) -> str:
+        """Return the deployed API artifact identifier without requiring .git at runtime."""
+        for value in (
+            self.app_build_sha,
+            os.getenv("APP_BUILD_SHA"),
+            os.getenv("VERCEL_GIT_COMMIT_SHA"),
+            os.getenv("GITHUB_SHA"),
+            os.getenv("SOURCE_VERSION"),
+        ):
+            normalized = (value or "").strip()
+            if normalized:
+                return normalized
+        return "unknown"
+
+    @property
     def allowed_cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
@@ -151,6 +168,11 @@ class Settings(BaseSettings):
     def validate_production_safety(self) -> "Settings":
         if not self.is_production:
             return self
+
+        if self.runtime_build_sha == "unknown":
+            raise ValueError(
+                "APP_BUILD_SHA (or a supported deployment commit SHA) is required when ENVIRONMENT=production"
+            )
 
         if self.jwt_secret_key == DEFAULT_JWT_SECRET_KEY:
             raise ValueError("JWT_SECRET_KEY must be changed when ENVIRONMENT=production")

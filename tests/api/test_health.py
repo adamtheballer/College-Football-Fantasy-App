@@ -44,6 +44,22 @@ def test_readiness_returns_200_when_database_matches_alembic_head(client, db_ses
     assert payload["expected_revisions"] == [head]
 
 
+def test_runtime_diagnostics_exposes_build_identity_and_migration_state(client, db_session, monkeypatch):
+    head = get_alembic_heads()[0]
+    _reset_alembic_version(db_session, head)
+    monkeypatch.setenv("APP_BUILD_SHA", "release-audit-sha")
+
+    response = client.get("/health/runtime")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert payload["api_build_sha"] == "release-audit-sha"
+    assert payload["current_revisions"] == [head]
+    assert payload["expected_revisions"] == [head]
+    assert payload["environment"]
+
+
 def test_readiness_returns_503_when_alembic_table_missing(client, db_session):
     _reset_alembic_version(db_session)
 
@@ -55,6 +71,17 @@ def test_readiness_returns_503_when_alembic_table_missing(client, db_session):
     assert payload["database"] == "ready"
     assert payload["migrations"] == "missing"
     assert payload["current_revisions"] == []
+
+
+def test_runtime_diagnostics_returns_503_when_migrations_are_missing(client, db_session):
+    _reset_alembic_version(db_session)
+
+    response = client.get("/health/runtime")
+
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["status"] == "not_ready"
+    assert payload["migrations"] == "missing"
 
 
 def test_readiness_returns_503_when_database_is_behind_head(client, db_session):

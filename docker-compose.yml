@@ -20,6 +20,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
+      args:
+        APP_BUILD_SHA: "${APP_BUILD_SHA:-local}"
     working_dir: /app
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/collegefootballfantasy
@@ -64,6 +66,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
+      args:
+        VITE_BUILD_SHA: "${VITE_BUILD_SHA:-local}"
     working_dir: /app/web
     ports:
       - "${WEB_PORT:-8080}:8080"

@@ -1,5 +1,8 @@
 name: CI
 
+permissions:
+  contents: read
+
 on:
   pull_request:
   push:
@@ -29,6 +32,8 @@ jobs:
       JWT_SECRET_KEY: ci-only-secret
       UI_BASE_URL: http://localhost:8080
       CORS_ORIGINS: http://localhost:8080
+      APP_BUILD_SHA: ${{ github.sha }}
+      VITE_BUILD_SHA: ${{ github.sha }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -87,6 +92,16 @@ jobs:
       - name: Run frontend E2E tests
         run: npm --prefix web run test:e2e
 
+      - name: Upload frontend E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-e2e-artifacts
+          path: |
+            web/playwright-report
+            web/test-results
+          if-no-files-found: ignore
+
   docker-clean-boot:
     runs-on: ubuntu-latest
     steps:
@@ -94,7 +109,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build and start isolated stack
-        run: COMPOSE_PROJECT_NAME=cff_ci DB_PORT=55450 docker compose up --build -d
+        run: APP_BUILD_SHA=${GITHUB_SHA} VITE_BUILD_SHA=${GITHUB_SHA} COMPOSE_PROJECT_NAME=cff_ci DB_PORT=55450 docker compose up --build -d
 
       - name: Verify API and web readiness
         run: |
@@ -106,6 +121,20 @@ jobs:
           done
           docker compose -p cff_ci logs
           exit 1
+
+      - name: Capture isolated-stack logs
+        if: always()
+        run: |
+          mkdir -p reports/docker-clean-boot
+          docker compose -p cff_ci logs --no-color > reports/docker-clean-boot/stack.log || true
+
+      - name: Upload isolated-stack diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-clean-boot-diagnostics
+          path: reports/docker-clean-boot
+          if-no-files-found: ignore
 
       - name: Stop isolated stack
         if: always()
@@ -119,3 +148,11 @@ jobs:
 
       - name: Run real Postgres/FastAPI/frontend/lifecycle E2E
         run: ./scripts/run_real_stack_e2e.sh
+
+      - name: Upload real-stack E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-stack-e2e-artifacts
+          path: reports/real-stack-e2e
+          if-no-files-found: ignore

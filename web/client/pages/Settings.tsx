@@ -21,6 +21,7 @@ import { restartGuide } from "@/lib/onboarding";
 import { useLeagues } from "@/hooks/use-leagues";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { PasswordChangeForm } from "@/components/auth/PasswordChangeForm";
+import { RuntimeDiagnosticsPanel } from "@/components/runtime/RuntimeDiagnosticsPanel";
 
 type LeagueNotificationPreference = {
   league_id: number;
@@ -309,6 +310,7 @@ export default function Settings() {
             ) : null}
           </div>
         </SettingsSection>
+        <RuntimeDiagnosticsPanel />
       </div>
     );
   }
@@ -357,6 +359,8 @@ export default function Settings() {
             </div>
           </div>
         </SettingsSection>
+
+        <RuntimeDiagnosticsPanel />
 
         {/* NOTIFICATIONS SECTION */}
         <SettingsSection 

@@ -81,6 +81,7 @@ environments:
       start_command: PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port ${API_PORT:-8000}
       health_path: /health
       readiness_path: /health/ready
+      runtime_diagnostics_path: /health/runtime
       minimum_replicas: 1
       restart_policy: always
       healthcheck:
@@ -99,6 +100,7 @@ environments:
       static_output: web/dist/spa
       env:
         VITE_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        VITE_BUILD_SHA: ${VITE_BUILD_SHA}
       requires_api_readiness: true
       release_check: curl --fail --show-error --silent ${PUBLIC_API_BASE_URL}/health/ready
     workers:
@@ -120,6 +122,8 @@ environments:
       - VITE_API_BASE_URL
       - REFRESH_COOKIE_SECURE
       - REFRESH_COOKIE_SAMESITE
+      - APP_BUILD_SHA
+      - VITE_BUILD_SHA
       - EMAIL_DELIVERY_MODE
       - SCORING_SEASON
       - SCORING_WEEK
@@ -143,5 +147,11 @@ environments:
       verify_alembic_head_before_promotion: true
       require_health_ready_before_traffic: true
       require_public_api_ready_before_web_promotion: true
+      require_matching_runtime_build_identity: true
       no_express_backend: true
       no_localhost_public_urls: true
+    runtime_identity_verification:
+      endpoint: ${PUBLIC_API_BASE_URL}/health/runtime
+      api_build_sha_env: APP_BUILD_SHA
+      web_build_sha_env: VITE_BUILD_SHA
+      expected_status: ready

@@ -13,6 +13,7 @@ def make_settings(**overrides):
     defaults = {
         "_env_file": None,
         "environment": "development",
+        "app_build_sha": "test-build-sha",
         "jwt_secret_key": DEFAULT_JWT_SECRET_KEY,
         "cors_origins": DEFAULT_CORS_ORIGINS,
         "cors_origin_regex": DEFAULT_CORS_ORIGIN_REGEX,
@@ -23,6 +24,7 @@ def make_settings(**overrides):
 
 def production_required_settings() -> dict[str, object]:
     return {
+        "app_build_sha": "release-test-sha",
         "email_delivery_mode": "smtp",
         "smtp_host": "smtp.example.com",
         "smtp_from_email": "no-reply@example.com",
@@ -47,6 +49,23 @@ def test_production_rejects_default_jwt_secret():
             environment="production",
             cors_origins="https://app.example.com",
             cors_origin_regex=None,
+        )
+
+
+def test_production_rejects_missing_build_identity():
+    with pytest.raises(ValidationError, match="APP_BUILD_SHA"):
+        make_settings(
+            environment="production",
+            jwt_secret_key="safe-production-secret",
+            cors_origins="https://app.example.com",
+            cors_origin_regex=None,
+            refresh_cookie_secure=True,
+            app_build_sha=None,
+            **{
+                key: value
+                for key, value in production_required_settings().items()
+                if key != "app_build_sha"
+            },
         )
 
 
