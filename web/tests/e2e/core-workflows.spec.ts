@@ -412,7 +412,7 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/leagues/create");
-    await expect(page.getByRole("heading", { name: /Create League/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Build your league/i })).toBeVisible();
     await page.getByRole("button", { name: /^Continue to /i }).click();
     await page.getByRole("button", { name: /^Continue to /i }).click();
     await page.getByRole("button", { name: /^Continue to /i }).click();
@@ -1611,6 +1611,7 @@ test.describe("critical browser workflows", () => {
       team_id: 11,
       add_player_id: 901,
       faab_bid: 0,
+      preference_order: 1,
     });
     expect(addDropCalls).toEqual([]);
   });

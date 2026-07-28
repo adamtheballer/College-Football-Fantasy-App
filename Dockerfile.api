@@ -2,9 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+ARG APP_BUILD_SHA=unknown
 ENV PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1 \
-    UV_PROJECT_ENVIRONMENT=/opt/cff-api-venv
+    UV_PROJECT_ENVIRONMENT=/opt/cff-api-venv \
+    APP_BUILD_SHA=${APP_BUILD_SHA}
 
 RUN pip install --no-cache-dir uv
 

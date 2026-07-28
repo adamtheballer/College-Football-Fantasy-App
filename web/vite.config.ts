@@ -5,6 +5,7 @@ import path from "path";
 const apiProxyTarget = process.env.VITE_API_PROXY_TARGET ?? "http://api:8000";
 const configuredDevPort = Number(process.env.WEB_PORT ?? "8080");
 const devServerPort = Number.isInteger(configuredDevPort) && configuredDevPort > 0 ? configuredDevPort : 8080;
+const buildSha = process.env.VITE_BUILD_SHA ?? process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA ?? "unknown";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -27,6 +28,9 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     outDir: "dist/spa",
+  },
+  define: {
+    "import.meta.env.VITE_BUILD_SHA": JSON.stringify(buildSha),
   },
   plugins: [react()],
   resolve: {

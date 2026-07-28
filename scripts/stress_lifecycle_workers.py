@@ -32,6 +32,7 @@ from collegefootballfantasy_api.app.models.trade_offer import TradeOffer
 from collegefootballfantasy_api.app.models.trade_offer_item import TradeOfferItem
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
+from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.schemas.trade import TradeActionRequest
 from collegefootballfantasy_api.app.services.draft_service import process_expired_draft_picks_once
@@ -146,6 +147,40 @@ def _seed_due_work() -> dict[str, int | datetime]:
                 ),
             ]
         )
+        # Waivers only run after a completed official draft. Keep that valid
+        # lifecycle state separate from the deliberately expired draft below,
+        # which exercises the auto-pick worker in the same stress run.
+        official_draft = Draft(
+            league_id=league.id,
+            draft_datetime_utc=process_at - timedelta(days=1),
+            pick_timer_seconds=1,
+            status="completed",
+            completed_at=process_at - timedelta(hours=1),
+        )
+        db.add(official_draft)
+        db.flush()
+        db.add_all(
+            [
+                DraftPick(
+                    draft_id=official_draft.id,
+                    team_id=proposing_team.id,
+                    player_id=giving_player.id,
+                    made_by_user_id=proposing_user.id,
+                    round_number=1,
+                    round_pick=1,
+                    overall_pick=1,
+                ),
+                DraftPick(
+                    draft_id=official_draft.id,
+                    team_id=receiving_team.id,
+                    player_id=receiving_player.id,
+                    made_by_user_id=receiving_user.id,
+                    round_number=1,
+                    round_pick=2,
+                    overall_pick=2,
+                ),
+            ]
+        )
         trade = TradeOffer(
             league_id=league.id,
             proposing_team_id=proposing_team.id,
@@ -182,6 +217,18 @@ def _seed_due_work() -> dict[str, int | datetime]:
             .one()
         )
         db.delete(stale_entry)
+        waiver_period = WaiverPeriod(
+            league_id=league.id,
+            season=league.season_year,
+            week=1,
+            window_key=f"stress-{suffix}",
+            opens_at=process_at - timedelta(days=1),
+            closes_at=process_at - timedelta(minutes=1),
+            processes_at=process_at - timedelta(minutes=1),
+            status="open",
+        )
+        db.add(waiver_period)
+        db.flush()
         db.add(
             WaiverClaim(
                 league_id=league.id,
@@ -189,6 +236,10 @@ def _seed_due_work() -> dict[str, int | datetime]:
                 add_player_id=waiver_player.id,
                 created_by_user_id=proposing_user.id,
                 status="pending",
+                season=league.season_year,
+                processing_week=waiver_period.week,
+                processing_window_id=waiver_period.window_key,
+                waiver_period_id=waiver_period.id,
                 priority_snapshot=1,
                 faab_bid=7,
                 process_after=process_at - timedelta(minutes=1),

@@ -8,9 +8,17 @@ export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-cff_real_e2e}"
 export DB_PORT="${DB_PORT:-55460}"
 export API_PORT="${API_PORT:-55461}"
 export WEB_PORT="${WEB_PORT:-55462}"
+REPORT_DIR="${REAL_STACK_E2E_REPORT_DIR:-$ROOT_DIR/reports/real-stack-e2e}"
+E2E_CONTAINER_NAME="${COMPOSE_PROJECT_NAME}_e2e_artifacts"
+
+mkdir -p "$REPORT_DIR"
 
 cleanup() {
+  local exit_status=$?
+  docker compose logs --no-color >"$REPORT_DIR/stack.log" 2>&1 || true
+  docker rm -f "$E2E_CONTAINER_NAME" >/dev/null 2>&1 || true
   docker compose down -v --remove-orphans
+  return "$exit_status"
 }
 trap cleanup EXIT
 
@@ -39,4 +47,14 @@ done
 docker compose exec -T db psql -U postgres -d collegefootballfantasy -Atc \
   "select status from worker_heartbeats where worker_name = 'lifecycle_processor'" | grep -qx "healthy"
 
-docker compose --profile e2e run --rm --no-deps e2e
+set +e
+docker compose --profile e2e run --no-deps --name "$E2E_CONTAINER_NAME" e2e
+e2e_status=$?
+set -e
+
+docker logs "$E2E_CONTAINER_NAME" >"$REPORT_DIR/e2e.log" 2>&1 || true
+docker cp "$E2E_CONTAINER_NAME:/app/web/playwright-report/." "$REPORT_DIR/playwright-report" 2>/dev/null || true
+docker cp "$E2E_CONTAINER_NAME:/app/web/test-results/." "$REPORT_DIR/test-results" 2>/dev/null || true
+docker rm -f "$E2E_CONTAINER_NAME" >/dev/null 2>&1 || true
+
+exit "$e2e_status"
