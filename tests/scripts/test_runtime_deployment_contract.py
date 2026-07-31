@@ -38,6 +38,9 @@ def test_release_candidate_launcher_embeds_the_checked_out_revision_and_refuses_
     assert "Refusing to label a dirty worktree as a release candidate." in launcher
     assert "scripts/check_release_source_integrity.py" in launcher
     assert "scripts/audit_preseason_source_contract.py" in launcher
+    assert "scripts/check_local_runtime_port.py --label \"release-candidate API\"" in launcher
+    assert "scripts/check_local_runtime_port.py --label \"release-candidate UI\"" in launcher
     assert "docker compose up --build --detach db api web lifecycle_worker" in launcher
-    assert 'export API_PORT="${API_PORT:-8000}"' in launcher
+    assert 'export API_PORT="${API_PORT:-18000}"' in launcher
+    assert 'export WEB_PORT="${WEB_PORT:-18080}"' in launcher
     assert '"http://127.0.0.1:${API_PORT}/health/runtime"' in launcher

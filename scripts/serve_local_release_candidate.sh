@@ -25,8 +25,11 @@ export CFF_RELEASE_PROJECT_ID="$(git rev-parse --short=12 HEAD)"
 # project. A commit-scoped project keeps its API, worker, and database from
 # being mistaken for a previously started local stack.
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-cff-rc-${CFF_RELEASE_PROJECT_ID}}"
-export API_PORT="${API_PORT:-8000}"
-export WEB_PORT="${WEB_PORT:-8080}"
+# Keep a release candidate separate from the generic development stack. This
+# means a browser cannot accidentally reopen localhost:8080 and exercise a
+# previous API process after a candidate restart.
+export API_PORT="${API_PORT:-18000}"
+export WEB_PORT="${WEB_PORT:-18080}"
 # The candidate API reaches Postgres over Docker's private ``db`` network; it
 # does not need the database exposed on the host.  Keep an opt-in diagnostic
 # binding for direct audits, but choose a free port when none is supplied so a
@@ -38,6 +41,9 @@ else
   export DB_PORT
 fi
 export CFF_RUNTIME_ID="${CFF_RUNTIME_ID:-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
+
+python3 scripts/check_local_runtime_port.py --label "release-candidate API" --port "$API_PORT" --port-variable API_PORT
+python3 scripts/check_local_runtime_port.py --label "release-candidate UI" --port "$WEB_PORT" --port-variable WEB_PORT
 
 PYTHONPATH=. uv run python scripts/check_release_source_integrity.py
 PYTHONPATH=. uv run python scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026

@@ -33,6 +33,12 @@ export VITE_API_PROXY_TARGET="http://127.0.0.1:${API_PORT}"
 API_READINESS_URL="http://127.0.0.1:${API_PORT}/health/ready"
 UI_PROXY_READINESS_URL="http://127.0.0.1:${WEB_PORT}/api/health/ready"
 
+# Refuse to attach this paired development runtime to a process left behind by
+# another worktree, compose project, or SSH tunnel.  The browser must only ever
+# reach the FastAPI process started below through Vite's same-origin proxy.
+python3 scripts/check_local_runtime_port.py --label API --port "$API_PORT" --port-variable API_PORT
+python3 scripts/check_local_runtime_port.py --label UI --port "$WEB_PORT" --port-variable WEB_PORT
+
 echo "Starting postgres..."
 "${COMPOSE_BIN[@]}" up -d db --remove-orphans
 
@@ -49,10 +55,8 @@ if ! command -v npm >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ ! -d web/node_modules ]; then
-  echo "Installing web dependencies..."
-  npm --prefix web ci
-fi
+echo "Syncing frontend dependencies to web/package-lock.json..."
+npm --prefix web ci
 
 echo "Running migrations..."
 PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head
@@ -69,6 +73,15 @@ PYTHONPATH=. uv run python scripts/build_weekly_projections.py \
 echo "Starting API..."
 PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port "$API_PORT" &
 API_PID=$!
+
+cleanup_runtime() {
+  for process_id in "${UI_PID:-}" "${API_PID:-}"; do
+    if [ -n "$process_id" ] && kill -0 "$process_id" 2>/dev/null; then
+      kill "$process_id" 2>/dev/null || true
+    fi
+  done
+}
+trap cleanup_runtime EXIT INT TERM
 
 for attempt in {1..60}; do
   if curl --fail --silent --max-time 2 "$API_READINESS_URL" >/dev/null; then
@@ -109,7 +122,6 @@ fi
 echo "API -> http://localhost:${API_PORT}"
 echo "UI  -> http://localhost:${WEB_PORT}"
 
-trap 'kill "$API_PID" "$UI_PID"' EXIT
 while kill -0 "$API_PID" 2>/dev/null && kill -0 "$UI_PID" 2>/dev/null; do
   sleep 1
 done
