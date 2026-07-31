@@ -88,6 +88,25 @@ type TradeOfferListResponse = {
   total: number;
 };
 
+/**
+ * `apiGet` is intentionally generic, so it cannot protect a route component
+ * from an old proxy/cache returning the collection envelope for a detail URL.
+ * Keep the deep-link modal open and show its safe unavailable state instead of
+ * dereferencing `items` and taking down the route.
+ */
+const isTradeOfferPayload = (value: unknown): value is TradeOffer => {
+  if (!value || typeof value !== "object") return false;
+  const offer = value as Record<string, unknown>;
+  return (
+    typeof offer.id === "number" &&
+    typeof offer.league_id === "number" &&
+    typeof offer.proposing_team_id === "number" &&
+    typeof offer.receiving_team_id === "number" &&
+    typeof offer.status === "string" &&
+    Array.isArray(offer.items)
+  );
+};
+
 type TradeRow = {
   rosterEntryId: number;
   playerId: number;
@@ -515,6 +534,14 @@ export default function Trade() {
     enabled: Boolean(isTradeOfferRoute && leagueId && requestedTradeId),
     queryFn: () => apiGet<TradeOffer>(`/leagues/${leagueId}/trades/${requestedTradeId}`),
   });
+
+  const focusedOffer = isTradeOfferPayload(focusedOfferQuery.data)
+    ? focusedOfferQuery.data
+    : null;
+  const focusedOfferUnavailable =
+    focusedOfferQuery.isError ||
+    !requestedTradeId ||
+    Boolean(focusedOfferQuery.data && !focusedOffer);
 
   const closeFocusedOffer = () => navigate(focusedOfferReturnPath, { replace: true });
 
@@ -960,7 +987,7 @@ export default function Trade() {
               Loading trade offer...
             </p>
           ) : null}
-          {focusedOfferQuery.isError || !requestedTradeId ? (
+          {focusedOfferUnavailable ? (
             <div className="rounded-2xl border border-red-300/25 bg-red-500/10 p-5">
               <p className="text-sm font-black text-red-100">This trade is unavailable.</p>
               <p className="mt-2 text-xs font-semibold leading-5 text-red-100/80">
@@ -968,8 +995,8 @@ export default function Trade() {
               </p>
             </div>
           ) : null}
-          {focusedOfferQuery.data ? (() => {
-            const offer = focusedOfferQuery.data;
+          {focusedOffer ? (() => {
+            const offer = focusedOffer;
             const proposingTeam = teams.find((team) => team.id === offer.proposing_team_id);
             const receivingTeam = teams.find((team) => team.id === offer.receiving_team_id);
             const proposingSends = offer.items.filter((item) => item.team_id === offer.proposing_team_id);

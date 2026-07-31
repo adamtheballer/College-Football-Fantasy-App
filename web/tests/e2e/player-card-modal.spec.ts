@@ -76,7 +76,7 @@ const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]
 };
 
 test.describe("player card modal", () => {
-  test("opens centered with ESPN profile details and closes from X or backdrop", async ({ page }) => {
+  test("opens centered with canonical bio details and no provider profile control", async ({ page }) => {
     await seedAuthenticatedSession(page);
     await page.route("**/stats/teams**", async (route) => {
       await route.fulfill({
@@ -174,7 +174,7 @@ test.describe("player card modal", () => {
     await page.getByRole("button", { name: /Jeremiah Smith/i }).first().click();
     const dialog = page.getByRole("dialog", { name: /Jeremiah Smith player card/i });
     await expect(dialog).toBeVisible();
-    await expect(dialog.locator("span").filter({ hasText: "ESPN PROFILE" }).first()).toBeVisible();
+    await expect(dialog.getByText("ESPN PROFILE", { exact: true })).toHaveCount(0);
     await expect(dialog.getByText("6'3\"")).toBeVisible();
     await expect(dialog.getByText("215 lbs")).toBeVisible();
     await expect(dialog.getByText("Columbus, Ohio")).toBeVisible();

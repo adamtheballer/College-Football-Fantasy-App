@@ -1632,6 +1632,11 @@ test.describe("critical browser workflows", () => {
       });
     });
     await page.route("**/leagues/1/trades**", async (route) => {
+      const pathname = new URL(route.request().url()).pathname;
+      if (pathname !== "/leagues/1/trades") {
+        await route.fallback();
+        return;
+      }
       if (route.request().method() === "GET") {
         await route.fulfill({
           status: 200,
@@ -1729,7 +1734,7 @@ test.describe("critical browser workflows", () => {
     const focusedOffer = page.getByRole("dialog", { name: /Review Trade Offer/i });
     await expect(focusedOffer).toBeVisible();
     await expect(focusedOffer.getByText("Arch Manning", { exact: true })).toBeVisible();
-    await focusedOffer.getByRole("button", { name: "Close", exact: true }).click();
+    await focusedOffer.getByRole("button", { name: "Back to league chat", exact: true }).click();
     await expect(page).toHaveURL(/\/chats\?leagueId=1&threadId=9$/);
   });
 
