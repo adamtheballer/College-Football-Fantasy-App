@@ -116,7 +116,13 @@ def _seed_due_work() -> dict[str, int | datetime]:
         receiving_player = Player(name=f"Stress RB {suffix}", school=stress_school, position="RB")
         stale_giving_player = Player(name=f"Stress Stale WR {suffix}", school=stress_school, position="WR")
         stale_receiving_player = Player(name=f"Stress Stale QB {suffix}", school=stress_school, position="QB")
-        waiver_player = Player(name=f"Stress WR {suffix}", school=stress_school, position="WR")
+        waiver_player = Player(
+            name=f"Stress WR {suffix}",
+            school=stress_school,
+            position="WR",
+            sheet_projected_season_points=160.0,
+            sheet_source_sheet_id=f"canonical-preseason:2026:stress-{suffix}",
+        )
         draft_player = Player(
             name=f"Stress Draft RB {suffix}",
             school=stress_school,
@@ -272,23 +278,22 @@ def _seed_due_work() -> dict[str, int | datetime]:
         )
         db.add(waiver_period)
         db.flush()
-        db.add(
-            WaiverClaim(
-                league_id=league.id,
-                team_id=proposing_team.id,
-                add_player_id=waiver_player.id,
-                created_by_user_id=proposing_user.id,
-                status="pending",
-                season=waiver_period.season,
-                processing_week=waiver_period.week,
-                processing_window_id=waiver_period.window_key,
-                waiver_period_id=waiver_period.id,
-                preference_order=1,
-                priority_snapshot=1,
-                faab_bid=7,
-                process_after=waiver_period.processes_at,
-            )
+        waiver_claim = WaiverClaim(
+            league_id=league.id,
+            team_id=proposing_team.id,
+            add_player_id=waiver_player.id,
+            created_by_user_id=proposing_user.id,
+            status="pending",
+            season=waiver_period.season,
+            processing_week=waiver_period.week,
+            processing_window_id=waiver_period.window_key,
+            waiver_period_id=waiver_period.id,
+            preference_order=1,
+            priority_snapshot=1,
+            faab_bid=7,
+            process_after=waiver_period.processes_at,
         )
+        db.add(waiver_claim)
         draft = Draft(
             league_id=league.id,
             draft_datetime_utc=process_at - timedelta(minutes=5),
@@ -306,6 +311,7 @@ def _seed_due_work() -> dict[str, int | datetime]:
             "trade_id": trade.id,
             "stale_trade_id": stale_trade.id,
             "waiver_player_id": waiver_player.id,
+            "waiver_claim_id": waiver_claim.id,
             "proposing_team_id": proposing_team.id,
             "receiving_team_id": receiving_team.id,
             "giving_player_id": giving_player.id,
@@ -350,6 +356,7 @@ def _assert_exactly_once(seed: dict[str, int | datetime], results: list[dict[str
             )
             .count()
         )
+        waiver_claim = db.get(WaiverClaim, seed["waiver_claim_id"])
         giving_entry = (
             db.query(RosterEntry)
             .filter(
@@ -386,7 +393,12 @@ def _assert_exactly_once(seed: dict[str, int | datetime], results: list[dict[str
     )
     assert giving_entry.team_id == seed["receiving_team_id"], "giving player did not move to receiving roster"
     assert receiving_entry.team_id == seed["proposing_team_id"], "receiving player did not move to proposing roster"
-    assert waiver_entry_count == 1, "waiver player was added more than once"
+    assert waiver_entry_count == 1, (
+        "waiver player was not added exactly once: "
+        f"count={waiver_entry_count}; claim_status={waiver_claim.status if waiver_claim else None}; "
+        f"failure_code={waiver_claim.failure_code if waiver_claim else None}; "
+        f"failure_reason={waiver_claim.failure_reason if waiver_claim else None}; workers={results}"
+    )
     assert spent == 7, "FAAB was not deducted exactly once"
     return {
         "workers": len(results),
