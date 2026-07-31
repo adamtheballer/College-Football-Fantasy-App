@@ -3,6 +3,10 @@ name: ${COMPOSE_PROJECT_NAME:-cff-playground}
 services:
   db:
     image: postgres:16
+    # The API and worker are intentionally restartable. The database must be
+    # restartable as well, otherwise a Docker/Colima interruption leaves the
+    # browser stack in a permanent API restart loop with no `db` hostname.
+    restart: unless-stopped
     environment:
       POSTGRES_DB: collegefootballfantasy
       POSTGRES_USER: postgres

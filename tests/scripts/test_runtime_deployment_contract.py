@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -20,6 +21,9 @@ def test_public_web_image_serves_the_built_spa_behind_a_same_origin_api_proxy():
     assert "scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026" in compose
     assert "scripts/bootstrap_canonical_player_data.py --apply" in compose
     assert "scripts/audit_canonical_player_registry.py --source-dir reports/source-imports/2026" in compose
+    db_service = re.search(r"^  db:\n(?P<body>.*?)(?=^  [a-z_]+:)", compose, flags=re.MULTILINE | re.DOTALL)
+    assert db_service is not None
+    assert "restart: unless-stopped" in db_service.group("body")
 
 
 def test_release_candidate_launcher_embeds_the_checked_out_revision_and_refuses_dirty_source():
