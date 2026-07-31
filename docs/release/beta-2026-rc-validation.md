@@ -1,10 +1,32 @@
 # Beta 2026 Release-Candidate Validation
 
-Release branch: `release/beta-2026`
-Candidate commit: the commit containing this validation record (record the exact SHA in the final PR and release tag)
-Validation date: 2026-07-27
+Release integration branch: `codex/runtime-provenance-contract` (PR #24)
+Runtime-hardening baseline: `8882d7a0992f595497dc688786e4f8e01e129a18`
+Validation snapshot date: 2026-07-31
 
-## Verified in the candidate
+> This branch is a release-hardening candidate, not the deployment branch.
+> It must be merged into the designated release branch and revalidated from the
+> exact merge commit before public beta. The production gates at the bottom of
+> this document remain mandatory and are not satisfied by local or CI results.
+
+## Current evidence — 2026-07-31
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| GitHub candidate CI | [Run 37](https://github.com/adamtheballer/College-Football-Fantasy-App/actions/runs/30622036317) for `d7d252f` | Passed: `verify`, `docker-clean-boot`, `real-stack-e2e`, and both Vercel checks |
+| Real-stack port isolation | `scripts/run_real_stack_e2e.sh` using Docker-assigned host ports | Passed locally: API, web, database, and lifecycle worker booted; both Playwright lifecycle scenarios passed; teardown completed |
+| Source identity/projection reconciliation | `scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026` | Passed: 813 identity rows, 813 projection rows, zero unmatched rows, duplicates, or invalid records; manifest hash/revision checks passed |
+| Canonical ID ownership | `scripts/audit_canonical_player_registry.py` | Passed: `players.id` is the application-owned canonical identifier; source workbook canonical-ID column is explicitly not required |
+| Source-artifact provenance gate | `scripts/check_release_source_integrity.py` | Hardened and regression-tested. It now compares HEAD, index, and targeted worktree metadata without a slow worktree-wide Git diff. In this local clone it correctly blocks two unrelated, uncommitted package changes: `web/package.json` and `web/package-lock.json`. |
+
+The local package changes above are intentionally not part of this candidate
+commit. They must be separately reviewed and either committed to a future
+candidate or discarded before a release artifact can be built locally.
+
+## Historical validation baseline — rerun from the final merge commit
+
+The following evidence predates the current candidate and is retained as a
+test plan/history only. It does not waive any current release gate.
 
 | Gate | Evidence | Result |
 | --- | --- | --- |
@@ -20,7 +42,7 @@ Validation date: 2026-07-27
 | Database readiness | `scripts/check_alembic_head.py` and `GET /health/ready` against the rebuilt local stack | Passed at `0082_release_audit_timestamps` |
 | Model registry parity | Legacy standalone registry entrypoint and canonical FastAPI/Alembic registry import the same model set | Passed: 2 focused tests; standalone `Player` query succeeds |
 | Real-stack browser gate | Isolated Docker stack: signup, session persistence, draft-pool load, two-manager draft synchronization, countdown, and auto-picks | Passed: 2 Playwright tests |
-| Player-pool integrity | Read-only audit of the canonical draft universe | Passed: 825 eligible players; zero non-approved schools, duplicate identities, and missing season projections |
+| Player-pool integrity | Read-only audit of the canonical draft universe | Superseded by the 2026-07-31 immutable source snapshot: 813 reconciled approved players |
 | Production configuration contract | Runtime validator and deployment manifest require HTTPS UI origin, secure cookies, SMTP/TLS, legal/support URLs, and SportsData scoring credentials | Passed: 19 tests |
 | League route data integrity | Removed the hard-coded demo league and its roster, matchup, waiver, settings, and watchlist responses; supported league routes now require real API data and show retryable errors instead of fictional league state | Passed: typecheck, 137 frontend tests, production build |
 
