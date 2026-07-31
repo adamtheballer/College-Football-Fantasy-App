@@ -224,8 +224,12 @@ def test_player_card_returns_espn_about_injury_history_and_cached_stats(client, 
     assert body["about"]["weight"] == "210 lbs"
     assert body["about"]["birthplace"] == "Tampa, FL, USA"
     assert body["about"]["player_class"] == "JR"
+    assert body["about"]["headshot_url"] is None
     assert body["injuries"][0]["injury"] == "Shoulder"
     assert body["season_stats"][0]["stats"]["PassingYards"] == 3200
+    db_session.refresh(player)
+    assert player.espn_headshot_url is None
+    assert player.image_url is None
 
 
 def test_player_card_uses_normalized_espn_provider_mapping(client, db_session, monkeypatch):

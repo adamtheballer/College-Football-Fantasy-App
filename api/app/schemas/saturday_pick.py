@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
+
+from collegefootballfantasy_api.app.core.config import settings
 
 
 SaturdayPickPosition = Literal["QB", "RB", "WR", "TE"]
@@ -48,6 +50,11 @@ class SaturdayPickPlayerRead(BaseModel):
     final_points: float | None = None
     scoring_status: str
     sort_order: int
+
+    @field_serializer("image_url")
+    def serialize_player_image_url(self, value: str | None) -> str | None:
+        """Never expose third-party player portraits while beta compliance is active."""
+        return value if settings.player_headshots_enabled else None
 
 
 class SaturdayPickLockPlayerRead(BaseModel):

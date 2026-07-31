@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.integrations.espn import ESPNClient
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.services.provider_identity import (
@@ -105,20 +106,22 @@ def persist_espn_player_profile(player: Player, profile_payload: dict[str, Any] 
     if not athlete:
         return False
     status = athlete.get("status") if isinstance(athlete.get("status"), dict) else {}
-    headshot = athlete.get("headshot") if isinstance(athlete.get("headshot"), dict) else {}
     values = {
         "espn_height": _profile_text(athlete.get("displayHeight")),
         "espn_weight": _profile_text(athlete.get("displayWeight")),
         "espn_birthplace": _profile_birthplace(profile_payload),
         "espn_status": _profile_text(status.get("name") or status.get("abbreviation")),
         "espn_jersey": _profile_text(athlete.get("jersey")),
-        "espn_headshot_url": _profile_text(headshot.get("href")),
     }
+    if settings.player_headshots_enabled:
+        headshot = athlete.get("headshot") if isinstance(athlete.get("headshot"), dict) else {}
+        values["espn_headshot_url"] = _profile_text(headshot.get("href"))
     for attribute, value in values.items():
         if value is not None:
             setattr(player, attribute, value)
-    if values["espn_headshot_url"] and not player.image_url:
-        player.image_url = values["espn_headshot_url"]
+    headshot_url = values.get("espn_headshot_url")
+    if headshot_url and not player.image_url:
+        player.image_url = headshot_url
     player.espn_profile_synced_at = datetime.now(timezone.utc)
     return True
 

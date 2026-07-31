@@ -1,6 +1,7 @@
 from sqlalchemy import Select, case, func, select
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league import League
@@ -16,7 +17,12 @@ from collegefootballfantasy_api.app.services.player_pool_filters import (
 
 
 def create_players(db: Session, players_in: list[PlayerCreate]) -> list[Player]:
-    players = [Player(**player.model_dump()) for player in players_in]
+    players = []
+    for player_in in players_in:
+        values = player_in.model_dump()
+        if not settings.player_headshots_enabled:
+            values["image_url"] = None
+        players.append(Player(**values))
     db.add_all(players)
     db.commit()
     for player in players:

@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_availability_event import PlayerAvailabilityEvent
@@ -422,10 +423,12 @@ def contest_read(db: Session, contest: SaturdayPickContest, viewer: User | None 
     if not rows:
         raise ValueError("Saturday Pick 6 contest has no featured players.")
     first_game_player = min(rows, key=lambda row: (as_utc(row.game_time), row.sort_order, row.id))
-    player_images = {
-        player.id: player.image_url or player.espn_headshot_url
-        for player in db.query(Player).filter(Player.id.in_([row.player_id for row in rows] or [-1])).all()
-    }
+    player_images = {}
+    if settings.player_headshots_enabled:
+        player_images = {
+            player.id: player.image_url or player.espn_headshot_url
+            for player in db.query(Player).filter(Player.id.in_([row.player_id for row in rows] or [-1])).all()
+        }
     entry = None
     if viewer:
         entry = db.query(SaturdayPickEntry).filter(

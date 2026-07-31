@@ -118,6 +118,23 @@ def test_contest_lock_is_the_first_featured_player_kickoff_and_identifies_that_p
     assert datetime.fromisoformat(published.json()["lock_at"].replace("Z", "+00:00")).replace(tzinfo=timezone.utc) == kickoff
 
 
+def test_saturday_pick_hides_featured_player_headshots_for_public_beta(client, db_session):
+    players, kickoff = _featured_players(db_session)
+    for player in players:
+        player.image_url = f"https://assets.espn.test/{player.id}.png"
+        player.espn_headshot_url = f"https://assets.espn.test/{player.id}-profile.png"
+    db_session.commit()
+
+    response = client.post(
+        "/admin/saturday-pick-6",
+        json=_create_payload(players, kickoff),
+        headers=admin_headers(client),
+    )
+
+    assert response.status_code == 201
+    assert all(row["image_url"] is None for row in response.json()["players"])
+
+
 def test_public_entry_can_change_before_lock_and_rejects_after_lock(client, db_session, monkeypatch):
     _enable_pick_6(monkeypatch)
     players, kickoff = _featured_players(db_session)

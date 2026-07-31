@@ -127,7 +127,9 @@ def _map_espn_about(
             jersey=stored_player.espn_jersey,
             position=player.position,
             team=player.school,
-            headshot_url=stored_player.espn_headshot_url or player.image_url,
+            headshot_url=(stored_player.espn_headshot_url or player.image_url)
+            if settings.player_headshots_enabled
+            else None,
             source="espn" if stored_player.espn_profile_synced_at else "local",
             message=message,
         )
@@ -145,7 +147,11 @@ def _map_espn_about(
         jersey=_profile_text(athlete.get("jersey")) or stored_player.espn_jersey,
         position=_profile_text(position.get("displayName") or position.get("abbreviation")) or player.position,
         team=_profile_text(team.get("displayName") or team.get("shortDisplayName")) or player.school,
-        headshot_url=_profile_text(headshot.get("href")) or stored_player.espn_headshot_url or player.image_url,
+        headshot_url=(
+            _profile_text(headshot.get("href")) or stored_player.espn_headshot_url or player.image_url
+        )
+        if settings.player_headshots_enabled
+        else None,
         source="espn",
         message=message,
     )

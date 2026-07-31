@@ -12,7 +12,6 @@ class RuntimeIdentityRead(BaseModel):
     git_sha: str
     git_branch: str
     environment: str
-    runtime_mode: str
     database_instance_uuid: str | None = None
     alembic_version: list[str]
     readiness_status: str
@@ -24,6 +23,7 @@ class DevelopmentRuntimeRead(BaseModel):
     git_sha: str
     git_branch: str
     environment: str
+    runtime_mode: str
     database_instance_uuid: str | None = None
     alembic_revision: str | None = None
     api_started_at: datetime

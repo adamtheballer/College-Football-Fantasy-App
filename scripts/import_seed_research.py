@@ -29,6 +29,7 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     user,
 )
 from collegefootballfantasy_api.app.db.session import SessionLocal
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 
@@ -147,7 +148,11 @@ def load_seed_payload(path: Path) -> tuple[list[dict], list[dict], list[str]]:
 
 def import_seed_file(path: Path) -> tuple[int, int, int, int, int]:
     players_payload, player_stats_payload, roster_urls = load_seed_payload(path)
-    headshot_index = build_headshot_index(roster_urls)
+    # Keep all player, projection, and stat imports intact while preventing
+    # the beta importer from fetching or storing unlicensed player portraits.
+    # Existing nullable image columns remain unchanged for a reversible flag
+    # enablement after commercial image rights are obtained.
+    headshot_index = build_headshot_index(roster_urls) if settings.player_headshots_enabled else {}
 
     created_players = 0
     updated_players = 0
@@ -170,14 +175,18 @@ def import_seed_file(path: Path) -> tuple[int, int, int, int, int]:
                     name=payload["name"],
                     position=payload["position"],
                     school=payload["school"],
-                    image_url=payload.get("image_url")
-                    or headshot_index.get(
-                        (
-                            normalize_lookup(payload["name"]),
-                            normalize_lookup(payload["school"]),
-                            normalize_lookup(payload["position"]),
+                    image_url=(
+                        payload.get("image_url")
+                        or headshot_index.get(
+                            (
+                                normalize_lookup(payload["name"]),
+                                normalize_lookup(payload["school"]),
+                                normalize_lookup(payload["position"]),
+                            )
                         )
-                    ),
+                    )
+                    if settings.player_headshots_enabled
+                    else None,
                 )
                 session.add(player)
                 session.flush()
@@ -188,13 +197,15 @@ def import_seed_file(path: Path) -> tuple[int, int, int, int, int]:
                 if player.external_id != next_external_id:
                     player.external_id = next_external_id
                     updated_players += 1
-                next_image_url = payload.get("image_url") or headshot_index.get(
-                    (
-                        normalize_lookup(payload["name"]),
-                        normalize_lookup(payload["school"]),
-                        normalize_lookup(payload["position"]),
+                next_image_url = None
+                if settings.player_headshots_enabled:
+                    next_image_url = payload.get("image_url") or headshot_index.get(
+                        (
+                            normalize_lookup(payload["name"]),
+                            normalize_lookup(payload["school"]),
+                            normalize_lookup(payload["position"]),
+                        )
                     )
-                )
                 if next_image_url and player.image_url != next_image_url:
                     player.image_url = next_image_url
                     updated_images += 1

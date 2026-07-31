@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     sportsdata_injury_ttl_days: int = 30
     provider_default_cache_ttl_days: int = 30
     historical_stats_provider: str = "espn"
+    # Third-party player portraits are disabled for the public beta until the
+    # product has the commercial rights required to display them. Keep this
+    # as a feature flag so licensed artwork can be restored without a schema
+    # or API breaking change.
+    player_headshots_enabled: bool = False
     espn_historical_stats_enabled: bool = False
     espn_historical_stats_base_url: str = (
         "https://site.web.api.espn.com/apis/common/v3/sports/football/college-football"

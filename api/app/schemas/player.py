@@ -1,7 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_serializer
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.schemas.historical_stats import PlayerHistoricalStatsResponse
 
 
@@ -34,6 +35,11 @@ class PlayerRead(PlayerBase):
     board_rank: int | None = None
     created_at: datetime
     updated_at: datetime
+
+    @field_serializer("image_url")
+    def serialize_player_image_url(self, value: str | None) -> str | None:
+        """Preserve the nullable contract while withholding unlicensed portraits."""
+        return value if settings.player_headshots_enabled else None
 
 
 class PlayerList(BaseModel):
