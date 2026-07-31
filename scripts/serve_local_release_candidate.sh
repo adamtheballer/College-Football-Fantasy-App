@@ -27,7 +27,16 @@ export CFF_RELEASE_PROJECT_ID="$(git rev-parse --short=12 HEAD)"
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-cff-rc-${CFF_RELEASE_PROJECT_ID}}"
 export API_PORT="${API_PORT:-8000}"
 export WEB_PORT="${WEB_PORT:-8080}"
-export DB_PORT="${DB_PORT:-5433}"
+# The candidate API reaches Postgres over Docker's private ``db`` network; it
+# does not need the database exposed on the host.  Keep an opt-in diagnostic
+# binding for direct audits, but choose a free port when none is supplied so a
+# preserved generic/local database can never prevent the candidate from
+# starting or make the browser talk to a stale stack.
+if [[ -z "${DB_PORT:-}" ]]; then
+  export DB_PORT="$(python3 -c 'import socket; sock = socket.socket(); sock.bind(("127.0.0.1", 0)); print(sock.getsockname()[1]); sock.close()')"
+else
+  export DB_PORT
+fi
 export CFF_RUNTIME_ID="${CFF_RUNTIME_ID:-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
 
 PYTHONPATH=. uv run python scripts/check_release_source_integrity.py
@@ -39,3 +48,4 @@ docker compose ps
 printf '\nRuntime identity:\n'
 curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:${API_PORT}/health/runtime"
 printf '\nStatic UI: http://127.0.0.1:%s/\n' "$WEB_PORT"
+printf 'Candidate database audit port: 127.0.0.1:%s\n' "$DB_PORT"
