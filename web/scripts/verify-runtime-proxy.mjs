@@ -13,4 +13,25 @@ if (payload?.status !== "ready") {
   throw new Error(`Browser API channel is not ready: ${JSON.stringify(payload)}.`);
 }
 
-console.log(`Runtime verified: ${webBase} is serving the UI and its same-origin /api channel is ready.`);
+const identityResponse = await fetch(`${webBase}/api/health/identity`, {
+  headers: { Accept: "application/json" },
+});
+if (!identityResponse.ok) {
+  throw new Error(`Browser API identity channel failed: ${webBase}/api/health/identity returned ${identityResponse.status}.`);
+}
+
+const identity = await identityResponse.json();
+const responseRevision = identityResponse.headers.get("x-cff-revision");
+if (!identity?.api_process_instance_uuid || !identity?.database_instance_uuid || !identity?.git_sha) {
+  throw new Error(`Runtime identity is incomplete: ${JSON.stringify(identity)}.`);
+}
+if (responseRevision && responseRevision !== identity.git_sha) {
+  throw new Error(`Proxy revision mismatch: header=${responseRevision} body=${identity.git_sha}.`);
+}
+
+const expectedRevision = process.env.CFF_GIT_SHA;
+if (expectedRevision && expectedRevision !== "unknown" && identity.git_sha !== expectedRevision) {
+  throw new Error(`Unexpected API revision: expected=${expectedRevision} actual=${identity.git_sha}.`);
+}
+
+console.log(`Runtime verified: ${webBase} is serving the UI and its same-origin /api channel is ready for ${identity.git_sha}.`);

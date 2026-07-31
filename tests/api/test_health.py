@@ -5,6 +5,7 @@ import sys
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.services.readiness import (
     check_alembic_readiness,
     get_alembic_heads,
@@ -27,6 +28,47 @@ def test_health(client):
     assert response.headers["x-frame-options"] == "DENY"
     assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
     assert response.headers["x-request-id"]
+    assert response.headers["x-cff-process-instance"]
+
+
+def test_runtime_identity_reports_safe_process_and_database_identifiers(client, db_session):
+    head = get_alembic_heads()[0]
+    _reset_alembic_version(db_session, head)
+
+    response = client.get("/health/identity")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["api_process_instance_uuid"]
+    assert payload["runtime_id"] == settings.runtime_id
+    assert payload["database_instance_uuid"]
+    assert payload["alembic_version"] == [head]
+    assert payload["readiness_status"] == "ready"
+    assert "database_host" not in payload
+    assert "database_url" not in payload
+
+
+def test_development_runtime_reports_safe_database_identity(client, db_session):
+    head = get_alembic_heads()[0]
+    _reset_alembic_version(db_session, head)
+
+    response = client.get("/health/runtime")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["environment"] == "development"
+    assert payload["database_instance_uuid"]
+    assert payload["alembic_revision"] == head
+    assert payload["api_started_at"]
+    assert "database_url" not in payload
+
+
+def test_development_runtime_is_hidden_outside_development(client, monkeypatch):
+    monkeypatch.setattr(settings, "environment", "production")
+
+    response = client.get("/health/runtime")
+
+    assert response.status_code == 404
 
 
 def test_readiness_returns_200_when_database_matches_alembic_head(client, db_session):

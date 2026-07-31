@@ -1,6 +1,12 @@
-FROM node:20
+FROM node:20 AS build
 
 WORKDIR /app/web
+
+ARG CFF_GIT_SHA=unknown
+ARG CFF_GIT_BRANCH=unknown
+
+LABEL org.opencontainers.image.revision=${CFF_GIT_SHA} \
+    org.opencontainers.image.version=${CFF_GIT_BRANCH}
 
 COPY web/package.json web/package-lock.json ./
 RUN npm install --global npm@10.9.3
@@ -9,3 +15,19 @@ RUN npm ci
 COPY web ./
 
 ENV VITE_API_BASE_URL=/api
+RUN npm run build
+
+FROM nginx:1.27-alpine
+
+ARG CFF_GIT_SHA=unknown
+ARG CFF_GIT_BRANCH=unknown
+
+LABEL org.opencontainers.image.revision=${CFF_GIT_SHA} \
+    org.opencontainers.image.version=${CFF_GIT_BRANCH}
+
+COPY --from=build /app/web/dist/spa /usr/share/nginx/html
+COPY web/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 8080
+
+CMD ["nginx", "-g", "daemon off;"]

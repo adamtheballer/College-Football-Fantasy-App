@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     api_log_level: str = "info"
+    # Supplied by the release launcher/build. These values let an operator
+    # prove that a browser is talking to the expected API process rather than
+    # an API left behind by another worktree or Compose project.
+    git_sha: str = "unknown"
+    git_branch: str = "unknown"
+    runtime_id: str | None = None
     ui_base_url: str = "http://localhost:5173"
     cors_origins: str = DEFAULT_CORS_ORIGINS
     cors_origin_regex: str | None = DEFAULT_CORS_ORIGIN_REGEX

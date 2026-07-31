@@ -1,4 +1,4 @@
-name: cff_local
+name: ${COMPOSE_PROJECT_NAME:-cff-playground}
 
 services:
   db:
@@ -20,6 +20,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
+      args:
+        CFF_GIT_SHA: "${CFF_GIT_SHA:-unknown}"
+        CFF_GIT_BRANCH: "${CFF_GIT_BRANCH:-unknown}"
     working_dir: /app
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/collegefootballfantasy
@@ -28,6 +31,9 @@ services:
       API_LOG_LEVEL: info
       UI_BASE_URL: http://localhost:8080
       PYTHONPATH: /app
+      GIT_SHA: "${CFF_GIT_SHA:-unknown}"
+      GIT_BRANCH: "${CFF_GIT_BRANCH:-unknown}"
+      RUNTIME_ID: "${CFF_RUNTIME_ID:-}"
       # The real-stack E2E suite creates three isolated accounts from one container IP.
       # Keep production limits in deployment configuration; this only prevents test setup throttling.
       AUTH_SIGNUP_RATE_LIMIT: 20
@@ -71,27 +77,34 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
-    working_dir: /app/web
+      args:
+        CFF_GIT_SHA: "${CFF_GIT_SHA:-unknown}"
+        CFF_GIT_BRANCH: "${CFF_GIT_BRANCH:-unknown}"
     ports:
       - "${WEB_PORT:-8080}:8080"
     restart: unless-stopped
     depends_on:
       api:
         condition: service_healthy
-    environment:
-      VITE_API_BASE_URL: /api
-      VITE_API_PROXY_TARGET: http://api:8000
-    command: >-
-      sh -c "npm ci && npm run dev:vite -- --host 0.0.0.0"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   lifecycle_worker:
     build:
       context: .
       dockerfile: Dockerfile.api
+      args:
+        CFF_GIT_SHA: "${CFF_GIT_SHA:-unknown}"
+        CFF_GIT_BRANCH: "${CFF_GIT_BRANCH:-unknown}"
     working_dir: /app
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/collegefootballfantasy
       PYTHONPATH: /app
+      GIT_SHA: "${CFF_GIT_SHA:-unknown}"
+      GIT_BRANCH: "${CFF_GIT_BRANCH:-unknown}"
       ESPN_HISTORICAL_STATS_ENABLED: "${ESPN_HISTORICAL_STATS_ENABLED:-true}"
     restart: unless-stopped
     depends_on:

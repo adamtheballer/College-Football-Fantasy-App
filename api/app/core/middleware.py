@@ -8,6 +8,7 @@ from collections.abc import Awaitable, Callable
 from fastapi import Request, Response
 
 from collegefootballfantasy_api.app.core.config import settings
+from collegefootballfantasy_api.app.services.runtime_inspector import API_PROCESS_INSTANCE_UUID
 
 logger = logging.getLogger("collegefootballfantasy_api.request")
 
@@ -26,6 +27,7 @@ async def request_context_middleware(
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
     request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
+    request.state.request_id = request_id
     started_at = time.monotonic()
     response: Response | None = None
     try:
@@ -36,6 +38,9 @@ async def request_context_middleware(
         status_code = response.status_code if response is not None else 500
         if response is not None:
             response.headers["X-Request-ID"] = request_id
+            response.headers["X-CFF-Revision"] = settings.git_sha
+            response.headers["X-CFF-Branch"] = settings.git_branch
+            response.headers["X-CFF-Process-Instance"] = API_PROCESS_INSTANCE_UUID
         logger.info(
             "request_completed",
             extra={

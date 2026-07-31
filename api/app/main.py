@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -34,8 +36,11 @@ from collegefootballfantasy_api.app.api.routes import (
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.logging import configure_logging
 from collegefootballfantasy_api.app.core.middleware import request_context_middleware, security_headers_middleware
+from collegefootballfantasy_api.app.db.session import SessionLocal
+from collegefootballfantasy_api.app.services.runtime_inspector import build_public_runtime_identity
 
 configure_logging(settings.api_log_level)
+logger = logging.getLogger("collegefootballfantasy_api.runtime")
 
 app = FastAPI(title="CollegeFootballFantasy API")
 app.middleware("http")(request_context_middleware)
@@ -49,6 +54,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def log_runtime_identity_on_startup() -> None:
+    with SessionLocal() as db:
+        identity = build_public_runtime_identity(db)
+    logger.info(
+        "api_runtime_started api_process_instance_uuid=%s database_instance_uuid=%s git_sha=%s git_branch=%s environment=%s readiness_status=%s",
+        identity.api_process_instance_uuid,
+        identity.database_instance_uuid,
+        identity.git_sha,
+        identity.git_branch,
+        identity.environment,
+        identity.readiness_status,
+    )
+
 
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/auth", tags=["auth"])

@@ -2,9 +2,17 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+ARG CFF_GIT_SHA=unknown
+ARG CFF_GIT_BRANCH=unknown
+
+LABEL org.opencontainers.image.revision=${CFF_GIT_SHA} \
+    org.opencontainers.image.version=${CFF_GIT_BRANCH}
+
 ENV PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1 \
-    UV_PROJECT_ENVIRONMENT=/opt/cff-api-venv
+    UV_PROJECT_ENVIRONMENT=/opt/cff-api-venv \
+    GIT_SHA=${CFF_GIT_SHA} \
+    GIT_BRANCH=${CFF_GIT_BRANCH}
 
 RUN pip install --no-cache-dir uv
 
