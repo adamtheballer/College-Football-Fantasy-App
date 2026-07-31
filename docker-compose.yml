@@ -38,6 +38,15 @@ services:
       GIT_SHA: "${CFF_GIT_SHA:-unknown}"
       GIT_BRANCH: "${CFF_GIT_BRANCH:-unknown}"
       RUNTIME_ID: "${CFF_RUNTIME_ID:-}"
+      # The release launcher marks a dirty-source run as diagnostic and a
+      # clean source run as a release candidate. Preserve that provenance in
+      # the API process so /health/runtime cannot make a diagnostic browser
+      # session look like valid beta-release evidence.
+      RUNTIME_MODE: "${CFF_RUNTIME_MODE:-unknown}"
+      # Keep this beta compliance flag deploy-configurable. It defaults to
+      # false, but a future licensed deployment can opt in without changing
+      # the Compose contract or database schema.
+      PLAYER_HEADSHOTS_ENABLED: "${PLAYER_HEADSHOTS_ENABLED:-false}"
       # The real-stack E2E suite creates three isolated accounts from one container IP.
       # Keep production limits in deployment configuration; this only prevents test setup throttling.
       AUTH_SIGNUP_RATE_LIMIT: 20

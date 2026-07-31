@@ -21,6 +21,11 @@ def test_public_web_image_serves_the_built_spa_behind_a_same_origin_api_proxy():
     assert "scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026" in compose
     assert "scripts/bootstrap_canonical_player_data.py --apply" in compose
     assert "scripts/audit_canonical_player_registry.py --source-dir reports/source-imports/2026" in compose
+    # The release launcher exports CFF_RUNTIME_MODE. Compose must carry that
+    # into Settings as RUNTIME_MODE or a diagnostic launch would falsely
+    # identify itself as an unknown/release-like API at /health/runtime.
+    assert 'RUNTIME_MODE: "${CFF_RUNTIME_MODE:-unknown}"' in compose
+    assert 'PLAYER_HEADSHOTS_ENABLED: "${PLAYER_HEADSHOTS_ENABLED:-false}"' in compose
     db_service = re.search(r"^  db:\n(?P<body>.*?)(?=^  [a-z_]+:)", compose, flags=re.MULTILINE | re.DOTALL)
     assert db_service is not None
     assert "restart: unless-stopped" in db_service.group("body")
