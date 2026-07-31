@@ -108,15 +108,23 @@ def _seed_due_work() -> dict[str, int | datetime]:
         db.flush()
 
         # The production draft pool accepts only the canonical Power 4 + Notre
-        # Dame universe. Use an approved school here so this stress fixture
-        # exercises the worker locking path, rather than its eligibility guard.
+        # Dame universe with a reconciled preseason projection. Mirror the
+        # bootstrap marker and positive-projection invariant here so this
+        # fixture exercises worker locking rather than the eligibility guard.
         stress_school = "Alabama"
         giving_player = Player(name=f"Stress QB {suffix}", school=stress_school, position="QB")
         receiving_player = Player(name=f"Stress RB {suffix}", school=stress_school, position="RB")
         stale_giving_player = Player(name=f"Stress Stale WR {suffix}", school=stress_school, position="WR")
         stale_receiving_player = Player(name=f"Stress Stale QB {suffix}", school=stress_school, position="QB")
         waiver_player = Player(name=f"Stress WR {suffix}", school=stress_school, position="WR")
-        draft_player = Player(name=f"Stress Draft RB {suffix}", school=stress_school, position="RB", sheet_adp=1)
+        draft_player = Player(
+            name=f"Stress Draft RB {suffix}",
+            school=stress_school,
+            position="RB",
+            sheet_adp=1,
+            sheet_projected_season_points=180.0,
+            sheet_source_sheet_id=f"canonical-preseason:2026:stress-{suffix}",
+        )
         official_proposing_player = Player(name=f"Stress Official RB {suffix}", school=stress_school, position="RB")
         official_receiving_player = Player(name=f"Stress Official WR {suffix}", school=stress_school, position="WR")
         db.add_all(
