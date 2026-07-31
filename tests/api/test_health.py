@@ -41,6 +41,7 @@ def test_runtime_identity_reports_safe_process_and_database_identifiers(client, 
     payload = response.json()
     assert payload["api_process_instance_uuid"]
     assert payload["runtime_id"] == settings.runtime_id
+    assert payload["runtime_mode"] == settings.runtime_mode
     assert payload["database_instance_uuid"]
     assert payload["alembic_version"] == [head]
     assert payload["readiness_status"] == "ready"
@@ -57,6 +58,7 @@ def test_development_runtime_reports_safe_database_identity(client, db_session):
     assert response.status_code == 200
     payload = response.json()
     assert payload["environment"] == "development"
+    assert payload["runtime_mode"] == settings.runtime_mode
     assert payload["database_instance_uuid"]
     assert payload["alembic_revision"] == head
     assert payload["api_started_at"]

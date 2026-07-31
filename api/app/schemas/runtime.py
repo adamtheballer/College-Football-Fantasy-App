@@ -8,9 +8,11 @@ class RuntimeIdentityRead(BaseModel):
 
     api_process_instance_uuid: str
     runtime_id: str | None = None
+    runtime_mode: str
     git_sha: str
     git_branch: str
     environment: str
+    runtime_mode: str
     database_instance_uuid: str | None = None
     alembic_version: list[str]
     readiness_status: str

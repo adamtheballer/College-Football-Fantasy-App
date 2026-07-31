@@ -55,6 +55,7 @@ def build_public_runtime_identity(db: Session) -> RuntimeIdentityRead:
     return RuntimeIdentityRead(
         api_process_instance_uuid=API_PROCESS_INSTANCE_UUID,
         runtime_id=settings.runtime_id,
+        runtime_mode=settings.runtime_mode,
         git_sha=settings.git_sha,
         git_branch=settings.git_branch,
         environment=settings.environment,
@@ -70,6 +71,7 @@ def build_development_runtime(db: Session) -> DevelopmentRuntimeRead:
         git_sha=identity.git_sha,
         git_branch=identity.git_branch,
         environment=identity.environment,
+        runtime_mode=identity.runtime_mode,
         database_instance_uuid=identity.database_instance_uuid,
         alembic_revision=",".join(identity.alembic_version) or None,
         api_started_at=API_STARTED_AT,

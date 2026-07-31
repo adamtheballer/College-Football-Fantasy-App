@@ -35,6 +35,8 @@ def test_release_candidate_launcher_embeds_the_checked_out_revision_and_refuses_
     assert 'COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-cff-rc-${CFF_RELEASE_PROJECT_ID}}"' in launcher
     assert 'git status --porcelain --untracked-files=normal' not in launcher
     assert 'ALLOW_DIRTY_RELEASE_CANDIDATE:-false' in launcher
+    assert 'export CFF_RUNTIME_MODE="release_candidate"' in launcher
+    assert 'export CFF_RUNTIME_MODE="diagnostic"' in launcher
     assert "Refusing to label release-critical local source as a release candidate." in launcher
     assert "python3 scripts/check_release_source_integrity.py" in launcher
     assert "scripts/check_release_source_integrity.py" in launcher

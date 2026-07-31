@@ -1,7 +1,7 @@
 # Beta 2026 Release-Candidate Validation
 
 Release integration branch: `codex/runtime-provenance-contract` (PR #24)
-Runtime-hardening baseline: `8882d7a0992f595497dc688786e4f8e01e129a18`
+Runtime-hardening baseline: `39e186f93105f53bbddd9fd2f5ce623a75518843`
 Validation snapshot date: 2026-07-31
 
 > This branch is a release-hardening candidate, not the deployment branch.
@@ -13,11 +13,12 @@ Validation snapshot date: 2026-07-31
 
 | Gate | Evidence | Result |
 | --- | --- | --- |
-| GitHub candidate CI | [Run 37](https://github.com/adamtheballer/College-Football-Fantasy-App/actions/runs/30622036317) for `d7d252f` | Passed: `verify`, `docker-clean-boot`, `real-stack-e2e`, and both Vercel checks |
+| GitHub candidate CI | [Run 42](https://github.com/adamtheballer/College-Football-Fantasy-App/actions/runs/30627066563) for `39e186f` | Passed: `verify`, `docker-clean-boot`, `real-stack-e2e`, and both Vercel checks |
 | Real-stack port isolation | `scripts/run_real_stack_e2e.sh` using Docker-assigned host ports | Passed locally: API, web, database, and lifecycle worker booted; both Playwright lifecycle scenarios passed; teardown completed |
 | Source identity/projection reconciliation | `scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026` | Passed: 813 identity rows, 813 projection rows, zero unmatched rows, duplicates, or invalid records; manifest hash/revision checks passed |
 | Canonical ID ownership | `scripts/audit_canonical_player_registry.py` | Passed: `players.id` is the application-owned canonical identifier; source workbook canonical-ID column is explicitly not required |
 | Source-artifact provenance gate | `scripts/check_release_source_integrity.py` | Hardened and regression-tested. It now compares HEAD, index, and targeted worktree metadata without a slow worktree-wide Git diff. In this local clone it correctly blocks two unrelated, uncommitted package changes: `web/package.json` and `web/package-lock.json`. |
+| Diagnostic-runtime identification | `scripts/serve_local_release_candidate.sh` and `/health/identity` | A clean launch identifies itself as `release_candidate`. The explicit dirty-source override identifies itself as `diagnostic`, so it cannot be confused with beta-release evidence. Focused syntax validation passed locally; the full regression suite must run in CI for the resulting commit. |
 
 The local package changes above are intentionally not part of this candidate
 commit. They must be separately reviewed and either committed to a future

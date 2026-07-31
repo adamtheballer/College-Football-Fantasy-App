@@ -27,6 +27,12 @@ if [[ "${ALLOW_DIRTY_RELEASE_CANDIDATE:-false}" != "true" ]]; then
     echo "Commit or isolate those source changes first. Set ALLOW_DIRTY_RELEASE_CANDIDATE=true for diagnostic use only." >&2
     exit 2
   fi
+  export CFF_RUNTIME_MODE="release_candidate"
+else
+  # A caller may deliberately run uncommitted source to diagnose a problem,
+  # but that process must identify itself as diagnostic everywhere runtime
+  # provenance is displayed.  It is not valid beta-release evidence.
+  export CFF_RUNTIME_MODE="diagnostic"
 fi
 
 export CFF_GIT_SHA="$(git -c core.fsmonitor=false rev-parse HEAD)"
