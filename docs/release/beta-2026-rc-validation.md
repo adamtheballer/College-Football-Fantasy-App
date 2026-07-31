@@ -1,7 +1,7 @@
 # Beta 2026 Release-Candidate Validation
 
 Release integration branch: `codex/runtime-provenance-contract` (PR #24)
-Runtime-hardening baseline: `39e186f93105f53bbddd9fd2f5ce623a75518843`
+Runtime-hardening baseline: `40a86ad856405e31f5e1313838b65aff1db117ea`
 Validation snapshot date: 2026-07-31
 
 > This branch is a release-hardening candidate, not the deployment branch.
@@ -13,13 +13,13 @@ Validation snapshot date: 2026-07-31
 
 | Gate | Evidence | Result |
 | --- | --- | --- |
-| GitHub candidate CI | [Run 44](https://github.com/adamtheballer/College-Football-Fantasy-App/actions/runs/30631718412) for `c7a6ec5` | Passed: `verify`, `docker-clean-boot`, `real-stack-e2e`, and both Vercel checks |
+| GitHub candidate CI | [Run 45](https://github.com/adamtheballer/College-Football-Fantasy-App/actions/runs/30633305960) for `40a86ad` | Passed: `verify`, `docker-clean-boot`, `real-stack-e2e`, and both Vercel checks |
 | Real-stack port isolation | `scripts/run_real_stack_e2e.sh` using Docker-assigned host ports | Passed locally: API, web, database, and lifecycle worker booted; both Playwright lifecycle scenarios passed; teardown completed |
 | Source identity/projection reconciliation | `scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026` | Passed: 813 identity rows, 813 projection rows, zero unmatched rows, duplicates, or invalid records; manifest hash/revision checks passed |
 | Canonical ID ownership | `scripts/audit_canonical_player_registry.py` | Passed: `players.id` is the application-owned canonical identifier; source workbook canonical-ID column is explicitly not required |
 | Source-artifact provenance gate | `scripts/check_release_source_integrity.py` | Hardened and regression-tested. It now compares HEAD, index, and targeted worktree metadata without a slow worktree-wide Git diff. In this local clone it correctly blocks two unrelated, uncommitted package changes: `web/package.json` and `web/package-lock.json`. |
 | Diagnostic-runtime identification | `scripts/serve_local_release_candidate.sh`, Docker Compose, and `GET /health/runtime` | Verified live on the isolated stack: an explicit dirty-source launch returns `runtime_mode: diagnostic`, its exact Git SHA/branch, and migration `0082_release_audit_timestamps`. Compose now forwards the launcher's mode, preventing a diagnostic browser session from being mistaken for release evidence. |
-| Player-headshot licensing | `PLAYER_HEADSHOTS_ENABLED=false` at profile sync, seed import, API serialization, player card, and Saturday Pick boundaries | Passed in Run 44: image columns and existing URLs remain reversible in the database, but no new third-party headshots are imported and all beta API responses provide `null`. The UI retains its same-size neutral silhouette fallback. |
+| Player-headshot licensing | `PLAYER_HEADSHOTS_ENABLED=false` at profile sync, seed import, API serialization, player card, and Saturday Pick boundaries | Passed in Run 45: image columns and existing URLs remain reversible in the database, but no new third-party headshots are imported and all beta API responses provide `null`. The UI retains its same-size neutral silhouette fallback. |
 
 The local package changes above are intentionally not part of this candidate
 commit. They must be separately reviewed and either committed to a future
