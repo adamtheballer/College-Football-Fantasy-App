@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import subprocess
 from pathlib import Path
 
@@ -47,6 +48,23 @@ def test_release_source_integrity_detects_untracked_critical_file(tmp_path: Path
     (repo / path).write_text("enabled = True\n", encoding="utf-8")
 
     assert release_source_integrity.dirty_release_critical_paths(repo) == [("UNTRACKED", path)]
+
+
+def test_release_source_integrity_detects_untracked_frontend_build_configuration(tmp_path: Path):
+    repo = make_repository(tmp_path)
+    path = Path("web/.npmrc")
+    (repo / path).write_text("engine-strict=true\n", encoding="utf-8")
+
+    assert release_source_integrity.dirty_release_critical_paths(repo) == [("UNTRACKED", path)]
+
+
+def test_release_source_integrity_ignores_stale_index_timestamp_when_content_matches(tmp_path: Path):
+    repo = make_repository(tmp_path)
+    path = repo / "api" / "app" / "main.py"
+    stat = path.stat()
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 10_000_000_000))
+
+    assert release_source_integrity.dirty_release_critical_paths(repo) == []
 
 
 def test_release_source_integrity_detects_staged_and_unstaged_critical_changes(tmp_path: Path):

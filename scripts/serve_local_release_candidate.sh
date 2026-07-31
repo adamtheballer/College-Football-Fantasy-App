@@ -2,25 +2,36 @@
 set -euo pipefail
 
 # Launch the same static web/API/worker topology used for release verification.
-# A dirty worktree may be used only when the caller explicitly marks it as
-# diagnostic; it must never be described as a release candidate.
+# A worktree with dirty release-critical source may be used only when the
+# caller explicitly marks it as diagnostic; it must never be described as a
+# release candidate.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+if ! git -c core.fsmonitor=false rev-parse --verify HEAD >/dev/null 2>&1; then
   echo "Cannot start a release candidate without a Git commit." >&2
   exit 1
 fi
 
-if [[ -n "$(git status --porcelain --untracked-files=normal)" && "${ALLOW_DIRTY_RELEASE_CANDIDATE:-false}" != "true" ]]; then
-  echo "Refusing to label a dirty worktree as a release candidate." >&2
-  echo "Commit or isolate the changes first. Set ALLOW_DIRTY_RELEASE_CANDIDATE=true for diagnostic use only." >&2
-  exit 2
+if [[ "${ALLOW_DIRTY_RELEASE_CANDIDATE:-false}" != "true" ]]; then
+  # Do not use `git status` here. On the affected macOS filesystem-monitor
+  # worktree it can take long enough to make the browser appear connected to a
+  # stale runtime. This gate is more relevant than a broad status scan: it
+  # fails closed only for source and build inputs that can change the release
+  # artifact, and it performs no worktree-wide Git refresh.
+  # This checker uses only the Python standard library. Run it directly so a
+  # broken or slow dependency wrapper cannot mask the actual provenance
+  # result or leave the launcher apparently hung before any service starts.
+  if ! python3 scripts/check_release_source_integrity.py; then
+    echo "Refusing to label release-critical local source as a release candidate." >&2
+    echo "Commit or isolate those source changes first. Set ALLOW_DIRTY_RELEASE_CANDIDATE=true for diagnostic use only." >&2
+    exit 2
+  fi
 fi
 
-export CFF_GIT_SHA="$(git rev-parse HEAD)"
-export CFF_GIT_BRANCH="$(git branch --show-current)"
-export CFF_RELEASE_PROJECT_ID="$(git rev-parse --short=12 HEAD)"
+export CFF_GIT_SHA="$(git -c core.fsmonitor=false rev-parse HEAD)"
+export CFF_GIT_BRANCH="$(git -c core.fsmonitor=false branch --show-current)"
+export CFF_RELEASE_PROJECT_ID="$(git -c core.fsmonitor=false rev-parse --short=12 HEAD)"
 # Never attach a release-candidate launch to the generic development compose
 # project. A commit-scoped project keeps its API, worker, and database from
 # being mistaken for a previously started local stack.
@@ -45,7 +56,6 @@ export CFF_RUNTIME_ID="${CFF_RUNTIME_ID:-$(uuidgen | tr '[:upper:]' '[:lower:]')
 python3 scripts/check_local_runtime_port.py --label "release-candidate API" --port "$API_PORT" --port-variable API_PORT
 python3 scripts/check_local_runtime_port.py --label "release-candidate UI" --port "$WEB_PORT" --port-variable WEB_PORT
 
-PYTHONPATH=. uv run python scripts/check_release_source_integrity.py
 PYTHONPATH=. uv run python scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026
 
 docker compose up --build --detach db api web lifecycle_worker

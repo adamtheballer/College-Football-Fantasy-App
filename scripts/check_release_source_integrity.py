@@ -26,12 +26,16 @@ RELEASE_CRITICAL_DIRECTORIES = (
     Path("web/public"),
 )
 RELEASE_CRITICAL_FILES = {
+    Path(".dockerignore"),
     Path("docker-compose.yml"),
     Path("deployments.yaml"),
     Path("Dockerfile.api"),
+    Path("Dockerfile.e2e"),
     Path("Dockerfile.web"),
     Path("pyproject.toml"),
     Path("uv.lock"),
+    Path("web/.dockerignore"),
+    Path("web/.npmrc"),
     Path("web/package.json"),
     Path("web/package-lock.json"),
     Path("web/vite.config.ts"),
@@ -147,6 +151,18 @@ def _index_stat_metadata(repo_root: Path, scope: list[str]) -> dict[Path, tuple[
     return entries
 
 
+def _worktree_blob_hash(repo_root: Path, path: Path) -> str:
+    """Hash one worktree file using Git's configured content filters.
+
+    An index mtime mismatch is only a candidate change: moving a clean clone
+    or a stale filesystem monitor can leave the cached stat data behind. Git
+    can resolve that candidate exactly by hashing just the affected path,
+    avoiding the expensive worktree-wide refresh performed by ``git diff``.
+    """
+
+    return _run_git(repo_root, "hash-object", "--", path.as_posix()).decode("ascii").strip()
+
+
 def dirty_release_critical_paths(repo_root: Path) -> list[tuple[str, Path]]:
     """Return all release-critical paths that differ from ``HEAD``.
 
@@ -188,7 +204,11 @@ def dirty_release_critical_paths(repo_root: Path) -> list[tuple[str, Path]]:
             continue
         stat = os.stat(candidate)
         if (stat.st_mtime_ns // 1_000_000_000, stat.st_mtime_ns % 1_000_000_000, stat.st_size) != cached:
-            modified.add(path)
+            # Cached index stat data is allowed to be stale. Hash only this
+            # candidate file before declaring it modified; this preserves
+            # exactness without re-scanning every release source file.
+            if _worktree_blob_hash(repo_root, path) != index_hashes[path]:
+                modified.add(path)
 
     findings = [("MODIFIED", path) for path in modified if is_release_critical(path)]
     return sorted(set(findings), key=lambda item: (item[1].as_posix(), item[0]))
@@ -210,4 +230,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
