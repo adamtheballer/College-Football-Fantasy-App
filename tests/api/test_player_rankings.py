@@ -70,14 +70,14 @@ def test_player_list_excludes_non_power4_rows_and_draft_pool_requires_sheet_proj
         name="Approved Receiver",
         position="WR",
         school="Ohio State",
-        sheet_source_sheet_id="snapshot:2026:Big10",
+        sheet_source_sheet_id="canonical-preseason:2026:Big10",
         sheet_projected_season_points=250.0,
     )
     missing_projection = Player(
         name="No Projection Receiver",
         position="WR",
         school="Ohio State",
-        sheet_source_sheet_id="snapshot:2026:Big10",
+        sheet_source_sheet_id="canonical-preseason:2026:Big10",
     )
     generated_non_power4 = Player(
         external_id="cfb27:eastonmesser|fau|WR",
@@ -99,6 +99,36 @@ def test_player_list_excludes_non_power4_rows_and_draft_pool_requires_sheet_proj
     ]
     assert draft_pool.status_code == 200
     assert [row["name"] for row in draft_pool.json()["data"]] == ["Approved Receiver"]
+
+
+def test_draft_pool_rejects_legacy_power4_records_even_when_they_have_projections(client, db_session):
+    canonical = Player(
+        name="Snapshot Quarterback",
+        position="QB",
+        school="Texas",
+        sheet_source_sheet_id="canonical-preseason:2026:Big12",
+        sheet_projected_season_points=275.0,
+    )
+    legacy = Player(
+        name="Legacy Quarterback",
+        position="QB",
+        school="Texas",
+        sheet_source_sheet_id="sportsdata:2026:Big12",
+        sheet_projected_season_points=999.0,
+    )
+    no_source = Player(
+        name="Untracked Quarterback",
+        position="QB",
+        school="Texas",
+        sheet_projected_season_points=998.0,
+    )
+    db_session.add_all((canonical, legacy, no_source))
+    db_session.commit()
+
+    response = client.get("/players", params={"draft_eligible": "true", "sort": "rank", "limit": 10})
+
+    assert response.status_code == 200
+    assert [row["name"] for row in response.json()["data"]] == ["Snapshot Quarterback"]
 
 
 def test_cfb27_source_contains_critical_compare_players():

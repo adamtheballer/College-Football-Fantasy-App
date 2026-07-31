@@ -7,6 +7,13 @@ from collegefootballfantasy_api.app.models.mock_draft import MockDraft
 from collegefootballfantasy_api.app.models.mock_draft_pick import MockDraftPick
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.schemas.mock_draft import MockDraftCreate
+from collegefootballfantasy_api.app.services.player_pool_filters import (
+    canonical_fantasy_player_filter,
+    is_canonical_fantasy_player,
+)
+
+
+MOCK_DRAFT_SEASON = 2026
 
 
 class MockDraftError(Exception):
@@ -98,6 +105,8 @@ def make_mock_pick(db: Session, mock_draft_id: int, owner_user_id: int, player_i
     player = db.get(Player, player_id)
     if not player:
         raise MockDraftNotFound("player not found")
+    if not is_canonical_fantasy_player(player, MOCK_DRAFT_SEASON):
+        raise MockDraftConflict("player is not in the approved mock draft pool")
 
     already_picked = (
         db.query(MockDraftPick.id)
@@ -144,7 +153,10 @@ def auto_pick_mock_draft(db: Session, mock_draft_id: int, owner_user_id: int) ->
     )
     player = (
         db.query(Player)
-        .filter(~Player.id.in_(picked_player_ids))
+        .filter(
+            ~Player.id.in_(picked_player_ids),
+            canonical_fantasy_player_filter(MOCK_DRAFT_SEASON),
+        )
         .order_by(
             Player.sheet_adp.is_(None),
             Player.sheet_adp.asc(),

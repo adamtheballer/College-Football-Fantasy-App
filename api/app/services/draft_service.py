@@ -28,8 +28,8 @@ from collegefootballfantasy_api.app.schemas.draft_room import (
 from collegefootballfantasy_api.app.services.draft_completion import finalize_draft_rosters_and_matchups
 from collegefootballfantasy_api.app.services.league_flow import FIXED_ROSTER_SLOTS
 from collegefootballfantasy_api.app.services.player_pool_filters import (
-    approved_school_player_filter,
-    is_approved_fantasy_school,
+    canonical_fantasy_player_filter,
+    is_canonical_fantasy_player,
 )
 from collegefootballfantasy_api.app.services.roster_legality import (
     assign_best_roster_slot_for_team,
@@ -262,7 +262,7 @@ def _select_auto_pick_player(
         .filter(
             Player.id.not_in(drafted_player_ids),
             Player.id.not_in(rostered_player_ids),
-            approved_school_player_filter(),
+            canonical_fantasy_player_filter(league.season_year),
         )
         .order_by(
             rank_bucket.asc(),
@@ -324,8 +324,11 @@ def _record_draft_pick(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="not your turn to draft")
     if db.query(DraftPick.id).filter(DraftPick.draft_id == draft_row.id, DraftPick.player_id == player.id).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player already drafted")
-    if not is_approved_fantasy_school(player.school):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="player is not eligible for this draft")
+    if not is_canonical_fantasy_player(player, league.season_year):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="player is not in this season's approved draft pool",
+        )
 
     roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
     roster_slot = assign_best_roster_slot_for_team(

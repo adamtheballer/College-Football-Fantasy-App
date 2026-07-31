@@ -3,17 +3,16 @@ from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
+from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.schemas.player import PlayerCreate
 from collegefootballfantasy_api.app.services.player_pool_filters import (
     approved_school_player_filter,
+    canonical_fantasy_player_filter,
     generated_test_player_filter,
 )
-
-
-DRAFT_ELIGIBLE_POSITIONS = ("QB", "RB", "WR", "TE", "K")
 
 
 def create_players(db: Session, players_in: list[PlayerCreate]) -> list[Player]:
@@ -39,12 +38,16 @@ def list_players(
 ) -> tuple[list[Player], int]:
     stmt: Select = select(Player).where(generated_test_player_filter(), approved_school_player_filter())
     if draft_eligible:
-        stmt = stmt.where(
-            Player.position.in_(DRAFT_ELIGIBLE_POSITIONS),
-            Player.sheet_source_sheet_id.isnot(None),
-            Player.sheet_projected_season_points.isnot(None),
-            Player.sheet_projected_season_points > 0,
-        )
+        # The public player board is broader than the fantasy pool because it
+        # can expose historical/provider records.  A draft board cannot be:
+        # it must be exactly the approved immutable snapshot for the league
+        # season (or the current beta season when browsing outside a league).
+        season = 2026
+        if league_id is not None:
+            league_season = db.scalar(select(League.season_year).where(League.id == league_id))
+            if league_season is not None:
+                season = int(league_season)
+        stmt = stmt.where(canonical_fantasy_player_filter(season))
     if position:
         requested_positions = [value.strip().upper() for value in position.split(",") if value.strip()]
         if len(requested_positions) == 1:

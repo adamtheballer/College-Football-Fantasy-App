@@ -25,6 +25,17 @@ from collegefootballfantasy_api.app.services.waiver_service import (
 )
 
 
+def canonical_player(name: str, position: str, school: str) -> Player:
+    """Create a player that represents a reconciled snapshot import."""
+    return Player(
+        name=name,
+        position=position,
+        school=school,
+        sheet_source_sheet_id="canonical-preseason:2026:test-fixture",
+        sheet_projected_season_points=200.0,
+    )
+
+
 def test_due_waiver_processing_is_idempotent_with_league_serialization(client, db_session):
     user = User(
         email="waiver-owner@example.com",
@@ -46,8 +57,8 @@ def test_due_waiver_processing_is_idempotent_with_league_serialization(client, d
         )
     )
     team = Team(league_id=league.id, name="Waiver Team", owner_user_id=user.id, owner_name="Waiver")
-    player = Player(name="Waiver Available QB", position="QB", school="Texas")
-    drafted_player = Player(name="Drafted QB", position="QB", school="Oregon")
+    player = canonical_player("Waiver Available QB", "QB", "Texas")
+    drafted_player = canonical_player("Drafted QB", "QB", "Oregon")
     db_session.add_all([team, player, drafted_player])
     db_session.flush()
     draft = Draft(league_id=league.id, draft_datetime_utc=datetime.now(timezone.utc), status="completed")
@@ -123,8 +134,8 @@ def test_completed_draft_adopts_valid_legacy_priorities_without_reordering(db_se
     settings = LeagueSettings(league_id=league.id, roster_slots_json={"QB": 1}, waiver_type="faab")
     first_team = Team(league_id=league.id, name="First Team", owner_user_id=user.id, owner_name="Legacy")
     second_team = Team(league_id=league.id, name="Second Team", owner_name="Second")
-    first_player = Player(name="First Drafted QB", position="QB", school="Texas")
-    second_player = Player(name="Second Drafted QB", position="QB", school="Oregon")
+    first_player = canonical_player("First Drafted QB", "QB", "Texas")
+    second_player = canonical_player("Second Drafted QB", "QB", "Oregon")
     db_session.add_all((settings, first_team, second_team, first_player, second_player))
     db_session.flush()
     draft = Draft(league_id=league.id, draft_datetime_utc=datetime.now(timezone.utc), status="completed")
@@ -197,7 +208,7 @@ def test_waiver_pool_includes_a_dropped_drafted_player(client, db_session):
     db_session.add(league)
     db_session.flush()
     team = Team(league_id=league.id, name="Waiver Team", owner_user_id=user.id, owner_name="Pool")
-    player = Player(name="Previously Drafted QB", position="QB", school="Ohio State")
+    player = canonical_player("Previously Drafted QB", "QB", "Ohio State")
     db_session.add_all((team, player))
     db_session.flush()
     db_session.add(
@@ -245,8 +256,8 @@ def test_waiver_pool_remains_available_when_a_legacy_claim_has_no_period(db_sess
     db_session.flush()
     league = League(name="Legacy Claim Waiver League", season_year=2026, commissioner_user_id=user.id, max_teams=1)
     team = Team(league=league, name="Legacy Team", owner_user_id=user.id, owner_name="Legacy")
-    available_player = Player(name="Still Available QB", position="QB", school="Texas")
-    legacy_claim_player = Player(name="Legacy Claim QB", position="QB", school="Oregon")
+    available_player = canonical_player("Still Available QB", "QB", "Texas")
+    legacy_claim_player = canonical_player("Legacy Claim QB", "QB", "Oregon")
     db_session.add_all((league, team, available_player, legacy_claim_player))
     db_session.flush()
     db_session.add(LeagueSettings(league_id=league.id, roster_slots_json={"QB": 1}, waiver_type="faab"))
@@ -285,7 +296,7 @@ def test_waiver_pool_surfaces_bye_status_instead_of_an_ambiguous_zero(db_session
     db_session.flush()
     league = League(name="Bye Projection League", season_year=2026, commissioner_user_id=user.id, max_teams=1)
     team = Team(league=league, name="Bye Projection Team", owner_user_id=user.id, owner_name="Bye")
-    player = Player(name="Week One Bye RB", position="RB", school="North Carolina")
+    player = canonical_player("Week One Bye RB", "RB", "North Carolina")
     db_session.add_all((league, team, player))
     db_session.flush()
     db_session.add(
@@ -321,7 +332,10 @@ def test_waiver_pool_returns_the_complete_beta_player_universe(db_session):
     db_session.add(league)
     db_session.flush()
     db_session.add(Team(league_id=league.id, name="Full Pool Team", owner_user_id=user.id, owner_name="Full Pool"))
-    players = [Player(name=f"Complete Pool Player {index}", position="QB", school="Texas") for index in range(101)]
+    players = [
+        canonical_player(f"Complete Pool Player {index}", "QB", "Texas")
+        for index in range(101)
+    ]
     db_session.add_all(players)
     db_session.commit()
 
@@ -329,6 +343,44 @@ def test_waiver_pool_returns_the_complete_beta_player_universe(db_session):
 
     assert waiver_view.total_available == 101
     assert len(waiver_view.available_players) == 101
+
+
+def test_waiver_pool_and_claims_reject_legacy_provider_players(db_session):
+    """A Power 4 provider row is not eligible unless snapshot-reconciled."""
+    user = User(
+        email="canonical-waiver-owner@example.com",
+        first_name="Canonical",
+        password_hash="test",
+        api_token="canonical-waiver-owner-token",
+    )
+    db_session.add(user)
+    db_session.flush()
+    league = League(name="Canonical Waiver League", season_year=2026, commissioner_user_id=user.id, max_teams=1)
+    db_session.add(league)
+    db_session.flush()
+    team = Team(league_id=league.id, name="Canonical Team", owner_user_id=user.id, owner_name="Canonical")
+    canonical = canonical_player("Reviewed Waiver QB", "QB", "Texas")
+    legacy = Player(
+        name="Legacy Provider QB",
+        position="QB",
+        school="Texas",
+        sheet_source_sheet_id="sportsdata:2026:legacy",
+        sheet_projected_season_points=999.0,
+    )
+    db_session.add_all((LeagueSettings(league_id=league.id, roster_slots_json={"QB": 1}), team, canonical, legacy))
+    db_session.commit()
+
+    waiver_view = build_waivers_view(db_session, league, user)
+    assert [candidate.id for candidate in waiver_view.available_players] == [canonical.id]
+
+    with pytest.raises(HTTPException, match="approved waiver pool"):
+        add_free_agent(
+            db_session,
+            league=league,
+            current_user=user,
+            player_id=legacy.id,
+            payload=FreeAgentAdd(team_id=team.id),
+        )
 
 
 def test_waiver_results_are_scoped_to_the_latest_completed_period(client, db_session):
@@ -345,8 +397,8 @@ def test_waiver_results_are_scoped_to_the_latest_completed_period(client, db_ses
     db_session.flush()
     db_session.add(LeagueSettings(league_id=league.id, roster_slots_json={"QB": 1}, waiver_type="faab"))
     team = Team(league_id=league.id, name="Results Team", owner_user_id=user.id, owner_name="Results")
-    old_player = Player(name="Old Waiver Winner", position="QB", school="Texas")
-    recent_player = Player(name="Recent Waiver Winner", position="QB", school="Oregon")
+    old_player = canonical_player("Old Waiver Winner", "QB", "Texas")
+    recent_player = canonical_player("Recent Waiver Winner", "QB", "Oregon")
     db_session.add_all((team, old_player, recent_player))
     db_session.flush()
     now = datetime.now(timezone.utc)
@@ -443,7 +495,7 @@ def test_free_agent_add_fills_an_open_slot_without_charging_faab(client, db_sess
     db_session.flush()
     settings = LeagueSettings(league_id=league.id, roster_slots_json={"QB": 1}, waiver_type="faab")
     team = Team(league_id=league.id, name="Free Agent Team", owner_user_id=user.id, owner_name="Free")
-    player = Player(name="Available Free Agent QB", position="QB", school="Texas")
+    player = canonical_player("Available Free Agent QB", "QB", "Texas")
     db_session.add_all((settings, team, player))
     db_session.flush()
     db_session.add(
@@ -501,7 +553,7 @@ def test_free_agent_add_accepts_untracked_player_after_waivers_clear(client, db_
     db_session.add(league)
     db_session.flush()
     team = Team(league_id=league.id, name="Untracked Team", owner_user_id=user.id, owner_name="Untracked")
-    player = Player(name="Untracked Free Agent QB", position="QB", school="Utah")
+    player = canonical_player("Untracked Free Agent QB", "QB", "Utah")
     db_session.add_all(
         (
             LeagueSettings(league_id=league.id, roster_slots_json={"QB": 1}, waiver_type="faab"),
@@ -553,7 +605,7 @@ def test_untracked_player_cannot_be_added_until_waivers_have_cleared(client, db_
     db_session.add(league)
     db_session.flush()
     team = Team(league_id=league.id, name="Pre-Clear Team", owner_user_id=user.id, owner_name="PreClear")
-    player = Player(name="Pre-Clear QB", position="QB", school="Arizona")
+    player = canonical_player("Pre-Clear QB", "QB", "Arizona")
     db_session.add_all(
         (
             LeagueSettings(league_id=league.id, roster_slots_json={"QB": 1}, waiver_type="faab"),

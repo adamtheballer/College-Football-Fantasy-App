@@ -164,7 +164,28 @@ def create_player(client, name: str = "Arch Manning", position: str = "QB") -> i
         headers=admin_headers(client),
     )
     assert response.status_code == 201
-    return response.json()[0]["id"]
+    player_id = response.json()[0]["id"]
+    # The real draft pool only accepts records produced by the reviewed
+    # snapshot bootstrap.  Test-only API ingestion is intentionally not that
+    # bootstrap, so mark this fixture explicitly after creation.
+    with TestingSessionLocal() as session:
+        player = session.get(Player, player_id)
+        assert player is not None
+        player.sheet_source_sheet_id = "canonical-preseason:2026:test-fixture"
+        player.sheet_projected_season_points = 200.0
+        session.commit()
+    return player_id
+
+
+def canonical_player(name: str, position: str, school: str = "Texas", *, sheet_adp: float | None = None) -> Player:
+    return Player(
+        name=name,
+        position=position,
+        school=school,
+        sheet_adp=sheet_adp,
+        sheet_source_sheet_id="canonical-preseason:2026:test-fixture",
+        sheet_projected_season_points=200.0,
+    )
 
 
 def join_league(client, league_id: int, suffix: str) -> str:
@@ -241,6 +262,29 @@ def test_draft_pick_persists_and_creates_roster_entry(client, db_session):
     roster = roster_response.json()
     assert roster["total"] == 1
     assert roster["data"][0]["player"]["id"] == player_id
+
+
+def test_manual_draft_pick_rejects_legacy_provider_player(client, db_session):
+    token = create_user_and_token(client, "legacy-draft-pool")
+    league = create_league(client, token)
+    legacy_player = Player(
+        name="Legacy Provider Draft QB",
+        position="QB",
+        school="Texas",
+        sheet_source_sheet_id="provider-sync:2026:legacy",
+        sheet_projected_season_points=999.0,
+    )
+    db_session.add(legacy_player)
+    db_session.commit()
+
+    response = client.post(
+        f"/leagues/{league['id']}/draft-picks",
+        json=draft_pick_payload(db_session, league["id"], legacy_player.id),
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "player is not in this season's approved draft pool"
 
 
 def test_commissioner_starts_pre_draft_then_worker_opens_first_pick(client, db_session):
@@ -407,11 +451,19 @@ def test_cpu_seats_pick_individually_after_their_server_delay(client, db_session
         ]
     )
     cpu_players = [
-        Player(name="CPU Lifecycle QB One", position="QB", school="Texas", sheet_adp=1),
-        Player(name="CPU Lifecycle QB Two", position="QB", school="Texas", sheet_adp=2),
-        Player(name="CPU Lifecycle QB Three", position="QB", school="Texas", sheet_adp=3),
+        canonical_player("CPU Lifecycle QB One", "QB", sheet_adp=1),
+        canonical_player("CPU Lifecycle QB Two", "QB", sheet_adp=2),
+        canonical_player("CPU Lifecycle QB Three", "QB", sheet_adp=3),
     ]
-    db_session.add_all(cpu_players)
+    legacy_top_ranked_player = Player(
+        name="Legacy Provider Top QB",
+        position="QB",
+        school="Texas",
+        sheet_adp=0,
+        sheet_source_sheet_id="provider-sync:2026:legacy",
+        sheet_projected_season_points=999.0,
+    )
+    db_session.add_all([*cpu_players, legacy_top_ranked_player])
     db_session.commit()
 
     start_response = client.post(f"/leagues/{league['id']}/draft/start", headers=auth_headers(commissioner_token))
@@ -626,8 +678,8 @@ def test_member_can_trigger_expired_real_draft_auto_pick(client, db_session):
         fill_league=False,
     )
     member_token = join_league(client, league["id"], "real-autopick-member")
-    top_qb = Player(name="Auto Pick QB One", position="QB", school="Texas", sheet_adp=1)
-    next_qb = Player(name="Auto Pick QB Two", position="QB", school="Texas", sheet_adp=2)
+    top_qb = canonical_player("Auto Pick QB One", "QB", sheet_adp=1)
+    next_qb = canonical_player("Auto Pick QB Two", "QB", sheet_adp=2)
     db_session.add_all([top_qb, next_qb])
     db_session.commit()
     draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
@@ -668,8 +720,8 @@ def test_member_can_trigger_expired_real_draft_auto_pick(client, db_session):
 def test_expired_manual_pick_waits_for_lifecycle_worker(client, db_session):
     token = create_user_and_token(client, "expired-manual")
     league = create_league(client, token, roster_slots={"QB": 1})
-    auto_player = Player(name="Expired Auto Pick QB", position="QB", school="Texas", sheet_adp=1)
-    late_player = Player(name="Late Manual Pick QB", position="QB", school="Texas", sheet_adp=2)
+    auto_player = canonical_player("Expired Auto Pick QB", "QB", sheet_adp=1)
+    late_player = canonical_player("Late Manual Pick QB", "QB", sheet_adp=2)
     db_session.add_all([auto_player, late_player])
     db_session.flush()
     draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
@@ -696,7 +748,7 @@ def test_expired_manual_pick_waits_for_lifecycle_worker(client, db_session):
 def test_lifecycle_worker_advances_expired_draft_without_browser(client, db_session):
     token = create_user_and_token(client, "worker-autopick")
     league = create_league(client, token, roster_slots={"QB": 1})
-    player = Player(name="Worker Auto Pick QB", position="QB", school="Texas", sheet_adp=1)
+    player = canonical_player("Worker Auto Pick QB", "QB", sheet_adp=1)
     db_session.add(player)
     db_session.flush()
     draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()

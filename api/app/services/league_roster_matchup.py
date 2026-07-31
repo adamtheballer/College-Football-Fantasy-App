@@ -51,7 +51,7 @@ from collegefootballfantasy_api.app.services.matchup_probability import (
     estimate_player_std_dev,
 )
 from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_context_for_players
-from collegefootballfantasy_api.app.services.player_pool_filters import approved_school_player_filter
+from collegefootballfantasy_api.app.services.player_pool_filters import canonical_fantasy_player_filter
 from collegefootballfantasy_api.app.services.roster_slots import CanonicalRosterSlot, build_team_roster_slots
 from collegefootballfantasy_api.app.services.waiver_service import serialize_claims, waiver_window_state
 
@@ -558,7 +558,7 @@ def build_waivers_view(
     # show a different pool than the claim service validates.
     query = db.query(Player).filter(
         ~Player.id.in_(unavailable_player_ids),
-        approved_school_player_filter(),
+        canonical_fantasy_player_filter(league.season_year),
     ).order_by(
         Player.sheet_projected_season_points.desc().nullslast(),
         Player.name.asc(),
