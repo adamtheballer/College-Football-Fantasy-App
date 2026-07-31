@@ -29,13 +29,14 @@ def test_public_web_image_serves_the_built_spa_behind_a_same_origin_api_proxy():
 def test_release_candidate_launcher_embeds_the_checked_out_revision_and_refuses_dirty_source():
     launcher = (REPO_ROOT / "scripts" / "serve_local_release_candidate.sh").read_text(encoding="utf-8")
 
-    assert 'CFF_GIT_SHA="$(git rev-parse HEAD)"' in launcher
-    assert 'CFF_GIT_BRANCH="$(git branch --show-current)"' in launcher
-    assert 'CFF_RELEASE_PROJECT_ID="$(git rev-parse --short=12 HEAD)"' in launcher
+    assert 'CFF_GIT_SHA="$(git -c core.fsmonitor=false rev-parse HEAD)"' in launcher
+    assert 'CFF_GIT_BRANCH="$(git -c core.fsmonitor=false branch --show-current)"' in launcher
+    assert 'CFF_RELEASE_PROJECT_ID="$(git -c core.fsmonitor=false rev-parse --short=12 HEAD)"' in launcher
     assert 'COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-cff-rc-${CFF_RELEASE_PROJECT_ID}}"' in launcher
-    assert 'git status --porcelain --untracked-files=normal' in launcher
+    assert 'git status --porcelain --untracked-files=normal' not in launcher
     assert 'ALLOW_DIRTY_RELEASE_CANDIDATE:-false' in launcher
-    assert "Refusing to label a dirty worktree as a release candidate." in launcher
+    assert "Refusing to label release-critical local source as a release candidate." in launcher
+    assert "python3 scripts/check_release_source_integrity.py" in launcher
     assert "scripts/check_release_source_integrity.py" in launcher
     assert "scripts/audit_preseason_source_contract.py" in launcher
     assert "scripts/check_local_runtime_port.py --label \"release-candidate API\"" in launcher
