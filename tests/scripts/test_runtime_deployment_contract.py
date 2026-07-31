@@ -17,6 +17,9 @@ def test_public_web_image_serves_the_built_spa_behind_a_same_origin_api_proxy():
     assert "try_files $uri $uri/ /index.html;" in nginx
     assert "npm run dev:vite" not in compose
     assert "condition: service_healthy" in compose
+    assert "scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026" in compose
+    assert "scripts/bootstrap_canonical_player_data.py --apply" in compose
+    assert "scripts/audit_canonical_player_registry.py --source-dir reports/source-imports/2026" in compose
 
 
 def test_release_candidate_launcher_embeds_the_checked_out_revision_and_refuses_dirty_source():
@@ -27,6 +30,8 @@ def test_release_candidate_launcher_embeds_the_checked_out_revision_and_refuses_
     assert 'git status --porcelain --untracked-files=normal' in launcher
     assert 'ALLOW_DIRTY_RELEASE_CANDIDATE:-false' in launcher
     assert "Refusing to label a dirty worktree as a release candidate." in launcher
+    assert "scripts/check_release_source_integrity.py" in launcher
+    assert "scripts/audit_preseason_source_contract.py" in launcher
     assert "docker compose up --build --detach db api web lifecycle_worker" in launcher
     assert 'export API_PORT="${API_PORT:-8000}"' in launcher
     assert '"http://127.0.0.1:${API_PORT}/health/runtime"' in launcher

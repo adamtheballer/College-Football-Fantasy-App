@@ -26,6 +26,9 @@ export CFF_GIT_SHA="$(git rev-parse HEAD)"
 export CFF_GIT_BRANCH="$(git branch --show-current)"
 export CFF_RUNTIME_ID="${CFF_RUNTIME_ID:-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
 
+PYTHONPATH=. uv run python scripts/check_release_source_integrity.py
+PYTHONPATH=. uv run python scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026
+
 docker compose up --build --detach db api web lifecycle_worker
 docker compose ps
 

@@ -64,6 +64,15 @@ environments:
 
   production:
     description: Managed cloud production deployment. Run migrations before promoting the API.
+    release_source:
+      canonical_id_owner: application_database_players_id
+      source_snapshot_directory: reports/source-imports/2026
+      preflight_commands:
+        - PYTHONPATH=. uv run python scripts/check_release_source_integrity.py
+        - PYTHONPATH=. uv run python scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026
+      post_migration_commands:
+        - PYTHONPATH=. uv run python scripts/bootstrap_canonical_player_data.py --apply
+        - PYTHONPATH=. uv run python scripts/audit_canonical_player_registry.py --source-dir reports/source-imports/2026
     database:
       engine: postgres
       managed: true
@@ -90,8 +99,12 @@ environments:
         failure_threshold: 3
       promotion_order:
         - build_artifact
+        - verify_release_source_artifact
+        - validate_immutable_player_snapshot
         - run_database_migrations
         - verify_alembic_head
+        - bootstrap_canonical_player_registry
+        - verify_canonical_player_registry
         - start_or_promote_api
         - require_health_ready
     web:

@@ -60,7 +60,12 @@ services:
       db:
         condition: service_healthy
     command: >-
-      sh -c "cd api && PYTHONPATH=/app uv run alembic -c alembic.ini upgrade head && cd /app && uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port 8000"
+      sh -c "cd /app &&
+      PYTHONPATH=/app uv run python scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026 &&
+      cd api && PYTHONPATH=/app uv run alembic -c alembic.ini upgrade head &&
+      cd /app && PYTHONPATH=/app uv run python scripts/bootstrap_canonical_player_data.py --apply &&
+      PYTHONPATH=/app uv run python scripts/audit_canonical_player_registry.py --source-dir reports/source-imports/2026 &&
+      uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port 8000"
     healthcheck:
       test:
         [

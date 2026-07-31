@@ -49,10 +49,16 @@ def test_production_manifest_starts_required_lifecycle_workers_before_promotion(
 
     assert production["api"]["promotion_order"] == [
         "build_artifact",
+        "verify_release_source_artifact",
+        "validate_immutable_player_snapshot",
         "run_database_migrations",
         "verify_alembic_head",
+        "bootstrap_canonical_player_registry",
+        "verify_canonical_player_registry",
         "start_or_promote_api",
         "require_health_ready",
     ]
+    assert production["release_source"]["canonical_id_owner"] == "application_database_players_id"
+    assert production["release_source"]["source_snapshot_directory"] == "reports/source-imports/2026"
     assert production["workers"]["scoring_processor"]["enabled"] is True
     assert production["workers"]["lifecycle_processor"]["enabled"] is True
