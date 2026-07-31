@@ -27,6 +27,8 @@ def test_release_candidate_launcher_embeds_the_checked_out_revision_and_refuses_
 
     assert 'CFF_GIT_SHA="$(git rev-parse HEAD)"' in launcher
     assert 'CFF_GIT_BRANCH="$(git branch --show-current)"' in launcher
+    assert 'CFF_RELEASE_PROJECT_ID="$(git rev-parse --short=12 HEAD)"' in launcher
+    assert 'COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-cff-rc-${CFF_RELEASE_PROJECT_ID}}"' in launcher
     assert 'git status --porcelain --untracked-files=normal' in launcher
     assert 'ALLOW_DIRTY_RELEASE_CANDIDATE:-false' in launcher
     assert "Refusing to label a dirty worktree as a release candidate." in launcher

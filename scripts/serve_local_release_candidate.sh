@@ -18,12 +18,16 @@ if [[ -n "$(git status --porcelain --untracked-files=normal)" && "${ALLOW_DIRTY_
   exit 2
 fi
 
-export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-cff-playground}"
+export CFF_GIT_SHA="$(git rev-parse HEAD)"
+export CFF_GIT_BRANCH="$(git branch --show-current)"
+export CFF_RELEASE_PROJECT_ID="$(git rev-parse --short=12 HEAD)"
+# Never attach a release-candidate launch to the generic development compose
+# project. A commit-scoped project keeps its API, worker, and database from
+# being mistaken for a previously started local stack.
+export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-cff-rc-${CFF_RELEASE_PROJECT_ID}}"
 export API_PORT="${API_PORT:-8000}"
 export WEB_PORT="${WEB_PORT:-8080}"
 export DB_PORT="${DB_PORT:-5433}"
-export CFF_GIT_SHA="$(git rev-parse HEAD)"
-export CFF_GIT_BRANCH="$(git branch --show-current)"
 export CFF_RUNTIME_ID="${CFF_RUNTIME_ID:-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
 
 PYTHONPATH=. uv run python scripts/check_release_source_integrity.py
