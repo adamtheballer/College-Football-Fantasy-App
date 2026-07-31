@@ -77,19 +77,6 @@ def _nul_records(payload: bytes) -> list[bytes]:
     return [record for record in payload.split(b"\0") if record]
 
 
-def _head_blob_hashes(repo_root: Path, scope: list[str]) -> dict[Path, str]:
-    """Read release-critical blobs from HEAD, without consulting the worktree."""
-
-    entries: dict[Path, str] = {}
-    payload = _run_git(repo_root, "ls-tree", "-r", "-z", "HEAD", "--", *scope)
-    for record in _nul_records(payload):
-        metadata, raw_path = record.split(b"\t", 1)
-        _mode, kind, object_id = metadata.split(maxsplit=2)
-        if kind == b"blob":
-            entries[Path(raw_path.decode("utf-8"))] = object_id.decode("ascii")
-    return entries
-
-
 def _index_blob_hashes(repo_root: Path, scope: list[str]) -> tuple[dict[Path, str], set[Path]]:
     """Read index blobs and surface unresolved merge entries as dirty source."""
 
@@ -105,6 +92,19 @@ def _index_blob_hashes(repo_root: Path, scope: list[str]) -> tuple[dict[Path, st
         else:
             conflicted.add(path)
     return entries, conflicted
+
+
+def _staged_release_paths(repo_root: Path, scope: list[str]) -> set[Path]:
+    """Return index-to-HEAD changes without walking the worktree.
+
+    ``git diff-index --cached`` consults the immutable HEAD tree and the index
+    only. Unlike a recursive ``git ls-tree`` plus a Python comparison, this
+    stays responsive on the affected local filesystem while still detecting
+    staged additions, deletions, and edits exactly.
+    """
+
+    payload = _run_git(repo_root, "diff-index", "--cached", "--name-only", "-z", "HEAD", "--", *scope)
+    return {Path(record.decode("utf-8")) for record in _nul_records(payload)}
 
 
 def _untracked_release_paths(repo_root: Path, scope: list[str]) -> set[Path]:
@@ -169,8 +169,8 @@ def dirty_release_critical_paths(repo_root: Path) -> list[tuple[str, Path]]:
     This deliberately avoids ``git status`` and ``git diff`` worktree refreshes.
     On a large macOS worktree those refreshes can exceed a release launcher's
     timeout even when only two files changed. Instead the gate compares the
-    immutable HEAD tree, the Git index, and Git-filtered worktree blob hashes
-    for only release-critical paths. That catches staged, unstaged, deleted,
+    Git's index-to-HEAD comparison and Git-filtered worktree blob hashes for
+    only release-critical paths. That catches staged, unstaged, deleted,
     conflicted, and untracked source without trusting a filesystem monitor.
     """
 
@@ -183,14 +183,8 @@ def dirty_release_critical_paths(repo_root: Path) -> list[tuple[str, Path]]:
     if untracked:
         return [("UNTRACKED", path) for path in sorted(untracked)]
 
-    head_hashes = _head_blob_hashes(repo_root, scope)
     index_hashes, conflicted = _index_blob_hashes(repo_root, scope)
-    modified: set[Path] = set(conflicted)
-    all_paths = set(head_hashes) | set(index_hashes)
-
-    for path in all_paths:
-        if head_hashes.get(path) != index_hashes.get(path):
-            modified.add(path)
+    modified = set(conflicted) | _staged_release_paths(repo_root, scope)
 
     index_stat_metadata = _index_stat_metadata(repo_root, scope)
     for path in index_hashes:
