@@ -1,0 +1,38 @@
+branch,sha,classification,ahead_of_pr24,behind_pr24,changed_files,migration_files,selected_for_pr24,decision,rationale
+origin/main,71d16f1d724da666a85eee315015fa29b688791b,BASE_RELEASE_BRANCH,0,116,0,0,no,baseline,Production base for PR #24; not a consolidation source.
+origin/codex/runtime-provenance-contract,44e1b0967c449518ed9937742b369e7d269ca015,TARGET_RELEASE_PR24,0,0,0,0,no,target,Canonical release candidate and only branch permitted to receive a reviewed consolidation commit.
+origin/codex/draft-order-active-marker,a4b1f8de9373d708ad7613955eb9e5d6f8a77b11,ALREADY_CONTAINED,0,82,0,0,no,already_included,Ancestor of PR #24.
+origin/codex/fix-create-league-422,813c6c48e78030915ab124a9291aafc31804fb28,ALREADY_CONTAINED,0,115,0,0,no,already_included,Ancestor of PR #24.
+origin/codex/fix-local-dev-port,f56b3bb0f8b0b4d48dacc2c6cab9148955f6acf1,ALREADY_CONTAINED,0,80,0,0,no,already_included,Ancestor of PR #24.
+origin/codex/fix-predraft-roster-placeholder-ui,ccae61aa57f853376b9aa3405187f9fce4a4aea2,SUPERSEDED,1,116,6,0,no,excluded,PR #24 already preserves configured slots after drops and renders slot placeholders; do not replace current roster implementation with a divergent component rewrite.
+origin/codex/fix-saturday-pick-workflow,3b949f75d81bfc27f663ed5aee5acab9379eb804,ALREADY_CONTAINED,0,22,0,0,no,already_included,Ancestor of PR #24.
+origin/codex/integrate-ready-core,a92c1565133be6c24e4645d3d2262e17ff792e8d,ALREADY_CONTAINED,0,75,0,0,no,already_included,Ancestor of PR #24.
+origin/codex/isolate-game-log-2026,3566eb5b48cda3d703c310feec96484b841a2071,ALREADY_CONTAINED,0,74,0,0,no,already_included,Ancestor of PR #24.
+origin/codex/port-canonical-scoring-engine,947d4550592902db875434e7cab51cf1c3c026ed,ALREADY_CONTAINED,0,87,0,0,no,already_included,Ancestor of PR #24.
+origin/codex/pr-split-recovery-plan,2c4c724dc0c727e46bd906c254cde5782cca9a02,DOCUMENTATION_ONLY,1,116,2,0,no,excluded,Recovery planning document only; does not change the release artifact.
+origin/codex/reconcile-canonical-0057,ee5879b22d6b7c67cc34cd1962e6aa144c04935d,ALREADY_CONTAINED,0,70,0,0,no,already_included,Ancestor of PR #24.
+origin/codex/reconcile-runtime-0075,8b345ef44a9cad6ad88a0a826034e21801b28a61,ALREADY_CONTAINED,0,55,0,0,no,already_included,Ancestor of PR #24.
+origin/codex/recover-canonical-0073,b86090b0687b3f24c5fceff64a1b8214adfd5013,ALREADY_CONTAINED,0,56,0,0,no,already_included,Ancestor of PR #24.
+origin/codex/remove-white-scrollbar,787e8967196a4f90ca09edbdd18fd04cb7f82103,BULK_UNVALIDATED,12,116,287,25,no,excluded,Large divergent stack with 25 migrations; not safe to merge or cherry-pick for this beta.
+origin/codex/restyle-create-league,82b4320a4d1fad6ad1a4bcdbd819dd36ef47538b,ALREADY_CONTAINED,0,84,0,0,no,already_included,Ancestor of PR #24.
+origin/codex/scoring-milestone-a,cf9d5f1ee8131b53d07572ea77376993f7268ded,SUPERSEDED_SCORING_DEFERRED,1,116,14,0,no,excluded,Canonical scoring engine is already in PR #24 and beta keeps live scoring disabled.
+origin/codex/unified-waivers-v2,147877fd22344dfdfd72534c22c96f6b11c6d0bd,ALREADY_CONTAINED,0,63,0,0,no,already_included,Ancestor of PR #24.
+origin/codex/updated-code,28a63c0ad758bcadea171c39b97262255d6933d5,INCOMPATIBLE_HISTORY,5,147,n/a,n/a,no,excluded,No merge base with PR #24; must not be used as a release integration source.
+origin/codex/waiver-hardening,a94b8713a457f1041d3592521117a3cc705dbe1d,SUPERSEDED,2,58,6,0,no,excluded,PR #24 contains the canonical waiver lifecycle and timing rules; isolated older UI and service changes require no release action.
+origin/codex/waiver-wire-production-v2,01294f00c40aaa72e4ea1c825085ab5090117ec5,ALREADY_CONTAINED,0,68,0,0,no,already_included,Ancestor of PR #24.
+origin/feature/achitecture_cleanup,7c229f160b149a02f833a283199e48e83242ecaa,ALREADY_CONTAINED,0,124,0,0,no,already_included,Ancestor of PR #24.
+origin/feature/create-join-league,5618fa9d9c7dc3311eadc9bf0d3538c9277df571,INCOMPATIBLE_HISTORY,12,147,n/a,n/a,no,excluded,No merge base with PR #24; create and join flows already have release coverage in the target.
+origin/feature/join-create-league,e1f405480f435528ce014688ee2393fce06d60e2,INCOMPATIBLE_HISTORY,11,147,n/a,n/a,no,excluded,No merge base with PR #24; cannot safely integrate during a release freeze.
+origin/feature/matchup-test-branch,9973156050984f611d44c00fe2fdffd6a6c95f25,BULK_UNVALIDATED,8,120,133,4,no,excluded,Large mixed matchup and trade stack with migrations; requires separate review and testing.
+origin/feature/mock-draft-lobby-multiplayer,308ccdd864c13ac702857c449a347a5de16c2e6e,BULK_UNVALIDATED,3,120,155,14,no,excluded,Large draft rewrite with 14 migrations; current target has dedicated draft fixes.
+origin/feature/scoring-engine,6cf65c2b9cdaf4d1599050e75343d76e1d0930af,ALREADY_CONTAINED,0,117,0,0,no,already_included,Ancestor of PR #24.
+origin/feature/scoring-engine-v2,781669fa63dfd0391c4214cc6baabc15f2f58361,SCORING_DEFERRED,4,116,40,3,no,excluded,Beta does not enable live scoring; post-beta scoring work cannot enter the release candidate.
+origin/feature/scoring-engine-v3,ddf94e6129e6903830323095b7de8d6b1464bfd4,SCORING_DEFERRED,9,116,250,21,no,excluded,Beta does not enable live scoring; large ingestion and worker changes are deferred.
+origin/feature/scoring-worker-hardening,ecd43f602387ae2015c479afcb23f4113d19c05e,SCORING_DEFERRED,2,116,9,0,no,excluded,Beta does not enable live scoring; target retains only safe lifecycle behavior.
+origin/feature/scoring-worker-reliability,d3247a3629ffba8990e6f393187de6d9860e99a7,SCORING_DEFERRED,3,116,17,1,no,excluded,Beta does not enable live scoring; worker reliability changes require post-beta validation.
+origin/feature/single-player-mock-draft-cleanup,4075897fc4f561a3fa759c919f84ad9d2c958418,BULK_UNVALIDATED,2,120,39,1,no,excluded,Divergent mock draft styling and lifecycle stack; target has targeted mock-draft repairs.
+origin/feature/trade-offer-lifecycle,58218158246d522342187b8168fbdca0fabb13ab,ALREADY_CONTAINED,0,94,0,0,no,already_included,Ancestor of PR #24.
+origin/hardening/fantasy-integrity,fdbddde7cb854c6917dffd038c0bf83fe207345c,UNTRUSTED_DIRTY_SOURCE,2,93,87,6,no,excluded,Source worktree was corrupted and dirty; current target includes reviewed canonical-pool and workflow hardening instead.
+origin/hardening/fantasy-integrity-recovered,daa0d918170b214da7245d05894d67c0718b8495,ALREADY_CONTAINED,0,88,0,0,no,already_included,Ancestor of PR #24.
+origin/release/beta-integration,09e3c1d6abe8cd887063423a73f4249ad562cd9d,ALREADY_CONTAINED,0,65,0,0,no,already_included,Ancestor of PR #24.
+origin/release/public-beta-rc1,42ffabd39eacd2becabd0c80154af55269239ca9,SUPERSEDED,4,58,20,0,no,excluded,PR #24 adds the later runtime provenance contract and records the newer validation baseline.

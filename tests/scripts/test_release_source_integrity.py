@@ -6,6 +6,7 @@ import importlib.util
 import os
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -17,7 +18,7 @@ SPEC.loader.exec_module(release_source_integrity)
 
 
 def git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "-c", "core.fsmonitor=false", *args], cwd=repo, check=True, capture_output=True)
 
 
 def make_repository(tmp_path: Path) -> Path:
@@ -33,6 +34,19 @@ def make_repository(tmp_path: Path) -> Path:
     git(repo, "add", ".")
     git(repo, "commit", "-qm", "initial source")
     return repo
+
+
+def test_release_source_integrity_git_calls_disable_filesystem_monitor(monkeypatch, tmp_path: Path):
+    calls: list[list[str]] = []
+
+    def fake_run(command: list[str], **_kwargs):
+        calls.append(command)
+        return SimpleNamespace(stdout=b"ok")
+
+    monkeypatch.setattr(release_source_integrity.subprocess, "run", fake_run)
+
+    assert release_source_integrity._run_git(tmp_path, "rev-parse", "HEAD") == b"ok"
+    assert calls == [["git", "-c", "core.fsmonitor=false", "rev-parse", "HEAD"]]
 
 
 def test_release_source_integrity_ignores_noncritical_changes(tmp_path: Path):

@@ -64,7 +64,11 @@ def _run_git(repo_root: Path, *args: str, input_bytes: bytes | None = None) -> b
     """Run a Git read command without triggering a worktree-wide refresh."""
 
     result = subprocess.run(
-        ["git", *args],
+        # The release launcher deliberately disables fsmonitor for its Git
+        # reads.  Keep this provenance gate on the same path: a stale macOS
+        # filesystem monitor can otherwise make a single-file hash check hang
+        # before the release stack starts.
+        ["git", "-c", "core.fsmonitor=false", *args],
         cwd=repo_root,
         input=input_bytes,
         check=True,
