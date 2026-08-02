@@ -396,8 +396,12 @@ def finalize_contest(db: Session, contest: SaturdayPickContest) -> SaturdayPickC
     for entry in entries:
         entry.is_winner = entry.selected_pick_player_id in winning_featured_ids
         entry.winner_determined_at = now
-        entry.reward_unlocked_at = now if entry.is_winner and contest.sponsor_name else None
-        if entry.is_winner and contest.sponsor_name:
+        entry.reward_unlocked_at = (
+            now
+            if entry.is_winner and contest.sponsor_name and settings.saturday_pick_6_sponsors_enabled
+            else None
+        )
+        if entry.is_winner and contest.sponsor_name and settings.saturday_pick_6_sponsors_enabled:
             db.add(SponsorRewardEvent(
                 contest_id=contest.id,
                 user_id=entry.user_id,
@@ -443,7 +447,10 @@ def contest_read(db: Session, contest: SaturdayPickContest, viewer: User | None 
         reward_unlocked_at=entry.reward_unlocked_at,
     ) if entry else None
     sponsor = None
-    if contest.sponsor_name:
+    # Keep sponsor data reversible in storage while preventing beta responses
+    # from exposing branding, logos, offers, or discount codes when the
+    # public-beta sponsor flag is disabled.
+    if contest.sponsor_name and settings.saturday_pick_6_sponsors_enabled:
         unlocked = bool(entry and entry.is_winner and contest.status == "FINAL")
         sponsor = SaturdayPickSponsorRead(
             name=contest.sponsor_name,

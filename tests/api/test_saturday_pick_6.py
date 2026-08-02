@@ -10,9 +10,10 @@ from collegefootballfantasy_api.app.models.saturday_pick import SaturdayPickCont
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 
 
-def _enable_pick_6(monkeypatch):
+def _enable_pick_6(monkeypatch, *, sponsors=False):
     monkeypatch.setattr(settings, "saturday_pick_6_enabled", True)
     monkeypatch.setattr(settings, "saturday_pick_6_public_enabled", True)
+    monkeypatch.setattr(settings, "saturday_pick_6_sponsors_enabled", sponsors)
 
 
 def _featured_players(db_session, *, position="QB", final_games=False):
@@ -135,6 +136,25 @@ def test_saturday_pick_hides_featured_player_headshots_for_public_beta(client, d
     assert all(row["image_url"] is None for row in response.json()["players"])
 
 
+def test_saturday_pick_hides_existing_sponsor_data_when_beta_sponsors_are_disabled(client, db_session, monkeypatch):
+    _enable_pick_6(monkeypatch)
+    players, kickoff = _featured_players(db_session)
+    response = client.post(
+        "/admin/saturday-pick-6",
+        json=_create_payload(
+            players,
+            kickoff,
+            sponsor_name="Example Sponsor",
+            sponsor_logo_url="https://assets.example.test/sponsor.png",
+            sponsor_code="BETA-CODE",
+        ),
+        headers=admin_headers(client),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["sponsor"] is None
+
+
 def test_public_entry_can_change_before_lock_and_rejects_after_lock(client, db_session, monkeypatch):
     _enable_pick_6(monkeypatch)
     players, kickoff = _featured_players(db_session)
@@ -162,7 +182,7 @@ def test_public_entry_can_change_before_lock_and_rejects_after_lock(client, db_s
 
 
 def test_finalization_marks_tied_winners_and_hides_sponsor_code_from_losers(client, db_session, monkeypatch):
-    _enable_pick_6(monkeypatch)
+    _enable_pick_6(monkeypatch, sponsors=True)
     players, kickoff = _featured_players(db_session, final_games=True)
     headers = admin_headers(client)
     created = client.post(

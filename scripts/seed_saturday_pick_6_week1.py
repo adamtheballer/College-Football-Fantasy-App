@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Create the verified Week 1 West Georgia Cornhole Saturday Pick 6 contest.
+"""Create the verified Week 1 Saturday Pick 6 contest.
 
 The script intentionally delegates validation to the contest service.  It will
 stop rather than guess a kickoff, opponent, player identity, or position.
@@ -30,8 +30,6 @@ WEEK_ONE_RB_NAMES = (
     "Nate Sheppard",
     "Cam Cook",
 )
-
-WEST_GEORGIA_CORNHOLE_LOGO_URL = "/west-georgia-cornhole.png"
 
 # These four kickoff times were absent from the initial spreadsheet import.
 # They come from the linked official athletic-department schedules and are kept
@@ -71,7 +69,7 @@ WEEK_ONE_KICKOFF_CORRECTIONS = {
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Seed the Week 1 Saturday Pick 6 sponsor contest.")
+    parser = argparse.ArgumentParser(description="Seed the Week 1 Saturday Pick 6 contest.")
     parser.add_argument("--season", type=int, default=2026)
     parser.add_argument("--week", type=int, default=1)
     parser.add_argument(
@@ -79,6 +77,8 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Existing operator account recorded as the contest creator. This trusted bootstrap command is not a public admin API.",
     )
+    parser.add_argument("--sponsor-name", default=None)
+    parser.add_argument("--sponsor-logo-url", default=None)
     parser.add_argument("--sponsor-offer", default=None)
     parser.add_argument("--sponsor-code", default=None)
     parser.add_argument("--sponsor-url", default=None)
@@ -123,18 +123,24 @@ def main() -> None:
         missing = [name for name in WEEK_ONE_RB_NAMES if name not in by_name]
         if missing:
             raise SystemExit(f"Missing canonical player identities: {', '.join(missing)}")
+        sponsor_fields = {}
+        if settings.saturday_pick_6_sponsors_enabled:
+            sponsor_fields = {
+                "sponsor_name": args.sponsor_name,
+                "sponsor_logo_url": args.sponsor_logo_url,
+                "sponsor_offer_text": args.sponsor_offer,
+                "sponsor_code": args.sponsor_code,
+                "sponsor_url": args.sponsor_url,
+                "sponsor_terms": args.sponsor_terms,
+            }
+
         payload = SaturdayPickContestCreate(
             season=args.season,
             week_number=args.week,
             contest_position="RB",
             title="Saturday Pick 6",
             featured_player_ids=[by_name[name].id for name in WEEK_ONE_RB_NAMES],
-            sponsor_name="West Georgia Cornhole",
-            sponsor_logo_url=WEST_GEORGIA_CORNHOLE_LOGO_URL,
-            sponsor_offer_text=args.sponsor_offer,
-            sponsor_code=args.sponsor_code,
-            sponsor_url=args.sponsor_url,
-            sponsor_terms=args.sponsor_terms,
+            **sponsor_fields,
         )
         try:
             backfill_missing_week_one_kickoffs(db, season=args.season, week=args.week)

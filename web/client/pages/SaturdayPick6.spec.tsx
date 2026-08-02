@@ -44,9 +44,9 @@ describe("SaturdayPick6 state helpers", () => {
     expect(lockDeadlineMessage("Ahmad Hardy", "2026-09-05T16:00:00Z")).toContain("Pick before kickoff; then it will lock.");
   });
 
-  it("uses the West Georgia Cornhole logo fallback and makes the discount-code prize explicit", () => {
-    const sponsor = { name: "West Georgia Cornhole", logo_url: null };
-    expect(getSaturdayPickSponsorLogo(sponsor)).toBe("/west-georgia-cornhole.png");
-    expect(getSaturdayPickRewardMessage(sponsor)).toContain("discount code");
+  it("uses only the sponsor logo supplied by the API", () => {
+    const sponsor = { name: "Example Sponsor", logo_url: null };
+    expect(getSaturdayPickSponsorLogo(sponsor)).toBeNull();
+    expect(getSaturdayPickRewardMessage(sponsor)).toContain("final scoring");
   });
 });

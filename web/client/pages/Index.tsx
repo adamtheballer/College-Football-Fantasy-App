@@ -329,7 +329,7 @@ export default function Index() {
             <p className="mt-6 cfb-micro-label text-cfb-brand">{saturdayPickQuery.data ? `${saturdayPickQuery.data.contest_position} Week` : "The weekly college football challenge"}</p>
             {saturdayPickQuery.data?.sponsor ? <div className="mt-3 flex items-center gap-3"><div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-cyan-100/35 bg-white p-1.5 shadow-[0_0_20px_rgba(34,211,238,0.16)]">{getSaturdayPickSponsorLogo(saturdayPickQuery.data.sponsor) ? <img src={getSaturdayPickSponsorLogo(saturdayPickQuery.data.sponsor) ?? undefined} alt={`${saturdayPickQuery.data.sponsor.name} logo`} className="h-full w-full object-contain" /> : <span className="text-xs font-black text-cfb-brand">{saturdayPickQuery.data.sponsor.name.slice(0, 2).toUpperCase()}</span>}</div><p className="font-display text-3xl font-black italic tracking-[-0.04em] text-cyan-100 sm:text-4xl">Presented by {saturdayPickQuery.data.sponsor.name}</p></div> : null}
             <h2 className="mt-2 cfb-display-title text-4xl sm:text-5xl lg:text-6xl">
-              {saturdayPickQuery.data?.sponsor ? "Pick the winner" : "Coming next week"}
+              {saturdayPickQuery.data ? "Make your pick" : "Coming next week"}
             </h2>
             <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-cfb-text-secondary sm:text-lg">
               {saturdayPickQuery.data
