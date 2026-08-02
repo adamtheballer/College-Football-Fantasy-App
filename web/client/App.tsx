@@ -17,8 +17,6 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const Leagues = lazy(() => import("./pages/Leagues"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Login = lazy(() => import("./pages/Login"));
-const Signup = lazy(() => import("./pages/Signup"));
-const BetaAccess = lazy(() => import("./pages/BetaAccess"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const CreateLeague = lazy(() => import("./pages/CreateLeague"));
 const JoinLeague = lazy(() => import("./pages/JoinLeague"));
@@ -199,8 +197,9 @@ const App = () => (
                 <Route path="/stats" element={<Navigate to="/leagues" replace />} />
                 <Route path="/stats/players" element={<Navigate to="/leagues" replace />} />
                 <Route path="/login" element={<Login />} />
-                <Route path="/beta-access" element={<BetaAccess />} />
-                <Route path="/signup" element={<Signup />} />
+                {/* Beta access, account creation, and returning-user sign-in share one auth surface. */}
+                <Route path="/beta-access" element={<Navigate to="/login?flow=beta" replace />} />
+                <Route path="/signup" element={<Navigate to="/login?flow=beta" replace />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
