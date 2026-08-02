@@ -274,11 +274,11 @@ test.describe("critical browser workflows", () => {
     expect(user).toContain("coach@example.com");
   });
 
-  test("signup opens league access immediately without email verification", async ({ page }) => {
+  test("signup requires a valid beta reservation before account creation", async ({ page }) => {
     const readyUser = {
       ...mockAuthPayload.user,
       first_name: "Adam",
-      email: "adam@example.com",
+      email: "ci-beta-user@example.test",
       email_verified_at: "2026-07-10T20:00:00Z",
     };
     const signupPayload = {
@@ -286,6 +286,29 @@ test.describe("critical browser workflows", () => {
       access_token: "signup-access-token",
       user: readyUser,
     };
+
+    await page.route("**/beta-access/validate", async (route) => {
+      const request = route.request();
+      const payload = request.postDataJSON() as { email?: string; code?: string };
+      if (payload.email !== "ci-beta-user@example.test" || payload.code !== "EARLY-CI1234") {
+        await route.fulfill({
+          status: 403,
+          contentType: "application/json",
+          body: JSON.stringify({ detail: "The email and early-access code do not match, or the code is no longer available." }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          reservation_token: "ci-only-reservation-token",
+          reservation_expires_at: "2030-01-01T00:00:00Z",
+          email: "ci-beta-user@example.test",
+          existing_account: false,
+        }),
+      });
+    });
 
     await page.route("**/auth/signup", async (route) => {
       await route.fulfill({
@@ -329,10 +352,21 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/signup");
-    await page.getByPlaceholder("Enter your first name").fill("Adam");
-    await page.getByPlaceholder("coach@saturday.com").fill("adam@example.com");
-    await page.getByPlaceholder("••••••••").fill("StrongPass123!");
-    await page.getByRole("button", { name: /Create Account/i }).click();
+    await expect(page).toHaveURL(/\/login\?flow=beta$/);
+    await expect(page.getByRole("heading", { name: /Join the beta/i })).toBeVisible();
+
+    await page.locator("#beta-email").fill("ci-beta-user@example.test");
+    await page.locator("#beta-code").fill("WRONG1");
+    await page.getByRole("button", { name: /Verify and continue/i }).click();
+    await expect(page.getByRole("alert")).toContainText(/do not match|no longer available/i);
+
+    await page.locator("#beta-code").fill("EARLY-CI1234");
+    await page.getByRole("button", { name: /Verify and continue/i }).click();
+    await expect(page.locator("#signup-email")).toHaveValue("ci-beta-user@example.test");
+    await expect(page.locator("#signup-email")).toHaveAttribute("readonly", "");
+    await page.locator("#signup-name").fill("Adam");
+    await page.locator("#signup-password").fill("StrongPass123!");
+    await page.getByRole("button", { name: /Create (beta )?account/i }).click();
     await expect
       .poll(() => page.evaluate(() => window.localStorage.getItem("cfb_access_token")))
       .toBe("signup-access-token");
@@ -349,7 +383,7 @@ test.describe("critical browser workflows", () => {
     await page.goto("/leagues");
     await expect(page.getByRole("heading", { name: /^Leagues$/i })).toBeVisible();
     const storedUser = await page.evaluate(() => window.localStorage.getItem("cfb_user"));
-    expect(storedUser).toContain("adam@example.com");
+    expect(storedUser).toContain("ci-beta-user@example.test");
   });
 
   test("leagues page renders backend response for authenticated session", async ({ page }) => {
@@ -477,8 +511,8 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/rosters");
-    await page.waitForURL("**/login");
-    await expect(page.getByRole("heading", { name: /^Sign in$/i })).toBeVisible();
+    await page.waitForURL(/\/login\?flow=beta$/);
+    await expect(page.getByRole("heading", { name: /Join the beta/i })).toBeVisible();
 
     const token = await page.evaluate(() => window.localStorage.getItem("cfb_access_token"));
     const user = await page.evaluate(() => window.localStorage.getItem("cfb_user"));

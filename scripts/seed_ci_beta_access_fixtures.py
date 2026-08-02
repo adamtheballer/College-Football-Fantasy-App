@@ -1,0 +1,56 @@
+"""Seed synthetic beta-access records for the disposable real-stack E2E database.
+
+This utility is deliberately inert unless its explicit CI-only environment
+guard is present.  It stores only HMACs, never raw access codes, and is called
+only after ``run_real_stack_e2e.sh`` creates a fresh Compose database.
+"""
+
+from __future__ import annotations
+
+import os
+
+from sqlalchemy import select
+
+from collegefootballfantasy_api.app.db.session import SessionLocal
+from collegefootballfantasy_api.app.models.beta_access import BetaAccessCode
+from collegefootballfantasy_api.app.services.beta_access import beta_access_hmac, normalize_beta_code, normalize_beta_email
+
+
+if os.environ.get("CFF_SEED_CI_BETA_ACCESS_FIXTURES") != "1":
+    raise SystemExit("Refusing to seed beta fixtures outside the isolated CI E2E command.")
+
+
+FIXTURES = (
+    ("ci-e2e-beta-user", "ci-beta-user@example.test", "EARLY-CI1234"),
+    ("ci-e2e-beta-commissioner", "ci-beta-commissioner@example.test", "EARLY-CI1235"),
+    ("ci-e2e-beta-manager", "ci-beta-manager@example.test", "EARLY-CI1236"),
+)
+
+
+def main() -> None:
+    with SessionLocal.begin() as db:
+        for source_waitlist_id, email, code in FIXTURES:
+            normalized_email = normalize_beta_email(email)
+            code_hmac = beta_access_hmac(normalize_beta_code(code), purpose="code")
+            existing = db.scalar(
+                select(BetaAccessCode).where(BetaAccessCode.source_waitlist_id == source_waitlist_id)
+            )
+            if existing is not None:
+                if existing.email != normalized_email or existing.code_hmac != code_hmac:
+                    raise RuntimeError("CI beta fixture identity does not match the isolated test registry.")
+                continue
+            db.add(
+                BetaAccessCode(
+                    source_waitlist_id=source_waitlist_id,
+                    email=normalized_email,
+                    code_hmac=code_hmac,
+                    state="AVAILABLE",
+                    source_status="READY_SENT",
+                    manual_review=False,
+                )
+            )
+    print("Seeded synthetic CI beta-access fixtures.")
+
+
+if __name__ == "__main__":
+    main()

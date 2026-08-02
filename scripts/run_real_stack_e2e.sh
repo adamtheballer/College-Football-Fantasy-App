@@ -10,8 +10,15 @@ export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-cff_real_e2e}"
 # use, so fixed host bindings make this E2E job flaky for reasons unrelated to
 # the application under test.
 export DB_PORT="${DB_PORT:-0}"
-export API_PORT="${API_PORT:-0}"
 export WEB_PORT="${WEB_PORT:-0}"
+# The E2E stack is deliberately isolated from any user-provided beta dataset.
+# These secrets are CI-only and the fixture script below writes only keyed HMACs.
+export BETA_ACCESS_ENABLED="true"
+export VITE_BETA_ACCESS_ENABLED="true"
+export BETA_ACCESS_CODE_HMAC_SECRET="${BETA_ACCESS_CODE_HMAC_SECRET:-ci-only-beta-access-code-hmac-secret-2026}"
+export BETA_ACCESS_RESERVATION_SECRET="${BETA_ACCESS_RESERVATION_SECRET:-ci-only-beta-access-reservation-secret-2026}"
+export CFF_GIT_SHA="${CFF_GIT_SHA:-$(git rev-parse HEAD)}"
+export CFF_GIT_BRANCH="${CFF_GIT_BRANCH:-$(git branch --show-current || printf 'detached')}"
 
 cleanup() {
   docker compose down -v --remove-orphans
@@ -36,19 +43,33 @@ resolve_host_port() {
   return 1
 }
 
-api_host_port="$(resolve_host_port api 8000)"
 web_host_port="$(resolve_host_port web 8080)"
+if ! [[ "$web_host_port" =~ ^[1-9][0-9]*$ ]] || (( web_host_port > 65535 )); then
+  echo "Unable to resolve a usable host port for web:8080; refusing to probe an invalid port." >&2
+  exit 1
+fi
+
+web_origin="http://127.0.0.1:${web_host_port}"
 
 for _attempt in $(seq 1 60); do
-  if curl --fail --silent --max-time 3 "http://127.0.0.1:${api_host_port}/health/ready" >/dev/null && \
-    curl --fail --silent --max-time 3 --head "http://127.0.0.1:${web_host_port}" >/dev/null; then
+  if curl --fail --silent --max-time 3 "${web_origin}/api/health/ready" >/dev/null && \
+    curl --fail --silent --max-time 3 "${web_origin}/api/health/runtime" >/dev/null && \
+    curl --fail --silent --max-time 3 --head "${web_origin}" >/dev/null; then
     break
   fi
   sleep 2
 done
 
-curl --fail --show-error --silent "http://127.0.0.1:${api_host_port}/health/ready" >/dev/null
-curl --fail --show-error --silent --head "http://127.0.0.1:${web_host_port}" >/dev/null
+ready_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/ready")"
+runtime_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/runtime")"
+jq -e '.status == "ready"' <<<"$ready_payload" >/dev/null
+jq -e --arg sha "$CFF_GIT_SHA" '.git_sha == $sha and .alembic_revision == "0084_beta_access_schema"' <<<"$runtime_payload" >/dev/null
+curl --fail --show-error --silent --head "${web_origin}" >/dev/null
+
+# This command runs only after Compose created a fresh disposable database.
+# It never accepts, reads, or logs a real invitation code.
+docker compose exec -T api env CFF_SEED_CI_BETA_ACCESS_FIXTURES=1 \
+  PYTHONPATH=/app uv run python scripts/seed_ci_beta_access_fixtures.py
 
 for _attempt in $(seq 1 30); do
   if docker compose exec -T db psql -U postgres -d collegefootballfantasy -Atc \
@@ -61,4 +82,8 @@ done
 docker compose exec -T db psql -U postgres -d collegefootballfantasy -Atc \
   "select status from worker_heartbeats where worker_name = 'lifecycle_processor'" | grep -qx "healthy"
 
+# The E2E service is profile-gated, so `up --build` above does not build it.
+# Build it explicitly to ensure Playwright always exercises the current source
+# rather than a stale locally cached test image.
+docker compose --profile e2e build e2e
 docker compose --profile e2e run --rm --no-deps e2e
