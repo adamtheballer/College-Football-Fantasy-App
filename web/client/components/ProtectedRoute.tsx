@@ -3,6 +3,7 @@ import { Navigate, useLocation } from "react-router-dom";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
+import { betaAccessEnabled } from "@/lib/beta-access";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -24,7 +25,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
   if (!isLoggedIn) {
     const from = `${location.pathname}${location.search}${location.hash}`;
-    return <Navigate to="/login" replace state={{ from }} />;
+    return <Navigate to={betaAccessEnabled ? "/beta-access" : "/login"} replace state={{ from }} />;
   }
 
   return <>{children}</>;

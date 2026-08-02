@@ -37,6 +37,7 @@ class UserCreate(BaseModel):
     email: str
     password: str
     username: Optional[str] = None
+    beta_access_reservation: str | None = None
 
     @field_validator("first_name")
     @classmethod
@@ -64,10 +65,19 @@ class UserCreate(BaseModel):
         normalized = value.strip()
         return normalized or None
 
+    @field_validator("beta_access_reservation")
+    @classmethod
+    def normalize_beta_access_reservation(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
 
 class UserLogin(BaseModel):
     email: str
     password: str
+    beta_access_reservation: str | None = None
 
     @field_validator("email")
     @classmethod
@@ -80,6 +90,14 @@ class UserLogin(BaseModel):
         if not value:
             raise ValueError("password is required")
         return value
+
+    @field_validator("beta_access_reservation")
+    @classmethod
+    def normalize_beta_access_reservation(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
 
 class UserRead(BaseModel):

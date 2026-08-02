@@ -1,0 +1,78 @@
+import { apiPost } from "@/lib/api";
+
+const RESERVATION_STORAGE_KEY = "cfb_beta_access_reservation";
+
+export const betaAccessEnabled = import.meta.env.VITE_BETA_ACCESS_ENABLED === "true";
+
+type BetaAccessValidationPayload = {
+  reservation_token: string;
+  reservation_expires_at: string;
+  email: string;
+  existing_account?: boolean;
+};
+
+export type BetaAccessReservation = {
+  token: string;
+  expiresAt: string;
+  email: string;
+  existingAccount: boolean;
+};
+
+const safeSessionGet = (key: string): string | null => {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const safeSessionSet = (key: string, value: string) => {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // A private-browser storage failure should not expose a bypass; signup
+    // remains blocked because no reservation can be retrieved.
+  }
+};
+
+const safeSessionRemove = (key: string) => {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // Ignore storage cleanup failures.
+  }
+};
+
+export const getBetaAccessReservation = (): BetaAccessReservation | null => {
+  if (!betaAccessEnabled) return null;
+  const stored = safeSessionGet(RESERVATION_STORAGE_KEY);
+  if (!stored) return null;
+  try {
+    const value = JSON.parse(stored) as BetaAccessReservation;
+    if (!value.token || !value.email || Number.isNaN(Date.parse(value.expiresAt)) || Date.parse(value.expiresAt) <= Date.now()) {
+      safeSessionRemove(RESERVATION_STORAGE_KEY);
+      return null;
+    }
+    return value;
+  } catch {
+    safeSessionRemove(RESERVATION_STORAGE_KEY);
+    return null;
+  }
+};
+
+export const clearBetaAccessReservation = () => safeSessionRemove(RESERVATION_STORAGE_KEY);
+
+export const validateBetaAccess = async (email: string, code: string): Promise<BetaAccessReservation> => {
+  const payload = await apiPost<BetaAccessValidationPayload>("/beta-access/validate", { email, code });
+  const reservation: BetaAccessReservation = {
+    token: payload.reservation_token,
+    expiresAt: payload.reservation_expires_at,
+    email: payload.email,
+    existingAccount: !!payload.existing_account,
+  };
+  if (!reservation.token || !reservation.email || Number.isNaN(Date.parse(reservation.expiresAt))) {
+    throw new Error("Unable to verify early access. Please try again.");
+  }
+  safeSessionSet(RESERVATION_STORAGE_KEY, JSON.stringify(reservation));
+  return reservation;
+};

@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError, apiUnavailableMessage } from "@/lib/api";
+import { clearBetaAccessReservation, getBetaAccessReservation } from "@/lib/beta-access";
 import { setPendingGuide } from "@/lib/onboarding";
 
 const featureCards = [
@@ -98,13 +99,24 @@ export default function Login() {
     location.state &&
     "passwordResetSuccess" in location.state &&
     location.state.passwordResetSuccess === true;
+  const betaAccessPending =
+    typeof location.state === "object" &&
+    location.state &&
+    "betaAccessPending" in location.state &&
+    location.state.betaAccessPending === true;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
     try {
-      const signedInUser = await login(email, password);
+      const reservation = getBetaAccessReservation();
+      const matchingReservation =
+        reservation && reservation.email === email.trim().toLowerCase() ? reservation.token : undefined;
+      const signedInUser = await login(email, password, matchingReservation);
+      if (matchingReservation) {
+        clearBetaAccessReservation();
+      }
       if (signedInUser) {
         setPendingGuide(signedInUser.id);
       }
@@ -258,6 +270,12 @@ export default function Login() {
               {resetSuccess ? (
                 <div className="rounded-2xl border border-cfb-gold/35 bg-cfb-gold/[0.12] px-4 py-3 text-xs font-bold text-yellow-100">
                   Password reset successfully. Sign in with your new password.
+                </div>
+              ) : null}
+
+              {betaAccessPending ? (
+                <div className="rounded-2xl border border-cfb-cyan/35 bg-cfb-cyan/[0.10] px-4 py-3 text-xs font-bold text-cyan-50">
+                  Your early-access code was verified. Sign in with that same email to finish linking beta access.
                 </div>
               ) : null}
 

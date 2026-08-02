@@ -12,6 +12,7 @@ ensure_models_registered()
 
 from collegefootballfantasy_api.app.api.routes import (
     auth,
+    beta_access,
     admin_trades,
     admin_scoring,
     chats,
@@ -73,6 +74,7 @@ def log_runtime_identity_on_startup() -> None:
 
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(beta_access.router, prefix="/beta-access", tags=["beta-access"])
 app.include_router(admin_scoring.router, prefix="/admin/scoring", tags=["admin-scoring"])
 app.include_router(admin_trades.router, prefix="/admin/trades", tags=["admin-trades"])
 app.include_router(leagues.router, prefix="/leagues", tags=["leagues"])

@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.api.deps import get_current_user
@@ -20,6 +21,7 @@ from collegefootballfantasy_api.app.core.security import (
     verify_password,
 )
 from collegefootballfantasy_api.app.db.session import get_db
+from collegefootballfantasy_api.app.models.beta_access import BetaAccessCode
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.auth import (
@@ -44,6 +46,12 @@ from collegefootballfantasy_api.app.services.auth_security import (
     reset_failed_login_state,
     revoke_user_sessions,
     utcnow,
+)
+from collegefootballfantasy_api.app.services.beta_access import (
+    GENERIC_MISMATCH_MESSAGE,
+    consume_beta_access_reservation,
+    redeem_beta_access,
+    release_beta_access_reservation,
 )
 from collegefootballfantasy_api.app.services.password_change import (
     PasswordChangeCredentialError,
@@ -153,6 +161,7 @@ def _complete_successful_login(
     password: str,
     response: Response,
     request: Request,
+    beta_access_code: BetaAccessCode | None = None,
 ) -> AuthResponse:
     now = utcnow()
     reset_failed_login_state(user)
@@ -162,6 +171,10 @@ def _complete_successful_login(
         user.password_changed_at = now
 
     refresh_token = _create_refresh_session(db, user_id=user.id, request=request)
+    if beta_access_code:
+        # A registered member must prove both their account password and the
+        # exact assigned e-mail/code pair before this entitlement is linked.
+        redeem_beta_access(db, code=beta_access_code, user=user, request=request)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -186,38 +199,61 @@ def current_user_profile(current_user: User = Depends(get_current_user)) -> User
 
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 def signup(payload: UserCreate, response: Response, request: Request, db: Session = Depends(get_db)) -> AuthResponse:
-    enforce_auth_rate_limit(
-        db,
-        action="signup",
-        identifier=payload.email,
-        request=request,
-        limit=settings.auth_signup_rate_limit,
-    )
-    existing = db.query(User).filter(func.lower(User.email) == payload.email).first()
-    if existing:
-        db.commit()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email already registered")
+    beta_access_code = None
+    signup_email = payload.email
+    if settings.beta_access_enabled:
+        if not payload.beta_access_reservation:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=GENERIC_MISMATCH_MESSAGE)
+        beta_access_code = consume_beta_access_reservation(db, token=payload.beta_access_reservation)
+        # The verified reservation is the only authority for a beta account's
+        # email; a direct client request cannot substitute another address.
+        signup_email = beta_access_code.email
 
-    username = _normalize_username(payload.username, fallback=payload.email.split("@", 1)[0])
-    if payload.username and db.query(User).filter(User.username == username).first():
-        db.commit()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="username already registered")
+    try:
+        enforce_auth_rate_limit(
+            db,
+            action="signup",
+            identifier=signup_email,
+            request=request,
+            limit=settings.auth_signup_rate_limit,
+        )
+        existing = db.query(User).filter(func.lower(User.email) == signup_email).first()
+        if existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email already registered")
 
-    now = utcnow()
-    user = User(
-        first_name=payload.first_name,
-        email=payload.email,
-        username=_unique_username(db, username),
-        password_hash=hash_password(payload.password),
-        api_token=generate_token(32),
-        last_login=now,
-        password_changed_at=now,
-        email_verified_at=now,
-    )
-    db.add(user)
-    db.flush()
-    refresh_token = _create_refresh_session(db, user_id=user.id, request=request)
-    db.commit()
+        username = _normalize_username(payload.username, fallback=signup_email.split("@", 1)[0])
+        if payload.username and db.query(User).filter(User.username == username).first():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="username already registered")
+
+        now = utcnow()
+        user = User(
+            first_name=payload.first_name,
+            email=signup_email,
+            username=_unique_username(db, username),
+            password_hash=hash_password(payload.password),
+            api_token=generate_token(32),
+            last_login=now,
+            password_changed_at=now,
+            email_verified_at=now,
+        )
+        db.add(user)
+        db.flush()
+        refresh_token = _create_refresh_session(db, user_id=user.id, request=request)
+        if beta_access_code:
+            redeem_beta_access(db, code=beta_access_code, user=user, request=request)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        if beta_access_code:
+            refreshed_code = db.query(BetaAccessCode).filter(BetaAccessCode.id == beta_access_code.id).one()
+            release_beta_access_reservation(db, code=refreshed_code, request=request)
+            db.commit()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="account could not be created") from exc
+    except HTTPException:
+        if beta_access_code:
+            release_beta_access_reservation(db, code=beta_access_code, request=request)
+            db.commit()
+        raise
     db.refresh(user)
 
     access_token, access_expires_at = create_access_token(
@@ -277,12 +313,27 @@ def login(payload: UserLogin, response: Response, request: Request, db: Session 
             raise HTTPException(status_code=423, detail="account temporarily locked")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
 
+    beta_access_code = None
+    # Existing accounts are not implicitly beta-approved merely because they
+    # predate this gate.  They must validate their own code once, after which
+    # beta_access_granted_at allows normal returning-user sign-in forever.
+    requires_beta_entitlement = settings.beta_access_enabled and user.beta_access_granted_at is None
+    if requires_beta_entitlement and not payload.beta_access_reservation:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=GENERIC_MISMATCH_MESSAGE)
+    if requires_beta_entitlement and payload.beta_access_reservation:
+        beta_access_code = consume_beta_access_reservation(db, token=payload.beta_access_reservation)
+        if beta_access_code.email != normalized_email:
+            # Preserve a valid reservation for its intended owner, but never
+            # attach it to a different signed-in account.
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=GENERIC_MISMATCH_MESSAGE)
+
     return _complete_successful_login(
         db=db,
         user=user,
         password=payload.password,
         response=response,
         request=request,
+        beta_access_code=beta_access_code,
     )
 
 

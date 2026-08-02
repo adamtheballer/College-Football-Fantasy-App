@@ -4,6 +4,7 @@ WORKDIR /app/web
 
 ARG CFF_GIT_SHA=unknown
 ARG CFF_GIT_BRANCH=unknown
+ARG VITE_BETA_ACCESS_ENABLED=false
 
 LABEL org.opencontainers.image.revision=${CFF_GIT_SHA} \
     org.opencontainers.image.version=${CFF_GIT_BRANCH}
@@ -15,6 +16,7 @@ RUN npm ci
 COPY web ./
 
 ENV VITE_API_BASE_URL=/api
+ENV VITE_BETA_ACCESS_ENABLED=${VITE_BETA_ACCESS_ENABLED}
 RUN npm run build
 
 FROM nginx:1.27-alpine

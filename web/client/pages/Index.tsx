@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import {
   Bell,
   CalendarClock,
@@ -20,6 +20,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLeagueWorkspace, useLeagues } from "@/hooks/use-leagues";
 import { useSaturdayPickContest } from "@/hooks/use-saturday-pick";
 import { apiGet } from "@/lib/api";
+import { betaAccessEnabled } from "@/lib/beta-access";
 import { getSaturdayPickRewardMessage, getSaturdayPickSponsorLogo } from "@/lib/saturday-pick-sponsor";
 import type { LeagueDetail } from "@/types/league";
 
@@ -201,6 +202,9 @@ export default function Index() {
   );
 
   if (!isLoggedIn) {
+    if (betaAccessEnabled) {
+      return <Navigate to="/beta-access" replace />;
+    }
     return <GuestHome />;
   }
 

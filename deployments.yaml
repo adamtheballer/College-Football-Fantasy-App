@@ -112,7 +112,11 @@ environments:
       build_command: npm --prefix web ci && npm --prefix web run build
       static_output: web/dist/spa
       env:
-        VITE_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        # The Vercel project must route /api/:path* to the always-on API host.
+        # Keep the public build on same-origin /api so browser code never embeds
+        # an API host or an access-control secret.
+        VITE_API_BASE_URL: /api
+        VITE_BETA_ACCESS_ENABLED: ${VITE_BETA_ACCESS_ENABLED}
       requires_api_readiness: true
       release_check: curl --fail --show-error --silent ${PUBLIC_API_BASE_URL}/health/ready
     workers:
@@ -132,6 +136,10 @@ environments:
       - UI_BASE_URL
       - PUBLIC_API_BASE_URL
       - VITE_API_BASE_URL
+      - BETA_ACCESS_ENABLED
+      - BETA_ACCESS_CODE_HMAC_SECRET
+      - BETA_ACCESS_RESERVATION_SECRET
+      - VITE_BETA_ACCESS_ENABLED
       - REFRESH_COOKIE_SECURE
       - REFRESH_COOKIE_SAMESITE
       - EMAIL_DELIVERY_MODE

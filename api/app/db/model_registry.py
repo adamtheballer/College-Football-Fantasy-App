@@ -13,6 +13,7 @@ def ensure_models_registered() -> None:
         application_instance,
         auth_action_token,
         auth_rate_limit_event,
+        beta_access,
         chat,
         cfb_standing_snapshot,
         college_team,

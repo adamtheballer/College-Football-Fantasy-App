@@ -47,6 +47,14 @@ services:
       # false, but a future licensed deployment can opt in without changing
       # the Compose contract or database schema.
       PLAYER_HEADSHOTS_ENABLED: "${PLAYER_HEADSHOTS_ENABLED:-false}"
+      BETA_ACCESS_ENABLED: "${BETA_ACCESS_ENABLED:-false}"
+      BETA_ACCESS_CODE_HMAC_SECRET: "${BETA_ACCESS_CODE_HMAC_SECRET:-change-me-beta-access-code-hmac}"
+      BETA_ACCESS_RESERVATION_SECRET: "${BETA_ACCESS_RESERVATION_SECRET:-change-me-beta-access-reservation}"
+      BETA_ACCESS_RESERVATION_TTL_MINUTES: "${BETA_ACCESS_RESERVATION_TTL_MINUTES:-15}"
+      BETA_ACCESS_RATE_LIMIT_WINDOW_MINUTES: "${BETA_ACCESS_RATE_LIMIT_WINDOW_MINUTES:-15}"
+      BETA_ACCESS_FAILED_EMAIL_LIMIT: "${BETA_ACCESS_FAILED_EMAIL_LIMIT:-5}"
+      BETA_ACCESS_FAILED_CODE_LIMIT: "${BETA_ACCESS_FAILED_CODE_LIMIT:-5}"
+      BETA_ACCESS_FAILED_IP_LIMIT: "${BETA_ACCESS_FAILED_IP_LIMIT:-10}"
       # The real-stack E2E suite creates three isolated accounts from one container IP.
       # Keep production limits in deployment configuration; this only prevents test setup throttling.
       AUTH_SIGNUP_RATE_LIMIT: 20
@@ -98,6 +106,7 @@ services:
       args:
         CFF_GIT_SHA: "${CFF_GIT_SHA:-unknown}"
         CFF_GIT_BRANCH: "${CFF_GIT_BRANCH:-unknown}"
+        VITE_BETA_ACCESS_ENABLED: "${VITE_BETA_ACCESS_ENABLED:-false}"
     ports:
       - "${WEB_PORT:-8080}:8080"
     restart: unless-stopped

@@ -6,6 +6,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_JWT_SECRET_KEY = "change-me-in-production"
+DEFAULT_BETA_ACCESS_CODE_HMAC_SECRET = "change-me-beta-access-code-hmac"
+DEFAULT_BETA_ACCESS_RESERVATION_SECRET = "change-me-beta-access-reservation"
 DEFAULT_CORS_ORIGINS = (
     "http://localhost:5173,"
     "http://127.0.0.1:5173,"
@@ -103,6 +105,16 @@ class Settings(BaseSettings):
     auth_refresh_rate_limit: int = 30
     auth_password_reset_rate_limit: int = 5
     auth_password_change_rate_limit: int = 5
+    # The public-beta gate is deliberately separate from normal authentication.
+    # It is disabled outside the approved beta environment by default.
+    beta_access_enabled: bool = False
+    beta_access_code_hmac_secret: str = DEFAULT_BETA_ACCESS_CODE_HMAC_SECRET
+    beta_access_reservation_secret: str = DEFAULT_BETA_ACCESS_RESERVATION_SECRET
+    beta_access_reservation_ttl_minutes: int = 15
+    beta_access_rate_limit_window_minutes: int = 15
+    beta_access_failed_email_limit: int = 5
+    beta_access_failed_code_limit: int = 5
+    beta_access_failed_ip_limit: int = 10
     provider_refresh_rate_limit: int = 30
     chat_message_rate_limit: int = 30
     chat_message_rate_limit_window_minutes: int = 1
@@ -150,6 +162,13 @@ class Settings(BaseSettings):
             raise ValueError("EMAIL_DELIVERY_MODE must be one of: console, smtp")
         return normalized
 
+    @field_validator("beta_access_reservation_ttl_minutes")
+    @classmethod
+    def validate_beta_access_reservation_ttl_minutes(cls, value: int) -> int:
+        if value < 1 or value > 60:
+            raise ValueError("BETA_ACCESS_RESERVATION_TTL_MINUTES must be between 1 and 60")
+        return value
+
     @property
     def is_production(self) -> bool:
         return self.environment.strip().lower() == "production"
@@ -177,6 +196,14 @@ class Settings(BaseSettings):
 
         if self.jwt_secret_key == DEFAULT_JWT_SECRET_KEY:
             raise ValueError("JWT_SECRET_KEY must be changed when ENVIRONMENT=production")
+
+        if self.beta_access_enabled:
+            if self.beta_access_code_hmac_secret == DEFAULT_BETA_ACCESS_CODE_HMAC_SECRET:
+                raise ValueError("BETA_ACCESS_CODE_HMAC_SECRET must be changed for production beta access")
+            if self.beta_access_reservation_secret == DEFAULT_BETA_ACCESS_RESERVATION_SECRET:
+                raise ValueError("BETA_ACCESS_RESERVATION_SECRET must be changed for production beta access")
+            if len(self.beta_access_code_hmac_secret) < 32 or len(self.beta_access_reservation_secret) < 32:
+                raise ValueError("Beta access secrets must each contain at least 32 characters")
 
         if not self.allowed_cors_origins:
             raise ValueError("CORS_ORIGINS must contain at least one production web origin")

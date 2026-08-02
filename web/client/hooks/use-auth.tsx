@@ -68,8 +68,8 @@ type SessionsPayload = {
 
 type AuthContextValue = {
   user: User | null;
-  login: (email: string, password: string) => Promise<User>;
-  signup: (firstName: string, email: string, password: string) => Promise<User>;
+  login: (email: string, password: string, betaAccessReservation?: string) => Promise<User>;
+  signup: (firstName: string, email: string, password: string, betaAccessReservation?: string) => Promise<User>;
   logout: () => void;
   resetPasswordWithCurrentPassword: (
     email: string,
@@ -223,8 +223,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const payload = await apiPost<AuthPayload>("/auth/login", { email, password });
+  const login = useCallback(async (email: string, password: string, betaAccessReservation?: string) => {
+    const payload = await apiPost<AuthPayload>("/auth/login", {
+      email,
+      password,
+      beta_access_reservation: betaAccessReservation,
+    });
     const nextUser = mapAuthPayload(payload);
     persistUser(nextUser, payload.access_token, payload.access_token_expires_at);
     queryClient.clear();
@@ -233,11 +237,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return nextUser;
   }, [queryClient]);
 
-  const signup = useCallback(async (firstName: string, email: string, password: string) => {
+  const signup = useCallback(async (firstName: string, email: string, password: string, betaAccessReservation?: string) => {
     const payload = await apiPost<AuthPayload>("/auth/signup", {
       first_name: firstName,
       email,
       password,
+      beta_access_reservation: betaAccessReservation,
     });
     const nextUser = mapAuthPayload(payload);
     persistUser(nextUser, payload.access_token, payload.access_token_expires_at);

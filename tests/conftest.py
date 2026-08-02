@@ -14,6 +14,7 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     cfb_standing_snapshot,
     auth_action_token,
     auth_rate_limit_event,
+    beta_access,
     college_team,
     draft,
     draft_pick,
