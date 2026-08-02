@@ -11,8 +11,10 @@ services:
       POSTGRES_DB: collegefootballfantasy
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    ports:
-      - "${DB_PORT:-5433}:5432"
+    # Keep PostgreSQL private to this Compose network. The browser-facing
+    # application is intentionally served only through the web service.
+    expose:
+      - "5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -74,8 +76,10 @@ services:
       ESPN_HISTORICAL_STATS_SEASONS_BACK: "${ESPN_HISTORICAL_STATS_SEASONS_BACK:-4}"
       ESPN_HISTORICAL_STATS_USER_AGENT: "${ESPN_HISTORICAL_STATS_USER_AGENT:-CollegeFootballFantasy/0.1 historical-stats}"
       ESPN_HISTORICAL_STATS_FAIL_OPEN: "${ESPN_HISTORICAL_STATS_FAIL_OPEN:-true}"
-    ports:
-      - "${API_PORT:-8000}:8000"
+    # FastAPI is reached by the web container through Docker DNS (`api:8000`).
+    # Do not publish a second browser-facing port alongside the web app.
+    expose:
+      - "8000"
     restart: unless-stopped
     depends_on:
       db:
