@@ -14,7 +14,10 @@ def test_public_web_image_serves_the_built_spa_behind_a_same_origin_api_proxy():
     assert "COPY --from=build /app/web/dist/spa /usr/share/nginx/html" in dockerfile
     assert 'CMD ["nginx", "-g", "daemon off;"]' in dockerfile
     assert "location /api/" in nginx
-    assert "proxy_pass http://api:8000/;" in nginx
+    assert "resolver 127.0.0.11 valid=10s ipv6=off;" in nginx
+    assert "set $api_upstream api:8000;" in nginx
+    assert "rewrite ^/api/(.*)$ /$1 break;" in nginx
+    assert "proxy_pass http://$api_upstream;" in nginx
     assert "try_files $uri $uri/ /index.html;" in nginx
     assert "npm run dev:vite" not in compose
     assert "condition: service_healthy" in compose

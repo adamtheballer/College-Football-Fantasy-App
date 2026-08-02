@@ -23,6 +23,7 @@ from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.models.beta_access import BetaAccessAuditEvent, BetaAccessCode
 from collegefootballfantasy_api.app.services.auth_security import utcnow
 from collegefootballfantasy_api.app.services.beta_access import (
+    AUDIT_HMAC_REKEYED,
     AUDIT_IMPORTED,
     AUDIT_IMPORT_REJECTED,
     beta_access_hmac,
@@ -68,6 +69,14 @@ def parse_args() -> argparse.Namespace:
     mode.add_argument("--dry-run", action="store_true", help="Validate source rows without writing (default).")
     mode.add_argument("--apply", action="store_true", help="Persist safe READY_SENT rows and review states.")
     mode.add_argument("--verify-only", action="store_true", help="Verify the imported registry without reading source rows.")
+    parser.add_argument(
+        "--rekey-code-hmac",
+        action="store_true",
+        help=(
+            "With an approved source export, rotate only the stored HMACs for matching, "
+            "available READY_SENT records after a beta-access secret rotation."
+        ),
+    )
     parser.add_argument("--report-path", type=Path, help="Optional aggregate-only JSON report path.")
     return parser.parse_args()
 
@@ -184,7 +193,7 @@ def parse_source(source: Path) -> tuple[list[ParsedRow], Counter[str]]:
     return rows, status_counts
 
 
-def apply_rows(rows: list[ParsedRow], *, apply: bool) -> Counter[str]:
+def apply_rows(rows: list[ParsedRow], *, apply: bool, rekey_code_hmac: bool = False) -> Counter[str]:
     outcomes: Counter[str] = Counter()
     with SessionLocal() as db:
         for row in rows:
@@ -204,9 +213,7 @@ def apply_rows(rows: list[ParsedRow], *, apply: bool) -> Counter[str]:
             existing_by_email = db.query(BetaAccessCode).filter(BetaAccessCode.email == row.email).one_or_none()
             existing_by_code = db.query(BetaAccessCode).filter(BetaAccessCode.code_hmac == code_hmac).one_or_none()
 
-            if existing_by_source and (
-                existing_by_source.email != row.email or existing_by_source.code_hmac != code_hmac
-            ):
+            if existing_by_source and existing_by_source.email != row.email:
                 outcomes["MANUAL_REVIEW"] += 1
                 if apply:
                     db.add(BetaAccessAuditEvent(action=AUDIT_IMPORT_REJECTED, created_at=utcnow()))
@@ -222,6 +229,31 @@ def apply_rows(rows: list[ParsedRow], *, apply: bool) -> Counter[str]:
                     db.add(BetaAccessAuditEvent(action=AUDIT_IMPORT_REJECTED, created_at=utcnow()))
                 continue
             if existing_by_source:
+                if existing_by_source.code_hmac != code_hmac:
+                    can_rekey = (
+                        rekey_code_hmac
+                        and existing_by_source.state == "AVAILABLE"
+                        and existing_by_source.source_status == "READY_SENT"
+                        and not existing_by_source.manual_review
+                        and row.status == "READY_SENT"
+                        and not row.manual_review
+                    )
+                    if not can_rekey:
+                        outcomes["MANUAL_REVIEW"] += 1
+                        if apply:
+                            db.add(BetaAccessAuditEvent(action=AUDIT_IMPORT_REJECTED, created_at=utcnow()))
+                        continue
+                    if apply:
+                        existing_by_source.code_hmac = code_hmac
+                        db.add(
+                            BetaAccessAuditEvent(
+                                beta_access_code_id=existing_by_source.id,
+                                action=AUDIT_HMAC_REKEYED,
+                                created_at=utcnow(),
+                            )
+                        )
+                    outcomes["REKEYED" if apply else "WOULD_REKEY"] += 1
+                    continue
                 outcomes["ALREADY_REDEEMED" if existing_by_source.state == "REDEEMED" else "ALREADY_IMPORTED"] += 1
                 continue
 
@@ -277,6 +309,8 @@ def verify_registry() -> dict[str, object]:
 def main() -> int:
     args = parse_args()
     ensure_models_registered()
+    if args.rekey_code_hmac and args.verify_only:
+        raise ValueError("--rekey-code-hmac requires --source and cannot be used with --verify-only")
     if args.verify_only:
         report: dict[str, object] = {"mode": "verify_only", **verify_registry()}
         exit_code = 1 if report["unsafe_non_ready_records"] else 0
@@ -284,9 +318,10 @@ def main() -> int:
         if args.source is None:
             raise ValueError("--source is required for --dry-run and --apply")
         rows, source_counts = parse_source(args.source.expanduser())
-        outcomes = apply_rows(rows, apply=args.apply)
+        outcomes = apply_rows(rows, apply=args.apply, rekey_code_hmac=args.rekey_code_hmac)
         report = {
             "mode": "apply" if args.apply else "dry_run",
+            "rekey_code_hmac": args.rekey_code_hmac,
             "source_row_count": len(rows),
             "source_status_counts": dict(sorted(source_counts.items())),
             "outcome_counts": dict(sorted(outcomes.items())),

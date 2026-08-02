@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from collegefootballfantasy_api.app.core.config import (
+    DEFAULT_BETA_ACCESS_RESERVATION_SECRET,
     DEFAULT_CORS_ORIGIN_REGEX,
     DEFAULT_CORS_ORIGINS,
     DEFAULT_JWT_SECRET_KEY,
@@ -43,6 +44,35 @@ def test_development_allows_local_default_cors_and_jwt_secret():
     assert settings.environment == "development"
     assert settings.jwt_secret_key == DEFAULT_JWT_SECRET_KEY
     assert "http://localhost:5173" in settings.allowed_cors_origins
+
+
+def test_beta_access_rejects_default_or_short_hmac_secrets_in_every_environment():
+    with pytest.raises(ValidationError, match="BETA_ACCESS_CODE_HMAC_SECRET must be changed"):
+        make_settings(beta_access_enabled=True)
+
+    with pytest.raises(ValidationError, match="BETA_ACCESS_RESERVATION_SECRET must be changed"):
+        make_settings(
+            beta_access_enabled=True,
+            beta_access_code_hmac_secret="x" * 32,
+            beta_access_reservation_secret=DEFAULT_BETA_ACCESS_RESERVATION_SECRET,
+        )
+
+    with pytest.raises(ValidationError, match="at least 32 characters"):
+        make_settings(
+            beta_access_enabled=True,
+            beta_access_code_hmac_secret="short",
+            beta_access_reservation_secret="also-short",
+        )
+
+
+def test_beta_access_accepts_nondefault_development_secrets():
+    settings = make_settings(
+        beta_access_enabled=True,
+        beta_access_code_hmac_secret="c" * 32,
+        beta_access_reservation_secret="r" * 32,
+    )
+
+    assert settings.beta_access_enabled
 
 
 def test_production_rejects_default_jwt_secret():

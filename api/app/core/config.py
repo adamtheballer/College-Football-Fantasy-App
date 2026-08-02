@@ -191,19 +191,24 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_safety(self) -> "Settings":
+        # A beta gate is an authentication boundary even in a local release
+        # candidate.  Permitting its published fallback HMAC secrets outside
+        # production makes a restart silently invalidate every imported code
+        # (or, worse, makes the code registry predictable).  Development can
+        # still run with beta access disabled, which remains the default.
+        if self.beta_access_enabled:
+            if self.beta_access_code_hmac_secret == DEFAULT_BETA_ACCESS_CODE_HMAC_SECRET:
+                raise ValueError("BETA_ACCESS_CODE_HMAC_SECRET must be changed when beta access is enabled")
+            if self.beta_access_reservation_secret == DEFAULT_BETA_ACCESS_RESERVATION_SECRET:
+                raise ValueError("BETA_ACCESS_RESERVATION_SECRET must be changed when beta access is enabled")
+            if len(self.beta_access_code_hmac_secret) < 32 or len(self.beta_access_reservation_secret) < 32:
+                raise ValueError("Beta access secrets must each contain at least 32 characters")
+
         if not self.is_production:
             return self
 
         if self.jwt_secret_key == DEFAULT_JWT_SECRET_KEY:
             raise ValueError("JWT_SECRET_KEY must be changed when ENVIRONMENT=production")
-
-        if self.beta_access_enabled:
-            if self.beta_access_code_hmac_secret == DEFAULT_BETA_ACCESS_CODE_HMAC_SECRET:
-                raise ValueError("BETA_ACCESS_CODE_HMAC_SECRET must be changed for production beta access")
-            if self.beta_access_reservation_secret == DEFAULT_BETA_ACCESS_RESERVATION_SECRET:
-                raise ValueError("BETA_ACCESS_RESERVATION_SECRET must be changed for production beta access")
-            if len(self.beta_access_code_hmac_secret) < 32 or len(self.beta_access_reservation_secret) < 32:
-                raise ValueError("Beta access secrets must each contain at least 32 characters")
 
         if not self.allowed_cors_origins:
             raise ValueError("CORS_ORIGINS must contain at least one production web origin")
