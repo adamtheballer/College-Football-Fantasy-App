@@ -9,6 +9,7 @@ readonly EXPECTED_BRANCH="codex/runtime-provenance-contract"
 readonly EXPECTED_PORT="18080"
 readonly EXPECTED_PROJECT="cff_beta"
 readonly ENV_FILE="${CFF_BETA_ENV_FILE:-/private/tmp/cff-local-beta.env}"
+readonly DISALLOWED_PUBLIC_PORTS=(3000 4173 5173 8000 8001 8080 18000 18081)
 
 fail() { echo "BETA PREFLIGHT FAILED: $*" >&2; exit 1; }
 [[ -r "$ENV_FILE" ]] || fail "private beta environment file is unavailable: $ENV_FILE"
@@ -19,6 +20,8 @@ source "$ENV_FILE"
 [[ "${PLAYER_HEADSHOTS_ENABLED:-}" == "false" ]] || fail "PLAYER_HEADSHOTS_ENABLED must be false"
 [[ "${BETA_ACCESS_CODE_HMAC_SECRET:-}" != "change-me-beta-access-code-hmac" ]] || fail "beta code secret is not configured"
 [[ "${BETA_ACCESS_RESERVATION_SECRET:-}" != "change-me-beta-access-reservation" ]] || fail "beta reservation secret is not configured"
+[[ -z "${VITE_API_BASE_URL:-}" || "${VITE_API_BASE_URL}" == "/api" ]] || fail "VITE_API_BASE_URL must be /api for the one-port beta runtime"
+grep -Fq 'ENV VITE_API_BASE_URL=/api' Dockerfile.web || fail "web image is not pinned to the same-origin /api base URL"
 
 branch="$(git -c core.fsmonitor=false branch --show-current)"
 [[ "$branch" == "$EXPECTED_BRANCH" ]] || fail "expected branch $EXPECTED_BRANCH, found ${branch:-detached HEAD}"
@@ -32,6 +35,14 @@ while IFS= read -r project; do
   [[ -z "$project" || "$project" == "$EXPECTED_PROJECT" ]] && continue
   [[ "$project" == cff_* ]] && fail "another CFF Compose project is running: $project (stop it explicitly before beta launch)"
 done <<< "$running_projects"
+
+for port in "${DISALLOWED_PUBLIC_PORTS[@]}"; do
+  listener="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
+  [[ -z "$listener" ]] && continue
+  echo "Detected unexpected public listener on port $port:" >&2
+  echo "$listener" >&2
+  fail "only http://127.0.0.1:$EXPECTED_PORT may be used for the local beta runtime"
+done
 
 listener="$(lsof -nP -iTCP:"$EXPECTED_PORT" -sTCP:LISTEN 2>/dev/null || true)"
 if [[ -n "$listener" ]] && ! docker compose -p "$EXPECTED_PROJECT" ps --status running --services 2>/dev/null | grep -qx web; then

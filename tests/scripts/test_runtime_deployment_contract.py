@@ -57,10 +57,12 @@ def test_beta_runtime_scripts_enforce_one_public_origin_and_an_existing_data_vol
 
     assert 'EXPECTED_BRANCH="codex/runtime-provenance-contract"' in preflight
     assert 'EXPECTED_PORT="18080"' in preflight
+    assert "DISALLOWED_PUBLIC_PORTS=(3000 4173 5173 8000 8001 8080 18000 18081)" in preflight
     assert "check_release_source_integrity.py" in preflight
     assert "git -c core.fsmonitor=false fsck" in preflight
     assert "docker volume inspect" in preflight
     assert "another CFF Compose project is running" in preflight
+    assert "VITE_API_BASE_URL must be /api" in preflight
     assert "BETA READY: http://127.0.0.1:18080/" in start
     assert "health/runtime" in start
     assert "down --remove-orphans" in stop
