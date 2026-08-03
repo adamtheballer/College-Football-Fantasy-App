@@ -21,10 +21,7 @@ from sqlalchemy import select
 from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.models.player import Player
-from collegefootballfantasy_api.app.services.cfb27_player_sync import (
-    cfb27_identity_key,
-    load_cfb27_ratings,
-)
+from collegefootballfantasy_api.app.services.cfb27_player_sync import cfb27_identity_key, load_reviewed_cfb27_snapshot
 from collegefootballfantasy_api.app.services.player_bio import normalize_sheet_player_class
 from collegefootballfantasy_api.app.services.power4 import resolve_power4_school
 from scripts.audit_preseason_source_contract import require_valid_contract, require_valid_source_directory
@@ -92,7 +89,10 @@ def read_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
-def bootstrap(*, identities_path: Path, projections_path: Path, apply: bool) -> dict[str, int]:
+def bootstrap(
+    *, identities_path: Path, projections_path: Path, ratings_path: Path | None = None,
+    ratings_manifest_path: Path | None = None, apply: bool
+) -> dict[str, int]:
     identity_rows = read_rows(identities_path)
     projection_rows = read_rows(projections_path)
     source_contract = require_valid_contract(projection_rows, identity_rows)
@@ -106,10 +106,21 @@ def bootstrap(*, identities_path: Path, projections_path: Path, apply: bool) -> 
         for row in identity_rows
         if identity_key(row.get("NAME"), row.get("SCHOOL"), row.get("POSITION")) in projections_by_key
     ]
-    ratings_by_key = {
-        cfb27_identity_key(name=rating.name, school=rating.school, position=rating.position): rating
-        for rating in load_cfb27_ratings()
-    }
+    # Ratings are deliberately opt-in.  The legacy app-data JSON was a seed,
+    # not a reviewed upstream source, and must never overwrite the owner’s
+    # Sheets-backed catalog.  A release import supplies a captured export of
+    # the configured CFB27 Ratings Sheet alongside its source manifest.
+    ratings_by_key = {}
+    if ratings_path is not None:
+        if ratings_manifest_path is None:
+            raise ValueError("CFB27 ratings import requires an approved snapshot manifest.")
+        snapshot = load_reviewed_cfb27_snapshot(
+            snapshot_path=ratings_path, manifest_path=ratings_manifest_path
+        )
+        ratings_by_key = {
+            cfb27_identity_key(name=rating.name, school=rating.school, position=rating.position): rating
+            for rating in snapshot.ratings
+        }
 
     ensure_models_registered()
     now = datetime.now(timezone.utc)
@@ -216,6 +227,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Bootstrap the offline reviewed 2026 player catalog.")
     parser.add_argument("--identities", type=Path, default=DEFAULT_IDENTITIES)
     parser.add_argument("--projections", type=Path, default=DEFAULT_PROJECTIONS)
+    parser.add_argument(
+        "--ratings",
+        type=Path,
+        help="Optional reviewed CFB27 rating snapshot captured from the configured CFB27 Ratings Sheet.",
+    )
+    parser.add_argument("--ratings-manifest", type=Path, help="Approved immutable manifest for --ratings.")
     parser.add_argument("--apply", action="store_true", help="Persist the idempotent bootstrap instead of validating it.")
     args = parser.parse_args()
     if not args.identities.is_file() or not args.projections.is_file():
@@ -232,10 +249,20 @@ def main() -> None:
         require_valid_source_directory(args.identities.parent)
     except ValueError as error:
         raise SystemExit(f"canonical player bootstrap rejected: {error}") from error
-    print(bootstrap(identities_path=args.identities, projections_path=args.projections, apply=args.apply))
+    if args.ratings is not None and not args.ratings.is_file():
+        raise SystemExit("Reviewed CFB27 rating snapshot does not exist.")
+    if args.ratings is not None and args.ratings_manifest is None:
+        raise SystemExit("Reviewed CFB27 ratings require --ratings-manifest.")
+    print(
+        bootstrap(
+            identities_path=args.identities,
+            projections_path=args.projections,
+            ratings_path=args.ratings,
+            ratings_manifest_path=args.ratings_manifest,
+            apply=args.apply,
+        )
+    )
 
 
 if __name__ == "__main__":
     main()
-
-
