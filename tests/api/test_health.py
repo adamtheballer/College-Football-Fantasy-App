@@ -42,6 +42,11 @@ def test_runtime_identity_reports_safe_process_and_database_identifiers(client, 
     assert payload["api_process_instance_uuid"]
     assert payload["runtime_id"] == settings.runtime_id
     assert payload["runtime_mode"] == settings.runtime_mode
+    assert payload["web_git_sha"] == settings.web_git_sha
+    assert payload["worker_git_sha"] == settings.worker_git_sha
+    assert payload["player_dataset_version"] == settings.player_dataset_version
+    assert payload["projection_dataset_version"] == settings.projection_dataset_version
+    assert payload["cfb27_rating_dataset_version"] == settings.cfb27_rating_dataset_version
     assert payload["database_instance_uuid"]
     assert payload["alembic_version"] == [head]
     assert payload["readiness_status"] == "ready"
@@ -59,6 +64,11 @@ def test_development_runtime_reports_safe_database_identity(client, db_session):
     payload = response.json()
     assert payload["environment"] == "development"
     assert payload["runtime_mode"] == settings.runtime_mode
+    assert payload["web_git_sha"] == settings.web_git_sha
+    assert payload["worker_git_sha"] == settings.worker_git_sha
+    assert payload["player_dataset_version"] == settings.player_dataset_version
+    assert payload["projection_dataset_version"] == settings.projection_dataset_version
+    assert payload["cfb27_rating_dataset_version"] == settings.cfb27_rating_dataset_version
     assert payload["database_instance_uuid"]
     assert payload["alembic_revision"] == head
     assert payload["api_started_at"]

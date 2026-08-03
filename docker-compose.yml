@@ -45,6 +45,11 @@ services:
       # the API process so /health/runtime cannot make a diagnostic browser
       # session look like valid beta-release evidence.
       RUNTIME_MODE: "${CFF_RUNTIME_MODE:-unknown}"
+      WEB_GIT_SHA: "${CFF_WEB_GIT_SHA:-unknown}"
+      WORKER_GIT_SHA: "${CFF_WORKER_GIT_SHA:-unknown}"
+      PLAYER_DATASET_VERSION: "${CFF_PLAYER_DATASET_VERSION:-unknown}"
+      PROJECTION_DATASET_VERSION: "${CFF_PROJECTION_DATASET_VERSION:-unknown}"
+      CFB27_RATING_DATASET_VERSION: "${CFF_CFB27_RATING_DATASET_VERSION:-unknown}"
       # Keep this beta compliance flag deploy-configurable. It defaults to
       # false, but a future licensed deployment can opt in without changing
       # the Compose contract or database schema.

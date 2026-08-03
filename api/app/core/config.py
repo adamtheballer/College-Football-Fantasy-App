@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     git_branch: str = "unknown"
     runtime_id: str | None = None
     runtime_mode: str = "unknown"
+    web_git_sha: str = "unknown"
+    worker_git_sha: str = "unknown"
+    player_dataset_version: str = "unknown"
+    projection_dataset_version: str = "unknown"
+    cfb27_rating_dataset_version: str = "unknown"
     ui_base_url: str = "http://localhost:5173"
     cors_origins: str = DEFAULT_CORS_ORIGINS
     cors_origin_regex: str | None = DEFAULT_CORS_ORIGIN_REGEX

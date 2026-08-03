@@ -1,0 +1,34 @@
+# The only supported public-beta override.  It deliberately reuses a named,
+# pre-existing database volume instead of letting Compose create a blank
+# project-scoped volume for a second copy of the application.
+name: cff_beta
+
+services:
+  db:
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  api:
+    environment:
+      UI_BASE_URL: "http://127.0.0.1:18080"
+      GIT_SHA: "${CFF_GIT_SHA:?CFF_GIT_SHA is required}"
+      GIT_BRANCH: "${CFF_GIT_BRANCH:?CFF_GIT_BRANCH is required}"
+      RUNTIME_MODE: "release_candidate"
+      RUNTIME_ID: "${CFF_RUNTIME_ID:?CFF_RUNTIME_ID is required}"
+      WEB_GIT_SHA: "${CFF_WEB_GIT_SHA:?CFF_WEB_GIT_SHA is required}"
+      WORKER_GIT_SHA: "${CFF_WORKER_GIT_SHA:?CFF_WORKER_GIT_SHA is required}"
+      PLAYER_DATASET_VERSION: "${CFF_PLAYER_DATASET_VERSION:?CFF_PLAYER_DATASET_VERSION is required}"
+      PROJECTION_DATASET_VERSION: "${CFF_PROJECTION_DATASET_VERSION:?CFF_PROJECTION_DATASET_VERSION is required}"
+      CFB27_RATING_DATASET_VERSION: "${CFF_CFB27_RATING_DATASET_VERSION:?CFB27_RATING_DATASET_VERSION is required}"
+  lifecycle_worker:
+    environment:
+      GIT_SHA: "${CFF_GIT_SHA:?CFF_GIT_SHA is required}"
+      GIT_BRANCH: "${CFF_GIT_BRANCH:?CFF_GIT_BRANCH is required}"
+      RUNTIME_MODE: "release_candidate"
+  web:
+    ports:
+      - "127.0.0.1:18080:8080"
+
+volumes:
+  pgdata:
+    external: true
+    name: "${CFF_BETA_DATA_VOLUME:?CFF_BETA_DATA_VOLUME is required}"

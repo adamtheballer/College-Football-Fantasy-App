@@ -19,6 +19,8 @@ def test_public_web_image_serves_the_built_spa_behind_a_same_origin_api_proxy():
     assert "rewrite ^/api/(.*)$ /$1 break;" in nginx
     assert "proxy_pass http://$api_upstream;" in nginx
     assert "try_files $uri $uri/ /index.html;" in nginx
+    assert 'Cache-Control "no-store" always;' in nginx
+    assert 'Cache-Control "public, max-age=31536000, immutable" always;' in nginx
     assert "npm run dev:vite" not in compose
     assert "condition: service_healthy" in compose
     assert "scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026" in compose
@@ -34,24 +36,29 @@ def test_public_web_image_serves_the_built_spa_behind_a_same_origin_api_proxy():
     assert "restart: unless-stopped" in db_service.group("body")
 
 
-def test_release_candidate_launcher_embeds_the_checked_out_revision_and_refuses_dirty_source():
+def test_release_candidate_launcher_is_a_safe_compatibility_shim():
     launcher = (REPO_ROOT / "scripts" / "serve_local_release_candidate.sh").read_text(encoding="utf-8")
 
-    assert 'CFF_GIT_SHA="$(git -c core.fsmonitor=false rev-parse HEAD)"' in launcher
-    assert 'CFF_GIT_BRANCH="$(git -c core.fsmonitor=false branch --show-current)"' in launcher
-    assert 'CFF_RELEASE_PROJECT_ID="$(git -c core.fsmonitor=false rev-parse --short=12 HEAD)"' in launcher
-    assert 'COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-cff-rc-${CFF_RELEASE_PROJECT_ID}}"' in launcher
-    assert 'git status --porcelain --untracked-files=normal' not in launcher
-    assert 'ALLOW_DIRTY_RELEASE_CANDIDATE:-false' in launcher
-    assert 'export CFF_RUNTIME_MODE="release_candidate"' in launcher
-    assert 'export CFF_RUNTIME_MODE="diagnostic"' in launcher
-    assert "Refusing to label release-critical local source as a release candidate." in launcher
-    assert "python3 scripts/check_release_source_integrity.py" in launcher
-    assert "scripts/check_release_source_integrity.py" in launcher
-    assert "scripts/audit_preseason_source_contract.py" in launcher
-    assert "scripts/check_local_runtime_port.py --label \"release-candidate API\"" in launcher
-    assert "scripts/check_local_runtime_port.py --label \"release-candidate UI\"" in launcher
-    assert "docker compose up --build --detach db api web lifecycle_worker" in launcher
-    assert 'export API_PORT="${API_PORT:-18000}"' in launcher
-    assert 'export WEB_PORT="${WEB_PORT:-18080}"' in launcher
-    assert '"http://127.0.0.1:${API_PORT}/health/runtime"' in launcher
+    assert "scripts/start-beta-local.sh" in launcher
+    assert "cff-rc-" not in launcher
+    assert "18000" not in launcher
+
+
+def test_beta_runtime_scripts_enforce_one_public_origin_and_an_existing_data_volume():
+    preflight = (REPO_ROOT / "scripts" / "preflight-beta-local.sh").read_text(encoding="utf-8")
+    start = (REPO_ROOT / "scripts" / "start-beta-local.sh").read_text(encoding="utf-8")
+    stop = (REPO_ROOT / "scripts" / "stop-beta-local.sh").read_text(encoding="utf-8")
+    override = (REPO_ROOT / "docker-compose.beta-local.yml").read_text(encoding="utf-8")
+
+    assert 'EXPECTED_BRANCH="codex/runtime-provenance-contract"' in preflight
+    assert 'EXPECTED_PORT="18080"' in preflight
+    assert "check_release_source_integrity.py" in preflight
+    assert "git -c core.fsmonitor=false fsck" in preflight
+    assert "docker volume inspect" in preflight
+    assert "another CFF Compose project is running" in preflight
+    assert "BETA READY: http://127.0.0.1:18080/" in start
+    assert "health/runtime" in start
+    assert "down --remove-orphans" in stop
+    assert "--volumes" not in stop
+    assert "external: true" in override
+    assert '"127.0.0.1:18080:8080"' in override

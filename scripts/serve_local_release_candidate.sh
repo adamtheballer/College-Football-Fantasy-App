@@ -1,73 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Launch the same static web/API/worker topology used for release verification.
-# A worktree with dirty release-critical source may be used only when the
-# caller explicitly marks it as diagnostic; it must never be described as a
-# release candidate.
+# Compatibility shim for the former release-candidate launcher.  The old
+# implementation created a commit-named Compose project and therefore a new,
+# empty database volume while still publishing the UI at 18080.  That made the
+# browser appear to lose leagues and beta-access data.  All beta starts now
+# use the fixed cff_beta project, one public origin, and an explicit existing
+# data volume.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
-
-if ! git -c core.fsmonitor=false rev-parse --verify HEAD >/dev/null 2>&1; then
-  echo "Cannot start a release candidate without a Git commit." >&2
-  exit 1
-fi
-
-if [[ "${ALLOW_DIRTY_RELEASE_CANDIDATE:-false}" != "true" ]]; then
-  # Do not use `git status` here. On the affected macOS filesystem-monitor
-  # worktree it can take long enough to make the browser appear connected to a
-  # stale runtime. This gate is more relevant than a broad status scan: it
-  # fails closed only for source and build inputs that can change the release
-  # artifact, and it performs no worktree-wide Git refresh.
-  # This checker uses only the Python standard library. Run it directly so a
-  # broken or slow dependency wrapper cannot mask the actual provenance
-  # result or leave the launcher apparently hung before any service starts.
-  if ! python3 scripts/check_release_source_integrity.py; then
-    echo "Refusing to label release-critical local source as a release candidate." >&2
-    echo "Commit or isolate those source changes first. Set ALLOW_DIRTY_RELEASE_CANDIDATE=true for diagnostic use only." >&2
-    exit 2
-  fi
-  export CFF_RUNTIME_MODE="release_candidate"
-else
-  # A caller may deliberately run uncommitted source to diagnose a problem,
-  # but that process must identify itself as diagnostic everywhere runtime
-  # provenance is displayed.  It is not valid beta-release evidence.
-  export CFF_RUNTIME_MODE="diagnostic"
-fi
-
-export CFF_GIT_SHA="$(git -c core.fsmonitor=false rev-parse HEAD)"
-export CFF_GIT_BRANCH="$(git -c core.fsmonitor=false branch --show-current)"
-export CFF_RELEASE_PROJECT_ID="$(git -c core.fsmonitor=false rev-parse --short=12 HEAD)"
-# Never attach a release-candidate launch to the generic development compose
-# project. A commit-scoped project keeps its API, worker, and database from
-# being mistaken for a previously started local stack.
-export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-cff-rc-${CFF_RELEASE_PROJECT_ID}}"
-# Keep a release candidate separate from the generic development stack. This
-# means a browser cannot accidentally reopen localhost:8080 and exercise a
-# previous API process after a candidate restart.
-export API_PORT="${API_PORT:-18000}"
-export WEB_PORT="${WEB_PORT:-18080}"
-# The candidate API reaches Postgres over Docker's private ``db`` network; it
-# does not need the database exposed on the host.  Keep an opt-in diagnostic
-# binding for direct audits, but choose a free port when none is supplied so a
-# preserved generic/local database can never prevent the candidate from
-# starting or make the browser talk to a stale stack.
-if [[ -z "${DB_PORT:-}" ]]; then
-  export DB_PORT="$(python3 -c 'import socket; sock = socket.socket(); sock.bind(("127.0.0.1", 0)); print(sock.getsockname()[1]); sock.close()')"
-else
-  export DB_PORT
-fi
-export CFF_RUNTIME_ID="${CFF_RUNTIME_ID:-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
-
-python3 scripts/check_local_runtime_port.py --label "release-candidate API" --port "$API_PORT" --port-variable API_PORT
-python3 scripts/check_local_runtime_port.py --label "release-candidate UI" --port "$WEB_PORT" --port-variable WEB_PORT
-
-PYTHONPATH=. uv run python scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026
-
-docker compose up --build --detach db api web lifecycle_worker
-docker compose ps
-
-printf '\nRuntime identity:\n'
-curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:${API_PORT}/health/runtime"
-printf '\nStatic UI: http://127.0.0.1:%s/\n' "$WEB_PORT"
-printf 'Candidate database audit port: 127.0.0.1:%s\n' "$DB_PORT"
+echo "serve_local_release_candidate.sh is retired; starting the fixed beta runtime instead." >&2
+exec scripts/start-beta-local.sh "$@"
