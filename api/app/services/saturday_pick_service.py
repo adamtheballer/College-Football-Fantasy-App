@@ -26,6 +26,7 @@ from collegefootballfantasy_api.app.models.saturday_pick import (
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.schemas.saturday_pick import (
     SaturdayPickContestCreate,
     SaturdayPickContestRead,
@@ -105,15 +106,12 @@ def _is_known_out(db: Session, player_id: int, season: int, week: int) -> bool:
 
 
 def _weekly_projection(db: Session, player_id: int, season: int, week: int) -> float | None:
-    projection = (
-        db.query(WeeklyProjection)
-        .filter(
-            WeeklyProjection.player_id == player_id,
-            WeeklyProjection.season == season,
-            WeeklyProjection.week == week,
-            WeeklyProjection.is_published.is_(True),
+    projection = db.scalar(
+        current_published_projections_query(
+            season=season,
+            week=week,
+            player_ids=(player_id,),
         )
-        .one_or_none()
     )
     return float(projection.fantasy_points) if projection and projection.fantasy_points is not None else None
 

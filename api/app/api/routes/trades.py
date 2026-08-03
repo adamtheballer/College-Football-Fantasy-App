@@ -13,6 +13,7 @@ from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.schemas.trade import (
@@ -133,12 +134,21 @@ def _build_performance_context(
     for player_id, points in actual_by_player.items():
         actual_by_position.setdefault(positions_by_player[player_id], []).append(points)
 
-    projection_rows = (
-        db.query(WeeklyProjection, Player)
-        .join(Player, WeeklyProjection.player_id == Player.id)
-        .filter(WeeklyProjection.season == season, WeeklyProjection.week < week)
-        .all()
-    )
+    # Projection rows are versioned.  Build historical context from the same
+    # authoritative published snapshot selection used by the roster, draft,
+    # matchup, and player-card paths—never from every saved version.
+    projection_rows = []
+    for projection_week in range(1, week):
+        projection_rows.extend(
+            db.execute(
+                current_published_projections_query(
+                    season=season,
+                    week=projection_week,
+                )
+                .join(Player, WeeklyProjection.player_id == Player.id)
+                .with_only_columns(WeeklyProjection, Player)
+            ).all()
+        )
     projected_points: dict[int, list[float]] = {}
     for projection, player in projection_rows:
         projected_points.setdefault(player.id, []).append(_projection_points(player, projection, scoring_rules))
@@ -185,9 +195,11 @@ def _build_replacement_by_pos(
     scoring_rules: dict | None = None,
 ) -> dict[str, float]:
     rows = (
-        db.query(WeeklyProjection, Player)
-        .join(Player, WeeklyProjection.player_id == Player.id)
-        .filter(WeeklyProjection.season == season, WeeklyProjection.week == week)
+        db.execute(
+            current_published_projections_query(season=season, week=week)
+            .join(Player, WeeklyProjection.player_id == Player.id)
+            .with_only_columns(WeeklyProjection, Player)
+        )
         .all()
     )
     points_by_pos: dict[str, list[float]] = {}
@@ -364,12 +376,13 @@ def analyze_trade(
     players = db.query(Player).filter(Player.id.in_(payload.receive_ids + payload.give_ids)).all()
     player_by_id = {player.id: player for player in players}
 
-    projections = (
-        db.query(WeeklyProjection)
-        .filter(WeeklyProjection.season == payload.season, WeeklyProjection.week == payload.week)
-        .filter(WeeklyProjection.player_id.in_(payload.receive_ids + payload.give_ids))
-        .all()
-    )
+    projections = db.scalars(
+        current_published_projections_query(
+            season=payload.season,
+            week=payload.week,
+            player_ids=payload.receive_ids + payload.give_ids,
+        )
+    ).all()
     proj_by_id = {proj.player_id: proj for proj in projections}
 
     injuries = (

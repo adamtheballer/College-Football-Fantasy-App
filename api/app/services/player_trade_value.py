@@ -11,6 +11,7 @@ from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.player_trade_value import PlayerTradeValue
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.schemas.player_trade_value import PlayerTradeValueHistoryRead, PlayerTradeValueRead
 
 VALUE_POLICY_VERSION = "universal_v1"
@@ -117,7 +118,13 @@ def calculate_player_trade_value(db: Session, *, player_id: int, season: int, we
         values = [value for value in (_stat_points(row.stats) for row in scores) if value is not None]
         if values: position_performance.append(sum(values) / len(values))
     performance_score = _percentile(performance_raw, position_performance, fallback=rating_score)
-    projection = db.query(WeeklyProjection).filter(WeeklyProjection.player_id == player.id, WeeklyProjection.season == season, WeeklyProjection.week >= max(week, 1), WeeklyProjection.is_published.is_(True)).order_by(WeeklyProjection.week.asc()).first()
+    projection = db.scalar(
+        current_published_projections_query(
+            season=season,
+            week=max(week, 1),
+            player_ids=(player.id,),
+        )
+    )
     projected = float(projection.fantasy_points) if projection else player.sheet_projected_season_points
     projected_pool = [float(row.sheet_projected_season_points) for row in pool if row.sheet_projected_season_points is not None]
     future_score = _percentile(projected, projected_pool, fallback=rating_score)

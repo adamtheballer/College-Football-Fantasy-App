@@ -24,6 +24,7 @@ from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueMatchupTabRead,
     LeagueInviteSettingsRead,
@@ -140,27 +141,14 @@ def _projection_map(
 ) -> dict[int, WeeklyProjection]:
     if not player_ids:
         return {}
-    rows = (
-        db.query(WeeklyProjection)
-        .filter(
-            WeeklyProjection.season == season,
-            WeeklyProjection.week == week,
-            WeeklyProjection.player_id.in_(player_ids),
+    rows = db.scalars(
+        current_published_projections_query(
+            season=season,
+            week=week,
+            player_ids=player_ids,
         )
-        .order_by(
-            WeeklyProjection.is_published.desc(),
-            WeeklyProjection.projection_version.desc(),
-            WeeklyProjection.id.desc(),
-        )
-        .all()
-    )
-    projections: dict[int, WeeklyProjection] = {}
-    for row in rows:
-        # One published projection is the source of truth.  The versioned
-        # history remains queryable without allowing an older row to win based
-        # on database iteration order.
-        projections.setdefault(row.player_id, row)
-    return projections
+    ).all()
+    return {row.player_id: row for row in rows}
 
 
 def _roster_rows(db: Session, team_id: int) -> list[RosterEntry]:

@@ -19,6 +19,7 @@ from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.schemas.roster import (
     AddDropRequest,
     AddDropResponse,
@@ -98,15 +99,13 @@ def _serialize_roster(db: Session, team: Team) -> list[RosterSlotRead]:
         week = resolve_current_week(db, league)
         projections_by_player = {
             row.player_id: float(row.fantasy_points or 0.0)
-            for row in (
-                db.query(WeeklyProjection)
-                .filter(
-                    WeeklyProjection.season == league.season_year,
-                    WeeklyProjection.week == week,
-                    WeeklyProjection.player_id.in_(player_ids),
+            for row in db.scalars(
+                current_published_projections_query(
+                    season=league.season_year,
+                    week=week,
+                    player_ids=player_ids,
                 )
-                .all()
-            )
+            ).all()
         }
 
     return [

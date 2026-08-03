@@ -7,12 +7,11 @@ invent a future-season line from schedule or model inputs.
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
-from typing import Iterable
-
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.domain.scoring_engine import calculate_player_fantasy_points
+from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
@@ -33,15 +32,6 @@ POSITION_SCARCITY = {"QB": 38.0, "RB": 58.0, "WR": 55.0, "TE": 62.0, "K": 25.0, 
 
 def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
-
-
-def _published_projection_by_week(rows: Iterable[WeeklyProjection]) -> dict[int, WeeklyProjection]:
-    by_week: dict[int, WeeklyProjection] = {}
-    for row in rows:
-        current = by_week.get(row.week)
-        if current is None or (row.locked_at is not None, row.updated_at, row.id) > (current.locked_at is not None, current.updated_at, current.id):
-            by_week[row.week] = row
-    return by_week
 
 
 def _projection_stats(row: WeeklyProjection) -> dict[str, float]:
@@ -138,8 +128,17 @@ def build_player_trajectory(
     scoring_rules = _league_scoring_rules(db, league_id)
     schedules = db.query(TeamSchedule).filter(TeamSchedule.team_name == player.school, TeamSchedule.season == season, TeamSchedule.week.in_(WEEKS)).all()
     schedule_by_week = {row.week: row for row in schedules}
-    published_rows = db.query(WeeklyProjection).filter(WeeklyProjection.player_id == player.id, WeeklyProjection.season == season, WeeklyProjection.week.in_(WEEKS), WeeklyProjection.is_published.is_(True)).all()
-    published_by_week = _published_projection_by_week(published_rows)
+    published_by_week = {
+        week: db.scalar(
+            current_published_projections_query(
+                season=season,
+                week=week,
+                player_ids=(player.id,),
+            )
+        )
+        for week in WEEKS
+    }
+    published_by_week = {week: row for week, row in published_by_week.items() if row is not None}
     scheduled_games = sum(1 for week in WEEKS if not (schedule_by_week.get(week) and (schedule_by_week[week].is_bye or schedule_by_week[week].location == "bye")))
     known_points = [_points_for_projection(player, row, scoring_rules) for row in published_by_week.values()]
     season_projection = _season_projection(db, player)
