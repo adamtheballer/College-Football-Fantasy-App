@@ -176,6 +176,37 @@ describe("buildDraftBoard", () => {
     expect(byName.get("Rank 14")?.masterDraftRank).toBeGreaterThanOrEqual(26);
   });
 
+  it("prevents quarterback depth from flooding rounds four through six in one-QB leagues", () => {
+    const players: Player[] = [
+      ...Array.from({ length: 28 }, (_, index) =>
+        makePlayer(index + 1, "QB", 360 - index, {
+          name: `Quarterback ${index + 1}`,
+          rank: index + 1,
+          adp: index + 1,
+        })
+      ),
+      ...Array.from({ length: 80 }, (_, index) =>
+        makePlayer(100 + index, index % 2 === 0 ? "RB" : "WR", 330 - index, {
+          name: `Skill Player ${index + 1}`,
+          rank: 29 + index,
+          adp: 29 + index,
+        })
+      ),
+    ];
+
+    const board = buildDraftBoard(players, config);
+    const earlyQuarterbacks = board
+      .slice(0, config.leagueSize * 6)
+      .filter((player) => player.pos === "QB");
+
+    // 12 starter-QB slots plus a small two-QB backup buffer, never an entire
+    // block of QB depth that hides RB/WR choices in rounds 4–6.
+    expect(earlyQuarterbacks).toHaveLength(14);
+    expect(
+      earlyQuarterbacks.map((player) => player.projectedPoints)
+    ).toEqual([...earlyQuarterbacks.map((player) => player.projectedPoints)].sort((a, b) => b - a));
+  });
+
   it("keeps even elite kickers in the late-round portion of the board", () => {
     const players: Player[] = [
       makePlayer(1, "K", 210, { name: "Elite Kicker", rank: 1, adp: 1, posRank: 1 }),

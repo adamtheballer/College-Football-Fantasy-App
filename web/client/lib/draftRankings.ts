@@ -190,6 +190,7 @@ const QB_BACKUP_REPLACEMENT_RATE = 0.4;
 const QB_STARTER_PROJECTION_FLOOR = 180;
 const QB_SOURCE_RANK_OUTLIER_GAP = 24;
 const QB_PROJECTION_RANK_BUFFER = 12;
+const EARLY_QB_ROUNDS = 6;
 
 const getProvidedBoardRank = (player: Player) => {
   const candidates = [player.boardRank, player.adp, player.rank];
@@ -301,6 +302,52 @@ const enforceQuarterbackProjectionOrder = <T extends { player: Player; projected
     reordered[index] = sortedQuarterbacks[qbIndex];
   });
   return reordered;
+};
+
+/**
+ * In a standard one-QB league, a draft board should surface the league's
+ * starting-QB demand before it starts recommending interchangeable bench QBs.
+ * Keep a small buffer for managers who deliberately take an early backup, but
+ * move the remaining QB depth out of rounds 4–6. This is a board-order rule
+ * only: it never changes the player's season projection or value.
+ */
+const deferExcessEarlyQuarterbacks = <T extends { player: Player }>(
+  board: T[],
+  config: DraftConfig
+) => {
+  if (config.rosterSlots.QB !== 1) return board;
+
+  const earlyBoardSize = Math.min(board.length, config.leagueSize * EARLY_QB_ROUNDS);
+  if (earlyBoardSize === 0) return board;
+
+  const quarterbackLimit = config.leagueSize + Math.max(2, Math.ceil(config.leagueSize * 0.15));
+  const earlyAccepted: T[] = [];
+  const deferredQuarterbacks: T[] = [];
+  let quarterbacksAccepted = 0;
+
+  for (const entry of board.slice(0, earlyBoardSize)) {
+    if (entry.player.pos === "QB" && quarterbacksAccepted >= quarterbackLimit) {
+      deferredQuarterbacks.push(entry);
+      continue;
+    }
+    earlyAccepted.push(entry);
+    if (entry.player.pos === "QB") quarterbacksAccepted += 1;
+  }
+
+  if (!deferredQuarterbacks.length) return board;
+
+  const laterEntries = board.slice(earlyBoardSize);
+  const promotedNonQuarterbacks = laterEntries
+    .filter((entry) => entry.player.pos !== "QB")
+    .slice(0, deferredQuarterbacks.length);
+  const promoted = new Set(promotedNonQuarterbacks);
+
+  return [
+    ...earlyAccepted,
+    ...promotedNonQuarterbacks,
+    ...deferredQuarterbacks,
+    ...laterEntries.filter((entry) => !promoted.has(entry)),
+  ];
 };
 
 export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPlayer[] => {
@@ -556,10 +603,12 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
     })
     .map(({ entry }) => entry);
 
-  const projectionOrderedBoard = enforceQuarterbackProjectionOrder([
-    ...positionAdjustedRanks,
-    ...lowProjectionQbRanks,
-  ]);
+  const projectionOrderedBoard = enforceQuarterbackProjectionOrder(
+    deferExcessEarlyQuarterbacks(
+      [...positionAdjustedRanks, ...lowProjectionQbRanks],
+      config
+    )
+  );
 
   const withRanks = projectionOrderedBoard.map((entry, index) => ({
     ...entry,

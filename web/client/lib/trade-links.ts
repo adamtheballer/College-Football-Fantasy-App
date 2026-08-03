@@ -17,19 +17,20 @@ export const tradeOfferPath = (
 };
 
 /**
- * Trade links can be opened from multiple league surfaces. Only allow a
- * same-app chat route as the post-close destination; this prevents a malformed
- * notification payload from redirecting somebody outside the product.
+ * Trade links can be opened from multiple league surfaces. Only allow known
+ * same-app conversation surfaces as the post-close destination; this prevents
+ * a malformed notification payload from redirecting somebody outside the
+ * product or into the trade builder.
  */
 export const resolveTradeOfferReturnPath = (returnTo: string | null): string => {
-  if (!returnTo) return "/trade";
+  if (!returnTo) return "/leagues";
 
   try {
     const parsed = new URL(returnTo, "https://cfbfantasy.local");
-    return parsed.origin === "https://cfbfantasy.local" && parsed.pathname === "/chats"
+    return parsed.origin === "https://cfbfantasy.local" && ["/alerts", "/chats"].includes(parsed.pathname)
       ? `${parsed.pathname}${parsed.search}`
-      : "/trade";
+      : "/leagues";
   } catch {
-    return "/trade";
+    return "/leagues";
   }
 };
