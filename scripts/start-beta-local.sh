@@ -11,6 +11,7 @@ readonly PROJECT="cff_beta"
 [[ -r "$ENV_FILE" ]] || { echo "Missing private beta environment: $ENV_FILE" >&2; exit 1; }
 # shellcheck disable=SC1090
 source "$ENV_FILE"
+export VITE_BETA_ACCESS_ENABLED="${VITE_BETA_ACCESS_ENABLED:-$BETA_ACCESS_ENABLED}"
 export CFF_GIT_SHA="$(git -c core.fsmonitor=false rev-parse HEAD)"
 export CFF_GIT_BRANCH="$(git -c core.fsmonitor=false branch --show-current)"
 export CFF_WEB_GIT_SHA="$CFF_GIT_SHA"
