@@ -34,6 +34,11 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_IDENTITIES = ROOT_DIR / "reports" / "source-imports" / "2026" / "player-identities.csv"
 DEFAULT_PROJECTIONS = ROOT_DIR / "reports" / "source-imports" / "2026" / "player-projections.csv"
 SOURCE_PREFIX = "canonical-preseason:2026:"
+# A player can remain in the database because an older preseason snapshot, a
+# past draft, or a roster record references it.  That does not make the player
+# part of the reviewed *current* player universe.  Keep the provenance intact
+# while moving the source marker out of the canonical eligibility namespace.
+LEGACY_SOURCE_PREFIX = "legacy-canonical-preseason:2026:"
 ELIGIBLE_POSITIONS = frozenset({"QB", "RB", "WR", "TE", "K"})
 
 PROJECTION_COLUMNS = {
@@ -109,6 +114,7 @@ def bootstrap(*, identities_path: Path, projections_path: Path, apply: bool) -> 
     ensure_models_registered()
     now = datetime.now(timezone.utc)
     created = updated = ratings_matched = 0
+    legacy_snapshot_players = 0
     with SessionLocal() as db:
         existing = {
             identity_key(player.name, player.school, player.position): player
@@ -166,6 +172,22 @@ def bootstrap(*, identities_path: Path, projections_path: Path, apply: bool) -> 
                 player.cfb27_synced_at = now
                 ratings_matched += 1
 
+        # The source snapshot is the authoritative public-beta pool.  Preserve
+        # legacy records (and their historical foreign-key relationships), but
+        # ensure a player omitted from the current approved snapshot cannot
+        # remain draftable merely because it was imported by an older snapshot.
+        for player in existing.values():
+            source_marker = (player.sheet_source_sheet_id or "").strip()
+            if not source_marker.startswith(SOURCE_PREFIX):
+                continue
+            key = identity_key(player.name, player.school, player.position)
+            if key in projections_by_key:
+                continue
+            player.sheet_source_sheet_id = (
+                f"{LEGACY_SOURCE_PREFIX}{source_marker.removeprefix(SOURCE_PREFIX)}"
+            )
+            legacy_snapshot_players += 1
+
         if not apply:
             db.rollback()
         else:
@@ -186,6 +208,7 @@ def bootstrap(*, identities_path: Path, projections_path: Path, apply: bool) -> 
         "created": created,
         "updated": updated,
         "ratings_matched": ratings_matched,
+        "legacy_snapshot_players_excluded_from_current_pool": legacy_snapshot_players,
     }
 
 
@@ -214,6 +237,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
 
 

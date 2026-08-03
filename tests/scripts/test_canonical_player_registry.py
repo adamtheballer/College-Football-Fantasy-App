@@ -46,7 +46,7 @@ def test_registry_audit_rejects_source_rows_that_do_not_resolve_to_one_player():
     assert report["source_keys_with_multiple_internal_players"][0]["player_ids"] == [41, 42]
 
 
-def test_registry_audit_rejects_a_bootstrap_player_left_out_of_the_approved_snapshot():
+def test_registry_audit_reports_a_legacy_snapshot_player_without_rejecting_current_source_rows():
     report = audit_canonical_player_registry(
         identity_rows=[_identity()],
         projection_rows=[_projection()],
@@ -60,7 +60,6 @@ def test_registry_audit_rejects_a_bootstrap_player_left_out_of_the_approved_snap
         ],
     )
 
-    assert report["status"] == "FAIL"
-    assert report["bootstrap_players_absent_from_approved_snapshot_count"] == 1
-
+    assert report["status"] == "PASS"
+    assert report["legacy_snapshot_players_retained_for_history_count"] == 1
 

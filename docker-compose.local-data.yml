@@ -1,0 +1,10 @@
+# Local recovery override only.
+#
+# Set CFF_DATABASE_VOLUME to an existing PostgreSQL data volume when a
+# diagnostic/release-candidate stack must be run against a deliberately chosen
+# restored local dataset. The default compose file continues to use an
+# isolated, commit-scoped volume.
+volumes:
+  pgdata:
+    external: true
+    name: ${CFF_DATABASE_VOLUME:?Set CFF_DATABASE_VOLUME to an existing PostgreSQL volume}

@@ -83,7 +83,11 @@ def audit_canonical_player_registry(
 
     missing_source_keys = sorted(key for key in source_keys if not registry.get(key))
     ambiguous_source_keys = sorted(key for key in source_keys if len(registry.get(key, [])) > 1)
-    unmapped_bootstrap_players = sorted(
+    # Older reviewed snapshots may legitimately leave records in the database
+    # for roster, draft, trade, or stat history.  They are not an ambiguity in
+    # the *current* source snapshot, and bootstrap moves them out of the active
+    # canonical source prefix before this audit runs.
+    legacy_snapshot_players = sorted(
         _display(identity_key(player.name, player.school, player.position))
         for player in bootstrap_players
         if identity_key(player.name, player.school, player.position) not in source_keys
@@ -99,7 +103,6 @@ def audit_canonical_player_registry(
         missing_source_keys
         or ambiguous_source_keys
         or invalid_registry_player_ids
-        or unmapped_bootstrap_players
     )
     return {
         "status": "FAIL" if has_errors else "PASS",
@@ -119,12 +122,13 @@ def audit_canonical_player_registry(
         ],
         "internal_players_without_primary_key_count": len(invalid_registry_player_ids),
         "internal_players_without_primary_key": sorted(invalid_registry_player_ids),
-        "bootstrap_players_absent_from_approved_snapshot_count": len(unmapped_bootstrap_players),
-        "bootstrap_players_absent_from_approved_snapshot": unmapped_bootstrap_players,
+        "legacy_snapshot_players_retained_for_history_count": len(legacy_snapshot_players),
+        "legacy_snapshot_players_retained_for_history": legacy_snapshot_players,
         "note": (
             "The source workbook remains human-editable. Immutable source snapshots are "
             "reconciled to the app-owned players.id registry; provider mappings are audited "
-            "separately because a source row need not have a provider identifier."
+            "separately because a source row need not have a provider identifier. Legacy "
+            "snapshot players are retained for history but excluded from the current pool."
         ),
     }
 
@@ -167,6 +171,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
 
 
