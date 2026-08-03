@@ -5,7 +5,7 @@ set -euo pipefail
 # chooses a database volume and never exposes a host API port.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
-readonly ENV_FILE="${CFF_BETA_ENV_FILE:-/private/tmp/cff-local-beta.env}"
+readonly ENV_FILE="${CFF_BETA_ENV_FILE:-$ROOT_DIR/.beta-runtime.env}"
 readonly PROJECT="cff_beta"
 
 [[ -r "$ENV_FILE" ]] || { echo "Missing private beta environment: $ENV_FILE" >&2; exit 1; }

@@ -10,6 +10,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ApiError } from "@/lib/api";
+import RuntimeCompatibilityGate from "@/components/RuntimeCompatibilityGate";
 import Layout from "./components/Layout";
 
 const Index = lazy(() => import("./pages/Index"));
@@ -67,6 +68,7 @@ const RouteFallback = () => (
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <RuntimeCompatibilityGate>
     <AuthProvider>
       <TooltipProvider>
         <Toaster />
@@ -209,6 +211,7 @@ const App = () => (
         </AppErrorBoundary>
       </TooltipProvider>
     </AuthProvider>
+    </RuntimeCompatibilityGate>
   </QueryClientProvider>
 );
 

@@ -24,7 +24,10 @@ services:
       GIT_SHA: "${CFF_GIT_SHA:?CFF_GIT_SHA is required}"
       GIT_BRANCH: "${CFF_GIT_BRANCH:?CFF_GIT_BRANCH is required}"
       RUNTIME_MODE: "release_candidate"
+  web:
+    ports:
+      - "127.0.0.1:18080:8080"
 volumes:
   pgdata:
     external: true
-    name: "${CFF_BETA_DATA_VOLUME:?CFF_BETA_DATA_VOLUME is required}"
+    name: "cff_beta_pgdata"

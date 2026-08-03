@@ -27,6 +27,8 @@ class DevelopmentRuntimeRead(BaseModel):
 
     git_sha: str
     git_branch: str
+    runtime_id: str | None = None
+    api_process_instance_uuid: str
     web_git_sha: str
     worker_git_sha: str
     environment: str

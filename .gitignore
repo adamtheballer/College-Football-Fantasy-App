@@ -61,3 +61,7 @@ Thumbs.db
 *.dump
 *.dump.list
 *.dump.sha256
+.beta-runtime.env
+artifacts/recovery/
+artifacts/release/
+artifacts/runtime/backups/

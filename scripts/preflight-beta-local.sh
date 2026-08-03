@@ -6,16 +6,17 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 readonly EXPECTED_BRANCH="codex/runtime-provenance-contract"
+readonly EXPECTED_CHECKOUT="/Users/adambajdechi/Documents/College-Football-Fantasy-App-clean"
 readonly EXPECTED_PORT="18080"
 readonly EXPECTED_PROJECT="cff_beta"
-readonly ENV_FILE="${CFF_BETA_ENV_FILE:-/private/tmp/cff-local-beta.env}"
+readonly ENV_FILE="${CFF_BETA_ENV_FILE:-$ROOT_DIR/.beta-runtime.env}"
 readonly DISALLOWED_PUBLIC_PORTS=(3000 4173 5173 8000 8001 8080 18000 18081)
 
 fail() { echo "BETA PREFLIGHT FAILED: $*" >&2; exit 1; }
 [[ -r "$ENV_FILE" ]] || fail "private beta environment file is unavailable: $ENV_FILE"
 # shellcheck disable=SC1090
 source "$ENV_FILE"
-[[ "${CFF_BETA_DATA_VOLUME:-}" ]] || fail "CFF_BETA_DATA_VOLUME is required in the private beta environment"
+[[ "$ROOT_DIR" == "$EXPECTED_CHECKOUT" ]] || fail "must run from $EXPECTED_CHECKOUT, found $ROOT_DIR"
 [[ "${BETA_ACCESS_ENABLED:-}" == "true" ]] || fail "BETA_ACCESS_ENABLED must be true"
 [[ "${PLAYER_HEADSHOTS_ENABLED:-}" == "false" ]] || fail "PLAYER_HEADSHOTS_ENABLED must be false"
 [[ "${BETA_ACCESS_CODE_HMAC_SECRET:-}" != "change-me-beta-access-code-hmac" ]] || fail "beta code secret is not configured"
@@ -28,7 +29,7 @@ branch="$(git -c core.fsmonitor=false branch --show-current)"
 python3 scripts/check_release_source_integrity.py || fail "release-critical source is dirty or incomplete"
 git -c core.fsmonitor=false fsck --full --no-dangling >/dev/null || fail "Git object database failed fsck"
 
-docker volume inspect "$CFF_BETA_DATA_VOLUME" >/dev/null 2>&1 || fail "required existing database volume is missing: $CFF_BETA_DATA_VOLUME"
+docker volume inspect cff_beta_pgdata >/dev/null 2>&1 || fail "required canonical database volume is missing: cff_beta_pgdata"
 
 running_projects="$(docker compose ls --format json 2>/dev/null | python3 -c 'import json,sys; print("\\n".join(x.get("Name", "") for x in json.load(sys.stdin)))' || true)"
 while IFS= read -r project; do
@@ -49,4 +50,4 @@ if [[ -n "$listener" ]] && ! docker compose -p "$EXPECTED_PROJECT" ps --status r
   fail "port $EXPECTED_PORT is already occupied by a non-beta process"
 fi
 
-echo "BETA PREFLIGHT PASSED: branch=$branch port=$EXPECTED_PORT volume=$CFF_BETA_DATA_VOLUME"
+echo "BETA PREFLIGHT PASSED: branch=$branch port=$EXPECTED_PORT volume=cff_beta_pgdata"

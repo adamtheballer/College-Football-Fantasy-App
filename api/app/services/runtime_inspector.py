@@ -75,6 +75,8 @@ def build_development_runtime(db: Session) -> DevelopmentRuntimeRead:
     return DevelopmentRuntimeRead(
         git_sha=identity.git_sha,
         git_branch=identity.git_branch,
+        runtime_id=identity.runtime_id,
+        api_process_instance_uuid=identity.api_process_instance_uuid,
         web_git_sha=identity.web_git_sha,
         worker_git_sha=identity.worker_git_sha,
         environment=identity.environment,
