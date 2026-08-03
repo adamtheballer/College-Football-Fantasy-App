@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "client/**/*.spec.ts",
+    "client/**/*.spec.tsx",
+    "client/**/*.test.ts",
+    "client/**/*.test.tsx",
+    "client/**/__tests__/**/*.ts",
+    "client/**/__tests__/**/*.tsx",
+    "client/**/tests/**/*.ts",
+    "client/**/tests/**/*.tsx",
+    "client/vite-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    ".vite",
+    ".vite-temp",
+    "client/**/fixtures/**"
+  ]
+}

@@ -16,7 +16,7 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["node", "react", "react-dom", "vite/client"],
+    "types": ["node", "react", "react-dom"],
 
     /* Linting */
     "strict": false,
@@ -33,8 +33,20 @@
     }
   },
   "include": [
-    "client/**/*",
-    "vite.config.ts"
+    "client/**/*"
   ],
-  "exclude": ["node_modules", "dist"]
+  "exclude": [
+    "client/**/*.spec.ts",
+    "client/**/*.spec.tsx",
+    "client/**/*.test.ts",
+    "client/**/*.test.tsx",
+    "client/**/__tests__/**",
+    "client/**/tests/**",
+    "client/**/fixtures/**",
+    "node_modules",
+    "dist",
+    "coverage",
+    ".vite",
+    ".vite-temp"
+  ]
 }
