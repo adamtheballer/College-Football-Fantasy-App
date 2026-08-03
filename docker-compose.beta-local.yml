@@ -25,7 +25,9 @@ services:
       GIT_BRANCH: "${CFF_GIT_BRANCH:?CFF_GIT_BRANCH is required}"
       RUNTIME_MODE: "release_candidate"
   web:
-    ports:
+    # Compose appends sequence values by default. The beta override must
+    # replace the base 8080 mapping rather than exposing both ports.
+    ports: !override
       - "127.0.0.1:18080:8080"
 volumes:
   pgdata:
