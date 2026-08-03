@@ -11,6 +11,16 @@ describe("formatDraftProjection", () => {
     expect(formatDraftProjection({ weeklyProjection: 18.25, hasWeeklyProjection: true })).toBe("18.3");
   });
 
+  it("uses the verified statline season total when a partial player payload omits the primary annual field", () => {
+    expect(
+      formatDraftProjection({
+        fallbackSeasonProjection: 314,
+        weeklyProjection: 0,
+        hasWeeklyProjection: false,
+      })
+    ).toBe("314.0");
+  });
+
   it("shows an em dash only when no usable projection exists", () => {
     expect(formatDraftProjection({ weeklyProjection: 0, hasWeeklyProjection: false })).toBe("—");
   });

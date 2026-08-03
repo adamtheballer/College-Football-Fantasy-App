@@ -484,6 +484,7 @@ export default function SinglePlayerMockDraftRoom() {
                 <p className="text-sm font-black tabular-nums text-foreground">
                   {formatDraftProjection({
                     seasonProjection: player.sheetProjectedSeasonPoints,
+                    fallbackSeasonProjection: player.sheetProjectionStats?.fpts,
                     weeklyProjection: player.projectedPoints,
                     hasWeeklyProjection: player.hasWeeklyProjection,
                   })}

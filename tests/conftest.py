@@ -8,6 +8,7 @@ from sqlalchemy.pool import StaticPool
 
 from collegefootballfantasy_api.app.db.base import Base
 from collegefootballfantasy_api.app.db.session import get_db
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.security import create_access_token
 from collegefootballfantasy_api.app.main import app
 from collegefootballfantasy_api.app.models import (  # noqa: F401
@@ -109,13 +110,21 @@ def admin_headers(client: TestClient) -> dict[str, str]:
 
 @pytest.fixture(name="client")
 def client_fixture() -> Generator[TestClient, None, None]:
+    # Unit/API tests that are not specifically exercising beta access must not
+    # inherit the developer machine's beta gate.  Individual beta-access tests
+    # opt in with their dedicated fixture, which restores this test default.
+    original_beta_access_enabled = settings.beta_access_enabled
+    settings.beta_access_enabled = False
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as client:
-        yield client
-    app.dependency_overrides.clear()
-    Base.metadata.drop_all(bind=engine)
+    try:
+        with TestClient(app) as client:
+            yield client
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+        settings.beta_access_enabled = original_beta_access_enabled
 
 
 @pytest.fixture(name="db_session")
