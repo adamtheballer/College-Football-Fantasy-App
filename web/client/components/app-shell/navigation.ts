@@ -1,12 +1,14 @@
 import type { ComponentType } from "react";
 import {
   Bell,
+  Bug,
   Home,
   LogIn,
   LogOut,
   MessageSquare,
   Settings,
   ShieldAlert,
+  Sparkles,
   Timer,
   Trophy,
   Wrench,
@@ -57,6 +59,14 @@ export const getShellNavItems = (
     },
     { name: "INJURY CENTER", path: "/injury-center", icon: ShieldAlert },
     { name: "ALERTS", path: "/alerts", icon: Bell },
+    // Keep support reachable from every signed-in screen. The destination is
+    // the existing in-app Support & Policies section; no feedback data is
+    // handled in the client or silently discarded.
+    { name: "REPORT BUG", path: "/settings#support", icon: Bug },
+    // Saturday Pick 6 is the current public coming-soon destination. Keeping
+    // it in the signed-in navigation makes the beta roadmap discoverable
+    // without introducing a second placeholder page.
+    { name: "COMING SOON", path: "/saturday-pick-6", icon: Sparkles },
     { name: "MOCK DRAFT", path: "/draft", icon: Timer },
     ...(user?.isAdmin
       ? [{ name: "ADMIN SCORING", path: "/admin/scoring", icon: Wrench, kind: "admin" as const }]

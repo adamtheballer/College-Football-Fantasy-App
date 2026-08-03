@@ -51,6 +51,18 @@ describe("app shell navigation helpers", () => {
     ).toBe(true);
   });
 
+  it("keeps the signed-in report-bug entry linked to the supported feedback section", () => {
+    expect(getShellNavItems(user, true)).toContainEqual(
+      expect.objectContaining({ name: "REPORT BUG", path: "/settings#support" }),
+    );
+  });
+
+  it("keeps Coming Soon linked to the established Saturday Pick 6 route", () => {
+    expect(getShellNavItems(user, true)).toContainEqual(
+      expect.objectContaining({ name: "COMING SOON", path: "/saturday-pick-6" }),
+    );
+  });
+
   it("surfaces an unread badge for the chats sidebar item", () => {
     const chats = getShellNavItems(user, true, 12).find((item) => item.name === "CHATS");
     const cappedChats = getShellNavItems(user, true, 120).find((item) => item.name === "CHATS");

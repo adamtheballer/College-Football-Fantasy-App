@@ -32,6 +32,7 @@ type LeagueNotificationPreference = {
 };
 
 const supportEmail = (import.meta.env.VITE_SUPPORT_EMAIL as string | undefined) || "absportscfb@gmail.com";
+const reportBugMailto = `mailto:${supportEmail}?subject=${encodeURIComponent("College Football Fantasy bug report")}`;
 const privacyPolicyUrl = import.meta.env.VITE_PRIVACY_POLICY_URL as string | undefined;
 const termsUrl = import.meta.env.VITE_TERMS_URL as string | undefined;
 const providerDisclosureUrl = import.meta.env.VITE_PROVIDER_DISCLOSURE_URL as string | undefined;
@@ -250,11 +251,12 @@ export default function Settings() {
           </div>
         </SettingsSection>
 
-        <SettingsSection
-          title="Support & Policies"
-          description="Helpful links and account resources"
-          icon={Shield}
-        >
+        <section id="support" className="scroll-mt-8">
+          <SettingsSection
+            title="Support & Policies"
+            description="Helpful links and account resources"
+            icon={Shield}
+          >
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Email Support</p>
             <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -275,6 +277,12 @@ export default function Settings() {
                 {supportCopyState === "copied" ? "Copied" : supportCopyState === "error" ? "Copy Failed" : "Copy Email"}
               </Button>
             </div>
+            <a
+              href={reportBugMailto}
+              className="mt-4 inline-flex min-h-10 items-center rounded-xl border border-cfb-danger/35 bg-cfb-danger/10 px-4 text-[10px] font-black uppercase tracking-[0.16em] text-red-100 transition hover:border-cfb-danger/60 hover:bg-cfb-danger/20"
+            >
+              Report a Bug
+            </a>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {privacyPolicyUrl ? (
@@ -308,7 +316,8 @@ export default function Settings() {
               </a>
             ) : null}
           </div>
-        </SettingsSection>
+          </SettingsSection>
+        </section>
       </div>
     );
   }

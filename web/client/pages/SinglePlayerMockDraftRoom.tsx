@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useDraftPlayerPool, usePlayerCard, usePlayerDetail } from "@/hooks/use-players";
 import { buildDraftBoard, type DraftPlayer } from "@/lib/draftRankings";
+import { formatDraftProjection } from "@/lib/draft-projections";
 import { mergeMockDraftMasterBoardPlayers } from "@/lib/mockDraftMasterBoard";
 import {
   advanceSinglePlayerMockDraft,
@@ -481,7 +482,11 @@ export default function SinglePlayerMockDraftRoom() {
                 </div>
                 <span className={cn("w-fit rounded-full border px-4 py-2 text-xs font-black", positionClass)}>{player.pos}</span>
                 <p className="text-sm font-black tabular-nums text-foreground">
-                  {player.hasWeeklyProjection ? player.projectedPoints.toFixed(1) : "—"}
+                  {formatDraftProjection({
+                    seasonProjection: player.sheetProjectedSeasonPoints,
+                    weeklyProjection: player.projectedPoints,
+                    hasWeeklyProjection: player.hasWeeklyProjection,
+                  })}
                 </p>
                 <div className="flex justify-end gap-2">
                   <Button
@@ -787,9 +792,12 @@ export default function SinglePlayerMockDraftRoom() {
   );
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(135deg,#020713_0%,#06172a_42%,#0a102c_68%,#120a29_100%)] text-foreground">
+    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(135deg,#020713_0%,#071b31_40%,#14113a_70%,#19082a_100%)] text-foreground">
       <div className="pointer-events-none absolute inset-0 opacity-[0.32] [background-image:radial-gradient(circle_at_18%_16%,rgba(56,189,248,0.2),transparent_30%),radial-gradient(circle_at_78%_12%,rgba(96,165,250,0.16),transparent_28%),radial-gradient(circle_at_86%_72%,rgba(251,191,36,0.08),transparent_26%),radial-gradient(circle_at_42%_92%,rgba(217,70,239,0.09),transparent_32%)]" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.075] [background-image:linear-gradient(rgba(255,255,255,0.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:56px_56px]" />
+      <div aria-hidden="true" className="pointer-events-none absolute -left-32 top-24 h-14 w-[42rem] rotate-[-16deg] rounded-full bg-gradient-to-r from-cfb-pink/20 via-cfb-brand/28 to-transparent blur-xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute -right-32 top-[28rem] h-12 w-[38rem] rotate-[18deg] rounded-full bg-gradient-to-r from-transparent via-cfb-cyan/24 to-cfb-gold/20 blur-xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute bottom-36 left-[18%] h-10 w-[32rem] rotate-[-11deg] rounded-full bg-gradient-to-r from-transparent via-cfb-gold/18 to-cfb-pink/22 blur-xl" />
 
       <div className="relative mx-auto max-w-[1800px] space-y-6 px-4 pb-28 pt-4 md:px-6">
         <div className="relative z-20 flex flex-wrap items-center justify-between gap-3">

@@ -39,7 +39,7 @@ export function PlayerCardHeader({
 }) {
   const metricCards = [
     ["Proj", typeof player.projectedPoints === "number" ? player.projectedPoints.toFixed(1) : "—"],
-    ["CFB 27 OVR", card?.player.cfb27_overall?.toString() ?? player.cfb27Overall?.toString() ?? "—"],
+    ["Current Player Value", card?.player.cfb27_overall?.toString() ?? player.cfb27Overall?.toString() ?? "—"],
     ["Class", card?.about.player_class ?? player.playerClass ?? "—"],
     ["Status", card?.about.status ?? player.status ?? "—"],
   ];

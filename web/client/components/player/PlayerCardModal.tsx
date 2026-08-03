@@ -48,8 +48,7 @@ const tabConfig: Array<{ id: PlayerCardTab; label: string; icon: typeof Info }> 
   { id: "value", label: "Value", icon: Activity },
 ];
 
-export const visiblePlayerCardTabs = (hasLeagueContext: boolean) =>
-  tabConfig.filter((tab) => tab.id !== "history" || hasLeagueContext);
+export const visiblePlayerCardTabs = (_hasLeagueContext: boolean) => tabConfig;
 
 const statDisplayKeys = [
   ["Pass Yds", ["pass_yards", "PassingYards", "passingYards"]],
@@ -787,7 +786,11 @@ export function PlayerCardModal({
           ) : activeTab === "history" ? (
             <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
               <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>League History</p>
-              {historyQuery.isLoading ? (
+              {!hasLeagueContext ? (
+                <p className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
+                  Open this player card from a league to view this player&apos;s draft, roster, trade, and waiver history.
+                </p>
+              ) : historyQuery.isLoading ? (
                 <div className="mt-5 flex min-h-40 items-center justify-center gap-3 rounded-2xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55"><Loader2 className="h-4 w-4 animate-spin" /> Loading league history</div>
               ) : historyQuery.isError ? (
                 <p className="mt-5 rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4 text-sm font-bold text-rose-100">League history is unavailable right now. Please try again shortly.</p>

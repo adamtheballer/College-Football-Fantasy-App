@@ -21,9 +21,12 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError, apiUnavailableMessage } from "@/lib/api";
 import {
+  BETA_ACCESS_CODE_PREFIX,
+  betaAccessCodeFromSuffix,
   betaAccessEnabled,
   clearBetaAccessReservation,
   getBetaAccessReservation,
+  normalizeBetaAccessCodeSuffix,
   validateBetaAccess,
 } from "@/lib/beta-access";
 import { setPendingGuide } from "@/lib/onboarding";
@@ -152,7 +155,7 @@ export default function Login() {
     setError(null);
     setIsLoading(true);
     try {
-      const reservation = await validateBetaAccess(email, accessCode);
+      const reservation = await validateBetaAccess(email, betaAccessCodeFromSuffix(accessCode));
       setEmail(reservation.email);
       setAccessCode("");
       if (reservation.existingAccount) {
@@ -332,7 +335,24 @@ export default function Login() {
                 </div>
                 <div className="space-y-2">
                   <label htmlFor="beta-code" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Early-access code</label>
-                  <span className="group relative block"><KeyRound className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="beta-code" value={accessCode} onChange={(event) => setAccessCode(event.target.value.toUpperCase())} className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-sm font-bold uppercase tracking-[0.16em] text-cfb-text-primary" placeholder="EARLY-XXXXXX" autoCapitalize="characters" required /></span>
+                  <span className="group flex h-14 items-center rounded-2xl border border-cfb-border-subtle bg-cfb-surface/80 transition focus-within:border-cfb-brand/60 focus-within:ring-2 focus-within:ring-cfb-brand/25">
+                    <span aria-hidden="true" className="ml-2 inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-cfb-brand/[0.12] px-3 text-sm font-black uppercase tracking-[0.16em] text-cfb-cyan">
+                      <KeyRound className="h-4 w-4" />
+                      {BETA_ACCESS_CODE_PREFIX}
+                    </span>
+                    <Input
+                      id="beta-code"
+                      value={accessCode}
+                      onChange={(event) => setAccessCode(normalizeBetaAccessCodeSuffix(event.target.value))}
+                      className="h-full min-w-0 flex-1 border-0 bg-transparent px-3 text-sm font-bold uppercase tracking-[0.16em] text-cfb-text-primary shadow-none placeholder:text-cfb-text-muted focus-visible:ring-0"
+                      placeholder="XXXXXX"
+                      maxLength={12}
+                      autoCapitalize="characters"
+                      autoComplete="one-time-code"
+                      required
+                    />
+                  </span>
+                  <p className="ml-3 text-[11px] font-semibold text-cfb-text-muted">Enter the six characters after {BETA_ACCESS_CODE_PREFIX}</p>
                 </div>
                 {error ? <div role="alert" className="rounded-2xl border border-cfb-danger/35 bg-cfb-danger/[0.14] px-4 py-3 text-xs font-bold text-red-100">{error}</div> : null}
                 <Button type="submit" className="h-14 w-full rounded-2xl bg-gradient-to-r from-cfb-cyan to-cfb-brand text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-[0_18px_42px_hsl(var(--brand-primary)/0.26)] hover:brightness-110" disabled={isLoading}>{isLoading ? "Verifying access..." : "Verify and continue"}</Button>

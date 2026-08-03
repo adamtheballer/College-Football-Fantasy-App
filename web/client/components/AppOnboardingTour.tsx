@@ -9,7 +9,7 @@ type TourStep = {
   target?: string;
 };
 
-const TOUR_STEPS: TourStep[] = [
+export const TOUR_STEPS: TourStep[] = [
   {
     target: "#nav-home",
     title: "Home Dashboard",
@@ -41,10 +41,22 @@ const TOUR_STEPS: TourStep[] = [
       "Alerts keeps league and player notifications in one supported workflow so you can review important changes quickly.",
   },
   {
-    target: "#nav-stats",
-    title: "Stats Research Center",
+    target: "#nav-report-bug",
+    title: "Report Bug",
     description:
-      "The stats tab is your research hub for Power 4 teams, including offense, defense, advanced analytics, injuries, and standings.",
+      "Use Report Bug to open Support & Policies and send the product team a clear issue report without losing your place in the app.",
+  },
+  {
+    target: "#nav-coming-soon",
+    title: "Coming Soon",
+    description:
+      "Coming Soon opens Saturday Pick 6, the weekly featured-player challenge. It is separate from league scoring and will show its current availability and lock time.",
+  },
+  {
+    target: "#nav-mock-draft",
+    title: "Mock Draft",
+    description:
+      "Practice your draft strategy in Mock Draft. It uses a separate simulation, so it never changes a real league, roster, or transaction.",
   },
   {
     target: "#nav-settings",
@@ -56,7 +68,7 @@ const TOUR_STEPS: TourStep[] = [
     target: "#nav-sign-out",
     title: "Sign Out",
     description:
-      "Use Sign Out when you are finished. Draft is intentionally skipped because it is temporary and only opens active draft workflows.",
+      "Use Sign Out when you are finished on a shared device. You can sign back in later and return to your leagues and saved account.",
   },
 ];
 

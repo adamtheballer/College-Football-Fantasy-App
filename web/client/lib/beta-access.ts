@@ -2,6 +2,8 @@ import { apiPost } from "@/lib/api";
 
 const RESERVATION_STORAGE_KEY = "cfb_beta_access_reservation";
 
+export const BETA_ACCESS_CODE_PREFIX = "EARLY-";
+
 export const betaAccessEnabled = import.meta.env.VITE_BETA_ACCESS_ENABLED === "true";
 
 type BetaAccessValidationPayload = {
@@ -61,6 +63,22 @@ export const getBetaAccessReservation = (): BetaAccessReservation | null => {
 };
 
 export const clearBetaAccessReservation = () => safeSessionRemove(RESERVATION_STORAGE_KEY);
+
+/**
+ * The beta form displays the shared prefix as fixed UI chrome. Accepting a
+ * pasted full code as well keeps the field forgiving without ever sending a
+ * partial value to the API.
+ */
+export const normalizeBetaAccessCodeSuffix = (value: string): string =>
+  value
+    .trim()
+    .toUpperCase()
+    .replace(/^EARLY-?/, "")
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 6);
+
+export const betaAccessCodeFromSuffix = (suffix: string): string =>
+  `${BETA_ACCESS_CODE_PREFIX}${normalizeBetaAccessCodeSuffix(suffix)}`;
 
 export const validateBetaAccess = async (email: string, code: string): Promise<BetaAccessReservation> => {
   const payload = await apiPost<BetaAccessValidationPayload>("/beta-access/validate", { email, code });
