@@ -16,6 +16,6 @@ describe("PasswordResetConfirm helpers", () => {
   it("keeps reset API failures user-actionable", () => {
     expect(passwordResetErrorMessage(new ApiError(400, "expired token"))).toContain("invalid, expired, or already used");
     expect(passwordResetErrorMessage(new ApiError(429, "too many requests"))).toContain("Too many reset attempts");
-    expect(passwordResetErrorMessage(new ApiError(0, "network failed"))).toContain("Unable to reach the backend API");
+    expect(passwordResetErrorMessage(new ApiError(0, "network failed"))).toContain("Local API is unavailable");
   });
 });

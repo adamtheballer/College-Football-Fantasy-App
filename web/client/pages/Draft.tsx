@@ -750,9 +750,15 @@ export default function Draft() {
   );
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(135deg,#020713_0%,#06172a_42%,#0a102c_68%,#120a29_100%)] text-foreground">
-      <div className="pointer-events-none absolute inset-0 opacity-[0.32] [background-image:radial-gradient(circle_at_18%_16%,rgba(56,189,248,0.2),transparent_30%),radial-gradient(circle_at_78%_12%,rgba(96,165,250,0.16),transparent_28%),radial-gradient(circle_at_86%_72%,rgba(251,191,36,0.08),transparent_26%),radial-gradient(circle_at_42%_92%,rgba(217,70,239,0.09),transparent_32%)]" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.075] [background-image:linear-gradient(rgba(255,255,255,0.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:56px_56px]" />
+    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(140deg,#071426_0%,#10284a_45%,#1d1b4a_100%)] text-foreground">
+      <div className="pointer-events-none absolute inset-0 opacity-[0.44] [background-image:radial-gradient(circle_at_16%_14%,rgba(56,189,248,0.21),transparent_30%),radial-gradient(circle_at_80%_10%,rgba(96,165,250,0.16),transparent_28%),radial-gradient(circle_at_88%_70%,rgba(251,191,36,0.11),transparent_27%),radial-gradient(circle_at_42%_92%,rgba(217,70,239,0.12),transparent_32%)]" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.045] [background-image:linear-gradient(rgba(255,255,255,0.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:56px_56px]" />
+      <div aria-hidden="true" className="pointer-events-none absolute -left-20 top-24 h-3 w-[30rem] rotate-[-22deg] rounded-full bg-gradient-to-r from-transparent via-cfb-pink/55 to-cfb-brand/35 blur-[1px]" />
+      <div aria-hidden="true" className="pointer-events-none absolute -left-14 top-48 h-1.5 w-72 rotate-[-10deg] rounded-full bg-gradient-to-r from-transparent via-cfb-cyan/45 to-transparent" />
+      <div aria-hidden="true" className="pointer-events-none absolute -right-20 top-28 h-3 w-[32rem] rotate-[-17deg] rounded-full bg-gradient-to-r from-cfb-cyan/48 via-cfb-brand/38 to-transparent blur-[1px]" />
+      <div aria-hidden="true" className="pointer-events-none absolute -right-16 top-52 h-1.5 w-64 rotate-[18deg] rounded-full bg-gradient-to-r from-cfb-pink/48 via-cfb-gold/34 to-transparent" />
+      <div aria-hidden="true" className="pointer-events-none absolute left-8 top-[31rem] font-display text-5xl font-black text-cfb-cyan/15 rotate-12">×</div>
+      <div aria-hidden="true" className="pointer-events-none absolute right-12 top-[26rem] font-display text-6xl font-black text-cfb-gold/15 -rotate-12">○</div>
 
       <div className="relative mx-auto max-w-[1800px] space-y-6 px-4 pb-28 pt-4 md:px-6">
         <div className="relative z-20 flex flex-wrap items-center justify-between gap-3">
@@ -761,14 +767,14 @@ export default function Draft() {
               type="button"
               variant="outline"
               size="icon"
-              className="h-12 w-12 rounded-2xl border-cyan-200/20 bg-slate-950/70 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.16)] backdrop-blur-xl hover:border-cyan-200/40 hover:bg-cyan-400/12 hover:text-white"
+              className="h-12 w-12 rounded-2xl border-white/15 bg-[#0a1931]/82 text-cyan-100 shadow-[0_16px_34px_rgba(2,8,23,0.28)] backdrop-blur-xl hover:border-cyan-200/40 hover:bg-cyan-400/12 hover:text-white"
               aria-label="Exit real draft room"
               title="Exit real draft room"
               onClick={() => navigate(exitPath)}
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <Button asChild variant="outline" className="h-12 rounded-2xl border-cyan-200/20 bg-slate-950/70 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100 hover:border-cyan-200/40 hover:bg-cyan-400/12 hover:text-white">
+            <Button asChild variant="outline" className="h-12 rounded-2xl border-white/15 bg-[#0a1931]/82 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100 shadow-[0_16px_34px_rgba(2,8,23,0.28)] hover:border-cyan-200/40 hover:bg-cyan-400/12 hover:text-white">
               <Link to={exitPath}>Exit</Link>
             </Button>
           </div>
@@ -777,7 +783,7 @@ export default function Draft() {
             <div className="pointer-events-none fixed left-1/2 top-3 z-[1250] -translate-x-1/2">
               <div
                 className={cn(
-                  "rounded-3xl border bg-slate-950/82 px-8 py-3 text-center shadow-[0_0_48px_rgba(34,211,238,0.18)] backdrop-blur-2xl transition",
+                  "rounded-3xl border bg-[#09162d]/90 px-8 py-3 text-center shadow-[0_18px_42px_rgba(2,8,23,0.38)] backdrop-blur-2xl transition",
                   timerDanger
                     ? "animate-pulse border-red-300/50 shadow-[0_0_58px_rgba(248,113,113,0.34)]"
                     : "border-cyan-200/20"
@@ -801,7 +807,7 @@ export default function Draft() {
           <div className="flex flex-wrap items-center justify-end gap-3">
             <div
               className={cn(
-                "rounded-3xl border border-cyan-200/20 bg-slate-950/72 px-6 py-4 text-right shadow-[0_0_42px_rgba(34,211,238,0.17)] backdrop-blur-xl",
+                "rounded-3xl border border-white/15 bg-[#0a1931]/82 px-6 py-4 text-right shadow-[0_18px_42px_rgba(2,8,23,0.32)] backdrop-blur-xl",
                 canPick && "border-cyan-200/50 bg-cyan-300/12 shadow-[0_0_58px_rgba(103,232,249,0.28)]"
               )}
             >
@@ -824,13 +830,13 @@ export default function Draft() {
                         : currentTeamLabel}
               </p>
             </div>
-            <Button asChild variant="outline" className="h-12 rounded-2xl border-white/15 bg-slate-950/65 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-white hover:bg-white/10">
+            <Button asChild variant="outline" className="h-12 rounded-2xl border-white/15 bg-[#0a1931]/82 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_16px_34px_rgba(2,8,23,0.28)] hover:bg-white/10">
               <Link to={`/league/${parsedLeagueId}`}>League Hub</Link>
             </Button>
           </div>
         </div>
 
-        <header className="rounded-[2rem] border border-cyan-200/15 bg-card/45 p-6 shadow-[0_0_70px_rgba(14,165,233,0.10)] md:p-8">
+        <header className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-[linear-gradient(135deg,rgba(16,46,78,0.90),rgba(34,27,75,0.86))] p-6 shadow-[0_24px_70px_rgba(2,8,23,0.30)] before:absolute before:inset-x-0 before:top-0 before:h-1.5 before:bg-gradient-to-r before:from-cfb-cyan before:via-cfb-gold before:to-cfb-pink md:p-8">
           <p className="text-[10px] font-black uppercase tracking-[0.26em] text-cyan-200">Real League Draft Room</p>
           <h1 className="mt-3 text-4xl font-black italic uppercase tracking-tight text-white md:text-6xl">
             {leagueName}
@@ -885,7 +891,7 @@ export default function Draft() {
           </div>
         ) : null}
 
-        <section className="overflow-hidden rounded-[2rem] border border-cyan-200/15 bg-card/50 shadow-[0_0_70px_rgba(14,165,233,0.13),inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <section className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-[#09182f]/82 shadow-[0_22px_62px_rgba(2,8,23,0.30),inset_0_1px_0_rgba(255,255,255,0.05)] before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-cfb-cyan/70 before:via-cfb-gold/70 before:to-cfb-pink/70">
           <div className="flex items-center justify-between gap-4 border-b border-cyan-100/10 px-5 py-4">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.26em] text-cyan-200 drop-shadow-[0_0_14px_rgba(103,232,249,0.32)]">Draft Order</p>
@@ -897,7 +903,7 @@ export default function Draft() {
               <button
                 type="button"
                 onClick={recenterDraftCarousel}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-200/20 bg-slate-950/60 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.14)] transition hover:border-cyan-200/50 hover:bg-cyan-300/12 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/15 bg-[#0a1931]/82 text-cyan-100 shadow-[0_12px_26px_rgba(2,8,23,0.25)] transition hover:border-cyan-200/50 hover:bg-cyan-300/12 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70"
                 aria-label="Center draft order on the current pick"
                 title="Center current pick"
               >
@@ -927,14 +933,14 @@ export default function Draft() {
                     }
                   }}
                   className={cn(
-                    "min-w-[178px] rounded-3xl border p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition",
+                    "min-w-[178px] rounded-3xl border p-4 shadow-[0_12px_26px_rgba(2,8,23,0.20),inset_0_1px_0_rgba(255,255,255,0.05)] transition",
                     isCurrent && isDraftActive
                       ? "border-cyan-200/80 bg-cyan-300/14 shadow-[0_0_52px_rgba(103,232,249,0.36),inset_0_1px_0_rgba(255,255,255,0.07)]"
                       : isCurrent
                         ? "border-amber-200/45 bg-amber-300/10 shadow-[0_0_42px_rgba(251,191,36,0.16)]"
                       : isUser
                         ? "border-cyan-300/40 bg-cyan-400/10 shadow-[0_0_30px_rgba(34,211,238,0.18),inset_0_1px_0_rgba(255,255,255,0.05)]"
-                      : "border-white/10 bg-white/[0.045] hover:border-cyan-200/20 hover:shadow-[0_0_22px_rgba(34,211,238,0.10)]",
+                      : "border-white/10 bg-[#13233e]/72 hover:border-cyan-200/20 hover:shadow-[0_16px_30px_rgba(2,8,23,0.24)]",
                     isLocked && "opacity-80"
                   )}
                 >
@@ -970,7 +976,7 @@ export default function Draft() {
         ) : null}
 
         {activeTab === "draft" ? (
-        <section data-testid="available-players-table" className="overflow-hidden rounded-[2rem] border border-cyan-200/15 bg-card/50 shadow-[0_0_56px_rgba(34,211,238,0.12),inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <section data-testid="available-players-table" className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-[#09182f]/82 shadow-[0_22px_62px_rgba(2,8,23,0.30),inset_0_1px_0_rgba(255,255,255,0.05)] before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-cfb-pink/60 before:via-cfb-gold/70 before:to-cfb-cyan/70">
           <div className="border-b border-cyan-100/10 p-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
@@ -991,7 +997,7 @@ export default function Draft() {
                   <Input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    className="h-12 rounded-2xl border-cyan-200/15 bg-slate-950/35 pl-11 text-sm font-bold"
+                    className="h-12 rounded-2xl border-white/15 bg-[#061226]/74 pl-11 text-sm font-bold shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
                     placeholder="Search players, schools..."
                   />
                 </div>
@@ -1063,7 +1069,7 @@ export default function Draft() {
                       }
                     }}
                     className={cn(
-                      "grid cursor-pointer grid-cols-[72px_minmax(0,1fr)_96px_110px_180px] items-center gap-3 border-b border-cyan-100/10 px-5 py-4 outline-none transition-[background-color,box-shadow,color] duration-200",
+                      "grid cursor-pointer grid-cols-[72px_minmax(0,1fr)_96px_110px_180px] items-center gap-3 border-b border-white/10 px-5 py-4 outline-none transition-[background-color,box-shadow,color] duration-200",
                       positionHoverClass,
                       isSelected && "bg-cyan-300/[0.075] shadow-[inset_3px_0_0_rgba(103,232,249,0.75)]"
                     )}
@@ -1154,7 +1160,7 @@ export default function Draft() {
       ) : null}
 
       <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[1200] flex justify-center px-4">
-        <div className="pointer-events-auto grid w-full max-w-xl grid-cols-4 rounded-2xl border border-cyan-200/15 bg-slate-950/88 p-1 shadow-[0_0_40px_rgba(34,211,238,0.16)] backdrop-blur-xl">
+        <div className="pointer-events-auto grid w-full max-w-xl grid-cols-4 rounded-2xl border border-white/15 bg-[#09162d]/92 p-1 shadow-[0_20px_48px_rgba(2,8,23,0.42)] backdrop-blur-xl">
           {DRAFT_TABS.map((tab) => {
             const Icon = tab.value === "draft" ? Trophy : tab.value === "queue" ? ClipboardList : tab.value === "roster" ? Users : History;
             return (

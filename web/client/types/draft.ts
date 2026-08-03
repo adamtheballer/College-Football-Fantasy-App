@@ -3,6 +3,7 @@ export interface DraftRoomTeam {
   name: string;
   owner_user_id: number | null;
   owner_name: string | null;
+  is_cpu?: boolean;
 }
 
 export interface DraftRoomPick {

@@ -338,6 +338,7 @@ const getBestAvailablePlayer = (
     RB: 2,
     WR: 2,
     TE: 1,
+    K: 0,
   };
   const hasOpenCoreStarter = Object.entries(requiredStarterTargets).some(
     ([slot, target]) => roster.filter((player) => player.assignedSlot === slot).length < target

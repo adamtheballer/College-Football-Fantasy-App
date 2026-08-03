@@ -289,7 +289,7 @@ describe("single-player mock draft engine", () => {
     );
 
     expect(advanced.picks).toHaveLength(8);
-    expect(advanced.picks.at(-1)?.position).toBe("RB");
+    expect(advanced.picks[advanced.picks.length - 1]?.position).toBe("RB");
   });
 
   it("does not let a bot spend a bench slot on a second kicker while skill players remain", () => {
