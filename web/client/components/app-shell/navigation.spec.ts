@@ -51,6 +51,13 @@ describe("app shell navigation helpers", () => {
     ).toBe(true);
   });
 
+  it("keeps Report Bug on its own route rather than routing to settings", () => {
+    const reportBug = getShellNavItems(user, true).find((item) => item.name === "REPORT BUG");
+
+    expect(reportBug?.path).toBe("/report-bug");
+    expect(reportBug?.path).not.toBe("/settings");
+  });
+
   it("keeps mobile navigation focused on the primary destinations", () => {
     const items = getShellNavItems(user, true);
     const mobile = getMobileNavItems(items).map((item) => item.name);

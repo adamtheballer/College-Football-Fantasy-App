@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import {
   Bell,
+  Bug,
   Home,
   LogIn,
   LogOut,
@@ -47,6 +48,7 @@ export const getShellNavItems = (user: User | null, isLoggedIn: boolean): ShellN
     { name: "CHATS", path: "/chats", icon: MessageSquare },
     { name: "INJURY CENTER", path: "/injury-center", icon: ShieldAlert },
     { name: "ALERTS", path: "/alerts", icon: Bell },
+    { name: "REPORT BUG", path: "/report-bug", icon: Bug },
     { name: "MOCK DRAFT", path: "/draft", icon: Timer },
     ...(user?.isAdmin
       ? [{ name: "ADMIN SCORING", path: "/admin/scoring", icon: Wrench, kind: "admin" as const }]
