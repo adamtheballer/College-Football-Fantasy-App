@@ -9,6 +9,7 @@ def test_public_web_image_serves_the_built_spa_behind_a_same_origin_api_proxy():
     dockerfile = (REPO_ROOT / "Dockerfile.web").read_text(encoding="utf-8")
     nginx = (REPO_ROOT / "web" / "nginx.conf").read_text(encoding="utf-8")
     compose = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    api_client = (REPO_ROOT / "web" / "client" / "lib" / "api.ts").read_text(encoding="utf-8")
 
     assert "RUN npm run build" in dockerfile
     assert "COPY --from=build /app/web/dist/spa /usr/share/nginx/html" in dockerfile
@@ -21,6 +22,10 @@ def test_public_web_image_serves_the_built_spa_behind_a_same_origin_api_proxy():
     assert "try_files $uri $uri/ /index.html;" in nginx
     assert 'Cache-Control "no-store" always;' in nginx
     assert 'Cache-Control "public, max-age=31536000, immutable" always;' in nginx
+    # Docker builds pin this today, but the source fallback must also remain
+    # same-origin so a local non-container build cannot silently target a
+    # stale host-port API.
+    assert 'return "/api";' in api_client
     assert "npm run dev:vite" not in compose
     assert "condition: service_healthy" in compose
     assert "scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026" in compose

@@ -1,10 +1,8 @@
 const resolveDefaultApiBase = () => {
-  if (typeof window === "undefined") {
-    return "http://127.0.0.1:8000";
-  }
-  const hostname = window.location.hostname || "127.0.0.1";
-  const apiHost = hostname === "localhost" ? "127.0.0.1" : hostname;
-  return `${window.location.protocol}//${apiHost}:8000`;
+  // The public web server proxies FastAPI under its own origin at `/api`.
+  // Keeping this relative avoids silently selecting a stale host-port API
+  // when the beta runtime deliberately exposes only the web port.
+  return "/api";
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || resolveDefaultApiBase();
