@@ -96,7 +96,10 @@ describe("api client", () => {
 
   it("refreshes an expired access token for auth bootstrap instead of dropping the session", async () => {
     const storage = new Map<string, string>();
-    vi.stubGlobal("window", { dispatchEvent: vi.fn(), location: { hostname: "localhost", protocol: "http:" } });
+    vi.stubGlobal("window", {
+      dispatchEvent: vi.fn(),
+      location: { hostname: "localhost", protocol: "http:", origin: "http://localhost" },
+    });
     vi.stubGlobal("localStorage", {
       getItem: vi.fn((key: string) => storage.get(key) ?? null),
       setItem: vi.fn((key: string, value: string) => storage.set(key, value)),
@@ -173,7 +176,10 @@ describe("api client", () => {
     const storage = new Map<string, string>();
     const dispatchEvent = vi.fn();
     const removeItem = vi.fn((key: string) => storage.delete(key));
-    vi.stubGlobal("window", { dispatchEvent, location: { hostname: "localhost", protocol: "http:" } });
+    vi.stubGlobal("window", {
+      dispatchEvent,
+      location: { hostname: "localhost", protocol: "http:", origin: "http://localhost" },
+    });
     vi.stubGlobal("localStorage", {
       getItem: vi.fn((key: string) => storage.get(key) ?? null),
       setItem: vi.fn((key: string, value: string) => storage.set(key, value)),
@@ -208,7 +214,10 @@ describe("api client", () => {
     const storage = new Map<string, string>();
     const dispatchEvent = vi.fn();
     const removeItem = vi.fn((key: string) => storage.delete(key));
-    vi.stubGlobal("window", { dispatchEvent, location: { hostname: "localhost", protocol: "http:" } });
+    vi.stubGlobal("window", {
+      dispatchEvent,
+      location: { hostname: "localhost", protocol: "http:", origin: "http://localhost" },
+    });
     vi.stubGlobal("localStorage", {
       getItem: vi.fn((key: string) => storage.get(key) ?? null),
       setItem: vi.fn((key: string, value: string) => storage.set(key, value)),
