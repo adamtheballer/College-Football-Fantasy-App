@@ -15,6 +15,7 @@ from collegefootballfantasy_api.app.api.routes import (
     projections,
     provider_identity,
     rosters,
+    saturday_pick,
     schedule,
     stats,
     teams,
@@ -49,6 +50,8 @@ app.include_router(leagues.router, prefix="/leagues", tags=["leagues"])
 app.include_router(teams.router, tags=["teams"])
 app.include_router(players.router, prefix="/players", tags=["players"])
 app.include_router(rosters.router, tags=["rosters"])
+app.include_router(saturday_pick.router, prefix="/saturday-pick-6", tags=["saturday-pick-6"])
+app.include_router(saturday_pick.admin_router, prefix="/admin/saturday-pick-6", tags=["admin-saturday-pick-6"])
 app.include_router(projections.router, prefix="/projections", tags=["projections"])
 app.include_router(provider_identity.router, prefix="/provider-identity", tags=["provider-identity"])
 app.include_router(injuries.router, prefix="/injuries", tags=["injuries"])

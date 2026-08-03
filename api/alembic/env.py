@@ -41,6 +41,7 @@ from collegefootballfantasy_api.app.models import (
     refresh_session,
     roster,
     scheduled_notification,
+    saturday_pick,
     scoring_admin_audit,
     scoring_run,
     standing,

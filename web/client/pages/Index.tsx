@@ -198,6 +198,18 @@ export default function Index() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-7 pb-24 pt-4">
+      <section className="relative overflow-hidden rounded-[2rem] border border-cfb-gold/35 bg-gradient-to-r from-cfb-brand/[0.16] via-slate-950/75 to-cfb-gold/[0.14] px-6 py-6 shadow-[0_0_40px_rgba(250,204,21,0.08)] sm:px-8">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-12 top-2 h-20 w-96 rotate-[-12deg] rounded-full bg-gradient-to-r from-transparent via-cfb-cyan/30 to-cfb-gold/35 blur-xl" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="cfb-micro-label text-cfb-gold">Saturday Pick 6 • Presented by West Georgia Cornhole</p>
+            <h2 className="mt-2 text-2xl font-black italic text-cfb-text-primary">Pick the weekly winner. Earn a discount code.</h2>
+          </div>
+          <Button asChild className="shrink-0">
+            <Link to="/saturday-pick-6">Make Your Pick <ChevronRight className="ml-2 h-4 w-4" /></Link>
+          </Button>
+        </div>
+      </section>
       <section className="relative grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div aria-hidden="true" className="pointer-events-none absolute -left-8 -top-8 h-28 w-80 rotate-[-14deg] rounded-full bg-gradient-to-r from-cfb-pink/45 via-cfb-brand/35 to-transparent blur-xl" />
         <div aria-hidden="true" className="pointer-events-none absolute -right-8 top-20 h-24 w-96 rotate-[-18deg] rounded-full bg-gradient-to-r from-transparent via-cfb-cyan/35 to-cfb-gold/30 blur-xl" />

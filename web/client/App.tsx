@@ -35,6 +35,7 @@ const Chats = lazy(() => import("./pages/Chats"));
 const InjuryCenter = lazy(() => import("./pages/InjuryCenter"));
 const Trade = lazy(() => import("./pages/Trade"));
 const AdminScoring = lazy(() => import("./pages/AdminScoring"));
+const SaturdayPick6 = lazy(() => import("./pages/SaturdayPick6"));
 
 const NON_RETRYABLE_STATUSES = new Set([401, 403, 404]);
 
@@ -191,6 +192,7 @@ const App = () => (
                 <Route path="/trade/:leagueId/:playerId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
                 <Route path="/leagues/:leagueId/trades/:tradeId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
                 <Route path="/admin/scoring" element={<ProtectedRoute><AdminScoring /></ProtectedRoute>} />
+                <Route path="/saturday-pick-6" element={<ProtectedRoute><SaturdayPick6 /></ProtectedRoute>} />
                 <Route path="/stats" element={<Navigate to="/leagues" replace />} />
                 <Route path="/stats/players" element={<Navigate to="/leagues" replace />} />
                 <Route path="/login" element={<Login />} />

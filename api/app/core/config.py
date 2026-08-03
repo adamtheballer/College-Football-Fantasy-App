@@ -71,6 +71,16 @@ class Settings(BaseSettings):
     espn_historical_stats_user_agent: str = "CollegeFootballFantasy/0.1 historical-stats"
     espn_historical_stats_fail_open: bool = True
     player_card_historical_stats_enabled: bool = True
+    # Saturday Pick 6 is a first-party beta feature. Sponsor presentation is
+    # configurable, while contest state remains in the database.
+    saturday_pick_6_enabled: bool = True
+    saturday_pick_6_public_enabled: bool = True
+    saturday_pick_6_sponsors_enabled: bool = True
+    saturday_pick_6_sponsor_name: str = "West Georgia Cornhole"
+    saturday_pick_6_sponsor_url: str = "https://westgeorgiacornhole.com/"
+    saturday_pick_6_sponsor_offer_text: str = (
+        "Pick the winner to earn a West Georgia Cornhole discount code."
+    )
     fantasy_scoring_rules_json: str | None = None
     jwt_secret_key: str = DEFAULT_JWT_SECRET_KEY
     jwt_access_token_ttl_minutes: int = 15
