@@ -44,7 +44,7 @@ export const TOUR_STEPS: TourStep[] = [
     target: "#nav-report-bug",
     title: "Report Bug",
     description:
-      "Use Report Bug to open Support & Policies and send the product team a clear issue report without losing your place in the app.",
+      "Use Report Bug to open the dedicated support page and email the product team a clear issue report without losing your place in the app.",
   },
   {
     target: "#nav-coming-soon",

@@ -51,9 +51,9 @@ describe("app shell navigation helpers", () => {
     ).toBe(true);
   });
 
-  it("keeps the signed-in report-bug entry linked to the supported feedback section", () => {
+  it("keeps the signed-in report-bug entry linked to its direct support route", () => {
     expect(getShellNavItems(user, true)).toContainEqual(
-      expect.objectContaining({ name: "REPORT BUG", path: "/settings#support" }),
+      expect.objectContaining({ name: "REPORT BUG", path: "/report-bug" }),
     );
   });
 

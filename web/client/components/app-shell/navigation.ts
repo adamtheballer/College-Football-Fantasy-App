@@ -59,10 +59,10 @@ export const getShellNavItems = (
     },
     { name: "INJURY CENTER", path: "/injury-center", icon: ShieldAlert },
     { name: "ALERTS", path: "/alerts", icon: Bell },
-    // Keep support reachable from every signed-in screen. The destination is
-    // the existing in-app Support & Policies section; no feedback data is
-    // handled in the client or silently discarded.
-    { name: "REPORT BUG", path: "/settings#support", icon: Bug },
+    // Report Bug has a dedicated route so it is refresh-safe and can be
+    // marked active independently of Settings. It opens the established
+    // mailto + copy-email support workflow; no feedback is silently stored.
+    { name: "REPORT BUG", path: "/report-bug", icon: Bug },
     // Saturday Pick 6 is the current public coming-soon destination. Keeping
     // it in the signed-in navigation makes the beta roadmap discoverable
     // without introducing a second placeholder page.

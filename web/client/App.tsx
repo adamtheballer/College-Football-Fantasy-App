@@ -17,6 +17,7 @@ const Index = lazy(() => import("./pages/Index"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Leagues = lazy(() => import("./pages/Leagues"));
 const Settings = lazy(() => import("./pages/Settings"));
+const ReportBug = lazy(() => import("./pages/ReportBug"));
 const Login = lazy(() => import("./pages/Login"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const CreateLeague = lazy(() => import("./pages/CreateLeague"));
@@ -185,6 +186,7 @@ const App = () => (
                   }
                 />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/report-bug" element={<ReportBug />} />
                 <Route path="/rosters" element={<ProtectedRoute><Rosters /></ProtectedRoute>} />
                 <Route path="/chats" element={<ProtectedRoute><Chats /></ProtectedRoute>} />
                 <Route path="/waivers" element={<ProtectedRoute><Navigate to="/leagues" replace /></ProtectedRoute>} />
