@@ -60,7 +60,11 @@ function useCountdown(lockAt: string | undefined) {
   };
 }
 
-export default function SaturdayPick6() {
+type SaturdayPick6Props = {
+  embedded?: boolean;
+};
+
+export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) {
   const contestQuery = useSaturdayPickContest();
   const savePick = useSaveSaturdayPick();
   const contest = contestQuery.data;
@@ -129,7 +133,7 @@ export default function SaturdayPick6() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-7 pb-20 pt-5">
+    <div className={embedded ? "space-y-7" : "mx-auto max-w-7xl space-y-7 pb-20 pt-5"}>
       <section className="relative overflow-hidden rounded-[2rem] border border-cyan-300/30 bg-[radial-gradient(circle_at_20%_20%,rgba(14,165,233,0.22),transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.98),rgba(30,41,59,0.96),rgba(8,47,73,0.88))] p-6 shadow-[0_0_60px_rgba(14,165,233,0.14)] sm:p-9">
         <div aria-hidden="true" className="absolute -left-12 top-16 h-3 w-72 rotate-[-18deg] rounded-full bg-cyan-200/25 blur-sm" />
         <div aria-hidden="true" className="absolute -right-16 -top-14 h-52 w-72 rotate-[-18deg] rounded-full bg-cfb-pink/20 blur-3xl" />

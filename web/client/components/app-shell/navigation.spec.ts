@@ -57,9 +57,9 @@ describe("app shell navigation helpers", () => {
     );
   });
 
-  it("keeps Coming Soon linked to the established Saturday Pick 6 route", () => {
+  it("keeps Coming Soon linked to the roadmap only", () => {
     expect(getShellNavItems(user, true)).toContainEqual(
-      expect.objectContaining({ name: "COMING SOON", path: "/saturday-pick-6" }),
+      expect.objectContaining({ name: "COMING SOON", path: "/coming-soon" }),
     );
   });
 

@@ -63,10 +63,7 @@ export const getShellNavItems = (
     // marked active independently of Settings. It opens the established
     // mailto + copy-email support workflow; no feedback is silently stored.
     { name: "REPORT BUG", path: "/report-bug", icon: Bug },
-    // Saturday Pick 6 is the current public coming-soon destination. Keeping
-    // it in the signed-in navigation makes the beta roadmap discoverable
-    // without introducing a second placeholder page.
-    { name: "COMING SOON", path: "/saturday-pick-6", icon: Sparkles },
+    { name: "COMING SOON", path: "/coming-soon", icon: Sparkles },
     { name: "MOCK DRAFT", path: "/draft", icon: Timer },
     ...(user?.isAdmin
       ? [{ name: "ADMIN SCORING", path: "/admin/scoring", icon: Wrench, kind: "admin" as const }]

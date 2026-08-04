@@ -18,11 +18,10 @@ import { PlaybookDecor, PositionBadge, StatusBadge, SurfaceCard } from "@/compon
 import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagueWorkspace, useLeagues } from "@/hooks/use-leagues";
-import { useSaturdayPickContest } from "@/hooks/use-saturday-pick";
 import { apiGet } from "@/lib/api";
 import { betaAccessEnabled } from "@/lib/beta-access";
-import { getSaturdayPickRewardMessage, getSaturdayPickSponsorLogo } from "@/lib/saturday-pick-sponsor";
 import type { LeagueDetail } from "@/types/league";
+import SaturdayPick6 from "./SaturdayPick6";
 
 type AlertItem = {
   id: number;
@@ -157,7 +156,6 @@ export default function Index() {
     selectedLeague?.id,
     Boolean(isLoggedIn && selectedLeague?.id),
   );
-  const saturdayPickQuery = useSaturdayPickContest(isLoggedIn);
 
   useEffect(() => {
     if (!isLoggedIn || !leagues.length) return;
@@ -316,39 +314,7 @@ export default function Index() {
         </SurfaceCard>
       </section>
 
-      <SurfaceCard
-        variant="scoreboard"
-        padding="spacious"
-        className="min-h-[270px] border-cfb-brand/50 shadow-[0_0_64px_rgba(37,99,235,0.22)]"
-      >
-        <PlaybookDecor className="opacity-45" />
-        <div aria-hidden="true" className="absolute -left-16 -top-20 h-64 w-96 rotate-[-20deg] rounded-full bg-cfb-brand/30 blur-3xl" />
-        <div aria-hidden="true" className="absolute -bottom-24 right-0 h-72 w-96 rounded-full bg-cfb-pink/20 blur-3xl" />
-        <div className="relative flex h-full flex-col justify-between gap-8 lg:flex-row lg:items-end">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-cfb-gold/45 bg-cfb-gold/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.2em] text-yellow-100">
-              <Trophy className="h-4 w-4" aria-hidden="true" />
-              Saturday Pick 6
-            </div>
-            <p className="mt-6 cfb-micro-label text-cfb-brand">{saturdayPickQuery.data ? `${saturdayPickQuery.data.contest_position} Week` : "The weekly college football challenge"}</p>
-            {saturdayPickQuery.data?.sponsor ? <div className="mt-3 flex items-center gap-3"><div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-cyan-100/35 bg-white p-1.5 shadow-[0_0_20px_rgba(34,211,238,0.16)]">{getSaturdayPickSponsorLogo(saturdayPickQuery.data.sponsor) ? <img src={getSaturdayPickSponsorLogo(saturdayPickQuery.data.sponsor) ?? undefined} alt={`${saturdayPickQuery.data.sponsor.name} logo`} className="h-full w-full object-contain" /> : <span className="text-xs font-black text-cfb-brand">{saturdayPickQuery.data.sponsor.name.slice(0, 2).toUpperCase()}</span>}</div><p className="font-display text-3xl font-black italic tracking-[-0.04em] text-cyan-100 sm:text-4xl">Presented by {saturdayPickQuery.data.sponsor.name}</p></div> : null}
-            <h2 className="mt-2 cfb-display-title text-4xl sm:text-5xl lg:text-6xl">
-              {saturdayPickQuery.data ? "Make your pick" : "Coming next week"}
-            </h2>
-            <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-cfb-text-secondary sm:text-lg">
-              {saturdayPickQuery.data
-                ? `${getSaturdayPickRewardMessage(saturdayPickQuery.data.sponsor)} Choose which featured ${saturdayPickQuery.data.contest_position} will score the most fantasy points.`
-    : "Six featured players. One weekly prediction. One prize. Make your call before kickoff."}
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-col gap-3 lg:items-end">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-cfb-text-muted">Six players. One winner.</p>
-            <Button asChild variant={saturdayPickQuery.data ? "default" : "outline"} className="h-13 rounded-xl px-7 text-[11px] font-black uppercase tracking-[0.16em]">
-              <Link to="/saturday-pick-6">{saturdayPickQuery.data?.entry ? "View Your Pick" : saturdayPickQuery.data ? "Make Your Pick" : "Learn More"}</Link>
-            </Button>
-          </div>
-        </div>
-      </SurfaceCard>
+      <SaturdayPick6 embedded />
 
       <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
         <SurfaceCard variant="default" padding="none">

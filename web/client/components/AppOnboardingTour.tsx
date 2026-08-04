@@ -50,7 +50,7 @@ export const TOUR_STEPS: TourStep[] = [
     target: "#nav-coming-soon",
     title: "Coming Soon",
     description:
-      "Coming Soon opens Saturday Pick 6, the weekly featured-player challenge. It is separate from league scoring and will show its current availability and lock time.",
+      "Coming Soon is the roadmap for upcoming app features. Saturday Pick 6 lives on the Home dashboard.",
   },
   {
     target: "#nav-mock-draft",
