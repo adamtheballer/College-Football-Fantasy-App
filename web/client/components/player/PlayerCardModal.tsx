@@ -335,7 +335,7 @@ export function PlayerCardModal({
   const position = (card?.about.position ?? player.position ?? "").toUpperCase();
   const gameLogQuery = usePlayerGameLog(player.id, 2026, activeTab === "game-log");
   const historyQuery = useLeaguePlayerHistory(leagueId ?? undefined, player.id, activeTab === "history" && hasLeagueContext);
-  const valueQuery = usePlayerTradeValues(player.id, 2026, activeTab === "value");
+  const valueQuery = usePlayerTradeValues(player.id, 2026);
   const trajectoryQuery = usePlayerTrajectory(
     player.id,
     2026,
@@ -407,7 +407,15 @@ export function PlayerCardModal({
         )}
         onClick={(event) => event.stopPropagation()}
       >
-        <PlayerCardHeader card={card} onClose={onClose} palette={palette} player={player} position={position} title={title} />
+        <PlayerCardHeader
+          card={card}
+          currentValue={valueQuery.data?.current ? normalizeTradeValueMeter(valueQuery.data.current.value) : null}
+          onClose={onClose}
+          palette={palette}
+          player={player}
+          position={position}
+          title={title}
+        />
 
         <nav className="flex gap-2 overflow-x-auto border-b border-white/10 bg-black/18 px-5 py-3 sm:flex-wrap sm:overflow-visible sm:px-8">
           {visiblePlayerCardTabs(hasLeagueContext).map((tab) => {

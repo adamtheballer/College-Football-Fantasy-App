@@ -16,6 +16,7 @@ import {
   visiblePlayerCardAboutMessage,
   visiblePlayerCardTabs,
 } from "./PlayerCardModal";
+import { CURRENT_VALUE_RATING_LABEL, formatCurrentValueRating } from "./PlayerCardHeader";
 
 describe("PlayerCardModal helpers", () => {
   it("always shows the History tab, with league context controlling its contents", () => {
@@ -50,6 +51,12 @@ describe("PlayerCardModal helpers", () => {
     expect(tradeValueMeterDegrees(98)).toBeLessThan(360);
     expect(tradeValueMeterDegrees(99)).toBe(360);
     expect(normalizeTradeValueMeter(100)).toBe(99);
+  });
+
+  it("uses the canonical current value label and an explicit unavailable state", () => {
+    expect(CURRENT_VALUE_RATING_LABEL).toBe("Current Value Rating");
+    expect(formatCurrentValueRating(78.4)).toBe("78");
+    expect(formatCurrentValueRating(null)).toBe("N/A");
   });
 
   it("shows a drafted player's round, pick, and overall selection in league history", () => {

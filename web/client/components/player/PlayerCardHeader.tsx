@@ -15,6 +15,11 @@ type PlayerCardPalette = {
   silhouette: string;
 };
 
+export const CURRENT_VALUE_RATING_LABEL = "Current Value Rating";
+
+export const formatCurrentValueRating = (value?: number | null) =>
+  typeof value === "number" && Number.isFinite(value) ? value.toFixed(0) : "N/A";
+
 const playbookMarks = [
   { label: "X", className: "left-[58%] top-8" },
   { label: "O", className: "left-[69%] top-14" },
@@ -24,6 +29,7 @@ const playbookMarks = [
 
 export function PlayerCardHeader({
   card,
+  currentValue,
   onClose,
   palette,
   player,
@@ -31,6 +37,7 @@ export function PlayerCardHeader({
   title,
 }: {
   card?: PlayerCardResponse | null;
+  currentValue?: number | null;
   onClose: () => void;
   palette: PlayerCardPalette;
   player: PlayerCardModalPlayer;
@@ -39,7 +46,7 @@ export function PlayerCardHeader({
 }) {
   const metricCards = [
     ["Proj", typeof player.projectedPoints === "number" ? player.projectedPoints.toFixed(1) : "—"],
-    ["Current Player Value", card?.player.cfb27_overall?.toString() ?? player.cfb27Overall?.toString() ?? "—"],
+    [CURRENT_VALUE_RATING_LABEL, formatCurrentValueRating(currentValue)],
     ["Class", card?.about.player_class ?? player.playerClass ?? "—"],
     ["Status", card?.about.status ?? player.status ?? "—"],
   ];

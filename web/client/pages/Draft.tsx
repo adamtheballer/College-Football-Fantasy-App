@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Bot, ClipboardList, History, LocateFixed, Loader2, Lock, Search, ShieldAlert, Trophy, User, Users } from "lucide-react";
 
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
+import { DraftRoomVisuals, draftMatteControlClass, draftMattePanelClass } from "@/components/DraftRoomVisuals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDraftPick, useDraftRoom, useStartDraft } from "@/hooks/use-draft";
@@ -761,12 +762,8 @@ export default function Draft() {
   );
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(135deg,#020713_0%,#071b31_40%,#14113a_70%,#19082a_100%)] text-foreground">
-      <div className="pointer-events-none absolute inset-0 opacity-[0.32] [background-image:radial-gradient(circle_at_18%_16%,rgba(56,189,248,0.2),transparent_30%),radial-gradient(circle_at_78%_12%,rgba(96,165,250,0.16),transparent_28%),radial-gradient(circle_at_86%_72%,rgba(251,191,36,0.08),transparent_26%),radial-gradient(circle_at_42%_92%,rgba(217,70,239,0.09),transparent_32%)]" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.075] [background-image:linear-gradient(rgba(255,255,255,0.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:56px_56px]" />
-      <div aria-hidden="true" className="pointer-events-none absolute -left-32 top-24 h-14 w-[42rem] rotate-[-16deg] rounded-full bg-gradient-to-r from-cfb-pink/20 via-cfb-brand/28 to-transparent blur-xl" />
-      <div aria-hidden="true" className="pointer-events-none absolute -right-32 top-[28rem] h-12 w-[38rem] rotate-[18deg] rounded-full bg-gradient-to-r from-transparent via-cfb-cyan/24 to-cfb-gold/20 blur-xl" />
-      <div aria-hidden="true" className="pointer-events-none absolute bottom-36 left-[18%] h-10 w-[32rem] rotate-[-11deg] rounded-full bg-gradient-to-r from-transparent via-cfb-gold/18 to-cfb-pink/22 blur-xl" />
+    <div className="relative min-h-screen overflow-hidden bg-[#080d13] text-foreground">
+      <DraftRoomVisuals />
 
       <div className="relative mx-auto max-w-[1800px] space-y-6 px-4 pb-28 pt-4 md:px-6">
         <div className="relative z-20 flex flex-wrap items-center justify-between gap-3">
@@ -791,10 +788,10 @@ export default function Draft() {
             <div className="pointer-events-none fixed left-1/2 top-3 z-[1250] -translate-x-1/2">
               <div
                 className={cn(
-                  "rounded-3xl border bg-slate-950/82 px-8 py-3 text-center shadow-[0_0_48px_rgba(34,211,238,0.18)] backdrop-blur-2xl transition",
+                  "rounded-3xl border border-white/14 bg-[#0b121a]/94 px-8 py-3 text-center shadow-[0_10px_24px_rgba(2,6,23,0.34)] transition",
                   timerDanger
                     ? "animate-pulse border-red-300/50 shadow-[0_0_58px_rgba(248,113,113,0.34)]"
-                    : "border-cyan-200/20"
+                    : "border-white/14"
                 )}
               >
                   <p className="text-[9px] font-black uppercase tracking-[0.26em] text-muted-foreground">
@@ -815,8 +812,8 @@ export default function Draft() {
           <div className="flex flex-wrap items-center justify-end gap-3">
             <div
               className={cn(
-                "rounded-3xl border border-cyan-200/20 bg-slate-950/72 px-6 py-4 text-right shadow-[0_0_42px_rgba(34,211,238,0.17)] backdrop-blur-xl",
-                canPick && "border-cyan-200/50 bg-cyan-300/12 shadow-[0_0_58px_rgba(103,232,249,0.28)]"
+                "rounded-3xl border border-white/14 bg-[#0b121a]/94 px-6 py-4 text-right shadow-[0_10px_24px_rgba(2,6,23,0.34)]",
+                canPick && "border-amber-200/45 bg-amber-300/10 shadow-[0_0_28px_rgba(251,191,36,0.14)]"
               )}
             >
               <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
@@ -844,13 +841,13 @@ export default function Draft() {
           </div>
         </div>
 
-        <header className="rounded-[2rem] border border-cyan-200/15 bg-card/45 p-6 shadow-[0_0_70px_rgba(14,165,233,0.10)] md:p-8">
-          <p className="text-[10px] font-black uppercase tracking-[0.26em] text-cyan-200">Real League Draft Room</p>
+        <header className={cn(draftMattePanelClass, "p-6 md:p-8")}>
+          <p className="text-[10px] font-black uppercase tracking-[0.26em] text-amber-200">Real League Draft Room</p>
           <h1 className="mt-3 text-4xl font-black italic uppercase tracking-tight text-white md:text-6xl">
             {leagueName}
           </h1>
           <div className="mt-5 flex flex-wrap gap-3">
-            <span className="rounded-full border border-cyan-200/15 bg-cyan-400/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100">
+            <span className="rounded-full border border-amber-200/25 bg-amber-300/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-amber-100">
               {formatStatus(draftRoom.status)}
             </span>
             <span className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
@@ -875,7 +872,7 @@ export default function Draft() {
           ) : null}
           {draftRoom.can_start_draft ? (
             <Button
-              className="mt-6 h-12 rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 px-6 text-[10px] font-black uppercase tracking-[0.18em] text-slate-950"
+              className="mt-6 h-12 rounded-2xl bg-gradient-to-r from-amber-200 to-orange-400 px-6 text-[10px] font-black uppercase tracking-[0.18em] text-slate-950 shadow-[0_8px_20px_rgba(251,146,60,0.2)]"
               disabled={startDraftMutation.isPending}
               onClick={() => {
                 setLocalError(null);
@@ -899,10 +896,10 @@ export default function Draft() {
           </div>
         ) : null}
 
-        <section className="overflow-hidden rounded-[2rem] border border-cyan-200/15 bg-card/50 shadow-[0_0_70px_rgba(14,165,233,0.13),inset_0_1px_0_rgba(255,255,255,0.04)]">
-          <div className="relative flex min-h-[76px] items-center justify-between gap-4 border-b border-cyan-100/10 px-5 py-4">
+        <section className={cn("overflow-hidden", draftMattePanelClass)}>
+          <div className="relative flex min-h-[76px] items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.26em] text-cyan-200 drop-shadow-[0_0_14px_rgba(103,232,249,0.32)]">Draft Order</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.26em] text-amber-200">Draft Order</p>
               <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">
                 Real league draft board preview
               </p>
@@ -910,7 +907,7 @@ export default function Draft() {
             <button
               type="button"
               onClick={recenterDraftCarousel}
-              className="absolute left-1/2 top-1/2 inline-flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[1.15rem] border border-cyan-200/30 bg-slate-950/75 text-cyan-100 shadow-[0_0_32px_rgba(34,211,238,0.2)] transition hover:border-cyan-200/60 hover:bg-cyan-300/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70"
+              className="absolute left-1/2 top-1/2 inline-flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[1.15rem] border border-white/16 bg-[#0b121a] text-amber-100 shadow-[0_8px_20px_rgba(2,6,23,0.32)] transition hover:border-amber-200/45 hover:bg-amber-300/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60"
               aria-label="Center draft order on the current pick"
               title="Center current pick"
             >
@@ -940,28 +937,28 @@ export default function Draft() {
                     }
                   }}
                   className={cn(
-                    "relative min-w-[178px] rounded-3xl border p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition",
+                    "relative min-w-[178px] rounded-3xl border border-white/10 bg-[#131c27] p-4 shadow-[0_8px_18px_rgba(2,6,23,0.22)] transition",
                     isCurrent && isDraftActive
-                      ? "border-cyan-200/80 bg-cyan-300/14 shadow-[0_0_52px_rgba(103,232,249,0.36),inset_0_1px_0_rgba(255,255,255,0.07)]"
+                      ? "border-amber-200/70 bg-amber-300/12 shadow-[0_0_28px_rgba(251,191,36,0.16)]"
                       : isCurrent
-                        ? "border-amber-200/45 bg-amber-300/10 shadow-[0_0_42px_rgba(251,191,36,0.16)]"
+                        ? "border-orange-200/45 bg-orange-300/10 shadow-[0_0_24px_rgba(251,146,60,0.14)]"
                       : isUser
-                        ? "border-cyan-300/40 bg-cyan-400/10 shadow-[0_0_30px_rgba(34,211,238,0.18),inset_0_1px_0_rgba(255,255,255,0.05)]"
-                      : "border-white/10 bg-white/[0.045] hover:border-cyan-200/20 hover:shadow-[0_0_22px_rgba(34,211,238,0.10)]",
+                        ? "border-emerald-200/40 bg-emerald-300/10 shadow-[0_0_22px_rgba(52,211,153,0.14)]"
+                      : "hover:border-white/25 hover:bg-white/[0.055]",
                     isLocked && "opacity-80"
                   )}
                 >
                   {isCurrent ? (
                     <div
                       aria-label="Current pick"
-                      className="absolute -top-3 left-1/2 z-10 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border border-cyan-100/70 bg-slate-950 text-cyan-100 shadow-[0_0_24px_rgba(103,232,249,0.55)]"
+                      className="absolute -top-3 left-1/2 z-10 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border border-amber-100/70 bg-[#0b121a] text-amber-100 shadow-[0_0_18px_rgba(251,191,36,0.30)]"
                     >
                       <LocateFixed className="h-3.5 w-3.5" />
                     </div>
                   ) : null}
                   <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Pick {slot.overallPick}</p>
                   <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{slot.round}.{slot.roundPick}</p>
-                  <div className="mt-3 flex h-8 w-8 items-center justify-center rounded-xl border border-cyan-200/30 bg-slate-950/55 text-cyan-100 shadow-[0_0_22px_rgba(103,232,249,0.24),inset_0_0_12px_rgba(103,232,249,0.08)]">
+                  <div className="mt-3 flex h-8 w-8 items-center justify-center rounded-xl border border-white/14 bg-black/20 text-amber-100">
                     {slot.team?.is_cpu ? <Bot className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" /> : <User className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" />}
                   </div>
                   <p className="mt-3 truncate text-base font-black text-foreground">
@@ -991,15 +988,15 @@ export default function Draft() {
         ) : null}
 
         {activeTab === "draft" ? (
-        <section data-testid="available-players-table" className="overflow-hidden rounded-[2rem] border border-cyan-200/15 bg-card/50 shadow-[0_0_56px_rgba(34,211,238,0.12),inset_0_1px_0_rgba(255,255,255,0.04)]">
-          <div className="border-b border-cyan-100/10 p-5">
+        <section data-testid="available-players-table" className={cn("overflow-hidden", draftMattePanelClass)}>
+          <div className="border-b border-white/10 p-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-200 drop-shadow-[0_0_14px_rgba(103,232,249,0.28)]">Available Players</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-amber-200">Available Players</p>
                 <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
                   Showing your roster needs: {viewerDraftBoardTeamName}
                 </p>
-                <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100/80">
+                <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-100/80">
                   Your legal positions: {legalPositions.length ? legalPositions.join(", ") : "None"}
                 </p>
                 <p className="mt-1 text-[9px] font-black uppercase tracking-[0.18em] text-amber-100/80">
@@ -1012,7 +1009,7 @@ export default function Draft() {
                   <Input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    className="h-12 rounded-2xl border-cyan-200/15 bg-slate-950/35 pl-11 text-sm font-bold"
+                    className="h-12 rounded-2xl border-white/14 bg-black/20 pl-11 text-sm font-bold"
                     placeholder="Search players, schools..."
                   />
                 </div>
@@ -1025,8 +1022,8 @@ export default function Draft() {
                       className={cn(
                         "h-10 rounded-2xl border px-4 text-[10px] font-black uppercase tracking-[0.14em] transition",
                         position === value
-                          ? "border-cyan-200/50 bg-cyan-300 text-slate-950 shadow-[0_0_22px_rgba(103,232,249,0.24)]"
-                          : "border-white/10 bg-white/5 text-muted-foreground hover:border-cyan-200/30 hover:text-cyan-100"
+                          ? "border-amber-200/55 bg-amber-200 text-slate-950 shadow-[0_8px_18px_rgba(251,191,36,0.20)]"
+                          : "border-white/10 bg-white/5 text-muted-foreground hover:border-amber-200/35 hover:text-amber-100"
                       )}
                     >
                       {value}
@@ -1037,7 +1034,7 @@ export default function Draft() {
             </div>
           </div>
 
-          <div className="grid grid-cols-[72px_minmax(0,1fr)_96px_110px_180px] border-b border-cyan-100/10 px-5 py-3 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+          <div className="grid grid-cols-[72px_minmax(0,1fr)_96px_110px_180px] border-b border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">
             <span>RK</span>
             <span>Player</span>
             <span>Pos</span>
@@ -1065,7 +1062,7 @@ export default function Draft() {
             ) : (
               visiblePlayers.slice(0, 180).map((player) => {
                 const positionClass = POSITION_STYLES[player.pos] ?? "border-white/20 bg-white/10 text-foreground";
-                const positionHoverClass = POSITION_ROW_HOVER_STYLES[player.pos] ?? "hover:bg-cyan-300/[0.045] focus:bg-cyan-300/[0.06]";
+                const positionHoverClass = POSITION_ROW_HOVER_STYLES[player.pos] ?? "hover:bg-amber-300/[0.045] focus:bg-amber-300/[0.06]";
                 const isSelected = selectedPlayerId === player.id;
                 const isQueued = queuedPlayerIds.includes(player.id);
                 const isBackendPlayer = player.id > 0;
@@ -1084,14 +1081,14 @@ export default function Draft() {
                       }
                     }}
                     className={cn(
-                      "grid cursor-pointer grid-cols-[72px_minmax(0,1fr)_96px_110px_180px] items-center gap-3 border-b border-cyan-100/10 px-5 py-4 outline-none transition-[background-color,box-shadow,color] duration-200",
+                      "grid cursor-pointer grid-cols-[72px_minmax(0,1fr)_96px_110px_180px] items-center gap-3 border-b border-white/10 px-5 py-4 outline-none transition-[background-color,box-shadow,color] duration-200",
                       positionHoverClass,
-                      isSelected && "bg-cyan-300/[0.075] shadow-[inset_3px_0_0_rgba(103,232,249,0.75)]"
+                      isSelected && "bg-amber-300/[0.075] shadow-[inset_3px_0_0_rgba(251,191,36,0.72)]"
                     )}
                   >
                     <p className="text-xl font-black tabular-nums text-muted-foreground">{visibleRank}</p>
                     <div className="min-w-0">
-                      <p className="truncate text-base font-black text-foreground transition-colors hover:text-cyan-100">{player.name}</p>
+                      <p className="truncate text-base font-black text-foreground transition-colors hover:text-amber-100">{player.name}</p>
                       <p className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">{player.school}</p>
                     </div>
                     <span className={cn("w-fit rounded-full border px-4 py-2 text-xs font-black", positionClass)}>{player.pos}</span>
@@ -1118,7 +1115,7 @@ export default function Draft() {
                         className={cn(
                           "h-10 rounded-2xl px-5 text-[10px] font-black uppercase tracking-[0.14em]",
                           canPick && isBackendPlayer
-                            ? "bg-gradient-to-r from-cyan-300 to-blue-500 text-slate-950"
+                            ? "bg-gradient-to-r from-amber-200 to-orange-400 text-slate-950"
                             : "border border-white/10 bg-white/[0.04] text-muted-foreground"
                         )}
                         disabled={!canPick || !isBackendPlayer}
@@ -1183,7 +1180,7 @@ export default function Draft() {
       ) : null}
 
       <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[1200] flex justify-center px-4">
-        <div className="pointer-events-auto grid w-full max-w-xl grid-cols-4 rounded-2xl border border-cyan-200/15 bg-slate-950/88 p-1 shadow-[0_0_40px_rgba(34,211,238,0.16)] backdrop-blur-xl">
+        <div className={cn("pointer-events-auto grid w-full max-w-xl grid-cols-4 rounded-2xl p-1", draftMatteControlClass)}>
           {DRAFT_TABS.map((tab) => {
             const Icon = tab.value === "draft" ? Trophy : tab.value === "queue" ? ClipboardList : tab.value === "roster" ? Users : History;
             return (
@@ -1194,8 +1191,8 @@ export default function Draft() {
                 className={cn(
                   "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition",
                   activeTab === tab.value
-                    ? "bg-gradient-to-r from-cyan-300 to-blue-400 text-slate-950 shadow-[0_0_24px_rgba(103,232,249,0.22)]"
-                    : "text-muted-foreground hover:bg-white/[0.06] hover:text-cyan-100"
+                    ? "bg-gradient-to-r from-amber-200 to-orange-400 text-slate-950 shadow-[0_8px_18px_rgba(251,146,60,0.18)]"
+                    : "text-muted-foreground hover:bg-white/[0.06] hover:text-amber-100"
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
