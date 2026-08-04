@@ -5,17 +5,16 @@
 export function DraftRoomVisuals() {
   return (
     <>
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(180,83,9,0.14),transparent_26%),radial-gradient(circle_at_84%_10%,rgba(22,101,52,0.13),transparent_24%),radial-gradient(circle_at_74%_82%,rgba(109,40,217,0.11),transparent_31%),linear-gradient(135deg,#080d13_0%,#111a22_45%,#15111d_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_0%,rgba(180,83,9,0.07),transparent_24%),radial-gradient(circle_at_88%_82%,rgba(30,64,175,0.05),transparent_28%),linear-gradient(135deg,#080d13_0%,#101820_48%,#0d1319_100%)]" />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-[0.16] [background-image:repeating-linear-gradient(0deg,rgba(226,232,240,0.38)_0_1px,transparent_1px_54px),linear-gradient(90deg,transparent_49.8%,rgba(226,232,240,0.30)_50%,transparent_50.2%),repeating-linear-gradient(90deg,transparent_0_67px,rgba(226,232,240,0.16)_67px_69px,transparent_69px_136px)] [background-size:auto_54px,100%_100%,100%_54px]"
+        className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:repeating-linear-gradient(0deg,rgba(226,232,240,0.38)_0_1px,transparent_1px_54px),linear-gradient(90deg,transparent_49.8%,rgba(226,232,240,0.30)_50%,transparent_50.2%),repeating-linear-gradient(90deg,transparent_0_67px,rgba(226,232,240,0.16)_67px_69px,transparent_69px_136px)] [background-size:auto_54px,100%_100%,100%_54px]"
       />
-      <div aria-hidden="true" className="pointer-events-none absolute -left-24 top-28 h-7 w-[38rem] rotate-[-11deg] bg-gradient-to-r from-transparent via-rose-400/40 to-amber-300/10 blur-sm" />
-      <div aria-hidden="true" className="pointer-events-none absolute -right-20 top-[26rem] h-6 w-[34rem] rotate-[14deg] bg-gradient-to-r from-transparent via-emerald-300/32 to-sky-300/8 blur-sm" />
-      <div aria-hidden="true" className="pointer-events-none absolute bottom-28 left-[18%] h-6 w-[30rem] rotate-[-8deg] bg-gradient-to-r from-transparent via-violet-400/26 to-orange-300/10 blur-sm" />
+      <div aria-hidden="true" className="pointer-events-none absolute -left-32 top-20 h-5 w-[30rem] rotate-[-9deg] bg-gradient-to-r from-transparent via-amber-300/14 to-transparent blur-sm" />
+      <div aria-hidden="true" className="pointer-events-none absolute -right-28 bottom-24 h-4 w-[26rem] rotate-[11deg] bg-gradient-to-r from-transparent via-slate-200/8 to-transparent blur-sm" />
       <svg
         aria-hidden="true"
-        className="pointer-events-none absolute right-0 top-20 hidden h-[30rem] w-[44rem] text-white/10 lg:block"
+        className="pointer-events-none absolute -right-16 top-[34rem] hidden h-[24rem] w-[36rem] text-white/[0.06] xl:block"
         fill="none"
         viewBox="0 0 704 480"
       >
@@ -34,7 +33,7 @@ export function DraftRoomVisuals() {
 }
 
 export const draftMattePanelClass =
-  "rounded-[1.75rem] border border-white/10 bg-[#101923]/92 shadow-[0_14px_34px_rgba(2,6,23,0.34)]";
+  "rounded-[1.75rem] border border-white/12 bg-[#101923] shadow-[0_14px_34px_rgba(2,6,23,0.38)]";
 
 export const draftMatteControlClass =
-  "border-white/14 bg-[#0b121a]/94 text-slate-100 shadow-[0_8px_20px_rgba(2,6,23,0.28)]";
+  "border-white/16 bg-[#0b121a] text-slate-100 shadow-[0_8px_20px_rgba(2,6,23,0.32)]";

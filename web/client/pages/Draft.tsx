@@ -772,14 +772,14 @@ export default function Draft() {
               type="button"
               variant="outline"
               size="icon"
-              className="h-12 w-12 rounded-2xl border-cyan-200/20 bg-slate-950/70 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.16)] backdrop-blur-xl hover:border-cyan-200/40 hover:bg-cyan-400/12 hover:text-white"
+              className="h-12 w-12 rounded-2xl border-white/15 bg-[#0b121a] text-slate-200 shadow-[0_8px_20px_rgba(2,6,23,0.32)] hover:border-amber-200/35 hover:bg-amber-300/10 hover:text-white"
               aria-label="Exit real draft room"
               title="Exit real draft room"
               onClick={() => navigate(exitPath)}
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <Button asChild variant="outline" className="h-12 rounded-2xl border-cyan-200/20 bg-slate-950/70 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100 hover:border-cyan-200/40 hover:bg-cyan-400/12 hover:text-white">
+            <Button asChild variant="outline" className="h-12 rounded-2xl border-white/15 bg-[#0b121a] px-5 text-[10px] font-black uppercase tracking-[0.18em] text-slate-200 hover:border-amber-200/35 hover:bg-amber-300/10 hover:text-white">
               <Link to={exitPath}>Exit</Link>
             </Button>
           </div>
@@ -788,7 +788,7 @@ export default function Draft() {
             <div className="pointer-events-none fixed left-1/2 top-3 z-[1250] -translate-x-1/2">
               <div
                 className={cn(
-                  "rounded-3xl border border-white/14 bg-[#0b121a]/94 px-8 py-3 text-center shadow-[0_10px_24px_rgba(2,6,23,0.34)] transition",
+                  "rounded-3xl border border-white/16 bg-[#0b121a] px-8 py-3 text-center shadow-[0_10px_24px_rgba(2,6,23,0.38)] transition",
                   timerDanger
                     ? "animate-pulse border-red-300/50 shadow-[0_0_58px_rgba(248,113,113,0.34)]"
                     : "border-white/14"
@@ -812,7 +812,7 @@ export default function Draft() {
           <div className="flex flex-wrap items-center justify-end gap-3">
             <div
               className={cn(
-                "rounded-3xl border border-white/14 bg-[#0b121a]/94 px-6 py-4 text-right shadow-[0_10px_24px_rgba(2,6,23,0.34)]",
+                "rounded-3xl border border-white/16 bg-[#0b121a] px-6 py-4 text-right shadow-[0_10px_24px_rgba(2,6,23,0.38)]",
                 canPick && "border-amber-200/45 bg-amber-300/10 shadow-[0_0_28px_rgba(251,191,36,0.14)]"
               )}
             >
