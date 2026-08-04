@@ -617,7 +617,7 @@ export default function Draft() {
                     Remove
                   </Button>
                   <Button
-                    className="h-10 flex-1 rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 text-[10px] font-black uppercase tracking-[0.14em] text-slate-950"
+                    className="h-10 flex-1 rounded-2xl border border-slate-400/25 bg-slate-800/85 text-[10px] font-black uppercase tracking-[0.14em] text-slate-100 shadow-none hover:bg-slate-700/85"
                     disabled={!canPick || !isLegalForCurrentPick || !isBackendPlayer}
                     onClick={() => makePick(player)}
                   >
@@ -872,7 +872,7 @@ export default function Draft() {
           ) : null}
           {draftRoom.can_start_draft ? (
             <Button
-              className="mt-6 h-12 rounded-2xl bg-gradient-to-r from-amber-200 to-orange-400 px-6 text-[10px] font-black uppercase tracking-[0.18em] text-slate-950 shadow-[0_8px_20px_rgba(251,146,60,0.2)]"
+              className="mt-6 h-12 rounded-2xl border border-slate-400/25 bg-slate-800/85 px-6 text-[10px] font-black uppercase tracking-[0.18em] text-slate-100 shadow-none hover:bg-slate-700/85"
               disabled={startDraftMutation.isPending}
               onClick={() => {
                 setLocalError(null);
@@ -1034,10 +1034,11 @@ export default function Draft() {
             </div>
           </div>
 
-          <div className="grid grid-cols-[72px_minmax(0,1fr)_96px_110px_180px] border-b border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+          <div className="grid grid-cols-[64px_minmax(0,1fr)_70px_86px_110px_180px] border-b border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">
             <span>RK</span>
             <span>Player</span>
             <span>Pos</span>
+            <span>CFB 27</span>
             <span>Proj</span>
             <span className="text-right">Action</span>
           </div>
@@ -1081,7 +1082,7 @@ export default function Draft() {
                       }
                     }}
                     className={cn(
-                      "grid cursor-pointer grid-cols-[72px_minmax(0,1fr)_96px_110px_180px] items-center gap-3 border-b border-white/10 px-5 py-4 outline-none transition-[background-color,box-shadow,color] duration-200",
+                      "grid cursor-pointer grid-cols-[64px_minmax(0,1fr)_70px_86px_110px_180px] items-center gap-3 border-b border-white/10 px-5 py-4 outline-none transition-[background-color,box-shadow,color] duration-200",
                       positionHoverClass,
                       isSelected && "bg-amber-300/[0.075] shadow-[inset_3px_0_0_rgba(251,191,36,0.72)]"
                     )}
@@ -1092,6 +1093,7 @@ export default function Draft() {
                       <p className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">{player.school}</p>
                     </div>
                     <span className={cn("w-fit rounded-full border px-4 py-2 text-xs font-black", positionClass)}>{player.pos}</span>
+                    <p className="text-sm font-black tabular-nums text-cfb-text-primary">{player.cfb27Overall ?? "—"}</p>
                     <p className="text-sm font-black tabular-nums text-foreground">
                       {formatDraftProjection({
                         seasonProjection: player.sheetProjectedSeasonPoints,
@@ -1115,7 +1117,7 @@ export default function Draft() {
                         className={cn(
                           "h-10 rounded-2xl px-5 text-[10px] font-black uppercase tracking-[0.14em]",
                           canPick && isBackendPlayer
-                            ? "bg-gradient-to-r from-amber-200 to-orange-400 text-slate-950"
+                            ? "border border-slate-400/25 bg-slate-800/85 text-slate-100 shadow-none hover:bg-slate-700/85"
                             : "border border-white/10 bg-white/[0.04] text-muted-foreground"
                         )}
                         disabled={!canPick || !isBackendPlayer}
@@ -1191,7 +1193,7 @@ export default function Draft() {
                 className={cn(
                   "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition",
                   activeTab === tab.value
-                    ? "bg-gradient-to-r from-amber-200 to-orange-400 text-slate-950 shadow-[0_8px_18px_rgba(251,146,60,0.18)]"
+                  ? "border border-slate-400/25 bg-slate-700/90 text-slate-100 shadow-none"
                     : "text-muted-foreground hover:bg-white/[0.06] hover:text-amber-100"
                 )}
               >

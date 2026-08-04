@@ -424,10 +424,11 @@ export default function SinglePlayerMockDraftRoom() {
         </div>
       </div>
 
-      <div className="grid grid-cols-[72px_minmax(0,1fr)_96px_110px_180px] border-b border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+      <div className="grid grid-cols-[64px_minmax(0,1fr)_70px_86px_110px_180px] border-b border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">
         <span>RK</span>
         <span>Player</span>
         <span>Pos</span>
+        <span>CFB 27</span>
         <span>Proj</span>
         <span className="text-right">Action</span>
       </div>
@@ -471,7 +472,7 @@ export default function SinglePlayerMockDraftRoom() {
                   }
                 }}
                 className={cn(
-                  "grid cursor-pointer grid-cols-[72px_minmax(0,1fr)_96px_110px_180px] items-center gap-3 border-b border-white/10 px-5 py-4 outline-none transition-[background-color,box-shadow,color] duration-200",
+                  "grid cursor-pointer grid-cols-[64px_minmax(0,1fr)_70px_86px_110px_180px] items-center gap-3 border-b border-white/10 px-5 py-4 outline-none transition-[background-color,box-shadow,color] duration-200",
                   positionHoverClass,
                   isSelected && "bg-amber-300/[0.075] shadow-[inset_3px_0_0_rgba(251,191,36,0.72)]"
                 )}
@@ -482,6 +483,7 @@ export default function SinglePlayerMockDraftRoom() {
                   <p className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">{player.school}</p>
                 </div>
                 <span className={cn("w-fit rounded-full border px-4 py-2 text-xs font-black", positionClass)}>{player.pos}</span>
+                <p className="text-sm font-black tabular-nums text-cfb-text-primary">{player.cfb27Overall ?? "—"}</p>
                 <p className="text-sm font-black tabular-nums text-foreground">
                   {formatDraftProjection({
                     seasonProjection: player.sheetProjectedSeasonPoints,
@@ -502,7 +504,7 @@ export default function SinglePlayerMockDraftRoom() {
                     {isQueued ? "Queued" : "Queue"}
                   </Button>
                   <Button
-                    className="h-10 rounded-2xl bg-gradient-to-r from-amber-200 to-orange-400 px-5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-950"
+                    className="h-10 rounded-2xl border border-slate-400/25 bg-slate-800/85 px-5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-100 shadow-none hover:bg-slate-700/85"
                     disabled={!userOnClock || draftState.status !== "live"}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -579,7 +581,7 @@ export default function SinglePlayerMockDraftRoom() {
                 <Button variant="outline" className="h-10 flex-1 rounded-2xl text-[10px] font-black uppercase tracking-[0.14em]" onClick={() => toggleQueue(player.id)}>
                   Remove
                 </Button>
-                <Button className="h-10 flex-1 rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 text-[10px] font-black uppercase tracking-[0.14em] text-slate-950" disabled={!userOnClock || draftState.status !== "live" || !isLegalForCurrentPick} onClick={() => draftPlayer(player.id)}>
+                <Button className="h-10 flex-1 rounded-2xl border border-slate-400/25 bg-slate-800/85 text-[10px] font-black uppercase tracking-[0.14em] text-slate-100 shadow-none hover:bg-slate-700/85" disabled={!userOnClock || draftState.status !== "live" || !isLegalForCurrentPick} onClick={() => draftPlayer(player.id)}>
                   {isLegalForCurrentPick ? "Draft" : "No Slot"}
                 </Button>
               </div>
@@ -977,7 +979,7 @@ export default function SinglePlayerMockDraftRoom() {
             <div className="grid gap-3 px-8 py-6 sm:grid-cols-3">
               <Button
                 type="button"
-                className="h-12 rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 px-6 text-[10px] font-black uppercase tracking-[0.16em] text-slate-950 shadow-[0_0_28px_rgba(103,232,249,0.24)]"
+                className="h-12 rounded-2xl border border-slate-400/25 bg-slate-800/85 px-6 text-[10px] font-black uppercase tracking-[0.16em] text-slate-100 shadow-none hover:bg-slate-700/85"
                 onClick={viewDraftedRoster}
               >
                 <ClipboardList className="mr-2 h-4 w-4" />
@@ -1015,7 +1017,7 @@ export default function SinglePlayerMockDraftRoom() {
               className={cn(
                 "rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition",
                 activeTab === tab.value
-                  ? "bg-gradient-to-r from-amber-200 to-orange-400 text-slate-950 shadow-[0_8px_18px_rgba(251,146,60,0.18)]"
+                  ? "border border-slate-400/25 bg-slate-700/90 text-slate-100 shadow-none"
                   : "text-muted-foreground hover:bg-white/[0.06] hover:text-amber-100"
               )}
             >
