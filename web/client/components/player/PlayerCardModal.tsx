@@ -50,18 +50,6 @@ const tabConfig: Array<{ id: PlayerCardTab; label: string; icon: typeof Info }> 
 
 export const visiblePlayerCardTabs = (_hasLeagueContext: boolean) => tabConfig;
 
-const statDisplayKeys = [
-  ["Pass Yds", ["pass_yards", "PassingYards", "passingYards"]],
-  ["Pass TD", ["pass_tds", "PassingTouchdowns", "passingTouchdowns"]],
-  ["INT", ["interceptions", "Interceptions"]],
-  ["Rush Yds", ["rush_yards", "RushingYards", "rushingYards"]],
-  ["Rush TD", ["rush_tds", "RushingTouchdowns", "rushingTouchdowns"]],
-  ["Rec", ["receptions", "Receptions"]],
-  ["Rec Yds", ["rec_yards", "ReceivingYards", "receivingYards"]],
-  ["Rec TD", ["rec_tds", "ReceivingTouchdowns", "receivingTouchdowns"]],
-  ["Fum Lost", ["fumbles_lost", "FumblesLost", "fumblesLost"]],
-] as const;
-
 const positionPalettes: Record<
   string,
   {
@@ -175,9 +163,6 @@ const getStatValue = (stats: Record<string, unknown> | null | undefined, keys: r
   }
   return null;
 };
-
-const getLatestStats = (card?: PlayerCardResponse) =>
-  card?.season_stats.find((row) => row.week === 0)?.stats ?? card?.season_stats[0]?.stats ?? null;
 
 const gameLogStatValue = (stats: Record<string, unknown> | null | undefined, keys: readonly string[]) =>
   getStatValue(stats, keys);
@@ -354,7 +339,6 @@ export function PlayerCardModal({
     historicalSeasons.find((row) => row.season === selectedHistoricalSeason) ??
     historicalSeasons[0] ??
     null;
-  const latestStats = useMemo(() => getLatestStats(card ?? undefined), [card]);
   const projectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
   const aboutMessage = visiblePlayerCardAboutMessage(card?.about.message);
   const cardActions = [...(action ? [action] : []), ...actions];
@@ -382,10 +366,6 @@ export function PlayerCardModal({
     .filter(([, value]) => value !== null)
     : [];
   const historicalTableRows = buildHistoricalStatsTableRows(activeHistoricalSeason);
-  const primaryStats = statDisplayKeys
-    .map(([label, keys]) => [label, getStatValue(latestStats, keys)] as const)
-    .filter(([, value]) => value !== null)
-    .slice(0, 6);
   useEffect(() => {
     setActiveTab("summary");
     setSelectedHistoricalSeason(null);
@@ -465,7 +445,7 @@ export function PlayerCardModal({
               ) : null}
             </div>
           ) : activeTab === "summary" ? (
-            <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
+            <div className="w-full">
               <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
                 <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Bio</p>
                 <div className="mt-4 grid grid-cols-2 gap-3">
@@ -507,25 +487,6 @@ export function PlayerCardModal({
                     ))}
                   </div>
                 ) : null}
-              </section>
-              <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
-                <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Season Snapshot</p>
-                {primaryStats.length ? (
-                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {primaryStats.map(([label, value]) => (
-                      <div key={label} className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
-                        <p className="mt-2 text-2xl font-black tabular-nums text-white">
-                          {formatPlayerCardValue(value)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
-                    No cached stat line is available for this player yet.
-                  </p>
-                )}
               </section>
             </div>
           ) : activeTab === "stats" ? (

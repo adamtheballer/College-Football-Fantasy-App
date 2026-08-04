@@ -16,7 +16,7 @@ import {
   visiblePlayerCardAboutMessage,
   visiblePlayerCardTabs,
 } from "./PlayerCardModal";
-import { CURRENT_VALUE_RATING_LABEL, formatCurrentValueRating } from "./PlayerCardHeader";
+import { CFB27_RATING_LABEL, formatCfb27Rating } from "./PlayerCardHeader";
 
 describe("PlayerCardModal helpers", () => {
   it("always shows the History tab, with league context controlling its contents", () => {
@@ -53,10 +53,10 @@ describe("PlayerCardModal helpers", () => {
     expect(normalizeTradeValueMeter(100)).toBe(99);
   });
 
-  it("uses the canonical current value label and an explicit unavailable state", () => {
-    expect(CURRENT_VALUE_RATING_LABEL).toBe("Current Value Rating");
-    expect(formatCurrentValueRating(78.4)).toBe("78");
-    expect(formatCurrentValueRating(null)).toBe("N/A");
+  it("uses the CFB 27 rating label and an explicit unavailable state", () => {
+    expect(CFB27_RATING_LABEL).toBe("CFB 27 Rating");
+    expect(formatCfb27Rating(85)).toBe("85");
+    expect(formatCfb27Rating(null)).toBe("N/A");
   });
 
   it("shows a drafted player's round, pick, and overall selection in league history", () => {
