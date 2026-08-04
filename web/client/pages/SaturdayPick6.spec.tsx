@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { SaturdayPickPlayer } from "@/hooks/use-saturday-pick";
 import { getSaturdayPickRewardMessage, getSaturdayPickSponsorLogo } from "@/lib/saturday-pick-sponsor";
 
-import { displayPoints, lockDeadlineMessage, pickConfirmationMessage, positionLabel, statusLabel } from "./SaturdayPick6";
+import { displayPoints, lockDeadlineMessage, pickConfirmationMessage, positionLabel, shouldRevealSponsorReward, statusLabel } from "./SaturdayPick6";
 
 const player: SaturdayPickPlayer = {
   id: 1,
@@ -42,6 +42,13 @@ describe("SaturdayPick6 state helpers", () => {
     expect(pickConfirmationMessage("Ahmad Hardy")).toBe("Your pick is in. Follow Ahmad Hardy this Saturday.");
     expect(lockDeadlineMessage("Ahmad Hardy", "2026-09-05T16:00:00Z")).toContain("Ahmad Hardy's game starts at");
     expect(lockDeadlineMessage("Ahmad Hardy", "2026-09-05T16:00:00Z")).toContain("Pick before kickoff; then it will lock.");
+  });
+
+  it("reveals a sponsor reward only for a finalized winning entry", () => {
+    expect(shouldRevealSponsorReward("OPEN", { is_winner: true })).toBe(false);
+    expect(shouldRevealSponsorReward("FINAL", { is_winner: false })).toBe(false);
+    expect(shouldRevealSponsorReward("FINAL", null)).toBe(false);
+    expect(shouldRevealSponsorReward("FINAL", { is_winner: true })).toBe(true);
   });
 
   it("uses only the sponsor logo supplied by the API", () => {

@@ -194,6 +194,24 @@ def test_finalization_marks_tied_winners_and_hides_sponsor_code_from_losers(clie
     contest_id = created.json()["id"]
     assert client.post(f"/admin/saturday-pick-6/{contest_id}/publish", json={}, headers=headers).status_code == 200
 
+    winner_signup = client.post("/auth/signup", json={"first_name": "Winner", "email": "winner@example.com", "password": "StrongPass123!"})
+    winner_headers = {"Authorization": f"Bearer {winner_signup.json()['access_token']}"}
+    winner_entry = client.put(
+        f"/saturday-pick-6/{contest_id}/entry",
+        json={"selected_pick_player_id": created.json()["players"][0]["id"]},
+        headers=winner_headers,
+    )
+    assert winner_entry.status_code == 200
+
+    loser_signup = client.post("/auth/signup", json={"first_name": "Loser", "email": "loser@example.com", "password": "StrongPass123!"})
+    loser_headers = {"Authorization": f"Bearer {loser_signup.json()['access_token']}"}
+    loser_entry = client.put(
+        f"/saturday-pick-6/{contest_id}/entry",
+        json={"selected_pick_player_id": created.json()["players"][2]["id"]},
+        headers=loser_headers,
+    )
+    assert loser_entry.status_code == 200
+
     # Force the first two players into an exact tie under canonical scoring.
     stats = db_session.query(PlayerGameStat).order_by(PlayerGameStat.player_id.asc()).all()
     stats[0].stats = {"pass_yards": 1_000, "pass_tds": 2}
@@ -204,12 +222,15 @@ def test_finalization_marks_tied_winners_and_hides_sponsor_code_from_losers(clie
     winning_ids = finalized.json()["winning_player_ids"]
     assert len(winning_ids) == 2
 
-    signup = client.post("/auth/signup", json={"first_name": "Loser", "email": "loser@example.com", "password": "StrongPass123!"})
-    user_headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
-    contest = client.get(f"/saturday-pick-6/{contest_id}", headers=user_headers).json()
-    losing_featured = next(row for row in contest["players"] if row["player_id"] not in winning_ids)
-    # A finalized contest cannot accept a late pick; the public payload still must never disclose a code.
-    assert contest["sponsor"]["code"] is None
+    winner_contest = client.get(f"/saturday-pick-6/{contest_id}", headers=winner_headers).json()
+    loser_contest = client.get(f"/saturday-pick-6/{contest_id}", headers=loser_headers).json()
+    losing_featured = next(row for row in loser_contest["players"] if row["player_id"] not in winning_ids)
+    assert winner_contest["entry"]["is_winner"] is True
+    assert winner_contest["sponsor"]["reward_unlocked"] is True
+    assert winner_contest["sponsor"]["code"] == "WINNER-ONLY"
+    # A finalized losing entry must never receive the sponsor code.
+    assert loser_contest["entry"]["is_winner"] is False
+    assert loser_contest["sponsor"]["code"] is None
     assert losing_featured["final_points"] is not None
 
 

@@ -5,7 +5,7 @@ import { Check, CircleX, Clock3, Copy, Lock, Radio, Trophy, UserRound } from "lu
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { type SaturdayPickPlayer, useSaveSaturdayPick, useSaturdayPickContest } from "@/hooks/use-saturday-pick";
-import { getSaturdayPickRewardMessage, getSaturdayPickSponsorLogo, saturdayPick6Sponsor } from "@/lib/saturday-pick-sponsor";
+import { getSaturdayPickSponsorLogo, saturdayPick6Sponsor } from "@/lib/saturday-pick-sponsor";
 
 const formatPoints = (value: number | null) =>
   typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "—";
@@ -43,6 +43,11 @@ export const displayPoints = (player: SaturdayPickPlayer, contestStatus: string)
   if (contestStatus === "FINAL") return player.final_points;
   return player.live_points ?? player.projected_points;
 };
+
+export const shouldRevealSponsorReward = (
+  contestStatus: string,
+  entry: { is_winner: boolean } | null | undefined,
+) => contestStatus === "FINAL" && entry?.is_winner === true;
 
 function useCountdown(lockAt: string | undefined) {
   const [now, setNow] = useState(() => Date.now());
@@ -116,8 +121,20 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
     (left, right) => new Date(left.game_time).getTime() - new Date(right.game_time).getTime() || left.sort_order - right.sort_order
   )[0];
   const lockPlayerName = firstGamePlayer?.player_name ?? "the first featured player";
-  const sponsor = contest.sponsor ?? { ...saturdayPick6Sponsor, terms: null, reward_unlocked: true };
+  // Branding is allowed before the challenge starts. The reward itself is
+  // deliberately API-owned: the code is never present in the client fallback
+  // and is only returned for a finalized, winning entry.
+  const sponsor = contest.sponsor ?? {
+    name: saturdayPick6Sponsor.name,
+    logo_url: saturdayPick6Sponsor.logo_url,
+    offer_text: null,
+    terms: null,
+    reward_unlocked: false,
+    code: null,
+    url: null,
+  };
   const sponsorLogo = getSaturdayPickSponsorLogo(sponsor);
+  const revealSponsorReward = shouldRevealSponsorReward(contest.status, contest.entry);
   const submit = async () => {
     if (!selectedPickId || !isOpen) return;
     setSubmitError(null);
@@ -146,8 +163,9 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
             <h1 className="mt-5 font-display text-4xl font-black italic tracking-[-0.05em] text-cfb-text-primary sm:text-6xl">{isResults ? "LIVE RESULTS" : isOpen ? "MAKE YOUR PICK" : "PICKS LOCKED"}</h1>
             <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-cfb-text-secondary sm:text-lg">Which featured {positionLabel(contest.contest_position)} will score the most fantasy points this week?</p>
           </div>
-          <div className="flex flex-wrap items-stretch gap-3">
-            <div className="flex max-w-sm items-center gap-4 rounded-2xl border border-red-200/35 bg-slate-950/55 p-4"><div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-white p-1.5 text-xs font-black text-cyan-900">{sponsorLogo ? <img src={sponsorLogo} alt="West Georgia Cornhole" className="h-full w-full object-contain" /> : sponsor.name.slice(0, 2).toUpperCase()}</div><div><p className="cfb-micro-label text-cyan-200">Presented by</p><p className="mt-1 text-lg font-black leading-tight text-white">{sponsor.name}</p><p className="mt-1 text-xs font-bold leading-5 text-cyan-100/80">{saturdayPick6Sponsor.tagline}</p><p className="mt-1 text-xs font-black text-red-100">{saturdayPick6Sponsor.offer_text}</p></div></div>
+          <div className="flex flex-wrap items-center gap-5">
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-white p-2 shadow-[0_0_26px_rgba(34,211,238,0.14)]">{sponsorLogo ? <img src={sponsorLogo} alt="West Georgia Cornhole" className="h-full w-full object-contain" /> : <span className="text-sm font-black text-cfb-brand">{sponsor.name.slice(0, 2).toUpperCase()}</span>}</div>
+            <div className="max-w-sm"><p className="cfb-micro-label text-cyan-200">Presented by</p><p className="mt-1 text-xl font-black leading-tight text-white sm:text-2xl">{sponsor.name}</p><p className="mt-2 text-base font-black leading-6 text-cyan-100 sm:text-lg">{saturdayPick6Sponsor.tagline}</p></div>
             <div className="rounded-2xl border border-cfb-border-strong bg-slate-950/55 px-5 py-3 text-right"><p className="cfb-micro-label text-cfb-text-muted">{isOpen ? "Locks in" : "Contest status"}</p><p className="mt-1 font-display text-2xl font-black tabular-nums text-cyan-100">{isOpen ? countdown.value : statusLabel(contest.status)}</p></div>
           </div>
         </div>
@@ -179,11 +197,9 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
 
       {isOpen ? <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-cfb-border-subtle bg-cfb-surface p-5"><div><p className="text-sm font-black text-cfb-text-primary">{selectedPlayer ? `You selected ${selectedPlayer.player_name}. Lock it in to follow them this Saturday.` : `Choose one featured ${positionLabel(contest.contest_position)}.`}</p><p className="mt-1 text-sm font-bold text-cfb-text-secondary">{lockDeadlineMessage(lockPlayerName, contest.lock_at)}</p>{submitError ? <p role="alert" className="mt-3 text-sm font-bold text-red-300">{submitError}</p> : null}</div><Button type="button" disabled={!selectedPickId || savePick.isPending} onClick={submit}>{savePick.isPending ? "Saving…" : contest.entry ? "Update Pick" : "Lock In Pick"}</Button></section> : null}
 
-      {contest.entry && contest.sponsor ? <section className={`rounded-3xl border p-6 ${contest.sponsor.reward_unlocked ? "border-cfb-success/40 bg-cfb-success/[0.10]" : "border-cyan-200/20 bg-cyan-200/[0.06]"}`}><p className="cfb-micro-label text-cyan-100">{contest.sponsor.reward_unlocked ? "Discount code unlocked" : "This week’s prize"}</p><h2 className="mt-2 text-2xl font-black text-cfb-text-primary">{contest.sponsor.name} discount code</h2><p className="mt-2 font-bold text-cfb-text-secondary">{contest.sponsor.offer_text ?? getSaturdayPickRewardMessage(contest.sponsor)}</p>{contest.sponsor.reward_unlocked && contest.sponsor.code ? <div className="mt-5 flex flex-wrap items-center gap-3"><code className="rounded-xl border border-white/15 bg-slate-950/55 px-4 py-3 font-black tracking-[0.16em] text-cyan-100">{contest.sponsor.code}</code><Button variant="outline" onClick={copySponsorCode}><Copy className="mr-2 h-4 w-4" /> Copy Code</Button>{contest.sponsor.url ? <Button asChild><a href={contest.sponsor.url} target="_blank" rel="noreferrer">Visit Sponsor</a></Button> : null}</div> : contest.sponsor.reward_unlocked ? <p className="mt-4 text-sm font-bold text-cfb-text-secondary">Your single-use discount code will appear here when the sponsor provides it.</p> : <p className="mt-4 text-sm font-bold text-cfb-text-secondary">Make your pick before kickoff. The correct pick receives the discount code after final scoring.</p>}</section> : null}
-
       <Dialog open={resultDialogOpen} onOpenChange={setResultDialogOpen}>
         <DialogContent className="max-w-lg border-cyan-300/35 bg-[#081321] text-cfb-text-primary">
-          {contest.entry?.is_winner ? <><DialogHeader><DialogTitle className="pr-8 text-3xl font-black uppercase italic text-cfb-gold">You got it right</DialogTitle><DialogDescription className="text-base font-semibold leading-6 text-cfb-text-secondary">{savedPlayer?.player_name ?? "Your pick"} finished with the most fantasy points.</DialogDescription></DialogHeader><div className="rounded-2xl border border-cfb-gold/30 bg-cfb-gold/[0.10] p-4"><p className="cfb-micro-label text-yellow-100">Single-use discount code</p>{contest.sponsor?.code ? <div className="mt-3 flex flex-wrap items-center gap-3"><code className="rounded-xl border border-white/15 bg-slate-950/55 px-4 py-3 font-black tracking-[0.16em] text-cyan-100">{contest.sponsor.code}</code><Button variant="outline" onClick={copySponsorCode}><Copy className="mr-2 h-4 w-4" /> Copy Code</Button></div> : <p className="mt-2 text-sm font-bold text-cfb-text-secondary">Your code will appear here when the sponsor provides it.</p>}</div></> : <><DialogHeader><DialogTitle className="pr-8 text-3xl font-black uppercase italic text-rose-200">Not this week</DialogTitle><DialogDescription className="text-base font-semibold leading-6 text-cfb-text-secondary">{savedPlayer?.player_name ?? "Your pick"} did not finish first. Try again next week.</DialogDescription></DialogHeader><div className="flex justify-center rounded-2xl border border-rose-300/25 bg-rose-500/[0.10] p-5"><CircleX className="h-20 w-20 text-rose-200" aria-label="Pick did not win" /></div></>}
+          {revealSponsorReward ? <><DialogHeader><DialogTitle className="pr-8 text-3xl font-black uppercase italic text-cfb-gold">You got it right</DialogTitle><DialogDescription className="text-base font-semibold leading-6 text-cfb-text-secondary">{savedPlayer?.player_name ?? "Your pick"} finished with the most fantasy points.</DialogDescription></DialogHeader><div className="rounded-2xl border border-cfb-gold/30 bg-cfb-gold/[0.10] p-4"><p className="cfb-micro-label text-yellow-100">Your winner discount code</p>{sponsor.code ? <div className="mt-3 flex flex-wrap items-center gap-3"><code className="rounded-xl border border-white/15 bg-slate-950/55 px-4 py-3 font-black tracking-[0.16em] text-cyan-100">{sponsor.code}</code><Button variant="outline" onClick={copySponsorCode}><Copy className="mr-2 h-4 w-4" /> Copy Code</Button></div> : <p className="mt-2 text-sm font-bold text-cfb-text-secondary">Your reward code is being prepared.</p>}</div></> : <><DialogHeader><DialogTitle className="pr-8 text-3xl font-black uppercase italic text-rose-200">Not this week</DialogTitle><DialogDescription className="text-base font-semibold leading-6 text-cfb-text-secondary">{savedPlayer?.player_name ?? "Your pick"} did not finish first. Try again next week.</DialogDescription></DialogHeader><div className="flex justify-center rounded-2xl border border-rose-300/25 bg-rose-500/[0.10] p-5"><CircleX className="h-20 w-20 text-rose-200" aria-label="Pick did not win" /></div></>}
           <DialogFooter><Button onClick={() => setResultDialogOpen(false)}>Close</Button></DialogFooter>
         </DialogContent>
       </Dialog>
