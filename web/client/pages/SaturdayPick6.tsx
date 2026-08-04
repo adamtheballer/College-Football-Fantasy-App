@@ -5,7 +5,7 @@ import { Check, CircleX, Clock3, Copy, Lock, Radio, Trophy, UserRound } from "lu
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { type SaturdayPickPlayer, useSaveSaturdayPick, useSaturdayPickContest } from "@/hooks/use-saturday-pick";
-import { getSaturdayPickRewardMessage, getSaturdayPickSponsorLogo } from "@/lib/saturday-pick-sponsor";
+import { getSaturdayPickRewardMessage, getSaturdayPickSponsorLogo, saturdayPick6Sponsor } from "@/lib/saturday-pick-sponsor";
 
 const formatPoints = (value: number | null) =>
   typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "—";
@@ -112,7 +112,8 @@ export default function SaturdayPick6() {
     (left, right) => new Date(left.game_time).getTime() - new Date(right.game_time).getTime() || left.sort_order - right.sort_order
   )[0];
   const lockPlayerName = firstGamePlayer?.player_name ?? "the first featured player";
-  const sponsorLogo = getSaturdayPickSponsorLogo(contest.sponsor);
+  const sponsor = contest.sponsor ?? { ...saturdayPick6Sponsor, terms: null, reward_unlocked: true };
+  const sponsorLogo = getSaturdayPickSponsorLogo(sponsor);
   const submit = async () => {
     if (!selectedPickId || !isOpen) return;
     setSubmitError(null);
@@ -124,7 +125,7 @@ export default function SaturdayPick6() {
     }
   };
   const copySponsorCode = async () => {
-    if (contest.sponsor?.code) await navigator.clipboard?.writeText(contest.sponsor.code);
+    if (sponsor.code) await navigator.clipboard?.writeText(sponsor.code);
   };
 
   return (
@@ -142,7 +143,7 @@ export default function SaturdayPick6() {
             <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-cfb-text-secondary sm:text-lg">Which featured {positionLabel(contest.contest_position)} will score the most fantasy points this week?</p>
           </div>
           <div className="flex flex-wrap items-stretch gap-3">
-            {contest.sponsor ? <div className="flex max-w-sm items-center gap-4 rounded-2xl border border-cyan-200/35 bg-slate-950/55 p-4 shadow-[0_0_28px_rgba(34,211,238,0.10)]"><div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-white p-1.5 text-xs font-black text-cyan-900">{sponsorLogo ? <img src={sponsorLogo} alt={`${contest.sponsor.name} logo`} className="h-full w-full object-contain" /> : contest.sponsor.name.slice(0, 2).toUpperCase()}</div><div><p className="cfb-micro-label text-cyan-200">Presented by</p><p className="mt-1 text-lg font-black leading-tight text-white">{contest.sponsor.name}</p><p className="mt-1 text-xs font-bold leading-5 text-cyan-100/80">{getSaturdayPickRewardMessage(contest.sponsor)}</p></div></div> : null}
+            <div className="flex max-w-sm items-center gap-4 rounded-2xl border border-red-200/35 bg-slate-950/55 p-4"><div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-white p-1.5 text-xs font-black text-cyan-900">{sponsorLogo ? <img src={sponsorLogo} alt="West Georgia Cornhole" className="h-full w-full object-contain" /> : sponsor.name.slice(0, 2).toUpperCase()}</div><div><p className="cfb-micro-label text-cyan-200">Presented by</p><p className="mt-1 text-lg font-black leading-tight text-white">{sponsor.name}</p><p className="mt-1 text-xs font-bold leading-5 text-cyan-100/80">{saturdayPick6Sponsor.tagline}</p><p className="mt-1 text-xs font-black text-red-100">{saturdayPick6Sponsor.offer_text}</p></div></div>
             <div className="rounded-2xl border border-cfb-border-strong bg-slate-950/55 px-5 py-3 text-right"><p className="cfb-micro-label text-cfb-text-muted">{isOpen ? "Locks in" : "Contest status"}</p><p className="mt-1 font-display text-2xl font-black tabular-nums text-cyan-100">{isOpen ? countdown.value : statusLabel(contest.status)}</p></div>
           </div>
         </div>
