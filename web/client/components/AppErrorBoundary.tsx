@@ -34,7 +34,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
           <p className="mt-3 text-sm font-medium leading-6 text-cfb-text-secondary">
             Your account and league data were not changed. Try loading the view again.
           </p>
-          <Button className="mt-6" onClick={() => this.setState({ hasError: false })}>
+          <Button className="mt-6" onClick={() => window.location.reload()}>
             Try Again
           </Button>
         </section>
