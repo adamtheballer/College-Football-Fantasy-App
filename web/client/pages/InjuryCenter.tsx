@@ -28,8 +28,14 @@ export type InjuryItem = {
 };
 
 const statusStyles: Record<string, string> = {
+  TBD: "bg-slate-500/10 text-slate-300 border-slate-500/30",
   OUT_FOR_SEASON: "bg-red-600/20 text-red-300 border-red-500/40",
   OUT: "bg-red-500/15 text-red-400 border-red-500/30",
+  DAY_TO_DAY: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
+  SUSPENDED: "bg-red-500/15 text-red-400 border-red-500/30",
+  INACTIVE: "bg-slate-500/10 text-slate-300 border-slate-500/30",
+  IR: "bg-red-600/20 text-red-300 border-red-500/40",
+  N_A: "bg-slate-500/10 text-slate-300 border-slate-500/30",
   DOUBTFUL: "bg-amber-500/15 text-amber-400 border-amber-500/30",
   QUESTIONABLE: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
   PROBABLE: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
@@ -56,11 +62,17 @@ const statusSortOrder: Record<string, number> = {
   OUT: 1,
   DOUBTFUL: 2,
   QUESTIONABLE: 3,
-  PROBABLE: 4,
-  FULL: 5,
+  DAY_TO_DAY: 4,
+  PROBABLE: 5,
+  TBD: 6,
+  INACTIVE: 7,
+  IR: 8,
+  SUSPENDED: 9,
+  FULL: 10,
+  N_A: 11,
 };
 
-const statusLabel = (value: string) => value.split("_").join(" ");
+const statusLabel = (value: string) => (value === "N_A" ? "N/A" : value.split("_").join(" "));
 
 export const buildInjuryPlayerCard = (injury: InjuryItem) => ({
   id: injury.id,
@@ -160,10 +172,12 @@ export default function InjuryCenter() {
         <PlayerCardModal
           player={buildInjuryPlayerCard(selectedInjury)}
           card={playerCardQuery.data}
+          error={playerCardQuery.isError}
           loading={playerCardQuery.isLoading}
           title="Injury Player Card"
           note={`${selectedInjury.injury} • Expected return: ${selectedInjury.returnTimeline}`}
           onClose={() => setSelectedPlayerId(null)}
+          onRetry={() => void playerCardQuery.refetch()}
         />
       ) : null}
 

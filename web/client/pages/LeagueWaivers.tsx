@@ -174,7 +174,7 @@ export default function LeagueWaivers() {
   );
   const createWatchlist = useCreateWatchlist();
   const toggleWatchlistPlayer = useToggleWatchlistPlayer();
-  const { data: selectedPlayerCard, isLoading: selectedPlayerCardLoading } = usePlayerCard(
+  const selectedPlayerCardQuery = usePlayerCard(
     selectedPlayer?.id,
     Boolean(selectedPlayer?.id)
   );
@@ -862,10 +862,12 @@ export default function LeagueWaivers() {
       </section>
       {selectedPlayer ? (
         <PlayerCardModal
-          card={selectedPlayerCard}
+          card={selectedPlayerCardQuery.data}
+          error={selectedPlayerCardQuery.isError}
           leagueId={Number.isFinite(parsedLeagueId) ? parsedLeagueId : undefined}
-          loading={selectedPlayerCardLoading}
+          loading={selectedPlayerCardQuery.isLoading}
           onClose={() => setSelectedPlayer(null)}
+          onRetry={() => void selectedPlayerCardQuery.refetch()}
           player={{
             id: selectedPlayer.id,
             name: selectedPlayer.name,

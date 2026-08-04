@@ -186,7 +186,7 @@ export function RosterSlotTable({
   const selectedPosition = selectedPlayer ? positionLabel(selectedPlayer) : null;
   const selectedProjection =
     selectedPlayer?.projected_points ?? selectedPlayer?.weekly_projected_fantasy_points ?? 0;
-  const { data: selectedPlayerCard, isLoading: selectedPlayerCardLoading } = usePlayerCard(
+  const selectedPlayerCardQuery = usePlayerCard(
     selectedPlayer?.player_id,
     Boolean(selectedPlayer?.player_id)
   );
@@ -373,10 +373,12 @@ export function RosterSlotTable({
                 ]
               : []
           }
-          card={selectedPlayerCard}
+          card={selectedPlayerCardQuery.data}
+          error={selectedPlayerCardQuery.isError}
           leagueId={Number.isFinite(numericLeagueId) ? numericLeagueId : undefined}
-          loading={selectedPlayerCardLoading}
+          loading={selectedPlayerCardQuery.isLoading}
           onClose={() => setSelectedPlayer(null)}
+          onRetry={() => void selectedPlayerCardQuery.refetch()}
           player={{
             id: selectedPlayer.player_id ?? 0,
             name: selectedPlayer.player_name ?? "Unknown player",

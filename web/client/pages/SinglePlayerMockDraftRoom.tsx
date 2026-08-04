@@ -183,7 +183,7 @@ export default function SinglePlayerMockDraftRoom() {
       sourceBoardRank: selectedBoardPlayer?.sourceBoardRank ?? selectedPlayerDetail?.boardRank ?? null,
     } as DraftPlayer;
   }, [selectedBoardPlayer, selectedPlayerDetail]);
-  const { data: selectedPlayerCard, isLoading: selectedPlayerCardLoading } = usePlayerCard(
+  const selectedPlayerCardQuery = usePlayerCard(
     selectedPlayer?.id,
     Boolean(selectedPlayer && selectedPlayer.id > 0)
   );
@@ -527,9 +527,11 @@ export default function SinglePlayerMockDraftRoom() {
 
     return (
       <PlayerCardModal
-        card={selectedPlayerCard}
-        loading={selectedPlayerCardLoading}
+        card={selectedPlayerCardQuery.data}
+        error={selectedPlayerCardQuery.isError}
+        loading={selectedPlayerCardQuery.isLoading}
         onClose={() => setSelectedPlayerId(null)}
+        onRetry={() => void selectedPlayerCardQuery.refetch()}
         player={{
           id: selectedPlayer.id,
           name: selectedPlayer.name,

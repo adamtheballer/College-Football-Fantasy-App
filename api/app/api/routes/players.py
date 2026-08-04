@@ -43,6 +43,10 @@ from collegefootballfantasy_api.app.services.player_trade_value import get_playe
 from collegefootballfantasy_api.app.services.player_trajectory import build_player_trajectory
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
 from collegefootballfantasy_api.app.services.auth_security import enforce_auth_rate_limit
+from collegefootballfantasy_api.app.services.injury_status import (
+    is_current_injury_designation,
+    normalize_injury_status,
+)
 
 router = APIRouter()
 
@@ -252,6 +256,8 @@ def get_player_card_endpoint(
     player_id: int,
     request: Request,
     refresh: bool = False,
+    injury_season: int | None = Query(default=None, ge=2020, le=2100),
+    injury_week: int = Query(default=1, ge=1, le=30),
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
 ) -> PlayerCardRead:
@@ -294,6 +300,22 @@ def get_player_card_endpoint(
     else:
         profile_message = None
 
+    current_injury_season = injury_season or datetime.now(timezone.utc).year
+    current_injury_row = (
+        db.query(Injury)
+        .filter(
+            Injury.player_id == player.id,
+            Injury.season == current_injury_season,
+            Injury.week == injury_week,
+        )
+        .order_by(Injury.updated_at.desc(), Injury.id.desc())
+        .first()
+    )
+    current_injury_status = (
+        normalize_injury_status(current_injury_row.status)
+        if current_injury_row and is_current_injury_designation(current_injury_row.status)
+        else None
+    )
     injury_rows = (
         db.query(Injury)
         .filter(Injury.player_id == player.id)
@@ -325,6 +347,7 @@ def get_player_card_endpoint(
     return PlayerCardRead(
         player=card_player,
         about=_map_espn_about(player, card_player, profile_payload, profile_message, espn_player_id=espn_id),
+        current_injury_status=current_injury_status,
         injuries=[
             PlayerCardInjuryRead(
                 id=row.id,

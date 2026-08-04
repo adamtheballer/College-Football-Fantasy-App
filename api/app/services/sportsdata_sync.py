@@ -22,6 +22,7 @@ from collegefootballfantasy_api.app.services.provider_identity import (
     upsert_player_provider_mapping,
     upsert_team_provider_mapping,
 )
+from collegefootballfantasy_api.app.services.injury_status import normalize_injury_status
 
 _OFFENSE_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 
@@ -48,27 +49,7 @@ def _pick_int(row: dict[str, Any], *keys: str) -> int | None:
 
 
 def _normalize_status(raw_status: str | None) -> str:
-    status = (raw_status or "FULL").upper()
-    if any(
-        token in status
-        for token in (
-            "OUT FOR SEASON",
-            "SEASON ENDING",
-            "SEASON-ENDING",
-            "SEASON END",
-            "LOST FOR THE SEASON",
-        )
-    ):
-        return "OUT_FOR_SEASON"
-    if "OUT" in status:
-        return "OUT"
-    if "DOUBTFUL" in status:
-        return "DOUBTFUL"
-    if "QUESTION" in status or "GTD" in status or "GAME-TIME" in status:
-        return "QUESTIONABLE"
-    if "PROBABLE" in status:
-        return "PROBABLE"
-    return "FULL"
+    return normalize_injury_status(raw_status)
 
 
 def _parse_datetime(value: str | None) -> datetime | None:

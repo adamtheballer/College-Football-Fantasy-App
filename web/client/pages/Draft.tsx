@@ -411,7 +411,7 @@ export default function Draft() {
     () => draftBoard.find((player) => player.id === selectedPlayerId) ?? null,
     [draftBoard, selectedPlayerId]
   );
-  const { data: playerCard, isLoading: playerCardLoading } = usePlayerCard(
+  const playerCardQuery = usePlayerCard(
     selectedPlayer?.id,
     Boolean(selectedPlayer && selectedPlayer.id > 0)
   );
@@ -1160,10 +1160,12 @@ export default function Draft() {
 
       {selectedPlayer ? (
         <PlayerCardModal
-          card={playerCard}
+          card={playerCardQuery.data}
+          error={playerCardQuery.isError}
           leagueId={parsedLeagueId}
-          loading={playerCardLoading}
+          loading={playerCardQuery.isLoading}
           onClose={() => setSelectedPlayerId(null)}
+          onRetry={() => void playerCardQuery.refetch()}
           player={{
             id: selectedPlayer.id,
             name: selectedPlayer.name,

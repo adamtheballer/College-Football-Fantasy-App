@@ -20,6 +20,16 @@ export const CFB27_RATING_LABEL = "CFB 27 Rating";
 export const formatCfb27Rating = (value?: number | null) =>
   typeof value === "number" && Number.isFinite(value) ? value.toFixed(0) : "N/A";
 
+export const formatPlayerCardStatus = (value?: string | null) => {
+  if (!value || value.toUpperCase() === "N_A") return "N/A";
+  return value.replace(/_/g, " ");
+};
+
+export const resolvePlayerCardStatus = (
+  card?: PlayerCardResponse | null,
+  contextualStatus?: string | null,
+) => formatPlayerCardStatus(card?.current_injury_status ?? card?.about.status ?? contextualStatus);
+
 const playbookMarks = [
   { label: "X", className: "left-[58%] top-8" },
   { label: "O", className: "left-[69%] top-14" },
@@ -44,11 +54,12 @@ export function PlayerCardHeader({
   position: string;
   title: string;
 }) {
+  const playerStatus = resolvePlayerCardStatus(card, player.status);
   const metricCards = [
     ["Proj", typeof player.projectedPoints === "number" ? player.projectedPoints.toFixed(1) : "—"],
     [CFB27_RATING_LABEL, formatCfb27Rating(cfb27Rating)],
     ["Class", card?.about.player_class ?? player.playerClass ?? "—"],
-    ["Status", card?.about.status ?? player.status ?? "—"],
+    ["Status", playerStatus],
   ];
   const playerPills = [
     card?.about.jersey ? `#${card.about.jersey}` : null,

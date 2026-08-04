@@ -207,6 +207,7 @@ export function usePlayerTrajectory(
 
 export type PlayerCardResponse = {
   player: BackendPlayerRead;
+  current_injury_status?: string | null;
   about: {
     espn_player_id?: string | null;
     height?: string | null;
@@ -694,11 +695,16 @@ export function usePlayerDetail(playerId?: number | null, enabled = true) {
 }
 
 export function usePlayerCard(playerId?: number | null, enabled = true) {
+  const injurySeason = new Date().getFullYear();
+  const injuryWeek = 1;
   return useQuery({
-    queryKey: ["player-card", playerId],
+    queryKey: ["player-card", playerId, injurySeason, injuryWeek],
     enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
-    staleTime: 60_000,
-    queryFn: () => apiGet<PlayerCardResponse>(`/players/${playerId}/card`),
+    staleTime: 5_000,
+    queryFn: () => apiGet<PlayerCardResponse>(`/players/${playerId}/card`, {
+      injury_season: injurySeason,
+      injury_week: injuryWeek,
+    }),
   });
 }
 

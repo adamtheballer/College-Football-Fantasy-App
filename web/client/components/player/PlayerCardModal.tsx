@@ -6,7 +6,7 @@ import { buildProjectedStats, formatStat, statRowsForPosition, statValue } from 
 import { cn } from "@/lib/utils";
 import type { PlayerStats } from "@/types/player";
 
-import { PlayerCardHeader } from "./PlayerCardHeader";
+import { PlayerCardHeader, resolvePlayerCardStatus } from "./PlayerCardHeader";
 import { PlayerTrajectoryChart } from "./PlayerTrajectoryChart";
 
 type PlayerCardTab = "summary" | "stats" | "game-log" | "alerts" | "projections" | "history" | "value";
@@ -312,20 +312,24 @@ export function PlayerCardModal({
   action,
   actions = [],
   card,
+  error = false,
   loading = false,
   leagueId,
   note,
   onClose,
+  onRetry,
   player,
   title = "Player Card",
 }: {
   action?: PlayerCardAction | null;
   actions?: PlayerCardAction[];
   card?: PlayerCardResponse | null;
+  error?: boolean;
   loading?: boolean;
   leagueId?: number | null;
   note?: string | null;
   onClose: () => void;
+  onRetry?: () => void;
   player: PlayerCardModalPlayer;
   title?: string;
 }) {
@@ -333,6 +337,7 @@ export function PlayerCardModal({
   const [selectedHistoricalSeason, setSelectedHistoricalSeason] = useState<number | null>(null);
   const hasLeagueContext = typeof leagueId === "number" && Number.isFinite(leagueId) && leagueId > 0;
   const position = (card?.about.position ?? player.position ?? "").toUpperCase();
+  const playerStatus = resolvePlayerCardStatus(card, player.status);
   const gameLogQuery = usePlayerGameLog(player.id, 2026, activeTab === "game-log");
   const historyQuery = useLeaguePlayerHistory(leagueId ?? undefined, player.id, activeTab === "history" && hasLeagueContext);
   const valueQuery = usePlayerTradeValues(player.id, 2026);
@@ -445,6 +450,20 @@ export function PlayerCardModal({
             <div className="flex min-h-56 items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/[0.04] text-[10px] font-black uppercase tracking-[0.22em] text-white/55">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading player card
             </div>
+          ) : error ? (
+            <div className="flex min-h-56 flex-col items-center justify-center gap-4 rounded-3xl border border-amber-300/20 bg-amber-400/10 p-6 text-center">
+              <p className="text-sm font-black text-amber-50">Player details are unavailable right now.</p>
+              <p className="text-xs font-bold leading-5 text-amber-100/75">The player card stayed open. Please try again.</p>
+              {onRetry ? (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="rounded-2xl border border-amber-100/30 bg-amber-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-amber-950 transition hover:bg-white"
+                >
+                  Retry
+                </button>
+              ) : null}
+            </div>
           ) : activeTab === "summary" ? (
             <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
               <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
@@ -456,7 +475,7 @@ export function PlayerCardModal({
                     ["Class", card?.about.player_class ?? player.playerClass],
                     ["Born", card?.about.birthplace],
                     ["School", card?.about.team ?? player.school],
-                    ["Status", card?.about.status ?? player.status],
+                    ["Status", playerStatus],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-2xl border border-white/10 bg-black/20 p-3">
                       <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>

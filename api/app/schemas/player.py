@@ -89,6 +89,7 @@ class PlayerCardStatRowRead(BaseModel):
 class PlayerCardRead(BaseModel):
     player: PlayerRead
     about: PlayerCardAboutRead
+    current_injury_status: str | None = None
     injuries: list[PlayerCardInjuryRead]
     season_stats: list[PlayerCardStatRowRead]
     historical_stats: PlayerHistoricalStatsResponse | None = None
