@@ -14,6 +14,7 @@ services:
       # explicit so a restart cannot inherit the development Compose defaults.
       SCORING_MODE: "disabled"
       SPORTSDATA_ENABLED: "false"
+      SATURDAY_PICK_6_SPONSORS_ENABLED: "${SATURDAY_PICK_6_SPONSORS_ENABLED:-false}"
       GIT_SHA: "${CFF_GIT_SHA:?CFF_GIT_SHA is required}"
       GIT_BRANCH: "${CFF_GIT_BRANCH:?CFF_GIT_BRANCH is required}"
       RUNTIME_MODE: "release_candidate"
