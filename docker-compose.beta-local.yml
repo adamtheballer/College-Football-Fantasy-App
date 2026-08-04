@@ -10,6 +10,10 @@ services:
   api:
     environment:
       UI_BASE_URL: "http://127.0.0.1:18080"
+      # The public beta intentionally ships without live scoring. Keep this
+      # explicit so a restart cannot inherit the development Compose defaults.
+      SCORING_MODE: "disabled"
+      SPORTSDATA_ENABLED: "false"
       GIT_SHA: "${CFF_GIT_SHA:?CFF_GIT_SHA is required}"
       GIT_BRANCH: "${CFF_GIT_BRANCH:?CFF_GIT_BRANCH is required}"
       RUNTIME_MODE: "release_candidate"
