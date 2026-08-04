@@ -70,7 +70,7 @@ done
 ready_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/ready")"
 runtime_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/runtime")"
 jq -e '.status == "ready"' <<<"$ready_payload" >/dev/null
-jq -e --arg sha "$CFF_GIT_SHA" '.git_sha == $sha and .alembic_revision == "0084_beta_access_schema"' <<<"$runtime_payload" >/dev/null
+jq -e --arg sha "$CFF_GIT_SHA" '.git_sha == $sha and .alembic_revision == "0086_content_moderation_events"' <<<"$runtime_payload" >/dev/null
 curl --fail --show-error --silent --head "${web_origin}" >/dev/null
 
 # This command runs only after Compose created a fresh disposable database.
