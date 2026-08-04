@@ -48,10 +48,19 @@ def test_rb_wr_te_ppr_scoring_works():
 
 
 def test_kicker_scoring_works_if_stat_fields_exist():
-    stats = normalize_player_stats({"FieldGoalsMade0to39": 1, "FieldGoalsMade40to49": 1, "FieldGoalsMade50Plus": 1, "ExtraPointsMade": 3})
+    stats = normalize_player_stats(
+        {
+            "FieldGoalsMade0to30": 1,
+            "FieldGoalsMade31to40": 1,
+            "FieldGoalsMade41to50": 1,
+            "FieldGoalsMade51to60": 1,
+            "FieldGoalsMade61Plus": 1,
+            "ExtraPointsMade": 3,
+        }
+    )
     points, _ = calculate_player_fantasy_points(stats, {})
 
-    assert points == 15.0
+    assert points == 38.0
 
 
 def test_missing_stats_score_zero():

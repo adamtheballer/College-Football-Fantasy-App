@@ -1,17 +1,29 @@
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from collegefootballfantasy_api.app.schemas.waiver import WaiverClaimRead, WaiverDropCandidateRead
 
 
+def _validate_iana_timezone(value: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("waiver_timezone must be a valid IANA timezone")
+    try:
+        ZoneInfo(normalized)
+    except ZoneInfoNotFoundError as exc:
+        raise ValueError("waiver_timezone must be a valid IANA timezone") from exc
+    return normalized
+
+
 class LeagueBasics(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=100)
     season_year: int
     max_teams: int
     is_private: bool = True
-    description: str | None = None
-    icon_url: str | None = None
+    description: str | None = Field(default=None, max_length=500)
+    icon_url: str | None = Field(default=None, max_length=500)
 
     @field_validator("max_teams")
     @classmethod
@@ -84,6 +96,11 @@ class LeagueSettingsInput(BaseModel):
             raise ValueError("waiver_processing_hour must be between 0 and 23")
         return value
 
+    @field_validator("waiver_timezone")
+    @classmethod
+    def validate_waiver_timezone(cls, value: str) -> str:
+        return _validate_iana_timezone(value)
+
     @field_validator("faab_starting_budget", "post_drop_waiver_hours")
     @classmethod
     def validate_nonnegative_waiver_values(cls, value: int) -> int:
@@ -112,7 +129,16 @@ class DraftScheduleInput(BaseModel):
     draft_datetime_utc: datetime
     timezone: str
     draft_type: str
+    draft_order_mode: str = "random"
     pick_timer_seconds: int
+
+    @field_validator("draft_order_mode")
+    @classmethod
+    def validate_draft_order_mode(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"random", "custom"}:
+            raise ValueError("draft_order_mode must be random or custom")
+        return normalized
 
 
 class LeagueCreateRequest(BaseModel):
@@ -136,8 +162,42 @@ class DraftRead(BaseModel):
     draft_datetime_utc: datetime
     timezone: str
     draft_type: str
+    draft_order_mode: str
     pick_timer_seconds: int
     status: str
+
+
+class DraftOrderEntryRead(BaseModel):
+    team_id: int
+    team_name: str
+    owner_user_id: int | None = None
+    owner_name: str | None = None
+    draft_position: int | None = None
+
+
+class DraftOrderRead(BaseModel):
+    draft_order_mode: str
+    max_teams: int
+    is_complete: bool
+    entries: list[DraftOrderEntryRead]
+
+
+class DraftOrderEntryInput(BaseModel):
+    team_id: int
+    draft_position: int = Field(ge=1)
+
+
+class DraftOrderUpdate(BaseModel):
+    draft_order_mode: str
+    entries: list[DraftOrderEntryInput] = Field(default_factory=list)
+
+    @field_validator("draft_order_mode")
+    @classmethod
+    def validate_draft_order_mode(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"random", "custom"}:
+            raise ValueError("draft_order_mode must be random or custom")
+        return normalized
 
 
 class LeagueSettingsRead(BaseModel):
@@ -234,6 +294,11 @@ class LeagueSettingsUpdate(BaseModel):
             raise ValueError("waiver_processing_hour must be between 0 and 23")
         return value
 
+    @field_validator("waiver_timezone")
+    @classmethod
+    def validate_updated_waiver_timezone(cls, value: str | None) -> str | None:
+        return _validate_iana_timezone(value) if value is not None else None
+
     @field_validator("faab_starting_budget", "post_drop_waiver_hours")
     @classmethod
     def validate_updated_nonnegative_waiver_values(cls, value: int | None) -> int | None:
@@ -275,6 +340,25 @@ class DraftUpdate(BaseModel):
     pick_timer_seconds: int
     status: str = "scheduled"
 
+    @field_validator("draft_datetime_utc")
+    @classmethod
+    def validate_timezone_aware_draft_time(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("draft_datetime_utc must include a timezone offset")
+        return value.astimezone(timezone.utc)
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_draft_timezone(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("timezone must be a valid IANA timezone")
+        try:
+            ZoneInfo(normalized)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError("timezone must be a valid IANA timezone") from exc
+        return normalized
+
 
 class LeagueDetailRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -292,6 +376,7 @@ class LeagueDetailRead(BaseModel):
     updated_at: datetime
     settings: LeagueSettingsRead
     draft: DraftRead | None
+    draft_order: DraftOrderRead | None = None
     members: list[LeagueMemberRead]
 
 

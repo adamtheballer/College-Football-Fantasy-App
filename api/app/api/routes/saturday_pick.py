@@ -29,6 +29,7 @@ from collegefootballfantasy_api.app.services.saturday_pick_service import (
     recommended_position,
     save_entry,
 )
+from collegefootballfantasy_api.app.services.content_moderation import moderate_user_text, moderate_user_url
 
 
 router = APIRouter()
@@ -139,6 +140,27 @@ def create_contest_endpoint(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_user),
 ) -> SaturdayPickContestRead:
+    payload.title = moderate_user_text(
+        db, actor_user_id=current_user.id, field_name="saturday_pick_title", value=payload.title, required=True
+    ) or ""
+    payload.sponsor_name = moderate_user_text(
+        db, actor_user_id=current_user.id, field_name="saturday_pick_sponsor_name", value=payload.sponsor_name
+    )
+    payload.sponsor_offer_text = moderate_user_text(
+        db, actor_user_id=current_user.id, field_name="saturday_pick_sponsor_offer", value=payload.sponsor_offer_text
+    )
+    payload.sponsor_terms = moderate_user_text(
+        db, actor_user_id=current_user.id, field_name="saturday_pick_sponsor_terms", value=payload.sponsor_terms
+    )
+    payload.override_reason = moderate_user_text(
+        db, actor_user_id=current_user.id, field_name="saturday_pick_override_reason", value=payload.override_reason
+    )
+    payload.sponsor_logo_url = moderate_user_url(
+        db, actor_user_id=current_user.id, field_name="saturday_pick_sponsor_logo_url", value=payload.sponsor_logo_url
+    )
+    payload.sponsor_url = moderate_user_url(
+        db, actor_user_id=current_user.id, field_name="saturday_pick_sponsor_url", value=payload.sponsor_url
+    )
     try:
         contest = create_contest(db, payload, current_user)
         db.commit()

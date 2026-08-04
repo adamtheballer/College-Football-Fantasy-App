@@ -424,11 +424,10 @@ export default function SinglePlayerMockDraftRoom() {
         </div>
       </div>
 
-      <div className="grid grid-cols-[64px_minmax(0,1fr)_70px_86px_110px_180px] border-b border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+      <div className="grid grid-cols-[64px_minmax(0,1fr)_70px_110px_180px] border-b border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">
         <span>RK</span>
         <span>Player</span>
         <span>Pos</span>
-        <span>CFB 27</span>
         <span>Proj</span>
         <span className="text-right">Action</span>
       </div>
@@ -472,7 +471,7 @@ export default function SinglePlayerMockDraftRoom() {
                   }
                 }}
                 className={cn(
-                  "grid cursor-pointer grid-cols-[64px_minmax(0,1fr)_70px_86px_110px_180px] items-center gap-3 border-b border-white/10 px-5 py-4 outline-none transition-[background-color,box-shadow,color] duration-200",
+                  "grid cursor-pointer grid-cols-[64px_minmax(0,1fr)_70px_110px_180px] items-center gap-3 border-b border-white/10 px-5 py-4 outline-none transition-[background-color,box-shadow,color] duration-200",
                   positionHoverClass,
                   isSelected && "bg-amber-300/[0.075] shadow-[inset_3px_0_0_rgba(251,191,36,0.72)]"
                 )}
@@ -483,7 +482,6 @@ export default function SinglePlayerMockDraftRoom() {
                   <p className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">{player.school}</p>
                 </div>
                 <span className={cn("w-fit rounded-full border px-4 py-2 text-xs font-black", positionClass)}>{player.pos}</span>
-                <p className="text-sm font-black tabular-nums text-cfb-text-primary">{player.cfb27Overall ?? "—"}</p>
                 <p className="text-sm font-black tabular-nums text-foreground">
                   {formatDraftProjection({
                     seasonProjection: player.sheetProjectedSeasonPoints,
@@ -545,7 +543,6 @@ export default function SinglePlayerMockDraftRoom() {
           sheetProjectionStats: selectedPlayer.sheetProjectionStats,
         }}
         title="Scouting Card"
-        note="Mock draft cards use the same linked player profile and verified stat data as the real draft room when available."
       />
     );
   };

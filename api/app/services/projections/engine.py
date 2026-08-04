@@ -139,9 +139,11 @@ def build_weekly_projections(
 
         if position in {"K", "PK"}:
             kicker_stats = {
-                "fg_made_0_39": 1.4 * talent * health,
-                "fg_made_40_49": 0.35 * talent * health,
-                "fg_made_50_plus": 0.1 * talent * health,
+                "fg_made_0_30": 1.05 * talent * health,
+                "fg_made_31_40": 0.35 * talent * health,
+                "fg_made_41_50": 0.35 * talent * health,
+                "fg_made_51_60": 0.1 * talent * health,
+                "fg_made_61_plus": 0.0,
                 "xp_made": 3.0 * talent * health,
                 "fg_missed": 0.2,
             }

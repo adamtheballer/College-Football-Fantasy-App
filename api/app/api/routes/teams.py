@@ -12,6 +12,7 @@ from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.team import TeamCreate, TeamList, TeamRead
+from collegefootballfantasy_api.app.services.content_moderation import moderate_user_text
 
 router = APIRouter()
 
@@ -29,6 +30,14 @@ def create_team_endpoint(
 ) -> TeamRead:
     get_league_or_404(db, league_id)
     require_league_member(db, league_id, current_user)
+    team_in.name = moderate_user_text(
+        db,
+        actor_user_id=current_user.id,
+        league_id=league_id,
+        field_name="team_name",
+        value=team_in.name,
+        required=True,
+    ) or ""
 
     existing_owner_team = (
         db.query(Team)

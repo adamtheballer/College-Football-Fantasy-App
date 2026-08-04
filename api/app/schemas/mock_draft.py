@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class MockDraftCreate(BaseModel):
-    title: str = "Single-Player Mock Draft"
+    title: str = Field(default="Single-Player Mock Draft", min_length=1, max_length=120)
     league_size: int = Field(default=12, ge=2, le=16)
     rounds: int = Field(default=13, ge=1, le=30)
     settings_json: dict = Field(default_factory=dict)

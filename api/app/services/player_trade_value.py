@@ -47,6 +47,13 @@ def _normalized_trade_value(value: float) -> float:
     return round(max(0.0, min(float(value), MAX_TRADE_VALUE)), 1)
 
 
+def preseason_rating_value(player: Player) -> float | None:
+    """Use the approved CFB 27 rating as the immutable Week 0 baseline."""
+    if player.cfb27_overall is None:
+        return None
+    return _normalized_trade_value(float(player.cfb27_overall))
+
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -79,16 +86,20 @@ def _availability_score(db: Session, player_id: int, season: int, week: int) -> 
     return scores.get(status, scores["UNKNOWN"])
 
 
-def _serialize(row: PlayerTradeValue | None) -> PlayerTradeValueRead | None:
+def _serialize(row: PlayerTradeValue | None, *, preseason_value: float | None = None) -> PlayerTradeValueRead | None:
     if row is None:
         return None
-    value = _normalized_trade_value(row.value)
+    value = preseason_value if row.week == 0 and preseason_value is not None else _normalized_trade_value(row.value)
     return PlayerTradeValueRead(week=row.week, value=value, tier=value_tier(value), positional_value_rank=row.positional_value_rank, weekly_change=row.weekly_change, confidence=row.confidence, policy_version=row.policy_version, calculated_at=row.calculated_at, factor_breakdown=row.factor_breakdown_json, explanations=row.explanation_json or [])
 
 
 def get_player_trade_values(db: Session, *, player_id: int, season: int, policy_version: str = VALUE_POLICY_VERSION) -> PlayerTradeValueHistoryRead:
     rows = db.query(PlayerTradeValue).filter(PlayerTradeValue.player_id == player_id, PlayerTradeValue.season == season, PlayerTradeValue.policy_version == policy_version).order_by(PlayerTradeValue.week.asc()).all()
-    return PlayerTradeValueHistoryRead(current=_serialize(rows[-1] if rows else None), history=[_serialize(row) for row in rows if _serialize(row) is not None])
+    player = db.get(Player, player_id)
+    baseline = preseason_rating_value(player) if player is not None else None
+    serialized_rows = [_serialize(row, preseason_value=baseline) for row in rows]
+    history = [row for row in serialized_rows if row is not None]
+    return PlayerTradeValueHistoryRead(current=history[-1] if history else None, history=history)
 
 
 def current_trade_value_snapshot(db: Session, *, player_id: int, season: int | None = None) -> dict | None:
@@ -98,7 +109,9 @@ def current_trade_value_snapshot(db: Session, *, player_id: int, season: int | N
     row = query.order_by(PlayerTradeValue.season.desc(), PlayerTradeValue.week.desc()).first()
     if row is None:
         return None
-    value = _normalized_trade_value(row.value)
+    player = db.get(Player, player_id)
+    baseline = preseason_rating_value(player) if player is not None else None
+    value = baseline if row.week == 0 and baseline is not None else _normalized_trade_value(row.value)
     return {"value": value, "tier": value_tier(value), "policy_version": row.policy_version, "week": row.week, "calculated_at": row.calculated_at.isoformat()}
 
 
@@ -139,6 +152,17 @@ def calculate_player_trade_value(db: Session, *, player_id: int, season: int, we
         "availability": round(future_weight * 0.1 * availability, 2),
         "positionalScarcity": round(future_weight * 0.05 * scarcity, 2),
     }
+    baseline = preseason_rating_value(player)
+    if week == 0 and baseline is not None:
+        factors = {
+            "preseasonRating": baseline,
+            "seasonPerformance": 0.0,
+            "recentForm": 0.0,
+            "futureProjection": 0.0,
+            "usageRole": 0.0,
+            "availability": 0.0,
+            "positionalScarcity": 0.0,
+        }
     value = _normalized_trade_value(sum(factors.values()))
     prior = db.query(PlayerTradeValue).filter(PlayerTradeValue.player_id == player.id, PlayerTradeValue.season == season, PlayerTradeValue.policy_version == policy_version, PlayerTradeValue.week < week).order_by(PlayerTradeValue.week.desc()).first()
     explanation = []

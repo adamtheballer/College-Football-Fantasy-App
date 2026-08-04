@@ -39,6 +39,17 @@ def test_player_trajectory_returns_only_the_preseason_snapshot_before_week_one(c
             PlayerTradeValue(
                 player_id=player.id,
                 season=2026,
+                week=0,
+                value=35.0,
+                tier="SPECULATIVE",
+                confidence=0.9,
+                policy_version=VALUE_POLICY_VERSION,
+                calculated_at=datetime.now(timezone.utc),
+                input_version="legacy-test",
+            ),
+            PlayerTradeValue(
+                player_id=player.id,
+                season=2026,
                 week=1,
                 value=84.0,
                 tier="ELITE",
@@ -57,7 +68,8 @@ def test_player_trajectory_returns_only_the_preseason_snapshot_before_week_one(c
     body = response.json()
     assert [point["week"] for point in body["projection"]] == [0]
     assert [point["week"] for point in body["value"]] == [0]
-    assert body["projection"][0]["source"] == "preseason"
+    assert body["value"][0] == {"week": 0, "value": 92.0, "source": "preseason"}
+    assert body["projection"][0] == {"week": 0, "points": 14.0, "source": "current"}
     assert body["value"][0]["source"] == "preseason"
     assert all(0 <= point["value"] <= 100 for point in body["value"])
     assert all(point["points"] >= 0 for point in body["projection"])

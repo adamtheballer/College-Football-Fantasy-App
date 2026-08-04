@@ -123,7 +123,11 @@ const scoringControls: Array<{
   { key: "rec_td", label: "Receiving TD", helper: "Points per receiving touchdown" },
   { key: "int", label: "Interception", helper: "Penalty for thrown interceptions" },
   { key: "fumble_lost", label: "Fumble lost", helper: "Penalty for lost fumbles" },
-  { key: "fg", label: "Field goal", helper: "Points per made field goal" },
+  {
+    key: "fg",
+    label: "Field goal (30 yards or less)",
+    helper: "3 points through 30 yards; +2 every 10 yards: 31–40 = 5, 41–50 = 7, 51–60 = 9, 61+ = 11",
+  },
   { key: "xp", label: "Extra point", helper: "Points per made extra point" },
 ];
 
@@ -436,6 +440,7 @@ function CreateLeagueForm() {
     draft_time: getDefaultDraftTime(),
     timezone,
     draft_type: "snake",
+    draft_order_mode: "random" as "random" | "custom",
     pick_timer_seconds: 90,
   });
 
@@ -565,6 +570,7 @@ function CreateLeagueForm() {
           draft_datetime_utc: draftDateTime.toISOString(),
           timezone: draft.timezone,
           draft_type: draft.draft_type,
+          draft_order_mode: draft.draft_order_mode,
           pick_timer_seconds: draft.pick_timer_seconds,
         },
       };
@@ -1071,6 +1077,31 @@ function CreateLeagueForm() {
                         </SelectItem>
                       </SelectContent>
                     </Select>
+                  </Field>
+                  <Field label="Draft order">
+                    <Select
+                      value={draft.draft_order_mode}
+                      onValueChange={(value: "random" | "custom") =>
+                        setDraft((prev) => ({ ...prev, draft_order_mode: value }))
+                      }
+                    >
+                      <SelectTrigger className={selectTriggerClass}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className={selectContentClass}>
+                        <SelectItem value="random" className="text-sm font-medium">
+                          Random at draft start
+                        </SelectItem>
+                        <SelectItem value="custom" className="text-sm font-medium">
+                          Commissioner sets order
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="mt-2 text-xs font-medium text-[#94A3B8]">
+                      {draft.draft_order_mode === "custom"
+                        ? "You can assign joined managers to slots in the draft lobby before the draft starts."
+                        : "The full order is randomized once when you start the draft."}
+                    </p>
                   </Field>
                   <Field label="Pick timer (seconds)">
                     <Input

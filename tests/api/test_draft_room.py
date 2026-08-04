@@ -316,6 +316,13 @@ def test_commissioner_starts_pre_draft_then_worker_opens_first_pick(client, db_s
     assert pre_draft["draft_starts_at"] is not None
     assert pre_draft["current_pick_deadline"] is None
 
+    duplicate_start = client.post(
+        f"/leagues/{league['id']}/draft/start",
+        headers=auth_headers(commissioner_token),
+    )
+    assert duplicate_start.status_code == 409
+    assert duplicate_start.json()["detail"] == "draft has already been started"
+
     early_pick = client.post(
         f"/leagues/{league['id']}/draft-picks",
         json={"player_id": player_id, "pick_number": 1, "draft_version": pre_draft["draft_version"]},
@@ -332,14 +339,18 @@ def test_commissioner_starts_pre_draft_then_worker_opens_first_pick(client, db_s
         now=draft.draft_starts_at + timedelta(seconds=1),
     ) == {"auto_picked": 0, "skipped": 1}
 
-    room = client.get(
+    commissioner_room = client.get(
         f"/leagues/{league['id']}/draft-room",
         headers=auth_headers(commissioner_token),
     ).json()
-    assert room["status"] == "on_clock"
-    assert room["current_pick"] == 1
-    assert room["can_make_pick"] is True
-    assert room["current_pick_deadline"] is not None
+    member_room = client.get(
+        f"/leagues/{league['id']}/draft-room",
+        headers=auth_headers(member_token),
+    ).json()
+    assert commissioner_room["status"] == member_room["status"] == "on_clock"
+    assert commissioner_room["current_pick"] == member_room["current_pick"] == 1
+    assert commissioner_room["can_make_pick"] is not member_room["can_make_pick"]
+    assert commissioner_room["current_pick_deadline"] is not None
 
 
 def test_two_managers_complete_the_full_server_authoritative_draft_lifecycle(client, db_session):
@@ -380,17 +391,18 @@ def test_two_managers_complete_the_full_server_authoritative_draft_lifecycle(cli
     assert commissioner_room["status"] == manager_room["status"] == "on_clock"
     assert commissioner_room["current_pick"] == manager_room["current_pick"] == 1
     assert commissioner_room["draft_version"] == manager_room["draft_version"]
-    assert commissioner_room["can_make_pick"] is True
-    assert manager_room["can_make_pick"] is False
+    assert commissioner_room["can_make_pick"] is not manager_room["can_make_pick"]
+    first_picker_token = commissioner_token if commissioner_room["can_make_pick"] else manager_token
+    first_picker_room = commissioner_room if commissioner_room["can_make_pick"] else manager_room
 
     first_pick = client.post(
         f"/leagues/{league['id']}/draft-picks",
         json={
             "player_id": first_player_id,
-            "pick_number": commissioner_room["current_pick"],
-            "draft_version": commissioner_room["draft_version"],
+            "pick_number": first_picker_room["current_pick"],
+            "draft_version": first_picker_room["draft_version"],
         },
-        headers=auth_headers(commissioner_token),
+        headers=auth_headers(first_picker_token),
     )
     assert first_pick.status_code == 201
     assert first_pick.json()["status"] == "transition"
@@ -398,22 +410,28 @@ def test_two_managers_complete_the_full_server_authoritative_draft_lifecycle(cli
     db_session.expire_all()
     draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
     process_expired_draft_picks_once(db_session, now=draft.transition_ends_at + timedelta(seconds=1))
+    commissioner_turn = client.get(
+        f"/leagues/{league['id']}/draft-room",
+        headers=auth_headers(commissioner_token),
+    ).json()
     manager_turn = client.get(
         f"/leagues/{league['id']}/draft-room",
         headers=auth_headers(manager_token),
     ).json()
-    assert manager_turn["status"] == "on_clock"
-    assert manager_turn["current_pick"] == 2
-    assert manager_turn["can_make_pick"] is True
+    assert commissioner_turn["status"] == manager_turn["status"] == "on_clock"
+    assert commissioner_turn["current_pick"] == manager_turn["current_pick"] == 2
+    assert commissioner_turn["can_make_pick"] is not manager_turn["can_make_pick"]
+    final_picker_token = commissioner_token if commissioner_turn["can_make_pick"] else manager_token
+    final_picker_room = commissioner_turn if commissioner_turn["can_make_pick"] else manager_turn
 
     final_pick = client.post(
         f"/leagues/{league['id']}/draft-picks",
         json={
             "player_id": second_player_id,
-            "pick_number": manager_turn["current_pick"],
-            "draft_version": manager_turn["draft_version"],
+            "pick_number": final_picker_room["current_pick"],
+            "draft_version": final_picker_room["draft_version"],
         },
-        headers=auth_headers(manager_token),
+        headers=auth_headers(final_picker_token),
     )
     assert final_pick.status_code == 201
     completed = final_pick.json()
@@ -464,6 +482,15 @@ def test_cpu_seats_pick_individually_after_their_server_delay(client, db_session
         sheet_projected_season_points=999.0,
     )
     db_session.add_all([*cpu_players, legacy_top_ranked_player])
+    db_session.commit()
+
+    # This lifecycle test deliberately exercises the human-then-CPU sequence;
+    # random order itself is covered separately below.
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    ordered_teams = db_session.query(Team).filter(Team.league_id == league["id"]).order_by(Team.id).all()
+    draft.draft_order_mode = "custom"
+    for position, team in enumerate(ordered_teams, start=1):
+        team.draft_position = position
     db_session.commit()
 
     start_response = client.post(f"/leagues/{league['id']}/draft/start", headers=auth_headers(commissioner_token))
@@ -874,6 +901,92 @@ def test_draft_pick_rejects_when_league_is_not_full(client, db_session):
     assert db_session.query(RosterEntry).filter(RosterEntry.player_id == player_id).count() == 0
     draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
     assert draft.status == "scheduled"
+
+
+def test_commissioner_can_build_custom_draft_order_as_managers_join_and_must_finish_before_start(client, db_session):
+    commissioner_token = create_user_and_token(client, "custom-order-commissioner")
+    league = create_league(
+        client,
+        commissioner_token,
+        max_teams=2,
+        fill_league=False,
+        activate_for_direct_pick_tests=False,
+    )
+    commissioner_team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+
+    partial = client.patch(
+        f"/leagues/{league['id']}/draft-order",
+        json={
+            "draft_order_mode": "custom",
+            "entries": [{"team_id": commissioner_team.id, "draft_position": 2}],
+        },
+        headers=auth_headers(commissioner_token),
+    )
+    assert partial.status_code == 200
+    assert partial.json()["is_complete"] is False
+    assert partial.json()["entries"][0]["draft_position"] == 2
+
+    member_token = join_league(client, league["id"], "custom-order-member")
+    member_attempt = client.patch(
+        f"/leagues/{league['id']}/draft-order",
+        json={"draft_order_mode": "custom", "entries": []},
+        headers=auth_headers(member_token),
+    )
+    assert member_attempt.status_code == 403
+
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    draft.draft_datetime_utc = datetime.now(timezone.utc) - timedelta(minutes=1)
+    db_session.commit()
+    incomplete_start = client.post(f"/leagues/{league['id']}/draft/start", headers=auth_headers(commissioner_token))
+    assert incomplete_start.status_code == 409
+    assert incomplete_start.json()["detail"] == "custom draft order must assign every manager exactly one draft position"
+
+    teams = db_session.query(Team).filter(Team.league_id == league["id"]).order_by(Team.id).all()
+    member_team = next(team for team in teams if team.id != commissioner_team.id)
+    completed = client.patch(
+        f"/leagues/{league['id']}/draft-order",
+        json={
+            "draft_order_mode": "custom",
+            "entries": [
+                {"team_id": member_team.id, "draft_position": 1},
+                {"team_id": commissioner_team.id, "draft_position": 2},
+            ],
+        },
+        headers=auth_headers(commissioner_token),
+    )
+    assert completed.status_code == 200
+    assert completed.json()["is_complete"] is True
+
+    started = client.post(f"/leagues/{league['id']}/draft/start", headers=auth_headers(commissioner_token))
+    assert started.status_code == 200
+    assert [team["id"] for team in started.json()["teams"]] == [member_team.id, commissioner_team.id]
+
+
+def test_random_draft_order_is_materialized_once_when_the_full_draft_starts(client, db_session):
+    commissioner_token = create_user_and_token(client, "random-order-commissioner")
+    league = create_league(
+        client,
+        commissioner_token,
+        max_teams=2,
+        fill_league=False,
+        activate_for_direct_pick_tests=False,
+    )
+    member_token = join_league(client, league["id"], "random-order-member")
+    assert member_token
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    draft.draft_datetime_utc = datetime.now(timezone.utc) - timedelta(minutes=1)
+    db_session.commit()
+
+    started = client.post(f"/leagues/{league['id']}/draft/start", headers=auth_headers(commissioner_token))
+    assert started.status_code == 200
+    ordered_ids = [team["id"] for team in started.json()["teams"]]
+    db_session.expire_all()
+    persisted_positions = {
+        team.id: team.draft_position
+        for team in db_session.query(Team).filter(Team.league_id == league["id"]).all()
+    }
+    assert set(persisted_positions.values()) == {1, 2}
+    assert ordered_ids == [team_id for team_id, _ in sorted(persisted_positions.items(), key=lambda pair: pair[1])]
 
 
 def test_draft_pick_rejects_position_without_open_roster_slot(client, db_session):

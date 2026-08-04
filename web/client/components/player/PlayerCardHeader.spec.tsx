@@ -19,7 +19,7 @@ describe("PlayerCardHeader injury status", () => {
           season_stats: [],
           historical_stats: null,
         } as never}
-        cfb27Rating={88}
+        currentValue={88}
         onClose={vi.fn()}
         palette={{
           headerBase: "bg-slate-900",
@@ -37,5 +37,6 @@ describe("PlayerCardHeader injury status", () => {
 
     expect(screen.getByText("OUT FOR SEASON")).toBeTruthy();
     expect(screen.queryByText("Active")).toBeNull();
+    expect(screen.getByText("Current Value Rating")).toBeTruthy();
   });
 });

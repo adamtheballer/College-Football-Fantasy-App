@@ -7,11 +7,13 @@ from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.security import generate_invite_code
+from collegefootballfantasy_api.app.domain.scoring_rules import ScoringRulesValidationError, field_goal_tier_rules
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
+from collegefootballfantasy_api.app.models.notification import NotificationLog
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.league_flow import (
@@ -24,6 +26,7 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
 )
 from collegefootballfantasy_api.app.services.league_workspace import get_league_detail
 from collegefootballfantasy_api.app.services.chat_service import get_or_create_league_chat_thread
+from collegefootballfantasy_api.app.services.content_moderation import moderate_user_text, moderate_user_url
 from collegefootballfantasy_api.app.services.notification_service import (
     cancel_scheduled_notifications,
     schedule_draft_notifications,
@@ -53,7 +56,7 @@ ROSTER_SLOT_BOUNDS = {
     "IR": (0, 4),
 }
 
-DRAFT_FINAL_STATUSES = {"started", "in_progress", "completed", "complete", "final", "closed"}
+DRAFT_RESCHEDULABLE_STATUSES = {"scheduled"}
 DRAFT_TYPES = {"snake"}
 MIN_PICK_TIMER_SECONDS = 15
 MAX_PICK_TIMER_SECONDS = 600
@@ -68,9 +71,11 @@ CANONICAL_SCORING_KEYS = {
     "rec_yards",
     "rec_tds",
     "fumbles_lost",
-    "fg_made_0_39",
-    "fg_made_40_49",
-    "fg_made_50_plus",
+    "fg_made_0_30",
+    "fg_made_31_40",
+    "fg_made_41_50",
+    "fg_made_51_60",
+    "fg_made_61_plus",
     "xp_made",
 }
 
@@ -88,7 +93,9 @@ SCORING_KEY_ALIASES = {
     "interception": "interceptions",
     "int": "interceptions",
     "fumble_lost": "fumbles_lost",
-    "fg": "fg_made_0_39",
+    "fg_made_0_39": "fg_made_0_30",
+    "fg_made_40_49": "fg_made_31_40",
+    "fg_made_50_plus": "fg_made_41_50",
     "xp": "xp_made",
 }
 
@@ -130,6 +137,12 @@ def normalize_scoring_settings(scoring_json: dict | None) -> dict:
     for raw_key, raw_value in (scoring_json or {}).items():
         key = str(raw_key).strip()
         if not key:
+            continue
+        if key == "fg":
+            try:
+                normalized.update(field_goal_tier_rules(raw_value))
+            except ScoringRulesValidationError:
+                invalid_keys.append(key)
             continue
         if key in YARDS_PER_POINT_SCORING_KEYS:
             value = _yards_per_point_to_multiplier(raw_value)
@@ -206,6 +219,15 @@ def create_league(
     db: Session,
     current_user: User,
 ) -> LeagueCreateResponse:
+    payload.basics.name = moderate_user_text(
+        db, actor_user_id=current_user.id, field_name="league_name", value=payload.basics.name, required=True
+    ) or ""
+    payload.basics.description = moderate_user_text(
+        db, actor_user_id=current_user.id, field_name="league_description", value=payload.basics.description
+    )
+    payload.basics.icon_url = moderate_user_url(
+        db, actor_user_id=current_user.id, field_name="league_icon_url", value=payload.basics.icon_url
+    )
     payload.settings = normalize_roster_settings(payload.settings)
     code = generate_unique_invite(db)
     league = League(
@@ -260,6 +282,7 @@ def create_league(
             draft_datetime_utc=payload.draft.draft_datetime_utc,
             timezone=payload.draft.timezone,
             draft_type=payload.draft.draft_type,
+            draft_order_mode=payload.draft.draft_order_mode,
             pick_timer_seconds=payload.draft.pick_timer_seconds,
             status="scheduled",
         )
@@ -405,58 +428,88 @@ def reschedule_draft(
     league: League,
     payload: DraftUpdate,
 ) -> DraftRead:
-    draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
-    if not draft_row:
-        draft_row = Draft(league_id=league.id)
-
-    if league.status not in {"pre_draft", "scheduled"}:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="draft can only be rescheduled before the draft starts",
-        )
-    if (draft_row.status or "").lower() in DRAFT_FINAL_STATUSES:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="started or completed drafts cannot be rescheduled",
-        )
-
     try:
-        ZoneInfo(payload.timezone)
-    except ZoneInfoNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid draft timezone") from exc
-
-    draft_type = payload.draft_type.strip().lower()
-    if draft_type not in DRAFT_TYPES:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid draft type")
-
-    if not MIN_PICK_TIMER_SECONDS <= payload.pick_timer_seconds <= MAX_PICK_TIMER_SECONDS:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"pick timer must be between {MIN_PICK_TIMER_SECONDS} and {MAX_PICK_TIMER_SECONDS} seconds",
+        # The league and draft are locked together. A concurrent request is serialized and the
+        # last committed schedule is the only authority used by the manual draft start flow.
+        locked_league = db.query(League).filter(League.id == league.id).with_for_update().one()
+        draft_row = (
+            db.query(Draft)
+            .filter(Draft.league_id == locked_league.id)
+            .with_for_update()
+            .one_or_none()
         )
+        if draft_row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft schedule not found")
 
-    next_draft_time = payload.draft_datetime_utc
-    if next_draft_time.tzinfo is None:
-        next_draft_time = next_draft_time.replace(tzinfo=timezone.utc)
-    next_draft_time = next_draft_time.astimezone(timezone.utc)
-    if next_draft_time <= datetime.now(timezone.utc) + timedelta(minutes=5):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="draft time must be at least 5 minutes in the future",
-        )
+        if locked_league.status not in {"pre_draft", "scheduled"}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="draft can only be rescheduled before the draft starts",
+            )
+        if (draft_row.status or "").lower() not in DRAFT_RESCHEDULABLE_STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="started or completed drafts cannot be rescheduled",
+            )
 
-    draft_row.draft_datetime_utc = next_draft_time
-    draft_row.timezone = payload.timezone
-    draft_row.draft_type = draft_type
-    draft_row.pick_timer_seconds = payload.pick_timer_seconds
-    draft_row.status = "scheduled"
-    db.add(draft_row)
+        draft_type = payload.draft_type.strip().lower()
+        if draft_type not in DRAFT_TYPES:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid draft type")
 
-    cancel_scheduled_notifications(db, league.id, reason="draft rescheduled")
-    members = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).all()
-    for member in members:
-        schedule_draft_notifications(db, league.id, member.user_id, draft_row.draft_datetime_utc)
+        if not MIN_PICK_TIMER_SECONDS <= payload.pick_timer_seconds <= MAX_PICK_TIMER_SECONDS:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"pick timer must be between {MIN_PICK_TIMER_SECONDS} and {MAX_PICK_TIMER_SECONDS} seconds",
+            )
 
-    db.commit()
-    db.refresh(draft_row)
-    return DraftRead.model_validate(draft_row)
+        next_draft_time = payload.draft_datetime_utc
+        if next_draft_time.tzinfo is None or next_draft_time.utcoffset() is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="draft time must include a timezone offset",
+            )
+        next_draft_time = next_draft_time.astimezone(timezone.utc)
+        if next_draft_time <= datetime.now(timezone.utc) + timedelta(minutes=5):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="draft time must be at least 5 minutes in the future",
+            )
+
+        draft_row.draft_datetime_utc = next_draft_time
+        draft_row.timezone = payload.timezone
+        draft_row.draft_type = draft_type
+        draft_row.pick_timer_seconds = payload.pick_timer_seconds
+        draft_row.status = "scheduled"
+        draft_row.draft_version += 1
+        db.add(draft_row)
+
+        # There are no queued draft-start jobs in this application. The lifecycle worker only
+        # advances drafts after start_draft has transitioned the status from scheduled. Replacing
+        # this canonical UTC timestamp therefore invalidates the prior start time; notification
+        # jobs are explicitly canceled and rebuilt for every league member.
+        cancel_scheduled_notifications(db, locked_league.id, reason="draft rescheduled")
+        members = db.query(LeagueMember).filter(LeagueMember.league_id == locked_league.id).all()
+        for member in members:
+            schedule_draft_notifications(db, locked_league.id, member.user_id, draft_row.draft_datetime_utc)
+            db.add(
+                NotificationLog(
+                    user_id=member.user_id,
+                    user_key=str(member.user_id),
+                    alert_type="DRAFT",
+                    title="Draft Rescheduled",
+                    body="Your league draft time was updated. Open the draft lobby for the new schedule.",
+                    payload={
+                        "league_id": locked_league.id,
+                        "draft_datetime_utc": next_draft_time.isoformat(),
+                        "timezone": draft_row.timezone,
+                        "draft_version": draft_row.draft_version,
+                    },
+                )
+            )
+
+        db.commit()
+        db.refresh(draft_row)
+        return DraftRead.model_validate(draft_row)
+    except Exception:
+        db.rollback()
+        raise

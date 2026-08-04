@@ -1,8 +1,13 @@
-import { CircleUserRound, Handshake, Sparkles } from "lucide-react";
+import { CircleUserRound, Handshake, Smartphone, Sparkles } from "lucide-react";
 
 import { SurfaceCard } from "@/components/fantasy";
 
 const roadmap = [
+  {
+    title: "CFB Fantasy App",
+    description: "The CFB Fantasy app is coming soon to the App Store, so you can manage your league from your phone.",
+    icon: Smartphone,
+  },
   {
     title: "Player Headshots",
     description: "Recognizable player imagery throughout the app when the approved player-image program is ready.",
@@ -34,7 +39,7 @@ export default function ComingSoon() {
         </div>
       </section>
 
-      <section className="grid gap-5 md:grid-cols-3">
+      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         {roadmap.map(({ title, description, icon: Icon }) => (
           <SurfaceCard key={title} variant="default" padding="default" className="min-h-56">
             <Icon className="h-7 w-7 text-cfb-brand" aria-hidden="true" />

@@ -15,6 +15,8 @@ from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.league_flow import (
+    DraftOrderEntryRead,
+    DraftOrderRead,
     DraftRead,
     LeagueDetailRead,
     LeagueNewsItem,
@@ -43,6 +45,29 @@ def get_league_detail(
     draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
     members_rows = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).all()
 
+    teams = db.query(Team).filter(Team.league_id == league.id).order_by(Team.id.asc()).all()
+    draft_order = None
+    if draft_row:
+        positioned = [team.draft_position for team in teams]
+        draft_order = DraftOrderRead(
+            draft_order_mode=draft_row.draft_order_mode or "random",
+            max_teams=league.max_teams,
+            is_complete=(
+                len(teams) == league.max_teams
+                and set(positioned) == set(range(1, league.max_teams + 1))
+            ),
+            entries=[
+                DraftOrderEntryRead(
+                    team_id=team.id,
+                    team_name=team.name,
+                    owner_user_id=team.owner_user_id,
+                    owner_name=team.owner_name,
+                    draft_position=team.draft_position,
+                )
+                for team in teams
+            ],
+        )
+
     return LeagueDetailRead(
         id=league.id,
         name=league.name,
@@ -62,6 +87,7 @@ def get_league_detail(
         updated_at=league.updated_at,
         settings=LeagueSettingsRead.model_validate(settings_row),
         draft=DraftRead.model_validate(draft_row) if draft_row else None,
+        draft_order=draft_order,
         members=[LeagueMemberRead.model_validate(m) for m in members_rows],
     )
 

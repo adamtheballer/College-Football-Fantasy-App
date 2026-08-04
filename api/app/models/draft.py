@@ -18,6 +18,10 @@ class Draft(TimestampMixin, Base):
     draft_datetime_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     timezone: Mapped[str] = mapped_column(String(50), default="UTC")
     draft_type: Mapped[str] = mapped_column(String(30), default="snake")
+    # ``random`` materializes one immutable order when the commissioner starts
+    # the full draft. ``custom`` lets the commissioner build the order while
+    # managers join, but it must be complete before the draft can start.
+    draft_order_mode: Mapped[str] = mapped_column(String(20), default="random")
     pick_timer_seconds: Mapped[int] = mapped_column(Integer, default=90)
     status: Mapped[str] = mapped_column(String(30), default="scheduled")
     pre_draft_starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

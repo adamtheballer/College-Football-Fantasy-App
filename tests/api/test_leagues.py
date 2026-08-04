@@ -6,9 +6,12 @@ from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
+from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.notification import NotificationLog
+from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.trade_offer import TradeOffer
@@ -17,6 +20,7 @@ from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.league_schedule import REGULAR_SEASON_WEEKS, ensure_league_schedule
 from collegefootballfantasy_api.app.services.scoring_service import normalize_scoring_rules
+from collegefootballfantasy_api.app.services.draft_service import process_expired_draft_picks_once
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -158,7 +162,11 @@ def test_scoring_rules_normalize_create_form_aliases():
     assert rules["rec_tds"] == 6
     assert rules["interceptions"] == -2
     assert rules["fumbles_lost"] == -2
-    assert rules["fg_made_0_39"] == 3
+    assert rules["fg_made_0_30"] == 3
+    assert rules["fg_made_31_40"] == 5
+    assert rules["fg_made_41_50"] == 7
+    assert rules["fg_made_51_60"] == 9
+    assert rules["fg_made_61_plus"] == 11
     assert rules["xp_made"] == 1
 
 
@@ -278,7 +286,11 @@ def test_create_league_accepts_create_form_scoring_keys(client):
     assert scoring["rec_tds"] == 6
     assert scoring["interceptions"] == -2
     assert scoring["fumbles_lost"] == -2
-    assert scoring["fg_made_0_39"] == 3
+    assert scoring["fg_made_0_30"] == 3
+    assert scoring["fg_made_31_40"] == 5
+    assert scoring["fg_made_41_50"] == 7
+    assert scoring["fg_made_51_60"] == 9
+    assert scoring["fg_made_61_plus"] == 11
     assert scoring["xp_made"] == 1
     assert "pass_yds_per_pt" not in scoring
     assert "rush_yds_per_pt" not in scoring
@@ -1062,3 +1074,114 @@ def test_started_draft_cannot_be_rescheduled(client, db_session):
 
     assert response.status_code == 409
     assert "cannot be rescheduled" in response.json()["detail"]
+
+
+def test_reschedule_persists_utc_time_replaces_notifications_and_records_member_event(client, db_session):
+    commissioner_token = create_user_and_token(client, "reschedule-persist-owner")
+    member_token = create_user_and_token(client, "reschedule-persist-member")
+    league = create_league(client, commissioner_token, "Persisted Reschedule", max_teams=2)
+    assert client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token)).status_code == 200
+    before = (
+        db_session.query(ScheduledNotification)
+        .filter(ScheduledNotification.league_id == league["id"], ScheduledNotification.canceled_at.is_(None))
+        .all()
+    )
+    assert len(before) == 4
+    next_time = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=5)
+
+    response = client.patch(
+        f"/leagues/{league['id']}/draft",
+        json={
+            "draft_datetime_utc": next_time.isoformat(),
+            "timezone": "America/New_York",
+            "draft_type": "snake",
+            "pick_timer_seconds": 120,
+        },
+        headers=auth_headers(commissioner_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["draft_datetime_utc"].startswith(next_time.isoformat()[:19])
+    db_session.expire_all()
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    assert draft.draft_datetime_utc.replace(tzinfo=timezone.utc) == next_time
+    assert draft.draft_version == 1
+    active = (
+        db_session.query(ScheduledNotification)
+        .filter(ScheduledNotification.league_id == league["id"], ScheduledNotification.canceled_at.is_(None))
+        .all()
+    )
+    assert len(active) == 4
+    member_user_ids = {
+        row.user_id
+        for row in db_session.query(LeagueMember).filter(LeagueMember.league_id == league["id"]).all()
+    }
+    assert {row.user_id for row in active} == member_user_ids
+    assert all(row.scheduled_for.replace(tzinfo=timezone.utc) in {next_time, next_time - timedelta(hours=1)} for row in active)
+    canceled = (
+        db_session.query(ScheduledNotification)
+        .filter(ScheduledNotification.league_id == league["id"], ScheduledNotification.canceled_at.is_not(None))
+        .count()
+    )
+    assert canceled == 4
+    events = (
+        db_session.query(NotificationLog)
+        .filter(NotificationLog.alert_type == "DRAFT")
+        .order_by(NotificationLog.id.asc())
+        .all()
+    )
+    assert len(events) == 2
+    assert {event.payload["league_id"] for event in events} == {league["id"]}
+    assert {event.payload["draft_version"] for event in events} == {1}
+
+
+def test_reschedule_requires_timestamp_with_timezone_offset(client):
+    token = create_user_and_token(client, "reschedule-naive")
+    league = create_league(client, token, "Timezone Required")
+
+    response = client.patch(
+        f"/leagues/{league['id']}/draft",
+        json={
+            "draft_datetime_utc": "2026-08-20T18:00:00",
+            "timezone": "America/New_York",
+            "draft_type": "snake",
+            "pick_timer_seconds": 90,
+        },
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 422
+    assert "timezone offset" in response.text
+
+
+def test_rescheduled_draft_does_not_start_at_the_replaced_time(client, db_session):
+    token = create_user_and_token(client, "reschedule-replaced-time")
+    league = create_league(client, token, "Replaced Schedule")
+    old_time = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(minutes=10)
+    new_time = old_time + timedelta(days=1)
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    draft.draft_datetime_utc = old_time
+    db_session.commit()
+
+    response = client.patch(
+        f"/leagues/{league['id']}/draft",
+        json={
+            "draft_datetime_utc": new_time.isoformat(),
+            "timezone": "America/New_York",
+            "draft_type": "snake",
+            "pick_timer_seconds": 90,
+        },
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    # The lifecycle worker never starts a scheduled draft. It only progresses an
+    # already-started draft, so the replaced time cannot resurrect an old schedule.
+    assert process_expired_draft_picks_once(db_session, now=old_time + timedelta(seconds=1)) == {
+        "auto_picked": 0,
+        "skipped": 0,
+    }
+    db_session.expire_all()
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    assert draft.status == "scheduled"
+    assert draft.draft_datetime_utc.replace(tzinfo=timezone.utc) == new_time

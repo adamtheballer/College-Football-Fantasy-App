@@ -1,7 +1,7 @@
 type TrajectoryPoint = {
   week: number;
   value: number;
-  source?: "preseason" | "published" | "bye";
+  source?: "preseason" | "current" | "published" | "bye";
 };
 
 const CHART_WIDTH = 760;
@@ -40,13 +40,20 @@ export function PlayerTrajectoryChart({
   const hasConnectedWeeks = ordered.some((point, index) => index > 0 && point.week === ordered[index - 1].week + 1);
   const peak = ordered.reduce((best, point) => point.value > best.value ? point : best, ordered[0] ?? { week: 0, value: 0 });
   const isPreseasonOnly = ordered.length === 1 && ordered[0]?.week === 0;
+  const isCurrentProjectionOnly = isPreseasonOnly && ordered[0]?.source === "current";
 
   return (
     <section className="rounded-3xl border border-cyan-200/20 bg-[#091323] p-4 sm:p-5" aria-label={ariaLabel}>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-100">{yLabel} by week</p>
-          <p className="mt-1 text-xs font-bold text-white/55">{isPreseasonOnly ? "Preseason baseline — weekly snapshots begin at Week 1" : "Week 0–13 trajectory"}</p>
+          <p className="mt-1 text-xs font-bold text-white/55">
+            {isCurrentProjectionOnly
+              ? "Current projection — weekly snapshots begin at Week 1"
+              : isPreseasonOnly
+                ? "Preseason baseline — weekly snapshots begin at Week 1"
+                : "Week 0–13 trajectory"}
+          </p>
         </div>
         <p className="text-xs font-black text-white">Peak: {valueFormatter(peak.value)} <span className="text-white/45">({peak.week === 0 ? "W0" : `W${peak.week}`})</span></p>
       </div>
@@ -74,14 +81,14 @@ export function PlayerTrajectoryChart({
           {hasConnectedWeeks ? <path d={connectedLine} fill="none" stroke="#5ee7ff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" /> : null}
           {ordered.map((point) => (
             <g key={point.week}>
-              <title>{point.week === 0 ? "Preseason baseline" : `Week ${point.week}`}: {valueFormatter(point.value)}</title>
+              <title>{point.week === 0 ? point.source === "current" ? "Current projection" : "Preseason baseline" : `Week ${point.week}`}: {valueFormatter(point.value)}</title>
               <circle cx={x(point.week)} cy={y(point.value)} r="6" fill={point.source === "published" ? "#ffffff" : point.source === "bye" ? "#64748b" : "#5ee7ff"} stroke="#08111f" strokeWidth="3" />
             </g>
           ))}
         </svg>
       </div>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-bold text-white/50">
-        <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-cyan-300" />Preseason baseline</span>
+        <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-cyan-300" />{points.some((point) => point.source === "current") ? "Current projection" : "Preseason baseline"}</span>
         <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-white" />Published weekly snapshot</span>
         {points.some((point) => point.source === "bye") ? <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-slate-500" />Bye</span> : null}
       </div>

@@ -15,6 +15,7 @@ from collegefootballfantasy_api.app.api.routes import (
     beta_access,
     admin_trades,
     admin_scoring,
+    admin_moderation,
     chats,
     health,
     insights,
@@ -77,6 +78,7 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(beta_access.router, prefix="/beta-access", tags=["beta-access"])
 app.include_router(admin_scoring.router, prefix="/admin/scoring", tags=["admin-scoring"])
 app.include_router(admin_trades.router, prefix="/admin/trades", tags=["admin-trades"])
+app.include_router(admin_moderation.router, prefix="/admin/moderation", tags=["admin-moderation"])
 app.include_router(leagues.router, prefix="/leagues", tags=["leagues"])
 app.include_router(chats.league_router, tags=["chat"])
 app.include_router(chats.router, tags=["chat"])

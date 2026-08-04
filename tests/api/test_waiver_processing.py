@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
@@ -16,12 +18,15 @@ from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+from collegefootballfantasy_api.app.schemas.league_flow import LeagueSettingsInput, LeagueSettingsUpdate
 from collegefootballfantasy_api.app.services.league_roster_matchup import build_waivers_view
 from collegefootballfantasy_api.app.schemas.waiver import FreeAgentAdd
 from collegefootballfantasy_api.app.services.waiver_service import (
+    _next_waiver_process_time,
     add_free_agent,
     initialize_waiver_state_after_official_draft,
     process_waiver_claims_once,
+    record_player_dropped_for_waivers,
 )
 
 
@@ -34,6 +39,141 @@ def canonical_player(name: str, position: str, school: str) -> Player:
         sheet_source_sheet_id="canonical-preseason:2026:test-fixture",
         sheet_projected_season_points=200.0,
     )
+
+
+def _league_settings_payload() -> dict:
+    return {
+        "scoring_json": {},
+        "roster_slots_json": {"QB": 1},
+        "playoff_teams": 4,
+        "waiver_type": "faab",
+        "trade_review_type": "commissioner",
+        "superflex_enabled": False,
+        "kicker_enabled": False,
+        "defense_enabled": False,
+    }
+
+
+def test_waiver_timezone_must_be_a_valid_iana_identifier():
+    invalid = {**_league_settings_payload(), "waiver_timezone": "Eastern Time"}
+
+    with pytest.raises(ValidationError, match="valid IANA timezone"):
+        LeagueSettingsInput.model_validate(invalid)
+    with pytest.raises(ValidationError, match="valid IANA timezone"):
+        LeagueSettingsUpdate.model_validate(invalid)
+
+
+def test_waiver_schedule_is_isolated_per_league_and_preserves_dst_local_hour(db_session):
+    """Two leagues may choose different local schedules without cross-talk."""
+    east_owner = User(
+        email="east-waiver-owner@example.com",
+        first_name="East",
+        password_hash="test",
+        api_token="east-waiver-owner-token",
+    )
+    west_owner = User(
+        email="west-waiver-owner@example.com",
+        first_name="West",
+        password_hash="test",
+        api_token="west-waiver-owner-token",
+    )
+    db_session.add_all((east_owner, west_owner))
+    db_session.flush()
+    east_league = League(name="Eastern Waiver League", season_year=2026, commissioner_user_id=east_owner.id, max_teams=2)
+    west_league = League(name="Pacific Waiver League", season_year=2026, commissioner_user_id=west_owner.id, max_teams=2)
+    db_session.add_all((east_league, west_league))
+    db_session.flush()
+    east_settings = LeagueSettings(
+        league_id=east_league.id,
+        roster_slots_json={"QB": 1},
+        waiver_processing_weekday=6,
+        waiver_processing_hour=8,
+        waiver_timezone="America/New_York",
+    )
+    west_settings = LeagueSettings(
+        league_id=west_league.id,
+        roster_slots_json={"QB": 1},
+        waiver_processing_weekday=6,
+        waiver_processing_hour=8,
+        waiver_timezone="America/Los_Angeles",
+    )
+    db_session.add_all((east_settings, west_settings))
+    db_session.flush()
+
+    # The following Sunday crosses into U.S. daylight saving time.  Both
+    # leagues must still process at 8:00 AM in their own local timezone.
+    before_dst = datetime(2026, 3, 7, 18, 0, tzinfo=timezone.utc)
+    east_due = _next_waiver_process_time(db_session, east_league, east_settings, now=before_dst)
+    west_due = _next_waiver_process_time(db_session, west_league, west_settings, now=before_dst)
+
+    assert east_due != west_due
+    assert (east_due.astimezone(ZoneInfo("America/New_York")).weekday(), east_due.astimezone(ZoneInfo("America/New_York")).hour) == (6, 8)
+    assert (west_due.astimezone(ZoneInfo("America/Los_Angeles")).weekday(), west_due.astimezone(ZoneInfo("America/Los_Angeles")).hour) == (6, 8)
+    assert east_settings.next_waiver_run_at == east_due
+    assert west_settings.next_waiver_run_at == west_due
+
+
+def test_lifecycle_releases_each_leagues_custom_post_drop_hold_without_due_period(db_session):
+    """A short hold must not wait for an unrelated weekly waiver run."""
+    first_owner = User(
+        email="short-hold-owner@example.com",
+        first_name="Short",
+        password_hash="test",
+        api_token="short-hold-owner-token",
+    )
+    second_owner = User(
+        email="long-hold-owner@example.com",
+        first_name="Long",
+        password_hash="test",
+        api_token="long-hold-owner-token",
+    )
+    db_session.add_all((first_owner, second_owner))
+    db_session.flush()
+    first_league = League(name="Short Hold League", season_year=2026, commissioner_user_id=first_owner.id, max_teams=2)
+    second_league = League(name="Long Hold League", season_year=2026, commissioner_user_id=second_owner.id, max_teams=2)
+    db_session.add_all((first_league, second_league))
+    db_session.flush()
+    first_team = Team(league_id=first_league.id, name="Short Hold Team", owner_user_id=first_owner.id, owner_name="Short")
+    second_team = Team(league_id=second_league.id, name="Long Hold Team", owner_user_id=second_owner.id, owner_name="Long")
+    first_player = canonical_player("Short Hold Player", "QB", "Texas")
+    second_player = canonical_player("Long Hold Player", "QB", "Oregon")
+    first_settings = LeagueSettings(league_id=first_league.id, roster_slots_json={"QB": 1}, post_drop_waiver_hours=1)
+    second_settings = LeagueSettings(league_id=second_league.id, roster_slots_json={"QB": 1}, post_drop_waiver_hours=48)
+    db_session.add_all((first_team, second_team, first_player, second_player, first_settings, second_settings))
+    db_session.flush()
+
+    dropped_at = datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc)
+    record_player_dropped_for_waivers(
+        db_session,
+        league=first_league,
+        player_id=first_player.id,
+        team_id=first_team.id,
+        transaction_id=None,
+        now=dropped_at,
+    )
+    record_player_dropped_for_waivers(
+        db_session,
+        league=second_league,
+        player_id=second_player.id,
+        team_id=second_team.id,
+        transaction_id=None,
+        now=dropped_at,
+    )
+    db_session.commit()
+
+    assert process_waiver_claims_once(db_session, now=dropped_at + timedelta(hours=2)) == {
+        "processed": 0,
+        "failed": 0,
+        "pending": 0,
+    }
+    first_availability = db_session.query(PlayerWaiverAvailability).filter_by(
+        league_id=first_league.id, player_id=first_player.id
+    ).one()
+    second_availability = db_session.query(PlayerWaiverAvailability).filter_by(
+        league_id=second_league.id, player_id=second_player.id
+    ).one()
+    assert first_availability.state == "free_agent"
+    assert second_availability.state == "waiver_locked"
 
 
 def test_due_waiver_processing_is_idempotent_with_league_serialization(client, db_session):

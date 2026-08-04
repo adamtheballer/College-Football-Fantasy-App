@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { PlayerTrajectoryChart } from "./PlayerTrajectoryChart";
 
-const renderChart = (points: Array<{ week: number; value: number; source: "preseason" | "published" }>) =>
+const renderChart = (points: Array<{ week: number; value: number; source: "preseason" | "current" | "published" }>) =>
   render(
     <PlayerTrajectoryChart
       ariaLabel="Projection trajectory"
@@ -37,5 +37,12 @@ describe("PlayerTrajectoryChart", () => {
 
     expect(screen.getByText("Week 0–13 trajectory")).toBeTruthy();
     expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("path[stroke='#5ee7ff']")).toHaveLength(1);
+  });
+
+  it("labels the Week 0 number as the current projection when it matches the player card", () => {
+    renderChart([{ week: 0, value: 22.0, source: "current" }]);
+
+    expect(screen.getByText("Current projection — weekly snapshots begin at Week 1")).toBeTruthy();
+    expect(screen.getByText("Peak: 22.0 pts")).toBeTruthy();
   });
 });

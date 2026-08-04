@@ -1,3 +1,4 @@
+import random
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
@@ -51,7 +52,10 @@ def _ensure_aware(value: datetime | None) -> datetime | None:
 
 def ordered_draft_teams(db: Session, league_id: int) -> list[Team]:
     teams = db.query(Team).filter(Team.league_id == league_id).all()
-    return sorted(teams, key=lambda team: (team.created_at, team.id))
+    return sorted(
+        teams,
+        key=lambda team: (team.draft_position is None, team.draft_position or 0, team.id),
+    )
 
 
 def draft_pick_team_for_number(teams: list[Team], pick_number: int) -> tuple[int, int, Team | None]:
@@ -115,9 +119,27 @@ def start_draft(db: Session, *, league: League, current_user: User) -> DraftRoom
     if scheduled_start is not None and scheduled_start > now:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="draft has not reached its scheduled start time")
 
-    teams = ordered_draft_teams(db, league.id)
+    teams = (
+        db.query(Team)
+        .filter(Team.league_id == league.id)
+        .with_for_update()
+        .all()
+    )
     if not _draft_teams_are_ready(db, league, teams):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="draft requires a full finalized manager order")
+
+    if (draft_row.draft_order_mode or "random") == "random":
+        random.SystemRandom().shuffle(teams)
+        for position, team in enumerate(teams, start=1):
+            team.draft_position = position
+    else:
+        positions = {team.draft_position for team in teams}
+        if positions != set(range(1, league.max_teams + 1)):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="custom draft order must assign every manager exactly one draft position",
+            )
+        teams = sorted(teams, key=lambda team: team.draft_position or 0)
 
     draft_row.status = "pre_draft"
     draft_row.pre_draft_starts_at = now

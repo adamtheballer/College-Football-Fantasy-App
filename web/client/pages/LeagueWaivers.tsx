@@ -881,7 +881,6 @@ export default function LeagueWaivers() {
             sheetProjectionStats: null,
           }}
           title="Available Player"
-          note="Week projection uses the app's current projection formula for the selected week. Schedule-strength adjustments should come from the league schedule data when available."
         />
       ) : null}
     </main>

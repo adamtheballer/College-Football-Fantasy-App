@@ -38,6 +38,11 @@ from collegefootballfantasy_api.app.schemas.chat import (
     ChatUnreadSummary,
 )
 from collegefootballfantasy_api.app.services.auth_security import enforce_auth_rate_limit
+from collegefootballfantasy_api.app.services.content_moderation import (
+    moderate_user_text,
+    normalize_for_moderation,
+    record_moderation_event,
+)
 
 
 SYSTEM_MESSAGE_TYPES = {
@@ -80,6 +85,14 @@ def _enforce_chat_rate_limit(
         )
     except HTTPException as exc:
         if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+            if action.startswith("chat_message"):
+                record_moderation_event(
+                    db,
+                    actor_user_id=current_user.id,
+                    field_name="chat_message",
+                    reason_code="spam_flood_protection",
+                    metadata_json={"rate_limit_action": action},
+                )
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Too many chat requests. Please wait and try again.",
@@ -613,6 +626,41 @@ def create_user_message(
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="client message id already used")
             return _message_read(db, existing)
 
+    payload.body = moderate_user_text(
+        db,
+        actor_user_id=current_user.id,
+        league_id=league_id,
+        field_name="chat_message",
+        value=payload.body,
+        required=True,
+    ) or ""
+    recent_messages = (
+        db.query(ChatMessage.body)
+        .filter(
+            ChatMessage.thread_id == thread_id,
+            ChatMessage.sender_user_id == current_user.id,
+            ChatMessage.deleted_at.is_(None),
+            ChatMessage.created_at >= utcnow() - timedelta(minutes=5),
+        )
+        .order_by(ChatMessage.id.desc())
+        .limit(10)
+        .all()
+    )
+    if any(normalize_for_moderation(row.body or "") == normalize_for_moderation(payload.body) for row in recent_messages):
+        record_moderation_event(
+            db,
+            actor_user_id=current_user.id,
+            league_id=league_id,
+            field_name="chat_message",
+            reason_code="spam_duplicate_message",
+            value=payload.body,
+            metadata_json={"thread_id": thread_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="That message was already sent recently. Please wait before sending it again.",
+        )
+
     _enforce_chat_rate_limit(
         db,
         action="chat_message",
@@ -693,7 +741,14 @@ def edit_user_message(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="deleted messages cannot be edited")
     if _as_utc(message.created_at) + timedelta(minutes=settings.chat_edit_window_minutes) < utcnow():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="message edit window has expired")
-    message.body = payload.body
+    message.body = moderate_user_text(
+        db,
+        actor_user_id=current_user.id,
+        league_id=league_id,
+        field_name="chat_message",
+        value=payload.body,
+        required=True,
+    ) or ""
     message.edited_at = utcnow()
     thread.updated_at = utcnow()
     db.add_all((message, thread))

@@ -18,6 +18,8 @@ def test_preseason_value_is_rating_only_and_post_week_one_blends_performance(db_
     mid = Player(name="Mid RB", position="RB", school="Miami", cfb27_overall=80, sheet_projected_season_points=180)
     db_session.add_all([elite, mid]); db_session.commit()
     preseason = calculate_player_trade_value(db_session, player_id=elite.id, season=2026, week=0)
+    assert preseason.value == 95
+    assert preseason.factor_breakdown_json["preseasonRating"] == 95
     assert preseason.factor_breakdown_json["seasonPerformance"] == 0
     assert preseason.factor_breakdown_json["futureProjection"] == 0
     db_session.add_all([
@@ -74,5 +76,5 @@ def test_trade_value_tiers_and_serialized_legacy_values_use_the_0_to_99_scale(db
     ]
     history = get_player_trade_values(db_session, player_id=player.id, season=2026)
     assert history.current is not None
-    assert history.current.value == 99.0
-    assert history.current.tier == "UNTOUCHABLE"
+    assert history.current.value == 88.0
+    assert history.current.tier == "EFFECTIVE_STARTER"

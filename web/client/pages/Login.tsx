@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   CalendarClock,
+  Check,
+  Copy,
   Eye,
   EyeOff,
   KeyRound,
@@ -17,6 +19,7 @@ import {
 
 import { PlaybookDecor, SurfaceCard } from "@/components/fantasy";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError, apiUnavailableMessage } from "@/lib/api";
@@ -94,12 +97,6 @@ export default function Login() {
       ? location.state.from
       : "/";
 
-  useEffect(() => {
-    if (isLoggedIn) {
-      navigate(redirectTarget, { replace: true });
-    }
-  }, [isLoggedIn, navigate, redirectTarget]);
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -108,6 +105,9 @@ export default function Login() {
     () => (new URLSearchParams(location.search).get("flow") === "beta" && betaAccessEnabled ? "access" : "signin")
   );
   const [showPassword, setShowPassword] = useState(false);
+  const [createdPassword, setCreatedPassword] = useState<string | null>(null);
+  const [holdPostSignupRedirect, setHoldPostSignupRedirect] = useState(false);
+  const [passwordCopied, setPasswordCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const resetSuccess =
@@ -120,6 +120,12 @@ export default function Login() {
     location.state &&
     "betaAccessPending" in location.state &&
     location.state.betaAccessPending === true;
+
+  useEffect(() => {
+    if (isLoggedIn && !holdPostSignupRedirect) {
+      navigate(redirectTarget, { replace: true });
+    }
+  }, [holdPostSignupRedirect, isLoggedIn, navigate, redirectTarget]);
 
   const selectMode = (nextMode: "signin" | "access" | "signup", clearError = true) => {
     if (clearError) setError(null);
@@ -191,11 +197,13 @@ export default function Login() {
       return;
     }
     setIsLoading(true);
+    setHoldPostSignupRedirect(true);
+    const passwordForConfirmation = password;
     try {
       const nextUser = await signup(firstName, email, password, reservation?.token);
       clearBetaAccessReservation();
       setPendingGuide(nextUser.id);
-      navigate("/", { replace: true });
+      setCreatedPassword(passwordForConfirmation);
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 0) {
         setError(apiUnavailableMessage());
@@ -206,9 +214,27 @@ export default function Login() {
       } else {
         setError("Create account failed. Please try again.");
       }
+      setHoldPostSignupRedirect(false);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const copyCreatedPassword = async () => {
+    if (!createdPassword) return;
+    try {
+      await navigator.clipboard.writeText(createdPassword);
+      setPasswordCopied(true);
+    } catch {
+      setPasswordCopied(false);
+    }
+  };
+
+  const finishSignup = () => {
+    setCreatedPassword(null);
+    setPassword("");
+    setHoldPostSignupRedirect(false);
+    navigate(redirectTarget, { replace: true });
   };
 
   return (
@@ -371,7 +397,7 @@ export default function Login() {
             <div className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface/60 p-4">
               <div className="flex items-center gap-3">
                 <CalendarClock className="h-5 w-5 text-cfb-gold" aria-hidden="true" />
-                <p className="text-sm font-semibold text-cfb-text-secondary">{mode === "signin" ? "New to the beta? Verify your invitation and create an account here." : "Already have an account? Return to sign in without leaving this page."}</p>
+                <p className="text-sm font-semibold text-cfb-text-secondary">{mode === "signin" ? "New to the beta? Verify your invitation and create an account here." : "Sign in if you already created your account and entered your code."}</p>
               </div>
             </div>
           </div>
@@ -381,6 +407,28 @@ export default function Login() {
           </div>
         </SurfaceCard>
       </section>
+
+      <Dialog open={Boolean(createdPassword)} onOpenChange={(open) => { if (!open) finishSignup(); }}>
+        <DialogContent className="max-w-lg border-cfb-cyan/30 bg-[#081321] text-cfb-text-primary">
+          <DialogHeader>
+            <DialogTitle className="pr-8 text-3xl font-black uppercase italic tracking-tight">Account created</DialogTitle>
+            <DialogDescription className="text-base font-semibold leading-6 text-cfb-text-secondary">
+              Save this password somewhere secure before continuing. CFB Fantasy does not store or show it again.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-2xl border border-cfb-cyan/25 bg-cfb-cyan/[0.08] p-4">
+            <p className="cfb-micro-label text-cyan-100">Your password</p>
+            <code className="mt-3 block break-all rounded-xl border border-white/15 bg-slate-950/60 px-4 py-3 text-base font-black tracking-[0.08em] text-cyan-100">{createdPassword}</code>
+          </div>
+          <DialogFooter className="gap-3 sm:gap-3">
+            <Button type="button" variant="outline" onClick={copyCreatedPassword}>
+              {passwordCopied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+              {passwordCopied ? "Copied" : "Copy password"}
+            </Button>
+            <Button type="button" onClick={finishSignup}>Continue to dashboard</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

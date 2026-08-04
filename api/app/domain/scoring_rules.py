@@ -28,9 +28,11 @@ OFFENSE_RULES: dict[str, float] = {
 }
 
 KICKER_RULES: dict[str, float] = {
-    "fg_made_0_39": 3,
-    "fg_made_40_49": 4,
-    "fg_made_50_plus": 5,
+    "fg_made_0_30": 3,
+    "fg_made_31_40": 5,
+    "fg_made_41_50": 7,
+    "fg_made_51_60": 9,
+    "fg_made_61_plus": 11,
     "xp_made": 1,
     "fg_missed": -1,
 }
@@ -74,15 +76,20 @@ SCORING_RULE_ALIASES = {
     "rushing_yards": "rush_yards",
     "receiving_yards": "rec_yards",
     "fumble_lost": "fumbles_lost",
-    "fg": "fg_made_0_39",
     "xp": "xp_made",
-    "FieldGoalsMade0To49": "fg_made_0_39",
-    "FieldGoalsMade0to49": "fg_made_0_39",
-    "FieldGoalsMade0To39": "fg_made_0_39",
-    "FieldGoalsMade0to39": "fg_made_0_39",
-    "FieldGoalsMade40To49": "fg_made_40_49",
-    "FieldGoalsMade40to49": "fg_made_40_49",
-    "FieldGoalsMade50Plus": "fg_made_50_plus",
+    "FieldGoalsMade0To30": "fg_made_0_30",
+    "FieldGoalsMade0to30": "fg_made_0_30",
+    "FieldGoalsMade31To40": "fg_made_31_40",
+    "FieldGoalsMade31to40": "fg_made_31_40",
+    "FieldGoalsMade41To50": "fg_made_41_50",
+    "FieldGoalsMade41to50": "fg_made_41_50",
+    "FieldGoalsMade51To60": "fg_made_51_60",
+    "FieldGoalsMade51to60": "fg_made_51_60",
+    "FieldGoalsMade61Plus": "fg_made_61_plus",
+    # The old three-bucket names remain accepted for stored legacy settings.
+    "fg_made_0_39": "fg_made_0_30",
+    "fg_made_40_49": "fg_made_31_40",
+    "fg_made_50_plus": "fg_made_41_50",
     "ExtraPointsMade": "xp_made",
     "FieldGoalsMissed": "fg_missed",
 }
@@ -149,6 +156,18 @@ def _coerce_rule_value(key: str, value: Any) -> float:
     return number
 
 
+def field_goal_tier_rules(base_points: Any) -> dict[str, float]:
+    """Build the fixed field-goal schedule from the selected 30-yard base."""
+    base = _coerce_rule_value("fg", base_points)
+    return {
+        "fg_made_0_30": base,
+        "fg_made_31_40": base + 2,
+        "fg_made_41_50": base + 4,
+        "fg_made_51_60": base + 6,
+        "fg_made_61_plus": base + 8,
+    }
+
+
 def _canonical_rule_key(raw_key: str, allowed: set[str]) -> str:
     canonical = SCORING_RULE_ALIASES.get(raw_key, raw_key)
     if canonical not in allowed:
@@ -177,6 +196,11 @@ def _partition_flat_rules(raw_rules: Mapping[str, Any]) -> tuple[dict[str, Any],
     kicker_raw: dict[str, Any] = {}
     for raw_key, raw_value in raw_rules.items():
         key = str(raw_key)
+        if key == "fg":
+            if kicker_raw:
+                raise ScoringRulesValidationError("field-goal base cannot be mixed with individual field-goal tiers")
+            kicker_raw.update(field_goal_tier_rules(raw_value))
+            continue
         yards_target = YARDS_PER_POINT_ALIASES.get(key)
         if yards_target is not None:
             if yards_target in offense_raw:

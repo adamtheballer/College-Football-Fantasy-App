@@ -37,6 +37,7 @@ def ensure_models_registered() -> None:
         matchup,
         mock_draft,
         mock_draft_pick,
+        moderation_event,
         notification,
         player,
         player_game_stat,

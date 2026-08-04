@@ -11,6 +11,7 @@ from collegefootballfantasy_api.app.services.player_pool_filters import (
     canonical_fantasy_player_filter,
     is_canonical_fantasy_player,
 )
+from collegefootballfantasy_api.app.services.content_moderation import moderate_user_text
 
 
 MOCK_DRAFT_SEASON = 2026
@@ -65,6 +66,9 @@ def list_mock_drafts(db: Session, owner_user_id: int) -> list[MockDraft]:
 
 
 def create_mock_draft(db: Session, owner_user_id: int, payload: MockDraftCreate) -> MockDraft:
+    payload.title = moderate_user_text(
+        db, actor_user_id=owner_user_id, field_name="mock_draft_title", value=payload.title, required=True
+    ) or ""
     mock_draft = MockDraft(
         owner_user_id=owner_user_id,
         title=payload.title,

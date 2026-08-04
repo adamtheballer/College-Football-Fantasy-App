@@ -43,8 +43,24 @@ export interface DraftInfo {
   draft_datetime_utc: string;
   timezone: string;
   draft_type: string;
+  draft_order_mode: "random" | "custom";
   pick_timer_seconds: number;
   status: string;
+}
+
+export interface DraftOrderEntry {
+  team_id: number;
+  team_name: string;
+  owner_user_id: number | null;
+  owner_name: string | null;
+  draft_position: number | null;
+}
+
+export interface DraftOrder {
+  draft_order_mode: "random" | "custom";
+  max_teams: number;
+  is_complete: boolean;
+  entries: DraftOrderEntry[];
 }
 
 export interface LeagueMember {
@@ -69,6 +85,7 @@ export interface LeagueDetail {
   updated_at: string;
   settings: LeagueSettings;
   draft: DraftInfo | null;
+  draft_order: DraftOrder | null;
   members: LeagueMember[];
 }
 

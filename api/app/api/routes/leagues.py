@@ -22,6 +22,8 @@ from collegefootballfantasy_api.app.schemas.draft_room import (
 from collegefootballfantasy_api.app.schemas.league import LeagueList
 from collegefootballfantasy_api.app.schemas.league_player_history import LeaguePlayerHistoryRead
 from collegefootballfantasy_api.app.schemas.league_flow import (
+    DraftOrderRead,
+    DraftOrderUpdate,
     DraftRead,
     DraftUpdate,
     LeagueCreateRequest,
@@ -54,6 +56,7 @@ from collegefootballfantasy_api.app.services.league_flow import (
     reschedule_draft as reschedule_draft_flow,
     update_league_settings as update_league_settings_flow,
 )
+from collegefootballfantasy_api.app.services.draft_order import update_draft_order
 from collegefootballfantasy_api.app.services.league_workspace import (
     build_league_news_items,
     build_power_rankings_rows,
@@ -380,6 +383,17 @@ def reschedule_draft(
 ) -> DraftRead:
     league, _ = require_commissioner(db, league_id, current_user)
     return reschedule_draft_flow(db, league, payload)
+
+
+@router.patch("/{league_id}/draft-order", response_model=DraftOrderRead)
+def update_draft_order_endpoint(
+    league_id: int,
+    payload: DraftOrderUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> DraftOrderRead:
+    league, _ = require_commissioner(db, league_id, current_user)
+    return update_draft_order(db, league=league, payload=payload)
 
 
 @router.delete("/{league_id}", status_code=status.HTTP_204_NO_CONTENT)

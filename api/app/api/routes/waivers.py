@@ -29,6 +29,7 @@ from collegefootballfantasy_api.app.services.waiver_service import (
     reorder_waiver_claims,
     submit_waiver_claim,
 )
+from collegefootballfantasy_api.app.services.content_moderation import moderate_user_text
 
 router = APIRouter(prefix="/leagues/{league_id}/waivers")
 
@@ -70,6 +71,9 @@ def submit_waiver_claim_endpoint(
 ) -> WaiverClaimRead:
     league = get_league_or_404(db, league_id)
     require_league_member(db, league.id, current_user)
+    payload.reason = moderate_user_text(
+        db, actor_user_id=current_user.id, league_id=league.id, field_name="waiver_note", value=payload.reason
+    )
     return submit_waiver_claim(db, league=league, current_user=current_user, payload=payload)
 
 
@@ -109,6 +113,9 @@ def cancel_waiver_claim_endpoint(
 ) -> WaiverClaimRead:
     league = get_league_or_404(db, league_id)
     require_league_member(db, league.id, current_user)
+    payload.reason = moderate_user_text(
+        db, actor_user_id=current_user.id, league_id=league.id, field_name="waiver_note", value=payload.reason
+    )
     return cancel_waiver_claim(
         db,
         league=league,
@@ -128,6 +135,9 @@ def edit_waiver_claim_endpoint(
 ) -> WaiverClaimRead:
     league = get_league_or_404(db, league_id)
     require_league_member(db, league.id, current_user)
+    payload.reason = moderate_user_text(
+        db, actor_user_id=current_user.id, league_id=league.id, field_name="waiver_note", value=payload.reason
+    )
     return edit_waiver_claim(db, league=league, current_user=current_user, claim_id=claim_id, payload=payload)
 
 

@@ -1444,21 +1444,33 @@ def _process_priority_period(
     return processed, failures
 
 
-def _release_expired_availability(db: Session, *, league_id: int, now: datetime) -> None:
+def _release_expired_availability(
+    db: Session,
+    *,
+    now: datetime,
+    league_id: int | None = None,
+) -> int:
+    """Release post-drop holds that have elapsed.
+
+    This is deliberately independent of a weekly waiver-period run.  A league
+    can choose a short post-drop hold (for example, one hour) and that hold
+    must expire at its configured timestamp even if no weekly claims are due.
+    """
     rows = (
         db.query(PlayerWaiverAvailability)
         .filter(
-            PlayerWaiverAvailability.league_id == league_id,
             PlayerWaiverAvailability.state.in_(("waiver_locked", "waivers")),
             PlayerWaiverAvailability.available_at.isnot(None),
             PlayerWaiverAvailability.available_at <= now,
         )
-        .with_for_update()
-        .all()
     )
+    if league_id is not None:
+        rows = rows.filter(PlayerWaiverAvailability.league_id == league_id)
+    rows = rows.with_for_update().all()
     for row in rows:
         row.state = "free_agent"
         row.waiver_period_id = None
+    return len(rows)
 
 
 def _process_period(db: Session, *, league: League, period: WaiverPeriod, now: datetime) -> tuple[int, int]:
@@ -1521,6 +1533,12 @@ def process_waiver_claims_once(
     now: datetime | None = None,
 ) -> dict[str, int]:
     processed_at = _as_utc(now or _now())
+    # The lifecycle worker calls this continuously.  Expire every league's
+    # independent post-drop hold before looking for weekly periods, so a
+    # league with no currently due claims still follows its configured hours.
+    released = _release_expired_availability(db, league_id=league_id, now=processed_at)
+    if released:
+        db.commit()
     query = db.query(WaiverPeriod).filter(
         WaiverPeriod.status.in_(("scheduled", "open", "failed")), WaiverPeriod.processes_at <= processed_at
     )

@@ -175,7 +175,6 @@ export default function InjuryCenter() {
           error={playerCardQuery.isError}
           loading={playerCardQuery.isLoading}
           title="Injury Player Card"
-          note={`${selectedInjury.injury} • Expected return: ${selectedInjury.returnTimeline}`}
           onClose={() => setSelectedPlayerId(null)}
           onRetry={() => void playerCardQuery.refetch()}
         />

@@ -17,6 +17,9 @@ class Team(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(200))
     owner_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     owner_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # Null is intentional before a commissioner finishes a custom order or a
+    # random order is materialized at draft start.
+    draft_position: Mapped[int | None] = mapped_column(nullable=True)
 
     league = relationship("League", back_populates="teams")
     roster_entries = relationship("RosterEntry", back_populates="team", cascade="all, delete-orphan")

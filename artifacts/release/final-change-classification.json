@@ -1,0 +1,9 @@
+{
+  "generated_at": "2026-08-04",
+  "scope": "canonical checkout before selective release staging",
+  "file_count": 77,
+  "tracked_hunk_count": 298,
+  "classification_source": "final-change-classification.csv",
+  "counts": {"BETA_READY": 64, "TEST_ONLY": 13, "BETA_NEEDS_FIX": 0, "POST_BETA": 0, "GENERATED": 0, "LOCAL_ONLY": 0, "SECRET": 0, "STALE": 0, "SUPERSEDED": 0, "MANUAL_REVIEW": 0},
+  "preservation": {"commit": "all classified files", "stash": "none required; no non-release hunk was found", "excluded": ["secrets", "database backups", "raw player-source CSVs", "node_modules", ".venv", "dist", "caches"]}
+}

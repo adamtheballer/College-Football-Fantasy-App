@@ -6,18 +6,21 @@ import {
   formatGameLogDate,
   gameLogColumnsForPosition,
   gameLogOpponentLabel,
+  buildHistoricalSeasonSummaryColumns,
   buildHistoricalStatsTableRows,
   draftHistorySummary,
   formatPlayerCardValue,
   getPlayerCardPalette,
   normalizeTradeValueMeter,
+  historicalSeasonSummaryValue,
   resolvePlayerCardCfb27Rating,
   resolvePlayerCardProjectionStats,
+  synchronizeProjectionTrajectoryToCardHeader,
   tradeValueMeterDegrees,
   visiblePlayerCardAboutMessage,
   visiblePlayerCardTabs,
 } from "./PlayerCardModal";
-import { CFB27_RATING_LABEL, formatCfb27Rating } from "./PlayerCardHeader";
+import { CURRENT_VALUE_RATING_LABEL, formatCurrentValueRating } from "./PlayerCardHeader";
 
 describe("PlayerCardModal helpers", () => {
   it("always shows the History tab, with league context controlling its contents", () => {
@@ -54,10 +57,10 @@ describe("PlayerCardModal helpers", () => {
     expect(normalizeTradeValueMeter(100)).toBe(99);
   });
 
-  it("uses the CFB 27 rating label and an explicit unavailable state", () => {
-    expect(CFB27_RATING_LABEL).toBe("CFB 27 Rating");
-    expect(formatCfb27Rating(85)).toBe("85");
-    expect(formatCfb27Rating(null)).toBe("N/A");
+  it("uses the canonical current-value label and an explicit unavailable state", () => {
+    expect(CURRENT_VALUE_RATING_LABEL).toBe("Current Value Rating");
+    expect(formatCurrentValueRating(85)).toBe("85");
+    expect(formatCurrentValueRating(null)).toBe("—");
   });
 
   it("uses the same loaded CFB 27 rating for every player-card rating display", () => {
@@ -143,6 +146,16 @@ describe("PlayerCardModal helpers", () => {
     expect(statValue(projectedStats, ["bustProb"])).toBe(0.16);
   });
 
+  it("uses the player-card headline projection for the graph's Week 0 point", () => {
+    expect(synchronizeProjectionTrajectoryToCardHeader([
+      { week: 0, points: 26.4, source: "preseason" },
+      { week: 1, points: 21.2, source: "published" },
+    ], 22.0)).toEqual([
+      { week: 0, points: 22.0, source: "current" },
+      { week: 1, points: 21.2, source: "published" },
+    ]);
+  });
+
   it("flattens ESPN historical categories into organized table rows", () => {
     const rows = buildHistoricalStatsTableRows({
       season: 2025,
@@ -172,5 +185,30 @@ describe("PlayerCardModal helpers", () => {
       { category: "Rushing", label: "Yards", value: 947 },
       { category: "Receiving", label: "Receptions", value: 16 },
     ]);
+  });
+
+  it("builds one consistent set of stat-table columns for every historical season", () => {
+    const seasons = [
+      {
+        season: 2025,
+        season_type: "regular",
+        summary: [{ label: "Fantasy Pts", value: 212.3 }, { label: "Rush Yds", value: 1047 }],
+        categories: [],
+        freshness: { provider: "verified_import", is_final: true },
+        scoring_context: {},
+      },
+      {
+        season: 2024,
+        season_type: "regular",
+        summary: [{ label: "Fantasy Pts", value: 164.1 }, { label: "Rec Yds", value: 812 }],
+        categories: [],
+        freshness: { provider: "verified_import", is_final: true },
+        scoring_context: {},
+      },
+    ] as never;
+
+    expect(buildHistoricalSeasonSummaryColumns(seasons)).toEqual(["Fantasy Pts", "Rush Yds", "Rec Yds"]);
+    expect(historicalSeasonSummaryValue(seasons[1], "Rec Yds")).toBe(812);
+    expect(historicalSeasonSummaryValue(seasons[1], "Rush Yds")).toBeNull();
   });
 });

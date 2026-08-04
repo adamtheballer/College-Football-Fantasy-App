@@ -19,7 +19,7 @@ import { useLeagues } from "@/hooks/use-leagues";
 import { formatDraftCountdown, hasDraftStarted } from "@/lib/draftStatus";
 import { isLeaguePostDraft, shouldShowLeagueDraftRoomAction } from "@/lib/leagueLifecycle";
 
-const LeagueCard = ({
+export const LeagueCard = ({
   id,
   name,
   status,
@@ -30,6 +30,7 @@ const LeagueCard = ({
   isPrivate,
   draftStatus,
   inviteCode,
+  iconUrl,
   onOpen,
   onOpenDraft,
 }: {
@@ -43,11 +44,14 @@ const LeagueCard = ({
   isPrivate: boolean;
   draftStatus: string;
   inviteCode?: string | null;
+  iconUrl?: string | null;
   onOpen: (leagueId: number) => void;
   onOpenDraft: (leagueId: number, draftUnlocked: boolean) => void;
 }) => {
   const [copiedInviteField, setCopiedInviteField] = useState<"code" | "link" | null>(null);
+  const [iconFailed, setIconFailed] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const leagueImageUrl = iconUrl?.trim() || null;
   const openLeague = () => onOpen(id);
   const normalizedDraftStatus = (draftStatus || "").toLowerCase();
   const normalizedLeagueStatus = (status || "").toLowerCase();
@@ -73,6 +77,10 @@ const LeagueCard = ({
     const interval = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(interval);
   }, [draftUnlocked, shouldShowDraftAction]);
+
+  useEffect(() => {
+    setIconFailed(false);
+  }, [leagueImageUrl]);
 
   const copyInviteValue = async (
     event: MouseEvent<HTMLButtonElement>,
@@ -105,8 +113,17 @@ const LeagueCard = ({
         <div className="absolute -top-6 -left-6 w-24 h-24 blur-[40px] opacity-20 rounded-full bg-gradient-to-br from-primary to-blue-600" />
         <div className="relative z-10 flex flex-col h-full justify-between gap-6">
           <div className="space-y-4">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110 duration-500 bg-gradient-to-br from-primary to-blue-600">
-              <Trophy className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 overflow-hidden rounded-2xl flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110 duration-500 bg-gradient-to-br from-primary to-blue-600">
+              {leagueImageUrl && !iconFailed ? (
+                <img
+                  src={leagueImageUrl}
+                  alt={`${name} league logo`}
+                  className="h-full w-full object-cover"
+                  onError={() => setIconFailed(true)}
+                />
+              ) : (
+                <Trophy className="w-6 h-6 text-white" aria-label="Default league trophy" />
+              )}
             </div>
             <div className="space-y-1">
               <h3 className="text-2xl font-black italic tracking-tight text-foreground uppercase group-hover:text-primary transition-colors">
@@ -293,6 +310,7 @@ export default function Leagues() {
               isPrivate={league.is_private}
               draftStatus={league.draft?.status || "none"}
               inviteCode={league.invite_code}
+              iconUrl={league.icon_url}
               onOpen={(leagueId) => {
                 setActiveLeagueId(leagueId);
                 const postDraft = isLeaguePostDraft({

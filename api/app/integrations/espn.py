@@ -287,11 +287,15 @@ def _team_aliases(team: dict[str, Any]) -> list[str]:
 
 
 def _field_goal_bucket(distance: int) -> str:
-    if distance >= 50:
-        return "fg_made_50_plus"
-    if distance >= 40:
-        return "fg_made_40_49"
-    return "fg_made_0_39"
+    if distance <= 30:
+        return "fg_made_0_30"
+    if distance <= 40:
+        return "fg_made_31_40"
+    if distance <= 50:
+        return "fg_made_41_50"
+    if distance <= 60:
+        return "fg_made_51_60"
+    return "fg_made_61_plus"
 
 
 def _field_goal_buckets_from_scoring_plays(summary: dict[str, Any]) -> dict[str, dict[str, int]]:
@@ -322,7 +326,16 @@ def _field_goal_buckets_from_scoring_plays(summary: dict[str, Any]) -> dict[str,
             if not name:
                 continue
             bucket = _field_goal_bucket(distance)
-            row = buckets.setdefault(name.lower(), {"fg_made_0_39": 0, "fg_made_40_49": 0, "fg_made_50_plus": 0})
+            row = buckets.setdefault(
+                name.lower(),
+                {
+                    "fg_made_0_30": 0,
+                    "fg_made_31_40": 0,
+                    "fg_made_41_50": 0,
+                    "fg_made_51_60": 0,
+                    "fg_made_61_plus": 0,
+                },
+            )
             row[bucket] += 1
     return buckets
 

@@ -32,6 +32,7 @@ from collegefootballfantasy_api.app.services.chat_service import (
     create_trade_finalized_chat_message,
     mark_trade_finalized_chat_message_processed,
 )
+from collegefootballfantasy_api.app.services.content_moderation import moderate_user_text
 from collegefootballfantasy_api.app.services.league_player_history import EVENT_TRADED, EVENT_TRADE_FAILED, append_league_player_event
 from collegefootballfantasy_api.app.services.player_trade_value import current_trade_value_snapshot
 from collegefootballfantasy_api.app.services.league_weeks import (
@@ -557,6 +558,9 @@ def _create_trade_offer_record(
 
 
 def create_trade_offer(db: Session, league: League, current_user: User, payload: TradeOfferCreate) -> TradeOfferRead:
+    payload.message = moderate_user_text(
+        db, actor_user_id=current_user.id, league_id=league.id, field_name="trade_message", value=payload.message
+    )
     _member_or_404(db, league.id, current_user.id)
     now = _utcnow()
     _ensure_trade_deadline_open(db, league, now)
@@ -601,6 +605,9 @@ def _complete_accepted_trade(
 
 
 def accept_trade_offer(db: Session, league: League, trade_id: int, current_user: User, payload: TradeActionRequest) -> TradeOfferRead:
+    payload.reason = moderate_user_text(
+        db, actor_user_id=current_user.id, league_id=league.id, field_name="trade_note", value=payload.reason
+    )
     offer = _load_offer(db, trade_id, for_update=True)
     if offer.league_id != league.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="trade offer not found")
@@ -642,6 +649,9 @@ def accept_trade_offer(db: Session, league: League, trade_id: int, current_user:
 
 
 def commissioner_approve_trade(db: Session, league: League, trade_id: int, current_user: User, payload: TradeActionRequest) -> TradeOfferRead:
+    payload.reason = moderate_user_text(
+        db, actor_user_id=current_user.id, league_id=league.id, field_name="trade_note", value=payload.reason
+    )
     _require_commissioner(league, current_user)
     offer = _load_offer(db, trade_id, for_update=True)
     if offer.league_id != league.id:
@@ -675,6 +685,9 @@ def commissioner_approve_trade(db: Session, league: League, trade_id: int, curre
 
 
 def reject_trade_offer(db: Session, league: League, trade_id: int, current_user: User, payload: TradeActionRequest) -> TradeOfferRead:
+    payload.reason = moderate_user_text(
+        db, actor_user_id=current_user.id, league_id=league.id, field_name="trade_note", value=payload.reason
+    )
     offer = _load_offer(db, trade_id, for_update=True)
     if offer.league_id != league.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="trade offer not found")
@@ -690,6 +703,9 @@ def reject_trade_offer(db: Session, league: League, trade_id: int, current_user:
 
 
 def cancel_trade_offer(db: Session, league: League, trade_id: int, current_user: User, payload: TradeActionRequest) -> TradeOfferRead:
+    payload.reason = moderate_user_text(
+        db, actor_user_id=current_user.id, league_id=league.id, field_name="trade_note", value=payload.reason
+    )
     offer = _load_offer(db, trade_id, for_update=True)
     if offer.league_id != league.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="trade offer not found")
@@ -711,6 +727,9 @@ def counter_trade_offer(
     current_user: User,
     payload: TradeOfferCounterCreate,
 ) -> TradeOfferRead:
+    payload.message = moderate_user_text(
+        db, actor_user_id=current_user.id, league_id=league.id, field_name="trade_message", value=payload.message
+    )
     offer = _load_offer(db, trade_id, for_update=True)
     if offer.league_id != league.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="trade offer not found")
@@ -749,6 +768,9 @@ def counter_trade_offer(
 
 
 def commissioner_veto_trade(db: Session, league: League, trade_id: int, current_user: User, payload: TradeActionRequest) -> TradeOfferRead:
+    payload.reason = moderate_user_text(
+        db, actor_user_id=current_user.id, league_id=league.id, field_name="trade_note", value=payload.reason
+    )
     _require_commissioner(league, current_user)
     offer = _load_offer(db, trade_id, for_update=True)
     if offer.league_id != league.id:

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import type {
   DraftInfo,
+  DraftOrder,
   LeagueDetail,
   LeagueCreateResponse,
   LeagueListResponse,
@@ -22,6 +23,11 @@ export type DraftUpdatePayload = {
   draft_type: string;
   pick_timer_seconds: number;
   status?: string;
+};
+
+export type DraftOrderUpdatePayload = {
+  draft_order_mode: "random" | "custom";
+  entries: Array<{ team_id: number; draft_position: number }>;
 };
 
 export function useLeagues(limit = 20, enabled = true) {
@@ -57,13 +63,34 @@ export function useRescheduleDraft(leagueId?: number) {
       }
       return apiPatch<DraftInfo>(`/leagues/${leagueId}/draft`, payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["leagues"] });
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "settings-view"] });
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "draft-room"] });
-      queryClient.invalidateQueries({ queryKey: ["draft-room", leagueId] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId] }),
+        queryClient.invalidateQueries({ queryKey: ["leagues"] }),
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] }),
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "settings-view"] }),
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "draft-room"] }),
+        queryClient.invalidateQueries({ queryKey: ["draft-room", leagueId] }),
+      ]);
+    },
+  });
+}
+
+export function useUpdateDraftOrder(leagueId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: DraftOrderUpdatePayload) => {
+      if (typeof leagueId !== "number" || Number.isNaN(leagueId)) {
+        throw new ApiError(400, "Invalid league ID.");
+      }
+      return apiPatch<DraftOrder>(`/leagues/${leagueId}/draft-order`, payload);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId] }),
+        queryClient.invalidateQueries({ queryKey: ["leagues"] }),
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "draft-room"] }),
+      ]);
     },
   });
 }

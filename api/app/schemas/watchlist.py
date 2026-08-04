@@ -1,17 +1,17 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from collegefootballfantasy_api.app.schemas.player import PlayerRead
 
 
 class WatchlistCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=80)
     league_id: int | None = None
 
 
 class WatchlistUpdate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=80)
 
 
 class WatchlistPlayerCreate(BaseModel):

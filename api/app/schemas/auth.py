@@ -2,7 +2,7 @@ from datetime import datetime
 import re
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 PASSWORD_POLICY_MESSAGE = (
@@ -33,10 +33,10 @@ def validate_password_strength(value: str) -> str:
 
 
 class UserCreate(BaseModel):
-    first_name: str
+    first_name: str = Field(min_length=1, max_length=100)
     email: str
     password: str
-    username: Optional[str] = None
+    username: Optional[str] = Field(default=None, max_length=80)
     beta_access_reservation: str | None = None
 
     @field_validator("first_name")

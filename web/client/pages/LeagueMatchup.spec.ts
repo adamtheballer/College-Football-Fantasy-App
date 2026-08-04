@@ -1,6 +1,52 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+
+import { fireEvent, render, screen } from "@testing-library/react";
+import { createElement } from "react";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("react-router-dom", () => ({
+  Navigate: () => null,
+  useParams: () => ({ leagueId: "42" }),
+}));
+
+vi.mock("@/components/league/LeagueTabs", () => ({ LeagueTabs: () => null }));
+vi.mock("@/components/league/SideBySideMatchup", () => ({ SideBySideMatchup: () => null }));
+vi.mock("@/components/league/WeekSelector", () => ({ WeekSelector: () => null }));
+vi.mock("@/components/league/WinChanceMeter", () => ({ WinChanceMeter: () => null }));
+
+vi.mock("@/hooks/use-leagues", () => ({
+  useLeagueDetail: () => ({
+    data: { draft: { status: "completed" }, status: "post_draft" },
+    isLoading: false,
+    isError: false,
+  }),
+  useLeagueMatchupTab: () => ({
+    data: {
+      matchup_id: 1,
+      week: 1,
+      status: "projected",
+      my_team: { fantasy_team_id: 10, fantasy_team_name: "My Team", record: "0-0-0", projected_total: 111.2, win_probability: 54, roster: [] },
+      opponent_team: { fantasy_team_id: 11, fantasy_team_name: "My Opponent", record: "0-0-0", projected_total: 106.4, win_probability: 46, roster: [] },
+    },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  useLeagueScoreboard: () => ({
+    data: {
+      data: [
+        { matchup_id: 1, week: 1, status: "projected", home_team_name: "My Team", away_team_name: "My Opponent", home_score: 111.2, away_score: 106.4 },
+        { matchup_id: 2, week: 1, status: "projected", home_team_name: "League Mate One", away_team_name: "League Mate Two", home_score: 103.1, away_score: 100.8 },
+      ],
+    },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
 
 import {
+  default as LeagueMatchup,
   formatMatchupPoints,
   formatMatchupStatus,
   matchupStatusVariant,
@@ -38,5 +84,21 @@ describe("league matchup helpers", () => {
     expect(shouldShowMatchupScorePanels("live")).toBe(true);
     expect(shouldShowMatchupScorePanels("final")).toBe(true);
     expect(shouldShowMatchupScorePanels("stat_corrected")).toBe(true);
+  });
+});
+
+describe("league matchup scoreboard", () => {
+  it("reveals every other scheduled league matchup without duplicating the viewer's game", () => {
+    render(createElement(LeagueMatchup));
+
+    expect(screen.getByRole("button", { name: "View league matchups" })).toBeTruthy();
+    expect(screen.queryByText("League Mate One")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "View league matchups" }));
+
+    expect(screen.getByRole("heading", { name: "Other Week 1 Matchups" })).toBeTruthy();
+    expect(screen.getByText("League Mate One")).toBeTruthy();
+    expect(screen.getByText("League Mate Two")).toBeTruthy();
+    expect(screen.queryByText("No other matchups this week")).toBeNull();
   });
 });

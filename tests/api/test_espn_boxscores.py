@@ -114,8 +114,8 @@ def test_extract_player_box_score_stats_from_espn_summary():
     assert by_name["Ryan Wingo"]["fumbles_lost"] == 1.0
 
     assert by_name["Bert Auburn"]["xp_made"] == 3.0
-    assert by_name["Bert Auburn"]["fg_made_0_39"] == 1
-    assert by_name["Bert Auburn"]["fg_made_40_49"] == 1
+    assert by_name["Bert Auburn"]["fg_made_31_40"] == 1
+    assert by_name["Bert Auburn"]["fg_made_41_50"] == 1
 
 
 def test_espn_box_score_stats_score_with_league_rules():

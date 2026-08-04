@@ -37,6 +37,11 @@ type HistoricalStatTableRow = {
   label: string;
   value: number | string | null;
 };
+type ProjectionTrajectoryPoint = {
+  week: number;
+  points: number;
+  source: "preseason" | "current" | "published" | "bye";
+};
 
 const tabConfig: Array<{ id: PlayerCardTab; label: string; icon: typeof Info }> = [
   { id: "summary", label: "Summary", icon: Info },
@@ -276,6 +281,30 @@ export const resolvePlayerCardProjectionStats = (
   );
 };
 
+/**
+ * The headline projection is the number a manager acts on.  Preserve that
+ * number at Week 0 in the visual trajectory even if an older cached response
+ * still carries the seasonal-average preseason baseline.
+ */
+export const synchronizeProjectionTrajectoryToCardHeader = (
+  points: ProjectionTrajectoryPoint[],
+  headlineProjection?: number | null,
+): ProjectionTrajectoryPoint[] => {
+  if (typeof headlineProjection !== "number" || !Number.isFinite(headlineProjection)) {
+    return points;
+  }
+
+  const hasWeekZero = points.some((point) => point.week === 0);
+  const synchronized = points.map((point) =>
+    point.week === 0
+      ? { ...point, points: headlineProjection, source: "current" as const }
+      : point,
+  );
+  return hasWeekZero
+    ? synchronized
+    : [{ week: 0, points: headlineProjection, source: "current" }, ...synchronized];
+};
+
 export const buildHistoricalStatsTableRows = (season: HistoricalSeason | null): HistoricalStatTableRow[] =>
   season?.categories.flatMap((category) =>
     category.stats.map((stat) => ({
@@ -284,6 +313,12 @@ export const buildHistoricalStatsTableRows = (season: HistoricalSeason | null): 
       value: stat.value,
     }))
   ) ?? [];
+
+export const buildHistoricalSeasonSummaryColumns = (seasons: HistoricalSeason[]): string[] =>
+  Array.from(new Set(seasons.flatMap((season) => season.summary.map((stat) => stat.label))));
+
+export const historicalSeasonSummaryValue = (season: HistoricalSeason, label: string) =>
+  season.summary.find((stat) => stat.label === label)?.value ?? null;
 
 export const visiblePlayerCardAboutMessage = (message?: string | null) => {
   const trimmed = message?.trim();
@@ -305,7 +340,6 @@ export function PlayerCardModal({
   error = false,
   loading = false,
   leagueId,
-  note,
   onClose,
   onRetry,
   player,
@@ -317,14 +351,12 @@ export function PlayerCardModal({
   error?: boolean;
   loading?: boolean;
   leagueId?: number | null;
-  note?: string | null;
   onClose: () => void;
   onRetry?: () => void;
   player: PlayerCardModalPlayer;
   title?: string;
 }) {
   const [activeTab, setActiveTab] = useState<PlayerCardTab>("summary");
-  const [selectedHistoricalSeason, setSelectedHistoricalSeason] = useState<number | null>(null);
   const hasLeagueContext = typeof leagueId === "number" && Number.isFinite(leagueId) && leagueId > 0;
   const position = (card?.about.position ?? player.position ?? "").toUpperCase();
   const playerStatus = resolvePlayerCardStatus(card, player.status);
@@ -340,12 +372,16 @@ export function PlayerCardModal({
   const palette = getPlayerCardPalette(position);
   const historicalStats = card?.historical_stats;
   const historicalSeasons = historicalStats?.seasons ?? [];
-  const activeHistoricalSeason: HistoricalSeason | null =
-    historicalSeasons.find((row) => row.season === selectedHistoricalSeason) ??
-    historicalSeasons[0] ??
-    null;
+  const historicalSummaryColumns = buildHistoricalSeasonSummaryColumns(historicalSeasons);
   const projectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
-  const cfb27Rating = resolvePlayerCardCfb27Rating(card, player.cfb27Overall);
+  const displayedProjectionTrajectory = useMemo(
+    () => synchronizeProjectionTrajectoryToCardHeader(
+      trajectoryQuery.data?.projection ?? [],
+      player.projectedPoints,
+    ),
+    [player.projectedPoints, trajectoryQuery.data?.projection],
+  );
+  const currentValueRating = valueQuery.data?.current?.value ?? null;
   const aboutMessage = visiblePlayerCardAboutMessage(card?.about.message);
   const cardActions = [...(action ? [action] : []), ...actions];
   const projectionHighlights = [
@@ -371,17 +407,9 @@ export function PlayerCardModal({
         .map((row) => [row.label, statValue(projectionStats, row.projectionKeys)] as const)
     .filter(([, value]) => value !== null)
     : [];
-  const historicalTableRows = buildHistoricalStatsTableRows(activeHistoricalSeason);
   useEffect(() => {
     setActiveTab("summary");
-    setSelectedHistoricalSeason(null);
   }, [player.id]);
-
-  useEffect(() => {
-    if (!selectedHistoricalSeason && historicalStats?.selected_season) {
-      setSelectedHistoricalSeason(historicalStats.selected_season);
-    }
-  }, [historicalStats?.selected_season, selectedHistoricalSeason]);
 
   return (
     <div
@@ -400,7 +428,7 @@ export function PlayerCardModal({
       >
         <PlayerCardHeader
           card={card}
-          cfb27Rating={cfb27Rating}
+          currentValue={currentValueRating}
           onClose={onClose}
           palette={palette}
           player={player}
@@ -474,11 +502,6 @@ export function PlayerCardModal({
                     {aboutMessage}
                   </p>
                 ) : null}
-                {note ? (
-                  <p className="mt-4 rounded-2xl border border-cyan-300/15 bg-cyan-300/10 p-3 text-xs font-bold leading-5 text-cyan-100">
-                    {note}
-                  </p>
-                ) : null}
                 {cardActions.length ? (
                   <div className="mt-4 grid gap-2 sm:grid-cols-2">
                     {cardActions.map((cardAction) => (
@@ -503,91 +526,42 @@ export function PlayerCardModal({
                     Historical Season Stats
                   </p>
                   <p className="mt-2 text-sm font-bold leading-6 text-white/55">
-                    Verified historical season totals are matched to the player’s canonical identity and imported into a clean season table.
+                    Verified season totals, with one row for each year this player has recorded stats.
                   </p>
                 </div>
-                {historicalSeasons.length > 1 ? (
-                  <label className="flex shrink-0 flex-col gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
-                    Season
-                    <select
-                      value={activeHistoricalSeason?.season ?? ""}
-                      onChange={(event) => setSelectedHistoricalSeason(Number(event.target.value))}
-                      className="rounded-2xl border border-white/15 bg-black/35 px-4 py-3 text-xs font-black text-white outline-none transition focus:border-cyan-200/55"
-                    >
-                      {historicalSeasons.map((row) => (
-                        <option key={row.season} value={row.season}>
-                          {row.season}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ) : null}
+                <p className="w-fit rounded-full border border-white/15 bg-white/[0.05] px-3 py-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/55">
+                  {position || "Player"}
+                </p>
               </div>
 
-              {activeHistoricalSeason ? (
-                <div className="mt-5 space-y-4">
-                  <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-2xl font-black italic text-white">
-                          {activeHistoricalSeason.season} {activeHistoricalSeason.team_name ?? card?.about.team ?? player.school}
-                        </p>
-                        <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/45">
-                          {[activeHistoricalSeason.position ?? position, activeHistoricalSeason.season_type]
-                            .filter(Boolean)
-                            .join(" • ")}
-                        </p>
-                      </div>
-                      <p className="rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/55">
-                        Verified import
-                      </p>
-                    </div>
-                    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      {activeHistoricalSeason.summary.slice(0, 8).map((item) => (
-                        <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.045] p-3">
-                          <p className="text-[8px] font-black uppercase tracking-[0.14em] text-white/40">{item.label}</p>
-                          <p className="mt-1 text-xl font-black tabular-nums text-white">
-                            {formatPlayerCardValue(item.value)}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/20">
-                    <table className="w-full border-collapse text-left">
-                      <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
-                        <tr>
-                          <th className="px-4 py-3">Category</th>
-                          <th className="px-4 py-3">Stat</th>
-                          <th className="px-4 py-3 text-right">Value</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/10">
-                        {historicalTableRows.map((item) => (
-                          <tr key={`${item.category}-${item.label}`} className="text-sm font-bold text-white/75">
-                            <td className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
-                              {item.category}
-                            </td>
-                            <td className="px-4 py-3">{item.label}</td>
-                            <td className="px-4 py-3 text-right font-black tabular-nums text-white">
-                              {formatPlayerCardValue(item.value)}
-                            </td>
-                          </tr>
+              {historicalSeasons.length ? (
+                <div className="mt-5 overflow-x-auto rounded-3xl border border-white/10 bg-black/20">
+                  <table className="min-w-max w-full border-collapse text-left">
+                    <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
+                      <tr>
+                        <th className="px-4 py-4">Year</th>
+                        <th className="min-w-36 px-4 py-4">Team</th>
+                        <th className="px-4 py-4">Pos</th>
+                        {historicalSummaryColumns.map((label) => (
+                          <th key={label} className="whitespace-nowrap px-4 py-4 text-right">{label}</th>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <p className="rounded-2xl border border-white/10 bg-white/[0.035] p-3 text-xs font-bold leading-5 text-white/45">
-                    Imported{" "}
-                    {activeHistoricalSeason.freshness.imported_at
-                      ? new Date(activeHistoricalSeason.freshness.imported_at).toLocaleString()
-                      : "time unknown"}
-                    {activeHistoricalSeason.freshness.parser_version
-                      ? ` • Parser ${activeHistoricalSeason.freshness.parser_version}`
-                      : ""}
-                  </p>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {historicalSeasons.map((season) => (
+                        <tr key={`${season.season}-${season.team_name ?? "team"}-${season.season_type}`} className="text-sm font-bold text-white/75 transition hover:bg-white/[0.035]">
+                          <td className="px-4 py-5 text-xl font-black tabular-nums text-white">{season.season}</td>
+                          <td className="px-4 py-5"><p className="font-black text-white">{season.team_name ?? card?.about.team ?? player.school}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.14em] text-white/45">{season.season_type}</p></td>
+                          <td className="px-4 py-5"><span className="rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-white/70">{season.position ?? position ?? "—"}</span></td>
+                          {historicalSummaryColumns.map((label) => (
+                            <td key={label} className="px-4 py-5 text-right font-black tabular-nums text-white">
+                              {formatPlayerCardValue(historicalSeasonSummaryValue(season, label))}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               ) : (
                 <p className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
@@ -731,7 +705,7 @@ export function PlayerCardModal({
                 ) : trajectoryQuery.data ? (
                   <PlayerTrajectoryChart
                     ariaLabel={`${player.name} projected fantasy points by week`}
-                    points={trajectoryQuery.data.projection.map((point) => ({ ...point, value: point.points }))}
+                    points={displayedProjectionTrajectory.map((point) => ({ ...point, value: point.points }))}
                     yLabel="Points"
                     yMax={30}
                     valueFormatter={(value) => `${value.toFixed(1)} pts`}
@@ -830,18 +804,18 @@ export function PlayerCardModal({
               : valueQuery.data?.current ? (() => {
                 const value = valueQuery.data.current;
                 const change = value.weekly_change;
-                const meterSource = cfb27Rating ?? value.value;
+                const meterSource = value.value;
                 const meterValue = normalizeTradeValueMeter(meterSource);
                 const meterDegrees = tradeValueMeterDegrees(meterSource);
                 const meterColor = meterValue >= 90 ? "#5ee7ff" : meterValue >= 80 ? "#5eead4" : meterValue >= 70 ? "#93c5fd" : "#fdba74";
                 return (
                   <div className="mt-5">
                     <div className="grid gap-5 md:grid-cols-[220px_1fr]">
-                      <div className="flex aspect-square w-full max-w-[220px] items-center justify-center rounded-full p-3" style={{ background: `conic-gradient(from -90deg, ${meterColor} 0deg ${meterDegrees}deg, rgba(148, 163, 184, 0.22) ${meterDegrees}deg 360deg)` }} aria-label={`CFB 27 rating ${meterValue.toFixed(0)} out of 99`}>
+                      <div className="flex aspect-square w-full max-w-[220px] items-center justify-center rounded-full p-3" style={{ background: `conic-gradient(from -90deg, ${meterColor} 0deg ${meterDegrees}deg, rgba(148, 163, 184, 0.22) ${meterDegrees}deg 360deg)` }} aria-label={`Current value rating ${meterValue.toFixed(0)} out of 99`}>
                         <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-slate-950 text-center">
                           <p className="text-5xl font-black tabular-nums text-white">{meterValue.toFixed(0)}</p>
                           <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">out of 99</p>
-                          <p className="mt-3 text-xs font-black uppercase tracking-[0.15em] text-cyan-200">CFB 27 Rating</p>
+                          <p className="mt-3 text-xs font-black uppercase tracking-[0.15em] text-cyan-200">Current Value Rating</p>
                         </div>
                       </div>
                       <div className="grid content-center gap-3 sm:grid-cols-3">

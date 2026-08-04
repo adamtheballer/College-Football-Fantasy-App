@@ -23,7 +23,8 @@ from collegefootballfantasy_api.app.schemas.player_trajectory import (
     PlayerTrajectoryRead,
     PlayerValueTrajectoryPointRead,
 )
-from collegefootballfantasy_api.app.services.player_trade_value import MAX_TRADE_VALUE, VALUE_POLICY_VERSION
+from collegefootballfantasy_api.app.services.player_trade_value import MAX_TRADE_VALUE, VALUE_POLICY_VERSION, preseason_rating_value
+from collegefootballfantasy_api.app.services.league_weeks import resolve_current_week
 
 WEEKS = tuple(range(1, 14))
 DISPLAY_WEEKS = tuple(range(0, 14))
@@ -35,6 +36,13 @@ def _clamp(value: float, low: float, high: float) -> float:
 
 
 def _projection_stats(row: WeeklyProjection) -> dict[str, float]:
+    # Published projection sources provide 0--39, 40--49, and 50+ volume,
+    # rather than exact made-kick distances.  Split that expected volume into
+    # the fixed league scoring tiers so a league's field-goal settings still
+    # apply to projections; live ESPN box scores use exact distances.
+    short_field_goals = float(row.field_goals_made_0_to_39 or row.field_goals_made_0_to_49 or 0.0)
+    medium_field_goals = float(row.field_goals_made_40_to_49 or 0.0)
+    long_field_goals = float(row.field_goals_made_50_plus or 0.0)
     return {
         "pass_yards": float(row.pass_yards or 0.0),
         "pass_tds": float(row.pass_tds or 0.0),
@@ -44,9 +52,11 @@ def _projection_stats(row: WeeklyProjection) -> dict[str, float]:
         "receptions": float(row.receptions or 0.0),
         "rec_yards": float(row.rec_yards or 0.0),
         "rec_tds": float(row.rec_tds or 0.0),
-        "fg_made_0_39": float(row.field_goals_made_0_to_39 or row.field_goals_made_0_to_49 or 0.0),
-        "fg_made_40_49": float(row.field_goals_made_40_to_49 or 0.0),
-        "fg_made_50_plus": float(row.field_goals_made_50_plus or 0.0),
+        "fg_made_0_30": short_field_goals * 0.75,
+        "fg_made_31_40": short_field_goals * 0.25,
+        "fg_made_41_50": medium_field_goals,
+        "fg_made_51_60": long_field_goals,
+        "fg_made_61_plus": 0.0,
         "xp_made": float(row.extra_points_made or 0.0),
     }
 
@@ -125,6 +135,9 @@ def build_player_trajectory(
     player = db.get(Player, player_id)
     if player is None:
         raise ValueError("player not found")
+    league = db.get(League, league_id) if league_id is not None else None
+    if league_id is not None and league is None:
+        raise ValueError("league not found")
     scoring_rules = _league_scoring_rules(db, league_id)
     schedules = db.query(TeamSchedule).filter(TeamSchedule.team_name == player.school, TeamSchedule.season == season, TeamSchedule.week.in_(WEEKS)).all()
     schedule_by_week = {row.week: row for row in schedules}
@@ -142,12 +155,32 @@ def build_player_trajectory(
     scheduled_games = sum(1 for week in WEEKS if not (schedule_by_week.get(week) and (schedule_by_week[week].is_bye or schedule_by_week[week].location == "bye")))
     known_points = [_points_for_projection(player, row, scoring_rules) for row in published_by_week.values()]
     season_projection = _season_projection(db, player)
-    base_points = season_projection / max(scheduled_games, 1) if season_projection > 0 else (sum(known_points) / len(known_points) if known_points else 0.0)
+    seasonal_baseline = season_projection / max(scheduled_games, 1) if season_projection > 0 else (sum(known_points) / len(known_points) if known_points else 0.0)
+
+    # The player-card headline is the active league week's published fantasy
+    # projection. Week 0 must display that identical source when a league
+    # context exists; dividing a season total by scheduled games here created
+    # a second, contradictory number in the same player card.
+    current_projection = None
+    if league is not None:
+        current_projection = db.scalar(
+            current_published_projections_query(
+                season=season,
+                week=resolve_current_week(db, league),
+                player_ids=(player.id,),
+            )
+        )
+    base_points = (
+        max(0.0, float(current_projection.fantasy_points or 0.0))
+        if current_projection is not None
+        else seasonal_baseline
+    )
+    baseline_source = "current" if current_projection is not None else "preseason"
 
     # Week 0 is the one preseason point. Future weekly projections are kept out
     # of the response until that week's real game window has opened.
     projection: list[PlayerProjectionTrajectoryPointRead] = [
-        PlayerProjectionTrajectoryPointRead(week=0, points=round(base_points, 1), source="preseason")
+        PlayerProjectionTrajectoryPointRead(week=0, points=round(base_points, 1), source=baseline_source)
     ]
     today = date.today()
     for week in WEEKS:
@@ -166,10 +199,11 @@ def build_player_trajectory(
         .all()
     }
     preseason_value = published_values.get(0)
+    authoritative_preseason_value = preseason_rating_value(player)
     value: list[PlayerValueTrajectoryPointRead] = [
         PlayerValueTrajectoryPointRead(
             week=0,
-            value=round(_clamp(float(preseason_value.value) if preseason_value else _estimated_value(db, player, season_projection), 0.0, MAX_TRADE_VALUE), 1),
+            value=round(_clamp(authoritative_preseason_value if authoritative_preseason_value is not None else (float(preseason_value.value) if preseason_value else _estimated_value(db, player, season_projection)), 0.0, MAX_TRADE_VALUE), 1),
             source="preseason",
         )
     ]

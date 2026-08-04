@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Clock, ShieldAlert, Trophy } from "lucide-react";
+import { ChevronDown, ChevronUp, Clock, ShieldAlert, Trophy } from "lucide-react";
 import { Navigate, useParams } from "react-router-dom";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
@@ -8,7 +8,8 @@ import { WeekSelector } from "@/components/league/WeekSelector";
 import { WinChanceMeter } from "@/components/league/WinChanceMeter";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { StatusBadge, SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
-import { useLeagueDetail, useLeagueMatchupTab } from "@/hooks/use-leagues";
+import { Button } from "@/components/ui/button";
+import { useLeagueDetail, useLeagueMatchupTab, useLeagueScoreboard } from "@/hooks/use-leagues";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import type { LeagueMatchupTabResponse, LeagueMatchupTeam } from "@/types/league";
 
@@ -105,6 +106,7 @@ export default function LeagueMatchup() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(1);
+  const [showLeagueMatchups, setShowLeagueMatchups] = useState(false);
   const leagueQuery = useLeagueDetail(parsedLeagueId);
   const postDraft = isLeaguePostDraft({
     draftStatus: leagueQuery.data?.draft?.status,
@@ -119,6 +121,14 @@ export default function LeagueMatchup() {
   const statusLabel = formatMatchupStatus(data?.status);
   const statusVariant = matchupStatusVariant(data?.status);
   const shouldShowScorePanels = shouldShowMatchupScorePanels(data?.status);
+  const scoreboardQuery = useLeagueScoreboard(
+    parsedLeagueId,
+    displayWeek,
+    postDraft && showLeagueMatchups,
+  );
+  const otherMatchups = (scoreboardQuery.data?.data ?? []).filter(
+    (matchup) => matchup.matchup_id !== data?.matchup_id,
+  );
 
   if (leagueQuery.isLoading) {
     return (
@@ -240,6 +250,64 @@ export default function LeagueMatchup() {
               <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 p-4 text-sm font-medium text-cfb-text-secondary">
                 {data.message}
               </div>
+            ) : null}
+          </SurfaceCard>
+
+          <SurfaceCard variant="default" padding="default" className="space-y-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="cfb-micro-label text-cfb-brand">League Scoreboard</p>
+                <h2 className="mt-2 text-2xl font-black text-cfb-text-primary">Other Week {displayWeek} Matchups</h2>
+                <p className="mt-1 text-sm font-medium text-cfb-text-secondary">See the rest of the league&apos;s head-to-head games for this week.</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowLeagueMatchups((visible) => !visible)}
+                aria-expanded={showLeagueMatchups}
+              >
+                {showLeagueMatchups ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
+                {showLeagueMatchups ? "Hide league matchups" : "View league matchups"}
+              </Button>
+            </div>
+
+            {showLeagueMatchups ? (
+              scoreboardQuery.isLoading ? <SkeletonState rows={3} /> : scoreboardQuery.isError ? (
+                <ErrorState
+                  title="Unable to load league matchups"
+                  message="The league scoreboard could not be loaded for this week."
+                  retryLabel="Try Again"
+                  onRetry={() => void scoreboardQuery.refetch()}
+                />
+              ) : otherMatchups.length ? (
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {otherMatchups.map((matchup) => {
+                    const showScores = shouldShowMatchupScorePanels(matchup.status);
+                    return (
+                      <div key={matchup.matchup_id} className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface/70 p-4 transition hover:border-cfb-brand/40 hover:bg-cfb-surface-raised/80">
+                        <div className="flex items-center justify-between gap-3">
+                          <StatusBadge variant={matchupStatusVariant(matchup.status)}>{formatMatchupStatus(matchup.status)}</StatusBadge>
+                          <span className="cfb-micro-label text-cfb-text-muted">Week {matchup.week}</span>
+                        </div>
+                        <div className="mt-4 flex items-center justify-between gap-4 text-center">
+                          <p className="min-w-0 flex-1 truncate text-base font-black text-cfb-text-primary">{matchup.home_team_name}</p>
+                          <div className="shrink-0 rounded-xl border border-cfb-border-subtle bg-cfb-surface px-3 py-2 text-sm font-black text-cfb-text-primary">
+                            {showScores ? `${formatMatchupPoints(matchup.home_score)} – ${formatMatchupPoints(matchup.away_score)}` : "VS"}
+                          </div>
+                          <p className="min-w-0 flex-1 truncate text-base font-black text-cfb-text-primary">{matchup.away_team_name}</p>
+                        </div>
+                        {!showScores ? <p className="mt-3 text-center text-xs font-semibold text-cfb-text-secondary">Scores will appear when this matchup goes live.</p> : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No other matchups this week"
+                  description={`This league does not have another scheduled head-to-head pairing for Week ${displayWeek}.`}
+                  icon={<Trophy className="h-5 w-5" aria-hidden="true" />}
+                />
+              )
             ) : null}
           </SurfaceCard>
 

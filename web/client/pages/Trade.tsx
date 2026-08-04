@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRightLeft, ChevronRight, Search, ShieldAlert, Users } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Check, ChevronRight, Search, ShieldAlert, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -253,26 +253,43 @@ const toTradeRosterSlots = (slots: Record<string, number> | undefined): Record<s
 const TradeList = ({
   title,
   subtitle,
+  direction,
   rows,
   selectedIds,
   onToggle,
 }: {
   title: string;
   subtitle: string;
+  direction: "give" | "receive";
   rows: TradeRow[];
   selectedIds: Set<number>;
   onToggle: (playerId: number) => void;
 }) => {
+  const isGiving = direction === "give";
+  const selectionClasses = isGiving
+    ? "border-rose-300/40 bg-rose-500/10 shadow-[0_12px_35px_rgba(244,63,94,0.08)]"
+    : "border-emerald-300/40 bg-emerald-500/10 shadow-[0_12px_35px_rgba(16,185,129,0.08)]";
+  const accentClasses = isGiving
+    ? "border-rose-300/25 bg-rose-500/10 text-rose-100"
+    : "border-emerald-300/25 bg-emerald-500/10 text-emerald-100";
+
   if (!rows.length) {
     return (
-      <Card className="rounded-[2rem] border border-white/10 bg-card/40">
-        <CardHeader>
-          <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">
-            {title}
-          </CardTitle>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
-            {subtitle}
-          </p>
+      <Card className="overflow-hidden rounded-[2rem] border border-white/10 bg-card/40">
+        <CardHeader className="border-b border-white/10 bg-white/[0.02]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] text-foreground">
+                {title}
+              </CardTitle>
+              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
+                {subtitle}
+              </p>
+            </div>
+            <span className={cn("rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em]", accentClasses)}>
+              {isGiving ? "You send" : "You receive"}
+            </span>
+          </div>
         </CardHeader>
         <CardContent className="pb-8">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
@@ -284,16 +301,23 @@ const TradeList = ({
   }
 
   return (
-    <Card className="rounded-[2rem] border border-white/10 bg-card/40">
-      <CardHeader>
-        <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">
-          {title}
-        </CardTitle>
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
-          {subtitle}
-        </p>
+    <Card className="overflow-hidden rounded-[2rem] border border-white/10 bg-card/40">
+      <CardHeader className="border-b border-white/10 bg-white/[0.02]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] text-foreground">
+              {title}
+            </CardTitle>
+            <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
+              {subtitle}
+            </p>
+          </div>
+          <span className={cn("rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em]", accentClasses)}>
+            {selectedIds.size} chosen
+          </span>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 p-4">
         {rows.map((row) => {
           const selected = selectedIds.has(row.playerId);
           return (
@@ -301,11 +325,12 @@ const TradeList = ({
               key={row.rosterEntryId}
               type="button"
               onClick={() => onToggle(row.playerId)}
+              aria-pressed={selected}
               className={cn(
-                "w-full rounded-2xl border px-4 py-3 text-left transition-all",
+                "group w-full rounded-2xl border px-4 py-3 text-left transition-all duration-200",
                 selected
-                  ? "border-primary/40 bg-primary/10"
-                  : "border-white/10 bg-white/[0.03] hover:border-white/20"
+                  ? selectionClasses
+                  : "border-white/10 bg-white/[0.03] hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.055]"
               )}
             >
               <div className="flex items-center justify-between gap-4">
@@ -317,14 +342,21 @@ const TradeList = ({
                     {row.school} • {row.slot}
                   </p>
                 </div>
-                <span
-                  className={cn(
-                    "rounded-xl border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]",
-                    POS_STYLES[row.position] ?? POS_STYLES.QB
-                  )}
-                >
-                  {row.position}
-                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  {selected ? (
+                    <span className={cn("grid h-7 w-7 place-items-center rounded-full border", accentClasses)}>
+                      <Check className="h-3.5 w-3.5" />
+                    </span>
+                  ) : null}
+                  <span
+                    className={cn(
+                      "rounded-xl border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]",
+                      POS_STYLES[row.position] ?? POS_STYLES.QB
+                    )}
+                  >
+                    {row.position}
+                  </span>
+                </div>
               </div>
             </button>
           );
@@ -694,33 +726,50 @@ export default function Trade() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-16 pt-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-2">
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">
-            Trade Analyzer
-          </p>
-          <h1 className="text-6xl font-black italic uppercase tracking-tight text-foreground">
-            Trade Builder
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {counteringOfferId
-              ? `Countering trade #${counteringOfferId}. Update either side, then run a fresh analysis.`
-              : "Select players from both rosters and compare trade value."}
-          </p>
+      <div className="relative overflow-hidden rounded-[2.25rem] border border-sky-300/20 bg-[radial-gradient(circle_at_88%_8%,rgba(56,189,248,0.18),transparent_30%),radial-gradient(circle_at_10%_100%,rgba(168,85,247,0.15),transparent_34%),rgba(9,20,37,0.9)] px-6 py-7 shadow-[0_24px_75px_rgba(14,116,144,0.16)] sm:px-8">
+        <div className="absolute right-6 top-5 hidden h-28 w-28 rounded-full border border-sky-200/10 bg-sky-300/[0.035] sm:block" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="rounded-full border border-sky-200/25 bg-sky-300/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-sky-100">
+                Trade desk
+              </span>
+              <span className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">
+                Build · Analyze · Send
+              </span>
+            </div>
+            <h1 className="text-5xl font-black italic uppercase tracking-tight text-foreground sm:text-6xl">
+              Trade Builder
+            </h1>
+            <p className="max-w-xl text-sm font-semibold leading-6 text-slate-300/85">
+              {counteringOfferId
+                ? `Countering trade #${counteringOfferId}. Update either side, then run a fresh analysis.`
+                : "Build a clear offer, compare the current projection edge, and send only after a fresh review."}
+            </p>
+          </div>
+          <Button
+            asChild
+            variant="outline"
+            className="h-11 shrink-0 rounded-2xl border-white/15 bg-white/[0.045] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10"
+          >
+            <Link to={`/league/${leagueId}`}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to League
+            </Link>
+          </Button>
         </div>
-        <Button
-          asChild
-          variant="outline"
-          className="h-11 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
-        >
-          <Link to={`/league/${leagueId}`}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to League
-          </Link>
-        </Button>
       </div>
 
-      <Card className="rounded-[2rem] border border-white/10 bg-card/40">
+      <Card className="overflow-visible rounded-[2rem] border border-white/10 bg-card/40">
+        <CardHeader className="border-b border-white/10 bg-white/[0.02]">
+          <CardTitle className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-foreground">
+            <span className="grid h-7 w-7 place-items-center rounded-full border border-sky-300/30 bg-sky-300/10 text-[10px] text-sky-100">1</span>
+            Choose the matchup
+          </CardTitle>
+          <p className="pt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
+            Pick a manager, then add assets from each roster.
+          </p>
+        </CardHeader>
         <CardContent className="grid gap-4 p-6 md:grid-cols-2">
           <div className="space-y-2">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
@@ -794,17 +843,24 @@ export default function Trade() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_4.5rem_minmax(0,1fr)] xl:items-stretch">
         <TradeList
           title="Players You Give"
           subtitle={myRosterLoading ? "Loading roster..." : "Select one or more players"}
+          direction="give"
           rows={resolvedMyRows}
           selectedIds={giveSet}
           onToggle={toggleGive}
         />
+        <div className="hidden xl:flex xl:items-center xl:justify-center">
+          <div className="grid h-14 w-14 place-items-center rounded-full border border-sky-300/25 bg-sky-300/10 text-sky-100 shadow-[0_12px_35px_rgba(56,189,248,0.15)]">
+            <ArrowRightLeft className="h-5 w-5" />
+          </div>
+        </div>
         <TradeList
           title={`Players You Receive${opponentTeam ? ` (${opponentTeam.name})` : ""}`}
           subtitle={theirRosterLoading ? "Loading roster..." : "Select one or more players"}
+          direction="receive"
           rows={theirRows}
           selectedIds={receiveSet}
           onToggle={toggleReceive}
@@ -820,14 +876,19 @@ export default function Trade() {
         </Card>
       )}
 
-      <Card className="rounded-[2rem] border border-white/10 bg-card/40">
-        <CardHeader className="flex flex-row items-center justify-between border-b border-white/10">
-          <CardTitle className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-primary">
-            <ArrowRightLeft className="h-4 w-4" />
-            Trade Analysis
-          </CardTitle>
+      <Card className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(14,31,54,0.92),rgba(8,18,35,0.92))] shadow-[0_22px_70px_rgba(8,47,73,0.14)]">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-white/10 bg-white/[0.02]">
+          <div>
+            <CardTitle className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-foreground">
+              <span className="grid h-7 w-7 place-items-center rounded-full border border-sky-300/30 bg-sky-300/10 text-sky-100">2</span>
+              Trade snapshot
+            </CardTitle>
+            <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
+              Projection context before you send
+            </p>
+          </div>
           <Button
-            className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
+            className="h-10 rounded-xl bg-gradient-to-r from-sky-300 to-blue-500 px-4 text-[10px] font-black uppercase tracking-[0.18em] text-slate-950 shadow-[0_10px_30px_rgba(59,130,246,0.25)] hover:from-sky-200 hover:to-blue-400"
             disabled={isAnalyzing || !giveIds.length || !receiveIds.length || !league || !workspace}
             onClick={() => (analysisIsCurrent ? setIsAnalysisReviewOpen(true) : handleAnalyze())}
           >
@@ -836,46 +897,45 @@ export default function Trade() {
           </Button>
         </CardHeader>
         <CardContent className="space-y-6 p-6">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                Giving
-              </p>
-              <p className="mt-2 text-2xl font-black italic text-foreground">
+          <div className="grid gap-4 lg:grid-cols-[1fr_auto_1fr] lg:items-stretch">
+            <div className="rounded-2xl border border-rose-300/20 bg-rose-500/[0.075] p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-100">You send</p>
+              <p className="mt-3 text-4xl font-black italic tabular-nums text-foreground">
                 {liveGiveValue.toFixed(1)}
               </p>
-              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
-                {giveIds.length} selected
+              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-rose-100/65">
+                {giveIds.length} asset{giveIds.length === 1 ? "" : "s"} selected
               </p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                Receiving
-              </p>
-              <p className="mt-2 text-2xl font-black italic text-foreground">
+            <div className="hidden lg:flex lg:items-center">
+              <div className="grid h-12 w-12 place-items-center rounded-full border border-sky-300/20 bg-sky-300/10 text-sky-100">
+                <ArrowRightLeft className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/[0.075] p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">You receive</p>
+              <p className="mt-3 text-4xl font-black italic tabular-nums text-foreground">
                 {liveReceiveValue.toFixed(1)}
               </p>
-              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
-                {receiveIds.length} selected
+              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/65">
+                {receiveIds.length} asset{receiveIds.length === 1 ? "" : "s"} selected
               </p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                Live Delta
-              </p>
-              <p
-                className={cn(
-                  "mt-2 text-2xl font-black italic",
-                  liveDelta > 0 ? "text-emerald-300" : liveDelta < 0 ? "text-red-300" : "text-foreground"
-                )}
-              >
-                {liveDelta >= 0 ? "+" : ""}
-                {liveDelta.toFixed(1)}
-              </p>
-              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
-                Projection-based
-              </p>
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Live projection edge</p>
+              <p className="mt-1 text-xs font-semibold text-muted-foreground">A quick comparison only — the formal review uses the trade analyzer.</p>
             </div>
+            <p
+              className={cn(
+                "text-3xl font-black italic tabular-nums",
+                liveDelta > 0 ? "text-emerald-300" : liveDelta < 0 ? "text-rose-300" : "text-foreground"
+              )}
+            >
+              {liveDelta >= 0 ? "+" : ""}{liveDelta.toFixed(1)}
+            </p>
           </div>
 
           {analysisError && (
@@ -885,13 +945,13 @@ export default function Trade() {
           )}
 
           {analysisIsCurrent ? (
-            <div className="rounded-xl border border-emerald-300/25 bg-emerald-500/10 p-5">
+            <div className="rounded-2xl border border-emerald-300/25 bg-emerald-500/10 p-5">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">
                 Analysis ready. Review the final trade before sending it.
               </p>
             </div>
           ) : (
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
                 Select players from both sides, then run analysis to see value differential.
               </p>

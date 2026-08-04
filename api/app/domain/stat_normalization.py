@@ -20,9 +20,11 @@ OFFENSE_ALIASES = {
 }
 
 KICKER_ALIASES = {
-    "fg_made_0_39": ["fg_made_0_39", "FieldGoalsMade0to39", "FieldGoalsMade0To39", "FgMade0To39"],
-    "fg_made_40_49": ["fg_made_40_49", "FieldGoalsMade40to49", "FieldGoalsMade40To49", "FgMade40To49"],
-    "fg_made_50_plus": ["fg_made_50_plus", "FieldGoalsMade50Plus", "FieldGoalsMade50", "FgMade50Plus"],
+    "fg_made_0_30": ["fg_made_0_30", "FieldGoalsMade0to30", "FieldGoalsMade0To30", "FgMade0To30"],
+    "fg_made_31_40": ["fg_made_31_40", "FieldGoalsMade31to40", "FieldGoalsMade31To40", "FgMade31To40"],
+    "fg_made_41_50": ["fg_made_41_50", "FieldGoalsMade41to50", "FieldGoalsMade41To50", "FgMade41To50"],
+    "fg_made_51_60": ["fg_made_51_60", "FieldGoalsMade51to60", "FieldGoalsMade51To60", "FgMade51To60"],
+    "fg_made_61_plus": ["fg_made_61_plus", "FieldGoalsMade61Plus", "FieldGoalsMade61", "FgMade61Plus"],
     "xp_made": ["xp_made", "ExtraPointsMade", "ExtraPoints", "XpMade"],
     "fg_missed": ["fg_missed", "FieldGoalsMissed", "FgMissed"],
 }

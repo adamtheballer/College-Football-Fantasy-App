@@ -13,6 +13,7 @@ from collegefootballfantasy_api.app.schemas.watchlist import (
     WatchlistRead,
     WatchlistUpdate,
 )
+from collegefootballfantasy_api.app.services.content_moderation import moderate_user_text
 
 router = APIRouter()
 
@@ -93,7 +94,18 @@ def create_watchlist_endpoint(
         get_league_or_404(db, payload.league_id)
         require_league_member(db, payload.league_id, current_user)
 
-    watchlist = Watchlist(user_id=current_user.id, league_id=payload.league_id, name=payload.name.strip())
+    watchlist = Watchlist(
+        user_id=current_user.id,
+        league_id=payload.league_id,
+        name=moderate_user_text(
+            db,
+            actor_user_id=current_user.id,
+            league_id=payload.league_id,
+            field_name="watchlist_name",
+            value=payload.name,
+            required=True,
+        ) or "",
+    )
     db.add(watchlist)
     db.commit()
     return _serialize_watchlist(db, watchlist.id)
@@ -107,7 +119,14 @@ def rename_watchlist_endpoint(
     current_user: User = Depends(get_current_user),
 ) -> WatchlistRead:
     watchlist = _owned_watchlist_or_404(db, watchlist_id, current_user)
-    watchlist.name = payload.name.strip()
+    watchlist.name = moderate_user_text(
+        db,
+        actor_user_id=current_user.id,
+        league_id=watchlist.league_id,
+        field_name="watchlist_name",
+        value=payload.name,
+        required=True,
+    ) or ""
     db.add(watchlist)
     db.commit()
     return _serialize_watchlist(db, watchlist.id)

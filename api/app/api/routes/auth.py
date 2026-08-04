@@ -53,6 +53,7 @@ from collegefootballfantasy_api.app.services.beta_access import (
     redeem_beta_access,
     release_beta_access_reservation,
 )
+from collegefootballfantasy_api.app.services.content_moderation import moderate_user_text
 from collegefootballfantasy_api.app.services.password_change import (
     PasswordChangeCredentialError,
     PasswordChangeValidationError,
@@ -199,6 +200,12 @@ def current_user_profile(current_user: User = Depends(get_current_user)) -> User
 
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 def signup(payload: UserCreate, response: Response, request: Request, db: Session = Depends(get_db)) -> AuthResponse:
+    payload.first_name = moderate_user_text(
+        db, actor_user_id=None, field_name="manager_name", value=payload.first_name, required=True
+    ) or ""
+    payload.username = moderate_user_text(
+        db, actor_user_id=None, field_name="manager_nickname", value=payload.username
+    )
     beta_access_code = None
     signup_email = payload.email
     if settings.beta_access_enabled:

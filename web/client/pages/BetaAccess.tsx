@@ -99,7 +99,7 @@ export default function BetaAccess() {
           <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-center">
             <p className="flex items-center justify-center gap-2 text-xs font-semibold text-slate-300"><LockKeyhole className="h-4 w-4 text-cyan-200" /> Your code is validated securely and never displayed again.</p>
             <p className="text-xs text-slate-400">Use the same email address where you received your code.</p>
-            <p className="text-xs text-slate-400">Already have an account?</p>
+            <p className="text-xs text-slate-400">Sign in if you already created your account and entered your code.</p>
             <Link to="/login" className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-cyan-200 hover:text-cyan-100">
               <ShieldCheck className="h-4 w-4" aria-hidden="true" /> Sign in
             </Link>

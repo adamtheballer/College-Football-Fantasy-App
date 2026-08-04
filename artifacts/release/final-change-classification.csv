@@ -1,0 +1,78 @@
+path,hunk_count,functional_area,classification,reason,test_coverage,proposed_commit_group,preservation_action
+api/alembic/env.py,1,migrations,BETA_READY,register release migrations,alembic-head,feat-moderation,commit
+api/app/api/routes/auth.py,2,auth-moderation,BETA_READY,moderate signup profile values,test_content_moderation,feat-moderation,commit
+api/app/api/routes/leagues.py,3,league-api,BETA_READY,draft order and reschedule endpoints,test_draft_room;test_leagues,fix-draft,commit
+api/app/api/routes/saturday_pick.py,2,pick6-moderation,BETA_READY,moderate pick6 user input,test_content_moderation,feat-moderation,commit
+api/app/api/routes/teams.py,2,team-moderation,BETA_READY,moderate team naming,test_content_moderation,feat-moderation,commit
+api/app/api/routes/waivers.py,4,waivers,BETA_READY,selected-week projection and moderated claims,test_waiver_processing,fix-waivers,commit
+api/app/api/routes/watchlists.py,3,watchlists-moderation,BETA_READY,moderate watchlist notes,test_content_moderation,feat-moderation,commit
+api/app/db/model_registry.py,1,moderation,BETA_READY,register moderation model,test_content_moderation,feat-moderation,commit
+api/app/domain/scoring_rules.py,5,scoring,BETA_READY,field-goal tiers through 61 plus,test_scoring_engine,fix-scoring,commit
+api/app/domain/stat_normalization.py,1,scoring,BETA_READY,normalize field-goal distance tiers,test_scoring_engine,fix-scoring,commit
+api/app/integrations/espn.py,2,injuries,BETA_READY,consistent provider injury status,test_espn_boxscores,fix-player-card,commit
+api/app/main.py,2,moderation,BETA_READY,mount moderation admin route,test_content_moderation,feat-moderation,commit
+api/app/models/draft.py,1,draft-order,BETA_READY,persist draft order mode,test_draft_room,fix-draft,commit
+api/app/models/team.py,1,draft-order,BETA_READY,persist per-team order position,test_draft_room,fix-draft,commit
+api/app/schemas/auth.py,3,auth,BETA_READY,password-save response and safe validation,test_auth_sessions,fix-navigation,commit
+api/app/schemas/league_flow.py,12,league-settings,BETA_READY,draft order reschedule waiver timezone scoring schemas,test_draft_room;test_leagues,fix-draft,commit
+api/app/schemas/mock_draft.py,1,mock-draft,BETA_READY,moderated mock draft schema,test_content_moderation,feat-moderation,commit
+api/app/schemas/player_trajectory.py,1,player-card,BETA_READY,allow current projection trajectory source,test_player_trajectory,fix-player-card,commit
+api/app/schemas/saturday_pick.py,2,pick6,BETA_READY,sponsor-safe pick contract,test_saturday_pick,feat-pick6,commit
+api/app/schemas/team.py,2,team-moderation,BETA_READY,team input validation,test_content_moderation,feat-moderation,commit
+api/app/schemas/watchlist.py,3,watchlists-moderation,BETA_READY,watchlist input validation,test_content_moderation,feat-moderation,commit
+api/app/services/chat_service.py,4,chat-moderation,BETA_READY,moderate user chat messages,test_content_moderation,feat-moderation,commit
+api/app/services/draft_service.py,4,draft-order,BETA_READY,materialize random order and enforce custom order,test_draft_room,fix-draft,commit
+api/app/services/league_flow.py,12,league-flow,BETA_READY,rescheduling scoring icon moderation,test_leagues;test_draft_room,fix-draft,commit
+api/app/services/league_workspace.py,3,league-ui-data,BETA_READY,league matchup and draft-order response,test_leagues,fix-core,commit
+api/app/services/mock_draft_service.py,2,mock-draft-moderation,BETA_READY,moderate mock draft input,test_content_moderation,feat-moderation,commit
+api/app/services/player_trade_value.py,6,player-card,BETA_READY,canonical current value and no conflicting baseline,test_player_trade_value,fix-player-card,commit
+api/app/services/player_trajectory.py,8,player-card,BETA_READY,projection graph shares current player metric,test_player_trajectory,fix-player-card,commit
+api/app/services/projections/engine.py,1,projections,BETA_READY,unavailable projection is not zero,test_waiver_processing,fix-waivers,commit
+api/app/services/trade_service.py,8,trades-moderation,BETA_READY,moderate trade user-generated text,test_content_moderation,feat-moderation,commit
+api/app/services/waiver_service.py,6,waivers,BETA_READY,league-specific waiver processing and projection ordering,test_waiver_processing,fix-waivers,commit
+tests/api/test_draft_room.py,12,draft-tests,TEST_ONLY,random order lifecycle regression coverage,pytest test_draft_room,test-release,commit
+tests/api/test_espn_boxscores.py,1,injury-tests,TEST_ONLY,injury consistency coverage,pytest test_espn_boxscores,test-release,commit
+tests/api/test_leagues.py,6,league-tests,TEST_ONLY,league settings and matchup coverage,pytest test_leagues,test-release,commit
+tests/api/test_player_trade_value.py,2,value-tests,TEST_ONLY,current value source coverage,pytest test_player_trade_value,test-release,commit
+tests/api/test_player_trajectory.py,2,trajectory-tests,TEST_ONLY,current projection graph coverage,pytest test_player_trajectory,test-release,commit
+tests/api/test_scoring_engine.py,2,scoring-tests,TEST_ONLY,field-goal tier coverage,pytest test_scoring_engine,test-release,commit
+tests/api/test_waiver_processing.py,6,waiver-tests,TEST_ONLY,league waiver time and sort coverage,pytest test_waiver_processing,test-release,commit
+tests/conftest.py,1,test-fixtures,TEST_ONLY,fixture support for current schemas,pytest targeted,test-release,commit
+tests/fixtures/scoring/k_week.json,5,scoring-fixture,TEST_ONLY,field-goal fixture data,pytest test_scoring_engine,test-release,commit
+web/client/components/DraftRoomVisuals.tsx,4,draft-ui,BETA_READY,simplified slightly blue matte visuals,vitest draft;typecheck,style-draft,commit
+web/client/components/player/PlayerCardHeader.tsx,5,player-card,BETA_READY,Current Value Rating only from dynamic value,PlayerCardModal spec;typecheck,fix-player-card,commit
+web/client/components/player/PlayerCardHeader.spec.tsx,1,player-card-tests,TEST_ONLY,header current-value label regression coverage,vitest PlayerCardHeader,test-release,commit
+web/client/components/player/PlayerCardModal.spec.ts,7,player-card-tests,TEST_ONLY,value and removed callout regression coverage,vitest PlayerCardModal,test-release,commit
+web/client/components/player/PlayerCardModal.tsx,21,player-card,BETA_READY,value tabs stats history and canonical metrics,vitest PlayerCardModal;typecheck,fix-player-card,commit
+web/client/components/player/PlayerTrajectoryChart.spec.tsx,2,trajectory-tests,TEST_ONLY,current projection graph coverage,vitest PlayerTrajectoryChart,test-release,commit
+web/client/components/player/PlayerTrajectoryChart.tsx,5,player-card,BETA_READY,current projection graph label/source,vitest PlayerTrajectoryChart;typecheck,fix-player-card,commit
+web/client/hooks/use-leagues.ts,3,league-ui-data,BETA_READY,draft-order and matchup query contracts,vitest DraftLobby;typecheck,fix-core,commit
+web/client/hooks/use-players.ts,1,player-card,BETA_READY,current trajectory source type,vitest PlayerTrajectoryChart;typecheck,fix-player-card,commit
+web/client/lib/scoringSettings.spec.ts,1,scoring-tests,TEST_ONLY,field-goal tier UI coverage,vitest scoringSettings,test-release,commit
+web/client/lib/scoringSettings.ts,2,scoring-ui,BETA_READY,field-goal tier descriptions,vitest scoringSettings;typecheck,fix-scoring,commit
+web/client/pages/BetaAccess.tsx,1,auth-ui,BETA_READY,clear sign-in versus access-code wording,vitest auth;typecheck,fix-navigation,commit
+web/client/pages/ComingSoon.tsx,3,coming-soon,BETA_READY,App Store coming-soon item,vitest;typecheck,fix-navigation,commit
+web/client/pages/CreateLeague.tsx,4,league-create,BETA_READY,league image fallback and draft-order selection,vitest Leagues;typecheck,fix-draft,commit
+web/client/pages/Draft.tsx,5,draft-ui,BETA_READY,matte real-draft controls and no CFB rating board,vitest draft;typecheck,style-draft,commit
+web/client/pages/DraftLobby.tsx,23,draft-ui,BETA_READY,commissioner reschedule and custom-order controls,vitest DraftLobby;typecheck,fix-draft,commit
+web/client/pages/InjuryCenter.tsx,1,injuries-ui,BETA_READY,provider injury status display,vitest;typecheck,fix-player-card,commit
+web/client/pages/LeagueMatchup.spec.ts,3,matchup-tests,TEST_ONLY,other league matchups regression coverage,vitest LeagueMatchup,test-release,commit
+web/client/pages/LeagueMatchup.tsx,5,matchup-ui,BETA_READY,league mate matchup selector,vitest LeagueMatchup;typecheck,fix-core,commit
+web/client/pages/LeagueWaivers.tsx,1,waivers-ui,BETA_READY,unavailable projection label,vitest;typecheck,fix-waivers,commit
+web/client/pages/Leagues.tsx,8,league-ui,BETA_READY,league image and setup state,vitest Leagues;typecheck,fix-core,commit
+web/client/pages/Login.tsx,11,auth-ui,BETA_READY,password-save guidance and beta flow clarity,vitest auth;typecheck,fix-navigation,commit
+web/client/pages/SinglePlayerMockDraftRoom.tsx,5,draft-ui,BETA_READY,linked profile UI without technical callout,vitest;typecheck,style-draft,commit
+web/client/pages/Trade.tsx,28,trade-ui,BETA_READY,approved trade-builder layout polish,vitest Trade;typecheck,fix-core,commit
+web/client/types/league.ts,3,league-ui-contract,BETA_READY,draft-order and matchup types,vitest DraftLobby;typecheck,fix-core,commit
+api/alembic/versions/0085_persist_draft_order.py,0,draft-order,BETA_READY,add persisted order fields,alembic-head;test_draft_room,fix-draft,commit
+api/alembic/versions/0086_content_moderation_events.py,0,moderation,BETA_READY,add moderation audit table,alembic-head;test_content_moderation,feat-moderation,commit
+api/app/api/routes/admin_moderation.py,0,moderation,BETA_READY,admin moderation review API,test_content_moderation,feat-moderation,commit
+api/app/models/moderation_event.py,0,moderation,BETA_READY,moderation audit model,test_content_moderation,feat-moderation,commit
+api/app/schemas/admin_moderation.py,0,moderation,BETA_READY,moderation response schema,test_content_moderation,feat-moderation,commit
+api/app/services/content_moderation.py,0,moderation,BETA_READY,central content safety enforcement,test_content_moderation,feat-moderation,commit
+api/app/services/draft_order.py,0,draft-order,BETA_READY,commissioner custom order service,test_draft_room,fix-draft,commit
+tests/api/test_content_moderation.py,0,moderation-tests,TEST_ONLY,moderation regression suite,pytest test_content_moderation,test-release,commit
+web/client/lib/draftSchedule.spec.ts,0,draft-tests,TEST_ONLY,draft schedule client coverage,vitest DraftLobby,test-release,commit
+web/client/lib/draftSchedule.ts,0,draft-ui,BETA_READY,timezone-safe schedule formatting,vitest DraftLobby;typecheck,fix-draft,commit
+web/client/pages/DraftLobby.spec.tsx,0,draft-tests,TEST_ONLY,reschedule and custom-order UI coverage,vitest DraftLobby,test-release,commit
+web/client/pages/Leagues.spec.tsx,0,league-tests,TEST_ONLY,league image fallback coverage,vitest Leagues,test-release,commit

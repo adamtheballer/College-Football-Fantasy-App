@@ -15,16 +15,16 @@ class SaturdayPickContestCreate(BaseModel):
     contest_position: SaturdayPickPosition
     featured_player_ids: list[int]
     lock_at: datetime | None = None
-    title: str = "Saturday Pick 6"
-    scoring_policy_version: str = "STANDARD_V1"
-    sponsor_name: str | None = None
-    sponsor_logo_url: str | None = None
-    sponsor_offer_text: str | None = None
-    sponsor_code: str | None = None
-    sponsor_url: str | None = None
-    sponsor_terms: str | None = None
+    title: str = Field(default="Saturday Pick 6", min_length=1, max_length=120)
+    scoring_policy_version: str = Field(default="STANDARD_V1", max_length=80)
+    sponsor_name: str | None = Field(default=None, max_length=120)
+    sponsor_logo_url: str | None = Field(default=None, max_length=500)
+    sponsor_offer_text: str | None = Field(default=None, max_length=500)
+    sponsor_code: str | None = Field(default=None, max_length=100)
+    sponsor_url: str | None = Field(default=None, max_length=500)
+    sponsor_terms: str | None = Field(default=None, max_length=1000)
     position_overridden: bool = False
-    override_reason: str | None = None
+    override_reason: str | None = Field(default=None, max_length=500)
 
 
 class SaturdayPickContestPublish(BaseModel):

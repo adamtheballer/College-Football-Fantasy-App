@@ -25,6 +25,17 @@ const yardsPerPointToMultiplier = (value: unknown, fallback: number) => {
   return Number((1 / yardsPerPoint).toFixed(6));
 };
 
+const fieldGoalTierPoints = (value: unknown) => {
+  const base = numberOr(value, 3);
+  return {
+    fg_made_0_30: base,
+    fg_made_31_40: base + 2,
+    fg_made_41_50: base + 4,
+    fg_made_51_60: base + 6,
+    fg_made_61_plus: base + 8,
+  };
+};
+
 export const createLeagueScoringToApi = (scoring: CreateLeagueScoring) => ({
   receptions: numberOr(scoring.ppr, 1),
   pass_tds: numberOr(scoring.pass_td, 4),
@@ -35,6 +46,6 @@ export const createLeagueScoringToApi = (scoring: CreateLeagueScoring) => ({
   rec_tds: numberOr(scoring.rec_td, 6),
   interceptions: numberOr(scoring.int, -2),
   fumbles_lost: numberOr(scoring.fumble_lost, -2),
-  fg_made_0_39: numberOr(scoring.fg, 3),
+  ...fieldGoalTierPoints(scoring.fg),
   xp_made: numberOr(scoring.xp, 1),
 });
