@@ -534,13 +534,14 @@ class RosterTabEntryRead(BaseModel):
     player_position: str | None = None
     school: str | None = None
     position: str | None = None
-    projected_points: float = 0.0
+    projected_points: float | None = None
     floor: float = 0.0
     ceiling: float = 0.0
     boom_prob: float = 0.0
     bust_prob: float = 0.0
     opponent: str | None = None
-    weekly_projected_fantasy_points: float = 0.0
+    weekly_projected_fantasy_points: float | None = None
+    projection_status: str = "UNAVAILABLE"
     game_start_at: datetime | None = None
     is_locked: bool = False
     acquisition_type: str = "ROSTER"
@@ -600,7 +601,7 @@ class LeagueWaiverPlayerRead(BaseModel):
     name: str
     school: str | None = None
     position: str | None = None
-    weekly_projected_fantasy_points: float = 0.0
+    weekly_projected_fantasy_points: float | None = None
     projection_status: str = "UNAVAILABLE"
     availability_state: str = "waivers"
     available_at: datetime | None = None

@@ -455,8 +455,48 @@ def test_waiver_pool_surfaces_bye_status_instead_of_an_ambiguous_zero(db_session
     waiver_view = build_waivers_view(db_session, league, user, selected_week=1)
 
     assert len(waiver_view.available_players) == 1
-    assert waiver_view.available_players[0].weekly_projected_fantasy_points == 0.0
+    assert waiver_view.available_players[0].weekly_projected_fantasy_points is None
     assert waiver_view.available_players[0].projection_status == "BYE"
+
+
+def test_waiver_pool_sorts_the_full_selected_week_projection_set_before_pagination(db_session):
+    user = User(email="waiver-sort-owner@example.com", first_name="Sort", password_hash="test", api_token="waiver-sort-owner-token")
+    league = League(name="Waiver Sort League", season_year=2026, commissioner_user_id=1, max_teams=1)
+    db_session.add(user)
+    db_session.flush()
+    league.commissioner_user_id = user.id
+    db_session.add(league)
+    db_session.flush()
+    db_session.add(Team(league_id=league.id, name="Waiver Sort Team", owner_user_id=user.id, owner_name="Sort"))
+    high = canonical_player("High Week One", "QB", "Texas")
+    low = canonical_player("Low Week One", "QB", "Texas")
+    zero = canonical_player("Verified Zero", "QB", "Texas")
+    bye = canonical_player("Bye Week One", "QB", "Texas")
+    missing = canonical_player("Missing Week One", "QB", "Texas")
+    db_session.add_all((high, low, zero, bye, missing))
+    db_session.flush()
+    db_session.add_all(
+        (
+            WeeklyProjection(player_id=high.id, season=2026, week=1, is_published=True, fantasy_points=24.0),
+            WeeklyProjection(player_id=low.id, season=2026, week=1, is_published=True, fantasy_points=11.0),
+            WeeklyProjection(player_id=zero.id, season=2026, week=1, is_published=True, fantasy_points=0.0),
+            WeeklyProjection(player_id=bye.id, season=2026, week=1, is_published=True, projection_status="BYE", fantasy_points=0.0),
+            WeeklyProjection(player_id=high.id, season=2026, week=2, is_published=True, fantasy_points=7.0),
+            WeeklyProjection(player_id=low.id, season=2026, week=2, is_published=True, fantasy_points=30.0),
+        )
+    )
+    db_session.commit()
+
+    first_page = build_waivers_view(db_session, league, user, selected_week=1, limit=2, offset=0)
+    second_page = build_waivers_view(db_session, league, user, selected_week=1, limit=2, offset=2)
+    third_page = build_waivers_view(db_session, league, user, selected_week=1, limit=2, offset=4)
+    week_two = build_waivers_view(db_session, league, user, selected_week=2, limit=2, offset=0)
+
+    assert [row.id for row in first_page.available_players] == [high.id, low.id]
+    assert [row.id for row in second_page.available_players] == [zero.id, bye.id]
+    assert [row.id for row in third_page.available_players] == [missing.id]
+    assert third_page.available_players[0].weekly_projected_fantasy_points is None
+    assert [row.id for row in week_two.available_players] == [low.id, high.id]
 
 
 def test_waiver_pool_returns_the_complete_beta_player_universe(db_session):

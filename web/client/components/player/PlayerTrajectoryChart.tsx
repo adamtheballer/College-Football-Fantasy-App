@@ -55,7 +55,7 @@ export function PlayerTrajectoryChart({
                 : "Week 0–13 trajectory"}
           </p>
         </div>
-        <p className="text-xs font-black text-white">Peak: {valueFormatter(peak.value)} <span className="text-white/45">({peak.week === 0 ? "W0" : `W${peak.week}`})</span></p>
+        <p className="text-xs font-black text-white">Peak: {valueFormatter(peak.value)} <span className="text-white/45">({peak.week === 0 ? "Preseason" : `W${peak.week}`})</span></p>
       </div>
       <div className="overflow-x-auto pb-1">
         <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="h-auto min-w-[620px] w-full" role="img" aria-label={ariaLabel}>
@@ -69,7 +69,7 @@ export function PlayerTrajectoryChart({
           ))}
           {weeks.map((week) => (
             <text key={`label-${week}`} x={x(week)} y={CHART_HEIGHT - 16} textAnchor="middle" fill="rgba(226,232,240,0.62)" fontSize="10" fontWeight="700">
-              W{week}
+              {week === 0 ? "Preseason" : `W${week}`}
             </text>
           ))}
           <text transform={`translate(14 ${PADDING.top + plotHeight / 2}) rotate(-90)`} textAnchor="middle" fill="rgba(226,232,240,0.72)" fontSize="11" fontWeight="800">
@@ -81,7 +81,7 @@ export function PlayerTrajectoryChart({
           {hasConnectedWeeks ? <path d={connectedLine} fill="none" stroke="#5ee7ff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" /> : null}
           {ordered.map((point) => (
             <g key={point.week}>
-              <title>{point.week === 0 ? point.source === "current" ? "Current projection" : "Preseason baseline" : `Week ${point.week}`}: {valueFormatter(point.value)}</title>
+              <title>{point.week === 0 ? point.source === "current" ? "Current projection" : "Preseason" : `Week ${point.week}`}: {valueFormatter(point.value)}</title>
               <circle cx={x(point.week)} cy={y(point.value)} r="6" fill={point.source === "published" ? "#ffffff" : point.source === "bye" ? "#64748b" : "#5ee7ff"} stroke="#08111f" strokeWidth="3" />
             </g>
           ))}

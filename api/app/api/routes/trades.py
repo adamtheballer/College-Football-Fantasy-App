@@ -376,87 +376,24 @@ def analyze_trade(
     players = db.query(Player).filter(Player.id.in_(payload.receive_ids + payload.give_ids)).all()
     player_by_id = {player.id: player for player in players}
 
-    projections = db.scalars(
-        current_published_projections_query(
-            season=payload.season,
-            week=payload.week,
-            player_ids=payload.receive_ids + payload.give_ids,
-        )
-    ).all()
-    proj_by_id = {proj.player_id: proj for proj in projections}
-
-    injuries = (
-        db.query(Injury)
-        .filter(Injury.season == payload.season, Injury.week == payload.week)
-        .filter(Injury.player_id.in_(payload.receive_ids + payload.give_ids))
-        .all()
-    )
-    injury_by_id = {inj.player_id: inj for inj in injuries}
-
-    league_size, league_roster_slots, scoring_rules = _league_analyzer_context(db, payload.league_id, current_user)
-    roster_slots = _normalize_roster_slots(league_roster_slots or payload.roster_slots)
-    replacement_by_pos = _build_replacement_by_pos(
-        db,
-        payload.season,
-        payload.week,
-        league_size or payload.league_size,
-        roster_slots,
-        scoring_rules,
-    )
-    performance_context = _build_performance_context(
-        db,
-        payload.league_id,
-        payload.season,
-        payload.week,
-        scoring_rules,
-    )
-
     published_values = {
         player_id: current_trade_value_snapshot(db, player_id=player_id, season=payload.season)
         for player_id in set(payload.receive_ids + payload.give_ids)
     }
-    # Published canonical values are the shared beta source of truth. Legacy
-    # analysis remains only as a safe transitional fallback until the weekly job
-    # has published the first value set for an existing season.
-    receive_value = 0.0
-    for pid in payload.receive_ids:
-        player = player_by_id.get(pid)
-        if player:
-            if published_values.get(pid):
-                receive_value += float(published_values[pid]["value"])
-                continue
-            injury_status = injury_by_id.get(pid).status if injury_by_id.get(pid) else None
-            schedule_mult = _schedule_multiplier(db, player, payload.season, payload.week)
-            receive_value += _player_value(
-                player,
-                proj_by_id.get(pid),
-                replacement_by_pos,
-                injury_status,
-                schedule_mult,
-                scoring_rules,
-                performance_context,
-                payload.week,
-            )
+    requested_player_ids = set(payload.receive_ids + payload.give_ids)
+    unavailable_player_ids = sorted(
+        player_id
+        for player_id in requested_player_ids
+        if player_id not in player_by_id or published_values.get(player_id) is None
+    )
+    if unavailable_player_ids:
+        return TradeAnalyzeResponse(
+            verdict="Unavailable",
+            unavailable_player_ids=unavailable_player_ids,
+        )
 
-    give_value = 0.0
-    for pid in payload.give_ids:
-        player = player_by_id.get(pid)
-        if player:
-            if published_values.get(pid):
-                give_value += float(published_values[pid]["value"])
-                continue
-            injury_status = injury_by_id.get(pid).status if injury_by_id.get(pid) else None
-            schedule_mult = _schedule_multiplier(db, player, payload.season, payload.week)
-            give_value += _player_value(
-                player,
-                proj_by_id.get(pid),
-                replacement_by_pos,
-                injury_status,
-                schedule_mult,
-                scoring_rules,
-                performance_context,
-                payload.week,
-            )
+    receive_value = sum(float(published_values[player_id]["value"]) for player_id in payload.receive_ids)
+    give_value = sum(float(published_values[player_id]["value"]) for player_id in payload.give_ids)
 
     delta = receive_value - give_value
     verdict = "Even"

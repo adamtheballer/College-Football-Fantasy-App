@@ -5,6 +5,7 @@ import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { usePlayerCard } from "@/hooks/use-players";
 import { useDropRosterPlayer, useUpdateLineup } from "@/hooks/use-roster-actions";
 import { getEligibleSlotsForPosition, normalizePosition } from "@/lib/rosterLegality";
+import { formatProjectionDisplay } from "@/lib/projection-display";
 import type { LeagueRosterPlayer } from "@/types/league";
 import { cn } from "@/lib/utils";
 import {
@@ -46,7 +47,7 @@ const displaySchoolName = (school?: string | null) => {
 
 const weeklyProjectionLabel = (player: LeagueRosterPlayer) => {
   const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
-  return typeof projection === "number" && Number.isFinite(projection) ? projection.toFixed(1) : "0.0";
+  return formatProjectionDisplay(projection, player.projection_status);
 };
 
 const isRealRosterPlayer = (player: LeagueRosterPlayer) =>
@@ -185,7 +186,7 @@ export function RosterSlotTable({
 
   const selectedPosition = selectedPlayer ? positionLabel(selectedPlayer) : null;
   const selectedProjection =
-    selectedPlayer?.projected_points ?? selectedPlayer?.weekly_projected_fantasy_points ?? 0;
+    selectedPlayer?.projected_points ?? selectedPlayer?.weekly_projected_fantasy_points;
   const selectedPlayerCardQuery = usePlayerCard(
     selectedPlayer?.player_id,
     Boolean(selectedPlayer?.player_id)
@@ -348,7 +349,7 @@ export function RosterSlotTable({
                 ) : null}
                 <span className="text-cfb-text-muted">{isRealPlayer ? player.opponent ?? "TBD" : "—"}</span>
                 <span className={cn("text-right font-black", style.text)}>
-                  {typeof projection === "number" && Number.isFinite(projection) ? projection.toFixed(1) : "0.0"}
+                  {formatProjectionDisplay(projection, player.projection_status)}
                 </span>
               </button>
             );

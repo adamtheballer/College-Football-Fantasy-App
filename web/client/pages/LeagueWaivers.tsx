@@ -31,6 +31,7 @@ import {
   useWatchlists,
 } from "@/hooks/use-watchlists";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
+import { formatProjectionDisplay } from "@/lib/projection-display";
 import type { PlayerStats } from "@/types/player";
 
 const positions = ["ALL", "QB", "RB", "WR", "TE", "K"] as const;
@@ -39,7 +40,7 @@ type AvailablePlayerRow = {
   name: string;
   school: string | null;
   position: string | null;
-  weekly_projected_fantasy_points: number;
+  weekly_projected_fantasy_points: number | null;
   projection_status: string;
   availability_state: string;
   available_at: string | null;
@@ -132,13 +133,7 @@ const availabilityLabel = (value?: string | null) => {
 export const waiverProjectionLabel = (
   points: number | null | undefined,
   projectionStatus: string | null | undefined,
-) => {
-  if (projectionStatus?.toUpperCase() === "BYE") return "BYE";
-  if (projectionStatus?.toUpperCase() === "OUT") return "OUT";
-  if (projectionStatus?.toUpperCase() === "UNAVAILABLE") return "—";
-  const value = Number(points);
-  return Number.isFinite(value) ? value.toFixed(1) : "—";
-};
+) => formatProjectionDisplay(points, projectionStatus);
 
 export default function LeagueWaivers() {
   const { leagueId } = useParams();
@@ -202,10 +197,11 @@ export default function LeagueWaivers() {
       });
   }, [players, position, search]);
 
-  const topProjection = players.reduce(
-    (top, player) => Math.max(top, Number(player.weekly_projected_fantasy_points ?? 0)),
-    0
-  );
+  const topProjection = players.reduce<number | null>((top, player) => {
+    const projection = player.weekly_projected_fantasy_points;
+    if (typeof projection !== "number" || !Number.isFinite(projection)) return top;
+    return top === null ? projection : Math.max(top, projection);
+  }, null);
   const positionCounts = players.reduce<Record<string, number>>((counts, player) => {
     const key = (player.position ?? "UNK").toUpperCase();
     counts[key] = (counts[key] ?? 0) + 1;
@@ -416,7 +412,7 @@ export default function LeagueWaivers() {
             <div className="rounded-2xl border border-sky-300/15 bg-sky-300/[0.06] p-4">
               <p className="text-sm font-black text-slate-50">Add: {claimPlayer?.name}</p>
               <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                {claimPlayer?.position ?? "-"} · {claimPlayer?.school ?? "-"} · {Number(claimPlayer?.weekly_projected_fantasy_points ?? 0).toFixed(1)} projected points
+                {claimPlayer?.position ?? "-"} · {claimPlayer?.school ?? "-"} · {formatProjectionDisplay(claimPlayer?.weekly_projected_fantasy_points, claimPlayer?.projection_status)} projected points
               </p>
             </div>
             <label className="grid gap-2">
@@ -503,7 +499,7 @@ export default function LeagueWaivers() {
             </div>
             <div className="rounded-[1.25rem] border border-emerald-300/20 bg-emerald-400/10 p-4 shadow-[0_0_34px_rgba(52,211,153,0.10)]">
               <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Top Proj</p>
-              <p className="mt-1 text-2xl font-black text-emerald-100">{topProjection.toFixed(1)}</p>
+              <p className="mt-1 text-2xl font-black text-emerald-100">{topProjection?.toFixed(1) ?? "—"}</p>
             </div>
             <div className="rounded-[1.25rem] border border-violet-300/20 bg-violet-400/10 p-4 shadow-[0_0_34px_rgba(167,139,250,0.10)]">
               <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Claims</p>
@@ -596,7 +592,7 @@ export default function LeagueWaivers() {
               <tbody className="divide-y divide-sky-300/10">
                 {filteredPlayers.map((player) => {
                   const tone = positionTone(player.position);
-                  const projected = Number(player.weekly_projected_fantasy_points ?? 0);
+                  const projected = player.weekly_projected_fantasy_points;
                   const projectionLabel = waiverProjectionLabel(projected, player.projection_status);
                   const claimable = canClaimAvailability(player.availability_state);
                   return (

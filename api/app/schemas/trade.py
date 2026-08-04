@@ -14,10 +14,11 @@ class TradeAnalyzeRequest(BaseModel):
 
 
 class TradeAnalyzeResponse(BaseModel):
-    receive_value: float
-    give_value: float
-    delta: float
+    receive_value: float | None = None
+    give_value: float | None = None
+    delta: float | None = None
     verdict: str
+    unavailable_player_ids: list[int] = []
 
 
 class TradeOfferItemCreate(BaseModel):

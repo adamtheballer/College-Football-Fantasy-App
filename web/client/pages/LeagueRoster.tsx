@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useLeagueDetail, useLeagueRosterTab } from "@/hooks/use-leagues";
 import { ApiError } from "@/lib/api";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
+import { isNumericProjection } from "@/lib/projection-display";
 import type { LeagueRosterPlayer, LeagueRosterTabResponse, LeagueRosterTeam } from "@/types/league";
 
 const starterSlot = (slot?: string | null) => {
@@ -101,7 +102,10 @@ export default function LeagueRoster() {
   );
   const starterTotal = hasRosterSlots
     ? starters.reduce(
-        (total, player) => total + Number(player.projected_points ?? player.weekly_projected_fantasy_points ?? 0),
+        (total, player) => {
+          const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
+          return isNumericProjection(projection, player.projection_status) ? total + projection : total;
+        },
         0
       )
     : null;
@@ -115,7 +119,10 @@ export default function LeagueRoster() {
 
   const benchTotal = hasRosterSlots
     ? bench.reduce(
-        (total, player) => total + Number(player.projected_points ?? player.weekly_projected_fantasy_points ?? 0),
+        (total, player) => {
+          const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
+          return isNumericProjection(projection, player.projection_status) ? total + projection : total;
+        },
         0
       )
     : null;

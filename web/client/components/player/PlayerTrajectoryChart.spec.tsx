@@ -19,11 +19,11 @@ const renderChart = (points: Array<{ week: number; value: number; source: "prese
 describe("PlayerTrajectoryChart", () => {
   afterEach(cleanup);
 
-  it("shows only a Week 0 dot before the season begins", () => {
+  it("shows only a preseason dot before the season begins", () => {
     renderChart([{ week: 0, value: 18.4, source: "preseason" }]);
 
     expect(screen.getByText("Preseason baseline — weekly snapshots begin at Week 1")).toBeTruthy();
-    expect(screen.getByText("W0")).toBeTruthy();
+    expect(screen.getByText("Preseason")).toBeTruthy();
     expect(screen.getByText("W13")).toBeTruthy();
     expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("path[stroke='#5ee7ff']")).toHaveLength(0);
     expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("circle")).toHaveLength(1);

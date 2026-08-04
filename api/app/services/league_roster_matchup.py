@@ -187,7 +187,7 @@ def _serialize_roster_entry(
     is_locked: bool = False,
 ) -> RosterTabEntryRead:
     entry = roster_slot.entry
-    projected = float(projection.fantasy_points or 0.0) if projection else 0.0
+    projected = float(projection.fantasy_points) if projection and projection.fantasy_points is not None else None
     floor = float(projection.floor or 0.0) if projection else 0.0
     ceiling = float(projection.ceiling or 0.0) if projection else 0.0
     return RosterTabEntryRead(
@@ -217,6 +217,7 @@ def _serialize_roster_entry(
         bust_prob=float(projection.bust_prob or 0.0) if projection else 0.0,
         opponent=opponent,
         weekly_projected_fantasy_points=projected,
+        projection_status=projection.projection_status if projection else "UNAVAILABLE",
         game_start_at=game_start_at,
         is_locked=is_locked,
     )
@@ -320,6 +321,8 @@ def _starter_projection_summary(roster: list[RosterTabEntryRead]) -> tuple[float
     variance = 0.0
     for entry in roster:
         if not entry.is_starter:
+            continue
+        if entry.projection_status == "BYE" or entry.projected_points is None:
             continue
         total += entry.projected_points
         std_dev = estimate_player_std_dev(entry.projected_points, entry.floor, entry.ceiling)
@@ -566,16 +569,11 @@ def build_waivers_view(
     # while they are still rostered; once dropped, they re-enter the league's
     # waiver/free-agent lifecycle. Excluding every DraftPick here made the UI
     # show a different pool than the claim service validates.
-    query = db.query(Player).filter(
+    eligible_players = db.query(Player).filter(
         ~Player.id.in_(unavailable_player_ids),
         canonical_fantasy_player_filter(league.season_year),
-    ).order_by(
-        Player.sheet_projected_season_points.desc().nullslast(),
-        Player.name.asc(),
-    )
-    total = query.count()
-    players = query.offset(max(0, offset)).limit(max(1, min(limit, 1000))).all()
-    player_ids = {player.id for player in players}
+    ).all()
+    player_ids = {player.id for player in eligible_players}
     availability_by_player = {
         row.player_id: row
         for row in db.query(PlayerWaiverAvailability)
@@ -685,6 +683,35 @@ def build_waivers_view(
             return ("free_agent", available_at) if waiver_state and waiver_state.mode == "free_agents" else ("waivers", available_at)
         return availability.state, available_at
 
+    def projection_for_player(player_id: int) -> tuple[float | None, str]:
+        score = score_by_player.get(player_id)
+        if score is not None:
+            return float(score.fantasy_points), "SCORED"
+        projection = projection_by_player.get(player_id)
+        if projection is None:
+            return None, "UNAVAILABLE"
+        status = projection.projection_status.upper()
+        if status == "BYE":
+            return None, "BYE"
+        return float(projection.fantasy_points), status
+
+    def waiver_sort_key(player: Player) -> tuple[int, float, float, str, int]:
+        projected, projection_status = projection_for_player(player.id)
+        if projected is not None and projected > 0:
+            state = 0
+        elif projected is not None:
+            state = 1
+        elif projection_status == "BYE":
+            state = 2
+        else:
+            state = 3
+        canonical_rank = float(player.sheet_adp) if player.sheet_adp is not None else float("inf")
+        return (state, -(projected or 0.0), canonical_rank, player.name.casefold(), player.id)
+
+    ordered_players = sorted(eligible_players, key=waiver_sort_key)
+    total = len(ordered_players)
+    players = ordered_players[offset : offset + limit]
+
     return LeagueWaiversRead(
         league_id=league.id,
         fantasy_team_id=team.id if team else None,
@@ -696,20 +723,8 @@ def build_waivers_view(
                 name=player.name,
                 school=player.school,
                 position=player.position,
-                weekly_projected_fantasy_points=float(
-                    score_by_player[player.id].fantasy_points
-                    if player.id in score_by_player
-                    else projection_by_player[player.id].fantasy_points
-                    if player.id in projection_by_player
-                    else 0.0
-                ),
-                projection_status=(
-                    "SCORED"
-                    if player.id in score_by_player
-                    else projection_by_player[player.id].projection_status
-                    if player.id in projection_by_player
-                    else "UNAVAILABLE"
-                ),
+                weekly_projected_fantasy_points=projection_for_player(player.id)[0],
+                projection_status=projection_for_player(player.id)[1],
                 availability_state=availability_for_player(player.id)[0],
                 available_at=availability_for_player(player.id)[1],
             )

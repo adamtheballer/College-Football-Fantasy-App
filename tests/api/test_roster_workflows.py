@@ -872,7 +872,8 @@ def test_drop_preserves_canonical_slot_across_team_and_league_roster_views(clien
     )
     assert league_qb_slot["player_id"] is None
     assert league_qb_slot["player_name"] is None
-    assert league_qb_slot["projected_points"] == 0.0
+    assert league_qb_slot["projected_points"] is None
+    assert league_qb_slot["projection_status"] == "UNAVAILABLE"
 
 
 def test_add_drop_uses_open_flex_slot_when_primary_position_is_full(client, db_session):

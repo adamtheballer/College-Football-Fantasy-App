@@ -1251,7 +1251,7 @@ def test_waiver_available_players_are_scoped_to_current_league(client, db_sessio
     assert owned_player_id in second_available_ids
 
 
-def test_roster_endpoint_returns_zero_projection_and_ir_capacity(client, db_session):
+def test_roster_endpoint_returns_unavailable_projection_and_ir_capacity(client, db_session):
     owner_token = create_user_and_token(client, "roster-view-owner")
     league = create_league(client, owner_token, max_teams=2)
     player_id = create_player(client, "Projection Missing QB", "QB")
@@ -1265,7 +1265,8 @@ def test_roster_endpoint_returns_zero_projection_and_ir_capacity(client, db_sess
     assert response.status_code == 200
     payload = response.json()
     assert payload["ir_slots"] == 1
-    assert payload["roster"][0]["projected_points"] == 0.0
+    assert payload["roster"][0]["projected_points"] is None
+    assert payload["roster"][0]["projection_status"] == "UNAVAILABLE"
     assert payload["roster"][0]["is_ir"] is False
 
 

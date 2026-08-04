@@ -184,7 +184,7 @@ def test_trade_analyze_allows_authenticated_user(client):
     assert response.status_code == 200
 
 
-def test_trade_analyze_uses_league_scoring_rules_for_projection_value(client, db_session):
+def test_trade_analyze_returns_an_explicit_unavailable_state_without_published_current_values(client, db_session):
     token = create_user_and_token(client, "analyze-scoring")
     league = create_league(client, token, "analyze-scoring", review_type="none")
     settings = db_session.query(LeagueSettings).filter_by(league_id=league["id"]).one()
@@ -228,12 +228,14 @@ def test_trade_analyze_uses_league_scoring_rules_for_projection_value(client, db
     )
 
     assert global_response.status_code == 200
-    assert global_response.json()["receive_value"] == 15.0
+    assert global_response.json()["receive_value"] is None
+    assert set(global_response.json()["unavailable_player_ids"]) == {receive_player.id, give_player.id}
     assert league_response.status_code == 200
-    assert league_response.json()["receive_value"] == 0.0
+    assert league_response.json()["receive_value"] is None
+    assert set(league_response.json()["unavailable_player_ids"]) == {receive_player.id, give_player.id}
 
 
-def test_trade_analyzer_uses_cfb27_in_week_one_then_stored_performance(client, db_session):
+def test_trade_analyzer_does_not_substitute_cfb27_or_projection_for_current_value(client, db_session):
     token = create_user_and_token(client, "cfb27-trade-value")
     league = create_league(client, token, "cfb27-trade-value", review_type="none")
     higher_rated_player = Player(
@@ -280,8 +282,8 @@ def test_trade_analyzer_uses_cfb27_in_week_one_then_stored_performance(client, d
     week_one_response = client.post("/trade/analyze", json=payload, headers=auth_headers(token))
 
     assert week_one_response.status_code == 200
-    assert week_one_response.json()["receive_value"] == 99.0
-    assert week_one_response.json()["give_value"] == 70.0
+    assert week_one_response.json()["receive_value"] is None
+    assert set(week_one_response.json()["unavailable_player_ids"]) == {higher_rated_player.id, stronger_performer.id}
 
     db_session.add_all(
         [
@@ -312,7 +314,8 @@ def test_trade_analyzer_uses_cfb27_in_week_one_then_stored_performance(client, d
     )
 
     assert later_week_response.status_code == 200
-    assert later_week_response.json()["give_value"] > later_week_response.json()["receive_value"]
+    assert later_week_response.json()["receive_value"] is None
+    assert set(later_week_response.json()["unavailable_player_ids"]) == {higher_rated_player.id, stronger_performer.id}
 
 
 def test_normalize_roster_slots_uses_payload_values():

@@ -232,6 +232,7 @@ export interface LeagueRosterPlayer {
   boom_prob?: number | null;
   bust_prob?: number | null;
   weekly_projected_fantasy_points: number | null;
+  projection_status?: string | null;
   game_start_at?: string | null;
   is_locked?: boolean;
   is_placeholder?: boolean;
@@ -315,7 +316,7 @@ export interface LeagueWaiverPlayer {
   name: string;
   school: string | null;
   position: string | null;
-  weekly_projected_fantasy_points: number;
+  weekly_projected_fantasy_points: number | null;
   projection_status: string;
   availability_state: string;
   available_at: string | null;

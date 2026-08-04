@@ -49,10 +49,11 @@ type TradeAnalyzePayload = {
 };
 
 type TradeAnalyzeResult = {
-  receive_value: number;
-  give_value: number;
-  delta: number;
+  receive_value: number | null;
+  give_value: number | null;
+  delta: number | null;
   verdict: string;
+  unavailable_player_ids: number[];
 };
 
 type TradeOfferItem = {
@@ -227,7 +228,14 @@ export const canSendTradeOffer = (
   analysisSignature: string | null,
   currentSignature: string,
   isSending: boolean
-) => Boolean(analysis && analysisSignature === currentSignature && !isSending);
+) => Boolean(
+  analysis &&
+    analysis.receive_value !== null &&
+    analysis.give_value !== null &&
+    analysis.delta !== null &&
+    analysisSignature === currentSignature &&
+    !isSending,
+);
 
 const formatTradeStatus = (status: string) =>
   status
@@ -992,14 +1000,14 @@ export default function Trade() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-2xl border border-red-300/20 bg-red-500/10 p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-100">You send</p>
-              <p className="mt-2 text-2xl font-black tabular-nums">{analysis?.give_value.toFixed(2) ?? "0.00"}</p>
+              <p className="mt-2 text-2xl font-black tabular-nums">{analysis?.give_value?.toFixed(2) ?? "N/A"}</p>
               <p className="mt-3 text-xs font-semibold leading-5 text-muted-foreground">
                 {selectedGiveRows.map((row) => row.name).join(", ") || "No players selected"}
               </p>
             </div>
             <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/10 p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">You receive</p>
-              <p className="mt-2 text-2xl font-black tabular-nums">{analysis?.receive_value.toFixed(2) ?? "0.00"}</p>
+              <p className="mt-2 text-2xl font-black tabular-nums">{analysis?.receive_value?.toFixed(2) ?? "N/A"}</p>
               <p className="mt-3 text-xs font-semibold leading-5 text-muted-foreground">
                 {selectedReceiveRows.map((row) => row.name).join(", ") || "No players selected"}
               </p>
@@ -1011,7 +1019,7 @@ export default function Trade() {
             <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
               <p className="text-2xl font-black text-primary">{analysis?.verdict ?? "Analysis unavailable"}</p>
               <p className={cn("text-xl font-black tabular-nums", (analysis?.delta ?? 0) >= 0 ? "text-emerald-300" : "text-red-300")}>
-                {(analysis?.delta ?? 0) >= 0 ? "+" : ""}{analysis?.delta.toFixed(2) ?? "0.00"}
+                {analysis?.delta === null || analysis?.delta === undefined ? "N/A" : `${analysis.delta >= 0 ? "+" : ""}${analysis.delta.toFixed(2)}`}
               </p>
             </div>
           </div>
