@@ -504,7 +504,7 @@ export default function SinglePlayerMockDraftRoom() {
                     {isQueued ? "Queued" : "Queue"}
                   </Button>
                   <Button
-                    className="h-10 rounded-2xl border border-slate-400/25 bg-slate-800/85 px-5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-100 shadow-none hover:bg-slate-700/85"
+                    className="h-10 rounded-2xl border border-cyan-100/35 bg-[#1b3349] px-5 text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)]"
                     disabled={!userOnClock || draftState.status !== "live"}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -581,7 +581,7 @@ export default function SinglePlayerMockDraftRoom() {
                 <Button variant="outline" className="h-10 flex-1 rounded-2xl text-[10px] font-black uppercase tracking-[0.14em]" onClick={() => toggleQueue(player.id)}>
                   Remove
                 </Button>
-                <Button className="h-10 flex-1 rounded-2xl border border-slate-400/25 bg-slate-800/85 text-[10px] font-black uppercase tracking-[0.14em] text-slate-100 shadow-none hover:bg-slate-700/85" disabled={!userOnClock || draftState.status !== "live" || !isLegalForCurrentPick} onClick={() => draftPlayer(player.id)}>
+                <Button className="h-10 flex-1 rounded-2xl border border-cyan-100/35 bg-[#1b3349] text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)]" disabled={!userOnClock || draftState.status !== "live" || !isLegalForCurrentPick} onClick={() => draftPlayer(player.id)}>
                   {isLegalForCurrentPick ? "Draft" : "No Slot"}
                 </Button>
               </div>
@@ -979,7 +979,7 @@ export default function SinglePlayerMockDraftRoom() {
             <div className="grid gap-3 px-8 py-6 sm:grid-cols-3">
               <Button
                 type="button"
-                className="h-12 rounded-2xl border border-slate-400/25 bg-slate-800/85 px-6 text-[10px] font-black uppercase tracking-[0.16em] text-slate-100 shadow-none hover:bg-slate-700/85"
+                className="h-12 rounded-2xl border border-cyan-100/35 bg-[#1b3349] px-6 text-[10px] font-black uppercase tracking-[0.16em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)]"
                 onClick={viewDraftedRoster}
               >
                 <ClipboardList className="mr-2 h-4 w-4" />
@@ -1017,7 +1017,7 @@ export default function SinglePlayerMockDraftRoom() {
               className={cn(
                 "rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition",
                 activeTab === tab.value
-                  ? "border border-slate-400/25 bg-slate-700/90 text-slate-100 shadow-none"
+                  ? "border border-cyan-100/35 bg-[#294d69] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_6px_16px_rgba(2,6,23,0.32)]"
                   : "text-muted-foreground hover:bg-white/[0.06] hover:text-amber-100"
               )}
             >

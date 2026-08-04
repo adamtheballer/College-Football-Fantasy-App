@@ -617,7 +617,7 @@ export default function Draft() {
                     Remove
                   </Button>
                   <Button
-                    className="h-10 flex-1 rounded-2xl border border-slate-400/25 bg-slate-800/85 text-[10px] font-black uppercase tracking-[0.14em] text-slate-100 shadow-none hover:bg-slate-700/85"
+                    className="h-10 flex-1 rounded-2xl border border-cyan-100/35 bg-[#1b3349] text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)]"
                     disabled={!canPick || !isLegalForCurrentPick || !isBackendPlayer}
                     onClick={() => makePick(player)}
                   >
@@ -872,7 +872,7 @@ export default function Draft() {
           ) : null}
           {draftRoom.can_start_draft ? (
             <Button
-              className="mt-6 h-12 rounded-2xl border border-slate-400/25 bg-slate-800/85 px-6 text-[10px] font-black uppercase tracking-[0.18em] text-slate-100 shadow-none hover:bg-slate-700/85"
+              className="mt-6 h-12 rounded-2xl border border-cyan-100/35 bg-[#1b3349] px-6 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)]"
               disabled={startDraftMutation.isPending}
               onClick={() => {
                 setLocalError(null);
@@ -1117,7 +1117,7 @@ export default function Draft() {
                         className={cn(
                           "h-10 rounded-2xl px-5 text-[10px] font-black uppercase tracking-[0.14em]",
                           canPick && isBackendPlayer
-                            ? "border border-slate-400/25 bg-slate-800/85 text-slate-100 shadow-none hover:bg-slate-700/85"
+                            ? "border border-cyan-100/35 bg-[#1b3349] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)]"
                             : "border border-white/10 bg-white/[0.04] text-muted-foreground"
                         )}
                         disabled={!canPick || !isBackendPlayer}
@@ -1193,7 +1193,7 @@ export default function Draft() {
                 className={cn(
                   "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition",
                   activeTab === tab.value
-                  ? "border border-slate-400/25 bg-slate-700/90 text-slate-100 shadow-none"
+                  ? "border border-cyan-100/35 bg-[#294d69] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_6px_16px_rgba(2,6,23,0.32)]"
                     : "text-muted-foreground hover:bg-white/[0.06] hover:text-amber-100"
                 )}
               >
