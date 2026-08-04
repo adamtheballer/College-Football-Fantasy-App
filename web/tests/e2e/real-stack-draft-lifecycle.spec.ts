@@ -42,6 +42,8 @@ async function signUp(page: Page, firstName: string, fixture: { email: string; c
   await page.locator("#signup-name").fill(firstName);
   await page.locator("#signup-password").fill(password);
   await page.getByRole("button", { name: /Create (beta )?account/i }).click();
+  await expect(page.getByRole("dialog", { name: /Account created/i })).toBeVisible();
+  await page.getByRole("button", { name: /Continue to dashboard/i }).click();
   await page.waitForURL("**/");
 
   const endGuide = page.getByRole("button", { name: /End Guide/i });

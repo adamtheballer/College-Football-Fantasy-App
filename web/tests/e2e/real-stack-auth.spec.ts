@@ -35,7 +35,8 @@ test.describe("real seeded stack", () => {
     await page.locator("#signup-name").fill("Real E2E Manager");
     await page.locator("#signup-password").fill(e2ePassword);
     await page.getByRole("button", { name: /Create (beta )?account/i }).click();
-
+    await expect(page.getByRole("dialog", { name: /Account created/i })).toBeVisible();
+    await page.getByRole("button", { name: /Continue to dashboard/i }).click();
     await page.waitForURL("**/");
     await expect(page.getByText(/College Football Fantasy/i).first()).toBeVisible();
     await expect
