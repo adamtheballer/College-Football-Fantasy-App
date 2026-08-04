@@ -75,7 +75,7 @@ describe("app shell navigation helpers", () => {
     const mobileItems = getMobileNavItems(getShellNavItems(user, true, 1));
     const mobile = mobileItems.map((item) => item.name);
 
-    expect(mobile).toEqual(["HOME", "LEAGUES", "CHATS", "MOCK DRAFT", "SETTINGS"]);
+    expect(mobile).toEqual(["HOME", "LEAGUES", "CHATS", "REPORT BUG", "MOCK DRAFT"]);
     expect(mobileItems.find((item) => item.name === "CHATS")?.badge).toBe("1");
     expect(mobile).not.toContain("SIGN OUT");
   });

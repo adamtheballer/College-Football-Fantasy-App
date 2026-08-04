@@ -77,7 +77,9 @@ export const getShellNavItems = (
 };
 
 export const getMobileNavItems = (items: ShellNavItem[]) => {
-  const preferred = new Set(["HOME", "LEAGUES", "CHATS", "MOCK DRAFT", "SETTINGS"]);
+  // The mobile bar is limited to five destinations. Keep bug reporting in
+  // that primary set so the Report Bug action is not desktop-only.
+  const preferred = new Set(["HOME", "LEAGUES", "CHATS", "MOCK DRAFT", "REPORT BUG"]);
   const filtered = items.filter((item) => preferred.has(item.name));
 
   if (filtered.length >= 4) {
