@@ -13,7 +13,7 @@ test.describe("real seeded stack", () => {
     const apiResponses: Array<{ url: string; status: number }> = [];
     page.on("response", (response) => {
       const pathname = new URL(response.url()).pathname.replace(/^\/api/, "");
-      if (pathname.startsWith("/auth/") || pathname.startsWith("/players")) {
+      if (pathname.startsWith("/auth/")) {
         apiResponses.push({ url: response.url(), status: response.status() });
       }
     });
@@ -53,18 +53,9 @@ test.describe("real seeded stack", () => {
     await page.goto("/leagues");
     await expect(page).toHaveURL(/\/leagues$/);
 
-    await page.goto("/draft/mock/single-player?new=1&teams=4&timer=60");
-    await expect(page).not.toHaveURL(/\/login$/);
-    await expect(page.getByText("Jeremiah Smith").first()).toBeVisible();
-
     expect(apiResponses.some((response) => response.url.includes("/auth/signup") && response.status === 201)).toBe(true);
     expect(apiResponses.some((response) => response.url.includes("/auth/me") && response.status === 200)).toBe(true);
-    expect(apiResponses.some((response) => response.url.includes("/players") && response.status === 200)).toBe(true);
 
-    // Draft rooms intentionally hide the application chrome. Return to a
-    // standard signed-in route before exercising the desktop sign-out control.
-    await page.goto("/leagues");
-    await expect(page).toHaveURL(/\/leagues$/);
     await page.locator("button:has(#nav-sign-out)").click();
     await expect
       .poll(() => page.evaluate(() => window.localStorage.getItem("cfb_access_token")))

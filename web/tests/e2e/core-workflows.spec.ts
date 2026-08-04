@@ -1666,7 +1666,7 @@ test.describe("critical browser workflows", () => {
       });
     });
     await page.route("**/leagues/1/trades**", async (route) => {
-      const pathname = new URL(route.request().url()).pathname;
+      const pathname = new URL(route.request().url()).pathname.replace(/^\/api/, "");
       if (pathname !== "/leagues/1/trades") {
         await route.fallback();
         return;
@@ -2073,11 +2073,7 @@ test.describe("critical browser workflows", () => {
     await page.route("**/watchlists**", async (route) => {
       const method = route.request().method();
       const url = new URL(route.request().url());
-      const path = url.pathname;
-      if (url.port !== "8000") {
-        await route.fallback();
-        return;
-      }
+      const path = url.pathname.replace(/^\/api/, "");
 
       if (method === "GET" && path.endsWith("/watchlists")) {
         await route.fulfill({
