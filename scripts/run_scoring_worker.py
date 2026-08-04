@@ -71,6 +71,8 @@ def record_worker_dead_letter(
 
 
 def run_iteration(args: argparse.Namespace) -> None:
+    if not settings.scoring_enabled:
+        raise RuntimeError("Scoring worker cannot run while SCORING_MODE=disabled.")
     live_args = argparse.Namespace(
         season=args.season,
         week=args.week,
@@ -134,6 +136,8 @@ def run_with_retries(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    if not settings.scoring_enabled:
+        raise SystemExit("Scoring worker cannot start while SCORING_MODE=disabled.")
     args = parse_args()
     schedule = schedule_for_mode(args.mode)
     logger.info(

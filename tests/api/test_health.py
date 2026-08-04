@@ -44,17 +44,22 @@ def test_runtime_identity_reports_safe_process_and_database_identifiers(client, 
     assert payload["runtime_mode"] == settings.runtime_mode
     assert payload["web_git_sha"] == settings.web_git_sha
     assert payload["worker_git_sha"] == settings.worker_git_sha
+    assert payload["scoring_mode"] == settings.scoring_mode
+    assert payload["sportsdata_enabled"] == settings.sportsdata_enabled
+    assert payload["scoring_worker_expected"] is settings.scoring_worker_expected
+    assert payload["provider_polling_expected"] is settings.provider_polling_expected
     assert payload["player_dataset_version"] == settings.player_dataset_version
     assert payload["projection_dataset_version"] == settings.projection_dataset_version
     assert payload["cfb27_rating_dataset_version"] == settings.cfb27_rating_dataset_version
     assert payload["database_instance_uuid"]
     assert payload["alembic_version"] == [head]
+    assert payload["alembic_revision"] == head
     assert payload["readiness_status"] == "ready"
     assert "database_host" not in payload
     assert "database_url" not in payload
 
 
-def test_development_runtime_reports_safe_database_identity(client, db_session):
+def test_runtime_reports_safe_database_identity(client, db_session):
     head = get_alembic_heads()[0]
     _reset_alembic_version(db_session, head)
 
@@ -62,7 +67,7 @@ def test_development_runtime_reports_safe_database_identity(client, db_session):
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["environment"] == "development"
+    assert payload["environment"] == settings.environment
     assert payload["runtime_mode"] == settings.runtime_mode
     assert payload["web_git_sha"] == settings.web_git_sha
     assert payload["worker_git_sha"] == settings.worker_git_sha
@@ -70,17 +75,27 @@ def test_development_runtime_reports_safe_database_identity(client, db_session):
     assert payload["projection_dataset_version"] == settings.projection_dataset_version
     assert payload["cfb27_rating_dataset_version"] == settings.cfb27_rating_dataset_version
     assert payload["database_instance_uuid"]
+    assert payload["alembic_version"] == [head]
     assert payload["alembic_revision"] == head
-    assert payload["api_started_at"]
+    assert payload["scoring_mode"] == settings.scoring_mode
+    assert payload["scoring_worker_expected"] is settings.scoring_worker_expected
+    assert payload["provider_polling_expected"] is settings.provider_polling_expected
     assert "database_url" not in payload
 
 
-def test_development_runtime_is_hidden_outside_development(client, monkeypatch):
+def test_runtime_remains_public_and_safe_in_production(client, db_session, monkeypatch):
+    head = get_alembic_heads()[0]
+    _reset_alembic_version(db_session, head)
     monkeypatch.setattr(settings, "environment", "production")
+    monkeypatch.setattr(settings, "scoring_mode", "disabled")
+    monkeypatch.setattr(settings, "sportsdata_enabled", False)
 
     response = client.get("/health/runtime")
 
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert response.json()["environment"] == "production"
+    assert response.json()["scoring_mode"] == "disabled"
+    assert response.json()["provider_polling_expected"] is False
 
 
 def test_readiness_returns_200_when_database_matches_alembic_head(client, db_session):

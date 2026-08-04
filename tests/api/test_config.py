@@ -224,6 +224,39 @@ def test_production_rejects_missing_sportsdata_credentials():
         )
 
 
+def test_production_allows_scoring_disabled_without_sportsdata_credentials():
+    required = production_required_settings()
+    required.pop("sportsdata_api_key")
+    required["sportsdata_enabled"] = False
+
+    settings = make_settings(
+        environment="production",
+        jwt_secret_key="safe-production-secret",
+        cors_origins="https://app.example.com",
+        cors_origin_regex=None,
+        refresh_cookie_secure=True,
+        scoring_mode="disabled",
+        **required,
+    )
+
+    assert settings.scoring_enabled is False
+    assert settings.scoring_worker_expected is False
+    assert settings.provider_polling_expected is False
+
+
+def test_production_rejects_provider_enablement_when_scoring_is_disabled():
+    with pytest.raises(ValidationError, match="SPORTSDATA_ENABLED must be false"):
+        make_settings(
+            environment="production",
+            jwt_secret_key="safe-production-secret",
+            cors_origins="https://app.example.com",
+            cors_origin_regex=None,
+            refresh_cookie_secure=True,
+            scoring_mode="disabled",
+            **production_required_settings(),
+        )
+
+
 def test_production_rejects_insecure_smtp():
     required = production_required_settings()
     required["smtp_use_tls"] = False

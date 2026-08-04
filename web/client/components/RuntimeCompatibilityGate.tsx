@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useState } from "react";
 
+import { buildApiUrl } from "@/lib/api";
 import { runtimeCompatibilityError, type RuntimeIdentity, WEB_BUILD_SHA } from "@/lib/runtime-compatibility";
 
 type GateState =
@@ -14,7 +15,7 @@ const RuntimeCompatibilityGate = ({ children }: { children: ReactNode }) => {
     let active = true;
     const verify = async () => {
       try {
-        const response = await fetch("/api/health/runtime", { cache: "no-store" });
+        const response = await fetch(buildApiUrl("/health/runtime"), { cache: "no-store" });
         if (!response.ok) throw new Error(`runtime status ${response.status}`);
         const runtime = (await response.json()) as RuntimeIdentity;
         const reason = runtimeCompatibilityError(runtime);

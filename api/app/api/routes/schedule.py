@@ -29,19 +29,20 @@ def schedule_preview(
 
     existing_schedule = db.query(Game.id).filter(Game.season == season).first()
     force_refresh = existing_schedule is None
-    try:
-        ensure_feed_fresh(
-            db,
-            provider="sportsdata",
-            feed="schedule_season",
-            scope={"season": season},
-            refresh_fn=lambda: sync_power4_schedule_from_sportsdata(db, season=season),
-            ttl_days=settings.sportsdata_schedule_ttl_days,
-            force_refresh=force_refresh,
-        )
-        db.commit()
-    except Exception:
-        db.rollback()
+    if settings.scoring_enabled and settings.sportsdata_enabled:
+        try:
+            ensure_feed_fresh(
+                db,
+                provider="sportsdata",
+                feed="schedule_season",
+                scope={"season": season},
+                refresh_fn=lambda: sync_power4_schedule_from_sportsdata(db, season=season),
+                ttl_days=settings.sportsdata_schedule_ttl_days,
+                force_refresh=force_refresh,
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
 
     games = (
         db.query(Game)

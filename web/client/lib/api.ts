@@ -39,7 +39,7 @@ export class ApiError extends Error {
   }
 }
 
-const buildUrl = (path: string, params?: Record<string, string | number | boolean | undefined>) => {
+export const buildApiUrl = (path: string, params?: Record<string, string | number | boolean | undefined>) => {
   const base = API_BASE.replace(/\/+$/, "");
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   const origin = typeof window === "undefined" ? "http://127.0.0.1" : window.location.origin;
@@ -133,7 +133,7 @@ const refreshAccessToken = async (): Promise<RefreshResult> => {
   }
   inflightRefresh = (async () => {
     try {
-      const res = await fetch(buildUrl("/auth/refresh"), {
+      const res = await fetch(buildApiUrl("/auth/refresh"), {
         method: "POST",
         credentials: "include",
       });
@@ -283,7 +283,7 @@ const apiRequest = async <T>({
   let res: Response;
   const requestSignal = createRequestSignal(signal);
   try {
-    res = await fetch(buildUrl(path, params), {
+    res = await fetch(buildApiUrl(path, params), {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),

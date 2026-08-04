@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { apiGet, apiPut, clearAccessTokenSession, storeAccessTokenSession } from "./api";
+import { apiGet, apiPut, buildApiUrl, clearAccessTokenSession, storeAccessTokenSession } from "./api";
 
 const originalFetch = globalThis.fetch;
 
@@ -12,6 +12,10 @@ afterEach(() => {
 });
 
 describe("api client", () => {
+  it("builds runtime checks through the shared API base", () => {
+    expect(buildApiUrl("/health/runtime")).toContain("/api/health/runtime");
+  });
+
   it("notifies the auth provider when the access token session is cleared", () => {
     const dispatchEvent = vi.fn();
     const removeItem = vi.fn();

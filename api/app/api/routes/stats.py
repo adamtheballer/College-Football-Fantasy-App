@@ -480,7 +480,7 @@ def get_power4_standings(
 
     existing_rows = read_power4_standings_snapshot(db, season=season, conference=conference_key)
     force_refresh = not existing_rows
-    if settings.sportsdata_enabled:
+    if settings.scoring_enabled and settings.sportsdata_enabled:
         try:
             ensure_feed_fresh(
                 db,
@@ -497,7 +497,7 @@ def get_power4_standings(
             if force_refresh:
                 _refresh_standings_snapshot(db, season, conference_key)
                 db.commit()
-    elif force_refresh:
+    elif force_refresh and settings.scoring_enabled:
         _refresh_standings_snapshot(db, season, conference_key)
         db.commit()
 
@@ -655,35 +655,36 @@ def list_power4_injuries(
     )
     force_refresh = existing_rows == 0
 
-    try:
-        ensure_feed_fresh(
-            db,
-            provider="sportsdata",
-            feed="injuries_week",
-            scope={"season": season, "week": week},
-            refresh_fn=lambda: sync_power4_injuries(
+    if settings.scoring_enabled and settings.sportsdata_enabled:
+        try:
+            ensure_feed_fresh(
                 db,
-                season=season,
-                week=week,
-                conference=conference_key,
-            ),
-            ttl_days=settings.sportsdata_injury_ttl_days,
-            force_refresh=force_refresh,
-        )
-        db.commit()
-    except Exception:
-        db.rollback()
-        if force_refresh:
-            try:
-                sync_power4_injuries(
+                provider="sportsdata",
+                feed="injuries_week",
+                scope={"season": season, "week": week},
+                refresh_fn=lambda: sync_power4_injuries(
                     db,
                     season=season,
                     week=week,
                     conference=conference_key,
-                )
-                db.commit()
-            except Exception:
-                db.rollback()
+                ),
+                ttl_days=settings.sportsdata_injury_ttl_days,
+                force_refresh=force_refresh,
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            if force_refresh:
+                try:
+                    sync_power4_injuries(
+                        db,
+                        season=season,
+                        week=week,
+                        conference=conference_key,
+                    )
+                    db.commit()
+                except Exception:
+                    db.rollback()
 
     query = db.query(Injury, Player).join(Player, Injury.player_id == Player.id)
     query = query.filter(Injury.season == season, Injury.week == week)

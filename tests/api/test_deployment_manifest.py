@@ -28,11 +28,7 @@ def test_production_manifest_covers_runtime_startup_requirements():
         "PRIVACY_POLICY_URL",
         "TERMS_URL",
         "PROVIDER_DISCLOSURE_URL",
-        "SCORING_PROVIDER",
-        "SPORTSDATA_API_KEY",
-        "SPORTSDATA_ENABLED",
-        "SCORING_SEASON",
-        "SCORING_WEEK",
+        "SCORING_MODE",
     }.issubset(required_env)
 
     safety_gates = production["safety_gates"]
@@ -40,7 +36,7 @@ def test_production_manifest_covers_runtime_startup_requirements():
     assert safety_gates["ui_base_url_must_be_non_local_https"] is True
     assert safety_gates["email_delivery_must_be_smtp"] is True
     assert safety_gates["smtp_tls_must_be_true"] is True
-    assert safety_gates["sportsdata_credentials_required"] is True
+    assert safety_gates["sportsdata_credentials_required_when_scoring_enabled"] is True
 
 
 def test_production_manifest_starts_required_lifecycle_workers_before_promotion():
@@ -60,5 +56,8 @@ def test_production_manifest_starts_required_lifecycle_workers_before_promotion(
     ]
     assert production["release_source"]["canonical_id_owner"] == "application_database_players_id"
     assert production["release_source"]["source_snapshot_directory"] == "reports/source-imports/2026"
-    assert production["workers"]["scoring_processor"]["enabled"] is True
+    assert production["scoring"]["mode"] == "disabled"
+    assert production["scoring"]["provider_polling"] is False
+    assert production["scoring"]["worker_deployed"] is False
+    assert production["workers"]["scoring_processor"]["enabled"] is False
     assert production["workers"]["lifecycle_processor"]["enabled"] is True

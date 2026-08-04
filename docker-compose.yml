@@ -50,6 +50,7 @@ services:
       PLAYER_DATASET_VERSION: "${CFF_PLAYER_DATASET_VERSION:-unknown}"
       PROJECTION_DATASET_VERSION: "${CFF_PROJECTION_DATASET_VERSION:-unknown}"
       CFB27_RATING_DATASET_VERSION: "${CFF_CFB27_RATING_DATASET_VERSION:-unknown}"
+      SCORING_MODE: "${SCORING_MODE:-enabled}"
       # Keep this beta compliance flag deploy-configurable. It defaults to
       # false, but a future licensed deployment can opt in without changing
       # the Compose contract or database schema.

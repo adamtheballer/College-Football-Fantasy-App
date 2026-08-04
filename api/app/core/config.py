@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -48,6 +49,10 @@ class Settings(BaseSettings):
     sportsdata_api_key: str | None = None
     sportsdata_base_url: str = "https://api.sportsdata.io/v3/cfb"
     sportsdataio_api_key: str | None = None
+    # Public beta can run all non-scoring workflows without a live provider.
+    # Keep this explicit rather than inferring it from whether a key happened
+    # to be configured, so a later credential change cannot start polling.
+    scoring_mode: Literal["enabled", "disabled"] = "enabled"
     scoring_provider: str = "sportsdata"
     scoring_allow_unofficial_providers: bool = False
     scoring_worker_interval_live_seconds: int = 60
@@ -179,6 +184,18 @@ class Settings(BaseSettings):
         return self.environment.strip().lower() == "production"
 
     @property
+    def scoring_enabled(self) -> bool:
+        return self.scoring_mode == "enabled"
+
+    @property
+    def scoring_worker_expected(self) -> bool:
+        return self.scoring_enabled
+
+    @property
+    def provider_polling_expected(self) -> bool:
+        return self.scoring_enabled and self.sportsdata_enabled
+
+    @property
     def allowed_cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
@@ -260,11 +277,16 @@ class Settings(BaseSettings):
         if not self.provider_disclosure_url:
             raise ValueError("PROVIDER_DISCLOSURE_URL is required when ENVIRONMENT=production")
 
+        if not self.scoring_enabled and self.sportsdata_enabled:
+            raise ValueError("SPORTSDATA_ENABLED must be false when SCORING_MODE=disabled")
+
         scoring_provider = self.scoring_provider.strip().lower()
-        if scoring_provider in {"espn", "cache", "mock"} and not self.scoring_allow_unofficial_providers:
+        if self.scoring_enabled and scoring_provider in {"espn", "cache", "mock"} and not self.scoring_allow_unofficial_providers:
             raise ValueError("Unofficial SCORING_PROVIDER requires SCORING_ALLOW_UNOFFICIAL_PROVIDERS=true")
 
-        if scoring_provider == "sportsdata" and (not self.sportsdata_enabled or not self.sportsdata_api_key):
+        if self.scoring_enabled and scoring_provider == "sportsdata" and (
+            not self.sportsdata_enabled or not self.sportsdata_api_key
+        ):
             raise ValueError("SPORTSDATA_ENABLED=true and SPORTSDATA_API_KEY are required for production sportsdata scoring")
 
         if self.scoring_worker_interval_live_seconds < 30:

@@ -130,6 +130,7 @@ See `.env.example` for the full list.
 - `SMTP_FROM_EMAIL`
 - `SMTP_USE_TLS`
 - `SCORING_PROVIDER`
+- `SCORING_MODE` (`enabled` or `disabled`)
 - `SCORING_ALLOW_UNOFFICIAL_PROVIDERS`
 - `SCORING_WORKER_INTERVAL_LIVE_SECONDS`
 - `SCORING_WORKER_INTERVAL_POSTGAME_SECONDS`
@@ -156,6 +157,8 @@ Production must use:
 - valid SMTP sender configuration so password-reset links are deliverable
 - `SCORING_PROVIDER=sportsdata` or another licensed provider integration approved for production use
 - `SUPPORT_EMAIL`, `PRIVACY_POLICY_URL`, `TERMS_URL`, and `PROVIDER_DISCLOSURE_URL` set to public support/legal pages
+
+For the public beta, set `SCORING_MODE=disabled` and `SPORTSDATA_ENABLED=false`. This prevents live provider polling and scoring-worker startup while leaving drafts, rosters, waivers, trades, projections, player cards, and lifecycle work available from existing application data. A live-scoring deployment must instead set `SCORING_MODE=enabled`, provide the approved provider configuration, and deploy the scoring worker.
 
 The API refuses to start in production with the `.env.example` JWT placeholder, default localhost CORS origins, wildcard CORS origins, or the default localhost CORS regex.
 When SMTP delivery is enabled, production startup also requires `SMTP_HOST` and `SMTP_FROM_EMAIL`.

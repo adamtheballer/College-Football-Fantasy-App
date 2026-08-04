@@ -7,6 +7,8 @@ from collegefootballfantasy_api.app.core.config import settings
 
 class SportsDataClient:
     def __init__(self, api_key: str | None = None, base_url: str | None = None) -> None:
+        if not settings.scoring_enabled or not settings.sportsdata_enabled:
+            raise RuntimeError("SportsData provider polling is disabled by SCORING_MODE.")
         self.api_key = api_key or settings.sportsdata_api_key
         self.base_url = (base_url or settings.sportsdata_base_url).rstrip("/")
 

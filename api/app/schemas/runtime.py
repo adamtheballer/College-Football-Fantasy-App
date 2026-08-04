@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from pydantic import BaseModel
 
 
@@ -14,28 +12,14 @@ class RuntimeIdentityRead(BaseModel):
     web_git_sha: str
     worker_git_sha: str
     environment: str
+    scoring_mode: str
+    sportsdata_enabled: bool
+    scoring_worker_expected: bool
+    provider_polling_expected: bool
     player_dataset_version: str
     projection_dataset_version: str
     cfb27_rating_dataset_version: str
     database_instance_uuid: str | None = None
     alembic_version: list[str]
-    readiness_status: str
-
-
-class DevelopmentRuntimeRead(BaseModel):
-    """Development-only diagnostics; never expose connection details."""
-
-    git_sha: str
-    git_branch: str
-    runtime_id: str | None = None
-    api_process_instance_uuid: str
-    web_git_sha: str
-    worker_git_sha: str
-    environment: str
-    runtime_mode: str
-    player_dataset_version: str
-    projection_dataset_version: str
-    cfb27_rating_dataset_version: str
-    database_instance_uuid: str | None = None
     alembic_revision: str | None = None
-    api_started_at: datetime
+    readiness_status: str

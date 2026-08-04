@@ -2,12 +2,60 @@ from datetime import datetime, timedelta, timezone
 
 from conftest import admin_headers
 from collegefootballfantasy_api.app.api.routes import stats as stats_routes
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.integrations.sportsdata import SportsDataClient
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.provider_sync_state import ProviderSyncState
 from collegefootballfantasy_api.app.services.sportsdata_sync import upsert_power4_standings_snapshot
+
+
+def test_disabled_scoring_mode_makes_zero_sportsdata_requests(client, db_session, monkeypatch):
+    create_response = client.post(
+        "/players",
+        json=[
+            {
+                "external_id": "disabled-1001",
+                "name": "Disabled Provider",
+                "position": "QB",
+                "school": "Alabama",
+            }
+        ],
+        headers=admin_headers(client),
+    )
+    assert create_response.status_code == 201
+    player_id = create_response.json()[0]["id"]
+    monkeypatch.setattr(settings, "scoring_mode", "disabled")
+    monkeypatch.setattr(settings, "sportsdata_enabled", False)
+
+    def fail_if_requested(*_args, **_kwargs):
+        raise AssertionError("SportsData must not receive a request while scoring is disabled")
+
+    monkeypatch.setattr(SportsDataClient, "_request", fail_if_requested)
+
+    response = client.get(
+        f"/players/{player_id}/stats?season=2026&week=1&refresh=true",
+        headers=admin_headers(client),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["stats"] is None
+    assert "disabled" in (response.json()["message"] or "").lower()
+
+
+def test_disabled_scoring_mode_skips_standings_provider_refresh(client, monkeypatch):
+    monkeypatch.setattr(settings, "scoring_mode", "disabled")
+    monkeypatch.setattr(settings, "sportsdata_enabled", False)
+    monkeypatch.setattr(
+        stats_routes,
+        "sync_power4_standings_from_sportsdata",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("provider refresh must stay disabled")),
+    )
+
+    response = client.get("/stats/standings?season=2026&conference=SEC")
+
+    assert response.status_code == 200
 
 
 def test_player_stats_endpoint_uses_db_backed_sportsdata_cache(client, db_session, monkeypatch):

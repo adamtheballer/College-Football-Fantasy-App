@@ -5,6 +5,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.integrations.sportsdata import SportsDataClient
 from collegefootballfantasy_api.app.models.league import League
@@ -117,6 +118,8 @@ def record_global_failure(provider: str, season: int, week: int, league_id: int 
 
 
 def run_once(args: argparse.Namespace) -> None:
+    if not settings.scoring_enabled:
+        raise RuntimeError("Live score synchronization is disabled by SCORING_MODE.")
     try:
         sync_result = upsert_provider_player_stats(args.provider, args.season, args.week)
         totals = {"players": 0, "teams": 0, "matchups": 0}

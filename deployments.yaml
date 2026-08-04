@@ -119,11 +119,16 @@ environments:
         VITE_BETA_ACCESS_ENABLED: ${VITE_BETA_ACCESS_ENABLED}
       requires_api_readiness: true
       release_check: curl --fail --show-error --silent ${PUBLIC_API_BASE_URL}/health/ready
+    scoring:
+      # Public beta intentionally has no live provider polling or scoring processor.
+      mode: disabled
+      provider_polling: false
+      worker_deployed: false
     workers:
       scoring_processor:
-        enabled: true
+        enabled: false
         command: PYTHONPATH=. uv run python scripts/run_scoring_worker.py --season ${SCORING_SEASON} --week ${SCORING_WEEK} --mode live
-        note: Required server-side processor for live score ingestion and matchup recalculation.
+        note: Omitted for public beta. Enable only with SCORING_MODE=enabled and an approved provider credential.
       lifecycle_processor:
         enabled: true
         command: PYTHONPATH=. uv run python scripts/run_lifecycle_worker.py
@@ -150,16 +155,17 @@ environments:
       - PRIVACY_POLICY_URL
       - TERMS_URL
       - PROVIDER_DISCLOSURE_URL
-      - SCORING_PROVIDER
-      - SPORTSDATA_API_KEY
-      - SPORTSDATA_ENABLED
-      - SCORING_SEASON
-      - SCORING_WEEK
+      - SCORING_MODE
     optional_env:
       - CORS_ORIGIN_REGEX
       - SMTP_PORT
       - SMTP_USERNAME
       - SMTP_PASSWORD
+      - SCORING_PROVIDER
+      - SPORTSDATA_API_KEY
+      - SPORTSDATA_ENABLED
+      - SCORING_SEASON
+      - SCORING_WEEK
     safety_gates:
       environment_must_equal: production
       reject_default_jwt_secret: true
@@ -169,7 +175,7 @@ environments:
       ui_base_url_must_be_non_local_https: true
       email_delivery_must_be_smtp: true
       smtp_tls_must_be_true: true
-      sportsdata_credentials_required: true
+      sportsdata_credentials_required_when_scoring_enabled: true
       migrations_before_api: true
       verify_alembic_head_before_promotion: true
       require_health_ready_before_traffic: true

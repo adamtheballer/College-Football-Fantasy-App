@@ -10,12 +10,11 @@ from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.application_instance import ApplicationInstance
-from collegefootballfantasy_api.app.schemas.runtime import DevelopmentRuntimeRead, RuntimeIdentityRead
+from collegefootballfantasy_api.app.schemas.runtime import RuntimeIdentityRead
 from collegefootballfantasy_api.app.services.readiness import check_alembic_readiness
 
 
 API_PROCESS_INSTANCE_UUID = str(uuid4())
-API_STARTED_AT = datetime.now(timezone.utc)
 
 
 def get_or_create_application_instance(db: Session, schema_version: str | None) -> ApplicationInstance:
@@ -61,30 +60,15 @@ def build_public_runtime_identity(db: Session) -> RuntimeIdentityRead:
         web_git_sha=settings.web_git_sha,
         worker_git_sha=settings.worker_git_sha,
         environment=settings.environment,
+        scoring_mode=settings.scoring_mode,
+        sportsdata_enabled=settings.sportsdata_enabled,
+        scoring_worker_expected=settings.scoring_worker_expected,
+        provider_polling_expected=settings.provider_polling_expected,
         player_dataset_version=settings.player_dataset_version,
         projection_dataset_version=settings.projection_dataset_version,
         cfb27_rating_dataset_version=settings.cfb27_rating_dataset_version,
         database_instance_uuid=instance.instance_uuid if instance else None,
         alembic_version=readiness.current_revisions,
+        alembic_revision=",".join(readiness.current_revisions) or None,
         readiness_status=readiness.status,
-    )
-
-
-def build_development_runtime(db: Session) -> DevelopmentRuntimeRead:
-    identity = build_public_runtime_identity(db)
-    return DevelopmentRuntimeRead(
-        git_sha=identity.git_sha,
-        git_branch=identity.git_branch,
-        runtime_id=identity.runtime_id,
-        api_process_instance_uuid=identity.api_process_instance_uuid,
-        web_git_sha=identity.web_git_sha,
-        worker_git_sha=identity.worker_git_sha,
-        environment=identity.environment,
-        runtime_mode=identity.runtime_mode,
-        player_dataset_version=identity.player_dataset_version,
-        projection_dataset_version=identity.projection_dataset_version,
-        cfb27_rating_dataset_version=identity.cfb27_rating_dataset_version,
-        database_instance_uuid=identity.database_instance_uuid,
-        alembic_revision=",".join(identity.alembic_version) or None,
-        api_started_at=API_STARTED_AT,
     )
