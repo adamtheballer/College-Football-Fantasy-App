@@ -820,6 +820,78 @@ def test_league_workspace_returns_real_matchup_and_standings(client, db_session)
     assert body["standings_summary"][1]["team_id"] == member_team.id
 
 
+def test_member_can_load_another_same_league_matchup_for_selected_week(client, db_session):
+    commissioner_token = create_user_and_token(client, "matchup-selector-commissioner")
+    league = create_league(client, commissioner_token, name="Matchup Selector League", max_teams=4)
+    for suffix in ("matchup-selector-two", "matchup-selector-three", "matchup-selector-four"):
+        member_token = create_user_and_token(client, suffix)
+        assert client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token)).status_code == 200
+
+    teams = db_session.query(Team).filter(Team.league_id == league["id"]).order_by(Team.id.asc()).all()
+    assert len(teams) == 4
+    own_matchup = Matchup(
+        league_id=league["id"],
+        season=2026,
+        week=5,
+        home_team_id=teams[0].id,
+        away_team_id=teams[1].id,
+        status="projected",
+    )
+    league_mate_matchup = Matchup(
+        league_id=league["id"],
+        season=2026,
+        week=5,
+        home_team_id=teams[2].id,
+        away_team_id=teams[3].id,
+        status="projected",
+    )
+    db_session.add_all([own_matchup, league_mate_matchup])
+    db_session.commit()
+
+    selected = client.get(
+        f"/leagues/{league['id']}/matchup?week=5&matchup_id={league_mate_matchup.id}",
+        headers=auth_headers(commissioner_token),
+    )
+
+    assert selected.status_code == 200
+    body = selected.json()
+    assert body["matchup_id"] == league_mate_matchup.id
+    assert body["week"] == 5
+    assert body["my_team"]["fantasy_team_id"] == teams[2].id
+    assert body["opponent_team"]["fantasy_team_id"] == teams[3].id
+    assert body["user_team"] is None
+
+    wrong_week = client.get(
+        f"/leagues/{league['id']}/matchup?week=6&matchup_id={league_mate_matchup.id}",
+        headers=auth_headers(commissioner_token),
+    )
+    assert wrong_week.status_code == 404
+
+    other_league = create_league(client, commissioner_token, name="Other Matchup Selector League", max_teams=2)
+    other_member_token = create_user_and_token(client, "other-matchup-selector-member")
+    assert client.post(
+        f"/leagues/{other_league['id']}/join",
+        headers=auth_headers(other_member_token),
+    ).status_code == 200
+    other_teams = db_session.query(Team).filter(Team.league_id == other_league["id"]).all()
+    other_matchup = Matchup(
+        league_id=other_league["id"],
+        season=2026,
+        week=5,
+        home_team_id=other_teams[0].id,
+        away_team_id=other_teams[1].id,
+        status="projected",
+    )
+    db_session.add(other_matchup)
+    db_session.commit()
+
+    cross_league = client.get(
+        f"/leagues/{league['id']}/matchup?week=5&matchup_id={other_matchup.id}",
+        headers=auth_headers(commissioner_token),
+    )
+    assert cross_league.status_code == 404
+
+
 def test_league_workspace_requires_membership(client):
     owner_token = create_user_and_token(client, "owner")
     outsider_token = create_user_and_token(client, "outsider")
@@ -1003,7 +1075,7 @@ def test_league_hub_endpoints_require_membership(client):
     outsider_token = create_user_and_token(client, "outsider-hub")
     league = create_league(client, owner_token, name="Protected Hub League")
 
-    for path in ("matchups", "power-rankings", "news"):
+    for path in ("matchup", "matchups", "power-rankings", "news"):
         response = client.get(f"/leagues/{league['id']}/{path}", headers=auth_headers(outsider_token))
         assert response.status_code == 403
         assert response.json()["detail"] == "league membership required"

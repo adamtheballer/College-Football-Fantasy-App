@@ -398,10 +398,45 @@ def build_matchup_tab_view(
     league: League,
     user: User,
     selected_week: int | None = None,
+    matchup_id: int | None = None,
 ) -> LeagueMatchupTabRead:
     week = resolve_current_week(db, league, selected_week)
-    team = _owned_team(db, league, user)
-    if not team:
+    viewer_team = _owned_team(db, league, user)
+    if matchup_id is not None:
+        matchup = (
+            db.query(Matchup)
+            .filter(
+                Matchup.id == matchup_id,
+                Matchup.league_id == league.id,
+                Matchup.season == league.season_year,
+                Matchup.week == week,
+            )
+            .first()
+        )
+        primary_team = db.get(Team, matchup.home_team_id) if matchup else None
+        opponent = db.get(Team, matchup.away_team_id) if matchup else None
+    else:
+        primary_team = viewer_team
+        matchup = (
+            db.query(Matchup)
+            .filter(
+                Matchup.league_id == league.id,
+                Matchup.season == league.season_year,
+                Matchup.week == week,
+                (Matchup.home_team_id == primary_team.id) | (Matchup.away_team_id == primary_team.id),
+            )
+            .first()
+            if primary_team
+            else None
+        )
+        opponent_id = (
+            matchup.away_team_id if matchup and matchup.home_team_id == primary_team.id else matchup.home_team_id
+            if matchup and primary_team
+            else None
+        )
+        opponent = db.get(Team, opponent_id) if opponent_id else None
+
+    if not primary_team:
         return LeagueMatchupTabRead(
             league_id=league.id,
             season=league.season_year,
@@ -411,28 +446,18 @@ def build_matchup_tab_view(
             message="No team found for your user in this league.",
         )
 
-    matchup = (
-        db.query(Matchup)
-        .filter(
-            Matchup.league_id == league.id,
-            Matchup.season == league.season_year,
-            Matchup.week == week,
-            (Matchup.home_team_id == team.id) | (Matchup.away_team_id == team.id),
-        )
-        .first()
-    )
     if not matchup:
-        my_roster = _serialize_team_roster(db, league, team, week)
+        my_roster = _serialize_team_roster(db, league, primary_team, week)
         my_total, my_variance = _starter_projection_summary(my_roster)
         my_prob, opponent_prob = calculate_matchup_win_probability(my_total, my_total, my_variance, my_variance)
         my_team = MatchupTeamRead(
-            id=team.id,
-            name=team.name,
-            record=_team_record(db, league, team.id),
+            id=primary_team.id,
+            name=primary_team.name,
+            record=_team_record(db, league, primary_team.id),
             projected_points=my_total,
             win_probability=my_prob,
-            fantasy_team_id=team.id,
-            fantasy_team_name=team.name,
+            fantasy_team_id=primary_team.id,
+            fantasy_team_name=primary_team.name,
             projected_total=my_total,
             roster=my_roster,
         )
@@ -442,30 +467,27 @@ def build_matchup_tab_view(
             week=week,
             status=None,
             my_team=my_team,
-            user_team=my_team,
+            user_team=my_team if viewer_team and viewer_team.id == primary_team.id else None,
             opponent_team=None,
             my_roster=my_roster,
             opponent_roster=[],
             message="No matchup generated yet.",
         )
 
-    opponent_id = matchup.away_team_id if matchup.home_team_id == team.id else matchup.home_team_id
-    opponent = db.get(Team, opponent_id)
-    opponent_name = opponent.name if opponent else "TBD"
     roster_by_team = _serialize_team_rosters(
         db,
         league,
-        {team.id: team, **({opponent.id: opponent} if opponent else {})},
+        {primary_team.id: primary_team, **({opponent.id: opponent} if opponent else {})},
         week,
     )
-    my_roster = roster_by_team[team.id]
+    my_roster = roster_by_team[primary_team.id]
     opponent_roster = roster_by_team.get(opponent.id, []) if opponent else []
     my_total, my_variance = _starter_projection_summary(my_roster)
     opponent_total, opponent_variance = _starter_projection_summary(opponent_roster)
     status = (matchup.status or "").lower()
     use_scored_totals = status in {"live", "final", "stat_corrected"}
     if use_scored_totals:
-        if matchup.home_team_id == team.id:
+        if matchup.home_team_id == primary_team.id:
             my_total = float(matchup.home_score or 0.0)
             opponent_total = float(matchup.away_score or 0.0)
         else:
@@ -478,18 +500,18 @@ def build_matchup_tab_view(
         opponent_variance,
     )
 
-    record_team_ids = {team.id}
+    record_team_ids = {primary_team.id}
     if opponent:
         record_team_ids.add(opponent.id)
     records = _team_records(db, league, record_team_ids)
     my_team = MatchupTeamRead(
-        id=team.id,
-        name=team.name,
-        record=records[team.id],
+        id=primary_team.id,
+        name=primary_team.name,
+        record=records[primary_team.id],
         projected_points=my_total,
         win_probability=my_probability,
-        fantasy_team_id=team.id,
-        fantasy_team_name=team.name,
+        fantasy_team_id=primary_team.id,
+        fantasy_team_name=primary_team.name,
         projected_total=my_total,
         roster=my_roster,
     )
@@ -515,7 +537,7 @@ def build_matchup_tab_view(
         matchup_id=matchup.id,
         status=matchup.status,
         my_team=my_team,
-        user_team=my_team,
+        user_team=my_team if viewer_team and viewer_team.id == primary_team.id else None,
         opponent_team=opponent_team,
         my_roster=my_roster,
         opponent_roster=opponent_roster,

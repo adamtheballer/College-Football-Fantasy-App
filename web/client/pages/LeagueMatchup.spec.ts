@@ -4,9 +4,12 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+const routerMocks = vi.hoisted(() => ({ setSearchParams: vi.fn() }));
+
 vi.mock("react-router-dom", () => ({
   Navigate: () => null,
   useParams: () => ({ leagueId: "42" }),
+  useSearchParams: () => [new URLSearchParams(), routerMocks.setSearchParams],
 }));
 
 vi.mock("@/components/league/LeagueTabs", () => ({ LeagueTabs: () => null }));
@@ -88,17 +91,18 @@ describe("league matchup helpers", () => {
 });
 
 describe("league matchup scoreboard", () => {
-  it("reveals every other scheduled league matchup without duplicating the viewer's game", () => {
+  it("lets a member load another same-league matchup through the canonical detail query", () => {
     render(createElement(LeagueMatchup));
 
-    expect(screen.getByRole("button", { name: "View league matchups" })).toBeTruthy();
-    expect(screen.queryByText("League Mate One")).toBeNull();
+    const selector = screen.getByRole("combobox", { name: "League matchup" });
+    expect(selector).toBeTruthy();
+    expect(screen.getByRole("option", { name: "My Team vs My Opponent" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "League Mate One vs League Mate Two" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "View league matchups" }));
+    fireEvent.change(selector, { target: { value: "2" } });
 
-    expect(screen.getByRole("heading", { name: "Other Week 1 Matchups" })).toBeTruthy();
-    expect(screen.getByText("League Mate One")).toBeTruthy();
-    expect(screen.getByText("League Mate Two")).toBeTruthy();
-    expect(screen.queryByText("No other matchups this week")).toBeNull();
+    expect(routerMocks.setSearchParams).toHaveBeenCalledTimes(1);
+    const nextParams = routerMocks.setSearchParams.mock.calls[0][0] as URLSearchParams;
+    expect(nextParams.toString()).toBe("week=1&matchup=2");
   });
 });

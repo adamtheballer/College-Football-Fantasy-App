@@ -13,6 +13,7 @@ from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
+from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.draft_room import (
@@ -152,12 +153,35 @@ def get_league_roster_tab_endpoint(
 def get_league_matchup_tab_endpoint(
     league_id: int,
     week: int | None = None,
+    matchup_id: int | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeagueMatchupTabRead:
     league = get_league_or_404(db, league_id)
     require_league_member(db, league.id, current_user)
-    return build_matchup_tab_view(db, league, current_user, selected_week=week)
+    if matchup_id is not None:
+        resolved_week = week
+        if resolved_week is None:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="week is required when matchup_id is provided")
+        matchup_exists = (
+            db.query(Matchup.id)
+            .filter(
+                Matchup.id == matchup_id,
+                Matchup.league_id == league.id,
+                Matchup.season == league.season_year,
+                Matchup.week == resolved_week,
+            )
+            .first()
+        )
+        if matchup_exists is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="matchup not found in this league and week")
+    return build_matchup_tab_view(
+        db,
+        league,
+        current_user,
+        selected_week=week,
+        matchup_id=matchup_id,
+    )
 
 
 @router.get("/{league_id}/players/{player_id}/history", response_model=LeaguePlayerHistoryRead)

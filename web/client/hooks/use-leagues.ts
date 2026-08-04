@@ -173,10 +173,11 @@ export function useLeagueRosterTab(
 export function useLeagueMatchupTab(
   leagueId?: number,
   week?: number,
+  matchupId?: number,
   enabled = true
 ) {
   return useQuery({
-    queryKey: ["league", leagueId, "matchup", week ?? "auto"],
+    queryKey: ["league", leagueId, "matchup", week ?? "auto", matchupId ?? "mine"],
     enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
     staleTime: 30_000,
     retry: (failureCount, error) => {
@@ -188,6 +189,7 @@ export function useLeagueMatchupTab(
     queryFn: () =>
       apiGet<LeagueMatchupTabResponse>(`/leagues/${leagueId}/matchup`, {
         week: typeof week === "number" ? week : undefined,
+        matchup_id: typeof matchupId === "number" ? matchupId : undefined,
       }),
     refetchInterval: (query) => {
       const status = query.state.data?.status?.toLowerCase();
