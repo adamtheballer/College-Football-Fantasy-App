@@ -11,6 +11,7 @@ import {
   formatPlayerCardValue,
   getPlayerCardPalette,
   normalizeTradeValueMeter,
+  resolvePlayerCardCfb27Rating,
   resolvePlayerCardProjectionStats,
   tradeValueMeterDegrees,
   visiblePlayerCardAboutMessage,
@@ -57,6 +58,12 @@ describe("PlayerCardModal helpers", () => {
     expect(CFB27_RATING_LABEL).toBe("CFB 27 Rating");
     expect(formatCfb27Rating(85)).toBe("85");
     expect(formatCfb27Rating(null)).toBe("N/A");
+  });
+
+  it("uses the same loaded CFB 27 rating for every player-card rating display", () => {
+    expect(resolvePlayerCardCfb27Rating({ player: { cfb27_overall: 90 } } as never, 73)).toBe(90);
+    expect(resolvePlayerCardCfb27Rating(null, 73)).toBe(73);
+    expect(resolvePlayerCardCfb27Rating(null, null)).toBeNull();
   });
 
   it("shows a drafted player's round, pick, and overall selection in league history", () => {

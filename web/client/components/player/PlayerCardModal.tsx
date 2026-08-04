@@ -138,6 +138,11 @@ export const normalizeTradeValueMeter = (value: number) =>
 export const tradeValueMeterDegrees = (value: number) =>
   (normalizeTradeValueMeter(value) / 99) * 360;
 
+export const resolvePlayerCardCfb27Rating = (
+  card?: PlayerCardResponse | null,
+  contextualRating?: number | null,
+) => card?.player.cfb27_overall ?? contextualRating ?? null;
+
 export const draftHistorySummary = (event: { event_type: string; metadata?: Record<string, unknown> | null }) => {
   if (event.event_type !== "DRAFTED" && event.event_type !== "AUTO_DRAFTED") return null;
   const metadata = event.metadata ?? {};
@@ -340,6 +345,7 @@ export function PlayerCardModal({
     historicalSeasons[0] ??
     null;
   const projectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
+  const cfb27Rating = resolvePlayerCardCfb27Rating(card, player.cfb27Overall);
   const aboutMessage = visiblePlayerCardAboutMessage(card?.about.message);
   const cardActions = [...(action ? [action] : []), ...actions];
   const projectionHighlights = [
@@ -394,7 +400,7 @@ export function PlayerCardModal({
       >
         <PlayerCardHeader
           card={card}
-          cfb27Rating={card?.player.cfb27_overall ?? player.cfb27Overall ?? null}
+          cfb27Rating={cfb27Rating}
           onClose={onClose}
           palette={palette}
           player={player}
@@ -824,17 +830,18 @@ export function PlayerCardModal({
               : valueQuery.data?.current ? (() => {
                 const value = valueQuery.data.current;
                 const change = value.weekly_change;
-                const meterValue = normalizeTradeValueMeter(value.value);
-                const meterDegrees = tradeValueMeterDegrees(value.value);
+                const meterSource = cfb27Rating ?? value.value;
+                const meterValue = normalizeTradeValueMeter(meterSource);
+                const meterDegrees = tradeValueMeterDegrees(meterSource);
                 const meterColor = meterValue >= 90 ? "#5ee7ff" : meterValue >= 80 ? "#5eead4" : meterValue >= 70 ? "#93c5fd" : "#fdba74";
                 return (
                   <div className="mt-5">
                     <div className="grid gap-5 md:grid-cols-[220px_1fr]">
-                      <div className="flex aspect-square w-full max-w-[220px] items-center justify-center rounded-full p-3" style={{ background: `conic-gradient(from -90deg, ${meterColor} 0deg ${meterDegrees}deg, rgba(148, 163, 184, 0.22) ${meterDegrees}deg 360deg)` }} aria-label={`Trade value ${meterValue.toFixed(0)} out of 99, ${value.tier.replace(/_/g, " ")}`}>
+                      <div className="flex aspect-square w-full max-w-[220px] items-center justify-center rounded-full p-3" style={{ background: `conic-gradient(from -90deg, ${meterColor} 0deg ${meterDegrees}deg, rgba(148, 163, 184, 0.22) ${meterDegrees}deg 360deg)` }} aria-label={`CFB 27 rating ${meterValue.toFixed(0)} out of 99`}>
                         <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-slate-950 text-center">
                           <p className="text-5xl font-black tabular-nums text-white">{meterValue.toFixed(0)}</p>
                           <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">out of 99</p>
-                          <p className="mt-3 text-xs font-black uppercase tracking-[0.15em] text-cyan-200">{value.tier.replace(/_/g, " ")}</p>
+                          <p className="mt-3 text-xs font-black uppercase tracking-[0.15em] text-cyan-200">CFB 27 Rating</p>
                         </div>
                       </div>
                       <div className="grid content-center gap-3 sm:grid-cols-3">
