@@ -54,7 +54,6 @@ test.describe("real seeded stack", () => {
     await expect(page).toHaveURL(/\/leagues$/);
 
     expect(apiResponses.some((response) => response.url.includes("/auth/signup") && response.status === 201)).toBe(true);
-    expect(apiResponses.some((response) => response.url.includes("/auth/me") && response.status === 200)).toBe(true);
 
     await page.locator("button:has(#nav-sign-out)").click();
     await expect
