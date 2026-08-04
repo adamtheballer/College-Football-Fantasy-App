@@ -6,6 +6,7 @@ import {
   isAuthFlowRoute,
   isCreateLeagueRoute,
   isDraftRoomRoute,
+  isSaturdayPick6Route,
   navDomId,
 } from "./navigation";
 import type { User } from "@/hooks/use-auth";
@@ -27,6 +28,8 @@ describe("app shell navigation helpers", () => {
   it("detects create-league and auth flow shell exceptions", () => {
     expect(isCreateLeagueRoute("/leagues/create")).toBe(true);
     expect(isCreateLeagueRoute("/leagues/join")).toBe(false);
+    expect(isSaturdayPick6Route("/saturday-pick-6")).toBe(true);
+    expect(isSaturdayPick6Route("/")).toBe(false);
     expect(isAuthFlowRoute("/login")).toBe(true);
     expect(isAuthFlowRoute("/league/1/roster")).toBe(false);
   });

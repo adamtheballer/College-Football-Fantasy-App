@@ -8,6 +8,7 @@ import {
   isAuthFlowRoute,
   isCreateLeagueRoute,
   isDraftRoomRoute,
+  isSaturdayPick6Route,
 } from "./app-shell/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useChatUnreadSummary } from "@/hooks/use-chat";
@@ -32,6 +33,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const isDraftRoomPage = isDraftRoomRoute(location.pathname);
   const isCreateLeaguePage = isCreateLeagueRoute(location.pathname);
+  const isSaturdayPick6Page = isSaturdayPick6Route(location.pathname);
   const isAuthFlowPage = isAuthFlowRoute(location.pathname);
 
   useEffect(() => {
@@ -83,7 +85,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         isLoggedIn={isLoggedIn}
         hideChrome={isDraftRoomPage}
         hideDecor={isCreateLeaguePage}
-        hideFloatingActions={isDraftRoomPage || isCreateLeaguePage}
+        hideFloatingActions={isDraftRoomPage || isCreateLeaguePage || isSaturdayPick6Page}
         compactContent={isDraftRoomPage || isCreateLeaguePage}
         onSignOut={logout}
         mainScrollRef={mainScrollRef}

@@ -29,6 +29,8 @@ export const isDraftRoomRoute = (pathname: string) =>
 
 export const isCreateLeagueRoute = (pathname: string) => pathname === "/leagues/create";
 
+export const isSaturdayPick6Route = (pathname: string) => pathname === "/saturday-pick-6";
+
 export const isAuthFlowRoute = (pathname: string) =>
   pathname === "/login" ||
   pathname === "/signup" ||
