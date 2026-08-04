@@ -409,7 +409,7 @@ export function PlayerCardModal({
       >
         <PlayerCardHeader
           card={card}
-          currentValue={valueQuery.data?.current ? normalizeTradeValueMeter(valueQuery.data.current.value) : null}
+          cfb27Rating={card?.player.cfb27_overall ?? player.cfb27Overall ?? null}
           onClose={onClose}
           palette={palette}
           player={player}
