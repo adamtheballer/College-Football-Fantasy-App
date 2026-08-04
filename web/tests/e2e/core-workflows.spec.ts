@@ -228,7 +228,7 @@ test.describe("critical browser workflows", () => {
     winner = true;
     await page.reload();
     await expect(page.getByRole("heading", { name: "You got it right", exact: true })).toBeVisible();
-    await expect(page.getByText("Your code will appear here when the sponsor provides it.")).toBeVisible();
+    await expect(page.getByText("Your reward code is being prepared.")).toBeVisible();
   });
 
   test("login flow stores auth session and routes to dashboard", async ({ page }) => {
@@ -324,6 +324,16 @@ test.describe("critical browser workflows", () => {
         body: JSON.stringify(readyUser),
       });
     });
+    await page.route("**/auth/refresh", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: "signup-access-token",
+          access_token_expires_at: "2030-01-01T00:00:00Z",
+        }),
+      });
+    });
     await page.route("**/notifications/preferences**", async (route) => {
       await route.fulfill({
         status: 200,
@@ -350,6 +360,13 @@ test.describe("critical browser workflows", () => {
         body: JSON.stringify({ data: [], total: 0, limit: 20, offset: 0 }),
       });
     });
+    await page.route("**/notifications/alerts?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [] }),
+      });
+    });
 
     await page.goto("/signup");
     await expect(page).toHaveURL(/\/login\?flow=beta$/);
@@ -367,6 +384,9 @@ test.describe("critical browser workflows", () => {
     await page.locator("#signup-name").fill("Adam");
     await page.locator("#signup-password").fill("StrongPass123!");
     await page.getByRole("button", { name: /Create (beta )?account/i }).click();
+    await expect(page.getByRole("dialog", { name: /Account created/i })).toBeVisible();
+    await expect(page.getByText("Save this password somewhere secure before continuing.")).toBeVisible();
+    await page.getByRole("button", { name: /Continue to dashboard/i }).click();
     await expect
       .poll(() => page.evaluate(() => window.localStorage.getItem("cfb_access_token")))
       .toBe("signup-access-token");
