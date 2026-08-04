@@ -7,7 +7,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  // The disposable real-stack suite shares one seeded database. Its draft
+  // scenario still opens two browser contexts, but separate specs must start
+  // serially so each waits for the runtime-provenance gate independently.
+  workers: realStack ? 1 : process.env.CI ? 2 : undefined,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:4173",
