@@ -19,6 +19,13 @@ export BETA_ACCESS_CODE_HMAC_SECRET="${BETA_ACCESS_CODE_HMAC_SECRET:-ci-only-bet
 export BETA_ACCESS_RESERVATION_SECRET="${BETA_ACCESS_RESERVATION_SECRET:-ci-only-beta-access-reservation-secret-2026}"
 export CFF_GIT_SHA="${CFF_GIT_SHA:-$(git rev-parse HEAD)}"
 export CFF_GIT_BRANCH="${CFF_GIT_BRANCH:-$(git branch --show-current || printf 'detached')}"
+# The runtime compatibility gate requires all three service identities. Keep
+# this disposable stack on the same committed artifact identity as the beta
+# release rather than letting the API defaults report unknown web/worker SHAs.
+export CFF_WEB_GIT_SHA="${CFF_WEB_GIT_SHA:-$CFF_GIT_SHA}"
+export CFF_WORKER_GIT_SHA="${CFF_WORKER_GIT_SHA:-$CFF_GIT_SHA}"
+export CFF_RUNTIME_MODE="${CFF_RUNTIME_MODE:-release_candidate}"
+export CFF_RUNTIME_ID="${CFF_RUNTIME_ID:-e2e-${CFF_GIT_SHA:0:12}}"
 
 cleanup() {
   docker compose down -v --remove-orphans
