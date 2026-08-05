@@ -20,22 +20,14 @@ def test_production_manifest_covers_runtime_startup_requirements():
         "PUBLIC_API_BASE_URL",
         "VITE_API_BASE_URL",
         "REFRESH_COOKIE_SECURE",
-        "EMAIL_DELIVERY_MODE",
-        "SMTP_HOST",
-        "SMTP_FROM_EMAIL",
-        "SMTP_USE_TLS",
-        "SUPPORT_EMAIL",
-        "PRIVACY_POLICY_URL",
-        "TERMS_URL",
-        "PROVIDER_DISCLOSURE_URL",
+        "EMAIL_ENABLED",
         "SCORING_MODE",
     }.issubset(required_env)
 
     safety_gates = production["safety_gates"]
     assert safety_gates["environment_must_equal"] == "production"
     assert safety_gates["ui_base_url_must_be_non_local_https"] is True
-    assert safety_gates["email_delivery_must_be_smtp"] is True
-    assert safety_gates["smtp_tls_must_be_true"] is True
+    assert safety_gates["email_disabled_beta_starts_without_smtp"] is True
     assert safety_gates["sportsdata_credentials_required_when_scoring_enabled"] is True
 
 

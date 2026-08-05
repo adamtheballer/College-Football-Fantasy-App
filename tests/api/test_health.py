@@ -46,6 +46,7 @@ def test_runtime_identity_reports_safe_process_and_database_identifiers(client, 
     assert payload["worker_git_sha"] == settings.worker_git_sha
     assert payload["scoring_mode"] == settings.scoring_mode
     assert payload["sportsdata_enabled"] == settings.sportsdata_enabled
+    assert payload["email_enabled"] is settings.email_enabled
     assert payload["scoring_worker_expected"] is settings.scoring_worker_expected
     assert payload["provider_polling_expected"] is settings.provider_polling_expected
     assert payload["player_dataset_version"] == settings.player_dataset_version
@@ -78,6 +79,7 @@ def test_runtime_reports_safe_database_identity(client, db_session):
     assert payload["alembic_version"] == [head]
     assert payload["alembic_revision"] == head
     assert payload["scoring_mode"] == settings.scoring_mode
+    assert payload["email_enabled"] is settings.email_enabled
     assert payload["scoring_worker_expected"] is settings.scoring_worker_expected
     assert payload["provider_polling_expected"] is settings.provider_polling_expected
     assert "database_url" not in payload
@@ -96,6 +98,7 @@ def test_runtime_remains_public_and_safe_in_production(client, db_session, monke
     assert response.json()["environment"] == "production"
     assert response.json()["scoring_mode"] == "disabled"
     assert response.json()["sportsdata_enabled"] is False
+    assert response.json()["email_enabled"] is False
     assert response.json()["scoring_worker_expected"] is False
     assert response.json()["provider_polling_expected"] is False
 

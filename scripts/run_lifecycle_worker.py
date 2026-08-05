@@ -50,10 +50,11 @@ def main() -> None:
     interval_seconds = max(1, args.interval_seconds)
     configure_logging(settings.api_log_level)
     logger.info(
-        "lifecycle_worker_started scoring_mode=%s sportsdata_enabled=%s provider_polling_expected=%s",
+        "lifecycle_worker_started scoring_mode=%s sportsdata_enabled=%s provider_polling_expected=%s email_enabled=%s",
         settings.scoring_mode,
         settings.sportsdata_enabled,
         settings.provider_polling_expected,
+        settings.email_enabled,
     )
     while True:
         try:

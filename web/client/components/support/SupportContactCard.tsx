@@ -2,24 +2,25 @@ import { useState } from "react";
 import { Copy } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-
-export const SUPPORT_EMAIL =
-  (import.meta.env.VITE_SUPPORT_EMAIL as string | undefined) || "absportscfb@gmail.com";
-
-const reportBugMailto = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
-  "College Football Fantasy bug report",
-)}`;
+import { useRuntimeCapabilities } from "@/components/RuntimeCompatibilityGate";
 
 /**
  * The app's only bug-report workflow: open a pre-addressed email to support.
  * Keeping it shared prevents Settings and the dedicated route from drifting.
  */
 export function SupportContactCard() {
+  const { support_email: supportEmail } = useRuntimeCapabilities();
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
+
+  if (!supportEmail) return null;
+
+  const reportBugMailto = `mailto:${supportEmail}?subject=${encodeURIComponent(
+    "College Football Fantasy bug report",
+  )}`;
 
   const copySupportEmail = async () => {
     try {
-      await navigator.clipboard.writeText(SUPPORT_EMAIL);
+      await navigator.clipboard.writeText(supportEmail);
       setCopyState("copied");
     } catch {
       setCopyState("error");
@@ -34,10 +35,10 @@ export function SupportContactCard() {
       </p>
       <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <a
-          href={`mailto:${SUPPORT_EMAIL}`}
+          href={`mailto:${supportEmail}`}
           className="break-all text-sm font-black text-foreground underline decoration-primary/50 underline-offset-4 transition hover:text-primary"
         >
-          {SUPPORT_EMAIL}
+          {supportEmail}
         </a>
         <Button
           type="button"

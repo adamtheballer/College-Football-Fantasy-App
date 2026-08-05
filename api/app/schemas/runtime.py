@@ -12,6 +12,11 @@ class RuntimeIdentityRead(BaseModel):
     web_git_sha: str
     worker_git_sha: str
     environment: str
+    email_enabled: bool
+    support_email: str | None = None
+    privacy_policy_url: str | None = None
+    terms_url: str | None = None
+    provider_disclosure_url: str | None = None
     scoring_mode: str
     sportsdata_enabled: bool
     scoring_worker_expected: bool

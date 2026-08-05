@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 
 import { buildApiUrl } from "@/lib/api";
 import { runtimeCompatibilityError, type RuntimeIdentity, WEB_BUILD_SHA } from "@/lib/runtime-compatibility";
@@ -8,8 +8,21 @@ type GateState =
   | { status: "ready" }
   | { status: "blocked"; reason: string; runtimeId: string };
 
+export type RuntimeCapabilities = Pick<
+  RuntimeIdentity,
+  "email_enabled" | "support_email" | "privacy_policy_url" | "terms_url" | "provider_disclosure_url"
+>;
+
+// Treat capabilities as disabled until the API explicitly supplies them. This
+// prevents a failed runtime-config fetch from manufacturing a mail or legal link.
+const disabledCapabilities: RuntimeCapabilities = { email_enabled: false };
+const RuntimeCapabilitiesContext = createContext<RuntimeCapabilities>(disabledCapabilities);
+
+export const useRuntimeCapabilities = () => useContext(RuntimeCapabilitiesContext);
+
 const RuntimeCompatibilityGate = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<GateState>({ status: "checking" });
+  const [capabilities, setCapabilities] = useState<RuntimeCapabilities>(disabledCapabilities);
 
   useEffect(() => {
     let active = true;
@@ -20,6 +33,13 @@ const RuntimeCompatibilityGate = ({ children }: { children: ReactNode }) => {
         const runtime = (await response.json()) as RuntimeIdentity;
         const reason = runtimeCompatibilityError(runtime);
         if (!active) return;
+        setCapabilities({
+          email_enabled: runtime.email_enabled === true,
+          support_email: runtime.support_email || null,
+          privacy_policy_url: runtime.privacy_policy_url || null,
+          terms_url: runtime.terms_url || null,
+          provider_disclosure_url: runtime.provider_disclosure_url || null,
+        });
         setState(
           reason
             ? {
@@ -58,7 +78,7 @@ const RuntimeCompatibilityGate = ({ children }: { children: ReactNode }) => {
     );
   }
 
-  return <>{children}</>;
+  return <RuntimeCapabilitiesContext.Provider value={capabilities}>{children}</RuntimeCapabilitiesContext.Provider>;
 };
 
 export default RuntimeCompatibilityGate;

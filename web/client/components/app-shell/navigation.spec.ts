@@ -54,8 +54,11 @@ describe("app shell navigation helpers", () => {
     ).toBe(true);
   });
 
-  it("keeps the signed-in report-bug entry linked to its direct support route", () => {
-    expect(getShellNavItems(user, true)).toContainEqual(
+  it("shows the report-bug entry only when the API supplies a support address", () => {
+    expect(getShellNavItems(user, true)).not.toContainEqual(
+      expect.objectContaining({ name: "REPORT BUG" }),
+    );
+    expect(getShellNavItems(user, true, 0, true)).toContainEqual(
       expect.objectContaining({ name: "REPORT BUG", path: "/report-bug" }),
     );
   });
@@ -75,7 +78,7 @@ describe("app shell navigation helpers", () => {
   });
 
   it("keeps mobile navigation focused on the primary destinations", () => {
-    const mobileItems = getMobileNavItems(getShellNavItems(user, true, 1));
+    const mobileItems = getMobileNavItems(getShellNavItems(user, true, 1, true));
     const mobile = mobileItems.map((item) => item.name);
 
     expect(mobile).toEqual(["HOME", "LEAGUES", "CHATS", "REPORT BUG", "MOCK DRAFT"]);

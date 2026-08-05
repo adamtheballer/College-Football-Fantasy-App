@@ -66,6 +66,7 @@ services:
       BETA_ACCESS_FAILED_EMAIL_LIMIT: "${BETA_ACCESS_FAILED_EMAIL_LIMIT:-5}"
       BETA_ACCESS_FAILED_CODE_LIMIT: "${BETA_ACCESS_FAILED_CODE_LIMIT:-5}"
       BETA_ACCESS_FAILED_IP_LIMIT: "${BETA_ACCESS_FAILED_IP_LIMIT:-10}"
+      EMAIL_ENABLED: "${EMAIL_ENABLED:-false}"
       # The real-stack E2E suite creates three isolated accounts from one container IP.
       # Keep production limits in deployment configuration; this only prevents test setup throttling.
       AUTH_SIGNUP_RATE_LIMIT: 20
@@ -147,6 +148,7 @@ services:
       GIT_BRANCH: "${CFF_GIT_BRANCH:-unknown}"
       SCORING_MODE: "${SCORING_MODE:-enabled}"
       SPORTSDATA_ENABLED: "${SPORTSDATA_ENABLED:-false}"
+      EMAIL_ENABLED: "${EMAIL_ENABLED:-false}"
       ESPN_HISTORICAL_STATS_ENABLED: "${ESPN_HISTORICAL_STATS_ENABLED:-true}"
     restart: unless-stopped
     depends_on:

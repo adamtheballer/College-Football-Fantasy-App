@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { PlaybookDecor, SurfaceCard } from "@/components/fantasy";
+import { useRuntimeCapabilities } from "@/components/RuntimeCompatibilityGate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -89,6 +90,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, signup, isLoggedIn } = useAuth();
+  const { email_enabled: emailEnabled } = useRuntimeCapabilities();
   const redirectTarget =
     typeof location.state === "object" &&
     location.state &&
@@ -336,7 +338,9 @@ export default function Login() {
                 <div className="space-y-2">
                   <span className="flex items-center justify-between px-3">
                     <label htmlFor="login-password" className="text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Password</label>
-                    <Link to="/reset-password" className="text-[9px] font-black uppercase tracking-widest text-cfb-gold transition hover:text-yellow-100">Reset password</Link>
+                    {emailEnabled ? (
+                      <Link to="/reset-password" className="text-[9px] font-black uppercase tracking-widest text-cfb-gold transition hover:text-yellow-100">Reset password</Link>
+                    ) : null}
                   </span>
                   <span className="group relative block">
                     <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted transition-colors group-focus-within:text-cfb-cyan" />

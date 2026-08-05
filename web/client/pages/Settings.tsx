@@ -21,7 +21,8 @@ import { restartGuide } from "@/lib/onboarding";
 import { useLeagues } from "@/hooks/use-leagues";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { PasswordChangeForm } from "@/components/auth/PasswordChangeForm";
-import { SUPPORT_EMAIL, SupportContactCard } from "@/components/support/SupportContactCard";
+import { useRuntimeCapabilities } from "@/components/RuntimeCompatibilityGate";
+import { SupportContactCard } from "@/components/support/SupportContactCard";
 
 type LeagueNotificationPreference = {
   league_id: number;
@@ -31,10 +32,6 @@ type LeagueNotificationPreference = {
   big_play_alerts: boolean;
   projection_alerts: boolean;
 };
-
-const privacyPolicyUrl = import.meta.env.VITE_PRIVACY_POLICY_URL as string | undefined;
-const termsUrl = import.meta.env.VITE_TERMS_URL as string | undefined;
-const providerDisclosureUrl = import.meta.env.VITE_PROVIDER_DISCLOSURE_URL as string | undefined;
 
 const SettingsSection = ({ title, description, children, icon: Icon }: any) => (
   <Card className="bg-card/40 backdrop-blur-md border-border/60 rounded-[2.5rem] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] group hover:border-primary/20 transition-all duration-700 relative">
@@ -55,6 +52,43 @@ const SettingsSection = ({ title, description, children, icon: Icon }: any) => (
     </CardContent>
   </Card>
 );
+
+const PolicyLinks = ({
+  privacyPolicyUrl,
+  termsUrl,
+  providerDisclosureUrl,
+  supportEmail,
+}: {
+  privacyPolicyUrl?: string | null;
+  termsUrl?: string | null;
+  providerDisclosureUrl?: string | null;
+  supportEmail?: string | null;
+}) => {
+  const links = [
+    privacyPolicyUrl ? { href: privacyPolicyUrl, label: "Privacy Policy", external: true } : null,
+    termsUrl ? { href: termsUrl, label: "Terms", external: true } : null,
+    providerDisclosureUrl ? { href: providerDisclosureUrl, label: "Provider Disclosure", external: true } : null,
+    supportEmail ? { href: `mailto:${supportEmail}`, label: "Contact Support", external: false } : null,
+  ].filter((link): link is { href: string; label: string; external: boolean } => link !== null);
+
+  if (!links.length) return null;
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {links.map((link) => (
+        <a
+          key={link.label}
+          href={link.href}
+          target={link.external ? "_blank" : undefined}
+          rel={link.external ? "noreferrer" : undefined}
+          className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
+        >
+          {link.label}
+        </a>
+      ))}
+    </div>
+  );
+};
 
 const SettingItem = ({ label, description, children }: any) => (
   <div className="flex items-center justify-between gap-10">
@@ -99,6 +133,12 @@ const CheckboxItem = ({ id, label, description, checked, onCheckedChange, disabl
 export default function Settings() {
   const navigate = useNavigate();
   const { user, isBootstrapping, logoutAll } = useAuth();
+  const {
+    privacy_policy_url: privacyPolicyUrl,
+    terms_url: termsUrl,
+    provider_disclosure_url: providerDisclosureUrl,
+    support_email: supportEmail,
+  } = useRuntimeCapabilities();
   const { data: leagues = [] } = useLeagues(50, Boolean(user));
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -240,47 +280,17 @@ export default function Settings() {
           </div>
         </SettingsSection>
 
-        <section id="support" className="scroll-mt-8">
+        {privacyPolicyUrl || termsUrl || providerDisclosureUrl || supportEmail ? <section id="support" className="scroll-mt-8">
           <SettingsSection
             title="Support & Policies"
             description="Helpful links and account resources"
             icon={Shield}
           >
           <SupportContactCard />
-          <div className="grid gap-3 sm:grid-cols-2">
-            {privacyPolicyUrl ? (
-              <a
-                href={privacyPolicyUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
-              >
-                Privacy Policy
-              </a>
-            ) : null}
-            {termsUrl ? (
-              <a
-                href={termsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
-              >
-                Terms
-              </a>
-            ) : null}
-            {providerDisclosureUrl ? (
-              <a
-                href={providerDisclosureUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
-              >
-                Provider Disclosure
-              </a>
-            ) : null}
-          </div>
+          <PolicyLinks privacyPolicyUrl={privacyPolicyUrl} termsUrl={termsUrl} providerDisclosureUrl={providerDisclosureUrl} supportEmail={supportEmail} />
           </SettingsSection>
         </section>
+        : null}
       </div>
     );
   }
@@ -560,46 +570,7 @@ export default function Settings() {
                 />
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {privacyPolicyUrl ? (
-                <a
-                  href={privacyPolicyUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
-                >
-                  Privacy Policy
-                </a>
-              ) : null}
-              {termsUrl ? (
-                <a
-                  href={termsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
-                >
-                  Terms
-                </a>
-              ) : null}
-              {providerDisclosureUrl ? (
-                <a
-                  href={providerDisclosureUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
-                >
-                  Provider Disclosure
-                </a>
-              ) : null}
-              {SUPPORT_EMAIL ? (
-                <a
-                  href={`mailto:${SUPPORT_EMAIL}`}
-                  className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
-                >
-                  Contact Support
-                </a>
-              ) : null}
-            </div>
+            <PolicyLinks privacyPolicyUrl={privacyPolicyUrl} termsUrl={termsUrl} providerDisclosureUrl={providerDisclosureUrl} supportEmail={supportEmail} />
 
             <div className="flex justify-center pt-8">
                <Button type="button" variant="ghost" onClick={() => void handleLogoutAll()} className="text-muted-foreground hover:text-red-400 gap-3 text-[11px] font-black uppercase tracking-[0.2em]">

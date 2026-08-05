@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
+import pytest
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.api.deps import require_verified_user
@@ -14,7 +15,7 @@ from collegefootballfantasy_api.app.core.security import (
 )
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
 from collegefootballfantasy_api.app.models.user import User
-from collegefootballfantasy_api.app.services.email_service import ConsoleEmailService, EmailPayload
+from collegefootballfantasy_api.app.services.email_service import ConsoleEmailService, EmailPayload, get_email_service
 from collegefootballfantasy_api.app.services import password_change
 
 
@@ -626,6 +627,22 @@ def test_console_email_service_does_not_log_password_reset_token(caplog):
     logged = "\n".join(record.getMessage() for record in caplog.records)
     assert "sensitive-token" not in logged
     assert "coach@example.com" in logged
+
+
+def test_disabled_email_service_does_not_log_or_attempt_delivery(caplog, monkeypatch):
+    monkeypatch.setattr(settings, "email_enabled", False)
+    payload = EmailPayload(
+        to_email="coach@example.com",
+        subject="Reset password",
+        body="token=sensitive-token",
+    )
+
+    with pytest.raises(RuntimeError, match="Email is unavailable during beta"):
+        get_email_service().send(payload)
+
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert "coach@example.com" not in logged
+    assert "sensitive-token" not in logged
 
 
 def test_local_dev_cors_allows_dynamic_vite_port(client):
