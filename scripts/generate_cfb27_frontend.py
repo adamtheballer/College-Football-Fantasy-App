@@ -12,7 +12,7 @@ TARGET_PATH = PROJECT_ROOT / "web" / "client" / "lib" / "cfb27Ratings.ts"
 VALID_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 # This is an OVR contract, not a board-rank contract.  A value such as 33 may
 # be a valid player rank but can never be emitted as a CFB27 overall rating.
-MIN_CFB27_OVERALL = 0
+MIN_CFB27_OVERALL = 62
 MAX_CFB27_OVERALL = 99
 
 

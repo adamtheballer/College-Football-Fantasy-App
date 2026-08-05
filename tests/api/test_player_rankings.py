@@ -145,12 +145,12 @@ def test_draft_pool_rejects_legacy_power4_records_even_when_they_have_projection
 
 def test_cfb27_source_contains_critical_compare_players():
     ratings = {
-        (rating.name, rating.school, rating.position): rating
+        (rating.name, rating.school.casefold(), rating.position): rating
         for rating in load_cfb27_ratings()
     }
 
-    jeremiah = ratings[("Jeremiah Smith", "Ohio State", "WR")]
-    ahmad = ratings[("Ahmad Hardy", "Missouri", "RB")]
+    jeremiah = ratings[("Jeremiah Smith", "ohio state", "WR")]
+    ahmad = ratings[("Ahmad Hardy", "missouri", "RB")]
     assert jeremiah.overall == 99
     assert ahmad.overall == 96
 
@@ -198,7 +198,9 @@ def test_cfb27_seed_migration_uses_backend_rating_source():
     }
 
     assert migration.down_revision == "0030_align_timestamp_nullability"
-    assert len(rows) == len(load_cfb27_ratings())
+    historical_source = json.loads(migration.CFB27_SOURCE_PATH.read_text(encoding="utf-8"))
+    assert len(rows) == len(historical_source)
+    assert len(rows) < len(load_cfb27_ratings())
     assert rows[("Jeremiah Smith", "Ohio State", "WR")]["overall"] == 99
     assert rows[("Ahmad Hardy", "Missouri", "RB")]["overall"] == 96
 
