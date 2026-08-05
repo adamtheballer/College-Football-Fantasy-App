@@ -22,6 +22,12 @@ class PlayerBase(BaseModel):
     cfb27_overall: int | None = None
     cfb27_position_rank: int | None = None
     cfb27_synced_at: datetime | None = None
+    raw_cfb27_rating: int | None = None
+    current_value_rating: float | None = None
+    value_policy_version: str | None = None
+    value_calculation_week: int | None = None
+    value_calculated_at: datetime | None = None
+    value_source_batch_id: str | None = None
 
 
 class PlayerCreate(PlayerBase):

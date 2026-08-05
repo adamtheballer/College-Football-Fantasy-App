@@ -1,12 +1,6 @@
-"""Build read-only player-card trajectories from real published snapshots.
-
-Week 0 is the preseason baseline. Weeks 1–13 appear only after that game week
-has begun and an actual published snapshot is available. The chart must never
-invent a future-season line from schedule or model inputs.
-"""
+"""Build player-card trajectories from canonical published weekly snapshots."""
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -24,7 +18,6 @@ from collegefootballfantasy_api.app.schemas.player_trajectory import (
     PlayerValueTrajectoryPointRead,
 )
 from collegefootballfantasy_api.app.services.player_trade_value import MAX_TRADE_VALUE, VALUE_POLICY_VERSION, preseason_rating_value
-from collegefootballfantasy_api.app.services.league_weeks import resolve_current_week
 
 WEEKS = tuple(range(1, 14))
 DISPLAY_WEEKS = tuple(range(0, 14))
@@ -96,18 +89,6 @@ def _league_scoring_rules(db: Session, league_id: int | None) -> dict | None:
     return settings.scoring_json if settings and settings.scoring_json else None
 
 
-def _week_has_started(schedule: TeamSchedule | None, *, today: date) -> bool:
-    """Return true only after a scheduled game week has actually started."""
-    if schedule is None:
-        return False
-    if schedule.kickoff_at is not None:
-        kickoff = schedule.kickoff_at
-        if kickoff.tzinfo is None:
-            return schedule.game_date is not None and schedule.game_date <= today
-        return kickoff <= datetime.now(timezone.utc)
-    return schedule.game_date is not None and schedule.game_date <= today
-
-
 def _estimated_value(db: Session, player: Player, season_projection: float) -> float:
     pool = db.query(Player).filter(func.upper(Player.position) == player.position.upper()).all()
     season_values = sorted(float(row.sheet_projected_season_points) for row in pool if row.sheet_projected_season_points is not None)
@@ -152,45 +133,17 @@ def build_player_trajectory(
         for week in WEEKS
     }
     published_by_week = {week: row for week, row in published_by_week.items() if row is not None}
-    scheduled_games = sum(1 for week in WEEKS if not (schedule_by_week.get(week) and (schedule_by_week[week].is_bye or schedule_by_week[week].location == "bye")))
-    known_points = [_points_for_projection(player, row, scoring_rules) for row in published_by_week.values()]
     season_projection = _season_projection(db, player)
-    seasonal_baseline = season_projection / max(scheduled_games, 1) if season_projection > 0 else (sum(known_points) / len(known_points) if known_points else 0.0)
-
-    # The player-card headline is the active league week's published fantasy
-    # projection. Week 0 must display that identical source when a league
-    # context exists; dividing a season total by scheduled games here created
-    # a second, contradictory number in the same player card.
-    current_projection = None
-    if league is not None:
-        current_projection = db.scalar(
-            current_published_projections_query(
-                season=season,
-                week=resolve_current_week(db, league),
-                player_ids=(player.id,),
-            )
-        )
-    base_points = (
-        max(0.0, float(current_projection.fantasy_points or 0.0))
-        if current_projection is not None
-        else seasonal_baseline
-    )
-    baseline_source = "current" if current_projection is not None else "preseason"
-
-    # Week 0 is the one preseason point. Future weekly projections are kept out
-    # of the response until that week's real game window has opened.
-    projection: list[PlayerProjectionTrajectoryPointRead] = [
-        PlayerProjectionTrajectoryPointRead(week=0, points=round(base_points, 1), source=baseline_source)
-    ]
-    today = date.today()
+    # A season total is metadata only. It is never divided, repeated, or
+    # emitted as a weekly graph point; this series is canonical weekly data.
+    projection: list[PlayerProjectionTrajectoryPointRead] = []
     for week in WEEKS:
         schedule = schedule_by_week.get(week)
-        if not _week_has_started(schedule, today=today):
-            continue
         if schedule and (schedule.is_bye or schedule.location == "bye"):
-            projection.append(PlayerProjectionTrajectoryPointRead(week=week, points=0.0, source="bye"))
+            projection.append(PlayerProjectionTrajectoryPointRead(week=week, points=None, source="bye", projection_status="BYE"))
         elif week in published_by_week:
-            projection.append(PlayerProjectionTrajectoryPointRead(week=week, points=round(_points_for_projection(player, published_by_week[week], scoring_rules), 1), source="published"))
+            row = published_by_week[week]
+            projection.append(PlayerProjectionTrajectoryPointRead(week=week, points=round(_points_for_projection(player, row, scoring_rules), 1), source="published", projection_status=row.projection_status, projection_version=row.projection_version, published_at=row.updated_at))
 
     published_values = {
         row.week: row
@@ -208,10 +161,8 @@ def build_player_trajectory(
         )
     ]
     for week in WEEKS:
-        if not _week_has_started(schedule_by_week.get(week), today=today):
-            continue
         existing = published_values.get(week)
         if existing is not None:
             value.append(PlayerValueTrajectoryPointRead(week=week, value=round(_clamp(float(existing.value), 0.0, MAX_TRADE_VALUE), 1), source="published"))
 
-    return PlayerTrajectoryRead(player_id=player.id, season=season, league_id=league_id, projection=projection, value=value)
+    return PlayerTrajectoryRead(player_id=player.id, season=season, league_id=league_id, projection=projection, value=value, preseason_projection_points=round(season_projection, 1) if season_projection > 0 else None)

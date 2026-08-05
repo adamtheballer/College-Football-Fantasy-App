@@ -1,12 +1,16 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
 class PlayerProjectionTrajectoryPointRead(BaseModel):
-    week: int = Field(ge=0, le=13)
-    points: float = Field(ge=0)
-    source: Literal["preseason", "current", "published", "bye"]
+    week: int = Field(ge=1, le=13)
+    points: float | None = Field(default=None, ge=0)
+    source: Literal["published", "bye"]
+    projection_status: str
+    projection_version: str | None = None
+    published_at: datetime | None = None
 
 
 class PlayerValueTrajectoryPointRead(BaseModel):
@@ -21,3 +25,4 @@ class PlayerTrajectoryRead(BaseModel):
     league_id: int | None = None
     projection: list[PlayerProjectionTrajectoryPointRead]
     value: list[PlayerValueTrajectoryPointRead]
+    preseason_projection_points: float | None = None

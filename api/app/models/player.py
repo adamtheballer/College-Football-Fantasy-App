@@ -13,6 +13,8 @@ class Player(TimestampMixin, Base):
         Index("ix_players_sheet_adp", "sheet_adp"),
         Index("ix_players_cfb27_rank", "cfb27_rank"),
         Index("ix_players_cfb27_overall", "cfb27_overall"),
+        Index("ix_players_raw_cfb27_rating", "raw_cfb27_rating"),
+        Index("ix_players_current_value_rating", "current_value_rating"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -31,6 +33,16 @@ class Player(TimestampMixin, Base):
     cfb27_overall: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cfb27_position_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cfb27_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # ``cfb27_overall`` remains a compatibility/read-model field.  These
+    # fields make the value contract explicit and prevent a weekly value from
+    # being mistaken for the immutable game rating.
+    raw_cfb27_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    current_value_rating: Mapped[float | None] = mapped_column(Float, nullable=True)
+    value_policy_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    value_calculation_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    value_calculated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    value_source_batch_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    value_input_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     espn_height: Mapped[str | None] = mapped_column(String(40), nullable=True)
     espn_height_inches: Mapped[int | None] = mapped_column(Integer, nullable=True)
     espn_weight: Mapped[str | None] = mapped_column(String(40), nullable=True)

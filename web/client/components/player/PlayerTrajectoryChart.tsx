@@ -1,6 +1,6 @@
 type TrajectoryPoint = {
   week: number;
-  value: number;
+  value: number | null;
   source?: "preseason" | "current" | "published" | "bye";
 };
 
@@ -8,7 +8,7 @@ const CHART_WIDTH = 760;
 const CHART_HEIGHT = 312;
 const PADDING = { top: 24, right: 26, bottom: 46, left: 54 };
 
-const finiteValue = (value: number) => (Number.isFinite(value) ? value : 0);
+const finiteValue = (value: number | null) => (typeof value === "number" && Number.isFinite(value) ? value : 0);
 
 export function PlayerTrajectoryChart({
   ariaLabel,
@@ -32,13 +32,14 @@ export function PlayerTrajectoryChart({
   const y = (value: number) => PADDING.top + (1 - Math.min(finiteValue(value), yMax) / yMax) * plotHeight;
   // Do not visually bridge weeks that have not produced a published snapshot.
   // A preseason card therefore renders one Week 0 dot, not a fictitious line.
-  const connectedLine = ordered.reduce((path, point, index) => {
-    const previous = ordered[index - 1];
+  const numericPoints = ordered.filter((point): point is TrajectoryPoint & { value: number } => typeof point.value === "number" && Number.isFinite(point.value));
+  const connectedLine = numericPoints.reduce((path, point, index) => {
+    const previous = numericPoints[index - 1];
     const command = previous && point.week === previous.week + 1 ? "L" : "M";
     return `${path}${command}${x(point.week)} ${y(point.value)} `;
   }, "");
-  const hasConnectedWeeks = ordered.some((point, index) => index > 0 && point.week === ordered[index - 1].week + 1);
-  const peak = ordered.reduce((best, point) => point.value > best.value ? point : best, ordered[0] ?? { week: 0, value: 0 });
+  const hasConnectedWeeks = numericPoints.some((point, index) => index > 0 && point.week === numericPoints[index - 1].week + 1);
+  const peak = numericPoints.reduce((best, point) => point.value > best.value ? point : best, numericPoints[0] ?? { week: 0, value: 0 });
   const isPreseasonOnly = ordered.length === 1 && ordered[0]?.week === 0;
   const isCurrentProjectionOnly = isPreseasonOnly && ordered[0]?.source === "current";
 
@@ -55,7 +56,7 @@ export function PlayerTrajectoryChart({
                 : "Week 0–13 trajectory"}
           </p>
         </div>
-        <p className="text-xs font-black text-white">Peak: {valueFormatter(peak.value)} <span className="text-white/45">({peak.week === 0 ? "Preseason" : `W${peak.week}`})</span></p>
+        {numericPoints.length ? <p className="text-xs font-black text-white">Peak: {valueFormatter(peak.value)} <span className="text-white/45">({peak.week === 0 ? "Preseason" : `W${peak.week}`})</span></p> : null}
       </div>
       <div className="overflow-x-auto pb-1">
         <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="h-auto min-w-[620px] w-full" role="img" aria-label={ariaLabel}>
@@ -81,8 +82,8 @@ export function PlayerTrajectoryChart({
           {hasConnectedWeeks ? <path d={connectedLine} fill="none" stroke="#5ee7ff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" /> : null}
           {ordered.map((point) => (
             <g key={point.week}>
-              <title>{point.week === 0 ? point.source === "current" ? "Current projection" : "Preseason" : `Week ${point.week}`}: {valueFormatter(point.value)}</title>
-              <circle cx={x(point.week)} cy={y(point.value)} r="6" fill={point.source === "published" ? "#ffffff" : point.source === "bye" ? "#64748b" : "#5ee7ff"} stroke="#08111f" strokeWidth="3" />
+              <title>{point.week === 0 ? point.source === "current" ? "Current projection" : "Preseason" : `Week ${point.week}`}: {point.source === "bye" || point.value === null ? "BYE" : valueFormatter(point.value)}</title>
+              {point.source === "bye" || point.value === null ? <text x={x(point.week)} y={y(0) - 8} textAnchor="middle" fill="rgba(226,232,240,0.62)" fontSize="9" fontWeight="800">BYE</text> : <circle cx={x(point.week)} cy={y(point.value)} r="6" fill={point.source === "published" ? "#ffffff" : "#5ee7ff"} stroke="#08111f" strokeWidth="3" />}
             </g>
           ))}
         </svg>

@@ -7,6 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.models.injury import Injury
+from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.player_trade_value import PlayerTradeValue
@@ -14,7 +15,11 @@ from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjec
 from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.schemas.player_trade_value import PlayerTradeValueHistoryRead, PlayerTradeValueRead
 
-VALUE_POLICY_VERSION = "universal_v1"
+PRESEASON_VALUE_POLICY_VERSION = "cfb27_exact_preseason_v1"
+IN_SEASON_VALUE_POLICY_VERSION = "universal_v2"
+# The default is the policy selected after checking authoritative application
+# state; callers must never select a dynamic policy just by passing week=1.
+VALUE_POLICY_VERSION = IN_SEASON_VALUE_POLICY_VERSION
 MAX_TRADE_VALUE = 99.0
 WEIGHT_POLICY: dict[int, tuple[float, float, float]] = {
     0: (1.00, 0.00, 0.00), 1: (0.75, 0.15, 0.10), 2: (0.65, 0.25, 0.10),
@@ -49,13 +54,46 @@ def _normalized_trade_value(value: float) -> float:
 
 def preseason_rating_value(player: Player) -> float | None:
     """Use the approved CFB 27 rating as the immutable Week 0 baseline."""
-    if player.cfb27_overall is None:
+    if player.raw_cfb27_rating is None:
         return None
-    return _normalized_trade_value(float(player.cfb27_overall))
+    return float(player.raw_cfb27_rating)
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def week_one_is_authoritatively_finalized(db: Session, *, season: int) -> bool:
+    """Fail closed until every scheduled app Week 1 matchup is final.
+
+    This is deliberately based on the persisted matchup lifecycle—not the
+    wall clock, provider availability, or a scoring-run success flag.  A
+    scoring run can be successful while official corrections remain possible.
+    """
+    statuses = [
+        str(status).casefold()
+        for (status,) in db.query(Matchup.status).filter(Matchup.season == season, Matchup.week == 1).all()
+    ]
+    return bool(statuses) and all(status in {"final", "stat_corrected"} for status in statuses)
+
+
+def active_value_policy_version(db: Session, *, season: int) -> str:
+    return IN_SEASON_VALUE_POLICY_VERSION if week_one_is_authoritatively_finalized(db, season=season) else PRESEASON_VALUE_POLICY_VERSION
+
+
+def _apply_current_value(
+    player: Player,
+    *,
+    value: float | None,
+    policy_version: str,
+    calculation_week: int,
+    inputs: dict,
+) -> None:
+    player.current_value_rating = _normalized_trade_value(value) if value is not None else None
+    player.value_policy_version = policy_version
+    player.value_calculation_week = calculation_week
+    player.value_calculated_at = _utcnow()
+    player.value_input_json = inputs
 
 
 def _stat_points(stats: dict | None) -> float | None:
@@ -86,42 +124,82 @@ def _availability_score(db: Session, player_id: int, season: int, week: int) -> 
     return scores.get(status, scores["UNKNOWN"])
 
 
-def _serialize(row: PlayerTradeValue | None, *, preseason_value: float | None = None) -> PlayerTradeValueRead | None:
+def _serialize(row: PlayerTradeValue | None, *, player: Player) -> PlayerTradeValueRead | None:
     if row is None:
         return None
-    value = preseason_value if row.week == 0 and preseason_value is not None else _normalized_trade_value(row.value)
-    return PlayerTradeValueRead(week=row.week, value=value, tier=value_tier(value), positional_value_rank=row.positional_value_rank, weekly_change=row.weekly_change, confidence=row.confidence, policy_version=row.policy_version, calculated_at=row.calculated_at, factor_breakdown=row.factor_breakdown_json, explanations=row.explanation_json or [])
+    value = player.current_value_rating
+    if value is None:
+        return None
+    return PlayerTradeValueRead(week=player.value_calculation_week if player.value_calculation_week is not None else row.week, value=value, raw_cfb27_rating=player.raw_cfb27_rating, current_value_rating=value, tier=value_tier(value), positional_value_rank=row.positional_value_rank, weekly_change=row.weekly_change, confidence=row.confidence, policy_version=player.value_policy_version or row.policy_version, calculated_at=player.value_calculated_at or row.calculated_at, factor_breakdown=player.value_input_json or row.factor_breakdown_json, explanations=row.explanation_json or [])
 
 
-def get_player_trade_values(db: Session, *, player_id: int, season: int, policy_version: str = VALUE_POLICY_VERSION) -> PlayerTradeValueHistoryRead:
-    rows = db.query(PlayerTradeValue).filter(PlayerTradeValue.player_id == player_id, PlayerTradeValue.season == season, PlayerTradeValue.policy_version == policy_version).order_by(PlayerTradeValue.week.asc()).all()
+def _current_value_read(player: Player, row: PlayerTradeValue | None = None, *, value: float | None = None, policy_version: str | None = None) -> PlayerTradeValueRead | None:
+    value = player.current_value_rating if value is None else value
+    if value is None:
+        return None
+    return PlayerTradeValueRead(
+        week=player.value_calculation_week or 0,
+        value=float(value),
+        raw_cfb27_rating=player.raw_cfb27_rating,
+        current_value_rating=float(value),
+        tier=value_tier(float(value)),
+        positional_value_rank=row.positional_value_rank if row is not None else None,
+        weekly_change=row.weekly_change if row is not None else None,
+        confidence=row.confidence if row is not None else 1.0,
+        policy_version=policy_version or player.value_policy_version or PRESEASON_VALUE_POLICY_VERSION,
+        calculated_at=player.value_calculated_at,
+        factor_breakdown=player.value_input_json,
+        explanations=row.explanation_json if row is not None and row.explanation_json else [],
+    )
+
+
+def get_player_trade_values(db: Session, *, player_id: int, season: int, policy_version: str | None = None) -> PlayerTradeValueHistoryRead:
     player = db.get(Player, player_id)
-    baseline = preseason_rating_value(player) if player is not None else None
-    serialized_rows = [_serialize(row, preseason_value=baseline) for row in rows]
+    if player is None:
+        return PlayerTradeValueHistoryRead(current=None, history=[])
+    active_policy = active_value_policy_version(db, season=season)
+    rows = db.query(PlayerTradeValue).filter(PlayerTradeValue.player_id == player_id, PlayerTradeValue.season == season, PlayerTradeValue.policy_version == active_policy).order_by(PlayerTradeValue.week.asc()).all()
+    serialized_rows = [_serialize(row, player=player) for row in rows]
     history = [row for row in serialized_rows if row is not None]
-    return PlayerTradeValueHistoryRead(current=history[-1] if history else None, history=history)
+    # A legacy dynamic row/current value is never publishable during preseason.
+    # Use raw CFB27 exactly, but do not mutate in a read endpoint.
+    effective_value = preseason_rating_value(player) if active_policy == PRESEASON_VALUE_POLICY_VERSION else player.current_value_rating
+    return PlayerTradeValueHistoryRead(current=_current_value_read(player, rows[-1] if rows else None, value=effective_value, policy_version=active_policy), history=history)
 
 
 def current_trade_value_snapshot(db: Session, *, player_id: int, season: int | None = None) -> dict | None:
-    query = db.query(PlayerTradeValue).filter(PlayerTradeValue.player_id == player_id, PlayerTradeValue.policy_version == VALUE_POLICY_VERSION)
-    if season is not None:
-        query = query.filter(PlayerTradeValue.season == season)
-    row = query.order_by(PlayerTradeValue.season.desc(), PlayerTradeValue.week.desc()).first()
-    if row is None:
-        return None
     player = db.get(Player, player_id)
-    baseline = preseason_rating_value(player) if player is not None else None
-    value = baseline if row.week == 0 and baseline is not None else _normalized_trade_value(row.value)
-    return {"value": value, "tier": value_tier(value), "policy_version": row.policy_version, "week": row.week, "calculated_at": row.calculated_at.isoformat()}
+    if player is None:
+        return None
+    effective_season = season if season is not None else 2026
+    active_policy = active_value_policy_version(db, season=effective_season)
+    value = preseason_rating_value(player) if active_policy == PRESEASON_VALUE_POLICY_VERSION else player.current_value_rating
+    if value is None:
+        return None
+    return {"value": float(value), "tier": value_tier(float(value)), "policy_version": active_policy, "week": 0 if active_policy == PRESEASON_VALUE_POLICY_VERSION else player.value_calculation_week or 0, "calculated_at": player.value_calculated_at.isoformat() if player.value_calculated_at else None}
 
 
 def calculate_player_trade_value(db: Session, *, player_id: int, season: int, week: int, policy_version: str = VALUE_POLICY_VERSION) -> PlayerTradeValue:
     player = db.get(Player, player_id)
     if player is None:
         raise ValueError("player not found")
+    baseline = preseason_rating_value(player)
+    active_policy = active_value_policy_version(db, season=season)
+    if active_policy == PRESEASON_VALUE_POLICY_VERSION:
+        if baseline is None:
+            raise ValueError("player is missing an approved raw CFB27 rating")
+        row = db.query(PlayerTradeValue).filter_by(player_id=player.id, season=season, week=0, policy_version=PRESEASON_VALUE_POLICY_VERSION).one_or_none()
+        if row is None:
+            row = PlayerTradeValue(player_id=player.id, season=season, week=0, policy_version=PRESEASON_VALUE_POLICY_VERSION, value=baseline, tier=value_tier(baseline), calculated_at=_utcnow(), input_version="cfb27-approved-preseason-v1")
+            db.add(row)
+        row.value, row.tier, row.weekly_change, row.confidence = baseline, value_tier(baseline), None, 1.0
+        row.calculated_at, row.factor_breakdown_json, row.explanation_json = _utcnow(), {"preseasonRating": baseline, "seasonPerformance": 0.0, "recentForm": 0.0, "futureProjection": 0.0, "usageRole": 0.0, "availability": 0.0, "positionalScarcity": 0.0}, []
+        _apply_current_value(player, value=baseline, policy_version=PRESEASON_VALUE_POLICY_VERSION, calculation_week=0, inputs={"raw_cfb27_rating": player.raw_cfb27_rating, "preseason_guard": "week_1_not_authoritatively_finalized"})
+        db.flush()
+        return row
     rating_weight, performance_weight, future_weight = weekly_value_weights(week)
     pool = _position_pool(db, player.position)
-    rating_score = _percentile(player.cfb27_overall, [float(row.cfb27_overall) for row in pool if row.cfb27_overall is not None])
+    rating_score = _percentile(player.raw_cfb27_rating, [float(row.raw_cfb27_rating) for row in pool if row.raw_cfb27_rating is not None])
     player_stats = db.query(PlayerStat).filter(PlayerStat.player_id == player.id, PlayerStat.season == season, PlayerStat.week.between(1, max(week, 1)), PlayerStat.verified.is_(True)).order_by(PlayerStat.week.asc()).all()
     points = [value for value in (_stat_points(row.stats) for row in player_stats) if value is not None]
     performance_raw = (sum(points) / len(points)) if points else None
@@ -152,30 +230,20 @@ def calculate_player_trade_value(db: Session, *, player_id: int, season: int, we
         "availability": round(future_weight * 0.1 * availability, 2),
         "positionalScarcity": round(future_weight * 0.05 * scarcity, 2),
     }
-    baseline = preseason_rating_value(player)
-    if week == 0 and baseline is not None:
-        factors = {
-            "preseasonRating": baseline,
-            "seasonPerformance": 0.0,
-            "recentForm": 0.0,
-            "futureProjection": 0.0,
-            "usageRole": 0.0,
-            "availability": 0.0,
-            "positionalScarcity": 0.0,
-        }
     value = _normalized_trade_value(sum(factors.values()))
-    prior = db.query(PlayerTradeValue).filter(PlayerTradeValue.player_id == player.id, PlayerTradeValue.season == season, PlayerTradeValue.policy_version == policy_version, PlayerTradeValue.week < week).order_by(PlayerTradeValue.week.desc()).first()
+    prior = db.query(PlayerTradeValue).filter(PlayerTradeValue.player_id == player.id, PlayerTradeValue.season == season, PlayerTradeValue.policy_version == active_policy, PlayerTradeValue.week < week).order_by(PlayerTradeValue.week.desc()).first()
     explanation = []
     if performance_raw is not None and performance_score >= 70: explanation.append({"direction": "UP", "reason": "SEASON_PERFORMANCE", "label": "Strong current-season production", "impact": round(performance_weight * performance_score / 100, 1)})
     if availability < 90: explanation.append({"direction": "DOWN", "reason": "AVAILABILITY", "label": "Availability concern", "impact": round((100 - availability) * future_weight / 100, 1)})
     if future_score >= 70: explanation.append({"direction": "UP", "reason": "FUTURE_PROJECTION", "label": "Strong rest-of-season outlook", "impact": round(future_weight * future_score / 100, 1)})
-    row = db.query(PlayerTradeValue).filter_by(player_id=player.id, season=season, week=week, policy_version=policy_version).one_or_none()
+    row = db.query(PlayerTradeValue).filter_by(player_id=player.id, season=season, week=week, policy_version=active_policy).one_or_none()
     if row is None:
-        row = PlayerTradeValue(player_id=player.id, season=season, week=week, policy_version=policy_version, value=value, tier=value_tier(value), calculated_at=_utcnow(), input_version="weekly-stats-projections-v1")
+        row = PlayerTradeValue(player_id=player.id, season=season, week=week, policy_version=active_policy, value=value, tier=value_tier(value), calculated_at=_utcnow(), input_version="weekly-stats-projections-v2")
         db.add(row)
     row.value, row.tier, row.weekly_change = value, value_tier(value), (round(value - prior.value, 1) if prior else None)
-    row.confidence = round((1.0 if player.cfb27_overall is not None else 0.45) * availability_confidence, 2)
+    row.confidence = round((1.0 if player.raw_cfb27_rating is not None else 0.45) * availability_confidence, 2)
     row.calculated_at, row.factor_breakdown_json, row.explanation_json = _utcnow(), factors, explanation[:4]
+    _apply_current_value(player, value=value, policy_version=active_policy, calculation_week=week, inputs={"raw_cfb27_rating": player.raw_cfb27_rating, "factors": factors})
     db.flush()
     return row
 

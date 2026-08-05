@@ -8,8 +8,10 @@ import {
   type RosterSlotLimits,
 } from "@/lib/rosterLegality";
 
-export const MOCK_TEAM_COUNT = 12;
-export const MOCK_USER_TEAM_ID = 6;
+export const MOCK_TEAM_COUNT = 10;
+// Compatibility fixture for deterministic engine tests. New user-facing drafts
+// are always created through createRandomSinglePlayerMockDraft instead.
+export const MOCK_USER_TEAM_ID = 5;
 export const MOCK_INTERMISSION_SECONDS = 5;
 export const MOCK_BOT_PICK_DELAY_SECONDS = 2;
 export const MOCK_PICK_TIMER_SECONDS = 30;
@@ -155,12 +157,37 @@ export const getMockTotalPicks = (state?: Pick<SinglePlayerMockDraftState, "sett
 export const getMockUserTeamId = (leagueSize = MOCK_TEAM_COUNT) =>
   Math.min(Math.max(1, Math.ceil(leagueSize / 2)), leagueSize);
 
+/**
+ * Returns a uniformly distributed zero-based draft slot. Fresh mocks must not
+ * inherit a fixed middle slot: the user team is assigned from this value
+ * whenever a new mock is created, reset, or recovered from invalid state.
+ */
+export const getRandomMockDraftSlotIndex = (leagueSize = MOCK_TEAM_COUNT) => {
+  const teamCount = Math.max(1, Math.floor(leagueSize));
+  const crypto = globalThis.crypto;
+
+  if (crypto?.getRandomValues) {
+    // Rejection sampling avoids modulo bias when the league size does not
+    // divide the Uint32 range evenly.
+    const range = 2 ** 32;
+    const acceptedUpperBound = range - (range % teamCount);
+    const randomValue = new Uint32Array(1);
+    do {
+      crypto.getRandomValues(randomValue);
+    } while (randomValue[0] >= acceptedUpperBound);
+    return randomValue[0] % teamCount;
+  }
+
+  // This fallback is only for runtimes without Web Crypto.
+  return Math.floor(Math.random() * teamCount);
+};
+
 export const createMockTeams = (
-  settings: MockDraftSettings = DEFAULT_MOCK_DRAFT_SETTINGS
+  settings: MockDraftSettings = DEFAULT_MOCK_DRAFT_SETTINGS,
+  userTeamId = getMockUserTeamId(settings.leagueSize)
 ): MockDraftTeam[] =>
   Array.from({ length: settings.leagueSize }, (_, index) => {
     const id = index + 1;
-    const userTeamId = getMockUserTeamId(settings.leagueSize);
     return {
       id,
       name: id === userTeamId ? "Your Team" : `Bot Team ${id}`,
@@ -170,7 +197,8 @@ export const createMockTeams = (
 
 export const createSinglePlayerMockDraft = (
   now = Date.now(),
-  settings: MockDraftSettings = DEFAULT_MOCK_DRAFT_SETTINGS
+  settings: MockDraftSettings = DEFAULT_MOCK_DRAFT_SETTINGS,
+  userTeamId = getMockUserTeamId(settings.leagueSize)
 ): SinglePlayerMockDraftState => ({
   id: `local-${now}`,
   settings,
@@ -180,11 +208,24 @@ export const createSinglePlayerMockDraft = (
   currentPick: 1,
   pickStartedAt: null,
   pickExpiresAt: null,
-  userTeamId: getMockUserTeamId(settings.leagueSize),
-  teams: createMockTeams(settings),
+  userTeamId,
+  teams: createMockTeams(settings, userTeamId),
   picks: [],
   queuedPlayerIds: [],
 });
+
+export const createRandomSinglePlayerMockDraft = (
+  now = Date.now(),
+  settings: MockDraftSettings = DEFAULT_MOCK_DRAFT_SETTINGS,
+  getSlotIndex = getRandomMockDraftSlotIndex
+) => {
+  const teamCount = Math.max(1, Math.floor(settings.leagueSize));
+  const userTeamId = Math.min(
+    teamCount,
+    Math.max(1, Math.floor(getSlotIndex(teamCount)) + 1)
+  );
+  return createSinglePlayerMockDraft(now, settings, userTeamId);
+};
 
 export const shouldStartNewSinglePlayerMockDraft = (search = "") => {
   const params = new URLSearchParams(search.startsWith("?") ? search : `?${search}`);
@@ -202,14 +243,14 @@ export const resolveInitialSinglePlayerMockDraftState = ({
 }): MockDraftInitialStateResolution => {
   if (shouldStartNewSinglePlayerMockDraft(search)) {
     return {
-      state: createSinglePlayerMockDraft(now, parseMockDraftSettings(search)),
+      state: createRandomSinglePlayerMockDraft(now, parseMockDraftSettings(search)),
       shouldClearStoredDraft: true,
       shouldReplaceUrl: true,
     };
   }
 
   return {
-    state: storedState ?? createSinglePlayerMockDraft(now),
+    state: storedState ?? createRandomSinglePlayerMockDraft(now),
     shouldClearStoredDraft: false,
     shouldReplaceUrl: false,
   };
@@ -318,7 +359,7 @@ export const reconcileSinglePlayerMockDraftState = (
 
     if (!canonicalPlayer) {
       return {
-        state: createSinglePlayerMockDraft(now, getMockDraftSettings(state)),
+        state: createRandomSinglePlayerMockDraft(now, getMockDraftSettings(state)),
         didChange: true,
         wasReset: true,
       };
@@ -327,7 +368,7 @@ export const reconcileSinglePlayerMockDraftState = (
     const canonicalIdentity = getDraftPlayerIdentityKey(canonicalPlayer);
     if (seenCanonicalIdentities.has(canonicalIdentity)) {
       return {
-        state: createSinglePlayerMockDraft(now, getMockDraftSettings(state)),
+        state: createRandomSinglePlayerMockDraft(now, getMockDraftSettings(state)),
         didChange: true,
         wasReset: true,
       };

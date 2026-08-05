@@ -11,12 +11,9 @@ import {
   draftHistorySummary,
   formatPlayerCardValue,
   getPlayerCardPalette,
-  normalizeTradeValueMeter,
   historicalSeasonSummaryValue,
   resolvePlayerCardCfb27Rating,
   resolvePlayerCardProjectionStats,
-  synchronizeProjectionTrajectoryToCardHeader,
-  tradeValueMeterDegrees,
   visiblePlayerCardAboutMessage,
   visiblePlayerCardTabs,
 } from "./PlayerCardModal";
@@ -49,18 +46,10 @@ describe("PlayerCardModal helpers", () => {
     expect(formatPlayerCardValue(Number.NaN)).toBe("—");
   });
 
-  it("fills the trade-value meter only at 99 out of 99", () => {
-    expect(normalizeTradeValueMeter(78)).toBe(78);
-    expect(tradeValueMeterDegrees(78)).toBeCloseTo((78 / 99) * 360);
-    expect(tradeValueMeterDegrees(98)).toBeLessThan(360);
-    expect(tradeValueMeterDegrees(99)).toBe(360);
-    expect(normalizeTradeValueMeter(100)).toBe(99);
-  });
-
   it("uses the canonical current-value label and an explicit unavailable state", () => {
     expect(CURRENT_VALUE_RATING_LABEL).toBe("Current Value Rating");
     expect(formatCurrentValueRating(85)).toBe("85");
-    expect(formatCurrentValueRating(null)).toBe("—");
+    expect(formatCurrentValueRating(null)).toBe("N/A");
   });
 
   it("uses the same loaded CFB 27 rating for every player-card rating display", () => {
@@ -146,16 +135,6 @@ describe("PlayerCardModal helpers", () => {
     expect(statValue(projectedStats, ["bustProb"])).toBe(0.16);
   });
 
-  it("uses the player-card headline projection for the graph's Week 0 point", () => {
-    expect(synchronizeProjectionTrajectoryToCardHeader([
-      { week: 0, points: 26.4, source: "preseason" },
-      { week: 1, points: 21.2, source: "published" },
-    ], 22.0)).toEqual([
-      { week: 0, points: 22.0, source: "current" },
-      { week: 1, points: 21.2, source: "published" },
-    ]);
-  });
-
   it("flattens ESPN historical categories into organized table rows", () => {
     const rows = buildHistoricalStatsTableRows({
       season: 2025,
@@ -207,7 +186,8 @@ describe("PlayerCardModal helpers", () => {
       },
     ] as never;
 
-    expect(buildHistoricalSeasonSummaryColumns(seasons)).toEqual(["Fantasy Pts", "Rush Yds", "Rec Yds"]);
+    expect(buildHistoricalSeasonSummaryColumns(seasons)).toEqual(["Fantasy Points", "Rush Yds", "Rec Yds"]);
+    expect(historicalSeasonSummaryValue(seasons[0], "Fantasy Points")).toBe(212.3);
     expect(historicalSeasonSummaryValue(seasons[1], "Rec Yds")).toBe(812);
     expect(historicalSeasonSummaryValue(seasons[1], "Rush Yds")).toBeNull();
   });

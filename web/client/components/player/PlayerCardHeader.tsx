@@ -18,7 +18,7 @@ type PlayerCardPalette = {
 export const CURRENT_VALUE_RATING_LABEL = "Current Value Rating";
 
 export const formatCurrentValueRating = (value?: number | null) =>
-  typeof value === "number" && Number.isFinite(value) ? value.toFixed(0) : "—";
+  typeof value === "number" && Number.isFinite(value) ? value.toFixed(0) : "N/A";
 
 export const formatPlayerCardStatus = (value?: string | null) => {
   if (!value || value.toUpperCase() === "N_A") return "N/A";

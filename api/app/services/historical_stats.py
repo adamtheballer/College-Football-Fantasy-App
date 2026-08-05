@@ -391,7 +391,7 @@ def _season_read(row: PlayerHistoricalSeasonStat) -> PlayerHistoricalSeasonRead:
     ]
     categories = [category for category in categories if category is not None]
     summary = [
-        _value("Fantasy Pts", row.fantasy_points),
+        _value("Fantasy Points", row.fantasy_points),
         _value("FPTS/G", row.fantasy_points_per_game),
         _value("Games", row.games_played),
         _value("Pass Yds", row.passing_yards),

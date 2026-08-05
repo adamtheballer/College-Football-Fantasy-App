@@ -21,6 +21,12 @@ type BackendPlayerRead = {
   cfb27_overall?: number | null;
   cfb27_position_rank?: number | null;
   cfb27_synced_at?: string | null;
+  raw_cfb27_rating?: number | null;
+  current_value_rating?: number | null;
+  value_policy_version?: string | null;
+  value_calculation_week?: number | null;
+  value_calculated_at?: string | null;
+  value_source_batch_id?: string | null;
   board_rank?: number | null;
 };
 
@@ -146,8 +152,8 @@ export type LeaguePlayerHistoryResponse = {
 
 export type PlayerTradeValueResponse = {
   current: {
-    week: number; value: number; tier: string; positional_value_rank?: number | null;
-    weekly_change?: number | null; confidence: number; policy_version: string; calculated_at: string;
+    week: number; value: number; raw_cfb27_rating?: number | null; current_value_rating: number; tier: string; positional_value_rank?: number | null;
+    weekly_change?: number | null; confidence: number; policy_version: string; calculated_at?: string | null;
     factor_breakdown?: Record<string, number> | null; explanations: Array<{ direction: string; reason: string; label: string; impact: number }>;
     history?: Array<{ week: number; value: number; tier: string; calculated_at: string }>;
   } | null;
@@ -158,8 +164,9 @@ export type PlayerTrajectoryResponse = {
   player_id: number;
   season: number;
   league_id?: number | null;
-  projection: Array<{ week: number; points: number; source: "preseason" | "current" | "published" | "bye" }>;
+  projection: Array<{ week: number; points: number | null; source: "published" | "bye"; projection_status: string; projection_version?: string | null; published_at?: string | null }>;
   value: Array<{ week: number; value: number; source: "preseason" | "published" }>;
+  preseason_projection_points?: number | null;
 };
 
 export function useLeaguePlayerHistory(

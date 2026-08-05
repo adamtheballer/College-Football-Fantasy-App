@@ -23,6 +23,7 @@ def main() -> None:
         help="Immutable CSV export created from the configured CFB27 Ratings Sheet (or a reviewed JSON fixture).",
     )
     parser.add_argument("--manifest", required=True, type=Path, help="Approved immutable manifest for --input.")
+    parser.add_argument("--season", type=int, default=2026, help="Season whose Week 1 lifecycle gate must still be preseason.")
     parser.add_argument("--dry-run", action="store_true", help="Report what would change without committing.")
     args = parser.parse_args()
 
@@ -34,7 +35,7 @@ def main() -> None:
         snapshot = load_reviewed_cfb27_snapshot(
             snapshot_path=ratings_path, manifest_path=args.manifest.expanduser().resolve()
         )
-        result = sync_cfb27_players(session, snapshot=snapshot, dry_run=args.dry_run)
+        result = sync_cfb27_players(session, snapshot=snapshot, dry_run=args.dry_run, season=args.season)
     finally:
         session.close()
 

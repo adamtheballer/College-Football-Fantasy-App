@@ -25,13 +25,17 @@ from collegefootballfantasy_api.app.services.player_pool_filters import (
 _MODEL_REGISTRY = (League, Player, RosterEntry, Team, User)
 
 
-CFB27_SOURCE_PATH = Path(__file__).resolve().parents[1] / "data" / "cfb27_ratings.json"
+# Read-only callers use the same frozen release artifact as the importer.  The
+# older JSON seed remains only for historical migrations.
+CFB27_SOURCE_PATH = Path(__file__).resolve().parents[1] / "data" / "cfb27_ratings_2026-08-04.csv"
 CFB27_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 CFB27_SCHOOL_ALIASES = {"california": "cal"}
 # The imported CFB27 source only contains real game overalls.  A board rank
 # (for example, 33) is never a player overall and must not be allowed through
 # this import path as an OVR value.
-CFB27_MIN_OVERALL = 70
+# The approved workbook includes eligible depth players below 70.  The import
+# must preserve the source value exactly rather than silently dropping them.
+CFB27_MIN_OVERALL = 0
 CFB27_MAX_OVERALL = 99
 
 
@@ -57,6 +61,8 @@ class ReviewedCfb27Snapshot:
     row_count: int
     approval_status: str
     dataset_version: str
+    export_batch_id: str
+    tabs: tuple[tuple[str, int], ...]
     ratings: tuple[Cfb27Rating, ...]
 
 
@@ -147,9 +153,7 @@ def load_cfb27_ratings() -> tuple[Cfb27Rating, ...]:
     while the import path is migrated away from this historical seed file.
     """
 
-    return _parse_cfb27_rating_rows(
-        json.loads(CFB27_SOURCE_PATH.read_text(encoding="utf-8")), source_label=str(CFB27_SOURCE_PATH)
-    )
+    return load_cfb27_ratings_from_snapshot(CFB27_SOURCE_PATH)
 
 
 def _column(row: dict[str, str], *candidates: str) -> str:
@@ -225,6 +229,8 @@ def load_reviewed_cfb27_snapshot(*, snapshot_path: Path, manifest_path: Path) ->
     row_count = metadata.get("row_count", metadata.get("record_count"))
     approval_status = metadata.get("approval_status")
     dataset_version = metadata.get("dataset_version")
+    export_batch_id = metadata.get("export_batch_id")
+    tabs = metadata.get("tabs")
     if not isinstance(spreadsheet_id, str) or not spreadsheet_id.strip():
         raise ValueError("CFB27 reviewed snapshot manifest is missing spreadsheet_id.")
     if not isinstance(retrieved_at, str) or not retrieved_at.strip():
@@ -237,6 +243,15 @@ def load_reviewed_cfb27_snapshot(*, snapshot_path: Path, manifest_path: Path) ->
         raise ValueError("CFB27 reviewed snapshot is not approved.")
     if not isinstance(dataset_version, str) or not dataset_version.strip():
         raise ValueError("CFB27 reviewed snapshot manifest is missing dataset_version.")
+    if not isinstance(export_batch_id, str) or not export_batch_id.strip():
+        raise ValueError("CFB27 reviewed snapshot manifest is missing export_batch_id.")
+    if not isinstance(tabs, list) or not tabs:
+        raise ValueError("CFB27 reviewed snapshot manifest is missing source tabs.")
+    normalized_tabs: list[tuple[str, int]] = []
+    for tab in tabs:
+        if not isinstance(tab, dict) or not isinstance(tab.get("title"), str) or not tab["title"].strip() or not isinstance(tab.get("gid"), int):
+            raise ValueError("CFB27 reviewed snapshot manifest has an invalid source tab.")
+        normalized_tabs.append((tab["title"].strip(), tab["gid"]))
 
     actual_hash = hashlib.sha256(snapshot_path.read_bytes()).hexdigest()
     if actual_hash != expected_hash:
@@ -253,6 +268,8 @@ def load_reviewed_cfb27_snapshot(*, snapshot_path: Path, manifest_path: Path) ->
         row_count=row_count,
         approval_status=approval_status,
         dataset_version=dataset_version,
+        export_batch_id=export_batch_id,
+        tabs=tuple(normalized_tabs),
         ratings=ratings,
     )
 
@@ -265,7 +282,7 @@ def _canonical_player(candidates: list[Player]) -> Player:
     return sorted(candidates, key=lambda player: (0 if _has_rank(player) else 1, player.id or 0))[0]
 
 
-def _update_canonical_player(player: Player, rating: Cfb27Rating) -> bool:
+def _update_canonical_player(player: Player, rating: Cfb27Rating, *, source_batch_id: str) -> bool:
     changed = False
     cfb27_changed = False
     # Names, schools, positions, and bios belong to the approved identity
@@ -282,6 +299,27 @@ def _update_canonical_player(player: Player, rating: Cfb27Rating) -> bool:
         player.cfb27_overall = rating.overall
         changed = True
         cfb27_changed = True
+    if player.raw_cfb27_rating != rating.overall:
+        player.raw_cfb27_rating = rating.overall
+        changed = True
+        cfb27_changed = True
+    # This importer is only used for the approved preseason reconciliation.
+    # The explicit release command checks finalized-week state before calling
+    # it, so never allow a historical weekly value to leak into this baseline.
+    if player.current_value_rating != float(rating.overall):
+        player.current_value_rating = float(rating.overall)
+        changed = True
+    if player.value_policy_version != "cfb27_exact_preseason_v1":
+        player.value_policy_version = "cfb27_exact_preseason_v1"
+        changed = True
+    if player.value_calculation_week != 0:
+        player.value_calculation_week = 0
+        changed = True
+    if player.value_source_batch_id != source_batch_id:
+        player.value_source_batch_id = source_batch_id
+        changed = True
+    player.value_calculated_at = datetime.now(timezone.utc)
+    player.value_input_json = {"raw_cfb27_rating": rating.overall, "source_batch_id": source_batch_id}
     if player.cfb27_position_rank != rating.position_rank:
         player.cfb27_position_rank = rating.position_rank
         changed = True
@@ -292,7 +330,7 @@ def _update_canonical_player(player: Player, rating: Cfb27Rating) -> bool:
 
 
 def sync_cfb27_players(
-    db: Session, *, snapshot: ReviewedCfb27Snapshot | None = None, dry_run: bool = False
+    db: Session, *, snapshot: ReviewedCfb27Snapshot | None = None, dry_run: bool = False, season: int = 2026
 ) -> dict[str, int]:
     """Sync only a reviewed ratings snapshot onto an already-approved pool.
 
@@ -305,6 +343,11 @@ def sync_cfb27_players(
         raise RuntimeError(
             "CFB27 sync requires an explicit reviewed ratings snapshot; the legacy packaged JSON is not an import source."
         )
+    # A source import may refresh raw ratings, but it must never reset an
+    # in-season value.  The lifecycle check is authoritative and fail-closed.
+    from collegefootballfantasy_api.app.services.player_trade_value import week_one_is_authoritatively_finalized
+    if week_one_is_authoritatively_finalized(db, season=season):
+        raise RuntimeError("CFB27 preseason reconciliation is blocked after authoritative Week 1 finalization.")
     existing_players = (
         db.query(Player)
         .filter(generated_test_player_filter(), approved_school_player_filter())
@@ -315,6 +358,18 @@ def sync_cfb27_players(
     for player in existing_players:
         key = cfb27_identity_key(name=player.name, school=player.school, position=player.position)
         players_by_key.setdefault(key, []).append(player)
+
+    duplicate_keys = [key for key, candidates in players_by_key.items() if len(candidates) > 1]
+    # Fail before touching a single row.  Choosing an arbitrary duplicate is
+    # not a reconciliation; it is a data-corruption risk.
+    snapshot_keys = {
+        cfb27_identity_key(name=rating.name, school=rating.school, position=rating.position)
+        for rating in snapshot.ratings
+        if is_approved_fantasy_school(rating.school)
+    }
+    conflicting_keys = sorted(set(duplicate_keys).intersection(snapshot_keys))
+    if conflicting_keys:
+        raise ValueError(f"CFB27 sync blocked by duplicate canonical identities: {', '.join(conflicting_keys)}")
 
     updated = 0
     matched = 0
@@ -329,10 +384,8 @@ def sync_cfb27_players(
         candidates = players_by_key.get(key)
         if candidates:
             matched += 1
-            if len(candidates) > 1:
-                duplicate_matches += 1
             canonical = _canonical_player(candidates)
-            if not dry_run and _update_canonical_player(canonical, rating):
+            if not dry_run and _update_canonical_player(canonical, rating, source_batch_id=snapshot.export_batch_id):
                 updated += 1
             continue
 

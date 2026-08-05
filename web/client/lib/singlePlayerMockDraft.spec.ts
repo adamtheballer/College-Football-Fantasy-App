@@ -1,7 +1,10 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
   advanceSinglePlayerMockDraft,
+  createRandomSinglePlayerMockDraft,
   buildMockRoster,
   createSinglePlayerMockDraft,
   getCurrentTeam,
@@ -134,6 +137,96 @@ describe("single-player mock draft engine", () => {
     expect(state.settings?.rounds).toBe(MOCK_ROUNDS);
     expect(state.settings?.leagueSize).toBe(10);
     expect(state.settings?.pickTimerSeconds).toBe(60);
+  });
+
+  it("assigns every valid user draft slot through the random mock factory", () => {
+    const settings = { leagueSize: 10, rounds: MOCK_ROUNDS, pickTimerSeconds: 30 };
+    const assignedTeamIds = Array.from({ length: settings.leagueSize }, (_, slot) =>
+      createRandomSinglePlayerMockDraft(1_000, settings, () => slot).userTeamId
+    );
+
+    expect(assignedTeamIds).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  });
+
+  it("creates exactly one human and nine bots for every ten-manager mock", () => {
+    const state = createRandomSinglePlayerMockDraft(
+      1_000,
+      { leagueSize: 10, rounds: MOCK_ROUNDS, pickTimerSeconds: 30 },
+      () => 9,
+    );
+
+    expect(state.userTeamId).toBe(10);
+    expect(state.teams).toHaveLength(10);
+    expect(state.teams.filter((team) => team.managerType === "user")).toHaveLength(1);
+    expect(state.teams.filter((team) => team.managerType === "bot")).toHaveLength(9);
+    expect(new Set(state.teams.map((team) => team.id)).size).toBe(10);
+  });
+
+  it("keeps an existing draft order on refresh or resume", () => {
+    const stored = createRandomSinglePlayerMockDraft(
+      1_000,
+      { leagueSize: 10, rounds: MOCK_ROUNDS, pickTimerSeconds: 30 },
+      () => 7,
+    );
+    const resolved = resolveInitialSinglePlayerMockDraftState({ storedState: stored, now: 5_000 });
+
+    expect(resolved.state).toBe(stored);
+    expect(resolved.state.userTeamId).toBe(8);
+    expect(resolved.state.teams).toEqual(stored.teams);
+  });
+
+  it("allows a new mock draft to draw the same position again", () => {
+    const settings = { leagueSize: 10, rounds: MOCK_ROUNDS, pickTimerSeconds: 30 };
+    const first = createRandomSinglePlayerMockDraft(1_000, settings, () => 4);
+    const second = createRandomSinglePlayerMockDraft(2_000, settings, () => 4);
+
+    expect(first.id).not.toBe(second.id);
+    expect(first.userTeamId).toBe(5);
+    expect(second.userTeamId).toBe(5);
+  });
+
+  it("uses the randomized first-round slot for snake-draft turns", () => {
+    const pickNumbersFor = (slot: number) =>
+      Array.from({ length: 30 }, (_, index) => index + 1).filter(
+        (overallPick) => getTeamIdForPick(overallPick, 10) === slot,
+      );
+
+    expect(pickNumbersFor(1)).toEqual([1, 20, 21]);
+    expect(pickNumbersFor(10)).toEqual([10, 11, 30]);
+    expect(pickNumbersFor(6)).toEqual([6, 15, 26]);
+  });
+
+  it("passes a seeded 10,000-draft fairness simulation without duplicate slots", () => {
+    const settings = { leagueSize: 10, rounds: MOCK_ROUNDS, pickTimerSeconds: 30 };
+    const counts = Array.from({ length: settings.leagueSize }, () => 0);
+    let seed = 0x5eed1234;
+    const nextSeededSlot = (teamCount: number) => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return Math.floor((seed / 2 ** 32) * teamCount);
+    };
+
+    for (let index = 0; index < 10_000; index += 1) {
+      const state = createRandomSinglePlayerMockDraft(1_000 + index, settings, nextSeededSlot);
+      counts[state.userTeamId - 1] += 1;
+      expect(state.teams).toHaveLength(10);
+      expect(new Set(state.teams.map((team) => team.id)).size).toBe(10);
+      expect(state.teams.filter((team) => team.managerType === "user")).toHaveLength(1);
+    }
+
+    // 1,000 expected assignments per slot; a ±15% deterministic tolerance
+    // catches a missing slot or materially biased implementation without
+    // demanding impossible exact equality from a random source.
+    expect(counts.every((count) => count >= 850 && count <= 1_150)).toBe(true);
+  });
+
+  it("shows the persisted user position in the draft-room UI", () => {
+    const source = readFileSync(
+      new URL("../pages/SinglePlayerMockDraftRoom.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain("Your Draft Position:");
+    expect(source).toContain("draftState.userTeamId");
   });
 
   it("starts a fresh mock when new=1 is present and clears stored state", () => {

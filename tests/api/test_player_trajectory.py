@@ -9,12 +9,13 @@ from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjec
 from collegefootballfantasy_api.app.services.player_trade_value import VALUE_POLICY_VERSION
 
 
-def test_player_trajectory_returns_only_the_preseason_snapshot_before_week_one(client, db_session):
+def test_player_trajectory_uses_published_weekly_rows_without_converting_a_season_total(client, db_session):
     player = Player(
         name="Trajectory Runner",
         position="RB",
         school="Texas",
         cfb27_overall=92,
+        raw_cfb27_rating=92,
         sheet_projected_season_points=260.0,
     )
     db_session.add(player)
@@ -66,17 +67,22 @@ def test_player_trajectory_returns_only_the_preseason_snapshot_before_week_one(c
 
     assert response.status_code == 200
     body = response.json()
-    assert [point["week"] for point in body["projection"]] == [0]
-    assert [point["week"] for point in body["value"]] == [0]
+    assert [point["week"] for point in body["projection"]] == [1, 2]
+    assert [point["week"] for point in body["value"]] == [0, 1]
     assert body["value"][0] == {"week": 0, "value": 92.0, "source": "preseason"}
-    assert body["projection"][0] == {"week": 0, "points": 14.0, "source": "current"}
+    assert body["preseason_projection_points"] == 260.0
+    assert body["projection"][0]["week"] == 1
+    assert body["projection"][0]["points"] == 14.0
+    assert body["projection"][0]["source"] == "published"
+    assert body["projection"][0]["projection_version"] == "FINAL"
+    assert body["projection"][1] == {"week": 2, "points": None, "source": "bye", "projection_status": "BYE", "projection_version": None, "published_at": None}
     assert body["value"][0]["source"] == "preseason"
     assert all(0 <= point["value"] <= 100 for point in body["value"])
-    assert all(point["points"] >= 0 for point in body["projection"])
+    assert all(point["points"] is None or point["points"] >= 0 for point in body["projection"])
 
 
-def test_player_trajectory_adds_weekly_snapshots_only_after_the_week_starts(client, db_session):
-    player = Player(name="Started Week Runner", position="RB", school="Texas", cfb27_overall=92, sheet_projected_season_points=260.0)
+def test_player_trajectory_includes_a_published_weekly_snapshot_without_a_wall_clock_gate(client, db_session):
+    player = Player(name="Started Week Runner", position="RB", school="Texas", raw_cfb27_rating=92, cfb27_overall=92, sheet_projected_season_points=260.0)
     db_session.add(player)
     db_session.flush()
     db_session.add_all(
@@ -92,8 +98,10 @@ def test_player_trajectory_adds_weekly_snapshots_only_after_the_week_starts(clie
 
     assert response.status_code == 200
     body = response.json()
-    assert [point["week"] for point in body["projection"]] == [0, 1]
-    assert body["projection"][1] == {"week": 1, "points": 14.0, "source": "published"}
+    assert [point["week"] for point in body["projection"]] == [1]
+    assert body["projection"][0]["week"] == 1
+    assert body["projection"][0]["points"] == 14.0
+    assert body["projection"][0]["source"] == "published"
     assert [point["week"] for point in body["value"]] == [0, 1]
     assert body["value"][1] == {"week": 1, "value": 84.0, "source": "published"}
 

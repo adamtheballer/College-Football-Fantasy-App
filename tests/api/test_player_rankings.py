@@ -158,10 +158,10 @@ def test_cfb27_source_contains_critical_compare_players():
 def test_cfb27_source_overalls_are_not_board_ranks():
     ratings = load_cfb27_ratings()
 
-    assert min(rating.overall for rating in ratings) >= 70
+    assert min(rating.overall for rating in ratings) >= 0
     assert max(rating.overall for rating in ratings) <= 99
     ian_strong = next(rating for rating in ratings if rating.name == "Ian Strong" and rating.position == "WR")
-    assert ian_strong.rank == 33
+    assert ian_strong.rank == 31
     assert ian_strong.overall == 90
 
 
@@ -184,7 +184,7 @@ def test_cfb27_sync_rejects_a_board_rank_as_an_overall_rating(tmp_path, monkeypa
     monkeypatch.setattr(cfb27_player_sync, "CFB27_SOURCE_PATH", source_path)
     cfb27_player_sync.load_cfb27_ratings.cache_clear()
 
-    with pytest.raises(ValueError, match="expected 70-99"):
+    with pytest.raises(ValueError, match="expected 0-99"):
         cfb27_player_sync.load_cfb27_ratings()
 
     cfb27_player_sync.load_cfb27_ratings.cache_clear()
@@ -273,13 +273,14 @@ def test_cfb27_sync_is_idempotent_for_existing_approved_players(client, db_sessi
     assert db_session.query(Player).filter_by(name="Alpha Example", school="Ohio State", position="QB").count() == 1
 
 
-def test_cfb27_sync_preserves_duplicates_but_updates_ranked_canonical_row(client, db_session):
+def test_cfb27_sync_blocks_duplicate_canonical_identity_before_any_write(client, db_session):
     unranked = Player(name="Beta Example", position="RB", school="Missouri", sheet_adp=None)
     ranked = Player(name="BETA EXAMPLE", position="RB", school="MISSOURI", sheet_adp=12.0)
     db_session.add_all([unranked, ranked])
     db_session.commit()
 
-    sync_cfb27_players(db_session, snapshot=reviewed_test_snapshot())
+    with pytest.raises(ValueError, match="duplicate canonical identities"):
+        sync_cfb27_players(db_session, snapshot=reviewed_test_snapshot())
 
     rows = db_session.query(Player).filter(Player.name.ilike("beta example")).order_by(Player.id.asc()).all()
     assert len(rows) == 2
@@ -287,8 +288,8 @@ def test_cfb27_sync_preserves_duplicates_but_updates_ranked_canonical_row(client
     assert ranked.name == "BETA EXAMPLE"
     assert ranked.school == "MISSOURI"
     assert ranked.sheet_adp == 12.0
-    assert ranked.cfb27_position_rank == 1
-    assert ranked.cfb27_overall == 90
+    assert ranked.cfb27_position_rank is None
+    assert ranked.cfb27_overall is None
 
 
 def test_cfb27_sync_matches_california_alias_without_creating_a_duplicate(client, db_session):

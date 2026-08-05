@@ -37,12 +37,6 @@ type HistoricalStatTableRow = {
   label: string;
   value: number | string | null;
 };
-type ProjectionTrajectoryPoint = {
-  week: number;
-  points: number;
-  source: "preseason" | "current" | "published" | "bye";
-};
-
 const tabConfig: Array<{ id: PlayerCardTab; label: string; icon: typeof Info }> = [
   { id: "summary", label: "Summary", icon: Info },
   { id: "stats", label: "Stats", icon: BarChart3 },
@@ -136,12 +130,6 @@ export const formatPlayerCardValue = (value: unknown, fallback = "—") => {
   if (typeof value === "number") return Number.isFinite(value) ? value.toLocaleString() : fallback;
   return String(value);
 };
-
-export const normalizeTradeValueMeter = (value: number) =>
-  Math.max(0, Math.min(99, Number.isFinite(value) ? value : 0));
-
-export const tradeValueMeterDegrees = (value: number) =>
-  (normalizeTradeValueMeter(value) / 99) * 360;
 
 export const resolvePlayerCardCfb27Rating = (
   card?: PlayerCardResponse | null,
@@ -281,30 +269,6 @@ export const resolvePlayerCardProjectionStats = (
   );
 };
 
-/**
- * The headline projection is the number a manager acts on.  Preserve that
- * number at Week 0 in the visual trajectory even if an older cached response
- * still carries the seasonal-average preseason baseline.
- */
-export const synchronizeProjectionTrajectoryToCardHeader = (
-  points: ProjectionTrajectoryPoint[],
-  headlineProjection?: number | null,
-): ProjectionTrajectoryPoint[] => {
-  if (typeof headlineProjection !== "number" || !Number.isFinite(headlineProjection)) {
-    return points;
-  }
-
-  const hasWeekZero = points.some((point) => point.week === 0);
-  const synchronized = points.map((point) =>
-    point.week === 0
-      ? { ...point, points: headlineProjection, source: "current" as const }
-      : point,
-  );
-  return hasWeekZero
-    ? synchronized
-    : [{ week: 0, points: headlineProjection, source: "current" }, ...synchronized];
-};
-
 export const buildHistoricalStatsTableRows = (season: HistoricalSeason | null): HistoricalStatTableRow[] =>
   season?.categories.flatMap((category) =>
     category.stats.map((stat) => ({
@@ -314,11 +278,29 @@ export const buildHistoricalStatsTableRows = (season: HistoricalSeason | null): 
     }))
   ) ?? [];
 
-export const buildHistoricalSeasonSummaryColumns = (seasons: HistoricalSeason[]): string[] =>
-  Array.from(new Set(seasons.flatMap((season) => season.summary.map((stat) => stat.label))));
+const HISTORICAL_STAT_COLUMN_ORDER = [
+  "Fantasy Points", "FPTS/G", "Games", "Completions", "Attempts", "Pass Yds", "Pass TD", "INT",
+  "Rush Att", "Rush Yds", "Rush TD", "Receptions", "Rec Yds", "Rec TD", "FGM", "FGA", "XPM", "XPA", "TD",
+];
 
-export const historicalSeasonSummaryValue = (season: HistoricalSeason, label: string) =>
-  season.summary.find((stat) => stat.label === label)?.value ?? null;
+export const buildHistoricalSeasonSummaryColumns = (seasons: HistoricalSeason[]): string[] => {
+  const present = new Set(seasons.flatMap((season) => season.summary.map((stat) => stat.label === "Fantasy Pts" ? "Fantasy Points" : stat.label)));
+  // This column is always present.  A missing/partial historical scoring
+  // record renders an em dash instead of a fabricated zero.
+  present.add("Fantasy Points");
+  return [
+    ...HISTORICAL_STAT_COLUMN_ORDER.filter((label) => present.has(label)),
+    ...[...present].filter((label) => !HISTORICAL_STAT_COLUMN_ORDER.includes(label)).sort(),
+  ];
+};
+
+export const historicalSeasonSummaryValue = (season: HistoricalSeason, label: string) => {
+  if (label === "Fantasy Points") {
+    return season.scoring_context?.fantasy_points ??
+      season.summary.find((stat) => stat.label === "Fantasy Points" || stat.label === "Fantasy Pts")?.value ?? null;
+  }
+  return season.summary.find((stat) => stat.label === label)?.value ?? null;
+};
 
 export const visiblePlayerCardAboutMessage = (message?: string | null) => {
   const trimmed = message?.trim();
@@ -374,14 +356,7 @@ export function PlayerCardModal({
   const historicalSeasons = historicalStats?.seasons ?? [];
   const historicalSummaryColumns = buildHistoricalSeasonSummaryColumns(historicalSeasons);
   const projectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
-  const displayedProjectionTrajectory = useMemo(
-    () => synchronizeProjectionTrajectoryToCardHeader(
-      trajectoryQuery.data?.projection ?? [],
-      player.projectedPoints,
-    ),
-    [player.projectedPoints, trajectoryQuery.data?.projection],
-  );
-  const currentValueRating = valueQuery.data?.current?.value ?? null;
+  const currentValueRating = valueQuery.data?.current?.current_value_rating ?? null;
   const aboutMessage = visiblePlayerCardAboutMessage(card?.about.message);
   const cardActions = [...(action ? [action] : []), ...actions];
   const projectionHighlights = [
@@ -535,13 +510,13 @@ export function PlayerCardModal({
               </div>
 
               {historicalSeasons.length ? (
-                <div className="mt-5 overflow-x-auto rounded-3xl border border-white/10 bg-black/20">
-                  <table className="min-w-max w-full border-collapse text-left">
+                <div className="mt-5 overflow-x-auto overscroll-x-contain touch-pan-x rounded-3xl border border-white/10 bg-black/20" aria-label="Historical stats table; scroll horizontally for all columns">
+                  <table className="min-w-[1050px] w-max border-collapse text-left">
                     <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
                       <tr>
-                        <th className="px-4 py-4">Year</th>
-                        <th className="min-w-36 px-4 py-4">Team</th>
-                        <th className="px-4 py-4">Pos</th>
+                        <th className="min-w-[5.5rem] whitespace-nowrap px-4 py-4">Year</th>
+                        <th className="min-w-36 whitespace-nowrap px-4 py-4">Team</th>
+                        <th className="min-w-[4.5rem] whitespace-nowrap px-4 py-4">Pos</th>
                         {historicalSummaryColumns.map((label) => (
                           <th key={label} className="whitespace-nowrap px-4 py-4 text-right">{label}</th>
                         ))}
@@ -550,8 +525,8 @@ export function PlayerCardModal({
                     <tbody className="divide-y divide-white/10">
                       {historicalSeasons.map((season) => (
                         <tr key={`${season.season}-${season.team_name ?? "team"}-${season.season_type}`} className="text-sm font-bold text-white/75 transition hover:bg-white/[0.035]">
-                          <td className="px-4 py-5 text-xl font-black tabular-nums text-white">{season.season}</td>
-                          <td className="px-4 py-5"><p className="font-black text-white">{season.team_name ?? card?.about.team ?? player.school}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.14em] text-white/45">{season.season_type}</p></td>
+                          <td className="whitespace-nowrap px-4 py-5 text-xl font-black tabular-nums text-white">{season.season}</td>
+                          <td className="min-w-36 px-4 py-5"><p className="font-black text-white">{season.team_name ?? card?.about.team ?? player.school}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.14em] text-white/45">{season.season_type}</p></td>
                           <td className="px-4 py-5"><span className="rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-white/70">{season.position ?? position ?? "—"}</span></td>
                           {historicalSummaryColumns.map((label) => (
                             <td key={label} className="px-4 py-5 text-right font-black tabular-nums text-white">
@@ -702,14 +677,28 @@ export function PlayerCardModal({
                   <div className="flex min-h-56 items-center justify-center gap-3 rounded-3xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">
                     <Loader2 className="h-4 w-4 animate-spin" /> Building season trajectory
                   </div>
+                ) : trajectoryQuery.data?.projection.length ? (
+                  <>
+                    {typeof trajectoryQuery.data.preseason_projection_points === "number" ? (
+                      <p className="mb-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm font-bold text-white/65">
+                        Preseason season projection: <span className="font-black text-white">{trajectoryQuery.data.preseason_projection_points.toFixed(1)} pts</span>
+                      </p>
+                    ) : null}
+                    <PlayerTrajectoryChart
+                      ariaLabel={`${player.name} projected fantasy points by week`}
+                      points={trajectoryQuery.data.projection.map((point) => ({ ...point, value: point.points }))}
+                      yLabel="Points"
+                      yMax={30}
+                      valueFormatter={(value) => `${value.toFixed(1)} pts`}
+                    />
+                  </>
                 ) : trajectoryQuery.data ? (
-                  <PlayerTrajectoryChart
-                    ariaLabel={`${player.name} projected fantasy points by week`}
-                    points={displayedProjectionTrajectory.map((point) => ({ ...point, value: point.points }))}
-                    yLabel="Points"
-                    yMax={30}
-                    valueFormatter={(value) => `${value.toFixed(1)} pts`}
-                  />
+                  <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-sm font-bold leading-6 text-white/60">
+                    {typeof trajectoryQuery.data.preseason_projection_points === "number" ? (
+                      <p>Preseason season projection: <span className="font-black text-white">{trajectoryQuery.data.preseason_projection_points.toFixed(1)} pts</span></p>
+                    ) : null}
+                    <p className={typeof trajectoryQuery.data.preseason_projection_points === "number" ? "mt-2" : undefined}>Weekly projections have not been published yet.</p>
+                  </div>
                 ) : (
                   <p className="rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4 text-sm font-bold text-rose-100">
                     Season projection trajectory is unavailable right now. Please try again shortly.
@@ -747,7 +736,7 @@ export function PlayerCardModal({
                 </div>
               ) : (
                 <p className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
-                  No detailed weekly stat split is linked to this card yet. The season trajectory above remains available.
+                  No detailed weekly stat split is linked to this card yet.
                 </p>
               )}
             </section>
@@ -799,34 +788,7 @@ export function PlayerCardModal({
                   </p>
                 )}
               </div>
-              {valueQuery.isLoading ? <div className="mt-5 flex min-h-40 items-center justify-center gap-3 rounded-2xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55"><Loader2 className="h-4 w-4 animate-spin" /> Loading value</div>
-              : valueQuery.isError ? <p className="mt-5 rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4 text-sm font-bold text-rose-100">Value update delayed. Please try again shortly.</p>
-              : valueQuery.data?.current ? (() => {
-                const value = valueQuery.data.current;
-                const change = value.weekly_change;
-                const meterSource = value.value;
-                const meterValue = normalizeTradeValueMeter(meterSource);
-                const meterDegrees = tradeValueMeterDegrees(meterSource);
-                const meterColor = meterValue >= 90 ? "#5ee7ff" : meterValue >= 80 ? "#5eead4" : meterValue >= 70 ? "#93c5fd" : "#fdba74";
-                return (
-                  <div className="mt-5">
-                    <div className="grid gap-5 md:grid-cols-[220px_1fr]">
-                      <div className="flex aspect-square w-full max-w-[220px] items-center justify-center rounded-full p-3" style={{ background: `conic-gradient(from -90deg, ${meterColor} 0deg ${meterDegrees}deg, rgba(148, 163, 184, 0.22) ${meterDegrees}deg 360deg)` }} aria-label={`Current value rating ${meterValue.toFixed(0)} out of 99`}>
-                        <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-slate-950 text-center">
-                          <p className="text-5xl font-black tabular-nums text-white">{meterValue.toFixed(0)}</p>
-                          <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">out of 99</p>
-                          <p className="mt-3 text-xs font-black uppercase tracking-[0.15em] text-cyan-200">Current Value Rating</p>
-                        </div>
-                      </div>
-                      <div className="grid content-center gap-3 sm:grid-cols-3">
-                        <div className="rounded-2xl border border-white/10 bg-black/20 p-3"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/45">Weekly change</p><p className="mt-2 text-xl font-black text-white">{change === null || change === undefined ? "NEW" : change > 0 ? `UP ${change}` : change < 0 ? `DOWN ${Math.abs(change)}` : "NO CHANGE"}</p></div>
-                        <div className="rounded-2xl border border-white/10 bg-black/20 p-3"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/45">Value rank</p><p className="mt-2 text-xl font-black text-white">{position || "Player"} #{value.positional_value_rank ?? "—"}</p></div>
-                        <div className="rounded-2xl border border-white/10 bg-black/20 p-3"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/45">Updated</p><p className="mt-2 text-sm font-black text-white">{new Date(value.calculated_at).toLocaleString()}</p></div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })() : <p className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">A published current value has not been generated yet. The chart above shows this player’s season outlook until the weekly value run publishes a value.</p>}
+              {!trajectoryQuery.isLoading && trajectoryQuery.data && !trajectoryQuery.data.value.some((point) => point.week > 0) ? <p className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">Player value history will appear as weekly snapshots are published.</p> : null}
             </section>
           )}
         </div>

@@ -14,7 +14,7 @@ import { mergeMockDraftMasterBoardPlayers } from "@/lib/mockDraftMasterBoard";
 import {
   advanceSinglePlayerMockDraft,
   buildMockRoster,
-  createSinglePlayerMockDraft,
+  createRandomSinglePlayerMockDraft,
   getCenteredDraftCarouselScrollLeft,
   getCurrentTeam,
   getDraftablePlayersForTeam,
@@ -351,7 +351,7 @@ export default function SinglePlayerMockDraftRoom() {
   );
 
   const resetDraft = () => {
-    const freshDraft = createSinglePlayerMockDraft(Date.now(), mockSettings);
+    const freshDraft = createRandomSinglePlayerMockDraft(Date.now(), mockSettings);
     setDraftState(freshDraft);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(freshDraft));
     setActiveTab("draft");
@@ -841,6 +841,14 @@ export default function SinglePlayerMockDraftRoom() {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-3">
+            <div className="rounded-3xl border border-cyan-200/35 bg-cyan-400/10 px-6 py-4 text-right shadow-[0_0_42px_rgba(34,211,238,0.17)] backdrop-blur-xl">
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100">
+                Your Draft Position: <span className="text-xl tabular-nums">{draftState.userTeamId}</span>
+              </p>
+              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                {userDraftBoardTeam?.name ?? "Your Team"}
+              </p>
+            </div>
             <div
               className={cn(
                 "rounded-3xl border border-white/16 bg-[#0b121a] px-6 py-4 text-right shadow-[0_10px_24px_rgba(2,6,23,0.38)]",
