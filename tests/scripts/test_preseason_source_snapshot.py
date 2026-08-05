@@ -14,13 +14,13 @@ def _copied_snapshot(tmp_path: Path) -> Path:
     return destination
 
 
-def test_checked_in_snapshot_is_a_complete_813_player_release_input():
+def test_checked_in_snapshot_is_a_complete_814_player_release_input():
     report = audit_source_directory(DEFAULT_SOURCE_DIRECTORY, require_provenance=True)
 
     assert report["status"] == "PASS"
-    assert report["identity_rows"] == 813
-    assert report["projection_rows"] == 813
-    assert report["approved_player_count"] == 813
+    assert report["identity_rows"] == 814
+    assert report["projection_rows"] == 814
+    assert report["approved_player_count"] == 814
     assert report["gate_context"]["source_provenance"]["status"] == "PASS"
 
 

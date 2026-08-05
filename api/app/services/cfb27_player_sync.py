@@ -340,8 +340,8 @@ def _update_canonical_player(player: Player, rating: Cfb27Rating, *, source_batc
     return changed
 
 
-def _clear_current_batch_rating_from_legacy_player(player: Player, *, source_batch_id: str) -> bool:
-    """Remove only an erroneous current-batch assignment from a legacy row.
+def _clear_current_batch_rating_from_legacy_player(player: Player) -> bool:
+    """Remove only an erroneous preseason CFB27 assignment from a legacy row.
 
     Legacy player rows are preserved for historical foreign keys.  The value
     source batch is the explicit provenance signal that this immutable CFB27
@@ -349,7 +349,11 @@ def _clear_current_batch_rating_from_legacy_player(player: Player, *, source_bat
     value is touched.
     """
 
-    if player.value_source_batch_id != source_batch_id:
+    if (
+        player.value_policy_version != "cfb27_exact_preseason_v1"
+        or player.value_calculation_week != 0
+        or not player.value_source_batch_id
+    ):
         return False
     player.cfb27_rank = None
     player.cfb27_overall = None
@@ -418,7 +422,12 @@ def sync_cfb27_players(
         db.query(Player)
         .filter(generated_test_player_filter())
         .filter(Player.sheet_source_sheet_id.like(f"legacy-canonical-preseason:{int(season)}:%"))
-        .filter(Player.value_source_batch_id == snapshot.export_batch_id)
+        # A corrected immutable export receives a new batch ID.  Clear only
+        # old preseason CFB27 values that were attached to retained legacy
+        # identities; never touch an in-season or differently governed value.
+        .filter(Player.value_policy_version == "cfb27_exact_preseason_v1")
+        .filter(Player.value_calculation_week == 0)
+        .filter(Player.value_source_batch_id.isnot(None))
         .all()
     )
     result = {
@@ -456,7 +465,7 @@ def sync_cfb27_players(
     try:
         if not dry_run:
             for player in legacy_assignments:
-                _clear_current_batch_rating_from_legacy_player(player, source_batch_id=snapshot.export_batch_id)
+                _clear_current_batch_rating_from_legacy_player(player)
             for key in matched_keys:
                 player = _canonical_player(players_by_key[key])
                 rating = ratings_by_key[key][0]

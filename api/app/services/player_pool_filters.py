@@ -28,6 +28,7 @@ _APPROVED_SCHOOLS = {
 _APPROVED_SCHOOL_KEYS = tuple(sorted(school.strip().lower() for school in _APPROVED_SCHOOLS))
 ELIGIBLE_FANTASY_POSITIONS = ("QB", "RB", "WR", "TE", "K")
 CANONICAL_PRESEASON_SOURCE_PREFIX = "canonical-preseason:"
+LEGACY_CANONICAL_PRESEASON_SOURCE_PREFIX = "legacy-canonical-preseason:"
 
 
 def approved_school_player_filter():
@@ -46,6 +47,24 @@ def canonical_preseason_player_filter(season: int):
 
     return Player.sheet_source_sheet_id.like(
         f"{CANONICAL_PRESEASON_SOURCE_PREFIX}{int(season)}:%"
+    )
+
+
+def retired_canonical_preseason_player_filter(season: int):
+    """Identify retained records removed from the reviewed current snapshot.
+
+    A legacy marker preserves roster, trade, and historical-stat foreign keys,
+    while making the record unavailable to every current-season surface.
+    """
+
+    return Player.sheet_source_sheet_id.like(
+        f"{LEGACY_CANONICAL_PRESEASON_SOURCE_PREFIX}{int(season)}:%"
+    )
+
+
+def is_retired_canonical_preseason_player(player: Player, season: int) -> bool:
+    return (player.sheet_source_sheet_id or "").strip().startswith(
+        f"{LEGACY_CANONICAL_PRESEASON_SOURCE_PREFIX}{int(season)}:"
     )
 
 

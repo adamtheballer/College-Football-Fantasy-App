@@ -161,7 +161,7 @@ def test_cfb27_source_contains_critical_compare_players():
     assert ahmad.overall == 96
 
 
-def test_release_source_gap_is_explicitly_manual_review_until_the_ratings_workbook_is_corrected():
+def test_release_source_matches_every_current_player_after_live_workbook_correction():
     root = Path(__file__).resolve().parents[2]
     with (root / "reports" / "source-imports" / "2026" / "player-projections.csv").open(newline="", encoding="utf-8") as handle:
         current_keys = {
@@ -180,27 +180,11 @@ def test_release_source_gap_is_explicitly_manual_review_until_the_ratings_workbo
     }
 
     unresolved = current_keys - rating_keys
-    assert len(current_keys) == 813
-    assert len(rating_keys) == 812
-    assert {key.split("|")[0] for key in unresolved} == {
-        "aidenmizell",
-        "amariodom",
-        "bryanjackson",
-        "calvinrusselliii",
-        "cameronkossman",
-        "camball",
-        "harveybroussardiii",
-        "harrydalton",
-        "jackcassidy",
-        "jaimeffrench",
-        "jaylenmbakwe",
-        "joshphifer",
-        "karlekjlaceyjr",
-        "naeemgladdingabdulrahim",
-        "petergonzalez",
-        "tjthomas",
-        "travillefredrickjr",
-    }
+    assert len(current_keys) == 814
+    assert len(rating_keys) == 814
+    assert unresolved == set()
+    assert cfb27_player_sync.cfb27_identity_key(name="Calvin Russell III", school="Syracuse", position="WR") not in current_keys
+    assert cfb27_player_sync.cfb27_identity_key(name="Cole Weaver", school="Syracuse", position="WR") in current_keys
 
 
 def test_cfb27_source_overalls_are_not_board_ranks():
@@ -349,7 +333,7 @@ def test_cfb27_sync_prefers_current_snapshot_and_clears_current_batch_value_from
         current_value_rating=95.0,
         value_policy_version="cfb27_exact_preseason_v1",
         value_calculation_week=0,
-        value_source_batch_id="test-cfb27-2026-01-15",
+        value_source_batch_id="previous-cfb27-2026-01-15",
         value_input_json={"raw_cfb27_rating": 95},
     )
     db_session.add_all((
@@ -371,6 +355,31 @@ def test_cfb27_sync_prefers_current_snapshot_and_clears_current_batch_value_from
     assert legacy.current_value_rating is None
     assert legacy.value_source_batch_id is None
     assert legacy.cfb27_overall is None
+
+
+def test_retired_canonical_player_is_hidden_from_search_and_current_card(client, db_session):
+    retired = Player(
+        name="Retired Current Player",
+        position="WR",
+        school="Syracuse",
+        sheet_source_sheet_id="legacy-canonical-preseason:2026:ACC",
+        sheet_projected_season_points=250.0,
+    )
+    active = Player(
+        name="Replacement Current Player",
+        position="WR",
+        school="Syracuse",
+        sheet_source_sheet_id="canonical-preseason:2026:ACC",
+        sheet_projected_season_points=250.0,
+    )
+    db_session.add_all((retired, active))
+    db_session.commit()
+
+    assert client.get("/players", params={"search": "Retired Current Player"}).json()["total"] == 0
+    assert all(row["id"] != retired.id for row in client.get("/players", params={"offset": 0, "limit": 100}).json()["data"])
+    assert client.get(f"/players/{retired.id}").status_code == 410
+    assert client.get(f"/players/{retired.id}/card").status_code == 410
+    assert client.get(f"/players/{active.id}/card").status_code == 200
 
 
 def test_cfb27_sync_dry_run_reports_missing_current_identity_without_mutating(client, db_session):
