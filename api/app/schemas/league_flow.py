@@ -145,6 +145,7 @@ class LeagueCreateRequest(BaseModel):
     basics: LeagueBasics
     settings: LeagueSettingsInput
     draft: DraftScheduleInput
+    beta_scoring_acknowledged: bool = False
 
 
 class LeagueMemberRead(BaseModel):
@@ -205,6 +206,8 @@ class LeagueSettingsRead(BaseModel):
     id: int
     league_id: int
     scoring_json: dict
+    scoring_snapshot_json: dict | None = None
+    scoring_locked_at: datetime | None = None
     roster_slots_json: dict
     playoff_teams: int
     waiver_type: str

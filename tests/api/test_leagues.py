@@ -21,6 +21,7 @@ from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.league_schedule import REGULAR_SEASON_WEEKS, ensure_league_schedule
 from collegefootballfantasy_api.app.services.scoring_service import normalize_scoring_rules
 from collegefootballfantasy_api.app.services.draft_service import process_expired_draft_picks_once
+from collegefootballfantasy_api.app.core.config import settings
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -93,6 +94,44 @@ def test_create_and_list_leagues(client):
     assert data["data"][0]["max_teams"] == created["max_teams"]
     assert len(data["data"][0]["members"]) == 1
     assert data["data"][0]["draft"]["draft_type"] == "snake"
+
+
+def test_beta_scoring_requires_acknowledgment_and_locks_the_persisted_snapshot(client, monkeypatch):
+    monkeypatch.setattr(settings, "beta_scoring_lock_enabled", True)
+    token = create_user_and_token(client, "beta-scoring-lock")
+    payload = {
+        "basics": {"name": "Beta Scoring Lock", "season_year": 2026, "max_teams": 4, "is_private": True},
+        "settings": {
+            "scoring_json": {"ppr": 1},
+            "roster_slots_json": {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 1, "K": 1, "BENCH": 5},
+            "playoff_teams": 2,
+            "waiver_type": "faab",
+            "trade_review_type": "commissioner",
+            "superflex_enabled": False,
+            "kicker_enabled": True,
+            "defense_enabled": False,
+        },
+        "draft": {
+            "draft_datetime_utc": "2026-08-19T18:00:00Z",
+            "timezone": "America/Los_Angeles",
+            "draft_type": "snake",
+            "pick_timer_seconds": 90,
+        },
+    }
+    denied = client.post("/leagues", json=payload, headers=auth_headers(token))
+    assert denied.status_code == 422
+
+    payload["beta_scoring_acknowledged"] = True
+    created = client.post("/leagues", json=payload, headers=auth_headers(token))
+    assert created.status_code == 201
+    league = created.json()["league"]
+    assert league["settings"]["scoring_snapshot_json"] == {"receptions": 1}
+    assert league["settings"]["scoring_locked_at"] is not None
+
+    update = {**payload["settings"], "scoring_json": {"ppr": 0.5}}
+    rejected = client.patch(f"/leagues/{league['id']}/settings", json=update, headers=auth_headers(token))
+    assert rejected.status_code == 409
+    assert "locked" in rejected.json()["detail"]
 
 
 def test_settings_trade_history_shows_completed_trade_parties_assets_and_time(client, db_session):

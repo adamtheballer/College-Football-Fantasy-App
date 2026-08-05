@@ -370,7 +370,12 @@ def _clear_current_batch_rating_from_legacy_player(player: Player) -> bool:
 
 
 def sync_cfb27_players(
-    db: Session, *, snapshot: ReviewedCfb27Snapshot | None = None, dry_run: bool = False, season: int = 2026
+    db: Session,
+    *,
+    snapshot: ReviewedCfb27Snapshot | None = None,
+    dry_run: bool = False,
+    season: int = 2026,
+    commit: bool = True,
 ) -> dict[str, int]:
     """Sync only a reviewed ratings snapshot onto an already-approved pool.
 
@@ -471,7 +476,10 @@ def sync_cfb27_players(
                 rating = ratings_by_key[key][0]
                 if _update_canonical_player(player, rating, source_batch_id=snapshot.export_batch_id):
                     result["updated"] += 1
-            db.commit()
+            if commit:
+                db.commit()
+            else:
+                db.flush()
         else:
             db.rollback()
     except Exception:

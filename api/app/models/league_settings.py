@@ -22,6 +22,8 @@ class LeagueSettings(TimestampMixin, Base):
     league_id: Mapped[int] = mapped_column(ForeignKey("leagues.id", ondelete="CASCADE"))
 
     scoring_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    scoring_snapshot_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    scoring_locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     roster_slots_json: Mapped[dict] = mapped_column(JSON, default=dict)
     playoff_teams: Mapped[int] = mapped_column(Integer, default=4)
     waiver_type: Mapped[str] = mapped_column(String(50), nullable=False, default="faab")

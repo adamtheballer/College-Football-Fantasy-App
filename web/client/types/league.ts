@@ -2,6 +2,8 @@ export interface LeagueSettings {
   id: number;
   league_id: number;
   scoring_json: Record<string, number | string | boolean>;
+  scoring_snapshot_json?: Record<string, number | string | boolean> | null;
+  scoring_locked_at?: string | null;
   roster_slots_json: Record<string, number>;
   playoff_teams: number;
   waiver_type: string;

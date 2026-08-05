@@ -13,10 +13,12 @@ import argparse
 import csv
 import re
 import unicodedata
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
 from collegefootballfantasy_api.app.db.session import SessionLocal
@@ -91,7 +93,7 @@ def read_rows(path: Path) -> list[dict[str, str]]:
 
 def bootstrap(
     *, identities_path: Path, projections_path: Path, ratings_path: Path | None = None,
-    ratings_manifest_path: Path | None = None, apply: bool
+    ratings_manifest_path: Path | None = None, apply: bool, db: Session | None = None, commit: bool = True
 ) -> dict[str, int]:
     identity_rows = read_rows(identities_path)
     projection_rows = read_rows(projections_path)
@@ -126,7 +128,7 @@ def bootstrap(
     now = datetime.now(timezone.utc)
     created = updated = ratings_matched = 0
     legacy_snapshot_players = 0
-    with SessionLocal() as db:
+    with (SessionLocal() if db is None else nullcontext(db)) as db:
         existing = {
             identity_key(player.name, player.school, player.position): player
             for player in db.scalars(select(Player)).all()
@@ -201,8 +203,10 @@ def bootstrap(
 
         if not apply:
             db.rollback()
-        else:
+        elif commit:
             db.commit()
+        else:
+            db.flush()
 
         eligible_count = sum(
             1

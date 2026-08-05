@@ -16,6 +16,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -402,6 +403,7 @@ function CreateLeagueForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<LeagueCreateResponse | null>(null);
+  const [betaScoringAcknowledged, setBetaScoringAcknowledged] = useState(false);
 
   const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
   const timezone = timezoneOptions.some((option) => option.value === detectedTimezone)
@@ -492,6 +494,7 @@ function CreateLeagueForm() {
   );
 
   const updateScoring = (key: ScoringKey, rawValue: number) => {
+    setBetaScoringAcknowledged(false);
     setScoring((prev) => ({
       ...prev,
       [key]: Number.isFinite(rawValue) ? rawValue : defaultScoring[key],
@@ -535,6 +538,10 @@ function CreateLeagueForm() {
       setError("Draft time must be at least 5 minutes in the future.");
       return;
     }
+    if (!betaScoringAcknowledged) {
+      setError("Review the point system and acknowledge the beta scoring notice before creating the league.");
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -566,6 +573,7 @@ function CreateLeagueForm() {
           kicker_enabled: true,
           defense_enabled: false,
         },
+        beta_scoring_acknowledged: betaScoringAcknowledged,
         draft: {
           draft_datetime_utc: draftDateTime.toISOString(),
           timezone: draft.timezone,
@@ -1137,6 +1145,19 @@ function CreateLeagueForm() {
                   <ReviewItem label="Roster format" value={rosterSummary || "--"} />
                   <ReviewItem label="Scoring" value={scoringSummary} />
                 </div>
+                <div className="rounded-[16px] border border-amber-300/20 bg-amber-300/10 p-5">
+                  <p className="text-sm font-bold text-amber-100">
+                    Beta notice: Scoring settings cannot be changed after the league is created. Review your point system carefully before continuing.
+                  </p>
+                  <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm font-semibold leading-6 text-slate-100">
+                    <Checkbox
+                      checked={betaScoringAcknowledged}
+                      onCheckedChange={(checked) => setBetaScoringAcknowledged(checked === true)}
+                      aria-label="I understand that scoring settings cannot be changed during the beta, and I have reviewed this league’s point system."
+                    />
+                    <span>I understand that scoring settings cannot be changed during the beta, and I have reviewed this league’s point system.</span>
+                  </label>
+                </div>
               </div>
             )}
           </div>
@@ -1166,7 +1187,7 @@ function CreateLeagueForm() {
                 type="button"
                 className={primaryButtonClass}
                 onClick={handleCreate}
-                disabled={loading}
+                disabled={loading || !betaScoringAcknowledged}
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 Create League

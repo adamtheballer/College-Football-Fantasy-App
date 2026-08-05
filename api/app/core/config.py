@@ -118,6 +118,10 @@ class Settings(BaseSettings):
     # The public-beta gate is deliberately separate from normal authentication.
     # It is disabled outside the approved beta environment by default.
     beta_access_enabled: bool = False
+    # The beta scoring agreement is server-authoritative.  It is intentionally
+    # independent of UI state so direct API clients cannot change a league's
+    # scoring after creation when the public-beta policy is enabled.
+    beta_scoring_lock_enabled: bool = False
     beta_access_code_hmac_secret: str = DEFAULT_BETA_ACCESS_CODE_HMAC_SECRET
     beta_access_reservation_secret: str = DEFAULT_BETA_ACCESS_RESERVATION_SECRET
     beta_access_reservation_ttl_minutes: int = 15
