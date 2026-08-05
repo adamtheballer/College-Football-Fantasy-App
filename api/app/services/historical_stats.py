@@ -13,7 +13,6 @@ from collegefootballfantasy_api.app.models.historical_stats import (
     PlayerHistoricalSeasonStat,
     ProviderStatCache,
 )
-from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId, TeamProviderId
 from collegefootballfantasy_api.app.schemas.historical_stats import (
@@ -36,6 +35,27 @@ from collegefootballfantasy_api.app.services.scoring_service import calculate_pl
 
 
 TRUSTED_PROVIDER_MAPPING_STATUSES = {"verified", "manual", "legacy_backfill", "auto_matched"}
+
+# Player-card history must be comparable across every player and season.  It
+# intentionally does not inherit a viewer's league settings: the app's
+# validated default rules are the canonical, full-PPR standard used here.
+STANDARD_HISTORICAL_SCORING_RULES: dict[str, Any] = {
+    # Offense inherits the app's standard full-PPR defaults. Historical
+    # sources frequently provide only an aggregate FGM column, so use the
+    # conventional flat three-point field-goal rule instead of inventing
+    # unavailable distance splits.
+    "offense": {},
+    "kicker": {
+        "fg_made_0_30": 3,
+        "fg_made_31_40": 3,
+        "fg_made_41_50": 3,
+        "fg_made_51_60": 3,
+        "fg_made_61_plus": 3,
+        "xp_made": 1,
+        "fg_missed": -1,
+    },
+}
+STANDARD_HISTORICAL_SCORING_VERSION = "standard-full-ppr-v1"
 
 
 def canonical_json_hash(payload: dict[str, Any]) -> str:
@@ -92,9 +112,19 @@ def _flatten_season_categories(season: ProviderPlayerSeason) -> dict[str, float 
 
 
 def _scoring_stats_from_historical_row(row: PlayerHistoricalSeasonStat) -> dict[str, float | None]:
-    field_goals_0_39 = sum(
+    field_goals_0_30 = sum(
         value or 0
         for value in (row.field_goals_0_19, row.field_goals_20_29, row.field_goals_30_39)
+    )
+    has_field_goal_distance_splits = any(
+        value is not None
+        for value in (
+            row.field_goals_0_19,
+            row.field_goals_20_29,
+            row.field_goals_30_39,
+            row.field_goals_40_49,
+            row.field_goals_50_plus,
+        )
     )
     return {
         "pass_yards": row.passing_yards,
@@ -106,20 +136,44 @@ def _scoring_stats_from_historical_row(row: PlayerHistoricalSeasonStat) -> dict[
         "rec_yards": row.receiving_yards,
         "rec_tds": row.receiving_touchdowns,
         "fumbles_lost": row.fumbles_lost,
-        "fg_made_0_39": field_goals_0_39,
-        "fg_made_40_49": row.field_goals_40_49,
-        "fg_made_50_plus": row.field_goals_50_plus,
+        "fg_made_0_30": field_goals_0_30 if has_field_goal_distance_splits else row.field_goals_made,
+        "fg_made_31_40": row.field_goals_40_49,
+        "fg_made_41_50": row.field_goals_50_plus,
         "xp_made": row.extra_points_made,
     }
 
 
-def _league_scoring_rules(db: Session, league_id: int | None) -> tuple[dict[str, Any], str]:
-    if not league_id:
-        return {}, "default"
-    settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league_id).first()
-    if not settings_row:
-        return {}, "default"
-    return settings_row.scoring_json or {}, f"league:{league_id}"
+def calculate_standard_historical_fantasy_points(
+    row: PlayerHistoricalSeasonStat,
+) -> tuple[float, float | None]:
+    """Return the league-independent standard total for one historical season."""
+    position = row.position or row.canonical_position
+    normalized_stats = normalize_player_stats(_scoring_stats_from_historical_row(row), position)
+    fantasy_points, _breakdown = calculate_player_fantasy_points(
+        normalized_stats,
+        STANDARD_HISTORICAL_SCORING_RULES,
+        position,
+    )
+    points_per_game = (
+        round(fantasy_points / row.games_played, 2)
+        if row.games_played and row.games_played > 0
+        else None
+    )
+    return fantasy_points, points_per_game
+
+
+def apply_standard_historical_fantasy_points(row: PlayerHistoricalSeasonStat) -> bool:
+    """Persist the canonical player-card score and report whether it changed."""
+    fantasy_points, points_per_game = calculate_standard_historical_fantasy_points(row)
+    changed = (
+        row.fantasy_points != fantasy_points
+        or row.fantasy_points_per_game != points_per_game
+        or row.scoring_rules_version != STANDARD_HISTORICAL_SCORING_VERSION
+    )
+    row.fantasy_points = fantasy_points
+    row.fantasy_points_per_game = points_per_game
+    row.scoring_rules_version = STANDARD_HISTORICAL_SCORING_VERSION
+    return changed
 
 
 def _assign_stats(row: PlayerHistoricalSeasonStat, flattened: dict[str, float | None]) -> None:
@@ -170,7 +224,6 @@ def upsert_historical_player_history(
     league_id: int | None = None,
     refresh_finalized: bool = False,
 ) -> tuple[int, int]:
-    scoring_rules, scoring_rules_version = _league_scoring_rules(db, league_id)
     rows_inserted = 0
     rows_updated = 0
     imported_at = datetime.now(timezone.utc)
@@ -211,13 +264,7 @@ def upsert_historical_player_history(
         row.games_played = season.games_played
         row.games_started = season.games_started
         _assign_stats(row, flattened)
-        normalized_stats = normalize_player_stats(_scoring_stats_from_historical_row(row))
-        fantasy_points, _breakdown = calculate_player_fantasy_points(normalized_stats, scoring_rules)
-        row.fantasy_points = fantasy_points
-        row.fantasy_points_per_game = (
-            round(fantasy_points / row.games_played, 2) if row.games_played and row.games_played > 0 else None
-        )
-        row.scoring_rules_version = scoring_rules_version
+        apply_standard_historical_fantasy_points(row)
         row.source_response_hash = source_response_hash
         row.parser_version = PARSER_VERSION
         row.imported_at = imported_at
@@ -323,6 +370,10 @@ def _category(label: str, key: str, pairs: list[tuple[str, float | int | str | N
 
 
 def _season_read(row: PlayerHistoricalSeasonStat) -> PlayerHistoricalSeasonRead:
+    # Recalculate for the response as well as during imports/backfills.  That
+    # makes legacy rows written before the standard contract immediately
+    # accurate without mutating data from a GET request.
+    fantasy_points, fantasy_points_per_game = calculate_standard_historical_fantasy_points(row)
     categories = [
         _category(
             "Passing",
@@ -391,8 +442,8 @@ def _season_read(row: PlayerHistoricalSeasonStat) -> PlayerHistoricalSeasonRead:
     ]
     categories = [category for category in categories if category is not None]
     summary = [
-        _value("Fantasy Points", row.fantasy_points),
-        _value("FPTS/G", row.fantasy_points_per_game),
+        _value("Fantasy Points", fantasy_points),
+        _value("FPTS/G", fantasy_points_per_game),
         _value("Games", row.games_played),
         _value("Pass Yds", row.passing_yards),
         _value("Rush Yds", row.rushing_yards),
@@ -418,9 +469,9 @@ def _season_read(row: PlayerHistoricalSeasonStat) -> PlayerHistoricalSeasonRead:
             is_final=row.is_final,
         ),
         scoring_context=HistoricalStatsScoringContext(
-            scoring_rules_version=row.scoring_rules_version,
-            fantasy_points=row.fantasy_points,
-            fantasy_points_per_game=row.fantasy_points_per_game,
+            scoring_rules_version=STANDARD_HISTORICAL_SCORING_VERSION,
+            fantasy_points=fantasy_points,
+            fantasy_points_per_game=fantasy_points_per_game,
         ),
         unknown_labels=row.unknown_labels,
     )

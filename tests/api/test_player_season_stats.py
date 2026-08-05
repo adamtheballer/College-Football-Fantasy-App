@@ -82,6 +82,46 @@ def test_player_card_exposes_verified_sheet_history_without_an_espn_row(client, 
     assert body["historical_stats"]["seasons"][0]["season"] == 2025
     assert {item["label"] for item in body["historical_stats"]["seasons"][0]["summary"]} >= {"Games", "Rec Yds", "TD"}
     assert 64 in [stat["value"] for category in body["historical_stats"]["seasons"][0]["categories"] for stat in category["stats"]]
+    scoring = body["historical_stats"]["seasons"][0]["scoring_context"]
+    # 64 receptions + 88 receiving yards points + 48 touchdown points.
+    assert scoring["fantasy_points"] == 200.0
+    assert scoring["fantasy_points_per_game"] == 16.67
+    assert scoring["scoring_rules_version"] == "standard-full-ppr-v1"
+
+
+def test_player_card_calculates_standard_kicker_points_from_aggregate_field_goals(client, db_session):
+    player = Player(name="Historical Kicker", position="K", school="Georgia")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        PlayerHistoricalSeasonStat(
+            player_id=player.id,
+            provider="google_season_stats",
+            provider_player_id="canonical-kicker",
+            season=2025,
+            season_type="regular",
+            team_name="Georgia",
+            position="K",
+            games_played=12,
+            field_goals_made=2,
+            extra_points_made=3,
+            # A prior league-scored value must never leak into the card.
+            fantasy_points=999,
+            scoring_rules_version="league:17",
+            parser_version="sheet-v1",
+            imported_at=datetime.now(timezone.utc),
+            is_final=True,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/players/{player.id}/card")
+
+    assert response.status_code == 200
+    scoring = response.json()["historical_stats"]["seasons"][0]["scoring_context"]
+    assert scoring["fantasy_points"] == 9.0
+    assert scoring["fantasy_points_per_game"] == 0.75
+    assert scoring["scoring_rules_version"] == "standard-full-ppr-v1"
 
 
 def test_player_season_stats_missing_sportsdata_key_returns_nullable_response(

@@ -33,7 +33,10 @@ from collegefootballfantasy_api.app.models.historical_stats import (
     PlayerHistoricalSeasonStat,
 )
 from collegefootballfantasy_api.app.models.player import Player
-from collegefootballfantasy_api.app.services.historical_stats import canonical_json_hash
+from collegefootballfantasy_api.app.services.historical_stats import (
+    apply_standard_historical_fantasy_points,
+    canonical_json_hash,
+)
 from collegefootballfantasy_api.app.services.power4 import resolve_power4_school
 
 
@@ -307,11 +310,9 @@ def _assign_row(
     target.extra_points_made = source.extra_points_made
     target.extra_points_attempted = source.extra_points_attempted
     target.kick_points = source.kick_points
-    # The source does not expose FG distance splits or league scoring rules.
-    # Leave fantasy totals null rather than derive a value that could be wrong.
-    target.fantasy_points = None
-    target.fantasy_points_per_game = None
-    target.scoring_rules_version = None
+    # Player-card history always uses the league-independent standard score.
+    # The same calculation is used for every provider and in the API response.
+    apply_standard_historical_fantasy_points(target)
     target.source_response_hash = canonical_json_hash(source.source_payload())
     target.source_url = source.source_url
     target.source_external_player_id = _source_provider_id(source, player)

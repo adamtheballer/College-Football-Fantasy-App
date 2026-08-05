@@ -3,11 +3,14 @@ from __future__ import annotations
 from scripts.import_google_historical_season_stats import (
     VERIFIED_SOURCE_NAME_ALIASES,
     SourceSeasonRow,
+    _assign_row,
     _identity_key,
     _resolve_player,
     build_report,
     read_source_rows,
 )
+from collegefootballfantasy_api.app.models.historical_stats import PlayerHistoricalSeasonStat
+from datetime import datetime, timezone
 
 
 class PlayerStub:
@@ -106,6 +109,49 @@ def test_resolves_approved_team_abbreviations_without_relaxing_identity():
 
     assert resolved is player
     assert match_type == "verified_alias"
+
+
+def test_import_assignment_persists_standard_fantasy_points():
+    source = SourceSeasonRow(
+        row_number=4,
+        current_team="Georgia",
+        depth_position="WR1",
+        player_name="Example Receiver",
+        season=2025,
+        college_team="Georgia",
+        passing_completions=0,
+        passing_attempts=0,
+        passing_yards=0,
+        passing_touchdowns=0,
+        interceptions=0,
+        rushing_attempts=0,
+        rushing_yards=0,
+        rushing_touchdowns=0,
+        receptions=55,
+        receiving_yards=811,
+        receiving_touchdowns=6,
+        field_goals_made=None,
+        field_goals_attempted=None,
+        extra_points_made=None,
+        extra_points_attempted=None,
+        kick_points=None,
+        source_url=None,
+    )
+    player = PlayerStub(1, "Example Receiver", "Georgia", "WR")
+    historical = PlayerHistoricalSeasonStat(
+        player_id=player.id,
+        provider="google_season_stats",
+        provider_player_id="canonical:1",
+        season=2025,
+        season_type="regular",
+        parser_version="sheet-v1",
+        imported_at=datetime.now(timezone.utc),
+    )
+
+    _assign_row(historical, source, player, {}, "source-hash", datetime.now(timezone.utc))
+
+    assert historical.fantasy_points == 172.1
+    assert historical.scoring_rules_version == "standard-full-ppr-v1"
 
 
 def test_report_distinguishes_missing_history_from_missing_source_identity():
