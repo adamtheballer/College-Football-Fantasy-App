@@ -49,8 +49,14 @@ def canonical_preseason_player_filter(season: int):
     )
 
 
-def canonical_fantasy_player_filter(season: int):
-    """SQL predicate for the complete public-beta draft and waiver universe."""
+def active_canonical_preseason_player_filter(season: int):
+    """SQL predicate for the reviewed current player snapshot before ratings.
+
+    This is the one active-player contract shared by the canonical bootstrap,
+    CFB27 reconciliation, and draft/waiver eligibility.  Historical and
+    legacy-preseason rows deliberately fail this predicate even when they are
+    retained for foreign-key history.
+    """
 
     return and_(
         generated_test_player_filter(),
@@ -60,6 +66,12 @@ def canonical_fantasy_player_filter(season: int):
         Player.sheet_projected_season_points.isnot(None),
         Player.sheet_projected_season_points > 0,
     )
+
+
+def canonical_fantasy_player_filter(season: int):
+    """SQL predicate for the complete public-beta draft and waiver universe."""
+
+    return active_canonical_preseason_player_filter(season)
 
 
 def is_approved_fantasy_school(school: str | None) -> bool:

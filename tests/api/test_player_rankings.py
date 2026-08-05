@@ -1,3 +1,5 @@
+import csv
+from dataclasses import replace
 from datetime import datetime, timezone
 import importlib.util
 import json
@@ -84,6 +86,8 @@ def test_player_list_excludes_non_power4_rows_and_draft_pool_requires_sheet_proj
         school="Ohio State",
         sheet_source_sheet_id="canonical-preseason:2026:Big10",
         sheet_projected_season_points=250.0,
+        raw_cfb27_rating=90,
+        current_value_rating=90.0,
     )
     missing_projection = Player(
         name="No Projection Receiver",
@@ -120,6 +124,8 @@ def test_draft_pool_rejects_legacy_power4_records_even_when_they_have_projection
         school="Texas",
         sheet_source_sheet_id="canonical-preseason:2026:Big12",
         sheet_projected_season_points=275.0,
+        raw_cfb27_rating=90,
+        current_value_rating=90.0,
     )
     legacy = Player(
         name="Legacy Quarterback",
@@ -153,6 +159,48 @@ def test_cfb27_source_contains_critical_compare_players():
     ahmad = ratings[("Ahmad Hardy", "missouri", "RB")]
     assert jeremiah.overall == 99
     assert ahmad.overall == 96
+
+
+def test_release_source_gap_is_explicitly_manual_review_until_the_ratings_workbook_is_corrected():
+    root = Path(__file__).resolve().parents[2]
+    with (root / "reports" / "source-imports" / "2026" / "player-projections.csv").open(newline="", encoding="utf-8") as handle:
+        current_keys = {
+            cfb27_player_sync.cfb27_identity_key(
+                name=row["PLAYER"],
+                school=row["TEAM"],
+                position=row["POSITION"][:2],
+            )
+            for row in csv.DictReader(handle)
+            if row["POSITION"][:2] in {"QB", "RB", "WR", "TE"} or row["POSITION"] == "K"
+        }
+    rating_keys = {
+        cfb27_player_sync.cfb27_identity_key(name=row.name, school=row.school, position=row.position)
+        for row in load_cfb27_ratings()
+        if cfb27_player_sync.is_approved_fantasy_school(row.school)
+    }
+
+    unresolved = current_keys - rating_keys
+    assert len(current_keys) == 813
+    assert len(rating_keys) == 812
+    assert {key.split("|")[0] for key in unresolved} == {
+        "aidenmizell",
+        "amariodom",
+        "bryanjackson",
+        "calvinrusselliii",
+        "cameronkossman",
+        "camball",
+        "harveybroussardiii",
+        "harrydalton",
+        "jackcassidy",
+        "jaimeffrench",
+        "jaylenmbakwe",
+        "joshphifer",
+        "karlekjlaceyjr",
+        "naeemgladdingabdulrahim",
+        "petergonzalez",
+        "tjthomas",
+        "travillefredrickjr",
+    }
 
 
 def test_cfb27_source_overalls_are_not_board_ranks():
@@ -224,18 +272,19 @@ def test_cfb27_sync_enriches_existing_approved_players_without_creating_player_r
         name="Beta Example",
         position="RB",
         school="Missouri",
-        sheet_source_sheet_id="snapshot:2026:SEC",
+        sheet_source_sheet_id="canonical-preseason:2026:SEC",
         sheet_projected_season_points=300.0,
     )
     jeremiah = Player(
         name="Alpha Example",
         position="QB",
         school="Ohio State",
-        sheet_source_sheet_id="snapshot:2026:Big10",
+        sheet_source_sheet_id="canonical-preseason:2026:Big10",
         sheet_projected_season_points=350.0,
     )
+    gamma = Player(name="Gamma Sample", position="WR", school="California", sheet_source_sheet_id="canonical-preseason:2026:Pac12", sheet_projected_season_points=240.0)
     non_power4 = Player(name="Easton Messer", position="WR", school="FAU")
-    db_session.add_all([ahmad, jeremiah, non_power4])
+    db_session.add_all([ahmad, jeremiah, gamma, non_power4])
     db_session.commit()
 
     result = sync_cfb27_players(db_session, snapshot=reviewed_test_snapshot())
@@ -245,9 +294,9 @@ def test_cfb27_sync_enriches_existing_approved_players_without_creating_player_r
     db_session.refresh(non_power4)
     assert result["total"] == 4
     assert result["created"] == 0
-    assert result["matched"] == 2
+    assert result["matched"] == 3
     assert result["skipped_non_power4"] > 0
-    assert db_session.query(Player).count() == 3
+    assert db_session.query(Player).count() == 4
     assert ahmad.cfb27_overall == 90
     assert jeremiah.cfb27_rank == 1
     assert non_power4.cfb27_rank is None
@@ -258,26 +307,154 @@ def test_cfb27_sync_is_idempotent_for_existing_approved_players(client, db_sessi
         name="Alpha Example",
         position="QB",
         school="Ohio State",
-        sheet_source_sheet_id="snapshot:2026:Big10",
+        sheet_source_sheet_id="canonical-preseason:2026:Big10",
         sheet_projected_season_points=350.0,
     )
-    db_session.add(player)
+    db_session.add_all((
+        player,
+        Player(name="Beta Example", position="RB", school="Missouri", sheet_source_sheet_id="canonical-preseason:2026:SEC", sheet_projected_season_points=250.0),
+        Player(name="Gamma Sample", position="WR", school="California", sheet_source_sheet_id="canonical-preseason:2026:Pac12", sheet_projected_season_points=250.0),
+    ))
     db_session.commit()
 
     first = sync_cfb27_players(db_session, snapshot=reviewed_test_snapshot())
     second = sync_cfb27_players(db_session, snapshot=reviewed_test_snapshot())
 
     assert first["created"] == 0
-    assert first["updated"] == 1
+    assert first["updated"] == 3
     assert second["created"] == 0
     assert second["updated"] == 0
-    assert second["already_present"] == 1
+    assert second["already_present"] == 3
     assert db_session.query(Player).filter_by(name="Alpha Example", school="Ohio State", position="QB").count() == 1
 
 
+def test_cfb27_sync_prefers_current_snapshot_and_clears_current_batch_value_from_legacy_row(client, db_session):
+    current = Player(
+        name="Alpha Example",
+        position="QB",
+        school="Ohio State",
+        sheet_source_sheet_id="canonical-preseason:2026:Big10",
+        sheet_projected_season_points=300.0,
+    )
+    legacy = Player(
+        name="Alpha Example",
+        position="QB",
+        school="Ohio State",
+        sheet_source_sheet_id="legacy-canonical-preseason:2026:Big10",
+        sheet_projected_season_points=300.0,
+        cfb27_rank=1,
+        cfb27_overall=95,
+        cfb27_position_rank=1,
+        raw_cfb27_rating=95,
+        current_value_rating=95.0,
+        value_policy_version="cfb27_exact_preseason_v1",
+        value_calculation_week=0,
+        value_source_batch_id="test-cfb27-2026-01-15",
+        value_input_json={"raw_cfb27_rating": 95},
+    )
+    db_session.add_all((
+        current,
+        legacy,
+        Player(name="Beta Example", position="RB", school="Missouri", sheet_source_sheet_id="canonical-preseason:2026:SEC", sheet_projected_season_points=250.0),
+        Player(name="Gamma Sample", position="WR", school="California", sheet_source_sheet_id="canonical-preseason:2026:Pac12", sheet_projected_season_points=250.0),
+    ))
+    db_session.commit()
+
+    result = sync_cfb27_players(db_session, snapshot=reviewed_test_snapshot())
+
+    db_session.refresh(current)
+    db_session.refresh(legacy)
+    assert result["matched"] == 3
+    assert result["legacy_assignments_to_clear"] == 1
+    assert current.raw_cfb27_rating == current.current_value_rating == 95
+    assert legacy.raw_cfb27_rating is None
+    assert legacy.current_value_rating is None
+    assert legacy.value_source_batch_id is None
+    assert legacy.cfb27_overall is None
+
+
+def test_cfb27_sync_dry_run_reports_missing_current_identity_without_mutating(client, db_session):
+    current = Player(
+        name="Unrated Current Player",
+        position="TE",
+        school="Miami",
+        sheet_source_sheet_id="canonical-preseason:2026:ACC",
+        sheet_projected_season_points=100.0,
+    )
+    db_session.add_all((
+        current,
+        Player(name="Alpha Example", position="QB", school="Ohio State", sheet_source_sheet_id="canonical-preseason:2026:Big10", sheet_projected_season_points=250.0),
+        Player(name="Beta Example", position="RB", school="Missouri", sheet_source_sheet_id="canonical-preseason:2026:SEC", sheet_projected_season_points=250.0),
+        Player(name="Gamma Sample", position="WR", school="California", sheet_source_sheet_id="canonical-preseason:2026:Pac12", sheet_projected_season_points=250.0),
+    ))
+    db_session.commit()
+
+    result = sync_cfb27_players(db_session, snapshot=reviewed_test_snapshot(), dry_run=True)
+
+    db_session.refresh(current)
+    assert result["current_eligible_players"] == 4
+    assert result["matched"] == 3
+    assert result["missing_current_players"] == result["manual_review_rows"] == 1
+    assert result["unused_source_rows"] == 0
+    assert current.raw_cfb27_rating is None
+    assert current.current_value_rating is None
+
+
+def test_cfb27_sync_rejects_duplicate_approved_source_identity_before_any_write(client, db_session):
+    snapshot = reviewed_test_snapshot()
+    duplicate_snapshot = replace(snapshot, ratings=(*snapshot.ratings, snapshot.ratings[0]))
+    current = Player(
+        name="Alpha Example",
+        position="QB",
+        school="Ohio State",
+        sheet_source_sheet_id="canonical-preseason:2026:Big10",
+        sheet_projected_season_points=250.0,
+    )
+    db_session.add(current)
+    db_session.commit()
+
+    with pytest.raises(ValueError, match="duplicate approved source identities"):
+        sync_cfb27_players(db_session, snapshot=duplicate_snapshot)
+
+    db_session.refresh(current)
+    assert current.raw_cfb27_rating is None
+
+
+def test_cfb27_sync_rolls_back_legacy_cleanup_when_the_transaction_fails(client, db_session, monkeypatch):
+    legacy = Player(
+        name="Alpha Example",
+        position="QB",
+        school="Ohio State",
+        sheet_source_sheet_id="legacy-canonical-preseason:2026:Big10",
+        sheet_projected_season_points=250.0,
+        raw_cfb27_rating=95,
+        current_value_rating=95.0,
+        value_source_batch_id="test-cfb27-2026-01-15",
+    )
+    db_session.add_all((
+        legacy,
+        Player(name="Alpha Example", position="QB", school="Ohio State", sheet_source_sheet_id="canonical-preseason:2026:Big10", sheet_projected_season_points=250.0),
+        Player(name="Beta Example", position="RB", school="Missouri", sheet_source_sheet_id="canonical-preseason:2026:SEC", sheet_projected_season_points=250.0),
+        Player(name="Gamma Sample", position="WR", school="California", sheet_source_sheet_id="canonical-preseason:2026:Pac12", sheet_projected_season_points=250.0),
+    ))
+    db_session.commit()
+
+    def fail_update(*_args, **_kwargs):
+        raise RuntimeError("forced update failure")
+
+    monkeypatch.setattr(cfb27_player_sync, "_update_canonical_player", fail_update)
+    with pytest.raises(RuntimeError, match="forced update failure"):
+        sync_cfb27_players(db_session, snapshot=reviewed_test_snapshot())
+
+    db_session.refresh(legacy)
+    assert legacy.raw_cfb27_rating == 95
+    assert legacy.current_value_rating == 95.0
+    assert legacy.value_source_batch_id == "test-cfb27-2026-01-15"
+
+
 def test_cfb27_sync_blocks_duplicate_canonical_identity_before_any_write(client, db_session):
-    unranked = Player(name="Beta Example", position="RB", school="Missouri", sheet_adp=None)
-    ranked = Player(name="BETA EXAMPLE", position="RB", school="MISSOURI", sheet_adp=12.0)
+    unranked = Player(name="Beta Example", position="RB", school="Missouri", sheet_adp=None, sheet_source_sheet_id="canonical-preseason:2026:SEC", sheet_projected_season_points=250.0)
+    ranked = Player(name="BETA EXAMPLE", position="RB", school="MISSOURI", sheet_adp=12.0, sheet_source_sheet_id="canonical-preseason:2026:SEC", sheet_projected_season_points=250.0)
     db_session.add_all([unranked, ranked])
     db_session.commit()
 
@@ -295,8 +472,12 @@ def test_cfb27_sync_blocks_duplicate_canonical_identity_before_any_write(client,
 
 
 def test_cfb27_sync_matches_california_alias_without_creating_a_duplicate(client, db_session):
-    canonical = Player(name="Gamma Sample", position="WR", school="California", sheet_adp=42.0)
-    db_session.add(canonical)
+    canonical = Player(name="Gamma Sample", position="WR", school="California", sheet_adp=42.0, sheet_source_sheet_id="canonical-preseason:2026:Pac12", sheet_projected_season_points=250.0)
+    db_session.add_all((
+        canonical,
+        Player(name="Alpha Example", position="QB", school="Ohio State", sheet_source_sheet_id="canonical-preseason:2026:Big10", sheet_projected_season_points=250.0),
+        Player(name="Beta Example", position="RB", school="Missouri", sheet_source_sheet_id="canonical-preseason:2026:SEC", sheet_projected_season_points=250.0),
+    ))
     db_session.commit()
 
     result = sync_cfb27_players(db_session, snapshot=reviewed_test_snapshot())
@@ -312,8 +493,9 @@ def test_cfb27_sync_matches_california_alias_without_creating_a_duplicate(client
 def test_players_rank_sort_uses_cfb27_compare_board(client, db_session):
     db_session.add_all(
         [
-            Player(name="Alpha Example", position="QB", school="Ohio State"),
-            Player(name="Beta Example", position="RB", school="Missouri"),
+            Player(name="Alpha Example", position="QB", school="Ohio State", sheet_source_sheet_id="canonical-preseason:2026:Big10", sheet_projected_season_points=250.0),
+            Player(name="Beta Example", position="RB", school="Missouri", sheet_source_sheet_id="canonical-preseason:2026:SEC", sheet_projected_season_points=250.0),
+            Player(name="Gamma Sample", position="WR", school="California", sheet_source_sheet_id="canonical-preseason:2026:Pac12", sheet_projected_season_points=250.0),
         ]
     )
     db_session.commit()
@@ -336,8 +518,9 @@ def test_players_rank_sort_uses_cfb27_compare_board(client, db_session):
 def test_players_search_returns_seeded_cfb27_compare_board(client, db_session):
     db_session.add_all(
         [
-            Player(name="Alpha Example", position="QB", school="Ohio State"),
-            Player(name="Beta Example", position="RB", school="Missouri"),
+            Player(name="Alpha Example", position="QB", school="Ohio State", sheet_source_sheet_id="canonical-preseason:2026:Big10", sheet_projected_season_points=250.0),
+            Player(name="Beta Example", position="RB", school="Missouri", sheet_source_sheet_id="canonical-preseason:2026:SEC", sheet_projected_season_points=250.0),
+            Player(name="Gamma Sample", position="WR", school="California", sheet_source_sheet_id="canonical-preseason:2026:Pac12", sheet_projected_season_points=250.0),
         ]
     )
     db_session.commit()
