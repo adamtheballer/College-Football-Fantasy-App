@@ -55,6 +55,10 @@ def _projection_stats(row: WeeklyProjection) -> dict[str, float]:
 
 
 def _points_for_projection(player: Player, row: WeeklyProjection, scoring_rules: dict | None) -> float:
+    # A published weekly snapshot's fantasy-points field is already its
+    # authoritative scoring result. Recalculate only older rows that lack it.
+    if row.fantasy_points is not None:
+        return max(0.0, float(row.fantasy_points))
     stats = _projection_stats(row)
     if not scoring_rules or not any(stats.values()):
         return max(0.0, float(row.fantasy_points or 0.0))

@@ -33,9 +33,10 @@ CFB27_SCHOOL_ALIASES = {"california": "cal"}
 # The imported CFB27 source only contains real game overalls.  A board rank
 # (for example, 33) is never a player overall and must not be allowed through
 # this import path as an OVR value.
-# The approved workbook includes eligible depth players below 70.  The import
-# must preserve the source value exactly rather than silently dropping them.
-CFB27_MIN_OVERALL = 0
+# The approved workbook includes eligible depth players below 70. Its verified
+# floor is 62; values below that are board ranks or malformed source data, not
+# an approved CFB27 player overall.
+CFB27_MIN_OVERALL = 62
 CFB27_MAX_OVERALL = 99
 
 
@@ -143,7 +144,11 @@ def _parse_cfb27_rating_rows(source: object, *, source_label: str) -> tuple[Cfb2
     )
 
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=4)
+def _load_cfb27_ratings_for_source(source_path: str) -> tuple[Cfb27Rating, ...]:
+    return load_cfb27_ratings_from_snapshot(Path(source_path))
+
+
 def load_cfb27_ratings() -> tuple[Cfb27Rating, ...]:
     """Compatibility loader for the legacy packaged snapshot only.
 
@@ -153,7 +158,13 @@ def load_cfb27_ratings() -> tuple[Cfb27Rating, ...]:
     while the import path is migrated away from this historical seed file.
     """
 
-    return load_cfb27_ratings_from_snapshot(CFB27_SOURCE_PATH)
+    # Cache by the resolved source, rather than by an empty argument list.
+    # This prevents a temporary importer/test snapshot from contaminating
+    # later reads after CFB27_SOURCE_PATH is restored.
+    return _load_cfb27_ratings_for_source(str(CFB27_SOURCE_PATH.resolve()))
+
+
+load_cfb27_ratings.cache_clear = _load_cfb27_ratings_for_source.cache_clear  # type: ignore[attr-defined]
 
 
 def _column(row: dict[str, str], *candidates: str) -> str:

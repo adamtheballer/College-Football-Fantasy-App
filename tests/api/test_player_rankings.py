@@ -184,7 +184,7 @@ def test_cfb27_sync_rejects_a_board_rank_as_an_overall_rating(tmp_path, monkeypa
     monkeypatch.setattr(cfb27_player_sync, "CFB27_SOURCE_PATH", source_path)
     cfb27_player_sync.load_cfb27_ratings.cache_clear()
 
-    with pytest.raises(ValueError, match="expected 0-99"):
+    with pytest.raises(ValueError, match="expected 62-99"):
         cfb27_player_sync.load_cfb27_ratings()
 
     cfb27_player_sync.load_cfb27_ratings.cache_clear()

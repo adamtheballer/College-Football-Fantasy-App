@@ -29,5 +29,5 @@ def test_frontend_generator_rejects_a_board_rank_as_an_overall_rating(tmp_path):
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="expected 0-99"):
+    with pytest.raises(ValueError, match="expected 62-99"):
         load_rating_rows(source_path)

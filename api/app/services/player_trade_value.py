@@ -164,7 +164,12 @@ def get_player_trade_values(db: Session, *, player_id: int, season: int, policy_
     # A legacy dynamic row/current value is never publishable during preseason.
     # Use raw CFB27 exactly, but do not mutate in a read endpoint.
     effective_value = preseason_rating_value(player) if active_policy == PRESEASON_VALUE_POLICY_VERSION else player.current_value_rating
-    return PlayerTradeValueHistoryRead(current=_current_value_read(player, rows[-1] if rows else None, value=effective_value, policy_version=active_policy), history=history)
+    current = (
+        _current_value_read(player, rows[-1] if rows else None, value=effective_value, policy_version=active_policy)
+        if effective_value is not None
+        else None
+    )
+    return PlayerTradeValueHistoryRead(current=current, history=history)
 
 
 def current_trade_value_snapshot(db: Session, *, player_id: int, season: int | None = None) -> dict | None:
