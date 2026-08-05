@@ -1,36 +1,42 @@
 import math
 
-NON_STARTER_SLOTS = {"BENCH", "IR"}
 
-
-def is_starting_slot(slot: str | None) -> bool:
-    return bool(slot) and slot.upper() not in NON_STARTER_SLOTS
-
-
-def estimate_player_std_dev(
-    fantasy_points: float,
-    floor: float | None = None,
-    ceiling: float | None = None,
-) -> float:
-    projection = max(float(fantasy_points or 0.0), 0.0)
-    if ceiling is not None and floor is not None and ceiling > floor:
-        return max((float(ceiling) - float(floor)) / 3.92, 2.5)
-    return max(projection * 0.35, 2.5)
-
-
-def normal_cdf(z_score: float) -> float:
-    return 0.5 * (1.0 + math.erf(z_score / math.sqrt(2.0)))
+def _valid_projection(value: float | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        projection = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(projection) or projection < 0:
+        return None
+    return projection
 
 
 def calculate_matchup_win_probability(
-    my_projected_points: float,
-    opponent_projected_points: float,
-    my_variance: float,
-    opponent_variance: float,
-) -> tuple[float, float]:
-    mean_diff = float(my_projected_points or 0.0) - float(opponent_projected_points or 0.0)
-    std_dev = math.sqrt(max(float(my_variance or 0.0) + float(opponent_variance or 0.0), 1.0))
-    my_probability = normal_cdf(mean_diff / std_dev) * 100.0
-    my_probability = round(min(99.0, max(1.0, my_probability)), 1)
-    opponent_probability = round(100.0 - my_probability, 1)
-    return my_probability, opponent_probability
+    my_projected_points: float | None,
+    opponent_projected_points: float | None,
+) -> tuple[float, float] | None:
+    """Return deterministic projected win chances from weekly lineup totals.
+
+    The API intentionally returns full precision. Presentation layers round one
+    side and derive the other complement so the displayed values always total
+    exactly 100.0%. A missing or invalid total is not a 50/50 matchup.
+    """
+
+    my_total = _valid_projection(my_projected_points)
+    opponent_total = _valid_projection(opponent_projected_points)
+    if my_total is None or opponent_total is None:
+        return None
+
+    margin = abs(my_total - opponent_total)
+    advantage = margin / 2.0 if margin <= 10.0 else 5.0 * (margin / 10.0) ** 2
+    advantage = min(advantage, 45.0)
+    favorite_probability = 50.0 + advantage
+    underdog_probability = 50.0 - advantage
+
+    if my_total == opponent_total:
+        return 50.0, 50.0
+    if my_total > opponent_total:
+        return favorite_probability, underdog_probability
+    return underdog_probability, favorite_probability

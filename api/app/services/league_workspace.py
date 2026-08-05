@@ -113,39 +113,33 @@ def build_matchup_summary(
     db: Session,
     league: League,
     owned_team: Team | None,
+    current_user: User,
 ) -> LeagueWorkspaceMatchupSummaryRead | None:
     if not owned_team:
         return None
 
-    matchup_rows = (
-        db.query(Matchup)
-        .filter(
-            Matchup.league_id == league.id,
-            Matchup.season == league.season_year,
-            (Matchup.home_team_id == owned_team.id) | (Matchup.away_team_id == owned_team.id),
-        )
-        .all()
-    )
-    if not matchup_rows:
+    # Import locally to avoid a module cycle: the matchup tab imports the
+    # standings helpers in this module. The dashboard intentionally reuses the
+    # tab view so total, probability, and selected-week lineup inputs cannot
+    # drift between surfaces.
+    from collegefootballfantasy_api.app.services.league_roster_matchup import build_matchup_tab_view
+
+    matchup_view = build_matchup_tab_view(db, league, current_user)
+    my_team = matchup_view.my_team
+    opponent_team = matchup_view.opponent_team
+    if my_team is None or opponent_team is None:
         return None
 
-    def matchup_sort_key(row: Matchup) -> tuple[int, int]:
-        status_priority = 0 if row.status in {"scheduled", "live", "projected"} else 1
-        return (status_priority, row.week)
-
-    matchup = sorted(matchup_rows, key=matchup_sort_key)[0]
-    is_home = matchup.home_team_id == owned_team.id
-    opponent_team_id = matchup.away_team_id if is_home else matchup.home_team_id
-    opponent = db.get(Team, opponent_team_id)
-
     return LeagueWorkspaceMatchupSummaryRead(
-        week=matchup.week,
-        team_id=owned_team.id,
-        opponent_team_id=opponent_team_id,
-        opponent_team_name=opponent.name if opponent else None,
-        status=matchup.status,
-        projected_points_for=matchup.home_score if is_home else matchup.away_score,
-        projected_points_against=matchup.away_score if is_home else matchup.home_score,
+        week=matchup_view.week,
+        team_id=my_team.fantasy_team_id,
+        opponent_team_id=opponent_team.fantasy_team_id,
+        opponent_team_name=opponent_team.fantasy_team_name,
+        status=matchup_view.status,
+        projected_points_for=my_team.projected_total,
+        projected_points_against=opponent_team.projected_total,
+        win_probability_for=my_team.win_probability,
+        win_probability_against=opponent_team.win_probability,
     )
 
 
@@ -467,7 +461,7 @@ def build_league_workspace(
             else None
         ),
         roster=roster_entries,
-        matchup_summary=build_matchup_summary(db, league, owned_team),
+        matchup_summary=build_matchup_summary(db, league, owned_team, current_user),
         standings_summary=build_standings_summary(db, league),
         allowed_actions=build_allowed_actions(league, membership, owned_team),
     )

@@ -1037,11 +1037,11 @@ test.describe("critical browser workflows", () => {
       weekly_projected_fantasy_points: projectedPoints,
     });
     const myRoster = [
-      rosterRow(1, 11, "Codex Team", "Arch Manning", 24.0),
+      rosterRow(1, 11, "Emily's Team", "Arch Manning", 133.1),
       rosterRow(2, 11, "Codex Team", "Bench Reserve", 11.5, "BENCH"),
     ];
     const opponentRoster = [
-      rosterRow(3, 12, "Rival Team", "Rival QB", 18.2),
+      rosterRow(3, 12, "Adam 2's Team", "Rival QB", 137.0),
       rosterRow(4, 12, "Rival Team", "Rival Bench", 10.0, "BENCH"),
     ];
     const scheduledPayload = {
@@ -1052,35 +1052,35 @@ test.describe("critical browser workflows", () => {
       status: "projected",
       my_team: {
         id: 11,
-        name: "Codex Team",
+        name: "Emily's Team",
         fantasy_team_id: 11,
-        fantasy_team_name: "Codex Team",
+        fantasy_team_name: "Emily's Team",
         record: "0-0-0",
-        projected_points: 24.0,
-        projected_total: 24.0,
-        win_probability: 57.3,
+        projected_points: 133.1,
+        projected_total: 133.1,
+        win_probability: 48.05,
         roster: myRoster,
       },
       user_team: {
         id: 11,
-        name: "Codex Team",
+        name: "Emily's Team",
         fantasy_team_id: 11,
-        fantasy_team_name: "Codex Team",
+        fantasy_team_name: "Emily's Team",
         record: "0-0-0",
-        projected_points: 24.0,
-        projected_total: 24.0,
-        win_probability: 57.3,
+        projected_points: 133.1,
+        projected_total: 133.1,
+        win_probability: 48.05,
         roster: myRoster,
       },
       opponent_team: {
         id: 12,
-        name: "Rival Team",
+        name: "Adam 2's Team",
         fantasy_team_id: 12,
-        fantasy_team_name: "Rival Team",
+        fantasy_team_name: "Adam 2's Team",
         record: "0-0-0",
-        projected_points: 18.2,
-        projected_total: 18.2,
-        win_probability: 42.7,
+        projected_points: 137.0,
+        projected_total: 137.0,
+        win_probability: 51.95,
         roster: opponentRoster,
       },
       my_roster: myRoster,
@@ -1100,9 +1100,9 @@ test.describe("critical browser workflows", () => {
         fantasy_team_id: 11,
         fantasy_team_name: "Codex Team",
         record: "0-0-0",
-        projected_points: 24.0,
-        projected_total: 24.0,
-        win_probability: 50.0,
+        projected_points: 133.1,
+        projected_total: 133.1,
+        win_probability: null,
         roster: myRoster,
       },
       user_team: {
@@ -1111,9 +1111,9 @@ test.describe("critical browser workflows", () => {
         fantasy_team_id: 11,
         fantasy_team_name: "Codex Team",
         record: "0-0-0",
-        projected_points: 24.0,
-        projected_total: 24.0,
-        win_probability: 50.0,
+        projected_points: 133.1,
+        projected_total: 133.1,
+        win_probability: null,
         roster: myRoster,
       },
       opponent_team: null,
@@ -1122,6 +1122,13 @@ test.describe("critical browser workflows", () => {
       projection_source: "weekly_projections",
       message: "No matchup generated yet.",
     };
+    const alternatePayload = {
+      ...scheduledPayload,
+      matchup_id: 102,
+      my_team: { ...scheduledPayload.my_team, projected_points: 120.0, projected_total: 120.0, win_probability: 70.0 },
+      user_team: { ...scheduledPayload.user_team, projected_points: 120.0, projected_total: 120.0, win_probability: 70.0 },
+      opponent_team: { ...scheduledPayload.opponent_team, projected_points: 100.0, projected_total: 100.0, win_probability: 30.0 },
+    };
     let matchupPayload: unknown = scheduledPayload;
 
     await page.route("**/leagues/1", async (route) => {
@@ -1129,29 +1136,52 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.route("**/leagues/1/matchup**", async (route) => {
+      const url = new URL(route.request().url());
+      const isScoreboardRequest = url.pathname.endsWith("/matchups");
+      const isAlternateMatchup = url.searchParams.get("matchup_id") === "102";
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(matchupPayload),
+        body: JSON.stringify(
+          isScoreboardRequest
+            ? {
+                data: [
+                  { matchup_id: 101, week: 1, status: "projected", home_team_name: "Emily's Team", away_team_name: "Adam 2's Team", home_score: 133.1, away_score: 137.0 },
+                  { matchup_id: 102, week: 1, status: "projected", home_team_name: "League Mate One", away_team_name: "League Mate Two", home_score: 120.0, away_score: 100.0 },
+                ],
+                total: 2,
+              }
+            : isAlternateMatchup
+              ? alternatePayload
+              : matchupPayload,
+        ),
       });
     });
 
     await page.goto("/league/1/matchup");
     await expect(page.getByRole("heading", { name: /^Matchup$/i })).toBeVisible();
-    await expect(page.getByText("Codex Team").first()).toBeVisible();
-    await expect(page.getByText("Rival Team").first()).toBeVisible();
-    await expect(page.getByText("24.0 - 18.2")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Emily's Team vs Adam 2's Team" })).toBeVisible();
+    await expect(page.getByText("133.1 - 137.0")).toHaveCount(0);
     await expect(page.getByText("My Projection")).toBeVisible();
     await expect(page.getByText("Their Projection")).toBeVisible();
-    await expect(page.getByText("24.0").first()).toBeVisible();
-    await expect(page.getByText("18.2").first()).toBeVisible();
-    await expect(page.getByText("57.3% / 42.7%")).toBeVisible();
+    await expect(page.getByText("133.1").first()).toBeVisible();
+    await expect(page.getByText("137.0").first()).toBeVisible();
+    await expect(page.getByText("48.1% / 51.9%")).toBeVisible();
+    await expect(page.getByText("Projected Leader").locator("..").getByText("Adam 2's Team")).toBeVisible();
+    await expect(page.getByTestId("win-chance-left-bar")).toHaveAttribute("style", /width: 48\.05%/);
+    await expect(page.getByTestId("win-chance-right-bar")).toHaveAttribute("style", /width: 51\.95%/);
     await expect(page.getByText("Arch Manning")).toBeVisible();
     await expect(page.getByText("Rival QB")).toBeVisible();
     await expect(page.getByRole("button", { name: "Previous week" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Next week" })).toBeVisible();
     await expect(page.getByText("Prev", { exact: true })).toHaveCount(0);
     await expect(page.getByText("Next", { exact: true })).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByText("48.1% / 51.9%")).toBeVisible();
+    await page.getByRole("combobox", { name: "League matchup" }).selectOption("102");
+    await expect(page.getByText("70.0% / 30.0%")).toBeVisible();
+    await expect(page.getByTestId("win-chance-left-bar")).toHaveAttribute("style", /width: 70%/);
+
     await page.getByRole("button", { name: "Next week" }).click();
     await expect(page.getByTestId("matchup-week-label")).toHaveText("Week 2");
     await page.getByRole("button", { name: "Previous week" }).click();

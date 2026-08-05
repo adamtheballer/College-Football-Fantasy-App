@@ -409,6 +409,8 @@ class LeagueWorkspaceMatchupSummaryRead(BaseModel):
     status: str | None = None
     projected_points_for: float | None = None
     projected_points_against: float | None = None
+    win_probability_for: float | None = None
+    win_probability_against: float | None = None
 
 
 class LeagueWorkspaceStandingSummaryRead(BaseModel):
@@ -576,11 +578,11 @@ class MatchupTeamRead(BaseModel):
     id: int
     name: str
     record: str | None = None
-    projected_points: float = 0.0
-    win_probability: float = 50.0
+    projected_points: float | None = None
+    win_probability: float | None = None
     fantasy_team_id: int
     fantasy_team_name: str
-    projected_total: float = 0.0
+    projected_total: float | None = None
     roster: list[RosterTabEntryRead]
 
 

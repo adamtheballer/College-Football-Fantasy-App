@@ -135,6 +135,8 @@ export interface LeagueWorkspaceMatchupSummary {
   status?: string | null;
   projected_points_for?: number | null;
   projected_points_against?: number | null;
+  win_probability_for?: number | null;
+  win_probability_against?: number | null;
 }
 
 export interface LeagueWorkspaceStandingSummary {
@@ -272,9 +274,9 @@ export interface LeagueMatchupTeam {
   fantasy_team_id: number;
   fantasy_team_name: string;
   record: string;
-  projected_points?: number;
-  projected_total: number;
-  win_probability: number;
+  projected_points?: number | null;
+  projected_total?: number | null;
+  win_probability?: number | null;
   roster: LeagueRosterPlayer[];
 }
 
