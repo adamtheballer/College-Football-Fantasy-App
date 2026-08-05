@@ -78,7 +78,7 @@ TEAM,PLAYER,EA POSITION,OVR
 "MICHIGAN STATE","Fredrick Moore","WR","78"
 "MICHIGAN STATE","KK Smith","WR","77"
 "MICHIGAN STATE","Chrishon McCray","WR","85"
-"MICHIGAN STATE","Bryson Williams","RB","77"
+"MICHIGAN STATE","Bryson Williams","WR","77"
 "MICHIGAN STATE","Brennan Parachek","TE","71"
 "MICHIGAN STATE","Kai Rios","TE","72"
 "MICHIGAN STATE","Liam Boyd","K","74"
@@ -811,4 +811,3 @@ TEAM,PLAYER,EA POSITION,OVR
 "NOTRE DAME","Cooper Flanagan","TE","80"
 "NOTRE DAME","James Flanigan","TE","75"
 "NOTRE DAME","Spencer Porath","K","82"
-

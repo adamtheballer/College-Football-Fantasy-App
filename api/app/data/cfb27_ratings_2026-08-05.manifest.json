@@ -1,0 +1,44 @@
+{
+  "cfb27_ratings": {
+    "spreadsheet_id": "1UpCZJDmx7YC2OG3krNImFKFQcLNPPJWlpP-S2LOEzHg",
+    "tabs": [
+      {
+        "title": "Big 10",
+        "gid": 0
+      },
+      {
+        "title": "ACC",
+        "gid": 1583045946
+      },
+      {
+        "title": "SEC",
+        "gid": 893843106
+      },
+      {
+        "title": "Big 12",
+        "gid": 1330988178
+      },
+      {
+        "title": "Independent",
+        "gid": 1963260727
+      }
+    ],
+    "retrieved_at": "2026-08-05T02:12:35Z",
+    "sha256": "3a4d5844983ad7c73578ac5dc81da34bd8a0f6adc98b29e86fb41ffcc4e02236",
+    "row_count": 812,
+    "dataset_version": "cfb27-2026-08-05-approved-workbook-r2",
+    "approval_status": "approved",
+    "export_batch_id": "cfb27-2026-08-05-live-workbook-r2",
+    "parent_export_batch_id": "cfb27-2026-08-04-live-workbook",
+    "parent_source_import_batch_id": "2026-07-30-r341-r916",
+    "source_correction": {
+      "player": "Bryson Williams",
+      "school": "MICHIGAN STATE",
+      "field": "EA POSITION",
+      "previous_value": "RB",
+      "corrected_value": "WR",
+      "rating_preserved": 77,
+      "authority": "reports/source-imports/2026/player-identities.csv and player-projections.csv"
+    }
+  }
+}

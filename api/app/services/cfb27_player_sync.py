@@ -27,7 +27,7 @@ _MODEL_REGISTRY = (League, Player, RosterEntry, Team, User)
 
 # Read-only callers use the same frozen release artifact as the importer.  The
 # older JSON seed remains only for historical migrations.
-CFB27_SOURCE_PATH = Path(__file__).resolve().parents[1] / "data" / "cfb27_ratings_2026-08-04.csv"
+CFB27_SOURCE_PATH = Path(__file__).resolve().parents[1] / "data" / "cfb27_ratings_2026-08-05.csv"
 CFB27_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 CFB27_SCHOOL_ALIASES = {"california": "cal"}
 # The imported CFB27 source only contains real game overalls.  A board rank
