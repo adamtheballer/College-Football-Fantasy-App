@@ -1,10 +1,10 @@
 {
   "source": "projection",
   "approval_status": "approved",
-  "export_batch_id": "2026-08-05-live-sheets-r361-r923-r347",
+  "export_batch_id": "2026-08-05-live-sheets-r361-r923-r347-refresh-043626z",
   "spreadsheet_id": "1NMP3EJSMbdRd7HDA0t7TwxzJ9DM_bUynLoRCgE6Ml74",
   "tabs": ["Big10", "ACC", "SEC", "Big12", "Notre Dame"],
-  "retrieved_at": "2026-08-05T04:15:50Z",
+  "retrieved_at": "2026-08-05T04:36:26Z",
   "spreadsheet_revision": "923",
   "row_count": 814,
   "sha256": "49d0c74db64ae2fa37ef42d4f55fa0eba1c9ba8abfef523d2828a43265dbc5d3",

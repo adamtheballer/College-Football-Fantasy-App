@@ -2,15 +2,15 @@
   "schema_version": 1,
   "season": 2026,
   "approval_status": "approved",
-  "export_batch_id": "2026-08-05-live-sheets-r361-r923-r347",
-  "exported_at_utc": "2026-08-05T04:15:50Z",
+  "export_batch_id": "2026-08-05-live-sheets-r361-r923-r347-refresh-043626z",
+  "exported_at_utc": "2026-08-05T04:36:26Z",
   "sources": {
     "identity": {
       "spreadsheet_id": "1yssIYnzIAImmPOSkFqZQAn1i54CZ3aKzMlzGyvgvrlQ",
       "snapshot_file": "player-identities.csv",
       "manifest_file": "player-identities.manifest.json",
       "tabs": ["Big 10", "ACC", "SEC", "Big 12", "Notre Dame"],
-      "exported_at_utc": "2026-08-05T04:15:50Z",
+      "exported_at_utc": "2026-08-05T04:36:26Z",
       "spreadsheet_revision": "361",
       "row_count": 814,
       "sha256": "a68f82d3eb886f700ad75aff8663bf7675f44024502fea883069f69831627a58",
@@ -21,7 +21,7 @@
       "snapshot_file": "player-projections.csv",
       "manifest_file": "player-projections.manifest.json",
       "tabs": ["Big10", "ACC", "SEC", "Big12", "Notre Dame"],
-      "exported_at_utc": "2026-08-05T04:15:50Z",
+      "exported_at_utc": "2026-08-05T04:36:26Z",
       "spreadsheet_revision": "923",
       "row_count": 814,
       "sha256": "49d0c74db64ae2fa37ef42d4f55fa0eba1c9ba8abfef523d2828a43265dbc5d3",
@@ -32,11 +32,11 @@
       "snapshot_file": "../../../api/app/data/cfb27_ratings_2026-08-05.csv",
       "manifest_file": "../../../api/app/data/cfb27_ratings_2026-08-05.manifest.json",
       "tabs": ["Big 10", "ACC", "SEC", "Big 12", "Independent"],
-      "exported_at_utc": "2026-08-05T04:15:50Z",
+      "exported_at_utc": "2026-08-05T04:36:26Z",
       "spreadsheet_revision": "347",
       "row_count": 814,
       "sha256": "4aaabe76b187f97fd46f5438e8f71859ef3bf67b174d9b2340deb88df1dd77e3",
-      "dataset_version": "cfb27-2026-08-05-live-workbook-r3"
+      "dataset_version": "cfb27-2026-08-05-live-workbook-r4"
     }
   }
 }

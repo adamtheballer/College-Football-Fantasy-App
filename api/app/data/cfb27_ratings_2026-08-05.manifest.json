@@ -8,14 +8,14 @@
       {"title": "Big 12", "gid": 1330988178},
       {"title": "Independent", "gid": 1963260727}
     ],
-    "retrieved_at": "2026-08-05T04:15:50Z",
+    "retrieved_at": "2026-08-05T04:36:26Z",
     "spreadsheet_revision": "347",
     "sha256": "4aaabe76b187f97fd46f5438e8f71859ef3bf67b174d9b2340deb88df1dd77e3",
     "row_count": 814,
-    "dataset_version": "cfb27-2026-08-05-live-workbook-r3",
+    "dataset_version": "cfb27-2026-08-05-live-workbook-r4",
     "approval_status": "approved",
-    "export_batch_id": "2026-08-05-live-sheets-r361-r923-r347",
-    "parent_export_batch_id": "cfb27-2026-08-05-live-workbook-r2",
+    "export_batch_id": "2026-08-05-live-sheets-r361-r923-r347-refresh-043626z",
+    "parent_export_batch_id": "2026-08-05-live-sheets-r361-r923-r347",
     "parent_source_import_batch_id": "2026-07-30-r341-r916",
     "source_corrections": [
       {"player": "Bryson Williams", "field": "EA POSITION", "previous_value": "HB", "corrected_value": "WR", "rating_preserved": 77},

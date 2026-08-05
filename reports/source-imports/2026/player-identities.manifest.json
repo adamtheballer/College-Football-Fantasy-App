@@ -1,10 +1,10 @@
 {
   "source": "identity",
   "approval_status": "approved",
-  "export_batch_id": "2026-08-05-live-sheets-r361-r923-r347",
+  "export_batch_id": "2026-08-05-live-sheets-r361-r923-r347-refresh-043626z",
   "spreadsheet_id": "1yssIYnzIAImmPOSkFqZQAn1i54CZ3aKzMlzGyvgvrlQ",
   "tabs": ["Big 10", "ACC", "SEC", "Big 12", "Notre Dame"],
-  "retrieved_at": "2026-08-05T04:15:50Z",
+  "retrieved_at": "2026-08-05T04:36:26Z",
   "spreadsheet_revision": "361",
   "row_count": 814,
   "sha256": "a68f82d3eb886f700ad75aff8663bf7675f44024502fea883069f69831627a58",
