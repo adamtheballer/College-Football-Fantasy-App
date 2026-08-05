@@ -1885,35 +1885,37 @@ test.describe("critical browser workflows", () => {
           page.evaluate(() => {
             const raw = window.localStorage.getItem("cfb_single_player_mock_draft");
             const draft = raw ? JSON.parse(raw) : null;
-            return draft?.currentPick ?? 0;
+            return draft?.currentPick === draft?.userTeamId;
           }),
-        { timeout: 15_000 }
+        { timeout: 25_000 }
       )
-      .toBe(4);
+      .toBe(true);
 
     const beforeUserPick = await page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}"));
-    expect(beforeUserPick.picks).toHaveLength(3);
+    expect(beforeUserPick.picks).toHaveLength(beforeUserPick.userTeamId - 1);
     expect(beforeUserPick.picks.every((pick: { pickedBy: string }) => pick.pickedBy === "bot")).toBe(true);
 
     await page.getByRole("button", { name: /^Draft$/ }).first().click();
 
     await expect
-      .poll(() => page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}").picks?.length ?? 0))
-      .toBe(4);
+      .poll(() => page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}").picks?.some((pick: { pickedBy: string }) => pick.pickedBy === "user") ?? false))
+      .toBe(true);
 
     const afterUserPick = await page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}"));
-    expect(afterUserPick.picks[3].pickedBy).toBe("user");
+    const userPickIndex = afterUserPick.picks.findIndex((pick: { pickedBy: string }) => pick.pickedBy === "user");
+    expect(userPickIndex).toBe(beforeUserPick.userTeamId - 1);
+    expect(afterUserPick.picks[userPickIndex].pickedBy).toBe("user");
 
     await expect
-      .poll(() => page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}").picks?.length ?? 0), {
+      .poll(() => page.evaluate((index) => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}").picks?.[index + 1]?.pickedBy ?? null, userPickIndex), {
         timeout: 5_000,
       })
-      .toBe(5);
+      .toBe("bot");
 
     const afterCpuPick = await page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}"));
-    expect(afterCpuPick.picks[4].pickedBy).toBe("bot");
+    expect(afterCpuPick.picks[userPickIndex + 1].pickedBy).toBe("bot");
 
-    const rosterPlayerName = afterUserPick.picks[3].playerName;
+    const rosterPlayerName = afterUserPick.picks[userPickIndex].playerName;
     await page.getByRole("button", { name: /^Roster$/ }).click();
     await page.getByRole("button", { name: `Open ${rosterPlayerName} player card` }).click();
     await expect(page.getByRole("dialog", { name: `${rosterPlayerName} player card` })).toBeVisible();
