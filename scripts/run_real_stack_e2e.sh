@@ -26,6 +26,9 @@ export CFF_WEB_GIT_SHA="${CFF_WEB_GIT_SHA:-$CFF_GIT_SHA}"
 export CFF_WORKER_GIT_SHA="${CFF_WORKER_GIT_SHA:-$CFF_GIT_SHA}"
 export CFF_RUNTIME_MODE="${CFF_RUNTIME_MODE:-release_candidate}"
 export CFF_RUNTIME_ID="${CFF_RUNTIME_ID:-e2e-${CFF_GIT_SHA:0:12}}"
+# The E2E stack is a fresh disposable database. Its catalog must be created by
+# the explicit all-or-nothing reconciler, never by ordinary runtime startup.
+export CFF_APPLY_PRESEASON_RECONCILIATION="true"
 
 cleanup() {
   docker compose down -v --remove-orphans
@@ -70,7 +73,7 @@ done
 ready_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/ready")"
 runtime_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/runtime")"
 jq -e '.status == "ready"' <<<"$ready_payload" >/dev/null
-jq -e --arg sha "$CFF_GIT_SHA" '.git_sha == $sha and .alembic_revision == "0087_player_value_contract"' <<<"$runtime_payload" >/dev/null
+jq -e --arg sha "$CFF_GIT_SHA" '.git_sha == $sha and .alembic_revision == "0088_beta_scoring_lock"' <<<"$runtime_payload" >/dev/null
 curl --fail --show-error --silent --head "${web_origin}" >/dev/null
 
 # This command runs only after Compose created a fresh disposable database.

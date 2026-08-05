@@ -29,7 +29,8 @@ def test_public_web_image_serves_the_built_spa_behind_a_same_origin_api_proxy():
     assert "npm run dev:vite" not in compose
     assert "condition: service_healthy" in compose
     assert "scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026" in compose
-    assert "scripts/bootstrap_canonical_player_data.py --apply" in compose
+    assert "CFF_APPLY_PRESEASON_RECONCILIATION" in compose
+    assert "scripts/reconcile_preseason_player_data.py" in compose
     assert "scripts/audit_canonical_player_registry.py --source-dir reports/source-imports/2026" in compose
     # The release launcher exports CFF_RUNTIME_MODE. Compose must carry that
     # into Settings as RUNTIME_MODE or a diagnostic launch would falsely
