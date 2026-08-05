@@ -1096,8 +1096,6 @@ export default function Draft() {
                       {formatDraftProjection({
                         seasonProjection: player.sheetProjectedSeasonPoints,
                         fallbackSeasonProjection: player.sheetProjectionStats?.fpts,
-                        weeklyProjection: player.projectedPoints,
-                        hasWeeklyProjection: player.hasWeeklyProjection,
                       })}
                     </p>
                     <div className="flex justify-end gap-2">

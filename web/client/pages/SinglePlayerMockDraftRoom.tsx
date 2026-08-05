@@ -486,8 +486,6 @@ export default function SinglePlayerMockDraftRoom() {
                   {formatDraftProjection({
                     seasonProjection: player.sheetProjectedSeasonPoints,
                     fallbackSeasonProjection: player.sheetProjectionStats?.fpts,
-                    weeklyProjection: player.projectedPoints,
-                    hasWeeklyProjection: player.hasWeeklyProjection,
                   })}
                 </p>
                 <div className="flex justify-end gap-2">
