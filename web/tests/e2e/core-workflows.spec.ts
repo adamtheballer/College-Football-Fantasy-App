@@ -649,7 +649,16 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByRole("heading", { name: "Draft Schedule", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Continue to Review", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Review", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: /Create League/i }).click();
+    const scoringAcknowledgment = page.getByRole("checkbox", {
+      name: "I understand that scoring settings cannot be changed during the beta, and I have reviewed this league’s point system.",
+    });
+    const createLeagueButton = page.getByRole("button", { name: /Create League/i });
+    await expect(scoringAcknowledgment).not.toBeChecked();
+    await expect(createLeagueButton).toBeDisabled();
+    await scoringAcknowledgment.check();
+    await expect(scoringAcknowledgment).toBeChecked();
+    await expect(createLeagueButton).toBeEnabled();
+    await createLeagueButton.click();
     await expect(page.getByRole("heading", { name: /Invite managers/i })).toBeVisible();
     await page.getByRole("button", { name: /Open League Hub/i }).click();
 
