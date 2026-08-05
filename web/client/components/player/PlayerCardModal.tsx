@@ -269,6 +269,21 @@ export const resolvePlayerCardProjectionStats = (
   );
 };
 
+/**
+ * The card payload and the value endpoint expose the same canonical field.
+ * Prefer the live value response, but retain the value embedded in the card
+ * response while that secondary request is revalidating.  This keeps a
+ * transient query failure or cold cache from turning a valid rating into N/A.
+ */
+export const resolvePlayerCardCurrentValueRating = (
+  tradeValue?: number | null,
+  card?: PlayerCardResponse | null,
+) => {
+  if (typeof tradeValue === "number" && Number.isFinite(tradeValue)) return tradeValue;
+  const cardValue = card?.player.current_value_rating;
+  return typeof cardValue === "number" && Number.isFinite(cardValue) ? cardValue : null;
+};
+
 export const buildHistoricalStatsTableRows = (season: HistoricalSeason | null): HistoricalStatTableRow[] =>
   season?.categories.flatMap((category) =>
     category.stats.map((stat) => ({
@@ -356,7 +371,10 @@ export function PlayerCardModal({
   const historicalSeasons = historicalStats?.seasons ?? [];
   const historicalSummaryColumns = buildHistoricalSeasonSummaryColumns(historicalSeasons);
   const projectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
-  const currentValueRating = valueQuery.data?.current?.current_value_rating ?? null;
+  const currentValueRating = resolvePlayerCardCurrentValueRating(
+    valueQuery.data?.current?.current_value_rating,
+    card,
+  );
   const aboutMessage = visiblePlayerCardAboutMessage(card?.about.message);
   const cardActions = [...(action ? [action] : []), ...actions];
   const projectionHighlights = [

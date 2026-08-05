@@ -186,6 +186,10 @@ export function usePlayerTradeValues(playerId?: number | null, season = 2026, en
   return useQuery({
     queryKey: ["player-trade-values", playerId, season],
     enabled: enabled && typeof playerId === "number" && Number.isFinite(playerId),
+    // Player-card and Value-tab cache entries must revalidate whenever a card
+    // is opened, including after a preseason value reconciliation.
+    staleTime: 0,
+    refetchOnMount: "always",
     retry: false,
     queryFn: async () => {
       const payload = await apiGet<PlayerTradeValueResponse>(`/players/${playerId}/trade-values`, { season });
@@ -708,6 +712,7 @@ export function usePlayerCard(playerId?: number | null, enabled = true) {
     queryKey: ["player-card", playerId, injurySeason, injuryWeek],
     enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
     staleTime: 5_000,
+    refetchOnMount: "always",
     queryFn: () => apiGet<PlayerCardResponse>(`/players/${playerId}/card`, {
       injury_season: injurySeason,
       injury_week: injuryWeek,

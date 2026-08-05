@@ -128,6 +128,42 @@ def test_preseason_contract_ignores_stale_dynamic_value_and_keeps_jeremiah_at_99
     assert snapshot is not None and snapshot["value"] == 99
 
 
+def test_preseason_current_value_is_exposed_consistently_by_player_card_and_trade_api(client, db_session):
+    arch = Player(
+        name="Arch Manning",
+        position="QB",
+        school="Texas",
+        cfb27_overall=91,
+        raw_cfb27_rating=91,
+    )
+    jeremiah = Player(
+        name="Jeremiah Smith",
+        position="WR",
+        school="Ohio State",
+        cfb27_overall=99,
+        raw_cfb27_rating=99,
+    )
+    db_session.add_all([arch, jeremiah])
+    db_session.commit()
+
+    # Initialization is idempotent and makes the database field match the
+    # immutable CFB27 rating before any Week 1 result is finalized.
+    calculate_player_trade_value(db_session, player_id=arch.id, season=2026, week=0)
+    calculate_player_trade_value(db_session, player_id=jeremiah.id, season=2026, week=0)
+    db_session.commit()
+
+    for player, expected in ((arch, 91), (jeremiah, 99)):
+        player_response = client.get(f"/players/{player.id}")
+        card_response = client.get(f"/players/{player.id}/card")
+        value_response = client.get(f"/players/{player.id}/trade-values", params={"season": 2026})
+
+        assert player_response.status_code == card_response.status_code == value_response.status_code == 200
+        assert player_response.json()["raw_cfb27_rating"] == expected
+        assert player_response.json()["current_value_rating"] == expected
+        assert card_response.json()["player"]["current_value_rating"] == expected
+        assert value_response.json()["current"]["current_value_rating"] == expected
+
+
 def test_value_endpoint_has_no_projection_or_legacy_rating_fallback(db_session):
     player = Player(
         name="Missing Rating", position="TE", school="Miami", cfb27_overall=95,
