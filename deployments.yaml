@@ -147,20 +147,18 @@ environments:
       - VITE_BETA_ACCESS_ENABLED
       - REFRESH_COOKIE_SECURE
       - REFRESH_COOKIE_SAMESITE
-      - EMAIL_DELIVERY_MODE
-      - SMTP_HOST
-      - SMTP_FROM_EMAIL
-      - SMTP_USE_TLS
-      - SUPPORT_EMAIL
-      - PRIVACY_POLICY_URL
-      - TERMS_URL
-      - PROVIDER_DISCLOSURE_URL
+      - EMAIL_ENABLED
       - SCORING_MODE
     optional_env:
+      - EMAIL_DELIVERY_MODE
       - CORS_ORIGIN_REGEX
       - SMTP_PORT
       - SMTP_USERNAME
       - SMTP_PASSWORD
+      - SUPPORT_EMAIL
+      - PRIVACY_POLICY_URL
+      - TERMS_URL
+      - PROVIDER_DISCLOSURE_URL
       - SCORING_PROVIDER
       - SPORTSDATA_API_KEY
       - SPORTSDATA_ENABLED
@@ -173,8 +171,7 @@ environments:
       cors_origin_regex_must_be_unset_or_production_safe: true
       refresh_cookie_secure_must_be_true: true
       ui_base_url_must_be_non_local_https: true
-      email_delivery_must_be_smtp: true
-      smtp_tls_must_be_true: true
+      email_disabled_beta_starts_without_smtp: true
       sportsdata_credentials_required_when_scoring_enabled: true
       migrations_before_api: true
       verify_alembic_head_before_promotion: true

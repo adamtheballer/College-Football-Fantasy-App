@@ -144,6 +144,10 @@ class Settings(BaseSettings):
     chat_read_rate_limit_window_minutes: int = 1
     chat_edit_window_minutes: int = 15
     email_delivery_mode: str = "console"
+    # Public beta deliberately operates without outbound email until a sender
+    # is approved. Keep this off by default so an omitted deployment variable
+    # cannot accidentally make SMTP a startup dependency or emit mail.
+    email_enabled: bool = False
     smtp_host: str | None = None
     smtp_port: int = 587
     smtp_username: str | None = None
@@ -179,6 +183,18 @@ class Settings(BaseSettings):
         if normalized not in {"console", "smtp"}:
             raise ValueError("EMAIL_DELIVERY_MODE must be one of: console, smtp")
         return normalized
+
+    @field_validator("email_enabled", mode="before")
+    @classmethod
+    def parse_email_enabled(cls, value: object) -> object:
+        """Parse the deployment capability without string-truthiness traps."""
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"true", "1", "yes", "on"}:
+                return True
+            if normalized in {"false", "0", "no", "off", ""}:
+                return False
+        return value
 
     @field_validator("beta_access_reservation_ttl_minutes")
     @classmethod
@@ -264,26 +280,19 @@ class Settings(BaseSettings):
         if not self.ui_base_url.strip().lower().startswith("https://") or self._is_local_origin(self.ui_base_url):
             raise ValueError("UI_BASE_URL must be a non-local HTTPS URL when ENVIRONMENT=production")
 
-        if self.email_delivery_mode != "smtp":
-            raise ValueError("EMAIL_DELIVERY_MODE must be smtp when ENVIRONMENT=production")
+        # Email is an explicit capability, not an inferred side effect of an
+        # SMTP-looking environment. A beta with EMAIL_ENABLED=false starts
+        # without SMTP or legal/support links. Re-enabling email restores the
+        # production sender requirements without changing application logic.
+        if self.email_enabled:
+            if self.email_delivery_mode != "smtp":
+                raise ValueError("EMAIL_DELIVERY_MODE must be smtp when EMAIL_ENABLED=true in production")
 
-        if not self.smtp_host or not self.smtp_from_email:
-            raise ValueError("SMTP_HOST and SMTP_FROM_EMAIL are required when ENVIRONMENT=production")
+            if not self.smtp_host or not self.smtp_from_email:
+                raise ValueError("SMTP_HOST and SMTP_FROM_EMAIL are required when EMAIL_ENABLED=true in production")
 
-        if not self.smtp_use_tls:
-            raise ValueError("SMTP_USE_TLS must be true when ENVIRONMENT=production")
-
-        if not self.support_email:
-            raise ValueError("SUPPORT_EMAIL is required when ENVIRONMENT=production")
-
-        if not self.privacy_policy_url:
-            raise ValueError("PRIVACY_POLICY_URL is required when ENVIRONMENT=production")
-
-        if not self.terms_url:
-            raise ValueError("TERMS_URL is required when ENVIRONMENT=production")
-
-        if not self.provider_disclosure_url:
-            raise ValueError("PROVIDER_DISCLOSURE_URL is required when ENVIRONMENT=production")
+            if not self.smtp_use_tls:
+                raise ValueError("SMTP_USE_TLS must be true when EMAIL_ENABLED=true in production")
 
         if not self.scoring_enabled and self.sportsdata_enabled:
             raise ValueError("SPORTSDATA_ENABLED must be false when SCORING_MODE=disabled")

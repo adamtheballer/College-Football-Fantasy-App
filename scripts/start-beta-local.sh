@@ -24,7 +24,7 @@ docker compose --env-file "$ENV_FILE" -p "$PROJECT" -f docker-compose.yml -f doc
 
 for _attempt in $(seq 1 60); do
   runtime="$(curl --fail --silent --max-time 3 http://127.0.0.1:18080/api/health/runtime 2>/dev/null || true)"
-  if [[ -n "$runtime" ]] && python3 -c 'import json,sys; d=json.loads(sys.stdin.read()); assert d["git_sha"] == sys.argv[1]; assert d["runtime_mode"] == "release_candidate"; assert d["scoring_mode"] == "disabled"; assert d["sportsdata_enabled"] is False; assert d["provider_polling_expected"] is False' "$CFF_GIT_SHA" <<< "$runtime"; then
+  if [[ -n "$runtime" ]] && python3 -c 'import json,sys; d=json.loads(sys.stdin.read()); assert d["git_sha"] == sys.argv[1]; assert d["runtime_mode"] == "release_candidate"; assert d["scoring_mode"] == "disabled"; assert d["sportsdata_enabled"] is False; assert d["provider_polling_expected"] is False; assert d["email_enabled"] is False' "$CFF_GIT_SHA" <<< "$runtime"; then
     echo "BETA READY: http://127.0.0.1:18080/"
     exit 0
   fi

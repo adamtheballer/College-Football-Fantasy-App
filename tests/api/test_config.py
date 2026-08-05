@@ -25,6 +25,7 @@ def make_settings(**overrides):
 def production_required_settings() -> dict[str, object]:
     return {
         "ui_base_url": "https://app.example.com",
+        "email_enabled": True,
         "email_delivery_mode": "smtp",
         "smtp_host": "smtp.example.com",
         "smtp_from_email": "no-reply@example.com",
@@ -182,10 +183,42 @@ def test_production_rejects_insecure_refresh_cookie():
         )
 
 
-def test_production_rejects_missing_public_policy_urls():
+def test_production_allows_beta_without_smtp_or_public_policy_urls():
+    settings = make_settings(
+        environment="production",
+        jwt_secret_key="safe-production-secret",
+        cors_origins="https://app.example.com",
+        cors_origin_regex=None,
+        refresh_cookie_secure=True,
+        ui_base_url="https://app.example.com",
+        scoring_mode="disabled",
+        sportsdata_enabled=False,
+        email_enabled=False,
+    )
+
+    assert settings.email_enabled is False
+    assert settings.smtp_host is None
+    assert settings.support_email is None
+    assert settings.privacy_policy_url is None
+
+
+@pytest.mark.parametrize("value", ("false", "0", "no", "off"))
+def test_email_false_environment_forms_disable_delivery(value):
+    assert make_settings(email_enabled=value).email_enabled is False
+
+
+def test_email_true_environment_form_enables_delivery_only_when_explicit():
+    assert make_settings(email_enabled="true").email_enabled is True
+
+
+def test_email_defaults_to_disabled_without_an_environment_value():
+    assert make_settings().email_enabled is False
+
+
+def test_production_email_enabled_requires_smtp_sender():
     required = production_required_settings()
-    required.pop("support_email")
-    with pytest.raises(ValidationError, match="SUPPORT_EMAIL is required"):
+    required.pop("smtp_host")
+    with pytest.raises(ValidationError, match="SMTP_HOST and SMTP_FROM_EMAIL are required"):
         make_settings(
             environment="production",
             jwt_secret_key="safe-production-secret",
@@ -207,7 +240,7 @@ def test_production_rejects_console_email_delivery():
             **{
                 key: value
                 for key, value in production_required_settings().items()
-                if key not in {"email_delivery_mode", "smtp_host", "smtp_from_email"}
+                if key not in {"email_delivery_mode"}
             },
         )
 

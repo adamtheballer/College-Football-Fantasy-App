@@ -1,9 +1,11 @@
 import { Bug } from "lucide-react";
 
 import { SupportContactCard } from "@/components/support/SupportContactCard";
+import { useRuntimeCapabilities } from "@/components/RuntimeCompatibilityGate";
 
 /** A direct, refresh-safe destination for the sidebar Report Bug action. */
 export default function ReportBug() {
+  const { support_email: supportEmail } = useRuntimeCapabilities();
   return (
     <main className="mx-auto max-w-3xl space-y-8 pb-24 pt-10 sm:pt-14">
       <header className="border-b border-border/50 pb-8">
@@ -15,7 +17,9 @@ export default function ReportBug() {
           Report a Bug
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-          Send the product team the details by email. Your report opens in your email app, so nothing is silently lost inside the beta.
+          {supportEmail
+            ? "Send the product team the details by email. Your report opens in your email app, so nothing is silently lost inside the beta."
+            : "Email feedback is unavailable during beta."}
         </p>
       </header>
 

@@ -37,6 +37,15 @@ class ConsoleEmailService(EmailService):
         logger.info("Auth email queued to %s: %s", payload.to_email, payload.subject)
 
 
+class DisabledEmailService(EmailService):
+    """Controlled no-mail boundary for the credential-free public beta."""
+
+    def send(self, payload: EmailPayload) -> None:
+        # Deliberately do not log addresses, message bodies, access codes, or
+        # password-reset tokens when mail is unavailable.
+        raise RuntimeError("Email is unavailable during beta")
+
+
 class SmtpEmailService(EmailService):
     def send(self, payload: EmailPayload) -> None:
         if not settings.smtp_host or not settings.smtp_from_email:
@@ -57,6 +66,8 @@ class SmtpEmailService(EmailService):
 
 
 def get_email_service() -> EmailService:
+    if not settings.email_enabled:
+        return DisabledEmailService()
     if settings.email_delivery_mode.strip().lower() == "smtp":
         return SmtpEmailService()
     return ConsoleEmailService()

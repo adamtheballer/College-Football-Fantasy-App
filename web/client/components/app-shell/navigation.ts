@@ -40,6 +40,7 @@ export const getShellNavItems = (
   user: User | null,
   isLoggedIn: boolean,
   chatUnreadCount = 0,
+  supportAvailable = false,
 ): ShellNavItem[] => {
   if (!isLoggedIn) {
     return [
@@ -61,10 +62,9 @@ export const getShellNavItems = (
     },
     { name: "INJURY CENTER", path: "/injury-center", icon: ShieldAlert },
     { name: "ALERTS", path: "/alerts", icon: Bell },
-    // Report Bug has a dedicated route so it is refresh-safe and can be
-    // marked active independently of Settings. It opens the established
-    // mailto + copy-email support workflow; no feedback is silently stored.
-    { name: "REPORT BUG", path: "/report-bug", icon: Bug },
+    // This mailto workflow is only reachable after the server has supplied a
+    // configured support address. Beta must not expose a dead feedback link.
+    ...(supportAvailable ? [{ name: "REPORT BUG", path: "/report-bug", icon: Bug }] : []),
     { name: "COMING SOON", path: "/coming-soon", icon: Sparkles },
     { name: "MOCK DRAFT", path: "/draft", icon: Timer },
     ...(user?.isAdmin

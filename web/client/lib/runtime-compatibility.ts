@@ -5,6 +5,11 @@ export type RuntimeIdentity = {
   api_process_instance_uuid: string;
   web_git_sha: string;
   worker_git_sha: string;
+  email_enabled: boolean;
+  support_email?: string | null;
+  privacy_policy_url?: string | null;
+  terms_url?: string | null;
+  provider_disclosure_url?: string | null;
 };
 
 export const WEB_BUILD_SHA = import.meta.env.VITE_GIT_SHA || "unknown";
