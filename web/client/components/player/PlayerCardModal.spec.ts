@@ -184,7 +184,7 @@ describe("PlayerCardModal helpers", () => {
     ]);
   });
 
-  it("builds one consistent set of stat-table columns for every historical season", () => {
+  it("removes unsupported historical fantasy totals while preserving aligned stat columns", () => {
     const seasons = [
       {
         season: 2025,
@@ -204,8 +204,9 @@ describe("PlayerCardModal helpers", () => {
       },
     ] as never;
 
-    expect(buildHistoricalSeasonSummaryColumns(seasons)).toEqual(["Fantasy Points", "Rush Yds", "Rec Yds"]);
-    expect(historicalSeasonSummaryValue(seasons[0], "Fantasy Points")).toBe(212.3);
+    expect(buildHistoricalSeasonSummaryColumns(seasons)).toEqual(["Rush Yds", "Rec Yds"]);
+    expect(buildHistoricalSeasonSummaryColumns(seasons)).not.toContain("Fantasy Points");
+    expect(buildHistoricalSeasonSummaryColumns(seasons)).not.toContain("Fantasy Pts");
     expect(historicalSeasonSummaryValue(seasons[1], "Rec Yds")).toBe(812);
     expect(historicalSeasonSummaryValue(seasons[1], "Rush Yds")).toBeNull();
   });

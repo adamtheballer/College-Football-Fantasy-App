@@ -294,15 +294,16 @@ export const buildHistoricalStatsTableRows = (season: HistoricalSeason | null): 
   ) ?? [];
 
 const HISTORICAL_STAT_COLUMN_ORDER = [
-  "Fantasy Points", "FPTS/G", "Games", "Completions", "Attempts", "Pass Yds", "Pass TD", "INT",
+  "FPTS/G", "Games", "Completions", "Attempts", "Pass Yds", "Pass TD", "INT",
   "Rush Att", "Rush Yds", "Rush TD", "Receptions", "Rec Yds", "Rec TD", "FGM", "FGA", "XPM", "XPA", "TD",
 ];
 
 export const buildHistoricalSeasonSummaryColumns = (seasons: HistoricalSeason[]): string[] => {
-  const present = new Set(seasons.flatMap((season) => season.summary.map((stat) => stat.label === "Fantasy Pts" ? "Fantasy Points" : stat.label)));
-  // This column is always present.  A missing/partial historical scoring
-  // record renders an em dash instead of a fabricated zero.
-  present.add("Fantasy Points");
+  const present = new Set(
+    seasons.flatMap((season) => season.summary.map((stat) => stat.label)).filter(
+      (label) => label !== "Fantasy Points" && label !== "Fantasy Pts",
+    ),
+  );
   return [
     ...HISTORICAL_STAT_COLUMN_ORDER.filter((label) => present.has(label)),
     ...[...present].filter((label) => !HISTORICAL_STAT_COLUMN_ORDER.includes(label)).sort(),
@@ -310,10 +311,6 @@ export const buildHistoricalSeasonSummaryColumns = (seasons: HistoricalSeason[])
 };
 
 export const historicalSeasonSummaryValue = (season: HistoricalSeason, label: string) => {
-  if (label === "Fantasy Points") {
-    return season.scoring_context?.fantasy_points ??
-      season.summary.find((stat) => stat.label === "Fantasy Points" || stat.label === "Fantasy Pts")?.value ?? null;
-  }
   return season.summary.find((stat) => stat.label === label)?.value ?? null;
 };
 

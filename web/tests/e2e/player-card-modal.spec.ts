@@ -121,6 +121,35 @@ test.describe("player card modal", () => {
                 updated_at: "2026-07-11T00:00:00Z",
               },
             ],
+            historical_stats: {
+              player_id: 1,
+              provider: "verified_import",
+              status: "available",
+              available_seasons: [2025],
+              seasons: [
+                {
+                  season: 2025,
+                  season_type: "regular",
+                  team_name: "Ohio State",
+                  position: "WR",
+                  games_played: 15,
+                  games_started: 15,
+                  summary: [
+                    { label: "Games", value: 15 },
+                    { label: "Rec Yds", value: 1305 },
+                    { label: "Rec TD", value: 12 },
+                    { label: "Fantasy Points", value: null },
+                  ],
+                  categories: [],
+                  freshness: { provider: "verified_import", is_final: true },
+                  scoring_context: {
+                    scoring_rules_version: null,
+                    fantasy_points: null,
+                    fantasy_points_per_game: null,
+                  },
+                },
+              ],
+            },
           }),
         });
         return;
@@ -187,6 +216,12 @@ test.describe("player card modal", () => {
       const dialogCenter = box.x + box.width / 2;
       expect(Math.abs(dialogCenter - viewport.width / 2)).toBeLessThan(viewport.width * 0.12);
     }
+
+    await dialog.getByRole("button", { name: "Stats" }).click();
+    await expect(dialog.getByText("Historical Season Stats", { exact: true })).toBeVisible();
+    await expect(dialog.getByRole("columnheader", { name: "Fantasy Points" })).toHaveCount(0);
+    await expect(dialog.getByRole("columnheader", { name: "Rec Yds" })).toBeVisible();
+    await expect(dialog.getByLabel("Historical stats table; scroll horizontally for all columns")).toBeVisible();
 
     await page.getByRole("button", { name: /Close player card/i }).click();
     await expect(dialog).toBeHidden();
