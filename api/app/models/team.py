@@ -10,6 +10,7 @@ class Team(TimestampMixin, Base):
         UniqueConstraint("league_id", "name", name="uq_team_league_name"),
         UniqueConstraint("league_id", "owner_user_id", name="uq_team_league_owner"),
         Index("ix_teams_league_id", "league_id"),
+        Index("ix_teams_league_draft_position", "league_id", "draft_position", unique=True),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
