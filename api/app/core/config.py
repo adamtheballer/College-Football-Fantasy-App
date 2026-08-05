@@ -65,7 +65,11 @@ class Settings(BaseSettings):
     scoring_dead_letter_after_failures: int = 3
     provider_unmatched_failure_threshold_percent: float = 10.0
     projection_provider: str = "sportsdataio"
-    sportsdata_enabled: bool = True
+    # Provider polling is opt-in. This keeps beta and other credential-free
+    # runtimes fail-closed when a deployment omits SPORTSDATA_ENABLED; the
+    # pydantic-settings bool parser remains the single authoritative parser
+    # for normal environment forms (false, 0, no, off, and explicit true).
+    sportsdata_enabled: bool = False
     sportsdata_player_stats_path: str = "stats/json/Player/{external_id}"
     sportsdata_player_stats_week_path: str = "stats/json/PlayerGameStatsByWeek/{season}/{week}"
     sportsdata_players_path: str = "scores/json/Players"

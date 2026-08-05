@@ -95,6 +95,8 @@ def test_runtime_remains_public_and_safe_in_production(client, db_session, monke
     assert response.status_code == 200
     assert response.json()["environment"] == "production"
     assert response.json()["scoring_mode"] == "disabled"
+    assert response.json()["sportsdata_enabled"] is False
+    assert response.json()["scoring_worker_expected"] is False
     assert response.json()["provider_polling_expected"] is False
 
 

@@ -37,6 +37,7 @@ def test_public_web_image_serves_the_built_spa_behind_a_same_origin_api_proxy():
     # identify itself as an unknown/release-like API at /health/runtime.
     assert 'RUNTIME_MODE: "${CFF_RUNTIME_MODE:-unknown}"' in compose
     assert 'PLAYER_HEADSHOTS_ENABLED: "${PLAYER_HEADSHOTS_ENABLED:-false}"' in compose
+    assert 'SPORTSDATA_ENABLED: "${SPORTSDATA_ENABLED:-false}"' in compose
     db_service = re.search(r"^  db:\n(?P<body>.*?)(?=^  [a-z_]+:)", compose, flags=re.MULTILINE | re.DOTALL)
     assert db_service is not None
     assert "restart: unless-stopped" in db_service.group("body")
@@ -70,3 +71,7 @@ def test_beta_runtime_scripts_enforce_one_public_origin_and_an_existing_data_vol
     assert "--volumes" not in stop
     assert "external: true" in override
     assert '"127.0.0.1:18080:8080"' in override
+    assert override.count('SPORTSDATA_ENABLED: "false"') == 2
+    assert override.count('SCORING_MODE: "disabled"') == 2
+    assert '"sportsdata_enabled"] is False' in start
+    assert '"provider_polling_expected"] is False' in start

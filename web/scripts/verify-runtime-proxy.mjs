@@ -33,5 +33,8 @@ const expectedRevision = process.env.CFF_GIT_SHA;
 if (expectedRevision && expectedRevision !== "unknown" && identity.git_sha !== expectedRevision) {
   throw new Error(`Unexpected API revision: expected=${expectedRevision} actual=${identity.git_sha}.`);
 }
+if (identity.scoring_mode !== "disabled" || identity.sportsdata_enabled !== false || identity.provider_polling_expected !== false) {
+  throw new Error(`Beta provider policy is not disabled: ${JSON.stringify(identity)}.`);
+}
 
 console.log(`Runtime verified: ${webBase} is serving the UI and its same-origin /api channel is ready for ${identity.git_sha}.`);

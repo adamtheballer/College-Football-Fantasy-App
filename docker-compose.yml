@@ -51,6 +51,9 @@ services:
       PROJECTION_DATASET_VERSION: "${CFF_PROJECTION_DATASET_VERSION:-unknown}"
       CFB27_RATING_DATASET_VERSION: "${CFF_CFB27_RATING_DATASET_VERSION:-unknown}"
       SCORING_MODE: "${SCORING_MODE:-enabled}"
+      # Provider polling is opt-in. Beta overrides this explicitly as well,
+      # while a missing deploy variable remains safely disabled.
+      SPORTSDATA_ENABLED: "${SPORTSDATA_ENABLED:-false}"
       # Keep this beta compliance flag deploy-configurable. It defaults to
       # false, but a future licensed deployment can opt in without changing
       # the Compose contract or database schema.
@@ -142,6 +145,8 @@ services:
       PYTHONPATH: /app
       GIT_SHA: "${CFF_GIT_SHA:-unknown}"
       GIT_BRANCH: "${CFF_GIT_BRANCH:-unknown}"
+      SCORING_MODE: "${SCORING_MODE:-enabled}"
+      SPORTSDATA_ENABLED: "${SPORTSDATA_ENABLED:-false}"
       ESPN_HISTORICAL_STATS_ENABLED: "${ESPN_HISTORICAL_STATS_ENABLED:-true}"
     restart: unless-stopped
     depends_on:

@@ -63,12 +63,15 @@ def log_runtime_identity_on_startup() -> None:
     with SessionLocal() as db:
         identity = build_public_runtime_identity(db)
     logger.info(
-        "api_runtime_started api_process_instance_uuid=%s database_instance_uuid=%s git_sha=%s git_branch=%s environment=%s readiness_status=%s",
+        "api_runtime_started api_process_instance_uuid=%s database_instance_uuid=%s git_sha=%s git_branch=%s environment=%s scoring_mode=%s sportsdata_enabled=%s provider_polling_expected=%s readiness_status=%s",
         identity.api_process_instance_uuid,
         identity.database_instance_uuid,
         identity.git_sha,
         identity.git_branch,
         identity.environment,
+        identity.scoring_mode,
+        identity.sportsdata_enabled,
+        identity.provider_polling_expected,
         identity.readiness_status,
     )
 
