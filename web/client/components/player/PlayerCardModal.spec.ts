@@ -13,6 +13,7 @@ import {
   getPlayerCardPalette,
   historicalSeasonSummaryValue,
   resolvePlayerCardCfb27Rating,
+  resolvePlayerCardCurrentValueRating,
   resolvePlayerCardProjectionStats,
   visiblePlayerCardAboutMessage,
   visiblePlayerCardTabs,
@@ -56,6 +57,23 @@ describe("PlayerCardModal helpers", () => {
     expect(resolvePlayerCardCfb27Rating({ player: { cfb27_overall: 90 } } as never, 73)).toBe(90);
     expect(resolvePlayerCardCfb27Rating(null, 73)).toBe(73);
     expect(resolvePlayerCardCfb27Rating(null, null)).toBeNull();
+  });
+
+  it("keeps a canonical card value visible while the trade-value cache revalidates", () => {
+    const archCard = {
+      player: {
+        id: 6,
+        name: "Arch Manning",
+        position: "QB",
+        school: "Texas",
+        raw_cfb27_rating: 91,
+        current_value_rating: 91,
+      },
+    } as never;
+
+    expect(resolvePlayerCardCurrentValueRating(undefined, archCard)).toBe(91);
+    expect(resolvePlayerCardCurrentValueRating(91, archCard)).toBe(91);
+    expect(resolvePlayerCardCurrentValueRating(null, { player: { raw_cfb27_rating: null, current_value_rating: null } } as never)).toBeNull();
   });
 
   it("shows a drafted player's round, pick, and overall selection in league history", () => {
@@ -166,7 +184,7 @@ describe("PlayerCardModal helpers", () => {
     ]);
   });
 
-  it("builds one consistent set of stat-table columns for every historical season", () => {
+  it("removes unsupported historical fantasy totals while preserving aligned stat columns", () => {
     const seasons = [
       {
         season: 2025,
@@ -186,8 +204,9 @@ describe("PlayerCardModal helpers", () => {
       },
     ] as never;
 
-    expect(buildHistoricalSeasonSummaryColumns(seasons)).toEqual(["Fantasy Points", "Rush Yds", "Rec Yds"]);
-    expect(historicalSeasonSummaryValue(seasons[0], "Fantasy Points")).toBe(212.3);
+    expect(buildHistoricalSeasonSummaryColumns(seasons)).toEqual(["Rush Yds", "Rec Yds"]);
+    expect(buildHistoricalSeasonSummaryColumns(seasons)).not.toContain("Fantasy Points");
+    expect(buildHistoricalSeasonSummaryColumns(seasons)).not.toContain("Fantasy Pts");
     expect(historicalSeasonSummaryValue(seasons[1], "Rec Yds")).toBe(812);
     expect(historicalSeasonSummaryValue(seasons[1], "Rush Yds")).toBeNull();
   });

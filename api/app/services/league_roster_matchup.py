@@ -1,3 +1,4 @@
+import math
 from datetime import datetime, timezone
 
 from sqlalchemy import func
@@ -49,7 +50,6 @@ from collegefootballfantasy_api.app.services.league_weeks import resolve_current
 from collegefootballfantasy_api.app.services.league_workspace import build_standings_summary
 from collegefootballfantasy_api.app.services.matchup_probability import (
     calculate_matchup_win_probability,
-    estimate_player_std_dev,
 )
 from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_context_for_players
 from collegefootballfantasy_api.app.services.player_pool_filters import canonical_fantasy_player_filter
@@ -316,18 +316,31 @@ def _serialize_team_rosters(
     }
 
 
-def _starter_projection_summary(roster: list[RosterTabEntryRead]) -> tuple[float, float]:
+def _starter_projection_total(roster: list[RosterTabEntryRead]) -> float | None:
+    """Sum one selected week's active starter projections, or report unavailable.
+
+    Empty template slots do not make an otherwise populated roster invalid, but
+    every actual starter must have a finite, non-negative non-BYE projection.
+    That keeps the displayed total and the win-probability input on precisely
+    the same weekly lineup records without fabricating missing values as zero.
+    """
     total = 0.0
-    variance = 0.0
+    starter_count = 0
     for entry in roster:
-        if not entry.is_starter:
+        if not entry.is_starter or entry.status == "EMPTY":
             continue
-        if entry.projection_status == "BYE" or entry.projected_points is None:
-            continue
-        total += entry.projected_points
-        std_dev = estimate_player_std_dev(entry.projected_points, entry.floor, entry.ceiling)
-        variance += std_dev * std_dev
-    return round(total, 2), variance
+        projected_points = entry.projected_points
+        if (
+            entry.projection_status == "BYE"
+            or projected_points is None
+            or not isinstance(projected_points, (int, float))
+            or not math.isfinite(projected_points)
+            or projected_points < 0
+        ):
+            return None
+        starter_count += 1
+        total += float(projected_points)
+    return round(total, 2) if starter_count else None
 
 
 def build_roster_tab_view(
@@ -451,14 +464,13 @@ def build_matchup_tab_view(
 
     if not matchup:
         my_roster = _serialize_team_roster(db, league, primary_team, week)
-        my_total, my_variance = _starter_projection_summary(my_roster)
-        my_prob, opponent_prob = calculate_matchup_win_probability(my_total, my_total, my_variance, my_variance)
+        my_total = _starter_projection_total(my_roster)
         my_team = MatchupTeamRead(
             id=primary_team.id,
             name=primary_team.name,
             record=_team_record(db, league, primary_team.id),
             projected_points=my_total,
-            win_probability=my_prob,
+            win_probability=None,
             fantasy_team_id=primary_team.id,
             fantasy_team_name=primary_team.name,
             projected_total=my_total,
@@ -485,23 +497,12 @@ def build_matchup_tab_view(
     )
     my_roster = roster_by_team[primary_team.id]
     opponent_roster = roster_by_team.get(opponent.id, []) if opponent else []
-    my_total, my_variance = _starter_projection_summary(my_roster)
-    opponent_total, opponent_variance = _starter_projection_summary(opponent_roster)
-    status = (matchup.status or "").lower()
-    use_scored_totals = status in {"live", "final", "stat_corrected"}
-    if use_scored_totals:
-        if matchup.home_team_id == primary_team.id:
-            my_total = float(matchup.home_score or 0.0)
-            opponent_total = float(matchup.away_score or 0.0)
-        else:
-            my_total = float(matchup.away_score or 0.0)
-            opponent_total = float(matchup.home_score or 0.0)
+    my_total = _starter_projection_total(my_roster)
+    opponent_total = _starter_projection_total(opponent_roster)
     my_probability, opponent_probability = calculate_matchup_win_probability(
         my_total,
         opponent_total,
-        my_variance,
-        opponent_variance,
-    )
+    ) or (None, None)
 
     record_team_ids = {primary_team.id}
     if opponent:
@@ -544,7 +545,7 @@ def build_matchup_tab_view(
         opponent_team=opponent_team,
         my_roster=my_roster,
         opponent_roster=opponent_roster,
-        projection_source="live_scoring" if use_scored_totals else "weekly_projections",
+        projection_source="weekly_projections",
         message=None,
     )
 

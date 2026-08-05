@@ -1,4 +1,4 @@
-from sqlalchemy import Select, case, func, select
+from sqlalchemy import Select, case, func, not_, or_, select
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.core.config import settings
@@ -13,6 +13,7 @@ from collegefootballfantasy_api.app.services.player_pool_filters import (
     approved_school_player_filter,
     canonical_fantasy_player_filter,
     generated_test_player_filter,
+    retired_canonical_preseason_player_filter,
 )
 
 
@@ -42,7 +43,18 @@ def list_players(
     draft_eligible: bool = False,
     sort: str | None = None,
 ) -> tuple[list[Player], int]:
-    stmt: Select = select(Player).where(generated_test_player_filter(), approved_school_player_filter())
+    # Retained legacy-canonical rows are historical records, not discoverable
+    # current players.  Keep generic provider/history rows available while
+    # ensuring a player retired by the reviewed snapshot cannot leak through
+    # search or pagination.
+    stmt: Select = select(Player).where(
+        generated_test_player_filter(),
+        approved_school_player_filter(),
+        or_(
+            Player.sheet_source_sheet_id.is_(None),
+            not_(retired_canonical_preseason_player_filter(2026)),
+        ),
+    )
     if draft_eligible:
         # The public player board is broader than the fantasy pool because it
         # can expose historical/provider records.  A draft board cannot be:

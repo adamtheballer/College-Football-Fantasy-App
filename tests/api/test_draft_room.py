@@ -1157,8 +1157,8 @@ def test_matchup_endpoint_returns_current_opponent_and_win_probability(client, d
     second_entry = db_session.query(RosterEntry).filter(RosterEntry.player_id == second_player_id).one()
     db_session.add_all(
         [
-            WeeklyProjection(player_id=first_player_id, season=2026, week=1, fantasy_points=24.0, floor=16.0, ceiling=32.0),
-            WeeklyProjection(player_id=second_player_id, season=2026, week=1, fantasy_points=12.0, floor=8.0, ceiling=18.0),
+            WeeklyProjection(player_id=first_player_id, season=2026, week=1, fantasy_points=133.1, floor=16.0, ceiling=32.0),
+            WeeklyProjection(player_id=second_player_id, season=2026, week=1, fantasy_points=137.0, floor=8.0, ceiling=18.0),
         ]
     )
     db_session.commit()
@@ -1180,8 +1180,10 @@ def test_matchup_endpoint_returns_current_opponent_and_win_probability(client, d
     payload = response.json()
     assert payload["opponent_team"] is not None
     assert payload["my_team"]["fantasy_team_id"] != payload["opponent_team"]["fantasy_team_id"]
-    assert payload["my_team"]["projected_total"] == 24.0
-    assert payload["opponent_team"]["projected_total"] == 12.0
+    assert payload["my_team"]["projected_total"] == 133.1
+    assert payload["opponent_team"]["projected_total"] == 137.0
+    assert payload["my_team"]["win_probability"] == 48.05
+    assert payload["opponent_team"]["win_probability"] == 51.95
     assert payload["my_roster"][0]["player_name"] == "Matchup QB One"
     assert payload["opponent_roster"][0]["player_name"] == "Matchup QB Two"
     assert round(payload["my_team"]["win_probability"] + payload["opponent_team"]["win_probability"], 2) == 100.0
@@ -1271,9 +1273,10 @@ def test_roster_endpoint_returns_unavailable_projection_and_ir_capacity(client, 
 
 
 def test_matchup_probability_helper_behaves_safely():
-    even = calculate_matchup_win_probability(100, 100, 100, 100)
+    even = calculate_matchup_win_probability(100, 100)
     assert even == (50.0, 50.0)
-    favored = calculate_matchup_win_probability(140, 100, 100, 100)
+    favored = calculate_matchup_win_probability(140, 100)
+    assert favored is not None
     assert favored[0] > favored[1]
     assert round(favored[0] + favored[1], 1) == 100.0
 

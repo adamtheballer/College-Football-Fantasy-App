@@ -97,7 +97,7 @@ jobs:
         run: |
           CFF_GIT_SHA="$(git rev-parse HEAD)" \
           CFF_GIT_BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-detached}}" \
-          COMPOSE_PROJECT_NAME=cff_ci DB_PORT=55450 docker compose up --build -d
+          CFF_APPLY_PRESEASON_RECONCILIATION=true SCORING_MODE=disabled SPORTSDATA_ENABLED=false COMPOSE_PROJECT_NAME=cff_ci DB_PORT=55450 docker compose up --build -d
 
       - name: Verify API and web readiness
         run: |
@@ -107,7 +107,7 @@ jobs:
             runtime="$(curl --fail --silent http://127.0.0.1:8080/api/health/runtime || true)"
             if curl --fail --silent --head http://127.0.0.1:8080 >/dev/null && \
               jq -e '.status == "ready"' <<<"$ready" >/dev/null && \
-              jq -e --arg sha "$expected_sha" '.git_sha == $sha and .alembic_revision == "0087_player_value_contract"' <<<"$runtime" >/dev/null; then
+              jq -e --arg sha "$expected_sha" '.git_sha == $sha and .alembic_revision == "0088_beta_scoring_lock" and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false' <<<"$runtime" >/dev/null; then
               exit 0
             fi
             sleep 5

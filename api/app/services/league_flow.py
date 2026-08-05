@@ -219,6 +219,11 @@ def create_league(
     db: Session,
     current_user: User,
 ) -> LeagueCreateResponse:
+    if settings.beta_scoring_lock_enabled and not payload.beta_scoring_acknowledged:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="beta scoring acknowledgment is required before creating a league",
+        )
     payload.basics.name = moderate_user_text(
         db, actor_user_id=current_user.id, field_name="league_name", value=payload.basics.name, required=True
     ) or ""
@@ -254,6 +259,8 @@ def create_league(
         LeagueSettings(
             league_id=league.id,
             scoring_json=payload.settings.scoring_json,
+            scoring_snapshot_json=dict(payload.settings.scoring_json) if settings.beta_scoring_lock_enabled else None,
+            scoring_locked_at=datetime.now(timezone.utc) if settings.beta_scoring_lock_enabled else None,
             roster_slots_json=payload.settings.roster_slots_json,
             playoff_teams=payload.settings.playoff_teams,
             waiver_type=payload.settings.waiver_type,
@@ -388,6 +395,16 @@ def update_league_settings(
         settings_row = LeagueSettings(league_id=league.id)
 
     payload = normalize_roster_settings(payload)
+    if (
+        settings.beta_scoring_lock_enabled
+        and settings_row.scoring_locked_at is not None
+        and settings_row.scoring_snapshot_json is not None
+        and payload.scoring_json != settings_row.scoring_snapshot_json
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="scoring settings are locked for this beta league",
+        )
     settings_row.scoring_json = payload.scoring_json
     settings_row.roster_slots_json = payload.roster_slots_json
     settings_row.playoff_teams = payload.playoff_teams

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { EmptyState } from "@/components/states";
+import { WinChanceMeter } from "@/components/league/WinChanceMeter";
 import { Button } from "@/components/ui/button";
 import { PlaybookDecor, PositionBadge, StatusBadge, SurfaceCard } from "@/components/fantasy";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
@@ -303,6 +304,13 @@ export default function Index() {
               </p>
             </div>
           </div>
+
+          <WinChanceMeter
+            myPercent={matchup?.win_probability_for}
+            opponentPercent={matchup?.win_probability_against}
+            myProjectedTotal={matchup?.projected_points_for}
+            opponentProjectedTotal={matchup?.projected_points_against}
+          />
 
           <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 p-4">
             <p className="text-sm font-bold text-cfb-text-secondary">

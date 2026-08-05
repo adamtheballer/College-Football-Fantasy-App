@@ -1,8 +1,6 @@
 export function formatDraftProjection({
   seasonProjection,
   fallbackSeasonProjection,
-  weeklyProjection,
-  hasWeeklyProjection,
 }: {
   seasonProjection?: number;
   /**
@@ -11,17 +9,11 @@ export function formatDraftProjection({
    * response cannot turn an eligible player's annual projection into a dash.
    */
   fallbackSeasonProjection?: number | null;
-  weeklyProjection: number;
-  hasWeeklyProjection: boolean;
 }): string {
   for (const annualProjection of [seasonProjection, fallbackSeasonProjection]) {
     if (typeof annualProjection === "number" && Number.isFinite(annualProjection) && annualProjection > 0) {
       return annualProjection.toFixed(1);
     }
-  }
-
-  if (hasWeeklyProjection && Number.isFinite(weeklyProjection)) {
-    return weeklyProjection.toFixed(1);
   }
 
   return "—";

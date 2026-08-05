@@ -28,6 +28,7 @@ _APPROVED_SCHOOLS = {
 _APPROVED_SCHOOL_KEYS = tuple(sorted(school.strip().lower() for school in _APPROVED_SCHOOLS))
 ELIGIBLE_FANTASY_POSITIONS = ("QB", "RB", "WR", "TE", "K")
 CANONICAL_PRESEASON_SOURCE_PREFIX = "canonical-preseason:"
+LEGACY_CANONICAL_PRESEASON_SOURCE_PREFIX = "legacy-canonical-preseason:"
 
 
 def approved_school_player_filter():
@@ -49,8 +50,32 @@ def canonical_preseason_player_filter(season: int):
     )
 
 
-def canonical_fantasy_player_filter(season: int):
-    """SQL predicate for the complete public-beta draft and waiver universe."""
+def retired_canonical_preseason_player_filter(season: int):
+    """Identify retained records removed from the reviewed current snapshot.
+
+    A legacy marker preserves roster, trade, and historical-stat foreign keys,
+    while making the record unavailable to every current-season surface.
+    """
+
+    return Player.sheet_source_sheet_id.like(
+        f"{LEGACY_CANONICAL_PRESEASON_SOURCE_PREFIX}{int(season)}:%"
+    )
+
+
+def is_retired_canonical_preseason_player(player: Player, season: int) -> bool:
+    return (player.sheet_source_sheet_id or "").strip().startswith(
+        f"{LEGACY_CANONICAL_PRESEASON_SOURCE_PREFIX}{int(season)}:"
+    )
+
+
+def active_canonical_preseason_player_filter(season: int):
+    """SQL predicate for the reviewed current player snapshot before ratings.
+
+    This is the one active-player contract shared by the canonical bootstrap,
+    CFB27 reconciliation, and draft/waiver eligibility.  Historical and
+    legacy-preseason rows deliberately fail this predicate even when they are
+    retained for foreign-key history.
+    """
 
     return and_(
         generated_test_player_filter(),
@@ -60,6 +85,12 @@ def canonical_fantasy_player_filter(season: int):
         Player.sheet_projected_season_points.isnot(None),
         Player.sheet_projected_season_points > 0,
     )
+
+
+def canonical_fantasy_player_filter(season: int):
+    """SQL predicate for the complete public-beta draft and waiver universe."""
+
+    return active_canonical_preseason_player_filter(season)
 
 
 def is_approved_fantasy_school(school: str | None) -> bool:

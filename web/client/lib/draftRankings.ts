@@ -109,34 +109,10 @@ const espnFantasyPoints = (player: Player) => {
     return player.sheetProjectedSeasonPoints;
   }
 
-  const proj: Partial<PlayerStats> = player.projection || {};
-  const passYds = proj.passingYards ?? 0;
-  const passTds = proj.passingTds ?? 0;
-  const ints = proj.ints ?? 0;
-  const rushYds = proj.rushingYards ?? 0;
-  const rushTds = proj.rushingTds ?? 0;
-  const recs = proj.receptions ?? 0;
-  const recYds = proj.receivingYards ?? 0;
-  const recTds = proj.receivingTds ?? 0;
-  const projectedFantasyPoints =
-    typeof proj.fpts === "number" && Number.isFinite(proj.fpts) && proj.fpts > 0
-      ? proj.fpts
-      : null;
-
-  if (projectedFantasyPoints !== null) {
-    return projectedFantasyPoints;
-  }
-
-  return (
-    passYds / 25 +
-    passTds * 4 +
-    ints * -2 +
-    rushYds / 10 +
-    rushTds * 6 +
-    recs * 1 +
-    recYds / 10 +
-    recTds * 6
-  );
+  const statlineSeasonPoints = player.sheetProjectionStats?.fpts;
+  return typeof statlineSeasonPoints === "number" && Number.isFinite(statlineSeasonPoints) && statlineSeasonPoints > 0
+    ? statlineSeasonPoints
+    : 0;
 };
 
 const historyFantasyPoints = (player: Player) => {

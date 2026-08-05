@@ -11,6 +11,7 @@ if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
 from collegefootballfantasy_api.app.core.config import settings
+from collegefootballfantasy_api.app.core.logging import configure_logging
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.services.draft_service import process_expired_draft_picks_once
 from collegefootballfantasy_api.app.services.saturday_pick_service import refresh_open_pick_contests
@@ -47,6 +48,13 @@ def run_once() -> dict[str, dict[str, int]]:
 def main() -> None:
     args = parse_args()
     interval_seconds = max(1, args.interval_seconds)
+    configure_logging(settings.api_log_level)
+    logger.info(
+        "lifecycle_worker_started scoring_mode=%s sportsdata_enabled=%s provider_polling_expected=%s",
+        settings.scoring_mode,
+        settings.sportsdata_enabled,
+        settings.provider_polling_expected,
+    )
     while True:
         try:
             result = run_once()

@@ -13,10 +13,12 @@ import argparse
 import csv
 import re
 import unicodedata
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
 from collegefootballfantasy_api.app.db.session import SessionLocal
@@ -91,11 +93,14 @@ def read_rows(path: Path) -> list[dict[str, str]]:
 
 def bootstrap(
     *, identities_path: Path, projections_path: Path, ratings_path: Path | None = None,
-    ratings_manifest_path: Path | None = None, apply: bool
-) -> dict[str, int]:
+    ratings_manifest_path: Path | None = None, apply: bool, db: Session | None = None, commit: bool = True,
+    rollback_on_dry_run: bool = True,
+) -> dict[str, int | str]:
     identity_rows = read_rows(identities_path)
     projection_rows = read_rows(projections_path)
     source_contract = require_valid_contract(projection_rows, identity_rows)
+    source_directory = require_valid_source_directory(identities_path.parent)
+    source_batch_id = source_directory["gate_context"]["source_provenance"]["export_batch_id"]
     projections_by_key = {
         identity_key(row.get("PLAYER"), row.get("TEAM"), row.get("POSITION")): row
         for row in projection_rows
@@ -126,7 +131,7 @@ def bootstrap(
     now = datetime.now(timezone.utc)
     created = updated = ratings_matched = 0
     legacy_snapshot_players = 0
-    with SessionLocal() as db:
+    with (SessionLocal() if db is None else nullcontext(db)) as db:
         existing = {
             identity_key(player.name, player.school, player.position): player
             for player in db.scalars(select(Player)).all()
@@ -172,7 +177,9 @@ def bootstrap(
             player.player_class = normalize_sheet_player_class(raw_class) or player.player_class
             player.sheet_projected_season_points = projection_stats["fpts"]
             player.sheet_projection_stats = projection_stats
-            player.sheet_source_sheet_id = f"canonical-preseason:2026:{projection.get('source_sheet') or 'unknown'}"
+            player.sheet_source_sheet_id = (
+                f"canonical-preseason:2026:{source_batch_id}:{projection.get('source_sheet') or 'unknown'}"
+            )
             player.sheet_synced_at = now
 
             rating = ratings_by_key.get(cfb27_identity_key(name=name, school=school, position=position))
@@ -200,9 +207,14 @@ def bootstrap(
             legacy_snapshot_players += 1
 
         if not apply:
-            db.rollback()
-        else:
+            if rollback_on_dry_run:
+                db.rollback()
+            else:
+                db.flush()
+        elif commit:
             db.commit()
+        else:
+            db.flush()
 
         eligible_count = sum(
             1
@@ -220,6 +232,7 @@ def bootstrap(
         "updated": updated,
         "ratings_matched": ratings_matched,
         "legacy_snapshot_players_excluded_from_current_pool": legacy_snapshot_players,
+        "source_batch_id": source_batch_id,
     }
 
 

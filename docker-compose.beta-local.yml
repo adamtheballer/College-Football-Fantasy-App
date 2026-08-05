@@ -13,6 +13,7 @@ services:
       # The public beta intentionally ships without live scoring. Keep this
       # explicit so a restart cannot inherit the development Compose defaults.
       SCORING_MODE: "disabled"
+      BETA_SCORING_LOCK_ENABLED: "true"
       SPORTSDATA_ENABLED: "false"
       SATURDAY_PICK_6_SPONSORS_ENABLED: "${SATURDAY_PICK_6_SPONSORS_ENABLED:-false}"
       GIT_SHA: "${CFF_GIT_SHA:?CFF_GIT_SHA is required}"
@@ -29,6 +30,10 @@ services:
       GIT_SHA: "${CFF_GIT_SHA:?CFF_GIT_SHA is required}"
       GIT_BRANCH: "${CFF_GIT_BRANCH:?CFF_GIT_BRANCH is required}"
       RUNTIME_MODE: "release_candidate"
+      # The lifecycle worker shares the beta provider policy even though it
+      # does not run the scoring loop itself.
+      SCORING_MODE: "disabled"
+      SPORTSDATA_ENABLED: "false"
   web:
     # Compose appends sequence values by default. The beta override must
     # replace the base 8080 mapping rather than exposing both ports.

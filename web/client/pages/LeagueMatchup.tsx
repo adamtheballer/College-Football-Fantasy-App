@@ -44,11 +44,18 @@ function teamTotal(team: LeagueMatchupTeam | null) {
 }
 
 function leadingTeam(myTeam: LeagueMatchupTeam | null, opponentTeam: LeagueMatchupTeam | null) {
-  const myTotal = teamTotal(myTeam);
-  const opponentTotal = teamTotal(opponentTeam);
-  if (typeof myTotal !== "number" || typeof opponentTotal !== "number") return "Even";
-  if (myTotal === opponentTotal) return "Even";
-  return myTotal > opponentTotal
+  const myProbability = myTeam?.win_probability;
+  const opponentProbability = opponentTeam?.win_probability;
+  if (
+    typeof myProbability !== "number" ||
+    typeof opponentProbability !== "number" ||
+    !Number.isFinite(myProbability) ||
+    !Number.isFinite(opponentProbability)
+  ) {
+    return "Win chance unavailable";
+  }
+  if (myProbability === opponentProbability) return "Even matchup";
+  return myProbability > opponentProbability
     ? myTeam?.fantasy_team_name ?? "Your Team"
     : opponentTeam?.fantasy_team_name ?? "Opponent";
 }

@@ -46,6 +46,27 @@ def test_development_allows_local_default_cors_and_jwt_secret():
     assert "http://localhost:5173" in settings.allowed_cors_origins
 
 
+@pytest.mark.parametrize("value", ("false", "0", "no", "off"))
+def test_sportsdata_false_environment_forms_disable_provider(value):
+    settings = make_settings(sportsdata_enabled=value)
+
+    assert settings.sportsdata_enabled is False
+    assert settings.provider_polling_expected is False
+
+
+def test_sportsdata_true_environment_form_enables_provider_only_when_explicit():
+    settings = make_settings(sportsdata_enabled="true")
+
+    assert settings.sportsdata_enabled is True
+
+
+def test_sportsdata_defaults_to_disabled_without_an_environment_value():
+    settings = make_settings()
+
+    assert settings.sportsdata_enabled is False
+    assert settings.provider_polling_expected is False
+
+
 def test_beta_access_rejects_default_or_short_hmac_secrets_in_every_environment():
     with pytest.raises(ValidationError, match="BETA_ACCESS_CODE_HMAC_SECRET must be changed"):
         make_settings(beta_access_enabled=True)

@@ -17,7 +17,7 @@ from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.player_pool_filters import (
-    approved_school_player_filter,
+    active_canonical_preseason_player_filter,
     generated_test_player_filter,
     is_approved_fantasy_school,
 )
@@ -27,7 +27,7 @@ _MODEL_REGISTRY = (League, Player, RosterEntry, Team, User)
 
 # Read-only callers use the same frozen release artifact as the importer.  The
 # older JSON seed remains only for historical migrations.
-CFB27_SOURCE_PATH = Path(__file__).resolve().parents[1] / "data" / "cfb27_ratings_2026-08-04.csv"
+CFB27_SOURCE_PATH = Path(__file__).resolve().parents[1] / "data" / "cfb27_ratings_2026-08-05.csv"
 CFB27_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 CFB27_SCHOOL_ALIASES = {"california": "cal"}
 # The imported CFB27 source only contains real game overalls.  A board rank
@@ -340,8 +340,42 @@ def _update_canonical_player(player: Player, rating: Cfb27Rating, *, source_batc
     return changed
 
 
+def _clear_current_batch_rating_from_legacy_player(player: Player) -> bool:
+    """Remove only an erroneous preseason CFB27 assignment from a legacy row.
+
+    Legacy player rows are preserved for historical foreign keys.  The value
+    source batch is the explicit provenance signal that this immutable CFB27
+    batch was incorrectly applied to a legacy row, so no older historical
+    value is touched.
+    """
+
+    if (
+        player.value_policy_version != "cfb27_exact_preseason_v1"
+        or player.value_calculation_week != 0
+        or not player.value_source_batch_id
+    ):
+        return False
+    player.cfb27_rank = None
+    player.cfb27_overall = None
+    player.cfb27_position_rank = None
+    player.cfb27_synced_at = None
+    player.raw_cfb27_rating = None
+    player.current_value_rating = None
+    player.value_policy_version = None
+    player.value_calculation_week = None
+    player.value_calculated_at = None
+    player.value_source_batch_id = None
+    player.value_input_json = None
+    return True
+
+
 def sync_cfb27_players(
-    db: Session, *, snapshot: ReviewedCfb27Snapshot | None = None, dry_run: bool = False, season: int = 2026
+    db: Session,
+    *,
+    snapshot: ReviewedCfb27Snapshot | None = None,
+    dry_run: bool = False,
+    season: int = 2026,
+    commit: bool = True,
 ) -> dict[str, int]:
     """Sync only a reviewed ratings snapshot onto an already-approved pool.
 
@@ -359,61 +393,96 @@ def sync_cfb27_players(
     from collegefootballfantasy_api.app.services.player_trade_value import week_one_is_authoritatively_finalized
     if week_one_is_authoritatively_finalized(db, season=season):
         raise RuntimeError("CFB27 preseason reconciliation is blocked after authoritative Week 1 finalization.")
-    existing_players = (
-        db.query(Player)
-        .filter(generated_test_player_filter(), approved_school_player_filter())
-        .filter(Player.position.in_(CFB27_POSITIONS))
-        .all()
-    )
+    # Ratings are valid only for the active, reviewed current snapshot.  Do
+    # not let retained legacy rows consume a source rating that belongs to a
+    # current draft/waiver identity.
+    existing_players = db.query(Player).filter(active_canonical_preseason_player_filter(season)).all()
     players_by_key: dict[str, list[Player]] = {}
     for player in existing_players:
         key = cfb27_identity_key(name=player.name, school=player.school, position=player.position)
         players_by_key.setdefault(key, []).append(player)
 
-    duplicate_keys = [key for key, candidates in players_by_key.items() if len(candidates) > 1]
+    duplicate_keys = sorted(key for key, candidates in players_by_key.items() if len(candidates) > 1)
     # Fail before touching a single row.  Choosing an arbitrary duplicate is
     # not a reconciliation; it is a data-corruption risk.
-    snapshot_keys = {
-        cfb27_identity_key(name=rating.name, school=rating.school, position=rating.position)
-        for rating in snapshot.ratings
-        if is_approved_fantasy_school(rating.school)
-    }
+    ratings_by_key: dict[str, list[Cfb27Rating]] = {}
+    for rating in snapshot.ratings:
+        if not is_approved_fantasy_school(rating.school):
+            continue
+        key = cfb27_identity_key(name=rating.name, school=rating.school, position=rating.position)
+        ratings_by_key.setdefault(key, []).append(rating)
+    snapshot_keys = set(ratings_by_key)
+    duplicate_source_keys = sorted(key for key, rows in ratings_by_key.items() if len(rows) > 1)
+    if duplicate_source_keys:
+        raise ValueError(f"CFB27 sync blocked by duplicate approved source identities: {', '.join(duplicate_source_keys)}")
     conflicting_keys = sorted(set(duplicate_keys).intersection(snapshot_keys))
     if conflicting_keys:
         raise ValueError(f"CFB27 sync blocked by duplicate canonical identities: {', '.join(conflicting_keys)}")
 
-    updated = 0
-    matched = 0
-    duplicate_matches = 0
-    unmatched_approved = 0
-    skipped_non_power4 = 0
-    for rating in snapshot.ratings:
-        if not is_approved_fantasy_school(rating.school):
-            skipped_non_power4 += 1
-            continue
-        key = cfb27_identity_key(name=rating.name, school=rating.school, position=rating.position)
-        candidates = players_by_key.get(key)
-        if candidates:
-            matched += 1
-            canonical = _canonical_player(candidates)
-            if not dry_run and _update_canonical_player(canonical, rating, source_batch_id=snapshot.export_batch_id):
-                updated += 1
-            continue
-
-        unmatched_approved += 1
-
-    if dry_run:
-        db.rollback()
-    elif updated:
-        db.commit()
-    return {
+    active_keys = set(players_by_key)
+    matched_keys = sorted(active_keys.intersection(snapshot_keys))
+    missing_current_keys = sorted(active_keys.difference(snapshot_keys))
+    unused_source_keys = sorted(snapshot_keys.difference(active_keys))
+    legacy_assignments = (
+        db.query(Player)
+        .filter(generated_test_player_filter())
+        .filter(Player.sheet_source_sheet_id.like(f"legacy-canonical-preseason:{int(season)}:%"))
+        # A corrected immutable export receives a new batch ID.  Clear only
+        # old preseason CFB27 values that were attached to retained legacy
+        # identities; never touch an in-season or differently governed value.
+        .filter(Player.value_policy_version == "cfb27_exact_preseason_v1")
+        .filter(Player.value_calculation_week == 0)
+        .filter(Player.value_source_batch_id.isnot(None))
+        .all()
+    )
+    result = {
         "created": 0,
-        "updated": updated,
-        "already_present": matched,
-        "matched": matched,
-        "missing": unmatched_approved,
-        "unmatched_approved": unmatched_approved,
-        "skipped_non_power4": skipped_non_power4,
-        "duplicate_matches": duplicate_matches,
+        "updated": 0,
+        "already_present": len(matched_keys),
+        "matched": len(matched_keys),
+        "current_eligible_players": len(active_keys),
+        "missing": len(missing_current_keys),
+        "missing_current_players": len(missing_current_keys),
+        "unmatched_approved": len(unused_source_keys),
+        "unused_source_rows": len(unused_source_keys),
+        "skipped_non_power4": len(snapshot.ratings) - len(snapshot_keys),
+        "duplicate_matches": 0,
+        "duplicate_current_identities": len(duplicate_keys),
+        "duplicate_source_rows": len(duplicate_source_keys),
+        "legacy_assignments_to_clear": len(legacy_assignments),
+        "manual_review_rows": len(missing_current_keys),
         "total": snapshot.row_count,
     }
+
+    # A partial result is audit evidence, never permission to mutate a player
+    # pool.  Exact composite identity is intentionally required; no aliases or
+    # fuzzy name matching may paper over a source discrepancy.
+    if missing_current_keys or unused_source_keys:
+        if dry_run:
+            db.rollback()
+            return result
+        raise ValueError(
+            "CFB27 sync blocked by current/source identity mismatch: "
+            f"{len(missing_current_keys)} current player(s) missing approved ratings; "
+            f"{len(unused_source_keys)} approved rating row(s) unused."
+        )
+
+    try:
+        if not dry_run:
+            for player in legacy_assignments:
+                _clear_current_batch_rating_from_legacy_player(player)
+            for key in matched_keys:
+                player = _canonical_player(players_by_key[key])
+                rating = ratings_by_key[key][0]
+                if _update_canonical_player(player, rating, source_batch_id=snapshot.export_batch_id):
+                    result["updated"] += 1
+            if commit:
+                db.commit()
+            else:
+                db.flush()
+        else:
+            db.rollback()
+    except Exception:
+        db.rollback()
+        raise
+    return result

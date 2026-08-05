@@ -65,7 +65,11 @@ class Settings(BaseSettings):
     scoring_dead_letter_after_failures: int = 3
     provider_unmatched_failure_threshold_percent: float = 10.0
     projection_provider: str = "sportsdataio"
-    sportsdata_enabled: bool = True
+    # Provider polling is opt-in. This keeps beta and other credential-free
+    # runtimes fail-closed when a deployment omits SPORTSDATA_ENABLED; the
+    # pydantic-settings bool parser remains the single authoritative parser
+    # for normal environment forms (false, 0, no, off, and explicit true).
+    sportsdata_enabled: bool = False
     sportsdata_player_stats_path: str = "stats/json/Player/{external_id}"
     sportsdata_player_stats_week_path: str = "stats/json/PlayerGameStatsByWeek/{season}/{week}"
     sportsdata_players_path: str = "scores/json/Players"
@@ -118,6 +122,10 @@ class Settings(BaseSettings):
     # The public-beta gate is deliberately separate from normal authentication.
     # It is disabled outside the approved beta environment by default.
     beta_access_enabled: bool = False
+    # The beta scoring agreement is server-authoritative.  It is intentionally
+    # independent of UI state so direct API clients cannot change a league's
+    # scoring after creation when the public-beta policy is enabled.
+    beta_scoring_lock_enabled: bool = False
     beta_access_code_hmac_secret: str = DEFAULT_BETA_ACCESS_CODE_HMAC_SECRET
     beta_access_reservation_secret: str = DEFAULT_BETA_ACCESS_RESERVATION_SECRET
     beta_access_reservation_ttl_minutes: int = 15

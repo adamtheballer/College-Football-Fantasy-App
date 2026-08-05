@@ -43,6 +43,24 @@ SOURCE_MANIFEST_SOURCES = {
     },
 }
 
+# This is a release-data integrity assertion, not a player-specific runtime
+# fallback. It pins a reviewed source row whose projection is used to catch a
+# season/weekly lineage mix-up before any reconciliation can touch a database.
+WAYNE_KNIGHT_EXPECTED_PROJECTION = {
+    "name": "Wayne Knight",
+    "team": "UCLA",
+    "position": "RB",
+    "depth_role": "RB1",
+    "rush_yards": 1300.0,
+    "rush_tds": 12.0,
+    "receptions": 28.0,
+    "rec_yards": 230.0,
+    "rec_tds": 2.0,
+    "fantasy_points": 265.0,
+}
+WAYNE_KNIGHT_APPROVED_SOURCE_BATCH = "2026-08-05-live-sheets-r361-r923-r347-refresh-043626z"
+WAYNE_KNIGHT_APPROVED_PROJECTION_SNAPSHOT_SHA256 = "49d0c74db64ae2fa37ef42d4f55fa0eba1c9ba8abfef523d2828a43265dbc5d3"
+
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
@@ -52,6 +70,13 @@ from collegefootballfantasy_api.app.services.power4 import normalize_school, res
 def _read_csv(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
+
+
+def _number(value: str | None) -> float | None:
+    try:
+        return float((value or "").replace(",", ""))
+    except ValueError:
+        return None
 
 
 def _normal(value: str | None) -> str:
@@ -122,6 +147,60 @@ def audit_rows(
         "identity_rows_without_projection_count": len(identity_only),
         "projection_rows_without_identity": [_display(key) for key in projection_only],
         "identity_rows_without_projection": [_display(key) for key in identity_only],
+    }
+
+
+def wayne_knight_projection_integrity(
+    projection_rows: list[dict[str, str]], identity_rows: list[dict[str, str]]
+) -> dict[str, Any]:
+    """Verify one reviewed release sentinel across identity and projection rows."""
+
+    expected = WAYNE_KNIGHT_EXPECTED_PROJECTION
+    key = _key(expected["name"], expected["team"], expected["position"])
+    projection_matches = [
+        (row_number, row)
+        for row_number, row in enumerate(projection_rows, start=2)
+        if _key(row.get("PLAYER"), _team(row.get("TEAM")), _position(row.get("POSITION"))) == key
+    ]
+    identity_matches = [
+        (row_number, row)
+        for row_number, row in enumerate(identity_rows, start=2)
+        if _key(row.get("NAME"), _team(row.get("SCHOOL")), _position(row.get("POSITION"))) == key
+    ]
+    errors: list[str] = []
+    if len(projection_matches) != 1:
+        errors.append(f"Wayne Knight must resolve to exactly one projection row; found {len(projection_matches)}.")
+    if len(identity_matches) != 1:
+        errors.append(f"Wayne Knight must resolve to exactly one identity row; found {len(identity_matches)}.")
+
+    projection_row = projection_matches[0][1] if len(projection_matches) == 1 else None
+    identity_row = identity_matches[0][1] if len(identity_matches) == 1 else None
+    if projection_row is not None:
+        if (projection_row.get("POSITION") or "").strip().upper() != expected["depth_role"]:
+            errors.append("Wayne Knight projection row must retain the reviewed RB1 depth role.")
+        for source_column, expected_value in {
+            "RUSH YDS": expected["rush_yards"],
+            "RUSH TDS": expected["rush_tds"],
+            "RECEPTIONS": expected["receptions"],
+            "REC YDS": expected["rec_yards"],
+            "REC TDS": expected["rec_tds"],
+            "FANTASY PROJ.": expected["fantasy_points"],
+        }.items():
+            if _number(projection_row.get(source_column)) != expected_value:
+                errors.append(
+                    f"Wayne Knight projection {source_column!r} must equal {expected_value:g}, got {projection_row.get(source_column)!r}."
+                )
+    if identity_row is not None and (identity_row.get("POSITION") or "").strip().upper() != expected["depth_role"]:
+        errors.append("Wayne Knight identity row must retain the reviewed RB1 depth role.")
+
+    return {
+        "status": "PASS" if not errors else "FAIL",
+        "canonical_key": _display(key),
+        "identity_source_row": identity_matches[0][0] if len(identity_matches) == 1 else None,
+        "projection_source_row": projection_matches[0][0] if len(projection_matches) == 1 else None,
+        "projection": expected,
+        "provider_id": projection_row.get("PROVIDER ID") if projection_row else None,
+        "errors": errors,
     }
 
 
@@ -283,6 +362,7 @@ def audit_source_directory(source_dir: Path, *, require_provenance: bool | None 
     projection_rows = _read_csv(projection_path)
     identity_rows = _read_csv(identity_path)
     report = audit_rows(projection_rows, identity_rows)
+    wayne_integrity = wayne_knight_projection_integrity(projection_rows, identity_rows)
     provenance = _source_provenance(source_dir, require_manifest=require_provenance)
     if provenance["status"] == "FAIL":
         report["status"] = "FAIL"
@@ -323,6 +403,21 @@ def audit_source_directory(source_dir: Path, *, require_provenance: bool | None 
         },
         "note": "The strict contract never consumes similarity suggestions. Reconciliation artifacts are review evidence only and cannot unblock the release until sources or approved overrides resolve every discrepancy. A release source directory additionally requires a verified shared-batch manifest; local mtimes are diagnostics, not source-revision evidence.",
     }
+    wayne_integrity["source_batch_id"] = provenance.get("export_batch_id")
+    wayne_integrity["projection_snapshot_sha256"] = provenance.get("sources", {}).get("projection", {}).get("sha256")
+    if wayne_integrity["source_batch_id"] != WAYNE_KNIGHT_APPROVED_SOURCE_BATCH:
+        wayne_integrity["errors"].append(
+            "Wayne Knight must be reconciled from the approved shared source batch."
+        )
+    if wayne_integrity["projection_snapshot_sha256"] != WAYNE_KNIGHT_APPROVED_PROJECTION_SNAPSHOT_SHA256:
+        wayne_integrity["errors"].append(
+            "Wayne Knight must be reconciled from the approved projection snapshot hash."
+        )
+    if wayne_integrity["errors"]:
+        wayne_integrity["status"] = "FAIL"
+    report["wayne_knight_projection_integrity"] = wayne_integrity
+    if wayne_integrity["status"] != "PASS":
+        report["status"] = "FAIL"
     return report
 
 
@@ -401,4 +496,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

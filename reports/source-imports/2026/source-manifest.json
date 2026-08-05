@@ -1,24 +1,42 @@
 {
   "schema_version": 1,
   "season": 2026,
-  "export_batch_id": "2026-07-30-r341-r916",
+  "approval_status": "approved",
+  "export_batch_id": "2026-08-05-live-sheets-r361-r923-r347-refresh-043626z",
+  "exported_at_utc": "2026-08-05T04:36:26Z",
   "sources": {
     "identity": {
       "spreadsheet_id": "1yssIYnzIAImmPOSkFqZQAn1i54CZ3aKzMlzGyvgvrlQ",
       "snapshot_file": "player-identities.csv",
+      "manifest_file": "player-identities.manifest.json",
       "tabs": ["Big 10", "ACC", "SEC", "Big 12", "Notre Dame"],
-      "exported_at_utc": "2026-07-30T06:27:12Z",
-      "spreadsheet_revision": "341",
-      "sha256": "ac5d1e4f99fb2419e9b161427f1e88efc5a313fe41f8b0f0de212f9909176356"
+      "exported_at_utc": "2026-08-05T04:36:26Z",
+      "spreadsheet_revision": "361",
+      "row_count": 814,
+      "sha256": "a68f82d3eb886f700ad75aff8663bf7675f44024502fea883069f69831627a58",
+      "dataset_version": "2026:a68f82d3eb88"
     },
     "projection": {
       "spreadsheet_id": "1NMP3EJSMbdRd7HDA0t7TwxzJ9DM_bUynLoRCgE6Ml74",
       "snapshot_file": "player-projections.csv",
+      "manifest_file": "player-projections.manifest.json",
       "tabs": ["Big10", "ACC", "SEC", "Big12", "Notre Dame"],
-      "exported_at_utc": "2026-07-30T06:27:12Z",
-      "spreadsheet_revision": "916",
-      "sha256": "f2f9ed7896c679955fb58e6d4993776152bac7dc7dd836702265af5915f6aa76"
+      "exported_at_utc": "2026-08-05T04:36:26Z",
+      "spreadsheet_revision": "923",
+      "row_count": 814,
+      "sha256": "49d0c74db64ae2fa37ef42d4f55fa0eba1c9ba8abfef523d2828a43265dbc5d3",
+      "dataset_version": "2026:49d0c74db64a"
+    },
+    "cfb27_ratings": {
+      "spreadsheet_id": "1UpCZJDmx7YC2OG3krNImFKFQcLNPPJWlpP-S2LOEzHg",
+      "snapshot_file": "../../../api/app/data/cfb27_ratings_2026-08-05.csv",
+      "manifest_file": "../../../api/app/data/cfb27_ratings_2026-08-05.manifest.json",
+      "tabs": ["Big 10", "ACC", "SEC", "Big 12", "Independent"],
+      "exported_at_utc": "2026-08-05T04:36:26Z",
+      "spreadsheet_revision": "347",
+      "row_count": 814,
+      "sha256": "4aaabe76b187f97fd46f5438e8f71859ef3bf67b174d9b2340deb88df1dd77e3",
+      "dataset_version": "cfb27-2026-08-05-live-workbook-r4"
     }
   }
 }
-

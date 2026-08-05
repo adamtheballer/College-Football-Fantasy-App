@@ -2,6 +2,8 @@ export interface LeagueSettings {
   id: number;
   league_id: number;
   scoring_json: Record<string, number | string | boolean>;
+  scoring_snapshot_json?: Record<string, number | string | boolean> | null;
+  scoring_locked_at?: string | null;
   roster_slots_json: Record<string, number>;
   playoff_teams: number;
   waiver_type: string;
@@ -133,6 +135,8 @@ export interface LeagueWorkspaceMatchupSummary {
   status?: string | null;
   projected_points_for?: number | null;
   projected_points_against?: number | null;
+  win_probability_for?: number | null;
+  win_probability_against?: number | null;
 }
 
 export interface LeagueWorkspaceStandingSummary {
@@ -270,9 +274,9 @@ export interface LeagueMatchupTeam {
   fantasy_team_id: number;
   fantasy_team_name: string;
   record: string;
-  projected_points?: number;
-  projected_total: number;
-  win_probability: number;
+  projected_points?: number | null;
+  projected_total?: number | null;
+  win_probability?: number | null;
   roster: LeagueRosterPlayer[];
 }
 

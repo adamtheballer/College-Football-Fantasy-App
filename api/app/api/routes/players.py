@@ -47,6 +47,7 @@ from collegefootballfantasy_api.app.services.injury_status import (
     is_current_injury_designation,
     normalize_injury_status,
 )
+from collegefootballfantasy_api.app.services.player_pool_filters import is_retired_canonical_preseason_player
 
 router = APIRouter()
 
@@ -248,6 +249,8 @@ def get_player_endpoint(player_id: int, db: Session = Depends(get_db)) -> Player
     player = get_player(db, player_id)
     if not player:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
+    if is_retired_canonical_preseason_player(player, 2026):
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="player is inactive for the current season")
     return player
 
 
@@ -264,6 +267,8 @@ def get_player_card_endpoint(
     player = get_player(db, player_id)
     if not player:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
+    if is_retired_canonical_preseason_player(player, 2026):
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="player is inactive for the current season")
 
     if refresh and (current_user is None or not current_user.is_admin):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin only")

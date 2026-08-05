@@ -49,6 +49,7 @@ const makePlayer = (
     receivingTds: 0,
     expectedPlays: fpts,
   },
+  sheetProjectedSeasonPoints: fpts,
   history: [],
   analysis: "",
   ...options,
@@ -368,6 +369,34 @@ describe("buildDraftBoard", () => {
 
     expect(board[0].draftRank).toBe(1);
     expect(board[0].projectedPoints).toBe(347.4);
+  });
+
+  it("uses Wayne Knight's approved season total instead of his weekly snapshot", () => {
+    const board = buildDraftBoard(
+      [
+        makePlayer(1, "RB", 12.5, {
+          name: "Wayne Knight",
+          school: "UCLA",
+          rank: 30,
+          adp: 30,
+          hasWeeklyProjection: true,
+          sheetProjectedSeasonPoints: 265,
+          sheetProjectionStats: { fpts: 265, rush_yards: 1300, rush_tds: 12, receptions: 28, rec_yards: 230, rec_tds: 2 },
+        }),
+      ],
+      config
+    );
+
+    expect(board[0].projectedPoints).toBe(265);
+  });
+
+  it("does not rank a weekly snapshot when no approved season projection exists", () => {
+    const board = buildDraftBoard(
+      [makePlayer(1, "RB", 12.5, { sheetProjectedSeasonPoints: undefined, sheetProjectionStats: undefined, hasWeeklyProjection: true })],
+      config
+    );
+
+    expect(board[0].projectedPoints).toBe(0);
   });
 
   it("blends provided game overall ratings into otherwise similar player rankings", () => {

@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, AlertTriangle, BarChart3, CalendarDays, History, Info, Loader2 } from "lucide-react";
 
 import { useLeaguePlayerHistory, usePlayerGameLog, usePlayerTradeValues, usePlayerTrajectory, type PlayerCardResponse } from "@/hooks/use-players";
+import {
+  getHistoricalStatColumnsForPosition,
+  historicalStatValuesForSeason,
+  historicalStatsTablePosition,
+} from "@/lib/historicalStatColumns";
 import { buildProjectedStats, formatStat, statRowsForPosition, statValue } from "@/lib/playerProjectionStats";
 import { cn } from "@/lib/utils";
 import type { PlayerStats } from "@/types/player";
@@ -269,6 +274,21 @@ export const resolvePlayerCardProjectionStats = (
   );
 };
 
+/**
+ * The card payload and the value endpoint expose the same canonical field.
+ * Prefer the live value response, but retain the value embedded in the card
+ * response while that secondary request is revalidating.  This keeps a
+ * transient query failure or cold cache from turning a valid rating into N/A.
+ */
+export const resolvePlayerCardCurrentValueRating = (
+  tradeValue?: number | null,
+  card?: PlayerCardResponse | null,
+) => {
+  if (typeof tradeValue === "number" && Number.isFinite(tradeValue)) return tradeValue;
+  const cardValue = card?.player.current_value_rating;
+  return typeof cardValue === "number" && Number.isFinite(cardValue) ? cardValue : null;
+};
+
 export const buildHistoricalStatsTableRows = (season: HistoricalSeason | null): HistoricalStatTableRow[] =>
   season?.categories.flatMap((category) =>
     category.stats.map((stat) => ({
@@ -278,28 +298,19 @@ export const buildHistoricalStatsTableRows = (season: HistoricalSeason | null): 
     }))
   ) ?? [];
 
-const HISTORICAL_STAT_COLUMN_ORDER = [
-  "Fantasy Points", "FPTS/G", "Games", "Completions", "Attempts", "Pass Yds", "Pass TD", "INT",
-  "Rush Att", "Rush Yds", "Rush TD", "Receptions", "Rec Yds", "Rec TD", "FGM", "FGA", "XPM", "XPA", "TD",
-];
-
-export const buildHistoricalSeasonSummaryColumns = (seasons: HistoricalSeason[]): string[] => {
-  const present = new Set(seasons.flatMap((season) => season.summary.map((stat) => stat.label === "Fantasy Pts" ? "Fantasy Points" : stat.label)));
-  // This column is always present.  A missing/partial historical scoring
-  // record renders an em dash instead of a fabricated zero.
-  present.add("Fantasy Points");
-  return [
-    ...HISTORICAL_STAT_COLUMN_ORDER.filter((label) => present.has(label)),
-    ...[...present].filter((label) => !HISTORICAL_STAT_COLUMN_ORDER.includes(label)).sort(),
-  ];
+export const buildHistoricalSeasonSummaryColumns = (
+  seasons: HistoricalSeason[],
+  currentPosition?: string | null,
+): string[] => {
+  const present = new Set(seasons.flatMap((season) => [...historicalStatValuesForSeason(season).keys()]));
+  return getHistoricalStatColumnsForPosition(
+    historicalStatsTablePosition(seasons, currentPosition),
+    present,
+  );
 };
 
 export const historicalSeasonSummaryValue = (season: HistoricalSeason, label: string) => {
-  if (label === "Fantasy Points") {
-    return season.scoring_context?.fantasy_points ??
-      season.summary.find((stat) => stat.label === "Fantasy Points" || stat.label === "Fantasy Pts")?.value ?? null;
-  }
-  return season.summary.find((stat) => stat.label === label)?.value ?? null;
+  return historicalStatValuesForSeason(season).get(label) ?? null;
 };
 
 export const visiblePlayerCardAboutMessage = (message?: string | null) => {
@@ -339,6 +350,7 @@ export function PlayerCardModal({
   title?: string;
 }) {
   const [activeTab, setActiveTab] = useState<PlayerCardTab>("summary");
+  const historicalStatsScrollRef = useRef<HTMLDivElement>(null);
   const hasLeagueContext = typeof leagueId === "number" && Number.isFinite(leagueId) && leagueId > 0;
   const position = (card?.about.position ?? player.position ?? "").toUpperCase();
   const playerStatus = resolvePlayerCardStatus(card, player.status);
@@ -354,11 +366,19 @@ export function PlayerCardModal({
   const palette = getPlayerCardPalette(position);
   const historicalStats = card?.historical_stats;
   const historicalSeasons = historicalStats?.seasons ?? [];
-  const historicalSummaryColumns = buildHistoricalSeasonSummaryColumns(historicalSeasons);
+  const historicalTablePosition = historicalStatsTablePosition(historicalSeasons, position);
+  const historicalSummaryColumns = buildHistoricalSeasonSummaryColumns(historicalSeasons, historicalTablePosition);
   const projectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
-  const currentValueRating = valueQuery.data?.current?.current_value_rating ?? null;
+  const currentValueRating = resolvePlayerCardCurrentValueRating(
+    valueQuery.data?.current?.current_value_rating,
+    card,
+  );
   const aboutMessage = visiblePlayerCardAboutMessage(card?.about.message);
   const cardActions = [...(action ? [action] : []), ...actions];
+
+  useEffect(() => {
+    if (historicalStatsScrollRef.current) historicalStatsScrollRef.current.scrollLeft = 0;
+  }, [player.id, historicalTablePosition]);
   const projectionHighlights = [
     ["Fantasy", projectionStats?.fpts ?? player.projectedPoints],
     ["Floor", projectionStats?.floor],
@@ -510,7 +530,7 @@ export function PlayerCardModal({
               </div>
 
               {historicalSeasons.length ? (
-                <div className="mt-5 overflow-x-auto overscroll-x-contain touch-pan-x rounded-3xl border border-white/10 bg-black/20" aria-label="Historical stats table; scroll horizontally for all columns">
+                <div ref={historicalStatsScrollRef} className="mt-5 overflow-x-auto overscroll-x-contain touch-pan-x rounded-3xl border border-white/10 bg-black/20" aria-label="Historical stats table; scroll horizontally for all columns">
                   <table className="min-w-[1050px] w-max border-collapse text-left">
                     <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
                       <tr>

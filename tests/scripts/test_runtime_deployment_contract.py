@@ -29,13 +29,15 @@ def test_public_web_image_serves_the_built_spa_behind_a_same_origin_api_proxy():
     assert "npm run dev:vite" not in compose
     assert "condition: service_healthy" in compose
     assert "scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026" in compose
-    assert "scripts/bootstrap_canonical_player_data.py --apply" in compose
+    assert "CFF_APPLY_PRESEASON_RECONCILIATION" in compose
+    assert "scripts/reconcile_preseason_player_data.py" in compose
     assert "scripts/audit_canonical_player_registry.py --source-dir reports/source-imports/2026" in compose
     # The release launcher exports CFF_RUNTIME_MODE. Compose must carry that
     # into Settings as RUNTIME_MODE or a diagnostic launch would falsely
     # identify itself as an unknown/release-like API at /health/runtime.
     assert 'RUNTIME_MODE: "${CFF_RUNTIME_MODE:-unknown}"' in compose
     assert 'PLAYER_HEADSHOTS_ENABLED: "${PLAYER_HEADSHOTS_ENABLED:-false}"' in compose
+    assert 'SPORTSDATA_ENABLED: "${SPORTSDATA_ENABLED:-false}"' in compose
     db_service = re.search(r"^  db:\n(?P<body>.*?)(?=^  [a-z_]+:)", compose, flags=re.MULTILINE | re.DOTALL)
     assert db_service is not None
     assert "restart: unless-stopped" in db_service.group("body")
@@ -69,3 +71,7 @@ def test_beta_runtime_scripts_enforce_one_public_origin_and_an_existing_data_vol
     assert "--volumes" not in stop
     assert "external: true" in override
     assert '"127.0.0.1:18080:8080"' in override
+    assert override.count('SPORTSDATA_ENABLED: "false"') == 2
+    assert override.count('SCORING_MODE: "disabled"') == 2
+    assert '"sportsdata_enabled"] is False' in start
+    assert '"provider_polling_expected"] is False' in start

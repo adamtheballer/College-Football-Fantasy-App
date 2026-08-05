@@ -1,0 +1,26 @@
+{
+  "cfb27_ratings": {
+    "spreadsheet_id": "1UpCZJDmx7YC2OG3krNImFKFQcLNPPJWlpP-S2LOEzHg",
+    "tabs": [
+      {"title": "Big 10", "gid": 0},
+      {"title": "ACC", "gid": 1583045946},
+      {"title": "SEC", "gid": 893843106},
+      {"title": "Big 12", "gid": 1330988178},
+      {"title": "Independent", "gid": 1963260727}
+    ],
+    "retrieved_at": "2026-08-05T04:36:26Z",
+    "spreadsheet_revision": "347",
+    "sha256": "4aaabe76b187f97fd46f5438e8f71859ef3bf67b174d9b2340deb88df1dd77e3",
+    "row_count": 814,
+    "dataset_version": "cfb27-2026-08-05-live-workbook-r4",
+    "approval_status": "approved",
+    "export_batch_id": "2026-08-05-live-sheets-r361-r923-r347-refresh-043626z",
+    "parent_export_batch_id": "2026-08-05-live-sheets-r361-r923-r347",
+    "parent_source_import_batch_id": "2026-07-30-r341-r916",
+    "source_corrections": [
+      {"player": "Bryson Williams", "field": "EA POSITION", "previous_value": "HB", "corrected_value": "WR", "rating_preserved": 77},
+      {"player": "Jaylen Mbakwe", "field": "EA POSITION", "previous_value": "CB", "corrected_value": "WR", "rating_preserved": 80},
+      {"player": "Jack Cassidy", "field": "CFB27 rating row", "corrected_value": "K / 75"}
+    ]
+  }
+}
