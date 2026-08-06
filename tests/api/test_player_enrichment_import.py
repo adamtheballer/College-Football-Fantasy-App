@@ -7,6 +7,7 @@ from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.services.player_enrichment_import import (
     EnrichmentSourceRow,
     MatchOutcome,
+    import_completed_weekly_stats,
     import_historical_totals,
     import_identities_and_bios,
     import_weekly_projections,
@@ -112,6 +113,23 @@ def test_historical_import_preserves_missing_fields_as_null(db_session):
     assert stored.passing_yards == 3828.0
     assert stored.receptions is None
     assert stored.fantasy_points is None
+
+    rerun = import_historical_totals(db_session, [row], approved_aliases={}, apply=True, source_sha256="a" * 64)
+    assert rerun.unchanged == 1
+
+
+def test_completed_stats_stage_is_idempotent_and_keeps_only_supplied_stats(db_session):
+    player = Player(name="Arch Manning", school="Texas", position="QB")
+    db_session.add(player)
+    db_session.commit()
+    row = source_row(season="2026", week="1", stats_json='{"passing_yards": 250, "passing_touchdowns": 2}')
+
+    first = import_completed_weekly_stats(db_session, [row], approved_aliases={}, apply=True)
+    db_session.commit()
+    rerun = import_completed_weekly_stats(db_session, [row], approved_aliases={}, apply=True)
+
+    assert first.inserted == 1
+    assert rerun.unchanged == 1
 
 
 def test_game_logs_derive_from_team_schedule_without_copying_player_schedules(db_session):
