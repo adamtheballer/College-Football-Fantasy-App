@@ -69,6 +69,12 @@ describe("app shell navigation helpers", () => {
     );
   });
 
+  it("includes Saturday Pick 6 in authenticated desktop navigation", () => {
+    expect(getShellNavItems(user, true)).toContainEqual(
+      expect.objectContaining({ name: "SATURDAY PICK 6", path: "/saturday-pick-6" }),
+    );
+  });
+
   it("surfaces an unread badge for the chats sidebar item", () => {
     const chats = getShellNavItems(user, true, 12).find((item) => item.name === "CHATS");
     const cappedChats = getShellNavItems(user, true, 120).find((item) => item.name === "CHATS");
@@ -81,9 +87,11 @@ describe("app shell navigation helpers", () => {
     const mobileItems = getMobileNavItems(getShellNavItems(user, true, 1, true));
     const mobile = mobileItems.map((item) => item.name);
 
-    expect(mobile).toEqual(["HOME", "LEAGUES", "CHATS", "REPORT BUG", "MOCK DRAFT"]);
+    expect(mobile).toEqual(["HOME", "LEAGUES", "SATURDAY PICK 6", "CHATS", "MOCK DRAFT"]);
+    expect(mobile).toHaveLength(5);
     expect(mobileItems.find((item) => item.name === "CHATS")?.badge).toBe("1");
     expect(mobile).not.toContain("SIGN OUT");
+    expect(mobile).not.toContain("REPORT BUG");
   });
 
   it("preserves stable onboarding target IDs", () => {

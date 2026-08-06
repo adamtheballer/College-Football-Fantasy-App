@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { SaturdayPickPlayer } from "@/hooks/use-saturday-pick";
 import { getSaturdayPickRewardMessage, getSaturdayPickSponsorLogo } from "@/lib/saturday-pick-sponsor";
 
-import { displayPoints, lockDeadlineMessage, pickConfirmationMessage, positionLabel, shouldRevealSponsorReward, statusLabel } from "./SaturdayPick6";
+import { displayPoints, isSaturdayPick6ComingSoon, lockDeadlineMessage, pickConfirmationMessage, positionLabel, SATURDAY_PICK_6_COMING_SOON_MESSAGE, shouldRevealSponsorReward, statusLabel } from "./SaturdayPick6";
 
 const player: SaturdayPickPlayer = {
   id: 1,
@@ -49,6 +49,16 @@ describe("SaturdayPick6 state helpers", () => {
     expect(shouldRevealSponsorReward("FINAL", { is_winner: false })).toBe(false);
     expect(shouldRevealSponsorReward("FINAL", null)).toBe(false);
     expect(shouldRevealSponsorReward("FINAL", { is_winner: true })).toBe(true);
+  });
+
+  it("keeps disabled, empty, and scheduled contests in the polished coming-soon state", () => {
+    expect(isSaturdayPick6ComingSoon(undefined)).toBe(true);
+    expect(isSaturdayPick6ComingSoon({ status: "OPEN", players: [] })).toBe(true);
+    expect(isSaturdayPick6ComingSoon({ status: "SCHEDULED", players: [player] })).toBe(true);
+    expect(isSaturdayPick6ComingSoon({ status: "OPEN", players: [player] })).toBe(false);
+    expect(SATURDAY_PICK_6_COMING_SOON_MESSAGE).toBe(
+      "Week 1 picks are coming soon. Six featured players will be available once weekly projections are published.",
+    );
   });
 
   it("uses only the sponsor logo supplied by the API", () => {

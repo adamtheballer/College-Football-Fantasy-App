@@ -12,5 +12,6 @@ These checklists track implementation and acceptance gates for the open producti
 - `issue-11-checklist.md` Persistent roster actions, waivers, watchlists
 - `beta-2026-rc-validation.md` Consolidated beta release-candidate evidence and production promotion gates
 - `beta-2026-branch-inventory.md` Branch ancestry classification for the beta release candidate
+- `saturday-pick-6.md` Production enablement and weekly-projection gate for Saturday Pick 6
 
 Each file should be updated alongside implementation PRs.
