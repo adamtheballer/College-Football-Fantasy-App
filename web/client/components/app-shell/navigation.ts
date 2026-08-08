@@ -54,6 +54,7 @@ export const getShellNavItems = (
   return [
     { name: "HOME", path: "/", icon: Home },
     { name: "LEAGUES", path: "/leagues", icon: Trophy },
+    { name: "SATURDAY PICK 6", path: "/saturday-pick-6", icon: Trophy },
     {
       name: "CHATS",
       path: "/chats",
@@ -76,14 +77,16 @@ export const getShellNavItems = (
 };
 
 export const getMobileNavItems = (items: ShellNavItem[]) => {
-  // The mobile bar is limited to five destinations. Keep bug reporting in
-  // that primary set so the Report Bug action is not desktop-only.
-  const preferred = new Set(["HOME", "LEAGUES", "CHATS", "MOCK DRAFT", "REPORT BUG"]);
-  const filtered = items.filter((item) => preferred.has(item.name));
+  // The mobile bar is limited to five destinations. Saturday Pick 6 replaces
+  // the lower-priority Report Bug shortcut; that action remains on desktop.
+  const preferred = ["HOME", "LEAGUES", "SATURDAY PICK 6", "CHATS", "MOCK DRAFT"];
+  const byName = new Map(items.map((item) => [item.name, item]));
+  const filtered = preferred.flatMap((name) => {
+    const item = byName.get(name);
+    return item ? [item] : [];
+  });
 
-  if (filtered.length >= 4) {
-    return filtered.slice(0, 5);
-  }
+  if (filtered.length >= 4) return filtered;
 
   return items.filter((item) => item.kind !== "danger" && item.kind !== "admin").slice(0, 5);
 };

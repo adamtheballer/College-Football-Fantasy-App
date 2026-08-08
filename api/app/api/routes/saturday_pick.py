@@ -34,6 +34,7 @@ from collegefootballfantasy_api.app.services.content_moderation import moderate_
 
 router = APIRouter()
 admin_router = APIRouter()
+PUBLIC_CONTEST_STATUSES = ("SCHEDULED", "OPEN", "LOCKED", "SCORING", "PROVISIONAL", "FINAL")
 
 
 def _require_public_enabled() -> None:
@@ -61,7 +62,7 @@ def get_current_contest(
         .filter(
             SaturdayPickContest.season == season,
             SaturdayPickContest.week_number == week,
-            SaturdayPickContest.status.in_(("OPEN", "LOCKED", "SCORING", "PROVISIONAL", "FINAL")),
+            SaturdayPickContest.status.in_(PUBLIC_CONTEST_STATUSES),
         )
         .one_or_none()
     )

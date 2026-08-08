@@ -8,6 +8,7 @@ from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.saturday_pick import SaturdayPickContest, SaturdayPickPlayer
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
+from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 
 
 def _enable_pick_6(monkeypatch, *, sponsors=False):
@@ -16,7 +17,7 @@ def _enable_pick_6(monkeypatch, *, sponsors=False):
     monkeypatch.setattr(settings, "saturday_pick_6_sponsors_enabled", sponsors)
 
 
-def _featured_players(db_session, *, position="QB", final_games=False):
+def _featured_players(db_session, *, position="QB", final_games=False, with_weekly_projections=True):
     kickoff = datetime.now(timezone.utc) + timedelta(hours=4)
     players = []
     for index in range(6):
@@ -44,6 +45,15 @@ def _featured_players(db_session, *, position="QB", final_games=False):
             is_bye=False,
             kickoff_at=game.start_date,
         ))
+        if with_weekly_projections:
+            db_session.add(WeeklyProjection(
+                player_id=player.id,
+                season=2026,
+                week=1,
+                is_published=True,
+                projection_version="FINAL",
+                fantasy_points=18.0 + index,
+            ))
         if final_games:
             db_session.add(PlayerGameStat(
                 player_id=player.id,
@@ -117,6 +127,26 @@ def test_contest_lock_is_the_first_featured_player_kickoff_and_identifies_that_p
     published = client.post(f"/admin/saturday-pick-6/{payload['id']}/publish", json={}, headers=headers)
     assert published.status_code == 200
     assert datetime.fromisoformat(published.json()["lock_at"].replace("Z", "+00:00")).replace(tzinfo=timezone.utc) == kickoff
+
+
+def test_scheduled_contest_is_visible_but_cannot_open_without_six_verified_weekly_projections(client, db_session, monkeypatch):
+    _enable_pick_6(monkeypatch)
+    players, kickoff = _featured_players(db_session, with_weekly_projections=False)
+    headers = admin_headers(client)
+    created = client.post("/admin/saturday-pick-6", json=_create_payload(players, kickoff), headers=headers)
+    assert created.status_code == 201
+    assert created.json()["status"] == "SCHEDULED"
+    assert all(player["projected_points"] is None for player in created.json()["players"])
+
+    signup = client.post("/auth/signup", json={"first_name": "Scheduled", "email": "scheduled@example.com", "password": "StrongPass123!"})
+    user_headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
+    current = client.get("/saturday-pick-6/current", params={"season": 2026, "week": 1}, headers=user_headers)
+    assert current.status_code == 200
+    assert current.json()["status"] == "SCHEDULED"
+
+    published = client.post(f"/admin/saturday-pick-6/{created.json()['id']}/publish", json={}, headers=headers)
+    assert published.status_code == 422
+    assert "verified weekly projections" in published.json()["detail"]
 
 
 def test_saturday_pick_hides_featured_player_headshots_for_public_beta(client, db_session):

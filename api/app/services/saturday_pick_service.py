@@ -161,7 +161,9 @@ def create_contest(db: Session, payload: SaturdayPickContestCreate, actor: User)
         week_number=payload.week_number,
         title=payload.title.strip() or "Saturday Pick 6",
         contest_position=payload.contest_position,
-        status="DRAFT",
+        # A scheduled contest can be shown as coming soon but cannot accept
+        # picks until publication proves all six weekly projections exist.
+        status="SCHEDULED",
         lock_at=lock_at,
         scoring_policy_version=payload.scoring_policy_version.strip() or "STANDARD_V1",
         sponsor_name=payload.sponsor_name,
@@ -207,6 +209,15 @@ def publish_contest(db: Session, contest: SaturdayPickContest) -> SaturdayPickCo
     first_kickoff = min(as_utc(player.game_time) for player in players)
     if as_utc(contest.lock_at) != first_kickoff:
         raise ValueError("Saturday Pick 6 locks exactly at the first featured player's kickoff.")
+    missing_projection_player_ids: list[int] = []
+    for featured in players:
+        projection = _weekly_projection(db, featured.player_id, contest.season, contest.week_number)
+        if projection is None:
+            missing_projection_player_ids.append(featured.player_id)
+            continue
+        featured.projected_points = projection
+    if missing_projection_player_ids:
+        raise ValueError("Publication requires verified weekly projections for all six featured players.")
     contest.status = "OPEN" if utc_now() < as_utc(contest.lock_at) else "LOCKED"
     contest.published_at = utc_now()
     contest.locked_at = utc_now() if contest.status == "LOCKED" else None
