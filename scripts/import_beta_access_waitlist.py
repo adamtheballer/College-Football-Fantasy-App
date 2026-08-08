@@ -21,6 +21,7 @@ from pathlib import Path
 from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.models.beta_access import BetaAccessAuditEvent, BetaAccessCode
+from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.auth_security import utcnow
 from collegefootballfantasy_api.app.services.beta_access import (
     AUDIT_HMAC_REKEYED,
@@ -45,6 +46,12 @@ EXPECTED_COLUMNS = {
 }
 CODE_COLUMNS = ("discount_code", "access_code", "early_access_code", "code")
 RAW_CODE_IN_TEXT = re.compile(r"EARLY-[A-Z0-9]{6}", re.IGNORECASE)
+RECONCILIATION_CATEGORIES = (
+    "MATCHED", "NEEDS_HMAC_RECONCILIATION", "REDEEMED_PRESERVE",
+    "RESERVED_ACTIVE", "RESERVED_EXPIRED", "MISSING_PRODUCTION_ROW",
+    "DUPLICATE_PRODUCTION_ROW", "CONFLICT", "INVALID_SOURCE",
+    "SUPPRESSED", "PENDING_NO_CODE",
+)
 @dataclass(frozen=True)
 class ParsedRow:
     source_id: str | None
@@ -193,6 +200,69 @@ def parse_source(source: Path) -> tuple[list[ParsedRow], Counter[str]]:
     return rows, status_counts
 
 
+def reconciliation_report(rows: list[ParsedRow]) -> tuple[Counter[str], list[dict[str, str]]]:
+    """Classify source rows without mutating production state or emitting codes."""
+    outcomes = Counter({category: 0 for category in RECONCILIATION_CATEGORIES})
+    reviews: list[dict[str, str]] = []
+    now = utcnow()
+    with SessionLocal() as db:
+        for row in rows:
+            def classify(category: str, reason: str | None = None) -> None:
+                outcomes[category] += 1
+                if reason and row.email:
+                    reviews.append({"email": row.email, "category": category, "reason": reason})
+
+            if row.status == "SKIPPED_SUPPRESSED":
+                classify("SUPPRESSED")
+                continue
+            if not row.code:
+                classify("PENDING_NO_CODE" if row.email else "INVALID_SOURCE", "missing usable source code")
+                continue
+            if row.status != "READY_SENT" or not row.email or row.manual_review:
+                classify("INVALID_SOURCE", "source row is not an unambiguous READY_SENT invitation")
+                continue
+
+            beta_rows = db.query(BetaAccessCode).filter(BetaAccessCode.email == row.email).all()
+            if len(beta_rows) == 0:
+                classify("MISSING_PRODUCTION_ROW")
+                continue
+            if len(beta_rows) > 1:
+                classify("DUPLICATE_PRODUCTION_ROW", "multiple production rows share the normalized email")
+                continue
+            beta = beta_rows[0]
+            users = db.query(User).filter(User.email == row.email).all()
+            expected_hmac = beta_access_hmac(row.code, purpose="code")
+            if len(users) > 1:
+                classify("CONFLICT", "multiple users share the normalized email")
+                continue
+            user = users[0] if users else None
+            if beta.state == "REDEEMED":
+                if not user or beta.redeemed_user_id != user.id or user.beta_access_granted_at is None:
+                    classify("CONFLICT", "redeemed beta row is not linked to an entitled matching user")
+                else:
+                    classify("REDEEMED_PRESERVE")
+                continue
+            if beta.state == "RESERVED":
+                if beta.reservation_expires_at is None:
+                    classify("CONFLICT", "reserved beta row has no expiration")
+                elif beta.reservation_expires_at > now:
+                    classify("RESERVED_ACTIVE")
+                else:
+                    classify("RESERVED_EXPIRED")
+                continue
+            if user and user.beta_access_granted_at is not None:
+                classify("CONFLICT", "unredeemed beta row conflicts with an entitled user")
+                continue
+            if beta.manual_review or beta.state != "AVAILABLE" or beta.source_status != "READY_SENT":
+                classify("CONFLICT", "production beta metadata is not eligible for automatic reconciliation")
+                continue
+            if beta.code_hmac == expected_hmac:
+                classify("MATCHED")
+            else:
+                classify("NEEDS_HMAC_RECONCILIATION")
+    return outcomes, reviews
+
+
 def apply_rows(rows: list[ParsedRow], *, apply: bool, rekey_code_hmac: bool = False) -> Counter[str]:
     outcomes: Counter[str] = Counter()
     with SessionLocal() as db:
@@ -317,14 +387,17 @@ def main() -> int:
     else:
         if args.source is None:
             raise ValueError("--source is required for --dry-run and --apply")
+        if args.apply:
+            raise ValueError("--apply is disabled for reconciliation; obtain explicit owner approval and use a reviewed transactional apply command")
         rows, source_counts = parse_source(args.source.expanduser())
-        outcomes = apply_rows(rows, apply=args.apply, rekey_code_hmac=args.rekey_code_hmac)
+        outcomes, manual_review = reconciliation_report(rows)
         report = {
-            "mode": "apply" if args.apply else "dry_run",
+            "mode": "dry_run",
             "rekey_code_hmac": args.rekey_code_hmac,
             "source_row_count": len(rows),
             "source_status_counts": dict(sorted(source_counts.items())),
             "outcome_counts": dict(sorted(outcomes.items())),
+            "manual_review": manual_review,
             "raw_credentials_emitted": False,
         }
         exit_code = 0
