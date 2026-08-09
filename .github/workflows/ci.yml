@@ -87,6 +87,16 @@ jobs:
       - name: Run frontend E2E tests
         run: npm --prefix web run test:e2e
 
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            web/playwright-report/
+            web/test-results/
+          if-no-files-found: ignore
+
   docker-clean-boot:
     runs-on: ubuntu-latest
     steps:
