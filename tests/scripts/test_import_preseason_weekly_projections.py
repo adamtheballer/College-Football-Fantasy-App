@@ -4,7 +4,7 @@ import json
 import pytest
 
 from collegefootballfantasy_api.app.domain.scoring_engine import calculate_player_fantasy_points
-from scripts.import_preseason_weekly_projections import _require_inputs, _stats
+from scripts.import_preseason_weekly_projections import _canonical_source_team, _require_inputs, _stats
 
 
 def _annual() -> dict[str, str]:
@@ -22,7 +22,7 @@ def test_kewan_neutral_weekly_components_preserve_source_math():
     points, _ = calculate_player_fantasy_points(
         {
             "pass_yards": values["pass_yards"], "pass_tds": values["pass_tds"],
-            "passing_interceptions": values["interceptions"], "rush_yards": values["rush_yards"],
+            "interceptions": values["interceptions"], "rush_yards": values["rush_yards"],
             "rush_tds": values["rush_tds"], "receptions": values["receptions"],
             "rec_yards": values["rec_yards"], "rec_tds": values["rec_tds"],
             "xp_made": values["extra_points_made"],
@@ -34,9 +34,24 @@ def test_kewan_neutral_weekly_components_preserve_source_math():
     assert points == 24.27
 
 
+def test_weekly_projection_scoring_deducts_interceptions():
+    values = _stats({**_annual(), "POSITION": "QB", "PASS YDS": "0", "PASS TDS": "0", "INTS": "24", "RUSH YDS": "0", "RUSH TDS": "0", "RECEPTIONS": "0", "REC YDS": "0", "REC TDS": "0"}, 12)
+
+    assert values is not None
+    points, _ = calculate_player_fantasy_points(
+        {"interceptions": values["interceptions"]}, {}, "QB"
+    )
+    assert points == -4.0
+
+
 def test_kicker_without_distance_buckets_and_missing_baseline_are_not_scored():
     assert _stats({**_annual(), "POSITION": "K", "FG": "22"}, 12) is None
     assert _stats({**_annual(), "RUSH YDS": ""}, 12) is None
+
+
+def test_canonical_source_team_keeps_notre_dame_consistent_between_workbooks():
+    assert _canonical_source_team("NOTRE DAME") == "Notre Dame"
+    assert _canonical_source_team("Notre Dame") == "Notre Dame"
 
 
 def test_builder_requires_complete_matching_sealed_manifest_and_scoring_audit(tmp_path):

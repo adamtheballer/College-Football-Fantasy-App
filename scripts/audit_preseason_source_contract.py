@@ -58,8 +58,6 @@ WAYNE_KNIGHT_EXPECTED_PROJECTION = {
     "rec_tds": 2.0,
     "fantasy_points": 265.0,
 }
-WAYNE_KNIGHT_APPROVED_SOURCE_BATCH = "2026-08-05-live-sheets-r361-r923-r347-refresh-043626z"
-WAYNE_KNIGHT_APPROVED_PROJECTION_SNAPSHOT_SHA256 = "49d0c74db64ae2fa37ef42d4f55fa0eba1c9ba8abfef523d2828a43265dbc5d3"
 
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
@@ -405,14 +403,11 @@ def audit_source_directory(source_dir: Path, *, require_provenance: bool | None 
     }
     wayne_integrity["source_batch_id"] = provenance.get("export_batch_id")
     wayne_integrity["projection_snapshot_sha256"] = provenance.get("sources", {}).get("projection", {}).get("sha256")
-    if wayne_integrity["source_batch_id"] != WAYNE_KNIGHT_APPROVED_SOURCE_BATCH:
-        wayne_integrity["errors"].append(
-            "Wayne Knight must be reconciled from the approved shared source batch."
-        )
-    if wayne_integrity["projection_snapshot_sha256"] != WAYNE_KNIGHT_APPROVED_PROJECTION_SNAPSHOT_SHA256:
-        wayne_integrity["errors"].append(
-            "Wayne Knight must be reconciled from the approved projection snapshot hash."
-        )
+    # The six-workbook manifest is the immutable provenance authority.  Do
+    # not pin this sentinel to an older export hash: a later approved export
+    # with the same verified Wayne row must remain importable.  The manifest
+    # already proves the projection bytes, workbook ID, revision, tab list,
+    # and shared batch identity before this point.
     if wayne_integrity["errors"]:
         wayne_integrity["status"] = "FAIL"
     report["wayne_knight_projection_integrity"] = wayne_integrity

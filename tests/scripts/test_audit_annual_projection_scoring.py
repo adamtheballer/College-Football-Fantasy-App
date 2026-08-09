@@ -1,4 +1,4 @@
-from scripts.audit_annual_projection_scoring import audit
+from scripts.audit_annual_projection_scoring import audit, canonical_projection_points
 
 
 def _row(**overrides: str) -> dict[str, str]:
@@ -21,6 +21,12 @@ def test_audit_proves_kewan_lacy_sheet_total_does_not_match_canonical_scoring():
     assert finding["canonical_fantasy_points"] == 291.2
     assert finding["difference_canonical_minus_sheet"] == -31.0
     assert finding["reason"] == "unproven_scoring_rule_difference"
+
+
+def test_component_score_applies_the_standard_interception_penalty():
+    row = _row(POSITION="QB", **{"PASS YDS": "0", "PASS TDS": "0", "INTS": "2", "RUSH YDS": "0", "RUSH TDS": "0", "RECEPTIONS": "0", "REC YDS": "0", "REC TDS": "0"})
+
+    assert canonical_projection_points(row) == -4.0
 
 
 def test_audit_refuses_to_score_kicker_total_without_distance_buckets():

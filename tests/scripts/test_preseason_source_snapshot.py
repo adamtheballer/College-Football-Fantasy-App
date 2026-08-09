@@ -1,10 +1,10 @@
+import json
 import shutil
 from pathlib import Path
 
 from collegefootballfantasy_api.app.domain.scoring_engine import calculate_player_fantasy_points
 from scripts.audit_preseason_source_contract import (
     DEFAULT_SOURCE_DIRECTORY,
-    WAYNE_KNIGHT_APPROVED_PROJECTION_SNAPSHOT_SHA256,
     audit_source_directory,
     require_valid_source_directory,
 )
@@ -26,7 +26,7 @@ def test_checked_in_snapshot_is_a_complete_814_player_release_input():
     assert report["gate_context"]["source_provenance"]["status"] == "PASS"
 
 
-def test_wayne_knight_projection_integrity_is_pinned_to_the_approved_batch():
+def test_wayne_knight_projection_integrity_is_bound_to_the_manifested_batch():
     report = audit_source_directory(DEFAULT_SOURCE_DIRECTORY, require_provenance=True)
     wayne = report["wayne_knight_projection_integrity"]
 
@@ -45,21 +45,40 @@ def test_wayne_knight_projection_integrity_is_pinned_to_the_approved_batch():
         "rec_tds": 2.0,
         "fantasy_points": 265.0,
     }
-    assert wayne["source_batch_id"] == "2026-08-05-live-sheets-r361-r923-r347-refresh-043626z"
-    assert wayne["projection_snapshot_sha256"] == WAYNE_KNIGHT_APPROVED_PROJECTION_SNAPSHOT_SHA256
+    provenance = report["gate_context"]["source_provenance"]
+    assert wayne["source_batch_id"] == provenance["export_batch_id"]
+    assert wayne["projection_snapshot_sha256"] == provenance["sources"]["projection"]["sha256"]
 
 
-def test_wayne_knight_gate_rejects_a_manifest_with_a_different_approved_snapshot(monkeypatch):
-    monkeypatch.setattr(
-        "scripts.audit_preseason_source_contract.WAYNE_KNIGHT_APPROVED_PROJECTION_SNAPSHOT_SHA256",
-        "0" * 64,
-    )
+def test_wayne_knight_gate_rejects_a_manifest_with_a_tampered_projection_hash(tmp_path: Path):
+    snapshot_dir = _copied_snapshot(tmp_path)
+    manifest_path = snapshot_dir / "source-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["sources"]["projection"]["sha256"] = "0" * 64
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
-    report = audit_source_directory(DEFAULT_SOURCE_DIRECTORY, require_provenance=True)
+    report = audit_source_directory(snapshot_dir, require_provenance=True)
 
     assert report["status"] == "FAIL"
-    assert report["wayne_knight_projection_integrity"]["status"] == "FAIL"
-    assert "approved projection snapshot hash" in report["wayne_knight_projection_integrity"]["errors"][0]
+    assert report["gate_context"]["source_provenance"]["status"] == "FAIL"
+    assert any(
+        "projection snapshot SHA-256 does not match the manifest" in error
+        for error in report["gate_context"]["source_provenance"]["errors"]
+    )
+
+
+def test_wayne_knight_accepts_a_later_manifested_batch_when_source_bytes_are_valid(tmp_path: Path):
+    snapshot_dir = _copied_snapshot(tmp_path)
+    manifest_path = snapshot_dir / "source-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["export_batch_id"] = "2026-08-09-approved-later-export"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    report = audit_source_directory(snapshot_dir, require_provenance=True)
+
+    assert report["status"] == "PASS"
+    assert report["wayne_knight_projection_integrity"]["status"] == "PASS"
+    assert report["wayne_knight_projection_integrity"]["source_batch_id"] == "2026-08-09-approved-later-export"
 
 
 def test_wayne_knight_source_stats_calculate_to_265_under_the_approved_default_rules():

@@ -5,6 +5,7 @@ import csv
 import hashlib
 import re
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -90,12 +91,29 @@ def cfb27_identity_key(*, name: str | None, school: str | None, position: str | 
     )
 
 
+def _whole_number(value: object, *, field: str, row_number: int) -> int:
+    """Parse an integer while accepting XLSX-exported whole-number decimals.
+
+    A value such as ``94.0`` is the normal serialized representation of an
+    Excel numeric OVR cell.  Fractions remain invalid so a source cannot turn
+    a board rank or malformed value into a player rating by truncation.
+    """
+
+    try:
+        parsed = Decimal(str(value).strip())
+    except (InvalidOperation, ValueError) as error:
+        raise ValueError(f"CFB27 row {row_number} has invalid {field} {value!r}; expected a whole number.") from error
+    if not parsed.is_finite() or parsed != parsed.to_integral_value():
+        raise ValueError(f"CFB27 row {row_number} has invalid {field} {value!r}; expected a whole number.")
+    return int(parsed)
+
+
 def _parse_cfb27_rating_rows(source: object, *, source_label: str) -> tuple[Cfb27Rating, ...]:
     if not isinstance(source, list):
         raise ValueError(f"CFB27 source {source_label} must contain a JSON list of reviewed rating rows.")
     normalized_rows = []
     for index, row in enumerate(source, start=1):
-        overall = int(row["overall"])
+        overall = _whole_number(row["overall"], field="overall", row_number=index)
         if not CFB27_MIN_OVERALL <= overall <= CFB27_MAX_OVERALL:
             raise ValueError(
                 f"CFB27 row {index} has invalid overall {overall}; "
@@ -107,7 +125,7 @@ def _parse_cfb27_rating_rows(source: object, *, source_label: str) -> tuple[Cfb2
         normalized_rows.append(
             {
                 "source_order": index - 1,
-                "position_rank": int(row.get("rank") or 0),
+                "position_rank": _whole_number(row.get("rank") or 0, field="rank", row_number=index),
                 "name": str(row["name"]),
                 "school": str(row["school"]),
                 "position": position,

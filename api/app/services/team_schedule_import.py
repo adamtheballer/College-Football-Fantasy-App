@@ -12,6 +12,7 @@ import io
 import re
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
+from decimal import Decimal, InvalidOperation
 from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
@@ -55,6 +56,27 @@ def _slug(value: str) -> str:
 
 def _bool(value: object | None) -> bool:
     return (_text(value) or "").lower() in {"yes", "true", "1", "y"}
+
+
+def _whole_number(value: object | None, *, field: str) -> int:
+    """Accept a CSV integer or an XLSX-exported whole-number decimal.
+
+    Excel commonly serializes a numeric cell as ``1.0`` when an XLSX source is
+    flattened to CSV.  That is the same schedule week as ``1``.  Fractions,
+    non-finite values, and arbitrary text remain invalid rather than being
+    silently truncated.
+    """
+
+    raw = _text(value)
+    if raw is None:
+        raise ValueError(f"{field} is required")
+    try:
+        parsed = Decimal(raw)
+    except InvalidOperation as error:
+        raise ValueError(f"{field} must be a whole number, got {raw!r}") from error
+    if not parsed.is_finite() or parsed != parsed.to_integral_value():
+        raise ValueError(f"{field} must be a whole number, got {raw!r}")
+    return int(parsed)
 
 
 def _parse_date(value: object | None) -> date | None:
@@ -167,7 +189,7 @@ def parse_schedule_csv(csv_text: str, *, season: int) -> tuple[list[ScheduleSour
             week_text = _text(raw.get("Week"))
             if not team_name or not conference or not week_text:
                 raise ValueError("team, conference, and week are required")
-            week = int(week_text)
+            week = _whole_number(week_text, field="week")
             if week < 0 or week > 30:
                 raise ValueError(f"week {week} is outside the supported range")
             if location not in VALID_LOCATIONS:

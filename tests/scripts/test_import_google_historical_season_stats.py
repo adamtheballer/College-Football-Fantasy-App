@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from scripts.import_google_historical_season_stats import (
     VERIFIED_SOURCE_NAME_ALIASES,
     SourceSeasonRow,
@@ -145,3 +147,54 @@ def test_report_distinguishes_missing_history_from_missing_source_identity():
         "source_has_no_completed_college_season": 1,
         "no_source_identity_row": 1,
     }
+
+
+def test_report_blocks_one_trusted_espn_id_attached_to_two_canonical_players():
+    first = SourceSeasonRow(
+        row_number=4,
+        current_team="UCF",
+        depth_position="WR1",
+        player_name="First Receiver",
+        season=2025,
+        college_team="UCF",
+        passing_completions=0,
+        passing_attempts=0,
+        passing_yards=0,
+        passing_touchdowns=0,
+        interceptions=0,
+        rushing_attempts=0,
+        rushing_yards=0,
+        rushing_touchdowns=0,
+        receptions=10,
+        receiving_yards=100,
+        receiving_touchdowns=1,
+        field_goals_made=0,
+        field_goals_attempted=0,
+        extra_points_made=0,
+        extra_points_attempted=0,
+        kick_points=0,
+        espn_player_id="1234567",
+    )
+    second = replace(
+        first,
+        row_number=5,
+        current_team="Houston",
+        player_name="Second Receiver",
+        college_team="Houston",
+    )
+    players = [
+        PlayerStub(1, "First Receiver", "UCF", "WR"),
+        PlayerStub(2, "Second Receiver", "Houston", "WR"),
+    ]
+
+    report = build_report([first, second], players)
+
+    assert report["trusted_espn_id_conflict_count"] == 1
+    assert report["trusted_espn_id_conflicts"] == [
+        {
+            "provider": "espn",
+            "provider_player_id": "1234567",
+            "canonical_player_keys": ["firstreceiver|ucf|WR", "secondreceiver|houston|WR"],
+            "reason": "one_trusted_espn_id_maps_to_multiple_canonical_players",
+        }
+    ]

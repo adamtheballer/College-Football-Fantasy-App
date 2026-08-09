@@ -335,7 +335,7 @@ def _assign_row(
             {
                 "pass_yards": source.passing_yards,
                 "pass_tds": source.passing_touchdowns,
-                "passing_interceptions": source.interceptions,
+                "interceptions": source.interceptions,
                 "rush_yards": source.rushing_yards,
                 "rush_tds": source.rushing_touchdowns,
                 "receptions": source.receptions,
@@ -387,6 +387,8 @@ def build_report(source_rows: list[SourceSeasonRow], players: Iterable[Player]) 
     matched_source_keys: set[tuple[str, str, str]] = set()
     exact_matches = alias_matches = 0
     unmatched_rows: list[dict[str, object]] = []
+    provider_ids_by_player: dict[tuple[str, str, str], set[str]] = defaultdict(set)
+    players_by_provider_id: dict[str, set[tuple[str, str, str]]] = defaultdict(set)
     for row in season_rows:
         player, match_type = _resolve_player(row, players_by_key)
         if player is None:
@@ -404,6 +406,11 @@ def build_report(source_rows: list[SourceSeasonRow], players: Iterable[Player]) 
         matched_source_keys.add(_identity_key(player.name, player.school, player.position))
         exact_matches += int(match_type == "exact")
         alias_matches += int(match_type == "verified_alias")
+        provider_id = _source_provider_id(row)
+        if provider_id:
+            canonical_key = _identity_key(player.name, player.school, player.position)
+            provider_ids_by_player[canonical_key].add(provider_id)
+            players_by_provider_id[provider_id].add(canonical_key)
     catalog_without_history = []
     for player in players:
         player_key = _identity_key(player.name, player.school, player.position)
@@ -427,6 +434,26 @@ def build_report(source_rows: list[SourceSeasonRow], players: Iterable[Player]) 
                 "reason": reason,
             }
         )
+    provider_id_conflicts = [
+        {
+            "provider": "espn",
+            "provider_player_id": provider_id,
+            "canonical_player_keys": ["|".join(key) for key in sorted(player_keys)],
+            "reason": "one_trusted_espn_id_maps_to_multiple_canonical_players",
+        }
+        for provider_id, player_keys in sorted(players_by_provider_id.items())
+        if len(player_keys) > 1
+    ]
+    player_provider_id_conflicts = [
+        {
+            "canonical_player_key": "|".join(player_key),
+            "provider": "espn",
+            "provider_player_ids": sorted(provider_ids),
+            "reason": "one_canonical_player_has_multiple_trusted_espn_ids",
+        }
+        for player_key, provider_ids in sorted(provider_ids_by_player.items())
+        if len(provider_ids) > 1
+    ]
     return {
         "source_rows": len(source_rows),
         "season_rows": len(season_rows),
@@ -443,6 +470,10 @@ def build_report(source_rows: list[SourceSeasonRow], players: Iterable[Player]) 
                 item["reason"] == "no_source_identity_row" for item in catalog_without_history
             ),
         },
+        "trusted_espn_id_player_count": len(provider_ids_by_player),
+        "trusted_espn_id_conflicts": provider_id_conflicts,
+        "trusted_espn_id_player_conflicts": player_provider_id_conflicts,
+        "trusted_espn_id_conflict_count": len(provider_id_conflicts) + len(player_provider_id_conflicts),
     }
 
 
@@ -456,6 +487,11 @@ def import_rows(path: Path, *, apply: bool) -> dict[str, Any]:
         report.update({"source_path": str(path), "source_sha256": source_hash, "apply": apply})
         if not apply:
             return report
+        if report["trusted_espn_id_conflict_count"]:
+            raise ValueError(
+                "Trusted ESPN identity reconciliation is blocked by "
+                f"{report['trusted_espn_id_conflict_count']} source conflict(s)."
+            )
 
         players_by_key = {_identity_key(player.name, player.school, player.position): player for player in players}
         teams_by_normalized_name = _team_lookup(db.query(CollegeTeam).all())

@@ -21,7 +21,7 @@ from collegefootballfantasy_api.app.domain.scoring_engine import calculate_playe
 SOURCE_COLUMNS = {
     "pass_yards": "PASS YDS",
     "pass_tds": "PASS TDS",
-    "passing_interceptions": "INTS",
+    "interceptions": "INTS",
     "rush_yards": "RUSH YDS",
     "rush_tds": "RUSH TDS",
     "receptions": "RECEPTIONS",
@@ -52,6 +52,27 @@ def _position(row: dict[str, str]) -> str:
 
 def _canonical_stats(row: dict[str, str]) -> dict[str, str | None]:
     return {stat: row.get(column) for stat, column in SOURCE_COLUMNS.items()}
+
+
+def canonical_projection_points(row: dict[str, str]) -> float | None:
+    """Return a component-derived annual total when the source can prove one.
+
+    ``FANTASY PROJ.`` is retained as a source-provided comparison value only.
+    It is not an input to the app's standard-scoring total.  In particular, a
+    kicker total-FG value cannot be translated into the app's distance-tiered
+    kicker scoring without inventing a distance distribution.
+    """
+
+    position = _position(row)
+    if not position:
+        return None
+    required_columns = tuple(SOURCE_COLUMNS.values())
+    if any(_component_state(row.get(column)) != "valid" for column in required_columns):
+        return None
+    if position == "K" and _number(row.get("FG")) not in (None, 0.0):
+        return None
+    points, _ = calculate_player_fantasy_points(_canonical_stats(row), {}, position)
+    return points
 
 
 def audit(rows: list[dict[str, str]]) -> dict[str, Any]:
@@ -94,11 +115,11 @@ def audit(rows: list[dict[str, str]]) -> dict[str, Any]:
             reason = "annual_sheet_has_total_field_goals_without_distance_buckets"
         elif sheet_points is None:
             outcome = "MISSING_SHEET_TOTAL"
-            canonical_points, _ = calculate_player_fantasy_points(_canonical_stats(row), {}, position)
+            canonical_points = canonical_projection_points(row)
             difference = None
             reason = "FANTASY_PROJ_blank"
         else:
-            canonical_points, _ = calculate_player_fantasy_points(_canonical_stats(row), {}, position)
+            canonical_points = canonical_projection_points(row)
             difference = round(canonical_points - sheet_points, 2)
             if abs(difference) < 0.005:
                 outcome = "EXACT_MATCH"

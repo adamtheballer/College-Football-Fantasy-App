@@ -21,7 +21,6 @@ from collegefootballfantasy_api.app.domain.scoring_engine import calculate_playe
 from collegefootballfantasy_api.app.models.college_team import CollegeTeam
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
-from collegefootballfantasy_api.app.services.power4 import resolve_power4_school
 from collegefootballfantasy_api.app.services.team_schedule_import import parse_schedule_csv
 from scripts.audit_preseason_source_contract import _key, _position, _team
 from scripts.freeze_authoritative_sheet_snapshots import REQUIRED_WORKBOOKS
@@ -44,6 +43,17 @@ def _number(value: str | None) -> float | None:
 
 def _source_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _canonical_source_team(value: str | None) -> str:
+    """Use the same reviewed-team normalization as the source contract.
+
+    Notre Dame is intentionally eligible but is not a Power Four conference
+    member, so calling the Power Four resolver directly turns its uppercase
+    XLSX value into a different key than the schedule workbook's team name.
+    """
+
+    return _team(value) or (value or "").strip()
 
 
 def _require_inputs(manifest_path: Path, annual_path: Path, schedule_path: Path, audit_path: Path) -> tuple[str, dict]:
@@ -85,22 +95,22 @@ def main() -> int:
     schedule_rows, schedule_report = parse_schedule_csv(args.schedule.read_text(encoding="utf-8-sig"), season=args.season)
     if schedule_report.has_errors:
         raise SystemExit("Sealed schedule snapshot has validation errors; weekly projections were not generated.")
-    schedules = {(resolve_power4_school(row.team_name) or row.team_name, row.week): row for row in schedule_rows}
-    game_counts = Counter(resolve_power4_school(row.team_name) or row.team_name for row in schedule_rows if not row.is_bye)
+    schedules = {(_canonical_source_team(row.team_name), row.week): row for row in schedule_rows}
+    game_counts = Counter(_canonical_source_team(row.team_name) for row in schedule_rows if not row.is_bye)
     ensure_models_registered()
     report = {"mode": "apply" if args.apply else "dry-run", "model_version": MODEL_VERSION, "source_sha256": annual_hash, "counts": Counter(), "rows": []}
     with SessionLocal() as db:
         players = db.scalars(select(Player)).all()
         teams = db.scalars(select(CollegeTeam)).all()
-        player_by_key = {_key(player.name, _team(player.school), _position(player.position)): player for player in players}
-        team_by_name = {_team(team.name): team for team in teams}
+        player_by_key = {_key(player.name, _canonical_source_team(player.school), _position(player.position)): player for player in players}
+        team_by_name = {_canonical_source_team(team.name): team for team in teams}
         try:
             for annual in annual_rows:
-                source_key = _key(annual.get("PLAYER"), _team(annual.get("TEAM")), _position(annual.get("POSITION")))
+                source_key = _key(annual.get("PLAYER"), _canonical_source_team(annual.get("TEAM")), _position(annual.get("POSITION")))
                 player = player_by_key.get(source_key)
                 if player is None:
                     report["counts"]["unmatched"] += 1; report["rows"].append({"player": annual.get("PLAYER"), "status": "UNMATCHED_IDENTITY"}); continue
-                team_name = _team(player.school)
+                team_name = _canonical_source_team(player.school)
                 canonical_team = team_by_name.get(team_name)
                 if canonical_team is None:
                     report["counts"]["missing_team"] += 1
@@ -115,13 +125,13 @@ def main() -> int:
                     schedule = schedules.get((team_name, week))
                     if schedule is None:
                         report["counts"]["missing_schedule"] += 1; continue
-                    opponent_team = team_by_name.get(_team(schedule.opponent_name)) if schedule.opponent_name else None
+                    opponent_team = team_by_name.get(_canonical_source_team(schedule.opponent_name)) if schedule.opponent_name else None
                     row_status = "BYE" if schedule.is_bye else status
                     if not schedule.is_bye and opponent_team is None:
                         row_status = "MISSING_OPPONENT"
                     points = 0.0 if row_status == "BYE" else None
                     if row_status == "ACTIVE" and weekly is not None:
-                        points, _ = calculate_player_fantasy_points({"pass_yards": weekly["pass_yards"], "pass_tds": weekly["pass_tds"], "passing_interceptions": weekly["interceptions"], "rush_yards": weekly["rush_yards"], "rush_tds": weekly["rush_tds"], "receptions": weekly["receptions"], "rec_yards": weekly["rec_yards"], "rec_tds": weekly["rec_tds"], "xp_made": weekly["extra_points_made"]}, {}, player.position)
+                        points, _ = calculate_player_fantasy_points({"pass_yards": weekly["pass_yards"], "pass_tds": weekly["pass_tds"], "interceptions": weekly["interceptions"], "rush_yards": weekly["rush_yards"], "rush_tds": weekly["rush_tds"], "receptions": weekly["receptions"], "rec_yards": weekly["rec_yards"], "rec_tds": weekly["rec_tds"], "xp_made": weekly["extra_points_made"]}, {}, player.position)
                     report["counts"][row_status.lower()] += 1
                     if not args.apply:
                         continue
