@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from urllib.request import Request, urlopen
 
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.models.registry import load_all_models
@@ -20,12 +19,14 @@ from collegefootballfantasy_api.app.services.team_schedule_import import (
 )
 
 
-DEFAULT_SOURCE = "https://docs.google.com/spreadsheets/d/1JnoISIE2fr_l7ze5qtAe2DIN4nFlI3CaZMdvaNHEnZQ/export?format=csv&gid=1843438972"
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Import canonical 2026 team schedules for player Game Logs.")
-    parser.add_argument("--source", default=DEFAULT_SOURCE, help="Google Sheet CSV export URL or a local CSV file path.")
+    parser.add_argument(
+        "--source",
+        type=Path,
+        required=True,
+        help="Approved local CSV snapshot. Live URLs are intentionally unsupported.",
+    )
     parser.add_argument("--season", type=int, default=2026)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="Validate and report only (default).")
@@ -34,13 +35,11 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_source(source: str) -> str:
-    source_path = Path(source).expanduser()
-    if source_path.exists():
-        return source_path.read_text(encoding="utf-8")
-    request = Request(source, headers={"User-Agent": "CollegeFootballFantasyScheduleImporter/1.0"})
-    with urlopen(request, timeout=30) as response:
-        return response.read().decode("utf-8-sig")
+def load_source(source: Path) -> str:
+    source_path = source.expanduser().resolve()
+    if not source_path.is_file():
+        raise ValueError("Schedule source must be an approved local CSV snapshot.")
+    return source_path.read_text(encoding="utf-8-sig")
 
 
 def main() -> int:
