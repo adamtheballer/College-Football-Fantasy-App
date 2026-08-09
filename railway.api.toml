@@ -5,8 +5,7 @@ buildCommand = "uv sync --frozen"
 [deploy]
 # Railway must complete both commands before it starts or promotes the API.
 preDeployCommand = [
-  "PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head",
-  "PYTHONPATH=. uv run python scripts/check_alembic_head.py",
+  "PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head && PYTHONPATH=. uv run python scripts/check_alembic_head.py",
 ]
 startCommand = "PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health/ready"

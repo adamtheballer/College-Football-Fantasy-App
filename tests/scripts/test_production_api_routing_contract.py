@@ -52,14 +52,19 @@ def test_railway_api_config_gates_migrations_before_the_port_aware_api_starts():
     config = tomllib.loads((REPO_ROOT / "railway.api.toml").read_text(encoding="utf-8"))
 
     assert config["build"] == {"builder": "RAILPACK", "buildCommand": "uv sync --frozen"}
-    assert config["deploy"]["preDeployCommand"] == [
-        "PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head",
-        "PYTHONPATH=. uv run python scripts/check_alembic_head.py",
-    ]
+    pre_deploy_commands = config["deploy"]["preDeployCommand"]
+    assert len(pre_deploy_commands) == 1
+    assert pre_deploy_commands[0] == (
+        "PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head && "
+        "PYTHONPATH=. uv run python scripts/check_alembic_head.py"
+    )
+    assert pre_deploy_commands[0].index("alembic -c api/alembic.ini upgrade head") < pre_deploy_commands[0].index("&&")
+    assert pre_deploy_commands[0].index("&&") < pre_deploy_commands[0].index("scripts/check_alembic_head.py")
     assert config["deploy"]["startCommand"] == (
         "PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port $PORT"
     )
     assert config["deploy"]["healthcheckPath"] == "/health/ready"
+    assert config["deploy"]["healthcheckTimeout"] == 100
     assert config["deploy"]["restartPolicyType"] == "ALWAYS"
 
 
