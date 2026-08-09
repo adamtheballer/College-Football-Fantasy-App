@@ -70,6 +70,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     setIsGuideActive(true);
   }, [isAuthFlowPage, location.pathname, navigate, user]);
 
+  if (!isLoggedIn && location.pathname === "/") return <>{children}</>;
+
   return (
     <>
       {user ? (
