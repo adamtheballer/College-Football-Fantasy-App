@@ -23,10 +23,10 @@ export const TOUR_STEPS: TourStep[] = [
       "Use Leagues to create, join, and manage your fantasy leagues, view league settings, and prepare for your draft.",
   },
   {
-    target: "#nav-saturday-pick-6",
+    target: "#dashboard-saturday-pick-6",
     title: "Saturday Pick 6",
     description:
-      "Saturday Pick 6 is your weekly featured-player challenge. Picks will open here once the approved weekly contest is ready.",
+      "Saturday Pick 6 is your weekly featured-player challenge on the dashboard. Picks will open here once the approved weekly contest is ready.",
   },
   {
     target: "#nav-chats",

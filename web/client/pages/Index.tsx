@@ -322,7 +322,9 @@ export default function Index() {
         </SurfaceCard>
       </section>
 
-      <SaturdayPick6 embedded />
+      <section id="dashboard-saturday-pick-6" aria-label="Saturday Pick 6">
+        <SaturdayPick6 embedded />
+      </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
         <SurfaceCard variant="default" padding="none">

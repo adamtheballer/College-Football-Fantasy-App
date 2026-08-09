@@ -54,7 +54,6 @@ export const getShellNavItems = (
   return [
     { name: "HOME", path: "/", icon: Home },
     { name: "LEAGUES", path: "/leagues", icon: Trophy },
-    { name: "SATURDAY PICK 6", path: "/saturday-pick-6", icon: Trophy },
     {
       name: "CHATS",
       path: "/chats",
@@ -77,9 +76,9 @@ export const getShellNavItems = (
 };
 
 export const getMobileNavItems = (items: ShellNavItem[]) => {
-  // The mobile bar is limited to five destinations. Saturday Pick 6 replaces
-  // the lower-priority Report Bug shortcut; that action remains on desktop.
-  const preferred = ["HOME", "LEAGUES", "SATURDAY PICK 6", "CHATS", "MOCK DRAFT"];
+  // Saturday Pick 6 remains a featured dashboard experience, not a permanent
+  // mobile destination. Keep the available support route in the five-item bar.
+  const preferred = ["HOME", "LEAGUES", "CHATS", "MOCK DRAFT", "REPORT BUG"];
   const byName = new Map(items.map((item) => [item.name, item]));
   const filtered = preferred.flatMap((name) => {
     const item = byName.get(name);
