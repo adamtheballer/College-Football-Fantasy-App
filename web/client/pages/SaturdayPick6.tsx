@@ -5,7 +5,7 @@ import { Check, CircleX, Clock3, Copy, Lock, Radio, Trophy, UserRound } from "lu
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { type SaturdayPickPlayer, useSaveSaturdayPick, useSaturdayPickContest } from "@/hooks/use-saturday-pick";
-import { getSaturdayPickSponsorLogo } from "@/lib/saturday-pick-sponsor";
+import { getSaturdayPickSponsorLogo, saturdayPick6Sponsor } from "@/lib/saturday-pick-sponsor";
 
 export const SATURDAY_PICK_6_COMING_SOON_MESSAGE =
   "Week 1 picks are coming soon. Six featured players will be available once weekly projections are published.";
@@ -57,7 +57,7 @@ export const isSaturdayPick6ComingSoon = (
 ) =>
   !contest ||
   contest.players.length === 0 ||
-  ["DRAFT", "SCHEDULED", "COMING_SOON"].includes(contest.status);
+  ["DRAFT", "COMING_SOON"].includes(contest.status);
 
 function useCountdown(lockAt: string | undefined) {
   const [now, setNow] = useState(() => Date.now());
@@ -85,6 +85,10 @@ function SaturdayPick6ComingSoon({ embedded }: SaturdayPick6Props) {
       <p className="cfb-micro-label text-cfb-brand">Saturday Pick 6</p>
       <h1 className="mt-3 text-4xl font-black text-cfb-text-primary">Saturday Pick 6</h1>
       <p className="mx-auto mt-4 max-w-xl text-cfb-text-secondary">{SATURDAY_PICK_6_COMING_SOON_MESSAGE}</p>
+      <div className="mx-auto mt-6 flex max-w-md items-center justify-center gap-4 rounded-2xl border border-cyan-200/25 bg-slate-950/30 p-4 text-left">
+        <img src={saturdayPick6Sponsor.logo_url} alt={saturdayPick6Sponsor.name} className="h-14 w-14 rounded-xl bg-white object-contain p-1" />
+        <div><p className="text-sm font-black text-cfb-text-primary">{saturdayPick6Sponsor.name}</p><p className="mt-1 text-xs font-bold text-cyan-100">{saturdayPick6Sponsor.tagline}</p></div>
+      </div>
       {!embedded ? <Button asChild className="mt-7"><Link to="/">Back to dashboard</Link></Button> : null}
     </section>
   );
@@ -138,9 +142,16 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
   // Sponsor data remains API-owned and is absent until the server has an
   // approved sponsor configuration. No browser fallback may expose branding
   // or a reward code.
-  const sponsor = contest.sponsor;
+  const sponsor = contest.sponsor ?? {
+    ...saturdayPick6Sponsor,
+    offer_text: saturdayPick6Sponsor.tagline,
+    code: null,
+    terms: null,
+    reward_unlocked: false,
+    url: null,
+  };
   const sponsorLogo = getSaturdayPickSponsorLogo(sponsor);
-  const revealSponsorReward = Boolean(sponsor) && shouldRevealSponsorReward(contest.status, contest.entry);
+  const revealSponsorReward = Boolean(contest.sponsor) && shouldRevealSponsorReward(contest.status, contest.entry);
   const submit = async () => {
     if (!selectedPickId || !isOpen) return;
     setSubmitError(null);
@@ -166,7 +177,7 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
               <span className="inline-flex items-center gap-2 rounded-full border border-cfb-gold/45 bg-cfb-gold/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.2em] text-yellow-100"><Trophy className="h-4 w-4" /> Saturday Pick 6</span>
               <span className="cfb-micro-label text-cyan-200">Week {contest.week_number} · {contest.contest_position} Week</span>
             </div>
-            <h1 className="mt-5 font-display text-4xl font-black italic tracking-[-0.05em] text-cfb-text-primary sm:text-6xl">{isResults ? "LIVE RESULTS" : isOpen ? "MAKE YOUR PICK" : "PICKS LOCKED"}</h1>
+            <h1 className="mt-5 font-display text-4xl font-black italic tracking-[-0.05em] text-cfb-text-primary sm:text-6xl">{isResults ? "LIVE RESULTS" : isOpen ? "MAKE YOUR PICK" : contest.status === "SCHEDULED" ? "PICKS OPENING SOON" : "PICKS LOCKED"}</h1>
             <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-cfb-text-secondary sm:text-lg">Which featured {positionLabel(contest.contest_position)} will score the most fantasy points this week?</p>
           </div>
           <div className="flex flex-wrap items-center gap-6">
@@ -196,7 +207,7 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
               {isResults ? <span className="absolute right-4 top-4 text-xs font-black tabular-nums text-cyan-100">#{index + 1}</span> : null}
               <div className="flex min-w-0 items-center gap-3 pr-8"><div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/12 bg-cfb-surface-raised text-cfb-brand">{player.image_url ? <img src={player.image_url} alt={player.player_name} className="h-full w-full object-cover" /> : <UserRound className="h-7 w-7" />}</div><div className="min-w-0"><h2 className="truncate text-xl font-black text-cfb-text-primary">{player.player_name}</h2><p className="mt-1 text-xs font-black uppercase tracking-[0.14em] text-cfb-text-muted">{player.school} · {player.canonical_position}</p></div></div>
               {isWinner ? <Trophy className="absolute right-4 top-4 h-5 w-5 text-cfb-gold" aria-label="Weekly winner" /> : null}
-              <div className="mt-5 grid grid-cols-2 gap-3 text-sm"><div><p className="cfb-micro-label">Opponent</p><p className="mt-1 font-black text-cfb-text-primary">vs. {player.opponent}</p></div><div><p className="cfb-micro-label">{pointLabel}</p><p className="mt-1 text-xl font-black tabular-nums text-cyan-100">{formatPoints(shownPoints)}</p></div></div>
+              <div className="mt-5 grid grid-cols-2 gap-3 text-sm"><div><p className="cfb-micro-label">Opponent</p><p className="mt-1 font-black text-cfb-text-primary">vs. {player.opponent}</p></div><div><p className="cfb-micro-label">{pointLabel}</p><p className="mt-1 text-xl font-black tabular-nums text-cyan-100">{typeof shownPoints === "number" ? formatPoints(shownPoints) : "Projection pending"}</p></div></div>
               <div className="mt-4 flex items-center justify-between gap-3 text-xs font-bold text-cfb-text-secondary"><span>{formatKickoff(player.game_time)}</span><span className={player.scoring_status === "DATA_DELAYED" ? "text-amber-200" : "text-cyan-100"}>{player.scoring_status === "LIVE" ? <Radio className="mr-1 inline h-3.5 w-3.5" /> : null}{statusLabel(player.scoring_status)}</span></div>
               {isOpen ? <Button type="button" className="mt-5 w-full" variant={selected ? "default" : "outline"} onClick={() => setPendingPickId(player.id)}>{selected ? <><Check className="mr-2 h-4 w-4" /> Your Pick</> : "Choose player"}</Button> : null}
             </article>

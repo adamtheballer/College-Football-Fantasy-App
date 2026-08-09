@@ -51,17 +51,17 @@ describe("SaturdayPick6 state helpers", () => {
     expect(shouldRevealSponsorReward("FINAL", { is_winner: true })).toBe(true);
   });
 
-  it("keeps disabled, empty, and scheduled contests in the polished coming-soon state", () => {
+  it("keeps disabled and empty contests in coming soon but previews a valid scheduled slate", () => {
     expect(isSaturdayPick6ComingSoon(undefined)).toBe(true);
     expect(isSaturdayPick6ComingSoon({ status: "OPEN", players: [] })).toBe(true);
-    expect(isSaturdayPick6ComingSoon({ status: "SCHEDULED", players: [player] })).toBe(true);
+    expect(isSaturdayPick6ComingSoon({ status: "SCHEDULED", players: [player] })).toBe(false);
     expect(isSaturdayPick6ComingSoon({ status: "OPEN", players: [player] })).toBe(false);
     expect(SATURDAY_PICK_6_COMING_SOON_MESSAGE).toBe(
       "Week 1 picks are coming soon. Six featured players will be available once weekly projections are published.",
     );
   });
 
-  it("uses only the sponsor logo supplied by the API", () => {
+  it("does not treat a public sponsor brand as a reward source", () => {
     const sponsor = { name: "Example Sponsor", logo_url: null };
     expect(getSaturdayPickSponsorLogo(sponsor)).toBeNull();
     expect(getSaturdayPickRewardMessage(sponsor)).toContain("final scoring");
