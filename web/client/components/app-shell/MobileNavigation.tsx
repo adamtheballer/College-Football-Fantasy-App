@@ -12,7 +12,7 @@ export function MobileNavigation({ items, pathname }: MobileNavigationProps) {
   return (
     <nav
       aria-label="Primary mobile navigation"
-      className="fixed inset-x-3 bottom-3 z-[170] rounded-2xl border border-cfb-border-subtle bg-cfb-sidebar/95 p-1.5 shadow-[0_18px_45px_rgba(2,6,23,0.45)] backdrop-blur-xl lg:hidden"
+      className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-[170] rounded-2xl border border-cfb-border-subtle bg-cfb-sidebar/95 p-1.5 shadow-[0_18px_45px_rgba(2,6,23,0.45)] backdrop-blur-xl lg:hidden"
     >
       <div className="grid grid-cols-5 gap-1">
         {items.map((item) => {

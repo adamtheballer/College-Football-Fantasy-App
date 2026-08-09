@@ -39,7 +39,7 @@ export function AppShell({
   const mobileNavItems = getMobileNavItems(navItems);
 
   return (
-    <div className="cfb-school-grid isolate relative flex h-screen overflow-hidden bg-cfb-canvas font-sans text-cfb-text-primary selection:bg-cfb-brand/30 selection:text-white">
+    <div className="cfb-school-grid isolate relative flex min-h-[100dvh] overflow-x-hidden bg-cfb-canvas font-sans text-cfb-text-primary selection:bg-cfb-brand/30 selection:text-white lg:h-screen lg:overflow-hidden">
       {!hideDecor ? <BackgroundEffects /> : null}
       {!hideFloatingActions ? <FloatingQuickActions /> : null}
 
@@ -50,14 +50,14 @@ export function AppShell({
       <main
         ref={mainScrollRef}
         data-app-scroll="true"
-        className="relative z-10 flex h-screen min-w-0 flex-1 flex-col overflow-y-auto"
+        className="relative z-10 flex min-h-[100dvh] min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] lg:h-screen"
       >
         {!hideChrome ? <TopBar isLoggedIn={isLoggedIn} user={user} /> : null}
 
         <div
           className={cn(
-            "flex-1",
-            compactContent ? "p-0" : "px-4 py-5 pb-28 sm:px-6 lg:p-8",
+            "min-w-0 flex-1",
+            compactContent ? "p-0" : "px-4 py-5 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:px-6 lg:p-8",
           )}
         >
           {children}
