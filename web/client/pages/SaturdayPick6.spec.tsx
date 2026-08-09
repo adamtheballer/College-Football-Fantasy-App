@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SaturdayPickPlayer } from "@/hooks/use-saturday-pick";
-import { getSaturdayPickRewardMessage, getSaturdayPickSponsorLogo } from "@/lib/saturday-pick-sponsor";
+import { getSaturdayPickRewardMessage, getSaturdayPickSponsorBranding } from "@/lib/saturday-pick-sponsor";
 
 import { displayPoints, isSaturdayPick6ComingSoon, lockDeadlineMessage, pickConfirmationMessage, positionLabel, SATURDAY_PICK_6_COMING_SOON_MESSAGE, shouldRevealSponsorReward, statusLabel } from "./SaturdayPick6";
 
@@ -61,9 +61,15 @@ describe("SaturdayPick6 state helpers", () => {
     );
   });
 
-  it("uses only the sponsor logo supplied by the API", () => {
+  it("uses approved public branding when the API has not published a sponsor", () => {
     const sponsor = { name: "Example Sponsor", logo_url: null };
-    expect(getSaturdayPickSponsorLogo(sponsor)).toBeNull();
+    expect(getSaturdayPickSponsorBranding(null)).toEqual({
+      name: "West Georgia Cornhole",
+      logo_url: "/assets/west-georgia-cornhole.png",
+      tagline: "#1 in All Things Cornhole & Outdoor Games",
+    });
+    expect(getSaturdayPickSponsorBranding(sponsor).name).toBe("Example Sponsor");
+    expect(getSaturdayPickSponsorBranding(sponsor).logo_url).toBe("/assets/west-georgia-cornhole.png");
     expect(getSaturdayPickRewardMessage(sponsor)).toContain("final scoring");
   });
 });
