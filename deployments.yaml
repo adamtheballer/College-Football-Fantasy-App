@@ -89,12 +89,13 @@ environments:
       railway_service: College-Football-Fantasy-App API
       railway_root_directory: /
       railway_config_path: /railway.api.toml
+      railway_builder: DOCKERFILE
+      railway_dockerfile_path: Dockerfile.api
       host: 0.0.0.0
       port_env: PORT
-      build_command: uv sync --frozen
       migrate_command: PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head
       verify_migrations_command: PYTHONPATH=. uv run python scripts/check_alembic_head.py
-      start_command: PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port $PORT
+      start_command: sh -c 'exec uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port "$PORT"'
       health_path: /health
       readiness_path: /health/ready
       minimum_replicas: 1
