@@ -9,6 +9,8 @@ from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameSta
 from collegefootballfantasy_api.app.models.saturday_pick import SaturdayPickContest, SaturdayPickPlayer
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+from collegefootballfantasy_api.app.schemas.saturday_pick import SaturdayPickContestCreate
+from collegefootballfantasy_api.app.services.saturday_pick_service import validate_contest_readiness
 
 
 def _enable_pick_6(monkeypatch, *, sponsors=False):
@@ -77,6 +79,22 @@ def _create_payload(players, lock_at, *, position="QB", **extra):
         "lock_at": lock_at.isoformat(),
         **extra,
     }
+
+
+def test_contest_readiness_is_select_only_and_does_not_allocate_contest_rows(db_session):
+    players, kickoff = _featured_players(db_session, position="RB")
+    payload = SaturdayPickContestCreate(**_create_payload(players, kickoff, position="RB"))
+    contest_count_before = db_session.query(SaturdayPickContest).count()
+    featured_count_before = db_session.query(SaturdayPickPlayer).count()
+
+    readiness = validate_contest_readiness(db_session, payload)
+
+    assert readiness.lock_at == kickoff
+    assert [player.name for player, _ in readiness.featured] == [player.name for player in players]
+    assert not db_session.new
+    assert not db_session.dirty
+    assert db_session.query(SaturdayPickContest).count() == contest_count_before
+    assert db_session.query(SaturdayPickPlayer).count() == featured_count_before
 
 
 def test_admin_rejects_mixed_position_and_wrong_field_size(client, db_session):

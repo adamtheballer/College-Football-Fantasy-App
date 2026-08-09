@@ -424,7 +424,7 @@ export default function SinglePlayerMockDraftRoom() {
         </div>
       </div>
 
-      <div className="grid grid-cols-[64px_minmax(0,1fr)_70px_110px_180px] border-b border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+      <div className="hidden grid-cols-[64px_minmax(0,1fr)_70px_110px_180px] border-b border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground sm:grid">
         <span>RK</span>
         <span>Player</span>
         <span>Pos</span>
@@ -432,7 +432,7 @@ export default function SinglePlayerMockDraftRoom() {
         <span className="text-right">Action</span>
       </div>
 
-      <div className="max-h-[690px] overflow-y-auto">
+      <div className="max-h-[calc(100dvh-13rem)] overflow-y-auto sm:max-h-[690px]">
         {isLoading ? (
           <div className="flex min-h-40 items-center justify-center gap-3 px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" /> Loading draft board...
@@ -471,27 +471,26 @@ export default function SinglePlayerMockDraftRoom() {
                   }
                 }}
                 className={cn(
-                  "grid cursor-pointer grid-cols-[64px_minmax(0,1fr)_70px_110px_180px] items-center gap-3 border-b border-white/10 px-5 py-4 outline-none transition-[background-color,box-shadow,color] duration-200",
+                  "grid cursor-pointer grid-cols-[44px_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-3 border-b border-white/10 px-4 py-4 outline-none transition-[background-color,box-shadow,color] duration-200 sm:grid-cols-[64px_minmax(0,1fr)_70px_110px_180px] sm:items-center sm:gap-3 sm:px-5",
                   positionHoverClass,
                   isSelected && "bg-amber-300/[0.075] shadow-[inset_3px_0_0_rgba(251,191,36,0.72)]"
                 )}
               >
-                <p className="text-xl font-black tabular-nums text-muted-foreground">{visibleRank}</p>
-                <div className="min-w-0">
-                  <p className="truncate text-base font-black text-foreground transition-colors hover:text-amber-100">{player.name}</p>
-                  <p className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">{player.school}</p>
+                <p className="col-start-1 row-start-1 pt-0.5 text-xl font-black tabular-nums text-muted-foreground sm:col-auto sm:row-auto sm:pt-0">{visibleRank}</p>
+                <div className="col-start-2 row-start-1 min-w-0 sm:col-auto sm:row-auto">
+                  <p className="line-clamp-2 text-base font-black leading-5 text-foreground transition-colors hover:text-amber-100 sm:truncate sm:leading-normal">{player.name}</p>
+                  <p className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground sm:tracking-[0.18em]">{player.school}</p>
                 </div>
-                <span className={cn("w-fit rounded-full border px-4 py-2 text-xs font-black", positionClass)}>{player.pos}</span>
-                <p className="text-sm font-black tabular-nums text-foreground">
-                  {formatDraftProjection({
-                    seasonProjection: player.sheetProjectedSeasonPoints,
-                    fallbackSeasonProjection: player.sheetProjectionStats?.fpts,
-                  })}
+                <span className={cn("col-start-3 row-start-1 shrink-0 rounded-full border px-3 py-2 text-xs font-black sm:col-auto sm:row-auto sm:w-fit sm:px-4", positionClass)}>{player.pos}</span>
+                <p className="col-span-3 flex items-end justify-between text-sm font-black tabular-nums text-foreground sm:col-auto sm:block">
+                  <span className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground sm:hidden">Season projection</span>
+                  <span>{formatDraftProjection({ seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</span>
                 </p>
-                <div className="flex justify-end gap-2">
+                <div className="col-span-3 grid grid-cols-2 gap-2 sm:col-auto sm:flex sm:justify-end">
                   <Button
                     variant="outline"
-                    className="h-10 rounded-2xl px-4 text-[10px] font-black uppercase tracking-[0.14em]"
+                    className="h-11 min-h-[52px] rounded-2xl px-3 text-[10px] font-black uppercase tracking-[0.14em] sm:h-10 sm:min-h-0 sm:px-4"
+                    style={{ minHeight: 52 }}
                     onClick={(event) => {
                       event.stopPropagation();
                       toggleQueue(player.id);
@@ -500,8 +499,9 @@ export default function SinglePlayerMockDraftRoom() {
                     {isQueued ? "Queued" : "Queue"}
                   </Button>
                   <Button
-                    className="h-10 rounded-2xl border border-cyan-100/35 bg-[#1b3349] px-5 text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)]"
+                    className="h-11 min-h-[52px] rounded-2xl border border-cyan-100/35 bg-[#1b3349] px-3 text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)] sm:h-10 sm:min-h-0 sm:px-5"
                     disabled={!userOnClock || draftState.status !== "live"}
+                    style={{ minHeight: 52 }}
                     onClick={(event) => {
                       event.stopPropagation();
                       draftPlayer(player.id);
@@ -796,7 +796,7 @@ export default function SinglePlayerMockDraftRoom() {
     <div className="relative min-h-screen overflow-hidden bg-[#080d13] text-foreground">
       <DraftRoomVisuals />
 
-      <div className="relative mx-auto max-w-[1800px] space-y-6 px-4 pb-28 pt-4 md:px-6">
+      <div className="relative mx-auto max-w-[1800px] space-y-6 px-4 pb-[calc(env(safe-area-inset-bottom)+7.5rem)] pt-4 md:px-6 md:pb-28">
         <div className="relative z-20 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Button
@@ -815,10 +815,10 @@ export default function SinglePlayerMockDraftRoom() {
             </Button>
           </div>
 
-          <div className="pointer-events-none fixed left-1/2 top-3 z-[1250] -translate-x-1/2">
+          <div className="pointer-events-none order-3 flex w-full justify-center sm:fixed sm:left-1/2 sm:top-3 sm:z-[1250] sm:w-auto sm:-translate-x-1/2">
             <div
               className={cn(
-                  "rounded-3xl border border-white/16 bg-[#0b121a] px-8 py-3 text-center shadow-[0_10px_24px_rgba(2,6,23,0.38)] transition",
+                  "rounded-3xl border border-white/16 bg-[#0b121a] px-6 py-3 text-center shadow-[0_10px_24px_rgba(2,6,23,0.38)] transition sm:px-8",
                 timerDanger
                   ? "animate-pulse border-red-300/50 shadow-[0_0_58px_rgba(248,113,113,0.34)]"
                     : "border-white/14"
@@ -1012,7 +1012,7 @@ export default function SinglePlayerMockDraftRoom() {
         </div>
       ) : null}
 
-      <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[1200] flex justify-center px-4">
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[1200] flex justify-center px-4 sm:bottom-4">
         <div className={cn("pointer-events-auto grid w-full max-w-xl grid-cols-4 rounded-2xl p-1", draftMatteControlClass)}>
           {MOCK_TABS.map((tab) => (
             <button

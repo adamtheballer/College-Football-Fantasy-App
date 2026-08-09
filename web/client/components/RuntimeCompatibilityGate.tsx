@@ -4,6 +4,7 @@ import { buildApiUrl } from "@/lib/api";
 import {
   publishRuntimeDebugIdentity,
   runtimeCompatibilityError,
+  runtimeDeploymentSkew,
   type RuntimeIdentity,
   WEB_BUILD_SHA,
 } from "@/lib/runtime-compatibility";
@@ -36,9 +37,11 @@ const RuntimeCompatibilityGate = ({ children }: { children: ReactNode }) => {
         const response = await fetch(buildApiUrl("/health/runtime"), { cache: "no-store" });
         if (!response.ok) throw new Error(`runtime status ${response.status}`);
         const runtime = (await response.json()) as RuntimeIdentity;
-        const reason = runtimeCompatibilityError(runtime);
+        const hostname = window.location.hostname;
+        const deploymentSkew = runtimeDeploymentSkew(runtime, { hostname });
+        const reason = runtimeCompatibilityError(runtime, { hostname });
         if (!active) return;
-        publishRuntimeDebugIdentity(runtime, reason);
+        publishRuntimeDebugIdentity(runtime, deploymentSkew);
         setCapabilities({
           email_enabled: runtime.email_enabled === true,
           support_email: runtime.support_email || null,

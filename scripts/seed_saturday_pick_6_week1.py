@@ -17,7 +17,11 @@ from collegefootballfantasy_api.app.db.model_registry import ensure_models_regis
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.saturday_pick import SaturdayPickContestCreate
-from collegefootballfantasy_api.app.services.saturday_pick_service import create_contest, publish_contest
+from collegefootballfantasy_api.app.services.saturday_pick_service import (
+    create_contest,
+    publish_contest,
+    validate_contest_readiness,
+)
 
 
 WEEK_ONE_RB_NAMES = (
@@ -84,19 +88,29 @@ def main() -> None:
             **sponsor_fields,
         )
         try:
+            # Never call create_contest during a dry run. It flushes records,
+            # and PostgreSQL sequences are not restored by transaction rollback.
+            readiness = validate_contest_readiness(db, payload)
+            if not args.apply:
+                print({
+                    "mode": "dry-run",
+                    "contest_id": None,
+                    "status": "SCHEDULED",
+                    "lock_at": readiness.lock_at.isoformat(),
+                    "players": list(WEEK_ONE_RB_NAMES),
+                })
+                return
+
             contest = create_contest(db, payload, actor)
             if args.publish:
                 publish_contest(db, contest)
             contest_status = contest.status
             contest_id = contest.id
-            if args.apply:
-                db.commit()
-            else:
-                db.rollback()
+            db.commit()
         except ValueError as exc:
             db.rollback()
             raise SystemExit(f"Week 1 Saturday Pick 6 was not created: {exc}") from exc
-        print({"mode": "apply" if args.apply else "dry-run", "contest_id": contest_id if args.apply else None, "status": contest_status, "players": list(WEEK_ONE_RB_NAMES)})
+        print({"mode": "apply", "contest_id": contest_id, "status": contest_status, "players": list(WEEK_ONE_RB_NAMES)})
 
 
 if __name__ == "__main__":

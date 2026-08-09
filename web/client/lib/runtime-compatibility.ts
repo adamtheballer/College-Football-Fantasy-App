@@ -21,6 +21,11 @@ export type RuntimeIdentity = {
 
 export const WEB_BUILD_SHA = import.meta.env.VITE_GIT_SHA || "unknown";
 
+type CompatibilityOptions = {
+  hostname?: string;
+  frontendGitSha?: string;
+};
+
 export type RuntimeDebugIdentity = Pick<
   RuntimeIdentity,
   | "git_sha"
@@ -46,7 +51,25 @@ declare global {
   }
 }
 
-export const runtimeCompatibilityError = (runtime: RuntimeIdentity): string | null => {
+export const isVercelPreviewHostname = (hostname: string | undefined): boolean => {
+  const normalized = hostname?.trim().toLowerCase() ?? "";
+  return normalized.length > ".vercel.app".length && normalized.endsWith(".vercel.app");
+};
+
+export const runtimeDeploymentSkew = (
+  runtime: RuntimeIdentity,
+  { hostname, frontendGitSha = WEB_BUILD_SHA }: CompatibilityOptions = {}
+): string | null => {
+  if (frontendGitSha === "unknown" || frontendGitSha === runtime.git_sha) return null;
+  return isVercelPreviewHostname(hostname)
+    ? "A Vercel preview bundle is using an aligned runtime from a different release."
+    : "The page bundle does not match the running API release.";
+};
+
+export const runtimeCompatibilityError = (
+  runtime: RuntimeIdentity,
+  { hostname, frontendGitSha = WEB_BUILD_SHA }: CompatibilityOptions = {}
+): string | null => {
   const required = [runtime.git_sha, runtime.web_git_sha, runtime.worker_git_sha];
   if (required.some((value) => !value || value === "unknown")) {
     return "The release runtime did not provide complete build identity information.";
@@ -54,7 +77,9 @@ export const runtimeCompatibilityError = (runtime: RuntimeIdentity): string | nu
   if (new Set(required).size !== 1) {
     return "The API, web, and worker build identities do not match.";
   }
-  if (WEB_BUILD_SHA !== "unknown" && WEB_BUILD_SHA !== runtime.git_sha) {
+  // Only Vercel's generated preview hosts can visual-QA a bundle against an
+  // otherwise aligned runtime. Production custom domains stay fail-closed.
+  if (!isVercelPreviewHostname(hostname) && runtimeDeploymentSkew(runtime, { hostname, frontendGitSha })) {
     return "The page bundle does not match the running API release.";
   }
   return null;
