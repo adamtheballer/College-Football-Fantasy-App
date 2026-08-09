@@ -1,7 +1,12 @@
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 
 import { buildApiUrl } from "@/lib/api";
-import { runtimeCompatibilityError, type RuntimeIdentity, WEB_BUILD_SHA } from "@/lib/runtime-compatibility";
+import {
+  publishRuntimeDebugIdentity,
+  runtimeCompatibilityError,
+  type RuntimeIdentity,
+  WEB_BUILD_SHA,
+} from "@/lib/runtime-compatibility";
 
 type GateState =
   | { status: "checking" }
@@ -33,6 +38,7 @@ const RuntimeCompatibilityGate = ({ children }: { children: ReactNode }) => {
         const runtime = (await response.json()) as RuntimeIdentity;
         const reason = runtimeCompatibilityError(runtime);
         if (!active) return;
+        publishRuntimeDebugIdentity(runtime, reason);
         setCapabilities({
           email_enabled: runtime.email_enabled === true,
           support_email: runtime.support_email || null,
