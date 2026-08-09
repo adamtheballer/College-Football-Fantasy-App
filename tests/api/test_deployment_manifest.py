@@ -41,10 +41,20 @@ def test_production_manifest_starts_required_lifecycle_workers_before_promotion(
         "validate_immutable_player_snapshot",
         "run_database_migrations",
         "verify_alembic_head",
-        "bootstrap_canonical_player_registry",
-        "verify_canonical_player_registry",
         "start_or_promote_api",
         "require_health_ready",
+    ]
+    assert production["api"]["cors_origins"] == [
+        "https://collegefantasyfootball.org",
+        "https://www.collegefantasyfootball.org",
+    ]
+    assert production["api"]["ui_base_url"] == "https://www.collegefantasyfootball.org"
+    assert production["api"]["public_api_base_url"] == "https://api.collegefantasyfootball.org"
+    assert production["release_source"]["post_migration_commands"] == [
+        "PYTHONPATH=. uv run python scripts/audit_canonical_player_registry.py --source-dir reports/source-imports/2026"
+    ]
+    assert production["release_source"]["manual_data_reconciliation_only"] == [
+        "PYTHONPATH=. uv run python scripts/bootstrap_canonical_player_data.py --apply"
     ]
     assert production["release_source"]["canonical_id_owner"] == "application_database_players_id"
     assert production["release_source"]["source_snapshot_directory"] == "reports/source-imports/2026"

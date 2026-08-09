@@ -71,8 +71,11 @@ environments:
         - PYTHONPATH=. uv run python scripts/check_release_source_integrity.py
         - PYTHONPATH=. uv run python scripts/audit_preseason_source_contract.py --source-dir reports/source-imports/2026
       post_migration_commands:
-        - PYTHONPATH=. uv run python scripts/bootstrap_canonical_player_data.py --apply
         - PYTHONPATH=. uv run python scripts/audit_canonical_player_registry.py --source-dir reports/source-imports/2026
+      manual_data_reconciliation_only:
+        # This mutates player data and must be executed in its own approved,
+        # transactional release operation; never as an API deploy side effect.
+        - PYTHONPATH=. uv run python scripts/bootstrap_canonical_player_data.py --apply
     database:
       engine: postgres
       managed: true
@@ -83,12 +86,15 @@ environments:
       backups_required: true
     api:
       process_type: web
+      railway_service: College-Football-Fantasy-App API
+      railway_root_directory: /
+      railway_config_path: /railway.api.toml
       host: 0.0.0.0
-      port_env: API_PORT
+      port_env: PORT
       build_command: uv sync --frozen
-      migrate_command: cd api && PYTHONPATH=.. uv run alembic -c alembic.ini upgrade head
+      migrate_command: PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head
       verify_migrations_command: PYTHONPATH=. uv run python scripts/check_alembic_head.py
-      start_command: PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port ${API_PORT:-8000}
+      start_command: PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port $PORT
       health_path: /health
       readiness_path: /health/ready
       minimum_replicas: 1
@@ -103,14 +109,34 @@ environments:
         - validate_immutable_player_snapshot
         - run_database_migrations
         - verify_alembic_head
-        - bootstrap_canonical_player_registry
-        - verify_canonical_player_registry
         - start_or_promote_api
         - require_health_ready
+      cors_origins:
+        - https://collegefantasyfootball.org
+        - https://www.collegefantasyfootball.org
+      ui_base_url: https://www.collegefantasyfootball.org
+      public_api_base_url: https://api.collegefantasyfootball.org
     web:
+      provider: vercel
+      canonical_project: college-football-fantasy-app
+      legacy_project_to_disable_manually: college-fantasy-roster
+      production_branch: main
+      root_directory: web
       process_type: static
-      build_command: npm --prefix web ci && npm --prefix web run build
-      static_output: web/dist/spa
+      install_command: npm ci
+      build_command: test -n "$VERCEL_GIT_COMMIT_SHA" && VITE_GIT_SHA="$VERCEL_GIT_COMMIT_SHA" npm run build
+      static_output: dist/spa
+      production_url: https://www.collegefantasyfootball.org
+      custom_domains:
+        - https://collegefantasyfootball.org
+        - https://www.collegefantasyfootball.org
+      api_proxy_origin: https://api.collegefantasyfootball.org
+      required_vercel_system_environment_variables:
+        - VERCEL_GIT_COMMIT_SHA
+      post_deploy_runtime_proxy_verification: >-
+        WEB_RUNTIME_URL=https://www.collegefantasyfootball.org
+        DIRECT_API_RUNTIME_URL=https://api.collegefantasyfootball.org
+        CFF_GIT_SHA=<release-sha> npm --prefix web run verify:runtime
       env:
         # The Vercel project must route /api/:path* to the always-on API host.
         # Keep the public build on same-origin /api so browser code never embeds
