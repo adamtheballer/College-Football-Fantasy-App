@@ -23,8 +23,8 @@ def test_reads_header_after_sheet_title_and_preserves_source_values(tmp_path):
     source.write_text(
         "CFB PLAYER PREVIOUS STATS\n"
         "Updated weekly\n"
-        "CURRENT TEAM,DEPTH POS,PLAYER,SEASON,COLLEGE TEAM,PASS CMP,REC,REC YDS,SOURCE URL\n"
-        "Alabama,WR1,Example Receiver,2025,ALA,0,55,811,https://example.test/player/1\n",
+        "CURRENT TEAM,DEPTH POS,PLAYER,SEASON,COLLEGE TEAM,PASS CMP,REC,REC YDS,ESPN ID,GP,SOURCE URL\n"
+        "Alabama,WR1,Example Receiver,2025,ALA,0,55,811,12345,12,https://example.test/player/1\n",
         encoding="utf-8",
     )
 
@@ -35,6 +35,8 @@ def test_reads_header_after_sheet_title_and_preserves_source_values(tmp_path):
     assert rows[0].position == "WR"
     assert rows[0].receptions == 55
     assert rows[0].receiving_yards == 811
+    assert rows[0].espn_player_id == "12345"
+    assert rows[0].games_played == 12
 
 
 def test_resolves_only_exact_or_reviewed_alias_identity():
