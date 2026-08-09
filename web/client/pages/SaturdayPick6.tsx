@@ -5,7 +5,7 @@ import { Check, CircleX, Clock3, Copy, Lock, Radio, Trophy, UserRound } from "lu
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { type SaturdayPickPlayer, useSaveSaturdayPick, useSaturdayPickContest } from "@/hooks/use-saturday-pick";
-import { getSaturdayPickSponsorLogo } from "@/lib/saturday-pick-sponsor";
+import { getSaturdayPickSponsorBranding } from "@/lib/saturday-pick-sponsor";
 
 export const SATURDAY_PICK_6_COMING_SOON_MESSAGE =
   "Week 1 picks are coming soon. Six featured players will be available once weekly projections are published.";
@@ -80,11 +80,20 @@ type SaturdayPick6Props = {
 };
 
 function SaturdayPick6ComingSoon({ embedded }: SaturdayPick6Props) {
+  const sponsor = getSaturdayPickSponsorBranding(null);
   return (
     <section className={embedded ? "rounded-3xl border border-cfb-border-subtle bg-cfb-surface p-6 text-center" : "mx-auto max-w-4xl py-20 text-center"}>
       <p className="cfb-micro-label text-cfb-brand">Saturday Pick 6</p>
       <h1 className="mt-3 text-4xl font-black text-cfb-text-primary">Saturday Pick 6</h1>
       <p className="mx-auto mt-4 max-w-xl text-cfb-text-secondary">{SATURDAY_PICK_6_COMING_SOON_MESSAGE}</p>
+      <div className="mx-auto mt-6 flex max-w-xl flex-wrap items-center justify-center gap-4 rounded-2xl border border-cyan-200/20 bg-cyan-300/[0.06] p-4 text-left">
+        <img src={sponsor.logo_url} alt={sponsor.name} className="h-14 w-14 rounded-xl bg-white p-1 object-contain" />
+        <div>
+          <p className="cfb-micro-label text-cyan-200">Presented by</p>
+          <p className="mt-1 font-black text-cfb-text-primary">{sponsor.name}</p>
+          <p className="mt-1 text-sm font-bold text-cyan-100">{sponsor.tagline}</p>
+        </div>
+      </div>
       {!embedded ? <Button asChild className="mt-7"><Link to="/">Back to dashboard</Link></Button> : null}
     </section>
   );
@@ -135,11 +144,10 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
     (left, right) => new Date(left.game_time).getTime() - new Date(right.game_time).getTime() || left.sort_order - right.sort_order
   )[0];
   const lockPlayerName = firstGamePlayer?.player_name ?? "the first featured player";
-  // Sponsor data remains API-owned and is absent until the server has an
-  // approved sponsor configuration. No browser fallback may expose branding
-  // or a reward code.
+  // Public sponsor display may fall back to the approved branding asset. The
+  // API remains the sole source for eligibility and any winner-only reward.
   const sponsor = contest.sponsor;
-  const sponsorLogo = getSaturdayPickSponsorLogo(sponsor);
+  const sponsorBranding = getSaturdayPickSponsorBranding(sponsor);
   const revealSponsorReward = Boolean(sponsor) && shouldRevealSponsorReward(contest.status, contest.entry);
   const submit = async () => {
     if (!selectedPickId || !isOpen) return;
@@ -170,10 +178,10 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
             <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-cfb-text-secondary sm:text-lg">Which featured {positionLabel(contest.contest_position)} will score the most fantasy points this week?</p>
           </div>
           <div className="flex flex-wrap items-center gap-6">
-            {sponsor ? <>
-              <div className="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-white/25 bg-white p-1.5 shadow-[0_0_34px_rgba(34,211,238,0.20)] sm:h-36 sm:w-36">{sponsorLogo ? <img src={sponsorLogo} alt={sponsor.name} className="h-full w-full object-contain" /> : <span className="text-sm font-black text-cfb-brand">{sponsor.name.slice(0, 2).toUpperCase()}</span>}</div>
-              <div className="max-w-md"><p className="cfb-micro-label text-cyan-200">Presented by</p><p className="mt-2 text-2xl font-black leading-tight text-white sm:text-3xl">{sponsor.name}</p>{sponsor.offer_text ? <p className="mt-3 text-lg font-black leading-7 text-cyan-100 sm:text-xl">{sponsor.offer_text}</p> : null}</div>
-            </> : null}
+            <>
+              <div className="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-white/25 bg-white p-1.5 shadow-[0_0_34px_rgba(34,211,238,0.20)] sm:h-36 sm:w-36"><img src={sponsorBranding.logo_url} alt={sponsorBranding.name} className="h-full w-full object-contain" /></div>
+              <div className="max-w-md"><p className="cfb-micro-label text-cyan-200">Presented by</p><p className="mt-2 text-2xl font-black leading-tight text-white sm:text-3xl">{sponsorBranding.name}</p><p className="mt-3 text-lg font-black leading-7 text-cyan-100 sm:text-xl">{sponsorBranding.tagline}</p></div>
+            </>
             <div className="flex flex-wrap items-center gap-3"><div className="rounded-2xl border border-cfb-border-strong bg-slate-950/55 px-5 py-3 text-right"><p className="cfb-micro-label text-cfb-text-muted">{isOpen ? "Locks in" : "Contest status"}</p><p className="mt-1 font-display text-2xl font-black tabular-nums text-cyan-100">{isOpen ? countdown.value : statusLabel(contest.status)}</p></div>{embedded && isOpen ? <Button asChild><Link to="/saturday-pick-6">{contest.entry ? "Change Your Pick" : "Make Your Pick"}</Link></Button> : null}</div>
           </div>
         </div>

@@ -32,7 +32,9 @@ describe("SaturdayPick6 unavailable states", () => {
 
     expect(screen.getByRole("heading", { name: "Saturday Pick 6" })).toBeTruthy();
     expect(screen.getByText(SATURDAY_PICK_6_COMING_SOON_MESSAGE)).toBeTruthy();
-    expect(screen.queryByText(/West Georgia Cornhole/i)).toBeNull();
+    expect(screen.getByText("West Georgia Cornhole")).toBeTruthy();
+    expect(screen.getByText("#1 in All Things Cornhole & Outdoor Games")).toBeTruthy();
+    expect(screen.queryByText(/CFBFAN/i)).toBeNull();
   });
 
   it("keeps an empty published response in the coming-soon state", () => {

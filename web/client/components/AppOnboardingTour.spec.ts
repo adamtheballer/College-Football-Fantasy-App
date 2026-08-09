@@ -12,8 +12,13 @@ describe("first-sign-in onboarding", () => {
       isAdmin: false,
     };
 
-    expect(TOUR_STEPS.map((step) => step.target)).toEqual(
-      getShellNavItems(regularNewUser, true, 0, true).map((item) => `#${navDomId(item.name)}`),
-    );
+    const navigationTargets = getShellNavItems(regularNewUser, true, 0, true)
+      .map((item) => `#${navDomId(item.name)}`);
+
+    expect(TOUR_STEPS.map((step) => step.target)).toEqual([
+      ...navigationTargets.slice(0, 2),
+      "#dashboard-saturday-pick-6",
+      ...navigationTargets.slice(2),
+    ]);
   });
 });
