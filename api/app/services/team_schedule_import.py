@@ -12,7 +12,7 @@ import io
 import re
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import inspect
@@ -76,7 +76,7 @@ def _parse_kickoff(game_date: date | None, value: object | None) -> datetime | N
     for pattern in ("%Y-%m-%d %I:%M %p", "%Y-%m-%d %I %p"):
         try:
             parsed = datetime.strptime(f"{game_date.isoformat()} {time_text.upper()}", pattern)
-            return parsed.replace(tzinfo=EASTERN_TIME)
+            return parsed.replace(tzinfo=EASTERN_TIME).astimezone(UTC)
         except ValueError:
             continue
     raise ValueError(f"unsupported Eastern kickoff time {time_text!r}")
