@@ -34,8 +34,12 @@ def test_production_manifest_names_one_canonical_frontend_and_railway_api_contra
 
     assert api["railway_config_path"] == "/railway.api.toml"
     assert api["railway_root_directory"] == "/"
+    assert api["railway_builder"] == "DOCKERFILE"
+    assert api["railway_dockerfile_path"] == "Dockerfile.api"
     assert api["port_env"] == "PORT"
-    assert api["start_command"].endswith("--port $PORT")
+    assert api["start_command"] == (
+        "sh -c 'exec uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port \"$PORT\"'"
+    )
     assert api["migrate_command"] == "PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head"
     assert api["verify_migrations_command"] == "PYTHONPATH=. uv run python scripts/check_alembic_head.py"
 
@@ -51,11 +55,17 @@ def test_production_manifest_names_one_canonical_frontend_and_railway_api_contra
 def test_railway_api_recovery_config_uses_readiness_without_a_predeploy_hook():
     config = tomllib.loads((REPO_ROOT / "railway.api.toml").read_text(encoding="utf-8"))
 
-    assert config["build"] == {"builder": "RAILPACK", "buildCommand": "uv sync --frozen"}
+    assert config["build"] == {"builder": "DOCKERFILE", "dockerfilePath": "Dockerfile.api"}
     assert "preDeployCommand" not in config["deploy"]
-    assert config["deploy"]["startCommand"] == (
-        "PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port $PORT"
+    start_command = config["deploy"]["startCommand"]
+    assert start_command == (
+        "sh -c 'exec uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port \"$PORT\"'"
     )
+    assert not start_command.startswith("PYTHONPATH=.")
+    assert "sh -c" in start_command
+    assert "exec uv run uvicorn" in start_command
+    assert "--host 0.0.0.0" in start_command
+    assert '"$PORT"' in start_command
     assert config["deploy"]["healthcheckPath"] == "/health/ready"
     assert config["deploy"]["healthcheckTimeout"] == 100
     assert config["deploy"]["restartPolicyType"] == "ALWAYS"
