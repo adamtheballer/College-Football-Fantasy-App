@@ -3,6 +3,7 @@ import json
 
 import pytest
 
+from collegefootballfantasy_api.app.domain.scoring_engine import calculate_player_fantasy_points
 from scripts.import_preseason_weekly_projections import _require_inputs, _stats
 
 
@@ -18,6 +19,19 @@ def test_kewan_neutral_weekly_components_preserve_source_math():
     assert values is not None
     assert values["rush_yards"] == 119
     assert values["receptions"] == pytest.approx(28 / 12)
+    points, _ = calculate_player_fantasy_points(
+        {
+            "pass_yards": values["pass_yards"], "pass_tds": values["pass_tds"],
+            "passing_interceptions": values["interceptions"], "rush_yards": values["rush_yards"],
+            "rush_tds": values["rush_tds"], "receptions": values["receptions"],
+            "rec_yards": values["rec_yards"], "rec_tds": values["rec_tds"],
+            "xp_made": values["extra_points_made"],
+        }, {}, "RB",
+    )
+    assert 291.2 / 12 == pytest.approx(24.2666666667)
+    # The canonical engine intentionally stores its scored output at its
+    # established two-decimal precision after receiving unrounded components.
+    assert points == 24.27
 
 
 def test_kicker_without_distance_buckets_and_missing_baseline_are_not_scored():
