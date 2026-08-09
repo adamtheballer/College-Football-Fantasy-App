@@ -48,18 +48,11 @@ def test_production_manifest_names_one_canonical_frontend_and_railway_api_contra
     assert web["required_vercel_system_environment_variables"] == ["VERCEL_GIT_COMMIT_SHA"]
 
 
-def test_railway_api_config_gates_migrations_before_the_port_aware_api_starts():
+def test_railway_api_recovery_config_uses_readiness_without_a_predeploy_hook():
     config = tomllib.loads((REPO_ROOT / "railway.api.toml").read_text(encoding="utf-8"))
 
     assert config["build"] == {"builder": "RAILPACK", "buildCommand": "uv sync --frozen"}
-    pre_deploy_commands = config["deploy"]["preDeployCommand"]
-    assert len(pre_deploy_commands) == 1
-    assert pre_deploy_commands[0] == (
-        "PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head && "
-        "PYTHONPATH=. uv run python scripts/check_alembic_head.py"
-    )
-    assert pre_deploy_commands[0].index("alembic -c api/alembic.ini upgrade head") < pre_deploy_commands[0].index("&&")
-    assert pre_deploy_commands[0].index("&&") < pre_deploy_commands[0].index("scripts/check_alembic_head.py")
+    assert "preDeployCommand" not in config["deploy"]
     assert config["deploy"]["startCommand"] == (
         "PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port $PORT"
     )
