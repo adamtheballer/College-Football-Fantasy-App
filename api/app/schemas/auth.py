@@ -74,6 +74,20 @@ class UserCreate(BaseModel):
         return normalized or None
 
 
+class UserProfileUpdate(BaseModel):
+    """The limited, self-service profile fields supported during beta."""
+
+    first_name: str = Field(min_length=1, max_length=100)
+
+    @field_validator("first_name")
+    @classmethod
+    def validate_first_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("manager name is required")
+        return normalized
+
+
 class UserLogin(BaseModel):
     email: str
     password: str

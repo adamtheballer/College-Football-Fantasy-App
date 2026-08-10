@@ -13,6 +13,7 @@ import {
   ApiError,
   apiDelete,
   apiGet,
+  apiPatch,
   apiPost,
   clearAccessTokenSession,
   getStoredAccessToken,
@@ -70,6 +71,7 @@ type AuthContextValue = {
   user: User | null;
   login: (email: string, password: string, betaAccessReservation?: string) => Promise<User>;
   signup: (firstName: string, email: string, password: string, betaAccessReservation?: string) => Promise<User>;
+  updateProfile: (firstName: string) => Promise<User>;
   logout: () => void;
   resetPasswordWithCurrentPassword: (
     email: string,
@@ -252,6 +254,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return nextUser;
   }, [queryClient]);
 
+  const updateProfile = useCallback(async (firstName: string) => {
+    const payload = await apiPatch<AuthUserPayload>("/auth/me", { first_name: firstName });
+    const nextUser = mapUserPayload(payload);
+    safeStorageSet(USER_STORAGE_KEY, JSON.stringify(nextUser));
+    setUser(nextUser);
+    dispatchAuthChanged();
+    return nextUser;
+  }, []);
+
   const logout = useCallback(() => {
     void apiPost("/auth/logout", {}).catch(() => {
       // Ignore network failures; local logout must still complete.
@@ -319,6 +330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       login,
       signup,
+      updateProfile,
       logout,
       resetPasswordWithCurrentPassword,
       changePassword,
@@ -338,6 +350,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resetPasswordWithCurrentPassword,
       revokeSession,
       signup,
+      updateProfile,
       user,
     ]
   );

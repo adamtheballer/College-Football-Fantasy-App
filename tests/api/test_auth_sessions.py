@@ -84,6 +84,32 @@ def test_signup_normalizes_and_returns_username(client):
     assert response.json()["user"]["username"] == "saturday-coach"
 
 
+def test_signed_in_manager_can_update_only_their_own_display_name(client, db_session):
+    payload = signup_user(client, "profile")
+    token = payload["access_token"]
+
+    response = client.patch(
+        "/auth/me",
+        json={"first_name": "  Updated Manager  "},
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["first_name"] == "Updated Manager"
+    assert client.get("/auth/me", headers=auth_headers(token)).json()["first_name"] == "Updated Manager"
+    assert db_session.get(User, payload["user"]["id"]).first_name == "Updated Manager"
+
+
+def test_manager_name_update_rejects_blank_values_without_mutating_profile(client, db_session):
+    payload = signup_user(client, "profile-blank")
+    token = payload["access_token"]
+
+    response = client.patch("/auth/me", json={"first_name": "   "}, headers=auth_headers(token))
+
+    assert response.status_code == 422
+    assert db_session.get(User, payload["user"]["id"]).first_name == "Coachprofile-blank"
+
+
 def test_signup_rejects_duplicate_username(client):
     first = client.post(
         "/auth/signup",
