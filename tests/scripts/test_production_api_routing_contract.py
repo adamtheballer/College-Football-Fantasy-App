@@ -42,6 +42,10 @@ def test_production_manifest_names_one_canonical_frontend_and_railway_api_contra
     )
     assert api["migrate_command"] == "PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head"
     assert api["verify_migrations_command"] == "PYTHONPATH=. uv run python scripts/check_alembic_head.py"
+    assert api["railway_predeploy_command"] == (
+        "PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head "
+        "&& PYTHONPATH=. uv run python scripts/check_alembic_head.py"
+    )
 
     assert web["canonical_project"] == "college-football-fantasy-app"
     assert web["legacy_project_to_disable_manually"] == "college-fantasy-roster"
@@ -52,11 +56,14 @@ def test_production_manifest_names_one_canonical_frontend_and_railway_api_contra
     assert web["required_vercel_system_environment_variables"] == ["VERCEL_GIT_COMMIT_SHA"]
 
 
-def test_railway_api_recovery_config_uses_readiness_without_a_predeploy_hook():
+def test_railway_api_config_runs_one_atomic_migration_gate_before_readiness():
     config = tomllib.loads((REPO_ROOT / "railway.api.toml").read_text(encoding="utf-8"))
 
     assert config["build"] == {"builder": "DOCKERFILE", "dockerfilePath": "Dockerfile.api"}
-    assert "preDeployCommand" not in config["deploy"]
+    assert config["deploy"]["preDeployCommand"] == [
+        "PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head "
+        "&& PYTHONPATH=. uv run python scripts/check_alembic_head.py"
+    ]
     start_command = config["deploy"]["startCommand"]
     assert start_command == (
         "sh -c 'exec uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port \"$PORT\"'"
