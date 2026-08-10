@@ -1,4 +1,10 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { AppOnboardingTour } from "./AppOnboardingTour";
@@ -24,12 +30,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const { user, logout, isLoggedIn } = useAuth();
   const { support_email: supportEmail } = useRuntimeCapabilities();
-  const { data: unreadChatSummary } = useChatUnreadSummary(isLoggedIn, location.pathname === "/chats");
+  const { data: unreadChatSummary } = useChatUnreadSummary(
+    isLoggedIn,
+    location.pathname === "/chats",
+  );
   const [isGuideActive, setIsGuideActive] = useState(false);
   const mainScrollRef = useRef<HTMLElement | null>(null);
 
   const navItems = useMemo(
-    () => getShellNavItems(user, isLoggedIn, unreadChatSummary?.total_unread ?? 0, Boolean(supportEmail)),
+    () =>
+      getShellNavItems(
+        user,
+        isLoggedIn,
+        unreadChatSummary?.total_unread ?? 0,
+        Boolean(supportEmail),
+      ),
     [isLoggedIn, supportEmail, unreadChatSummary?.total_unread, user],
   );
 
@@ -95,10 +110,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         user={user}
         isLoggedIn={isLoggedIn}
         hideChrome={isDraftRoomPage}
-        // Marketing surfaces can keep the stadium/playbook treatment. Authenticated
-        // management screens use a quieter data-first shell instead.
-        hideDecor={isLoggedIn || isCreateLeaguePage}
-        hideFloatingActions={isLoggedIn || isDraftRoomPage || isCreateLeaguePage || isSaturdayPick6Page}
+        // Keep the shared collegiate field treatment behind every route. It is
+        // intentionally quiet enough for data-dense authenticated pages while
+        // preventing the shell from collapsing to a flat black canvas.
+        hideDecor={false}
+        hideFloatingActions={
+          isLoggedIn ||
+          isDraftRoomPage ||
+          isCreateLeaguePage ||
+          isSaturdayPick6Page
+        }
         compactContent={isDraftRoomPage || isCreateLeaguePage}
         // Draft rooms use the same page-level scroll owner as every other
         // route. A fixed outer viewport plus a nested player-board scroller

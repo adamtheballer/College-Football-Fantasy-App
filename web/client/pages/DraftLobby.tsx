@@ -416,7 +416,7 @@ export default function DraftLobby() {
               <Clock className="w-6 h-6 text-primary" />
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Starts In</p>
-                <p className="text-2xl font-black text-foreground">{countdown}</p>
+                <p className="whitespace-nowrap text-[clamp(1.35rem,6vw,2rem)] font-black tabular-nums text-foreground">{countdown}</p>
               </div>
             </div>
             <div className="flex items-center gap-4 px-6 py-4 rounded-2xl bg-white/5 border border-white/10">
@@ -435,16 +435,19 @@ export default function DraftLobby() {
             </div>
           </div>
           {countdownParts && countdownParts.totalMs > 0 ? (
-            <div className="grid grid-cols-4 gap-3">
+            <div data-testid="draft-countdown-units" className="grid grid-cols-4 gap-2 sm:gap-3">
               {[
-                ["Days", countdownParts.days],
-                ["Hours", countdownParts.hours],
-                ["Minutes", countdownParts.minutes],
-                ["Seconds", countdownParts.seconds],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-2xl border border-white/10 bg-black/15 p-4 text-center">
-                  <p className="text-3xl font-black text-slate-50">{value}</p>
-                  <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-slate-500">{label}</p>
+                { label: "Days", compactLabel: "DAYS", value: countdownParts.days },
+                { label: "Hours", compactLabel: "HRS", value: countdownParts.hours },
+                { label: "Minutes", compactLabel: "MIN", value: countdownParts.minutes },
+                { label: "Seconds", compactLabel: "SEC", value: countdownParts.seconds },
+              ].map(({ label, compactLabel, value }) => (
+                <div key={label} className="min-w-0 rounded-2xl border border-white/10 bg-black/15 px-2 py-3 text-center sm:p-4">
+                  <p className="whitespace-nowrap text-[clamp(1.55rem,8.5vw,1.875rem)] font-black leading-none tabular-nums text-slate-50">{value}</p>
+                  <p aria-label={label} className="mt-2 whitespace-nowrap text-[8px] font-black uppercase tracking-[0.08em] text-slate-500 sm:text-[9px] sm:tracking-[0.18em]">
+                    <span className="sm:hidden">{compactLabel}</span>
+                    <span className="hidden sm:inline">{label}</span>
+                  </p>
                 </div>
               ))}
             </div>

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { SaturdayPickPlayer } from "@/hooks/use-saturday-pick";
 import { getSaturdayPickRewardMessage, getSaturdayPickSponsorLogo } from "@/lib/saturday-pick-sponsor";
 
-import { displayPoints, isSaturdayPick6ComingSoon, lockDeadlineMessage, pickConfirmationMessage, positionLabel, SATURDAY_PICK_6_COMING_SOON_MESSAGE, shouldRevealSponsorReward, statusLabel } from "./SaturdayPick6";
+import { displayPoints, isSaturdayPick6ComingSoon, lockDeadlineMessage, pickConfirmationMessage, positionLabel, SATURDAY_PICK_6_COMING_SOON_MESSAGE, SATURDAY_PICK_6_HOW_IT_WORKS, shouldRevealSponsorReward, statusLabel } from "./SaturdayPick6";
 
 const player: SaturdayPickPlayer = {
   id: 1,
@@ -22,6 +22,13 @@ const player: SaturdayPickPlayer = {
 };
 
 describe("SaturdayPick6 state helpers", () => {
+  it("explains the weekly pick and winner reward without promising a code before results finalize", () => {
+    expect(SATURDAY_PICK_6_HOW_IT_WORKS).toContain("six featured players");
+    expect(SATURDAY_PICK_6_HOW_IT_WORKS).toContain("first kickoff");
+    expect(SATURDAY_PICK_6_HOW_IT_WORKS).toContain("most fantasy points that week");
+    expect(SATURDAY_PICK_6_HOW_IT_WORKS).toContain("discount code");
+  });
+
   it("uses a live score when available and preserves a missing live score as the projection", () => {
     expect(displayPoints(player, "SCORING")).toBe(18.4);
     expect(displayPoints({ ...player, live_points: 21.6, scoring_status: "LIVE" }, "SCORING")).toBe(21.6);

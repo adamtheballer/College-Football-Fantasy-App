@@ -44,14 +44,21 @@ export function AppShell({
     <div
       className={cn(
         "isolate relative flex h-[100dvh] min-h-0 overflow-hidden bg-cfb-canvas font-sans text-cfb-text-primary selection:bg-cfb-brand/30 selection:text-white lg:h-screen",
-        isLoggedIn ? "bg-[#0b0d10]" : "cfb-school-grid",
       )}
+      style={{
+        background:
+          "radial-gradient(ellipse at 12% 8%, rgba(122, 235, 241, 0.19), transparent 33%), radial-gradient(ellipse at 89% 7%, rgba(141, 183, 255, 0.18), transparent 30%), radial-gradient(ellipse at 70% 88%, rgba(190, 153, 231, 0.12), transparent 35%), linear-gradient(135deg, #245a80 0%, #3a729d 47%, #405f96 100%)",
+      }}
     >
       {!hideDecor ? <BackgroundEffects /> : null}
       {!hideFloatingActions ? <FloatingQuickActions /> : null}
 
       {!hideChrome ? (
-        <DesktopSidebar items={navItems} pathname={pathname} onSignOut={onSignOut} />
+        <DesktopSidebar
+          items={navItems}
+          pathname={pathname}
+          onSignOut={onSignOut}
+        />
       ) : null}
 
       <main
@@ -70,7 +77,9 @@ export function AppShell({
         <div
           className={cn(
             "flex-1",
-            compactContent ? "p-0" : "px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] sm:px-6 sm:py-6 sm:pb-24 lg:p-8",
+            compactContent
+              ? "p-0"
+              : "px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] sm:px-6 sm:py-6 sm:pb-24 lg:p-8",
           )}
         >
           {children}

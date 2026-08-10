@@ -408,7 +408,7 @@ export function PlayerCardModal({
 
   return (
     <div
-      className="fixed inset-0 z-[1400] flex items-center justify-center bg-slate-950/78 p-0 backdrop-blur-md sm:p-6"
+      className="fixed inset-0 z-[1400] flex items-end justify-center bg-slate-950/78 p-3 backdrop-blur-md sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label={`${player.name} player card`}
@@ -416,7 +416,7 @@ export function PlayerCardModal({
     >
       <article
         className={cn(
-          "relative flex h-[100dvh] max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden rounded-none border-x-0 border-y border-white/12 bg-[#0b0d10] text-white sm:h-auto sm:max-h-[92vh] sm:rounded-xl sm:border-x",
+          "relative flex h-[82dvh] max-h-[82dvh] w-full max-w-5xl flex-col overflow-hidden rounded-[1.75rem] border border-white/12 bg-[#0b0d10] text-white shadow-[0_28px_80px_rgba(2,6,23,0.62)] sm:h-auto sm:max-h-[92vh] sm:rounded-xl",
           palette.glow
         )}
         onClick={(event) => event.stopPropagation()}

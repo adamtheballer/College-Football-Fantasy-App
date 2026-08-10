@@ -571,8 +571,8 @@ export default function Draft() {
   const currentTeamLabel = draftRoom.current_team_name || "Draft complete";
   const latestPick = draftRoom.picks[draftRoom.picks.length - 1];
   const currentPick = draftRoom.current_pick;
-  const canPick = isDraftActive && draftRoom.can_make_pick && !pickMutation.isPending;
-  const actionLabel = isScheduledPreview || isPreDraft || isTransition ? "Locked" : draftRoom.can_make_pick ? "Draft" : "Wait";
+  const isUserTurn = isDraftActive && draftRoom.can_make_pick;
+  const canPick = isUserTurn && !pickMutation.isPending;
   const completed = draftRoom.current_team_id === null || ["complete", "completed"].includes(draftRoom.status);
   const exitPath = completed ? `/league/${parsedLeagueId}/roster` : `/league/${parsedLeagueId}/lobby`;
   const backendPlayerCount = playersPayload?.total ?? 0;
@@ -933,24 +933,30 @@ export default function Draft() {
 
         <section data-testid="mobile-draft-order" className={cn("shrink-0 overflow-hidden sm:hidden", draftMattePanelClass)}>
           <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
-            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-amber-200">Draft order</p>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-amber-200">Draft order</p>
+              <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Swipe for future rounds</p>
+            </div>
             <p className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">{currentPick} / {totalPicks}</p>
           </div>
-          <div className="grid grid-cols-5 gap-1 px-2 py-2">
-            {draftOrderPicks.slice(
-              Math.min(Math.max(0, currentPick - 3), Math.max(0, draftOrderPicks.length - 5)),
-              Math.min(draftOrderPicks.length, Math.min(Math.max(0, currentPick - 3), Math.max(0, draftOrderPicks.length - 5)) + 5),
-            ).map((slot) => {
-              const isCurrent = !completed && slot.overallPick === currentPick;
-              const isUser = slot.team?.id === draftRoom.user_team_id;
-              return (
-                <div key={slot.overallPick} aria-current={isCurrent ? "step" : undefined} className={cn("flex min-w-0 flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}>
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/12 bg-black/20">{slot.team?.is_cpu ? <Bot className="h-3 w-3" /> : <User className="h-3 w-3" />}</span>
-                  <span className="mt-1 whitespace-nowrap text-[9px] font-black tabular-nums">{slot.round}.{slot.roundPick}</span>
-                  <span className="max-w-full truncate text-[8px] font-black uppercase tracking-[0.04em]">{isUser ? "You" : slot.team?.name?.replace("Bot Team", "B") ?? "Team"}</span>
-                </div>
-              );
-            })}
+          <div
+            data-testid="mobile-draft-order-scroll"
+            aria-label="Draft order; swipe horizontally to view every pick and future rounds"
+            className="overflow-x-auto overscroll-x-contain scroll-smooth snap-x px-2 py-2 touch-pan-x"
+          >
+            <div className="flex min-w-max gap-1.5">
+              {draftOrderPicks.map((slot) => {
+                const isCurrent = !completed && slot.overallPick === currentPick;
+                const isUser = slot.team?.id === draftRoom.user_team_id;
+                return (
+                  <div key={slot.overallPick} aria-current={isCurrent ? "step" : undefined} className={cn("flex w-[4.15rem] shrink-0 snap-start flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}>
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/12 bg-black/20">{slot.team?.is_cpu ? <Bot className="h-3 w-3" /> : <User className="h-3 w-3" />}</span>
+                    <span className="mt-1 whitespace-nowrap text-[9px] font-black tabular-nums">{slot.round}.{slot.roundPick}</span>
+                    <span className="max-w-full truncate text-[8px] font-black uppercase tracking-[0.04em]">{isUser ? "You" : slot.team?.name?.replace("Bot Team", "B") ?? "Team"}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </section>
 
@@ -1089,10 +1095,9 @@ export default function Draft() {
             </div>
           </div>
 
-          <div className="hidden grid-cols-[64px_minmax(0,1fr)_70px_110px_180px] border-b border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground sm:grid">
+          <div className="grid grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground sm:grid-cols-[64px_minmax(0,1fr)_110px_140px] sm:gap-3 sm:px-5 sm:py-3 sm:text-[9px] sm:tracking-[0.22em]">
             <span>RK</span>
             <span>Player</span>
-            <span>Pos</span>
             <span>Proj</span>
             <span className="text-right">Action</span>
           </div>
@@ -1122,6 +1127,8 @@ export default function Draft() {
                 const isQueued = queuedPlayerIds.includes(player.id);
                 const isBackendPlayer = player.id > 0;
                 const visibleRank = player.masterDraftRank ?? player.draftRank;
+                const actionIsDraft = isUserTurn;
+                const actionIsDisabled = actionIsDraft && (!canPick || !isBackendPlayer);
                 return (
                   <div
                     key={player.id}
@@ -1136,60 +1143,61 @@ export default function Draft() {
                       }
                     }}
                     className={cn(
-                      "grid min-h-[68px] cursor-pointer grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-x-2 border-b border-white/10 px-3 py-2 outline-none transition-[background-color,box-shadow,color] duration-200 sm:min-h-0 sm:grid-cols-[64px_minmax(0,1fr)_70px_110px_180px] sm:items-center sm:gap-3 sm:px-5 sm:py-4",
+                      "grid min-h-[66px] cursor-pointer grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 outline-none transition-[background-color,box-shadow,color] duration-200 sm:min-h-0 sm:grid-cols-[64px_minmax(0,1fr)_110px_140px] sm:items-center sm:gap-3 sm:px-5 sm:py-3",
                       positionHoverClass,
                       isSelected && "bg-amber-300/[0.075] shadow-[inset_3px_0_0_rgba(251,191,36,0.72)]"
                     )}
                   >
-                    <p className="row-span-2 self-center text-base font-bold tabular-nums text-muted-foreground sm:row-auto sm:text-xl sm:font-black">{visibleRank}</p>
-                    <div className="min-w-0 self-center sm:col-auto sm:row-auto">
-                      <p className="line-clamp-2 text-sm font-black leading-4 text-foreground transition-colors hover:text-amber-100 sm:text-base sm:leading-normal">{player.name}</p>
-                      <p className="mt-0.5 truncate text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground sm:mt-1 sm:text-[10px] sm:tracking-[0.18em]">{player.school}</p>
-                    </div>
-                    <div className="row-span-2 flex items-center justify-end gap-1.5 sm:contents">
-                      <div className="flex flex-col items-end gap-0.5 sm:contents">
-                        <span className={cn("shrink-0 rounded-lg border px-2 py-1 text-[9px] font-black sm:col-auto sm:row-auto sm:w-fit sm:rounded-full sm:px-4 sm:py-2 sm:text-xs", positionClass)}>{player.pos}</span>
-                        <p className="text-[10px] font-black tabular-nums text-foreground sm:col-auto sm:block sm:text-sm">{formatDraftProjection({ seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</p>
+                    <p className="self-center text-base font-bold tabular-nums text-muted-foreground sm:text-xl sm:font-black">{visibleRank}</p>
+                    <div className="min-w-0 self-center">
+                      <p className="truncate text-sm font-black leading-4 text-foreground transition-colors hover:text-amber-100 sm:text-base sm:leading-normal">{player.name}</p>
+                      <div className="mt-0.5 flex min-w-0 items-center gap-1.5 sm:mt-1 sm:gap-2">
+                        <p className="truncate text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground sm:text-[10px] sm:tracking-[0.18em]">{player.school}</p>
+                        <span className={cn("shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black sm:rounded-full sm:px-2 sm:text-[9px]", positionClass)}>{player.pos}</span>
                       </div>
-                      <div className="flex items-center gap-1 sm:col-auto sm:justify-end sm:gap-2">
-                      <Button
-                        variant="outline"
-                        className="h-10 min-h-[44px] w-10 rounded-lg px-0 text-[10px] font-black uppercase tracking-[0.08em] sm:h-10 sm:min-h-0 sm:w-auto sm:rounded-xl sm:px-4 sm:tracking-[0.14em]"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          toggleQueue(player.id);
-                        }}
-                      >
-                        <ClipboardList className="h-3.5 w-3.5 sm:hidden" aria-hidden="true" />
-                        <span className="sr-only sm:hidden">{isQueued ? "Queued" : "Queue"}</span>
-                        <span className="hidden sm:inline">{isQueued ? "Queued" : "Queue"}</span>
-                      </Button>
+                    </div>
+                    <p className="text-right text-[10px] font-black tabular-nums text-foreground sm:text-sm">{formatDraftProjection({ seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</p>
                       <Button
                         className={cn(
-                          "h-10 min-h-[44px] rounded-lg px-3 text-[9px] font-black uppercase tracking-[0.06em] sm:h-10 sm:min-h-0 sm:rounded-xl sm:px-5 sm:text-[10px] sm:tracking-[0.14em]",
-                          canPick && isBackendPlayer
+                          "h-10 min-h-[44px] w-[78px] rounded-lg px-1 text-[8px] font-black uppercase tracking-[0.04em] sm:h-10 sm:min-h-0 sm:w-[140px] sm:rounded-xl sm:px-3 sm:text-[10px] sm:tracking-[0.14em]",
+                          actionIsDraft && isBackendPlayer
                             ? "border border-cyan-100/35 bg-[#1b3349] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)]"
-                            : "border border-white/10 bg-white/[0.04] text-muted-foreground"
+                            : actionIsDraft
+                              ? "border border-white/10 bg-white/[0.04] text-muted-foreground"
+                              : "border border-white/15 bg-white/[0.06] text-cyan-50 transition hover:border-cyan-100/45 hover:bg-white/[0.12]"
                         )}
-                        disabled={!canPick || !isBackendPlayer}
+                        disabled={actionIsDisabled}
                         onClick={(event) => {
                           event.stopPropagation();
-                          makePick(player);
+                          if (actionIsDraft) {
+                            makePick(player);
+                          } else {
+                            toggleQueue(player.id);
+                          }
                         }}
                         title={
-                          isScheduledPreview || isPreDraft || isTransition
-                            ? isLeagueFull
-                              ? "Draft picks unlock after the commissioner starts the draft and the countdown ends."
-                              : "Draft picks unlock after the league is full."
-                            : !isBackendPlayer
-                              ? "This master-board player needs backend CFB27 sync before a real pick can be saved."
-                              : undefined
+                          actionIsDraft && !isBackendPlayer
+                            ? "This master-board player needs backend CFB27 sync before a real pick can be saved."
+                            : actionIsDraft && !canPick
+                              ? "Submitting your draft pick."
+                              : isQueued
+                                ? `Remove ${player.name} from your queue.`
+                                : actionIsDraft
+                                  ? `Draft ${player.name}.`
+                                  : `Queue ${player.name}.`
                         }
+                        aria-label={actionIsDraft ? `Draft ${player.name}` : isQueued ? `Remove ${player.name} from queue` : `Queue ${player.name}`}
                       >
-                        {pickMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : !isBackendPlayer ? "Sync Req" : !canPick && (isScheduledPreview || isPreDraft || isTransition) ? <><Lock className="mr-2 h-3.5 w-3.5" />{actionLabel}</> : actionLabel}
+                        {actionIsDraft
+                          ? pickMutation.isPending
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : !isBackendPlayer
+                              ? "Sync Req"
+                              : "Draft"
+                          : isQueued
+                            ? "Queued"
+                            : "Queue"}
                       </Button>
-                      </div>
-                    </div>
                   </div>
                 );
               })

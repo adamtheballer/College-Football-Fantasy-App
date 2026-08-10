@@ -150,6 +150,14 @@ afterEach(() => {
 });
 
 describe("Chats", () => {
+  it("keeps the mobile composer at Safari's no-focus-zoom font size", () => {
+    render(<Chats />);
+
+    const composer = screen.getByPlaceholderText("Message your league…");
+    expect(composer.className).toContain("text-base");
+    expect(composer.className).toContain("sm:text-sm");
+  });
+
   it("shows the master chat, isolates messages after league switching, and marks the viewed thread read", () => {
     render(<Chats />);
 
