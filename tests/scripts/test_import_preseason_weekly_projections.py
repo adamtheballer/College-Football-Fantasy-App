@@ -4,7 +4,12 @@ import json
 import pytest
 
 from collegefootballfantasy_api.app.domain.scoring_engine import calculate_player_fantasy_points
-from scripts.import_preseason_weekly_projections import _canonical_source_team, _require_inputs, _stats
+from scripts.import_preseason_weekly_projections import (
+    _canonical_source_team,
+    _require_inputs,
+    _stats,
+    sealed_annual_baseline_source,
+)
 
 
 def _annual() -> dict[str, str]:
@@ -59,6 +64,14 @@ def test_kicker_total_field_goals_uses_flat_beta_scoring_and_missing_baseline_is
 def test_canonical_source_team_keeps_notre_dame_consistent_between_workbooks():
     assert _canonical_source_team("NOTRE DAME") == "Notre Dame"
     assert _canonical_source_team("Notre Dame") == "Notre Dame"
+
+
+def test_weekly_projection_provenance_is_the_annual_snapshot_hash():
+    annual_hash = "0b3d244603cd0000000000000000000000000000000000000000000000000000"
+
+    assert sealed_annual_baseline_source(annual_hash) == "sealed:0b3d244603cd"
+    with pytest.raises(ValueError, match="SHA-256"):
+        sealed_annual_baseline_source("not-a-sha")
 
 
 def test_builder_requires_complete_matching_sealed_manifest_and_scoring_audit(tmp_path):
