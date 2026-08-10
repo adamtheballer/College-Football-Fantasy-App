@@ -401,14 +401,14 @@ export default function SinglePlayerMockDraftRoom() {
                 placeholder="Search players, schools..."
               />
             </div>
-            <div data-testid="draft-player-filters" className="grid grid-cols-[1.2fr_repeat(5,minmax(0,1fr))] gap-1 sm:flex sm:flex-wrap sm:gap-2">
+            <div data-testid="draft-player-filters" className="flex min-w-0 gap-1 overflow-x-auto pb-0.5 sm:flex-wrap sm:gap-2 sm:overflow-visible">
               {POSITIONS.map((value) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setPosition(value)}
                   className={cn(
-                    "h-9 min-w-0 whitespace-nowrap rounded-xl border px-0 text-[9px] font-black uppercase tracking-[0.04em] transition sm:h-10 sm:rounded-2xl sm:px-4 sm:text-[10px] sm:tracking-[0.14em]",
+                    "h-9 shrink-0 whitespace-nowrap rounded-full border px-3 text-[10px] font-bold uppercase tracking-[0.03em] transition sm:h-10 sm:px-4 sm:text-[10px] sm:font-black sm:tracking-[0.14em]",
                     position === value
                       ? "border-amber-200/55 bg-amber-200 text-slate-950 shadow-[0_8px_18px_rgba(251,191,36,0.20)]"
                       : "border-white/10 bg-white/5 text-muted-foreground hover:border-amber-200/35 hover:text-amber-100"
@@ -469,28 +469,28 @@ export default function SinglePlayerMockDraftRoom() {
                   }
                 }}
                 className={cn(
-                  "grid min-h-[78px] cursor-pointer grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-x-2 border-b border-white/10 px-3 py-2 outline-none transition-[background-color,box-shadow,color] duration-200 sm:min-h-0 sm:grid-cols-[64px_minmax(0,1fr)_70px_110px_180px] sm:items-center sm:gap-3 sm:px-5 sm:py-4",
+                  "grid min-h-[68px] cursor-pointer grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-x-2 border-b border-white/10 px-3 py-2 outline-none transition-[background-color,box-shadow,color] duration-200 sm:min-h-0 sm:grid-cols-[64px_minmax(0,1fr)_70px_110px_180px] sm:items-center sm:gap-3 sm:px-5 sm:py-4",
                   positionHoverClass,
                   isSelected && "bg-amber-300/[0.075] shadow-[inset_3px_0_0_rgba(251,191,36,0.72)]"
                 )}
               >
-                <p className="row-span-2 self-center text-lg font-black tabular-nums text-muted-foreground sm:row-auto sm:text-xl">{visibleRank}</p>
+                <p className="row-span-2 self-center text-base font-bold tabular-nums text-muted-foreground sm:row-auto sm:text-xl sm:font-black">{visibleRank}</p>
                 <div className="min-w-0 self-center sm:col-auto sm:row-auto">
                   <p className="line-clamp-2 text-sm font-black leading-4 text-foreground transition-colors hover:text-amber-100 sm:text-base sm:leading-normal">{player.name}</p>
                   <p className="mt-0.5 truncate text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground sm:mt-1 sm:text-[10px] sm:tracking-[0.18em]">{player.school}</p>
                 </div>
-                <div className="row-span-2 flex flex-col items-end justify-center gap-1.5 sm:contents">
-                  <div className="flex items-center gap-1.5 sm:contents">
+                <div className="row-span-2 flex items-center justify-end gap-1.5 sm:contents">
+                  <div className="flex flex-col items-end gap-0.5 sm:contents">
                     <span className={cn("shrink-0 rounded-lg border px-2 py-1 text-[9px] font-black sm:col-auto sm:row-auto sm:w-fit sm:rounded-full sm:px-4 sm:py-2 sm:text-xs", positionClass)}>{player.pos}</span>
                     <p className="text-[10px] font-black tabular-nums text-foreground sm:col-auto sm:block sm:text-sm">
                       <span className="sm:hidden">{formatDraftProjection({ seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</span>
                       <span className="hidden sm:inline">{formatDraftProjection({ seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</span>
                     </p>
                   </div>
-                  <div className="flex items-center gap-1.5 sm:col-auto sm:justify-end sm:gap-2">
+                  <div className="flex items-center gap-1 sm:col-auto sm:justify-end sm:gap-2">
                   <Button
                     variant="outline"
-                    className="h-9 min-h-[44px] w-9 rounded-lg px-0 text-[10px] font-black uppercase tracking-[0.08em] sm:h-10 sm:min-h-0 sm:w-auto sm:rounded-2xl sm:px-4 sm:tracking-[0.14em]"
+                    className="h-10 min-h-[44px] w-10 rounded-lg px-0 text-[10px] font-black uppercase tracking-[0.08em] sm:h-10 sm:min-h-0 sm:w-auto sm:rounded-xl sm:px-4 sm:tracking-[0.14em]"
                     onClick={(event) => {
                       event.stopPropagation();
                       toggleQueue(player.id);
@@ -501,7 +501,7 @@ export default function SinglePlayerMockDraftRoom() {
                     <span className="hidden sm:inline">{isQueued ? "Queued" : "Queue"}</span>
                   </Button>
                   <Button
-                    className="h-9 min-h-[44px] rounded-lg border border-cyan-100/35 bg-[#1b3349] px-2.5 text-[9px] font-black uppercase tracking-[0.08em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)] sm:h-10 sm:min-h-0 sm:rounded-2xl sm:px-5 sm:text-[10px] sm:tracking-[0.14em]"
+                    className="h-10 min-h-[44px] rounded-lg border border-cyan-100/35 bg-[#1b3349] px-3 text-[9px] font-black uppercase tracking-[0.06em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_5px_12px_rgba(2,6,23,0.24)] transition hover:border-cyan-100/60 hover:bg-[#294d69] sm:h-10 sm:min-h-0 sm:rounded-xl sm:px-5 sm:text-[10px] sm:tracking-[0.14em]"
                     disabled={!userOnClock || draftState.status !== "live"}
                     onClick={(event) => {
                       event.stopPropagation();

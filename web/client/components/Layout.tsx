@@ -86,8 +86,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         user={user}
         isLoggedIn={isLoggedIn}
         hideChrome={isDraftRoomPage}
-        hideDecor={isCreateLeaguePage}
-        hideFloatingActions={isDraftRoomPage || isCreateLeaguePage || isSaturdayPick6Page}
+        // Marketing surfaces can keep the stadium/playbook treatment. Authenticated
+        // management screens use a quieter data-first shell instead.
+        hideDecor={isLoggedIn || isCreateLeaguePage}
+        hideFloatingActions={isLoggedIn || isDraftRoomPage || isCreateLeaguePage || isSaturdayPick6Page}
         compactContent={isDraftRoomPage || isCreateLeaguePage}
         fixedViewport={isDraftRoomPage}
         onSignOut={logout}

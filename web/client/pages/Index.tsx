@@ -212,23 +212,20 @@ export default function Index() {
   const ownedTeamName = workspace?.owned_team?.name ?? "Your Team";
 
   return (
-    <div className="mx-auto w-full touch-pan-y max-w-7xl space-y-5 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] pt-3 sm:space-y-7 sm:pb-24 sm:pt-4">
-      <section className="relative grid gap-4 sm:gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <div aria-hidden="true" className="pointer-events-none absolute -left-8 -top-8 h-28 w-80 rotate-[-14deg] rounded-full bg-gradient-to-r from-cfb-pink/45 via-cfb-brand/35 to-transparent blur-xl" />
-        <div aria-hidden="true" className="pointer-events-none absolute -right-8 top-20 h-24 w-96 rotate-[-18deg] rounded-full bg-gradient-to-r from-transparent via-cfb-cyan/35 to-cfb-gold/30 blur-xl" />
-        <div aria-hidden="true" className="pointer-events-none absolute bottom-2 left-16 h-20 w-96 rotate-[-10deg] rounded-full bg-gradient-to-r from-cfb-gold/30 via-cfb-brand/20 to-transparent blur-xl" />
-        <SurfaceCard variant="scoreboard" padding="compact" className="cfb-playbook-pattern relative min-h-0 sm:min-h-[330px] sm:p-8">
-          <div className="flex h-full flex-col justify-between gap-5 sm:gap-8">
-            <div className="space-y-3 sm:space-y-4">
-              <div className="inline-flex items-center gap-2 rounded-full border border-cfb-brand/35 bg-cfb-brand/[0.12] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-blue-100 sm:px-4 sm:py-2 sm:text-[11px] sm:tracking-[0.18em]">
+    <div className="mx-auto w-full touch-pan-y max-w-7xl space-y-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] pt-1 sm:space-y-6 sm:pb-24 sm:pt-3">
+      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <SurfaceCard variant="raised" padding="compact" className="relative min-h-0 sm:p-7">
+          <div className="flex h-full flex-col justify-between gap-4 sm:gap-6">
+            <div className="space-y-2 sm:space-y-3">
+              <div className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-cfb-brand sm:font-black sm:tracking-[0.14em]">
                 <Zap className="h-4 w-4" aria-hidden="true" />
                 Game Week Command Center
               </div>
               <div>
-                <h1 className="text-3xl font-black leading-[1.03] tracking-[-0.04em] text-cfb-text-primary sm:text-5xl">
+                <h1 className="text-2xl font-bold leading-tight tracking-[-0.03em] text-cfb-text-primary sm:text-5xl sm:font-black">
                   Good to see you, {user?.firstName ?? "Manager"}.
                 </h1>
-                <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-cfb-text-secondary sm:mt-3 sm:text-base sm:leading-7">
+                <p className="mt-1.5 max-w-2xl text-sm leading-6 text-cfb-text-secondary sm:mt-3 sm:text-base sm:leading-7">
                   Resume your active league, check the matchup board, and handle roster decisions
                   before kickoff.
                 </p>
@@ -236,27 +233,27 @@ export default function Index() {
             </div>
 
             {selectedLeague ? (
-              <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+              <div className="grid gap-3 border-t border-cfb-border-subtle pt-3 lg:grid-cols-[1fr_auto] lg:items-end">
                 <div>
-                  <p className="cfb-micro-label text-cfb-brand">Current League</p>
-                  <h2 className="mt-2 text-3xl font-black italic text-cfb-text-primary">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-cfb-brand sm:font-black sm:tracking-[0.16em]">Current League</p>
+                  <h2 className="mt-1 text-xl font-bold text-cfb-text-primary sm:mt-2 sm:text-3xl sm:font-black sm:italic">
                     {selectedLeague.name}
                   </h2>
-                  <p className="mt-2 text-xs font-black uppercase tracking-[0.16em] text-cfb-text-muted">
+                  <p className="mt-1 text-xs font-medium text-cfb-text-muted sm:mt-2 sm:font-black sm:uppercase sm:tracking-[0.12em]">
                     {formatDashboardStatus(selectedLeague.status)} • {selectedLeague.members.length}/
                     {selectedLeague.max_teams} managers • {formatDraftTime(selectedLeague.draft?.draft_datetime_utc)}
                   </p>
                 </div>
-                <div className="flex gap-3 max-[360px]:flex-col sm:flex-wrap">
+                <div className="flex items-center gap-2 sm:flex-wrap">
                   <Button
-                    className="h-12 flex-1 justify-center rounded-xl text-[11px] font-black uppercase tracking-[0.13em] sm:h-11 sm:flex-none sm:tracking-[0.16em]"
+                    className="h-10 flex-1 justify-center rounded-lg text-[11px] font-black uppercase tracking-[0.08em] sm:h-11 sm:flex-none sm:rounded-xl sm:tracking-[0.14em]"
                     onClick={() => navigate(`/league/${selectedLeague.id}`)}
                   >
                     Open League
                   </Button>
                   <Button
-                    variant="outline"
-                    className="h-12 flex-1 justify-center rounded-xl text-[11px] font-black uppercase tracking-[0.13em] sm:h-11 sm:flex-none sm:tracking-[0.16em]"
+                    variant="ghost"
+                    className="h-10 flex-1 justify-center rounded-lg text-[11px] font-bold text-cfb-text-secondary hover:bg-cfb-surface-hover hover:text-cfb-text-primary sm:h-11 sm:flex-none sm:rounded-xl sm:font-black sm:uppercase sm:tracking-[0.1em]"
                     onClick={() => navigate(`/league/${selectedLeague.id}/matchup`)}
                   >
                     View Matchup
@@ -264,9 +261,9 @@ export default function Index() {
                 </div>
               </div>
             ) : (
-              <div className="flex gap-3 max-[360px]:flex-col sm:flex-wrap">
-                <Button className="h-12 flex-1 sm:flex-none" onClick={() => navigate("/leagues/create")}>Create League</Button>
-                <Button className="h-12 flex-1 sm:flex-none" variant="outline" onClick={() => navigate("/leagues/join")}>
+              <div className="flex gap-2 sm:flex-wrap">
+                <Button className="h-10 flex-1 rounded-lg sm:h-11 sm:flex-none sm:rounded-xl" onClick={() => navigate("/leagues/create")}>Create League</Button>
+                <Button className="h-10 flex-1 rounded-lg sm:h-11 sm:flex-none sm:rounded-xl" variant="outline" onClick={() => navigate("/leagues/join")}>
                   Join League
                 </Button>
               </div>
@@ -274,11 +271,11 @@ export default function Index() {
           </div>
         </SurfaceCard>
 
-        <SurfaceCard variant="raised" padding="compact" className="space-y-4 sm:space-y-5 sm:p-6">
+        <SurfaceCard variant="default" padding="compact" className="space-y-3 sm:space-y-4 sm:p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="cfb-micro-label text-cfb-brand">Week {matchup?.week ?? 1}</p>
-              <h2 className="mt-1 text-xl font-black text-cfb-text-primary sm:mt-2 sm:text-2xl">Matchup Snapshot</h2>
+              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-cfb-brand sm:font-black sm:tracking-[0.16em]">Week {matchup?.week ?? 1}</p>
+              <h2 className="mt-1 text-lg font-bold text-cfb-text-primary sm:mt-2 sm:text-2xl sm:font-black">Matchup Snapshot</h2>
             </div>
             <StatusBadge className="text-[10px] tracking-[0.1em] sm:text-[11px] sm:tracking-[0.14em]" variant={matchup?.status === "live" ? "live" : "projected"}>
               {matchup?.status ? formatDashboardStatus(matchup.status) : "Projected"}
@@ -312,8 +309,8 @@ export default function Index() {
             opponentProjectedTotal={matchup?.projected_points_against}
           />
 
-          <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 p-4">
-            <p className="text-sm font-bold text-cfb-text-secondary">
+          <div className="border-t border-cfb-border-subtle pt-3">
+            <p className="text-sm text-cfb-text-secondary">
               {matchup
                 ? "Projected totals update as the league scoring data refreshes."
                 : "No scheduled matchup is available yet. Draft or schedule generation will populate this card."}

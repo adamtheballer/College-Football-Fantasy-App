@@ -156,11 +156,11 @@ export function PlayerCardHeader({
               ))}
             </div>
           </div>
-          <div data-testid="player-card-metric-rail" className="grid grid-cols-4 gap-1.5 sm:gap-2 xl:grid-cols-2 xl:self-end 2xl:grid-cols-4">
+          <div data-testid="player-card-metric-rail" className="grid grid-cols-4 gap-px overflow-hidden rounded-xl border border-white/15 bg-white/10 xl:grid-cols-2 xl:self-end 2xl:grid-cols-4">
             {metricCards.map(({ label, mobileLabel, value }) => (
               <div
                 key={label}
-                className="flex min-h-[3.8rem] min-w-0 flex-col justify-center rounded-xl border border-white/15 bg-black/25 p-2 backdrop-blur sm:min-h-[5.75rem] sm:rounded-2xl sm:p-3"
+                className="flex min-h-[3.8rem] min-w-0 flex-col justify-center bg-black/30 p-2 backdrop-blur sm:min-h-[4.75rem] sm:p-3"
               >
                 <p className="truncate text-[8px] font-black uppercase tracking-[0.1em] text-white/55 sm:text-[9px] sm:tracking-[0.18em]">
                   <span className="sm:hidden" aria-label={label}>{mobileLabel}</span>

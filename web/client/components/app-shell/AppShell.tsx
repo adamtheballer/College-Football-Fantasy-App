@@ -41,7 +41,12 @@ export function AppShell({
   const mobileNavItems = getMobileNavItems(navItems);
 
   return (
-    <div className="cfb-school-grid isolate relative flex h-[100dvh] min-h-0 overflow-hidden bg-cfb-canvas font-sans text-cfb-text-primary selection:bg-cfb-brand/30 selection:text-white lg:h-screen">
+    <div
+      className={cn(
+        "isolate relative flex h-[100dvh] min-h-0 overflow-hidden bg-cfb-canvas font-sans text-cfb-text-primary selection:bg-cfb-brand/30 selection:text-white lg:h-screen",
+        isLoggedIn ? "bg-[#0b0d10]" : "cfb-school-grid",
+      )}
+    >
       {!hideDecor ? <BackgroundEffects /> : null}
       {!hideFloatingActions ? <FloatingQuickActions /> : null}
 
@@ -65,7 +70,7 @@ export function AppShell({
         <div
           className={cn(
             "flex-1",
-            compactContent ? "p-0" : "px-4 py-5 pb-28 sm:px-6 lg:p-8",
+            compactContent ? "p-0" : "px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] sm:px-6 sm:py-6 sm:pb-24 lg:p-8",
           )}
         >
           {children}
