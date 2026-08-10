@@ -62,7 +62,7 @@ export const TOUR_STEPS: TourStep[] = [
     target: "#nav-settings",
     title: "Settings",
     description:
-      "Customize notifications, league preferences, and account behavior here so the app fits how you play.",
+      "Update your manager profile, choose your default league, and revisit this guide whenever you need it.",
   },
   {
     target: "#nav-sign-out",

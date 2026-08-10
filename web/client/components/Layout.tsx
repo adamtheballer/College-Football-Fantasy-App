@@ -18,7 +18,7 @@ import {
 } from "./app-shell/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useChatUnreadSummary } from "@/hooks/use-chat";
-import { clearPendingGuide, hasPendingGuide } from "@/lib/onboarding";
+import { clearPendingGuide, shouldStartGuide } from "@/lib/onboarding";
 import { useRuntimeCapabilities } from "@/components/RuntimeCompatibilityGate";
 
 interface LayoutProps {
@@ -52,6 +52,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isCreateLeaguePage = isCreateLeagueRoute(location.pathname);
   const isSaturdayPick6Page = isSaturdayPick6Route(location.pathname);
   const isAuthFlowPage = isAuthFlowRoute(location.pathname);
+  const replayGuideRequested = Boolean(
+    (location.state as { replayGuide?: boolean } | null)?.replayGuide,
+  );
 
   // AppShell deliberately owns scrolling so persistent navigation never creates
   // a second document scroller. Reset that one owner before a new route paints;
@@ -73,15 +76,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       return;
     }
 
-    const shouldStartGuide = hasPendingGuide(user.id);
-    if (!shouldStartGuide) {
+    const guideShouldStart = shouldStartGuide(user.id, replayGuideRequested);
+    if (!guideShouldStart) {
       clearPendingGuide(user.id);
       setIsGuideActive(false);
       return;
     }
 
     if (location.pathname !== "/") {
-      navigate("/", { replace: true });
+      navigate("/", { replace: true, state: { replayGuide: replayGuideRequested } });
       return;
     }
 
@@ -92,7 +95,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
     clearPendingGuide(user.id);
     setIsGuideActive(true);
-  }, [isAuthFlowPage, location.pathname, navigate, user]);
+  }, [isAuthFlowPage, location.pathname, navigate, replayGuideRequested, user]);
 
   return (
     <>

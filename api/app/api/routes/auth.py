@@ -36,6 +36,7 @@ from collegefootballfantasy_api.app.schemas.auth import (
     UserCreate,
     UserLogin,
     UserRead,
+    UserProfileUpdate,
 )
 from collegefootballfantasy_api.app.services.auth_security import (
     enforce_auth_rate_limit,
@@ -195,6 +196,27 @@ def _complete_successful_login(
 
 @router.get("/me", response_model=UserRead)
 def current_user_profile(current_user: User = Depends(get_current_user)) -> UserRead:
+    return UserRead.model_validate(current_user)
+
+
+@router.patch("/me", response_model=UserRead)
+def update_current_user_profile(
+    payload: UserProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> UserRead:
+    """Update only the signed-in manager's beta profile fields."""
+
+    current_user.first_name = moderate_user_text(
+        db,
+        actor_user_id=current_user.id,
+        field_name="manager_name",
+        value=payload.first_name,
+        required=True,
+    ) or current_user.first_name
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
     return UserRead.model_validate(current_user)
 
 

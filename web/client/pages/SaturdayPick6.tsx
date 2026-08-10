@@ -11,7 +11,7 @@ export const SATURDAY_PICK_6_COMING_SOON_MESSAGE =
   "Week 1 picks are coming soon. Six featured players will be available once weekly projections are published.";
 
 export const SATURDAY_PICK_6_HOW_IT_WORKS =
-  "How it works: choose one of six featured players before the first kickoff. If your player scores the most fantasy points that week, you unlock that week's featured-brand discount code.";
+  "How it works: Choose one of six featured players before the first kickoff. If your player scores the most fantasy points that week, you unlock that week's featured brand discount code.";
 
 const formatPoints = (value: number | null) =>
   typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "—";

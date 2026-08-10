@@ -36,6 +36,11 @@ export const setCompletedGuide = (userId: number) => {
 export const hasPendingGuide = (userId: number) =>
   safeGet(pendingGuideKey(userId)) === "true";
 
+// A replay is intentionally explicit. It should still open the guide after
+// Settings routes back to Home even if a browser blocks localStorage writes.
+export const shouldStartGuide = (userId: number, replayRequested = false) =>
+  replayRequested || hasPendingGuide(userId);
+
 export const setPendingGuide = (userId: number) => {
   if (!hasCompletedGuide(userId)) {
     safeSet(pendingGuideKey(userId), "true");

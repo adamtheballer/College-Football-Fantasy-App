@@ -27,6 +27,7 @@ describe("SaturdayPick6 state helpers", () => {
     expect(SATURDAY_PICK_6_HOW_IT_WORKS).toContain("first kickoff");
     expect(SATURDAY_PICK_6_HOW_IT_WORKS).toContain("most fantasy points that week");
     expect(SATURDAY_PICK_6_HOW_IT_WORKS).toContain("discount code");
+    expect(SATURDAY_PICK_6_HOW_IT_WORKS).toMatch(/^How it works: Choose /);
   });
 
   it("uses a live score when available and preserves a missing live score as the projection", () => {
