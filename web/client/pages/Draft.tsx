@@ -13,6 +13,7 @@ import { useDraftPlayerPool, usePlayerCard } from "@/hooks/use-players";
 import { ApiError } from "@/lib/api";
 import { buildDraftBoard, type DraftConfig, type DraftPlayer } from "@/lib/draftRankings";
 import { formatDraftProjection } from "@/lib/draft-projections";
+import { getCenteredDraftOrderScrollLeft } from "@/lib/draftOrderCarousel";
 import { filterDraftablePlayers, getLegalPositionsForRoster } from "@/lib/rosterLegality";
 import { cn } from "@/lib/utils";
 import type { DraftRoomPick, DraftRoomTeam } from "@/types/draft";
@@ -114,21 +115,6 @@ const getRoundNumber = (overallPick: number, teamCount: number) =>
 
 const getRoundPick = (overallPick: number, teamCount: number) =>
   ((overallPick - 1) % Math.max(1, teamCount)) + 1;
-
-const getCenteredScrollLeft = ({
-  overallPick,
-  cardOffsetLeft,
-  cardWidth,
-  containerWidth,
-}: {
-  overallPick: number;
-  cardOffsetLeft: number;
-  cardWidth: number;
-  containerWidth: number;
-}) => {
-  if (overallPick <= 3) return 0;
-  return Math.max(0, cardOffsetLeft - containerWidth / 2 + cardWidth / 2);
-};
 
 const buildPreviewTeams = (teams: DraftRoomTeam[], maxTeams: number): PreviewTeam[] => {
   const targetCount = Math.max(teams.length, maxTeams, 1);
@@ -470,19 +456,24 @@ export default function Draft() {
 
   const centerDraftCarouselOnPick = useCallback(
     (overallPick: number, behavior: ScrollBehavior = "smooth") => {
-      const container = carouselRef.current;
-      const activeCard = pickRefs.current.get(overallPick);
-      if (!container || !activeCard) return;
+      const center = (
+        container: HTMLDivElement | null,
+        cards: Map<number, HTMLDivElement | null>,
+      ) => {
+        const activeCard = cards.get(overallPick);
+        if (!container || !activeCard) return;
+        container.scrollTo({
+          left: getCenteredDraftOrderScrollLeft({
+            overallPick,
+            cardOffsetLeft: activeCard.offsetLeft,
+            cardWidth: activeCard.offsetWidth,
+            containerWidth: container.clientWidth,
+          }),
+          behavior,
+        });
+      };
 
-      container.scrollTo({
-        left: getCenteredScrollLeft({
-          overallPick,
-          cardOffsetLeft: activeCard.offsetLeft,
-          cardWidth: activeCard.offsetWidth,
-          containerWidth: container.clientWidth,
-        }),
-        behavior,
-      });
+      center(carouselRef.current, pickRefs.current);
     },
     []
   );
@@ -490,6 +481,16 @@ export default function Draft() {
   const recenterDraftCarousel = () => {
     centerDraftCarouselOnPick(draftRoom?.current_pick ?? 1);
   };
+
+  useEffect(() => {
+    const currentPick = draftRoom?.current_pick;
+    if (!currentPick || ["complete", "completed"].includes(draftRoom.status)) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      centerDraftCarouselOnPick(currentPick, currentPick >= 4 ? "smooth" : "auto");
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [centerDraftCarouselOnPick, draftRoom?.current_pick, draftRoom?.status]);
 
   const makePick = async (player: DraftPlayer) => {
     if (!isLeagueFull) {
