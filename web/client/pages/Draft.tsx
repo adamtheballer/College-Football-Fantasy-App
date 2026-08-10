@@ -933,24 +933,30 @@ export default function Draft() {
 
         <section data-testid="mobile-draft-order" className={cn("shrink-0 overflow-hidden sm:hidden", draftMattePanelClass)}>
           <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
-            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-amber-200">Draft order</p>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-amber-200">Draft order</p>
+              <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Swipe for future rounds</p>
+            </div>
             <p className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">{currentPick} / {totalPicks}</p>
           </div>
-          <div className="grid grid-cols-5 gap-1 px-2 py-2">
-            {draftOrderPicks.slice(
-              Math.min(Math.max(0, currentPick - 3), Math.max(0, draftOrderPicks.length - 5)),
-              Math.min(draftOrderPicks.length, Math.min(Math.max(0, currentPick - 3), Math.max(0, draftOrderPicks.length - 5)) + 5),
-            ).map((slot) => {
-              const isCurrent = !completed && slot.overallPick === currentPick;
-              const isUser = slot.team?.id === draftRoom.user_team_id;
-              return (
-                <div key={slot.overallPick} aria-current={isCurrent ? "step" : undefined} className={cn("flex min-w-0 flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}>
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/12 bg-black/20">{slot.team?.is_cpu ? <Bot className="h-3 w-3" /> : <User className="h-3 w-3" />}</span>
-                  <span className="mt-1 whitespace-nowrap text-[9px] font-black tabular-nums">{slot.round}.{slot.roundPick}</span>
-                  <span className="max-w-full truncate text-[8px] font-black uppercase tracking-[0.04em]">{isUser ? "You" : slot.team?.name?.replace("Bot Team", "B") ?? "Team"}</span>
-                </div>
-              );
-            })}
+          <div
+            data-testid="mobile-draft-order-scroll"
+            aria-label="Draft order; swipe horizontally to view every pick and future rounds"
+            className="overflow-x-auto overscroll-x-contain scroll-smooth snap-x px-2 py-2 touch-pan-x"
+          >
+            <div className="flex min-w-max gap-1.5">
+              {draftOrderPicks.map((slot) => {
+                const isCurrent = !completed && slot.overallPick === currentPick;
+                const isUser = slot.team?.id === draftRoom.user_team_id;
+                return (
+                  <div key={slot.overallPick} aria-current={isCurrent ? "step" : undefined} className={cn("flex w-[4.15rem] shrink-0 snap-start flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}>
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/12 bg-black/20">{slot.team?.is_cpu ? <Bot className="h-3 w-3" /> : <User className="h-3 w-3" />}</span>
+                    <span className="mt-1 whitespace-nowrap text-[9px] font-black tabular-nums">{slot.round}.{slot.roundPick}</span>
+                    <span className="max-w-full truncate text-[8px] font-black uppercase tracking-[0.04em]">{isUser ? "You" : slot.team?.name?.replace("Bot Team", "B") ?? "Team"}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </section>
 

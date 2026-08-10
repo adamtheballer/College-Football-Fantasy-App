@@ -5,7 +5,7 @@
 export function DraftRoomVisuals() {
   return (
     <>
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_0%,rgba(125,211,252,0.24),transparent_29%),radial-gradient(circle_at_88%_82%,rgba(96,165,250,0.22),transparent_32%),linear-gradient(135deg,#153d63_0%,#1f5b88_48%,#163d66_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_0%,rgba(125,211,252,0.15),transparent_29%),radial-gradient(circle_at_88%_82%,rgba(96,165,250,0.13),transparent_32%),linear-gradient(135deg,#0d243b_0%,#143a5b_48%,#102943_100%)]" />
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 opacity-[0.13] [background-image:repeating-linear-gradient(0deg,rgba(226,232,240,0.40)_0_1px,transparent_1px_54px),linear-gradient(90deg,transparent_49.8%,rgba(226,232,240,0.32)_50%,transparent_50.2%),repeating-linear-gradient(90deg,transparent_0_67px,rgba(226,232,240,0.18)_67px_69px,transparent_69px_136px)] [background-size:auto_54px,100%_100%,100%_54px]"
@@ -33,7 +33,7 @@ export function DraftRoomVisuals() {
 }
 
 export const draftMattePanelClass =
-  "rounded-[1.75rem] border border-sky-100/24 bg-[#163b60]/[0.90] shadow-[0_14px_34px_rgba(7,27,49,0.30)] backdrop-blur-sm";
+  "rounded-[1.75rem] border border-sky-100/24 bg-[#102b45]/[0.92] shadow-[0_14px_34px_rgba(7,27,49,0.38)] backdrop-blur-sm";
 
 export const draftMatteControlClass =
-  "border-sky-100/24 bg-[#102f4e]/[0.94] text-slate-100 shadow-[0_8px_20px_rgba(7,27,49,0.28)] backdrop-blur-sm";
+  "border-sky-100/24 bg-[#0c2439]/[0.96] text-slate-100 shadow-[0_8px_20px_rgba(7,27,49,0.34)] backdrop-blur-sm";
