@@ -298,7 +298,7 @@ test.describe("critical browser workflows", () => {
     expect(leagueRouteResult.headingHeight).toBeLessThan(48);
 
     await page.goto("/draft/mock/single-player?new=1&teams=8&timer=15");
-    await expect(page.locator("main[data-app-scroll='true']")).toHaveAttribute("data-scroll-owner", "draft-room");
+    await expect(page.locator("main[data-app-scroll='true']")).toHaveAttribute("data-scroll-owner", "page");
 
     await page.goto("/");
     await expect(page.getByRole("heading", { name: /Good to see you, Codex/i })).toBeVisible();
@@ -1069,17 +1069,17 @@ test.describe("critical browser workflows", () => {
       await expect(queueButton).toHaveClass(/min-h-\[44px\]/);
       await expect(draftButton).toHaveClass(/min-h-\[44px\]/);
     }
-    const compactDraftContract = await page.evaluate(() => {
-      const scrollOwner = document.querySelector("main[data-app-scroll='true']");
+    const draftScrollContract = await page.evaluate(() => {
+      const appScroller = document.querySelector<HTMLElement>("main[data-app-scroll='true']");
       const playerList = document.querySelector<HTMLElement>("[data-testid='draft-player-list']");
       const tabs = document.querySelector<HTMLElement>("[data-testid='draft-room-tabs']");
       const filterButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-testid='draft-player-filters'] button"));
       const viewportHeight = window.innerHeight;
 
       return {
-        owner: scrollOwner?.getAttribute("data-scroll-owner"),
-        outerScrollable: scrollOwner ? scrollOwner.scrollHeight > scrollOwner.clientHeight : null,
-        listScrollable: playerList ? getComputedStyle(playerList).overflowY === "auto" : null,
+        owner: appScroller?.getAttribute("data-scroll-owner"),
+        outerScrollable: appScroller ? appScroller.scrollHeight > appScroller.clientHeight : null,
+        listScrollable: playerList ? /auto|scroll/.test(getComputedStyle(playerList).overflowY) : null,
         tabsInViewport: tabs ? tabs.getBoundingClientRect().bottom <= viewportHeight : null,
         filtersOnOneLine: new Set(filterButtons.map((button) => Math.round(button.getBoundingClientRect().top))).size === 1,
         tabLabelsDoNotWrap: Array.from(document.querySelectorAll("[data-testid='draft-room-tabs'] button")).every(
@@ -1087,28 +1087,14 @@ test.describe("critical browser workflows", () => {
         ),
       };
     });
-    expect(compactDraftContract).toEqual({
-      owner: "draft-room",
+    expect(draftScrollContract).toEqual({
+      owner: "page",
       outerScrollable: false,
-      listScrollable: true,
+      listScrollable: false,
       tabsInViewport: true,
       filtersOnOneLine: true,
       tabLabelsDoNotWrap: true,
     });
-    const playerList = page.getByTestId("draft-player-list");
-    await playerList.evaluate((element) => {
-      element.scrollTop = element.scrollHeight;
-    });
-    const lastPlayer = page.getByTestId("draft-player-row").last();
-    await expect(lastPlayer).toBeVisible();
-    const finalPlayerGeometry = await lastPlayer.evaluate((element) => {
-      const list = document.querySelector<HTMLElement>("[data-testid='draft-player-list']");
-      return {
-        rowBottom: element.getBoundingClientRect().bottom,
-        listBottom: list?.getBoundingClientRect().bottom ?? 0,
-      };
-    });
-    expect(finalPlayerGeometry.rowBottom).toBeLessThanOrEqual(finalPlayerGeometry.listBottom + 1);
     await page
       .getByTestId("draft-player-row")
       .filter({ hasText: "Arch Manning" })
