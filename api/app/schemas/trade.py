@@ -1,6 +1,7 @@
 from datetime import datetime
+import re
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class TradeAnalyzeRequest(BaseModel):
@@ -39,6 +40,19 @@ class TradeOfferCreate(BaseModel):
     give_items: list[TradeOfferItemCreate] = Field(default_factory=list)
     receive_items: list[TradeOfferItemCreate] = Field(default_factory=list)
     message: str | None = Field(default=None, max_length=1000)
+    client_request_id: str | None = Field(default=None, max_length=100)
+
+    @field_validator("client_request_id")
+    @classmethod
+    def validate_client_request_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if not re.fullmatch(r"[A-Za-z0-9._:-]{8,100}", normalized):
+            raise ValueError("client_request_id has an unsupported format")
+        return normalized
 
     @model_validator(mode="after")
     def validate_sides(self) -> "TradeOfferCreate":

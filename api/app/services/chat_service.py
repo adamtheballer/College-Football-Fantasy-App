@@ -54,6 +54,27 @@ SYSTEM_MESSAGE_TYPES = {
     "commissioner",
 }
 MASTER_LEAGUE_THREAD_TITLE = "General"
+PRIVATE_TRADE_CARD_TYPE = "private_trade_offer"
+PRIVATE_TRADE_STATUS_LABELS = {
+    "proposed": "Trade offer sent",
+    "accepted": "Trade accepted",
+    "rejected": "Trade rejected",
+    "cancelled": "Trade cancelled",
+    "countered": "Trade countered",
+    "vetoed": "Trade vetoed",
+    "expired": "Trade expired",
+    "failed": "Trade failed",
+}
+PRIVATE_TRADE_EVENT_SUFFIXES = {
+    "proposed": "created",
+    "accepted": "accepted",
+    "rejected": "rejected",
+    "cancelled": "canceled",
+    "countered": "countered",
+    "vetoed": "vetoed",
+    "expired": "expired",
+    "failed": "failed",
+}
 
 
 def utcnow() -> datetime:
@@ -926,6 +947,174 @@ def create_system_chat_message(
             if existing:
                 return existing
         raise
+    return message
+
+
+def _get_or_create_trade_direct_thread(db: Session, offer: TradeOffer) -> ChatThread:
+    """Create the canonical per-league manager thread without an endpoint commit.
+
+    Trade events are generated inside the trade transaction, so they cannot use
+    the user-facing direct-message helper (which rate-limits and commits).
+    """
+    proposing = db.get(Team, offer.proposing_team_id)
+    receiving = db.get(Team, offer.receiving_team_id)
+    if proposing is None or receiving is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade teams are no longer available")
+    proposing_user_id = proposing.owner_user_id
+    receiving_user_id = receiving.owner_user_id
+    if proposing_user_id is None or receiving_user_id is None or proposing_user_id == receiving_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="trade offers require two active human-managed teams",
+        )
+
+    participant_ids = {proposing_user_id, receiving_user_id}
+    users = db.query(User).filter(User.id.in_(participant_ids)).all()
+    if len(users) != 2 or any(not user.is_active for user in users):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="trade offer participants must be active users",
+        )
+    member_ids = {
+        user_id
+        for (user_id,) in db.query(LeagueMember.user_id)
+        .filter(LeagueMember.league_id == offer.league_id, LeagueMember.user_id.in_(participant_ids))
+        .all()
+    }
+    if member_ids != participant_ids:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="trade offer participants must be active league members",
+        )
+
+    low_user_id, high_user_id = sorted(participant_ids)
+    thread = (
+        db.query(ChatThread)
+        .filter(
+            ChatThread.league_id == offer.league_id,
+            ChatThread.thread_type == "direct",
+            ChatThread.direct_user_low_id == low_user_id,
+            ChatThread.direct_user_high_id == high_user_id,
+        )
+        .one_or_none()
+    )
+    if thread is not None:
+        return thread
+
+    try:
+        with db.begin_nested():
+            thread = ChatThread(
+                league_id=offer.league_id,
+                thread_type="direct",
+                created_by_user_id=proposing_user_id,
+                direct_user_low_id=low_user_id,
+                direct_user_high_id=high_user_id,
+            )
+            db.add(thread)
+            db.flush()
+            db.add_all(
+                [
+                    ChatThreadParticipant(thread_id=thread.id, user_id=low_user_id, joined_at=utcnow()),
+                    ChatThreadParticipant(thread_id=thread.id, user_id=high_user_id, joined_at=utcnow()),
+                ]
+            )
+            db.flush()
+    except IntegrityError:
+        thread = (
+            db.query(ChatThread)
+            .filter(
+                ChatThread.league_id == offer.league_id,
+                ChatThread.thread_type == "direct",
+                ChatThread.direct_user_low_id == low_user_id,
+                ChatThread.direct_user_high_id == high_user_id,
+            )
+            .one_or_none()
+        )
+        if thread is None:
+            raise
+    else:
+        _record_chat_audit_event(
+            db,
+            league_id=offer.league_id,
+            thread_id=thread.id,
+            actor_user_id=proposing_user_id,
+            action="direct_thread_created",
+            metadata_json={"recipient_user_id": receiving_user_id, "source": "trade_offer"},
+            event_key=f"direct-thread:{thread.id}:created",
+        )
+    return thread
+
+
+def _trade_private_message_metadata(db: Session, offer: TradeOffer, *, event_status: str) -> dict:
+    league = db.get(League, offer.league_id)
+    proposing = db.get(Team, offer.proposing_team_id)
+    receiving = db.get(Team, offer.receiving_team_id)
+    if league is None or proposing is None or receiving is None:
+        raise ValueError("trade context must exist before a private chat message can be created")
+    if event_status not in PRIVATE_TRADE_STATUS_LABELS:
+        raise ValueError(f"unsupported private trade event status: {event_status}")
+
+    return {
+        "card_type": PRIVATE_TRADE_CARD_TYPE,
+        "event_key": f"trade:{offer.id}:{PRIVATE_TRADE_EVENT_SUFFIXES[event_status]}",
+        "trade_id": offer.id,
+        "league": {"id": league.id, "name": league.name},
+        "proposing_team": {"id": proposing.id, "name": proposing.name, "owner_user_id": proposing.owner_user_id},
+        "receiving_team": {"id": receiving.id, "name": receiving.name, "owner_user_id": receiving.owner_user_id},
+        "proposing_team_sends": [
+            _trade_asset_metadata(item) for item in offer.items if item.team_id == proposing.id
+        ],
+        "receiving_team_sends": [
+            _trade_asset_metadata(item) for item in offer.items if item.team_id == receiving.id
+        ],
+        "trade_status": event_status,
+        "offer_status": offer.status,
+        "created_at": offer.created_at.isoformat() if offer.created_at else None,
+        "expires_at": offer.expires_at.isoformat() if offer.expires_at else None,
+        "accepted_at": offer.accepted_at.isoformat() if offer.accepted_at else None,
+    }
+
+
+def create_trade_private_chat_message(
+    db: Session,
+    offer: TradeOffer,
+    *,
+    event_status: str,
+) -> ChatMessage:
+    """Persist one idempotent private trade card for the two participating owners."""
+    metadata_json = _trade_private_message_metadata(db, offer, event_status=event_status)
+    event_key = metadata_json["event_key"]
+    existing = db.query(ChatMessage).filter(ChatMessage.event_key == event_key).one_or_none()
+    if existing is not None:
+        return existing
+    thread = _get_or_create_trade_direct_thread(db, offer)
+    try:
+        with db.begin_nested():
+            message = ChatMessage(
+                thread_id=thread.id,
+                league_id=offer.league_id,
+                message_type="system",
+                body=PRIVATE_TRADE_STATUS_LABELS[event_status],
+                metadata_json=metadata_json,
+                event_key=event_key,
+            )
+            thread.updated_at = utcnow()
+            db.add_all((message, thread))
+            db.flush()
+    except IntegrityError:
+        existing = db.query(ChatMessage).filter(ChatMessage.event_key == event_key).one_or_none()
+        if existing is not None:
+            return existing
+        raise
+    _record_chat_audit_event(
+        db,
+        league_id=offer.league_id,
+        thread_id=thread.id,
+        message_id=message.id,
+        action="private_trade_message_generated",
+        metadata_json={"trade_id": offer.id, "trade_status": event_status},
+        event_key=f"{event_key}:chat-audit",
+    )
     return message
 
 

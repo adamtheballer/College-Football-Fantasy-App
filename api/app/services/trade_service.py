@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from collegefootballfantasy_api.app.models.draft import Draft
@@ -29,6 +30,7 @@ from collegefootballfantasy_api.app.schemas.trade import (
     TradeReviewRead,
 )
 from collegefootballfantasy_api.app.services.chat_service import (
+    create_trade_private_chat_message,
     create_trade_finalized_chat_message,
     mark_trade_finalized_chat_message_processed,
 )
@@ -490,6 +492,55 @@ def _serialize_offer(offer: TradeOffer) -> TradeOfferRead:
     )
 
 
+def _find_idempotent_offer(
+    db: Session,
+    *,
+    current_user_id: int,
+    client_request_id: str | None,
+) -> TradeOffer | None:
+    if not client_request_id:
+        return None
+    return (
+        db.query(TradeOffer)
+        .options(joinedload(TradeOffer.items).joinedload(TradeOfferItem.player), joinedload(TradeOffer.reviews))
+        .filter(
+            TradeOffer.created_by_user_id == current_user_id,
+            TradeOffer.client_request_id == client_request_id,
+        )
+        .one_or_none()
+    )
+
+
+def _require_matching_idempotent_offer(
+    offer: TradeOffer,
+    *,
+    league_id: int,
+    payload: TradeOfferCreate,
+    countered_from_trade_id: int | None,
+) -> TradeOffer:
+    expected_items = sorted(
+        (item.team_id, item.player_id, item.draft_pick_id)
+        for item in [*payload.give_items, *payload.receive_items]
+    )
+    actual_items = sorted(
+        (item.team_id, item.player_id, item.draft_pick_id)
+        for item in offer.items
+    )
+    if (
+        offer.league_id != league_id
+        or offer.proposing_team_id != payload.proposing_team_id
+        or offer.receiving_team_id != payload.receiving_team_id
+        or offer.countered_from_trade_id != countered_from_trade_id
+        or offer.message != payload.message
+        or actual_items != expected_items
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="client_request_id was already used for a different trade offer",
+        )
+    return offer
+
+
 def list_trade_offers(db: Session, league: League, current_user: User) -> TradeOfferList:
     _member_or_404(db, league.id, current_user.id)
     rows = (
@@ -527,6 +578,7 @@ def _create_trade_offer_record(
         created_by_user_id=current_user.id,
         status=TRADE_STATUS_PROPOSED,
         message=payload.message,
+        client_request_id=payload.client_request_id,
         expires_at=_utcnow() + timedelta(days=DEFAULT_TRADE_EXPIRATION_DAYS),
         countered_from_trade_id=countered_from_trade_id,
     )
@@ -544,6 +596,7 @@ def _create_trade_offer_record(
                 snapshot_json={"trade_value": player_snapshot} if player_snapshot else None,
             )
         )
+    db.flush()
     _add_review(db, offer, "proposed", current_user.id, payload.message)
     _create_alert(
         db,
@@ -558,26 +611,62 @@ def _create_trade_offer_record(
 
 
 def create_trade_offer(db: Session, league: League, current_user: User, payload: TradeOfferCreate) -> TradeOfferRead:
+    _member_or_404(db, league.id, current_user.id)
+    # Store and compare the same canonical note on the initial request and a
+    # transport retry.  Without this normalization, a successful request with
+    # surrounding whitespace would be persisted as the trimmed value, then a
+    # retry of the identical client payload would look like a different offer.
     payload.message = moderate_user_text(
         db, actor_user_id=current_user.id, league_id=league.id, field_name="trade_message", value=payload.message
     )
-    _member_or_404(db, league.id, current_user.id)
+    existing = _find_idempotent_offer(
+        db,
+        current_user_id=current_user.id,
+        client_request_id=payload.client_request_id,
+    )
+    if existing is not None:
+        return _serialize_offer(
+            _require_matching_idempotent_offer(
+                existing,
+                league_id=league.id,
+                payload=payload,
+                countered_from_trade_id=None,
+            )
+        )
     now = _utcnow()
     _ensure_trade_deadline_open(db, league, now)
     proposing, receiving = _validate_payload(db, league.id, payload)
     _require_team_owner(proposing, current_user)
 
-    with db.begin_nested():
-        offer = _create_trade_offer_record(
+    try:
+        with db.begin_nested():
+            offer = _create_trade_offer_record(
+                db,
+                league=league,
+                current_user=current_user,
+                payload=payload,
+                proposing=proposing,
+                receiving=receiving,
+            )
+            _validate_no_locked_players(db, league, offer, now)
+            _plan_roster_swap(db, offer)
+            create_trade_private_chat_message(db, offer, event_status="proposed")
+    except IntegrityError:
+        existing = _find_idempotent_offer(
             db,
-            league=league,
-            current_user=current_user,
-            payload=payload,
-            proposing=proposing,
-            receiving=receiving,
+            current_user_id=current_user.id,
+            client_request_id=payload.client_request_id,
         )
-        _validate_no_locked_players(db, league, offer, now)
-        _plan_roster_swap(db, offer)
+        if existing is None:
+            raise
+        return _serialize_offer(
+            _require_matching_idempotent_offer(
+                existing,
+                league_id=league.id,
+                payload=payload,
+                countered_from_trade_id=None,
+            )
+        )
     db.commit()
     return _serialize_offer(_load_offer(db, offer.id))
 
@@ -642,6 +731,7 @@ def accept_trade_offer(db: Session, league: League, trade_id: int, current_user:
         body = "Trade accepted and processed."
     _add_review(db, offer, "accepted", current_user.id, payload.reason)
     _notify_participants(db, offer, "TRADE_ACCEPTED", "Trade Accepted", body)
+    create_trade_private_chat_message(db, offer, event_status="accepted")
     if offer.status != TRADE_STATUS_COMMISSIONER_REVIEW:
         _announce_trade_finalized(db, offer, finalized_at=now)
     db.commit()
@@ -698,6 +788,7 @@ def reject_trade_offer(db: Session, league: League, trade_id: int, current_user:
     offer.status = TRADE_STATUS_REJECTED
     _add_review(db, offer, "rejected", current_user.id, payload.reason)
     _notify_participants(db, offer, "TRADE_REJECTED", "Trade Rejected", "A trade offer was rejected.")
+    create_trade_private_chat_message(db, offer, event_status="rejected")
     db.commit()
     return _serialize_offer(_load_offer(db, offer.id))
 
@@ -716,6 +807,7 @@ def cancel_trade_offer(db: Session, league: League, trade_id: int, current_user:
     offer.status = TRADE_STATUS_CANCELLED
     _add_review(db, offer, "cancelled", current_user.id, payload.reason)
     _notify_participants(db, offer, "TRADE_CANCELLED", "Trade Cancelled", "A trade offer was cancelled.")
+    create_trade_private_chat_message(db, offer, event_status="cancelled")
     db.commit()
     return _serialize_offer(_load_offer(db, offer.id))
 
@@ -733,6 +825,21 @@ def counter_trade_offer(
     offer = _load_offer(db, trade_id, for_update=True)
     if offer.league_id != league.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="trade offer not found")
+    _member_or_404(db, league.id, current_user.id)
+    existing = _find_idempotent_offer(
+        db,
+        current_user_id=current_user.id,
+        client_request_id=payload.client_request_id,
+    )
+    if existing is not None:
+        return _serialize_offer(
+            _require_matching_idempotent_offer(
+                existing,
+                league_id=league.id,
+                payload=payload,
+                countered_from_trade_id=offer.id,
+            )
+        )
     if offer.status != TRADE_STATUS_PROPOSED:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade offer is not pending a counter")
     now = _utcnow()
@@ -748,21 +855,40 @@ def counter_trade_offer(
         )
     _require_team_owner(proposing, current_user)
 
-    with db.begin_nested():
-        replacement = _create_trade_offer_record(
+    try:
+        with db.begin_nested():
+            replacement = _create_trade_offer_record(
+                db,
+                league=league,
+                current_user=current_user,
+                payload=payload,
+                proposing=proposing,
+                receiving=counter_receiving,
+                countered_from_trade_id=offer.id,
+            )
+            _validate_no_locked_players(db, league, replacement, now)
+            _plan_roster_swap(db, replacement)
+            offer.status = TRADE_STATUS_COUNTERED
+            _add_review(db, offer, "countered", current_user.id, payload.message)
+            _notify_participants(db, offer, "TRADE_COUNTERED", "Trade Countered", "A replacement trade offer was sent.")
+            create_trade_private_chat_message(db, offer, event_status="countered")
+            create_trade_private_chat_message(db, replacement, event_status="proposed")
+    except IntegrityError:
+        existing = _find_idempotent_offer(
             db,
-            league=league,
-            current_user=current_user,
-            payload=payload,
-            proposing=proposing,
-            receiving=counter_receiving,
-            countered_from_trade_id=offer.id,
+            current_user_id=current_user.id,
+            client_request_id=payload.client_request_id,
         )
-        _validate_no_locked_players(db, league, replacement, now)
-        _plan_roster_swap(db, replacement)
-        offer.status = TRADE_STATUS_COUNTERED
-        _add_review(db, offer, "countered", current_user.id, payload.message)
-        _notify_participants(db, offer, "TRADE_COUNTERED", "Trade Countered", "A replacement trade offer was sent.")
+        if existing is None:
+            raise
+        return _serialize_offer(
+            _require_matching_idempotent_offer(
+                existing,
+                league_id=league.id,
+                payload=payload,
+                countered_from_trade_id=offer.id,
+            )
+        )
     db.commit()
     return _serialize_offer(_load_offer(db, replacement.id))
 
@@ -780,6 +906,7 @@ def commissioner_veto_trade(db: Session, league: League, trade_id: int, current_
     offer.status = TRADE_STATUS_VETOED
     _add_review(db, offer, "vetoed", current_user.id, payload.reason)
     _notify_participants(db, offer, "TRADE_VETOED", "Trade Vetoed", "A trade offer was vetoed.")
+    create_trade_private_chat_message(db, offer, event_status="vetoed")
     db.commit()
     return _serialize_offer(_load_offer(db, offer.id))
 
@@ -804,6 +931,7 @@ def expire_trade_offers_once(db: Session, now: datetime | None = None) -> dict[s
         offer.status = TRADE_STATUS_EXPIRED
         _add_review(db, offer, "expired", None, "trade offer expired")
         _notify_participants(db, offer, "TRADE_EXPIRED", "Trade Expired", "A trade offer expired before acceptance.")
+        create_trade_private_chat_message(db, offer, event_status="expired")
         db.commit()
         expired += 1
     return {"expired": expired}
@@ -883,6 +1011,7 @@ def process_trade_offers_once(db: Session, now: datetime | None = None) -> dict[
                 )
             _add_review(db, offer, "failed", None, offer.failure_reason)
             _notify_participants(db, offer, "TRADE_FAILED", "Trade Failed", offer.failure_reason)
+            create_trade_private_chat_message(db, offer, event_status="failed")
             failed += 1
         db.commit()
     return {"processed": processed, "failed": failed}

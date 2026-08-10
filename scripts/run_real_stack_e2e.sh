@@ -78,7 +78,7 @@ done
 ready_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/ready")"
 runtime_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/runtime")"
 jq -e '.status == "ready"' <<<"$ready_payload" >/dev/null
-jq -e --arg sha "$CFF_GIT_SHA" '.git_sha == $sha and .alembic_revision == "0088_beta_scoring_lock" and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' <<<"$runtime_payload" >/dev/null
+jq -e --arg sha "$CFF_GIT_SHA" '.git_sha == $sha and .alembic_revision == "0089_trade_private_chat" and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' <<<"$runtime_payload" >/dev/null
 curl --fail --show-error --silent --head "${web_origin}" >/dev/null
 
 # This command runs only after Compose created a fresh disposable database.

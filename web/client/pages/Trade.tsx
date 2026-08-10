@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRightLeft, Check, ChevronRight, Search, ShieldAlert, Users } from "lucide-react";
@@ -37,6 +37,11 @@ import type { RosterEntry } from "@/types/roster";
 import type { Team } from "@/types/team";
 
 const OFFENSE_POSITIONS = new Set(["QB", "RB", "WR", "TE", "K"]);
+
+const createClientTradeRequestId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `trade-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 type TradeAnalyzePayload = {
   receive_ids: number[];
@@ -430,6 +435,7 @@ export default function Trade() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [counteringOfferId, setCounteringOfferId] = useState<number | null>(null);
+  const pendingTradeRequest = useRef<{ signature: string; id: string } | null>(null);
   const targetTeamIdParam = searchParams.get("teamId");
   const targetTeamId =
     targetTeamIdParam && /^\d+$/.test(targetTeamIdParam)
@@ -489,6 +495,14 @@ export default function Trade() {
   const currentTradeSignature = useMemo(
     () => tradeSelectionSignature(leagueId, opponentTeamId, giveIds, receiveIds),
     [giveIds, leagueId, opponentTeamId, receiveIds]
+  );
+  const tradeSubmitSignature = useMemo(
+    () => JSON.stringify({
+      selection: currentTradeSignature,
+      counterTradeId: counteringOfferId,
+      message: tradeMessage.trim(),
+    }),
+    [counteringOfferId, currentTradeSignature, tradeMessage]
   );
   const selectedGiveRows = useMemo(
     () => resolvedMyRows.filter((row) => giveSet.has(row.playerId)),
@@ -586,7 +600,7 @@ export default function Trade() {
   const closeFocusedOffer = () => navigate(focusedOfferReturnPath, { replace: true });
 
   const createOfferMutation = useMutation({
-    mutationFn: (counterTradeId: number | null) =>
+    mutationFn: ({ counterTradeId, clientRequestId }: { counterTradeId: number | null; clientRequestId: string }) =>
       apiPost<TradeOffer>(
         counterTradeId ? `/leagues/${leagueId}/trades/${counterTradeId}/counter` : `/leagues/${leagueId}/trades`,
         {
@@ -595,6 +609,7 @@ export default function Trade() {
           give_items: selectedGiveRows.map((row) => ({ team_id: row.teamId, player_id: row.playerId })),
           receive_items: selectedReceiveRows.map((row) => ({ team_id: row.teamId, player_id: row.playerId })),
           message: tradeMessage.trim() || null,
+          client_request_id: clientRequestId,
         }
       ),
     onSuccess: () => {
@@ -604,6 +619,7 @@ export default function Trade() {
       setReceiveIds([]);
       setTradeMessage("");
       setCounteringOfferId(null);
+      pendingTradeRequest.current = null;
       setIsAnalysisReviewOpen(false);
       setSendError(null);
     },
@@ -693,7 +709,11 @@ export default function Trade() {
       return;
     }
     setSendError(null);
-    createOfferMutation.mutate(counteringOfferId);
+    const request = pendingTradeRequest.current?.signature === tradeSubmitSignature
+      ? pendingTradeRequest.current
+      : { signature: tradeSubmitSignature, id: createClientTradeRequestId() };
+    pendingTradeRequest.current = request;
+    createOfferMutation.mutate({ counterTradeId: counteringOfferId, clientRequestId: request.id });
   };
 
   const beginCounterOffer = (offer: TradeOffer) => {

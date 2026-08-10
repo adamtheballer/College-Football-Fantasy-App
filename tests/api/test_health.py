@@ -2,11 +2,14 @@
 import subprocess
 import sys
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.services.readiness import (
+    DEFAULT_ALEMBIC_INI,
     check_alembic_readiness,
     get_alembic_heads,
 )
@@ -18,6 +21,13 @@ def _reset_alembic_version(db_session, revision: str | None = None) -> None:
         db_session.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)"))
         db_session.execute(text("INSERT INTO alembic_version (version_num) VALUES (:revision)"), {"revision": revision})
     db_session.commit()
+
+
+def test_all_alembic_revisions_fit_the_legacy_version_column():
+    script = ScriptDirectory.from_config(Config(str(DEFAULT_ALEMBIC_INI)))
+    oversized = [revision.revision for revision in script.walk_revisions() if len(revision.revision) > 32]
+
+    assert oversized == []
 
 
 def test_health(client):

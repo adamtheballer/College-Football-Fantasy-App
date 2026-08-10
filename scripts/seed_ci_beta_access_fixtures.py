@@ -24,6 +24,8 @@ FIXTURES = (
     ("ci-e2e-beta-user", "ci-beta-user@example.test", "EARLY-CI1234"),
     ("ci-e2e-beta-commissioner", "ci-beta-commissioner@example.test", "EARLY-CI1235"),
     ("ci-e2e-beta-manager", "ci-beta-manager@example.test", "EARLY-CI1236"),
+    ("ci-e2e-beta-trade-proposer", "ci-beta-trade-proposer@example.test", "EARLY-CI1237"),
+    ("ci-e2e-beta-trade-recipient", "ci-beta-trade-recipient@example.test", "EARLY-CI1238"),
 )
 
 
