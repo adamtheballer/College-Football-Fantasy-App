@@ -277,6 +277,26 @@ test.describe("critical browser workflows", () => {
     });
     await expect(page.getByText("Deadline and lock warnings should always be checked before kickoff.")).toBeVisible();
 
+    await page.getByRole("navigation", { name: "Primary mobile navigation" }).getByRole("link", { name: "Leagues" }).click();
+    await expect(page).toHaveURL(/\/leagues$/);
+    await expect(page.getByRole("heading", { name: "Leagues", exact: true })).toBeVisible();
+    await page.waitForTimeout(350);
+    if (process.env.CAPTURE_MOBILE_UI === "1") {
+      await page.screenshot({ path: testInfo.outputPath("mobile-leagues-390x844.png"), fullPage: false });
+    }
+
+    const leagueRouteResult = await page.locator("main[data-app-scroll='true']").evaluate((element) => {
+      const area = element as HTMLElement;
+      const heading = document.querySelector("h1");
+      return {
+        owner: area.dataset.scrollOwner,
+        scrollTop: area.scrollTop,
+        headingHeight: heading?.getBoundingClientRect().height ?? 0,
+      };
+    });
+    expect(leagueRouteResult).toEqual({ owner: "page", scrollTop: 0, headingHeight: expect.any(Number) });
+    expect(leagueRouteResult.headingHeight).toBeLessThan(48);
+
     await page.goto("/draft/mock/single-player?new=1&teams=8&timer=15");
     await expect(page.locator("main[data-app-scroll='true']")).toHaveAttribute("data-scroll-owner", "draft-room");
 

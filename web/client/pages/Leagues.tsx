@@ -105,15 +105,13 @@ export const LeagueCard = ({
           openLeague();
         }
       }}
-      className="bg-card/40 backdrop-blur-md border-border/60 rounded-[2.5rem] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] group hover:border-primary/40 transition-all duration-500 relative cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="relative cursor-pointer overflow-hidden rounded-xl border-border/70 bg-[#15181c] shadow-[0_8px_20px_rgba(0,0,0,0.22)] transition-colors hover:border-primary/45 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
-    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-primary/10 transition-colors" />
     <div className="flex flex-col md:flex-row relative z-10">
-      <div className="flex-1 p-8 border-b md:border-b-0 md:border-r border-border/40 relative overflow-hidden">
-        <div className="absolute -top-6 -left-6 w-24 h-24 blur-[40px] opacity-20 rounded-full bg-gradient-to-br from-primary to-blue-600" />
-        <div className="relative z-10 flex flex-col h-full justify-between gap-6">
-          <div className="space-y-4">
-            <div className="w-12 h-12 overflow-hidden rounded-2xl flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110 duration-500 bg-gradient-to-br from-primary to-blue-600">
+      <div className="flex-1 border-b border-border/60 p-4 md:border-b-0 md:border-r">
+        <div className="flex h-full flex-col justify-between gap-4">
+          <div className="space-y-3">
+            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-primary/30 bg-primary/10 text-primary">
               {leagueImageUrl && !iconFailed ? (
                 <img
                   src={leagueImageUrl}
@@ -126,41 +124,41 @@ export const LeagueCard = ({
               )}
             </div>
             <div className="space-y-1">
-              <h3 className="text-2xl font-black italic tracking-tight text-foreground uppercase group-hover:text-primary transition-colors">
+              <h3 className="text-base font-bold tracking-tight text-foreground">
                 {name}
               </h3>
-              <p className="text-[10px] font-black tracking-[0.2em] text-muted-foreground uppercase">
+              <p className="text-[10px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
                 {status.replace(/_/g, " ")} • {teams} teams
               </p>
             </div>
           </div>
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/70">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/15 px-2.5 py-1.5">
                 <Users className="w-3 h-3 text-primary" />
                 {memberCount}/{teams} members
               </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/15 px-2.5 py-1.5">
                 {isPrivate ? <Lock className="w-3 h-3 text-primary" /> : <Globe2 className="w-3 h-3 text-primary" />}
                 {isPrivate ? "Private" : "Public"}
               </span>
             </div>
             {inviteShouldBeVisible ? (
               <div
-                className="max-w-md rounded-2xl border border-sky-300/20 bg-sky-300/10 p-3"
+                className="max-w-md rounded-lg border border-sky-300/20 bg-sky-300/[0.06] p-3"
                 onClick={(event) => event.stopPropagation()}
               >
-                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-sky-200/80">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-200/80">
                   Invite stays here until the draft is complete
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs font-black tracking-[0.08em] text-slate-50">
+                  <span className="min-w-0 flex-1 truncate rounded-md border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs font-bold tracking-[0.08em] text-slate-50">
                     {inviteCode}
                   </span>
                   <button
                     type="button"
                     onClick={(event) => copyInviteValue(event, "code", inviteCode)}
-                    className="inline-flex h-9 items-center gap-2 rounded-xl border border-sky-300/25 bg-sky-300/15 px-3 text-[9px] font-black uppercase tracking-[0.14em] text-sky-100 transition hover:border-sky-200/60 hover:bg-sky-300/20"
+                    className="inline-flex h-9 items-center gap-2 rounded-md border border-sky-300/25 bg-sky-300/15 px-3 text-[9px] font-bold uppercase tracking-[0.12em] text-sky-100 transition hover:border-sky-200/60 hover:bg-sky-300/20"
                   >
                     <Copy className="h-3.5 w-3.5" />
                     {copiedInviteField === "code" ? "Copied" : "Code"}
@@ -168,7 +166,7 @@ export const LeagueCard = ({
                   <button
                     type="button"
                     onClick={(event) => copyInviteValue(event, "link", inviteLink)}
-                    className="inline-flex h-9 items-center gap-2 rounded-xl border border-emerald-300/25 bg-emerald-300/12 px-3 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-300/18"
+                    className="inline-flex h-9 items-center gap-2 rounded-md border border-emerald-300/25 bg-emerald-300/12 px-3 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-300/18"
                   >
                     <Link2 className="h-3.5 w-3.5" />
                     {copiedInviteField === "link" ? "Copied" : "Link"}
@@ -180,26 +178,26 @@ export const LeagueCard = ({
         </div>
       </div>
 
-      <div className="flex-[1.1] p-8 bg-white/5 border-b md:border-b-0 md:border-r border-border/40">
-        <div className="space-y-6">
-          <h4 className="text-[10px] font-black tracking-[0.3em] text-primary uppercase opacity-60">
+      <div className="flex-[1.1] border-b border-border/60 bg-black/10 p-4 md:border-b-0 md:border-r">
+        <div className="space-y-3">
+          <h4 className="text-[10px] font-semibold tracking-[0.12em] text-primary uppercase opacity-80">
             League snapshot
           </h4>
-          <div className="space-y-4">
-            <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
-              <p className="text-[10px] font-black tracking-[0.2em] uppercase text-muted-foreground/60">
+          <div>
+            <div className="rounded-lg border border-white/10 bg-black/15 p-3">
+              <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
                 Draft
               </p>
-              <p className="mt-2 text-sm font-bold text-foreground">{draftLabel}</p>
+              <p className="mt-1.5 text-sm font-semibold text-foreground">{draftLabel}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="p-8 flex flex-col gap-4 items-center justify-center bg-gradient-to-br from-primary/5 to-transparent min-w-[240px]">
+      <div className="grid grid-cols-2 gap-2 p-4 md:flex md:min-w-[190px] md:flex-col md:justify-center">
         <Button
           variant="outline"
-          className="w-full border-white/5 bg-white/5 text-foreground font-black tracking-[0.2em] text-[10px] uppercase h-12 px-8 rounded-2xl hover:bg-white/10 transition-all duration-300"
+          className="h-11 w-full rounded-lg border-white/10 bg-white/[0.04] px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-foreground hover:bg-white/[0.08]"
           onClick={(event) => {
             event.stopPropagation();
             openLeague();
@@ -212,7 +210,7 @@ export const LeagueCard = ({
           <Button
             variant="outline"
             className={[
-              "w-full font-black tracking-[0.2em] text-[10px] uppercase h-12 px-8 rounded-2xl transition-all duration-300",
+              "h-11 w-full rounded-lg px-3 text-[10px] font-bold uppercase tracking-[0.1em] transition-colors",
               draftUnlocked
                 ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
                 : "border-amber-300/25 bg-amber-300/10 text-amber-100 hover:bg-amber-300/15",
@@ -227,7 +225,7 @@ export const LeagueCard = ({
           </Button>
         )}
         {shouldShowDraftAction && !draftUnlocked ? (
-          <p className="text-center text-[9px] font-black uppercase tracking-[0.16em] text-amber-100/80">
+          <p className="col-span-2 text-center text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-100/80 md:col-auto">
             Opens in {formatDraftCountdown(draftDateTime, now)}
           </p>
         ) : null}
@@ -244,32 +242,32 @@ export default function Leagues() {
   const { data: leagueRows = [], isLoading, isError, refetch } = useLeagues(20, isLoggedIn);
 
   return (
-    <div className="relative z-10 mx-auto max-w-6xl space-y-12 pb-20 pt-1 animate-in fade-in duration-1000">
-      <div className="relative space-y-6 pt-10">
-        <div className="flex items-center justify-between">
-          <h1 className="py-1 font-display text-6xl font-black uppercase italic leading-[1.08] tracking-[-0.045em] text-foreground bg-gradient-to-br from-white via-white to-primary/40 bg-clip-text text-transparent">
+    <div className="relative z-10 mx-auto max-w-6xl space-y-6 pb-4 pt-1 animate-in fade-in duration-300">
+      <div className="space-y-3 border-b border-cfb-border-subtle pb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="break-normal text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             Leagues
           </h1>
           {isLoggedIn && (
-            <div className="flex items-center gap-3">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
               <Button
                 variant="outline"
-                className="border-primary/30 text-primary text-[10px] font-black uppercase tracking-widest rounded-2xl h-12 px-8 hover:bg-primary/10 transition-all"
+                className="h-11 rounded-lg border-primary/35 bg-primary/[0.08] px-3 text-[10px] font-bold uppercase tracking-[0.08em] text-primary hover:bg-primary/[0.14]"
                 onClick={() => navigate("/leagues/create")}
               >
-                Create League +
+                Create
               </Button>
               <Button
                 variant="outline"
-                className="border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase tracking-widest rounded-2xl h-12 px-8 hover:bg-emerald-500/10 transition-all"
+                className="h-11 rounded-lg border-emerald-500/30 bg-emerald-500/[0.06] px-3 text-[10px] font-bold uppercase tracking-[0.08em] text-emerald-300 hover:bg-emerald-500/[0.12]"
                 onClick={() => navigate("/leagues/join")}
               >
-                Join League
+                Join
               </Button>
             </div>
           )}
         </div>
-        <p className="text-muted-foreground text-xl font-medium max-w-2xl leading-relaxed">
+        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
           {isLoggedIn
             ? "Manage your active leagues, jump into drafts, and open the right league hub."
             : "Sign in to create or join a league and use the supported React experience."}
@@ -277,18 +275,18 @@ export default function Leagues() {
       </div>
 
       {isLoggedIn ? (
-        <div className="space-y-8">
+        <div className="space-y-4">
           {isLoading && (
             <div className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
               Loading leagues...
             </div>
           )}
           {isError && (
-            <Card className="bg-card/40 backdrop-blur-md border-border/40 rounded-[3rem] p-12 text-center">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-red-300">
+            <Card className="rounded-xl border-border/60 bg-[#15181c] p-6 text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-red-300">
                 Unable to load leagues. Confirm the backend is running and your session is valid.
               </p>
-              <Button variant="outline" onClick={() => void refetch()} className="mt-5 rounded-xl border-sky-300/25 text-sky-100">
+              <Button variant="outline" onClick={() => void refetch()} className="mt-5 rounded-lg border-sky-300/25 text-sky-100">
                 Try Again
               </Button>
             </Card>
@@ -330,34 +328,34 @@ export default function Leagues() {
             />
           ))}
           {!isLoading && leagueRows.length === 0 && (
-            <Card className="bg-card/40 backdrop-blur-md border-border/40 rounded-[3rem] p-12 space-y-8">
-              <div className="space-y-3 text-center">
-                <h3 className="text-2xl font-black uppercase text-foreground">No leagues yet</h3>
-                <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">
+            <Card className="space-y-5 rounded-xl border-border/60 bg-[#15181c] p-6">
+              <div className="space-y-2 text-center">
+                <h3 className="text-lg font-bold text-foreground">No leagues yet</h3>
+                <p className="text-sm text-muted-foreground">
                   Create a league or join one with an invite code to get started.
                 </p>
               </div>
-              <div className="flex flex-wrap justify-center gap-3">
-                <Button onClick={() => navigate("/leagues/create")}>Create League</Button>
-                <Button variant="outline" onClick={() => navigate("/leagues/join")}>Join League</Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button className="h-11 rounded-lg" onClick={() => navigate("/leagues/create")}>Create League</Button>
+                <Button className="h-11 rounded-lg" variant="outline" onClick={() => navigate("/leagues/join")}>Join League</Button>
               </div>
             </Card>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <Card className="bg-card/40 backdrop-blur-md border-border/40 rounded-[3rem] p-12 text-center group hover:border-primary/20 transition-all duration-700 relative overflow-hidden">
-            <div className="space-y-6 relative z-10">
-              <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center mx-auto text-primary group-hover:scale-110 transition-transform">
-                <Trophy className="w-10 h-10" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Card className="rounded-xl border-border/60 bg-[#15181c] p-6 text-center">
+            <div className="space-y-4">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Trophy className="w-6 h-6" />
               </div>
               <div className="space-y-2">
-                <h3 className="text-2xl font-black italic uppercase tracking-tight text-foreground">Create League</h3>
-                <p className="text-sm font-medium text-muted-foreground/60 max-w-[240px] mx-auto">
+                <h3 className="text-lg font-bold text-foreground">Create League</h3>
+                <p className="mx-auto max-w-[240px] text-sm text-muted-foreground">
                   Start your own custom league and invite your friends to draft.
                 </p>
               </div>
-              <Button asChild className="w-full h-14 bg-primary text-primary-foreground font-black tracking-[0.2em] text-[10px] uppercase rounded-2xl shadow-[0_10px_20px_rgba(var(--primary),0.2)]">
+              <Button asChild className="h-11 w-full rounded-lg text-[10px] font-bold uppercase tracking-[0.1em]">
                 <Link to="/login" className="block">
                   Sign In to Create
                 </Link>
@@ -365,18 +363,18 @@ export default function Leagues() {
             </div>
           </Card>
 
-          <Card className="bg-card/40 backdrop-blur-md border-border/40 rounded-[3rem] p-12 text-center group hover:border-emerald-500/20 transition-all duration-700 relative overflow-hidden">
-            <div className="space-y-6 relative z-10">
-              <div className="w-20 h-20 rounded-3xl bg-emerald-500/10 flex items-center justify-center mx-auto text-emerald-500 group-hover:scale-110 transition-transform">
-                <Users className="w-10 h-10" />
+          <Card className="rounded-xl border-border/60 bg-[#15181c] p-6 text-center">
+            <div className="space-y-4">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+                <Users className="w-6 h-6" />
               </div>
               <div className="space-y-2">
-                <h3 className="text-2xl font-black italic uppercase tracking-tight text-foreground">Join League</h3>
-                <p className="text-sm font-medium text-muted-foreground/60 max-w-[240px] mx-auto">
+                <h3 className="text-lg font-bold text-foreground">Join League</h3>
+                <p className="mx-auto max-w-[240px] text-sm text-muted-foreground">
                   Join an existing league with an invite code and start scouting.
                 </p>
               </div>
-              <Button asChild className="w-full h-14 bg-emerald-500 text-white font-black tracking-[0.2em] text-[10px] uppercase rounded-2xl shadow-[0_10px_20px_rgba(16,185,129,0.2)]">
+              <Button asChild className="h-11 w-full rounded-lg bg-emerald-500 text-[10px] font-bold uppercase tracking-[0.1em] text-white hover:bg-emerald-400">
                 <Link to="/login" className="block">
                   Sign In to Join
                 </Link>
