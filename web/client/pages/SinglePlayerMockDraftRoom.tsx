@@ -422,10 +422,9 @@ export default function SinglePlayerMockDraftRoom() {
         </div>
       </div>
 
-      <div className="hidden grid-cols-[64px_minmax(0,1fr)_70px_110px_180px] border-b border-white/10 px-5 py-3 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground sm:grid">
+      <div className="grid grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground sm:grid-cols-[64px_minmax(0,1fr)_110px_140px] sm:gap-3 sm:px-5 sm:py-3 sm:text-[9px] sm:tracking-[0.22em]">
         <span>RK</span>
         <span>Player</span>
-        <span>Pos</span>
         <span>Proj</span>
         <span className="text-right">Action</span>
       </div>
@@ -455,6 +454,9 @@ export default function SinglePlayerMockDraftRoom() {
             const isQueued = draftState.queuedPlayerIds.includes(player.id);
             const isSelected = selectedPlayerId === player.id;
             const visibleRank = player.masterDraftRank ?? player.draftRank;
+            const isLegalForCurrentPick = draftablePlayerIds.has(player.id);
+            const actionIsDraft = userOnClock && draftState.status === "live";
+            const actionIsDisabled = actionIsDraft && !isLegalForCurrentPick;
             return (
               <div
                 key={player.id}
@@ -469,49 +471,41 @@ export default function SinglePlayerMockDraftRoom() {
                   }
                 }}
                 className={cn(
-                  "grid min-h-[68px] cursor-pointer grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-x-2 border-b border-white/10 px-3 py-2 outline-none transition-[background-color,box-shadow,color] duration-200 sm:min-h-0 sm:grid-cols-[64px_minmax(0,1fr)_70px_110px_180px] sm:items-center sm:gap-3 sm:px-5 sm:py-4",
+                  "grid min-h-[66px] cursor-pointer grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 outline-none transition-[background-color,box-shadow,color] duration-200 sm:min-h-0 sm:grid-cols-[64px_minmax(0,1fr)_110px_140px] sm:items-center sm:gap-3 sm:px-5 sm:py-3",
                   positionHoverClass,
                   isSelected && "bg-amber-300/[0.075] shadow-[inset_3px_0_0_rgba(251,191,36,0.72)]"
                 )}
               >
-                <p className="row-span-2 self-center text-base font-bold tabular-nums text-muted-foreground sm:row-auto sm:text-xl sm:font-black">{visibleRank}</p>
-                <div className="min-w-0 self-center sm:col-auto sm:row-auto">
-                  <p className="line-clamp-2 text-sm font-black leading-4 text-foreground transition-colors hover:text-amber-100 sm:text-base sm:leading-normal">{player.name}</p>
-                  <p className="mt-0.5 truncate text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground sm:mt-1 sm:text-[10px] sm:tracking-[0.18em]">{player.school}</p>
-                </div>
-                <div className="row-span-2 flex items-center justify-end gap-1.5 sm:contents">
-                  <div className="flex flex-col items-end gap-0.5 sm:contents">
-                    <span className={cn("shrink-0 rounded-lg border px-2 py-1 text-[9px] font-black sm:col-auto sm:row-auto sm:w-fit sm:rounded-full sm:px-4 sm:py-2 sm:text-xs", positionClass)}>{player.pos}</span>
-                    <p className="text-[10px] font-black tabular-nums text-foreground sm:col-auto sm:block sm:text-sm">
-                      <span className="sm:hidden">{formatDraftProjection({ seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</span>
-                      <span className="hidden sm:inline">{formatDraftProjection({ seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</span>
-                    </p>
+                <p className="self-center text-base font-bold tabular-nums text-muted-foreground sm:text-xl sm:font-black">{visibleRank}</p>
+                <div className="min-w-0 self-center">
+                  <p className="truncate text-sm font-black leading-4 text-foreground transition-colors hover:text-amber-100 sm:text-base sm:leading-normal">{player.name}</p>
+                  <div className="mt-0.5 flex min-w-0 items-center gap-1.5 sm:mt-1 sm:gap-2">
+                    <p className="truncate text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground sm:text-[10px] sm:tracking-[0.18em]">{player.school}</p>
+                    <span className={cn("shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black sm:rounded-full sm:px-2 sm:text-[9px]", positionClass)}>{player.pos}</span>
                   </div>
-                  <div className="flex items-center gap-1 sm:col-auto sm:justify-end sm:gap-2">
+                </div>
+                <p className="text-right text-[10px] font-black tabular-nums text-foreground sm:text-sm">{formatDraftProjection({ seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</p>
                   <Button
-                    variant="outline"
-                    className="h-10 min-h-[44px] w-10 rounded-lg px-0 text-[10px] font-black uppercase tracking-[0.08em] sm:h-10 sm:min-h-0 sm:w-auto sm:rounded-xl sm:px-4 sm:tracking-[0.14em]"
+                    className={cn(
+                      "h-10 min-h-[44px] w-[78px] rounded-lg px-1 text-[8px] font-black uppercase tracking-[0.04em] sm:h-10 sm:min-h-0 sm:w-[140px] sm:rounded-xl sm:px-3 sm:text-[10px] sm:tracking-[0.14em]",
+                      actionIsDraft
+                        ? "border border-cyan-100/35 bg-[#1b3349] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_5px_12px_rgba(2,6,23,0.24)] transition hover:border-cyan-100/60 hover:bg-[#294d69]"
+                        : "border border-white/15 bg-white/[0.06] text-cyan-50 transition hover:border-cyan-100/45 hover:bg-white/[0.12]"
+                    )}
+                    disabled={actionIsDisabled}
                     onClick={(event) => {
                       event.stopPropagation();
-                      toggleQueue(player.id);
+                      if (actionIsDraft) {
+                        draftPlayer(player.id);
+                      } else {
+                        toggleQueue(player.id);
+                      }
                     }}
+                    title={actionIsDraft ? (isLegalForCurrentPick ? `Draft ${player.name}.` : "No legal roster slot is available for this player.") : isQueued ? `Remove ${player.name} from your queue.` : `Queue ${player.name}.`}
+                    aria-label={actionIsDraft ? `Draft ${player.name}` : isQueued ? `Remove ${player.name} from queue` : `Queue ${player.name}`}
                   >
-                    <ClipboardList className="h-3.5 w-3.5 sm:hidden" aria-hidden="true" />
-                    <span className="sr-only sm:hidden">{isQueued ? "Queued" : "Queue"}</span>
-                    <span className="hidden sm:inline">{isQueued ? "Queued" : "Queue"}</span>
+                    {actionIsDraft ? (isLegalForCurrentPick ? "Draft" : "No Slot") : isQueued ? "Queued" : "Queue"}
                   </Button>
-                  <Button
-                    className="h-10 min-h-[44px] rounded-lg border border-cyan-100/35 bg-[#1b3349] px-3 text-[9px] font-black uppercase tracking-[0.06em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_5px_12px_rgba(2,6,23,0.24)] transition hover:border-cyan-100/60 hover:bg-[#294d69] sm:h-10 sm:min-h-0 sm:rounded-xl sm:px-5 sm:text-[10px] sm:tracking-[0.14em]"
-                    disabled={!userOnClock || draftState.status !== "live"}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      draftPlayer(player.id);
-                    }}
-                  >
-                    Draft
-                  </Button>
-                </div>
-                </div>
               </div>
             );
           })

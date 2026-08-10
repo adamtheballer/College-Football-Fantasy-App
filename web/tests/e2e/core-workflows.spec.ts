@@ -935,6 +935,19 @@ test.describe("critical browser workflows", () => {
         player_class: "FR",
         external_id: "arch-manning",
       },
+      {
+        id: 502,
+        name: "Quinn Ewers",
+        position: "QB",
+        school: "Texas",
+        image_url: null,
+        board_rank: 2,
+        sheet_adp: 2,
+        sheet_projected_season_points: 294,
+        sheet_projection_stats: null,
+        player_class: "JR",
+        external_id: "quinn-ewers",
+      },
     ];
 
     let draftRoom = {
@@ -1050,25 +1063,24 @@ test.describe("critical browser workflows", () => {
       await page.setViewportSize(viewport);
       const row = page.getByTestId("draft-player-row").filter({ hasText: "Arch Manning" });
       await expect(row).toBeVisible();
-      const queueButton = row.getByRole("button", { name: /^Queue$/i });
-      const draftButton = row.getByRole("button", { name: /^Draft$/i });
-      await expect(queueButton).toBeVisible();
+      const draftButton = row.getByRole("button", { name: /^Draft Arch Manning$/i });
       await expect(draftButton).toBeVisible();
+      await expect(row.getByRole("button", { name: /^Queue Arch Manning$/i })).toHaveCount(0);
       const geometry = await row.evaluate((element) => ({
         rowRight: element.getBoundingClientRect().right,
         documentWidth: document.documentElement.scrollWidth,
       }));
-      const [queueHeight, draftHeight] = await Promise.all([
-        queueButton.evaluate((element) => element.offsetHeight),
-        draftButton.evaluate((element) => element.offsetHeight),
-      ]);
+      const draftHeight = await draftButton.evaluate((element) => element.offsetHeight);
       expect(geometry.documentWidth).toBeLessThanOrEqual(viewport.width);
       expect(geometry.rowRight).toBeLessThanOrEqual(viewport.width);
-      expect(queueHeight).toBeGreaterThanOrEqual(34);
       expect(draftHeight).toBeGreaterThanOrEqual(34);
-      await expect(queueButton).toHaveClass(/min-h-\[44px\]/);
       await expect(draftButton).toHaveClass(/min-h-\[44px\]/);
     }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const desktopRow = page.getByTestId("draft-player-row").filter({ hasText: "Arch Manning" });
+    await expect(desktopRow.getByRole("button", { name: /^Draft Arch Manning$/i })).toBeVisible();
+    await expect(desktopRow.getByRole("button", { name: /^Queue Arch Manning$/i })).toHaveCount(0);
+    await page.setViewportSize({ width: 430, height: 932 });
     const draftScrollContract = await page.evaluate(() => {
       const appScroller = document.querySelector<HTMLElement>("main[data-app-scroll='true']");
       const playerList = document.querySelector<HTMLElement>("[data-testid='draft-player-list']");
@@ -1098,11 +1110,15 @@ test.describe("critical browser workflows", () => {
     await page
       .getByTestId("draft-player-row")
       .filter({ hasText: "Arch Manning" })
-      .getByRole("button", { name: /^Draft$/i })
+      .getByRole("button", { name: /^Draft Arch Manning$/i })
       .click();
     await expect(page.getByText(/Last pick/i)).toBeVisible();
     await expect(page.getByText(/Arch Manning/i).first()).toBeVisible();
     await expect(page.getByText(/Other Team/i).first()).toBeVisible();
+    const queuedRow = page.getByTestId("draft-player-row").filter({ hasText: "Quinn Ewers" });
+    await expect(queuedRow.getByRole("button", { name: /^Draft Quinn Ewers$/i })).toHaveCount(0);
+    await queuedRow.getByRole("button", { name: /^Queue Quinn Ewers$/i }).click();
+    await expect(queuedRow.getByRole("button", { name: /Remove Quinn Ewers from queue/i })).toBeVisible();
   });
 
   test("league matchup page renders projected teams and honest empty state", async ({ page }) => {
@@ -2060,28 +2076,27 @@ test.describe("critical browser workflows", () => {
       await page.setViewportSize(viewport);
       const row = page.getByTestId("draft-player-row").filter({ hasText: "Jeremiah Smith" });
       await expect(row).toBeVisible();
-      const queueButton = row.getByRole("button", { name: /^Queue$/i });
-      const draftButton = row.getByRole("button", { name: /^Draft$/i });
+      const queueButton = row.getByRole("button", { name: /^Queue Jeremiah Smith$/i });
       await expect(queueButton).toBeVisible();
-      await expect(draftButton).toBeVisible();
+      await expect(row.getByRole("button", { name: /^Draft Jeremiah Smith$/i })).toHaveCount(0);
       const geometry = await row.evaluate((element) => ({
         rowRight: element.getBoundingClientRect().right,
         documentWidth: document.documentElement.scrollWidth,
       }));
-      const [queueHeight, draftHeight] = await Promise.all([
-        queueButton.evaluate((element) => element.offsetHeight),
-        draftButton.evaluate((element) => element.offsetHeight),
-      ]);
+      const queueHeight = await queueButton.evaluate((element) => element.offsetHeight);
       expect(geometry.documentWidth).toBeLessThanOrEqual(viewport.width);
       expect(geometry.rowRight).toBeLessThanOrEqual(viewport.width);
       expect(queueHeight).toBeGreaterThanOrEqual(34);
-      expect(draftHeight).toBeGreaterThanOrEqual(34);
       await expect(queueButton).toHaveClass(/min-h-\[44px\]/);
-      await expect(draftButton).toHaveClass(/min-h-\[44px\]/);
       if (process.env.CAPTURE_MOBILE_UI === "1") {
         await page.screenshot({ path: testInfo.outputPath(`mobile-mock-draft-${viewport.width}x${viewport.height}.png`), fullPage: false });
       }
     }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const desktopRow = page.getByTestId("draft-player-row").filter({ hasText: "Jeremiah Smith" });
+    await expect(desktopRow.getByRole("button", { name: /^Queue Jeremiah Smith$/i })).toBeVisible();
+    await expect(desktopRow.getByRole("button", { name: /^Draft Jeremiah Smith$/i })).toHaveCount(0);
+    await page.setViewportSize({ width: 430, height: 932 });
     const scrollContract = await page.evaluate(() => {
       const appScroller = document.querySelector<HTMLElement>("main[data-app-scroll='true']");
       const playerList = document.querySelector<HTMLElement>("[data-testid='draft-player-list']");
@@ -2137,7 +2152,7 @@ test.describe("critical browser workflows", () => {
     expect(beforeUserPick.picks).toHaveLength(beforeUserPick.userTeamId - 1);
     expect(beforeUserPick.picks.every((pick: { pickedBy: string }) => pick.pickedBy === "bot")).toBe(true);
 
-    await page.getByRole("button", { name: /^Draft$/ }).first().click();
+    await page.getByRole("button", { name: /^Draft / }).first().click();
 
     await expect
       .poll(() => page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}").picks?.some((pick: { pickedBy: string }) => pick.pickedBy === "user") ?? false))

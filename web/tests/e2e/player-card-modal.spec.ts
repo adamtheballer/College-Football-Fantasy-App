@@ -236,8 +236,12 @@ test.describe("player card modal", () => {
     const mobileBox = await mobileArticle.boundingBox();
     expect(mobileBox).not.toBeNull();
     if (mobileBox) {
-      expect(Math.abs(mobileBox.height - 844)).toBeLessThanOrEqual(2);
-      expect(mobileBox.width).toBe(390);
+      // Mobile player cards intentionally use a compact, blurred-backdrop
+      // bottom sheet instead of taking over the entire viewport.
+      expect(mobileBox.height).toBeGreaterThan(844 * 0.7);
+      expect(mobileBox.height).toBeLessThan(844 * 0.85);
+      expect(mobileBox.width).toBeGreaterThan(390 * 0.9);
+      expect(mobileBox.width).toBeLessThanOrEqual(390);
     }
     if (process.env.PLAYWRIGHT_CAPTURE_SCREENSHOTS === "1") {
       await page.screenshot({ path: testInfo.outputPath("player-card-mobile-390x844.png"), fullPage: true });
