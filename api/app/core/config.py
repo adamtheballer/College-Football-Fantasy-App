@@ -119,8 +119,8 @@ class Settings(BaseSettings):
     auth_refresh_rate_limit: int = 30
     auth_password_reset_rate_limit: int = 5
     auth_password_change_rate_limit: int = 5
-    # The public-beta gate is deliberately separate from normal authentication.
-    # It is disabled outside the approved beta environment by default.
+    # Legacy deployment name for the optional Early Access Pro-code program.
+    # This switch must never restrict normal signup or sign-in.
     beta_access_enabled: bool = False
     # The beta scoring agreement is server-authoritative.  It is intentionally
     # independent of UI state so direct API clients cannot change a league's
@@ -241,14 +241,14 @@ class Settings(BaseSettings):
         # candidate.  Permitting its published fallback HMAC secrets outside
         # production makes a restart silently invalidate every imported code
         # (or, worse, makes the code registry predictable).  Development can
-        # still run with beta access disabled, which remains the default.
+        # still run with the optional code program disabled, which remains the default.
         if self.beta_access_enabled:
             if self.beta_access_code_hmac_secret == DEFAULT_BETA_ACCESS_CODE_HMAC_SECRET:
-                raise ValueError("BETA_ACCESS_CODE_HMAC_SECRET must be changed when beta access is enabled")
+                raise ValueError("BETA_ACCESS_CODE_HMAC_SECRET must be changed when Early Access Pro codes are enabled")
             if self.beta_access_reservation_secret == DEFAULT_BETA_ACCESS_RESERVATION_SECRET:
-                raise ValueError("BETA_ACCESS_RESERVATION_SECRET must be changed when beta access is enabled")
+                raise ValueError("BETA_ACCESS_RESERVATION_SECRET must be changed when Early Access Pro codes are enabled")
             if len(self.beta_access_code_hmac_secret) < 32 or len(self.beta_access_reservation_secret) < 32:
-                raise ValueError("Beta access secrets must each contain at least 32 characters")
+                raise ValueError("Early Access Pro-code secrets must each contain at least 32 characters")
 
         if not self.is_production:
             return self

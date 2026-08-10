@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ApiError } from "@/lib/api";
-import { loginErrorMessage } from "./Login";
+import { initialLoginMode, loginErrorMessage, loginPathForMode } from "./Login";
 import { isAuthFlowRoute } from "@/components/app-shell/navigation";
 
 describe("loginErrorMessage", () => {
@@ -40,5 +40,21 @@ describe("reset password route", () => {
   it("uses the direct reset route instead of the retired token confirmation route", () => {
     expect(isAuthFlowRoute("/reset-password")).toBe(true);
     expect(isAuthFlowRoute("/password-reset/confirm")).toBe(false);
+  });
+});
+
+describe("optional Early Access Pro flow", () => {
+  it("keeps standard signup and login open while retaining legacy code links", () => {
+    expect(initialLoginMode(null, true)).toBe("signin");
+    expect(initialLoginMode("signup", true)).toBe("signup");
+    expect(initialLoginMode("pro", true)).toBe("access");
+    expect(initialLoginMode("beta", true)).toBe("access");
+    expect(initialLoginMode("pro", false)).toBe("signin");
+  });
+
+  it("routes the optional code claim separately from normal account creation", () => {
+    expect(loginPathForMode("signin")).toBe("/login");
+    expect(loginPathForMode("signup")).toBe("/login?flow=signup");
+    expect(loginPathForMode("access")).toBe("/login?flow=pro");
   });
 });

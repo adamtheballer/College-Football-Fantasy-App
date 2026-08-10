@@ -29,3 +29,8 @@ class User(TimestampMixin, Base):
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     auth_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+
+    @property
+    def early_access_pro_eligible(self) -> bool:
+        """Existing code-redemption ledger, redeemable for one Pro year at alpha launch."""
+        return self.beta_access_granted_at is not None

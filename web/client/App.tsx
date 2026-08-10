@@ -203,9 +203,9 @@ const App = () => (
                 <Route path="/stats" element={<Navigate to="/leagues" replace />} />
                 <Route path="/stats/players" element={<Navigate to="/leagues" replace />} />
                 <Route path="/login" element={<Login />} />
-                {/* Beta access, account creation, and returning-user sign-in share one auth surface. */}
-                <Route path="/beta-access" element={<Navigate to="/login?flow=beta" replace />} />
-                <Route path="/signup" element={<Navigate to="/login?flow=beta" replace />} />
+                {/* Kept for shared legacy links; codes now grant optional Pro credit. */}
+                <Route path="/beta-access" element={<Navigate to="/login?flow=pro" replace />} />
+                <Route path="/signup" element={<Navigate to="/login?flow=signup" replace />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
