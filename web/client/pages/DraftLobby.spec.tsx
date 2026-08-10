@@ -85,6 +85,15 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("DraftLobby rescheduling", () => {
+  it("keeps countdown values and unit labels inside four compact mobile timer cards", () => {
+    renderLobby();
+
+    const countdownUnits = screen.getByTestId("draft-countdown-units");
+    expect(countdownUnits.className).toContain("grid-cols-4");
+    expect(screen.getByLabelText("Days").className).toContain("whitespace-nowrap");
+    expect(screen.getByLabelText("Minutes").className).toContain("whitespace-nowrap");
+  });
+
   it("shows the commissioner a visible league-timezone modal with the current schedule prefilled", () => {
     renderLobby();
 
