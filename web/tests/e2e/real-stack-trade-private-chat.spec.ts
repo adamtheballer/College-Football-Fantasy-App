@@ -103,6 +103,7 @@ async function primeBrowserSession(page: Page, session: AuthSession) {
 
 test.describe("real FastAPI/PostgreSQL league chat", () => {
   test.skip(!enabled, "Set REAL_STACK_E2E=1 after starting FastAPI and PostgreSQL; this suite never mocks chat endpoints.");
+  test.setTimeout(90_000);
 
   test("two league members exchange messages and see a binding trade card without cross-league leakage", async ({ browser, request }) => {
     const userA = await signup(request, "Avery", betaFixtures.proposer);
@@ -129,7 +130,8 @@ test.describe("real FastAPI/PostgreSQL league chat", () => {
     const pageB = await contextB.newPage();
     await primeBrowserSession(pageB, userB);
     await pageB.goto("/chats");
-    await expect(pageB.getByText("Good luck this week").last()).toBeVisible();
+    await expect(pageB.getByText("# General").first()).toBeVisible({ timeout: 15_000 });
+    await expect(pageB.getByText("Good luck this week").last()).toBeVisible({ timeout: 15_000 });
     await expect.poll(async () => {
       const response = await request.get(`${apiBaseUrl}/chats/unread-summary`, { headers: authHeaders(userB) });
       return (await response.json()).total_unread;

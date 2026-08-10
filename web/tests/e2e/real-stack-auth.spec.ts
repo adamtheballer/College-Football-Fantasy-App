@@ -38,7 +38,7 @@ test.describe("real seeded stack", () => {
     await expect(page.getByRole("dialog", { name: /Account created/i })).toBeVisible();
     await page.getByRole("button", { name: /Continue to dashboard/i }).click();
     await page.waitForURL("**/");
-    await expect(page.getByText(/College Football Fantasy/i).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Good to see you, Real E2E/i })).toBeVisible();
     await expect
       .poll(() => page.evaluate(() => window.localStorage.getItem("cfb_access_token")))
       .not.toBeNull();
