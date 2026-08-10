@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { AppOnboardingTour } from "./AppOnboardingTour";
@@ -37,6 +37,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isCreateLeaguePage = isCreateLeagueRoute(location.pathname);
   const isSaturdayPick6Page = isSaturdayPick6Route(location.pathname);
   const isAuthFlowPage = isAuthFlowRoute(location.pathname);
+
+  // AppShell deliberately owns scrolling so persistent navigation never creates
+  // a second document scroller. Reset that one owner before a new route paints;
+  // otherwise navigating from a long page can leave the next page at its old
+  // bottom offset on mobile Safari.
+  useLayoutEffect(() => {
+    if (isDraftRoomPage) return;
+
+    mainScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [isDraftRoomPage, location.key, location.pathname, location.search]);
 
   useEffect(() => {
     if (!user) {
@@ -86,9 +97,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         user={user}
         isLoggedIn={isLoggedIn}
         hideChrome={isDraftRoomPage}
-        hideDecor={isCreateLeaguePage}
-        hideFloatingActions={isDraftRoomPage || isCreateLeaguePage || isSaturdayPick6Page}
+        // Marketing surfaces can keep the stadium/playbook treatment. Authenticated
+        // management screens use a quieter data-first shell instead.
+        hideDecor={isLoggedIn || isCreateLeaguePage}
+        hideFloatingActions={isLoggedIn || isDraftRoomPage || isCreateLeaguePage || isSaturdayPick6Page}
         compactContent={isDraftRoomPage || isCreateLeaguePage}
+        fixedViewport={isDraftRoomPage}
         onSignOut={logout}
         mainScrollRef={mainScrollRef}
       >

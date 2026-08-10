@@ -66,4 +66,12 @@ describe("MobileNavigation", () => {
 
     expect(onSignOut).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps the five primary labels on one line at narrow mobile widths", () => {
+    renderNavigation();
+
+    for (const label of ["HOME", "LEAGUES", "CHATS", "DRAFT", "More"]) {
+      expect(screen.getByText(label).className).toContain("whitespace-nowrap");
+    }
+  });
 });

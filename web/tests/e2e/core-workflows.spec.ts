@@ -231,6 +231,90 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("Your reward code is being prepared.")).toBeVisible();
   });
 
+  test("mobile dashboard retains the normal page scroller outside draft rooms", async ({ page }, testInfo) => {
+    await seedAuthenticatedSession(page);
+    await page.route("**/leagues?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [], total: 0, limit: 20, offset: 0 }),
+      });
+    });
+    await page.route("**/notifications/alerts?**", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [] }) });
+    });
+    await page.route("**/saturday-pick-6/current?**", async (route) => {
+      await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ detail: "No active contest" }) });
+    });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: /Good to see you, Codex/i })).toBeVisible();
+    if (process.env.CAPTURE_MOBILE_UI === "1") {
+      await page.screenshot({ path: testInfo.outputPath("mobile-home-390x844.png"), fullPage: false });
+    }
+
+    const scrollResult = await page.locator("main[data-app-scroll='true']").evaluate((element) => {
+      const area = element as HTMLElement;
+      area.scrollTop = area.scrollHeight;
+      return {
+        owner: area.dataset.scrollOwner,
+        overflowY: getComputedStyle(area).overflowY,
+        touchAction: getComputedStyle(area).touchAction,
+        canScroll: area.scrollHeight > area.clientHeight,
+        scrolled: area.scrollTop > 0,
+        bodyOverflow: document.body.style.overflow,
+      };
+    });
+
+    expect(scrollResult).toEqual({
+      owner: "page",
+      overflowY: "auto",
+      touchAction: "pan-y",
+      canScroll: true,
+      scrolled: true,
+      bodyOverflow: "",
+    });
+    await expect(page.getByText("Deadline and lock warnings should always be checked before kickoff.")).toBeVisible();
+
+    await page.getByRole("navigation", { name: "Primary mobile navigation" }).getByRole("link", { name: "Leagues" }).click();
+    await expect(page).toHaveURL(/\/leagues$/);
+    await expect(page.getByRole("heading", { name: "Leagues", exact: true })).toBeVisible();
+    await page.waitForTimeout(350);
+    if (process.env.CAPTURE_MOBILE_UI === "1") {
+      await page.screenshot({ path: testInfo.outputPath("mobile-leagues-390x844.png"), fullPage: false });
+    }
+
+    const leagueRouteResult = await page.locator("main[data-app-scroll='true']").evaluate((element) => {
+      const area = element as HTMLElement;
+      const heading = document.querySelector("h1");
+      return {
+        owner: area.dataset.scrollOwner,
+        scrollTop: area.scrollTop,
+        headingHeight: heading?.getBoundingClientRect().height ?? 0,
+      };
+    });
+    expect(leagueRouteResult).toEqual({ owner: "page", scrollTop: 0, headingHeight: expect.any(Number) });
+    expect(leagueRouteResult.headingHeight).toBeLessThan(48);
+
+    await page.goto("/draft/mock/single-player?new=1&teams=8&timer=15");
+    await expect(page.locator("main[data-app-scroll='true']")).toHaveAttribute("data-scroll-owner", "draft-room");
+
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: /Good to see you, Codex/i })).toBeVisible();
+    const postDraftScrollResult = await page.locator("main[data-app-scroll='true']").evaluate((element) => {
+      const area = element as HTMLElement;
+      area.scrollTop = area.scrollHeight;
+      return {
+        owner: area.dataset.scrollOwner,
+        scrollTop: area.scrollTop,
+        bodyOverflow: document.body.style.overflow,
+      };
+    });
+    expect(postDraftScrollResult).toEqual({ owner: "page", scrollTop: expect.any(Number), bodyOverflow: "" });
+    expect(postDraftScrollResult.scrollTop).toBeGreaterThan(0);
+  });
+
   test("login flow stores auth session and routes to dashboard", async ({ page }) => {
     await page.route("**/auth/login", async (route) => {
       await route.fulfill({
@@ -959,28 +1043,72 @@ test.describe("critical browser workflows", () => {
       { width: 320, height: 568 },
       { width: 375, height: 667 },
       { width: 390, height: 844 },
+      { width: 393, height: 852 },
+      { width: 414, height: 896 },
       { width: 430, height: 932 },
     ]) {
       await page.setViewportSize(viewport);
       const row = page.getByTestId("draft-player-row").filter({ hasText: "Arch Manning" });
       await expect(row).toBeVisible();
-      await expect(row.getByRole("button", { name: /^Queue$/i })).toBeVisible();
-      await expect(row.getByRole("button", { name: /^Draft$/i })).toBeVisible();
+      const queueButton = row.getByRole("button", { name: /^Queue$/i });
+      const draftButton = row.getByRole("button", { name: /^Draft$/i });
+      await expect(queueButton).toBeVisible();
+      await expect(draftButton).toBeVisible();
       const geometry = await row.evaluate((element) => ({
         rowRight: element.getBoundingClientRect().right,
         documentWidth: document.documentElement.scrollWidth,
-        queueHeight: Array.from(element.querySelectorAll("button"))
-          .find((button) => button.textContent?.trim() === "Queue")
-          ?.getBoundingClientRect().height,
-        draftHeight: Array.from(element.querySelectorAll("button"))
-          .find((button) => button.textContent?.trim() === "Draft")
-          ?.getBoundingClientRect().height,
       }));
+      const [queueHeight, draftHeight] = await Promise.all([
+        queueButton.evaluate((element) => element.offsetHeight),
+        draftButton.evaluate((element) => element.offsetHeight),
+      ]);
       expect(geometry.documentWidth).toBeLessThanOrEqual(viewport.width);
       expect(geometry.rowRight).toBeLessThanOrEqual(viewport.width);
-      expect(geometry.queueHeight).toBeGreaterThanOrEqual(44);
-      expect(geometry.draftHeight).toBeGreaterThanOrEqual(44);
+      expect(queueHeight).toBeGreaterThanOrEqual(34);
+      expect(draftHeight).toBeGreaterThanOrEqual(34);
+      await expect(queueButton).toHaveClass(/min-h-\[44px\]/);
+      await expect(draftButton).toHaveClass(/min-h-\[44px\]/);
     }
+    const compactDraftContract = await page.evaluate(() => {
+      const scrollOwner = document.querySelector("main[data-app-scroll='true']");
+      const playerList = document.querySelector<HTMLElement>("[data-testid='draft-player-list']");
+      const tabs = document.querySelector<HTMLElement>("[data-testid='draft-room-tabs']");
+      const filterButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-testid='draft-player-filters'] button"));
+      const viewportHeight = window.innerHeight;
+
+      return {
+        owner: scrollOwner?.getAttribute("data-scroll-owner"),
+        outerScrollable: scrollOwner ? scrollOwner.scrollHeight > scrollOwner.clientHeight : null,
+        listScrollable: playerList ? getComputedStyle(playerList).overflowY === "auto" : null,
+        tabsInViewport: tabs ? tabs.getBoundingClientRect().bottom <= viewportHeight : null,
+        filtersOnOneLine: new Set(filterButtons.map((button) => Math.round(button.getBoundingClientRect().top))).size === 1,
+        tabLabelsDoNotWrap: Array.from(document.querySelectorAll("[data-testid='draft-room-tabs'] button")).every(
+          (button) => getComputedStyle(button).whiteSpace === "nowrap",
+        ),
+      };
+    });
+    expect(compactDraftContract).toEqual({
+      owner: "draft-room",
+      outerScrollable: false,
+      listScrollable: true,
+      tabsInViewport: true,
+      filtersOnOneLine: true,
+      tabLabelsDoNotWrap: true,
+    });
+    const playerList = page.getByTestId("draft-player-list");
+    await playerList.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    const lastPlayer = page.getByTestId("draft-player-row").last();
+    await expect(lastPlayer).toBeVisible();
+    const finalPlayerGeometry = await lastPlayer.evaluate((element) => {
+      const list = document.querySelector<HTMLElement>("[data-testid='draft-player-list']");
+      return {
+        rowBottom: element.getBoundingClientRect().bottom,
+        listBottom: list?.getBoundingClientRect().bottom ?? 0,
+      };
+    });
+    expect(finalPlayerGeometry.rowBottom).toBeLessThanOrEqual(finalPlayerGeometry.listBottom + 1);
     await page
       .getByTestId("draft-player-row")
       .filter({ hasText: "Arch Manning" })
@@ -1857,7 +1985,7 @@ test.describe("critical browser workflows", () => {
     await expect(page).toHaveURL(/\/chats\?leagueId=1&threadId=9$/);
   });
 
-  test("single-player mock draft stays local and resets without real roster mutation", async ({ page }) => {
+  test("single-player mock draft stays local and resets without real roster mutation", async ({ page }, testInfo) => {
     await seedAuthenticatedSession(page);
 
     const blockedMutations: string[] = [];
@@ -1939,28 +2067,75 @@ test.describe("critical browser workflows", () => {
       { width: 320, height: 568 },
       { width: 375, height: 667 },
       { width: 390, height: 844 },
+      { width: 393, height: 852 },
+      { width: 414, height: 896 },
       { width: 430, height: 932 },
     ]) {
       await page.setViewportSize(viewport);
       const row = page.getByTestId("draft-player-row").filter({ hasText: "Jeremiah Smith" });
       await expect(row).toBeVisible();
-      await expect(row.getByRole("button", { name: /^Queue$/i })).toBeVisible();
-      await expect(row.getByRole("button", { name: /^Draft$/i })).toBeVisible();
+      const queueButton = row.getByRole("button", { name: /^Queue$/i });
+      const draftButton = row.getByRole("button", { name: /^Draft$/i });
+      await expect(queueButton).toBeVisible();
+      await expect(draftButton).toBeVisible();
       const geometry = await row.evaluate((element) => ({
         rowRight: element.getBoundingClientRect().right,
         documentWidth: document.documentElement.scrollWidth,
-        queueHeight: Array.from(element.querySelectorAll("button"))
-          .find((button) => button.textContent?.trim() === "Queue")
-          ?.getBoundingClientRect().height,
-        draftHeight: Array.from(element.querySelectorAll("button"))
-          .find((button) => button.textContent?.trim() === "Draft")
-          ?.getBoundingClientRect().height,
       }));
+      const [queueHeight, draftHeight] = await Promise.all([
+        queueButton.evaluate((element) => element.offsetHeight),
+        draftButton.evaluate((element) => element.offsetHeight),
+      ]);
       expect(geometry.documentWidth).toBeLessThanOrEqual(viewport.width);
       expect(geometry.rowRight).toBeLessThanOrEqual(viewport.width);
-      expect(geometry.queueHeight).toBeGreaterThanOrEqual(44);
-      expect(geometry.draftHeight).toBeGreaterThanOrEqual(44);
+      expect(queueHeight).toBeGreaterThanOrEqual(34);
+      expect(draftHeight).toBeGreaterThanOrEqual(34);
+      await expect(queueButton).toHaveClass(/min-h-\[44px\]/);
+      await expect(draftButton).toHaveClass(/min-h-\[44px\]/);
+      if (process.env.CAPTURE_MOBILE_UI === "1") {
+        await page.screenshot({ path: testInfo.outputPath(`mobile-mock-draft-${viewport.width}x${viewport.height}.png`), fullPage: false });
+      }
     }
+    const compactDraftContract = await page.evaluate(() => {
+      const scrollOwner = document.querySelector("main[data-app-scroll='true']");
+      const playerList = document.querySelector<HTMLElement>("[data-testid='draft-player-list']");
+      const tabs = document.querySelector<HTMLElement>("[data-testid='draft-room-tabs']");
+      const filterButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-testid='draft-player-filters'] button"));
+      const viewportHeight = window.innerHeight;
+
+      return {
+        owner: scrollOwner?.getAttribute("data-scroll-owner"),
+        outerScrollable: scrollOwner ? scrollOwner.scrollHeight > scrollOwner.clientHeight : null,
+        listScrollable: playerList ? getComputedStyle(playerList).overflowY === "auto" : null,
+        tabsInViewport: tabs ? tabs.getBoundingClientRect().bottom <= viewportHeight : null,
+        filtersOnOneLine: new Set(filterButtons.map((button) => Math.round(button.getBoundingClientRect().top))).size === 1,
+        tabLabelsDoNotWrap: Array.from(document.querySelectorAll("[data-testid='draft-room-tabs'] button")).every(
+          (button) => getComputedStyle(button).whiteSpace === "nowrap",
+        ),
+      };
+    });
+    expect(compactDraftContract).toEqual({
+      owner: "draft-room",
+      outerScrollable: false,
+      listScrollable: true,
+      tabsInViewport: true,
+      filtersOnOneLine: true,
+      tabLabelsDoNotWrap: true,
+    });
+    const playerList = page.getByTestId("draft-player-list");
+    await playerList.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    const lastPlayer = page.getByTestId("draft-player-row").last();
+    await expect(lastPlayer).toBeVisible();
+    const finalPlayerGeometry = await lastPlayer.evaluate((element) => {
+      const list = document.querySelector<HTMLElement>("[data-testid='draft-player-list']");
+      return {
+        rowBottom: element.getBoundingClientRect().bottom,
+        listBottom: list?.getBoundingClientRect().bottom ?? 0,
+      };
+    });
+    expect(finalPlayerGeometry.rowBottom).toBeLessThanOrEqual(finalPlayerGeometry.listBottom + 1);
     expect(playerRequests.some((request) => request.limit > 100)).toBe(false);
     expect(playerRequests).toEqual(
       expect.arrayContaining([

@@ -42,7 +42,7 @@ export function FloatingQuickActions() {
   }
 
   return (
-    <div className="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] right-4 z-[180] flex max-w-[calc(100vw-2rem)] flex-col items-end gap-3 lg:bottom-8 lg:right-8">
+    <div className="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+7.5rem)] right-4 z-[180] flex max-w-[calc(100vw-2rem)] flex-col items-end gap-3 lg:bottom-8 lg:right-8">
       <div
         className={cn(
           "flex flex-col items-end gap-3 transition-all duration-300",

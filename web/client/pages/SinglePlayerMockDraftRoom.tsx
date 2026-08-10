@@ -55,19 +55,19 @@ const formatPlayerPoolError = (error: unknown) => {
 };
 
 const POSITION_STYLES: Record<string, string> = {
-  QB: "border-blue-300/40 bg-blue-500/15 text-blue-100 shadow-[0_0_16px_rgba(96,165,250,0.18)]",
-  RB: "border-emerald-300/40 bg-emerald-500/15 text-emerald-100 shadow-[0_0_16px_rgba(74,222,128,0.18)]",
-  WR: "border-violet-300/40 bg-violet-500/15 text-violet-100 shadow-[0_0_16px_rgba(196,181,253,0.18)]",
-  TE: "border-amber-300/40 bg-amber-500/15 text-amber-100 shadow-[0_0_16px_rgba(251,191,36,0.18)]",
-  K: "border-slate-300/40 bg-slate-400/15 text-slate-100 shadow-[0_0_16px_rgba(203,213,225,0.14)]",
+  QB: "border-blue-300/30 bg-blue-400/[0.08] text-blue-100",
+  RB: "border-emerald-300/30 bg-emerald-400/[0.08] text-emerald-100",
+  WR: "border-violet-300/30 bg-violet-400/[0.08] text-violet-100",
+  TE: "border-amber-300/30 bg-amber-400/[0.08] text-amber-100",
+  K: "border-slate-300/30 bg-slate-200/[0.08] text-slate-100",
 };
 
 const POSITION_ROW_HOVER_STYLES: Record<string, string> = {
-  QB: "hover:bg-blue-400/[0.06] hover:shadow-[inset_3px_0_0_rgba(96,165,250,0.65),0_0_28px_rgba(96,165,250,0.10)] focus:bg-blue-400/[0.08]",
-  RB: "hover:bg-emerald-400/[0.06] hover:shadow-[inset_3px_0_0_rgba(52,211,153,0.65),0_0_28px_rgba(52,211,153,0.10)] focus:bg-emerald-400/[0.08]",
-  WR: "hover:bg-violet-400/[0.06] hover:shadow-[inset_3px_0_0_rgba(167,139,250,0.65),0_0_28px_rgba(167,139,250,0.10)] focus:bg-violet-400/[0.08]",
-  TE: "hover:bg-amber-400/[0.06] hover:shadow-[inset_3px_0_0_rgba(251,191,36,0.65),0_0_28px_rgba(251,191,36,0.10)] focus:bg-amber-400/[0.08]",
-  K: "hover:bg-slate-200/[0.06] hover:shadow-[inset_3px_0_0_rgba(226,232,240,0.65),0_0_28px_rgba(226,232,240,0.10)] focus:bg-slate-200/[0.08]",
+  QB: "hover:bg-blue-400/[0.07] hover:shadow-[inset_2px_0_0_rgba(96,165,250,0.65)] focus:bg-blue-400/[0.10]",
+  RB: "hover:bg-emerald-400/[0.07] hover:shadow-[inset_2px_0_0_rgba(52,211,153,0.65)] focus:bg-emerald-400/[0.10]",
+  WR: "hover:bg-violet-400/[0.07] hover:shadow-[inset_2px_0_0_rgba(167,139,250,0.65)] focus:bg-violet-400/[0.10]",
+  TE: "hover:bg-amber-400/[0.07] hover:shadow-[inset_2px_0_0_rgba(251,191,36,0.65)] focus:bg-amber-400/[0.10]",
+  K: "hover:bg-slate-200/[0.07] hover:shadow-[inset_2px_0_0_rgba(226,232,240,0.65)] focus:bg-slate-200/[0.10]",
 };
 
 const ROSTER_POSITION_STYLES: Record<string, { border: string; bg: string; text: string; dot: string; hover: string }> = {
@@ -381,36 +381,34 @@ export default function SinglePlayerMockDraftRoom() {
   };
 
   const renderAvailablePlayers = () => (
-    <section data-testid="available-players-table" className={cn("overflow-hidden", draftMattePanelClass)}>
-      <div className="border-b border-white/10 p-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+    <section data-testid="available-players-table" className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", draftMattePanelClass)}>
+      <div className="shrink-0 border-b border-white/10 p-3 sm:p-5">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-amber-200">Available Players</p>
-            <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-              Showing your roster needs: {userDraftBoardTeam?.name ?? "Your Team"}
-            </p>
-            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-100/80">
-              Your legal positions: {userLegalPositions.length ? userLegalPositions.join(", ") : "None"}
-            </p>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-200 sm:text-[11px] sm:tracking-[0.24em]">Available Players</p>
+            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground sm:mt-2 sm:block sm:text-[10px] sm:tracking-[0.18em]">
+              <span className="sm:block">Needs: {userDraftBoardTeam?.name ?? "Your Team"}</span>
+              <span className="text-emerald-100/80 sm:mt-1 sm:block">Legal: {userLegalPositions.length ? userLegalPositions.join(" · ") : "None"}</span>
+            </div>
           </div>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-3">
             <div className="relative w-full lg:w-[480px]">
               <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                className="h-12 rounded-2xl border-white/14 bg-black/20 pl-11 text-sm font-bold"
+                className="h-11 rounded-xl border-white/14 bg-black/20 pl-10 text-sm font-bold sm:h-12 sm:rounded-2xl sm:pl-11"
                 placeholder="Search players, schools..."
               />
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div data-testid="draft-player-filters" className="flex min-w-0 gap-1 overflow-x-auto pb-0.5 sm:flex-wrap sm:gap-2 sm:overflow-visible">
               {POSITIONS.map((value) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setPosition(value)}
                   className={cn(
-                    "h-10 rounded-2xl border px-4 text-[10px] font-black uppercase tracking-[0.14em] transition",
+                    "h-9 shrink-0 whitespace-nowrap rounded-full border px-3 text-[10px] font-bold uppercase tracking-[0.03em] transition sm:h-10 sm:px-4 sm:text-[10px] sm:font-black sm:tracking-[0.14em]",
                     position === value
                       ? "border-amber-200/55 bg-amber-200 text-slate-950 shadow-[0_8px_18px_rgba(251,191,36,0.20)]"
                       : "border-white/10 bg-white/5 text-muted-foreground hover:border-amber-200/35 hover:text-amber-100"
@@ -432,7 +430,7 @@ export default function SinglePlayerMockDraftRoom() {
         <span className="text-right">Action</span>
       </div>
 
-      <div className="max-h-[calc(100dvh-13rem)] overflow-y-auto sm:max-h-[690px]">
+      <div data-testid="draft-player-list" className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y sm:max-h-[690px] sm:flex-none">
         {isLoading ? (
           <div className="flex min-h-40 items-center justify-center gap-3 px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" /> Loading draft board...
@@ -471,37 +469,40 @@ export default function SinglePlayerMockDraftRoom() {
                   }
                 }}
                 className={cn(
-                  "grid cursor-pointer grid-cols-[44px_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-3 border-b border-white/10 px-4 py-4 outline-none transition-[background-color,box-shadow,color] duration-200 sm:grid-cols-[64px_minmax(0,1fr)_70px_110px_180px] sm:items-center sm:gap-3 sm:px-5",
+                  "grid min-h-[68px] cursor-pointer grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-x-2 border-b border-white/10 px-3 py-2 outline-none transition-[background-color,box-shadow,color] duration-200 sm:min-h-0 sm:grid-cols-[64px_minmax(0,1fr)_70px_110px_180px] sm:items-center sm:gap-3 sm:px-5 sm:py-4",
                   positionHoverClass,
                   isSelected && "bg-amber-300/[0.075] shadow-[inset_3px_0_0_rgba(251,191,36,0.72)]"
                 )}
               >
-                <p className="col-start-1 row-start-1 pt-0.5 text-xl font-black tabular-nums text-muted-foreground sm:col-auto sm:row-auto sm:pt-0">{visibleRank}</p>
-                <div className="col-start-2 row-start-1 min-w-0 sm:col-auto sm:row-auto">
-                  <p className="line-clamp-2 text-base font-black leading-5 text-foreground transition-colors hover:text-amber-100 sm:truncate sm:leading-normal">{player.name}</p>
-                  <p className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground sm:tracking-[0.18em]">{player.school}</p>
+                <p className="row-span-2 self-center text-base font-bold tabular-nums text-muted-foreground sm:row-auto sm:text-xl sm:font-black">{visibleRank}</p>
+                <div className="min-w-0 self-center sm:col-auto sm:row-auto">
+                  <p className="line-clamp-2 text-sm font-black leading-4 text-foreground transition-colors hover:text-amber-100 sm:text-base sm:leading-normal">{player.name}</p>
+                  <p className="mt-0.5 truncate text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground sm:mt-1 sm:text-[10px] sm:tracking-[0.18em]">{player.school}</p>
                 </div>
-                <span className={cn("col-start-3 row-start-1 shrink-0 rounded-full border px-3 py-2 text-xs font-black sm:col-auto sm:row-auto sm:w-fit sm:px-4", positionClass)}>{player.pos}</span>
-                <p className="col-span-3 flex items-end justify-between text-sm font-black tabular-nums text-foreground sm:col-auto sm:block">
-                  <span className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground sm:hidden">Season projection</span>
-                  <span>{formatDraftProjection({ seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</span>
-                </p>
-                <div className="col-span-3 grid grid-cols-2 gap-2 sm:col-auto sm:flex sm:justify-end">
+                <div className="row-span-2 flex items-center justify-end gap-1.5 sm:contents">
+                  <div className="flex flex-col items-end gap-0.5 sm:contents">
+                    <span className={cn("shrink-0 rounded-lg border px-2 py-1 text-[9px] font-black sm:col-auto sm:row-auto sm:w-fit sm:rounded-full sm:px-4 sm:py-2 sm:text-xs", positionClass)}>{player.pos}</span>
+                    <p className="text-[10px] font-black tabular-nums text-foreground sm:col-auto sm:block sm:text-sm">
+                      <span className="sm:hidden">{formatDraftProjection({ seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</span>
+                      <span className="hidden sm:inline">{formatDraftProjection({ seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</span>
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 sm:col-auto sm:justify-end sm:gap-2">
                   <Button
                     variant="outline"
-                    className="h-11 min-h-[52px] rounded-2xl px-3 text-[10px] font-black uppercase tracking-[0.14em] sm:h-10 sm:min-h-0 sm:px-4"
-                    style={{ minHeight: 52 }}
+                    className="h-10 min-h-[44px] w-10 rounded-lg px-0 text-[10px] font-black uppercase tracking-[0.08em] sm:h-10 sm:min-h-0 sm:w-auto sm:rounded-xl sm:px-4 sm:tracking-[0.14em]"
                     onClick={(event) => {
                       event.stopPropagation();
                       toggleQueue(player.id);
                     }}
                   >
-                    {isQueued ? "Queued" : "Queue"}
+                    <ClipboardList className="h-3.5 w-3.5 sm:hidden" aria-hidden="true" />
+                    <span className="sr-only sm:hidden">{isQueued ? "Queued" : "Queue"}</span>
+                    <span className="hidden sm:inline">{isQueued ? "Queued" : "Queue"}</span>
                   </Button>
                   <Button
-                    className="h-11 min-h-[52px] rounded-2xl border border-cyan-100/35 bg-[#1b3349] px-3 text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)] sm:h-10 sm:min-h-0 sm:px-5"
+                    className="h-10 min-h-[44px] rounded-lg border border-cyan-100/35 bg-[#1b3349] px-3 text-[9px] font-black uppercase tracking-[0.06em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_5px_12px_rgba(2,6,23,0.24)] transition hover:border-cyan-100/60 hover:bg-[#294d69] sm:h-10 sm:min-h-0 sm:rounded-xl sm:px-5 sm:text-[10px] sm:tracking-[0.14em]"
                     disabled={!userOnClock || draftState.status !== "live"}
-                    style={{ minHeight: 52 }}
                     onClick={(event) => {
                       event.stopPropagation();
                       draftPlayer(player.id);
@@ -509,6 +510,7 @@ export default function SinglePlayerMockDraftRoom() {
                   >
                     Draft
                   </Button>
+                </div>
                 </div>
               </div>
             );
@@ -793,11 +795,42 @@ export default function SinglePlayerMockDraftRoom() {
   );
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#080d13] text-foreground">
+    <div data-draft-room="mock" className="relative flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-[#080d13] text-foreground sm:block sm:h-auto sm:min-h-screen">
       <DraftRoomVisuals />
 
-      <div className="relative mx-auto max-w-[1800px] space-y-6 px-4 pb-[calc(env(safe-area-inset-bottom)+7.5rem)] pt-4 md:px-6 md:pb-28">
-        <div className="relative z-20 flex flex-wrap items-center justify-between gap-3">
+      <div className="relative mx-auto flex min-h-0 w-full max-w-[1800px] flex-1 flex-col space-y-2 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:block sm:space-y-6 sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+7.5rem)] sm:pt-4 md:px-6 md:pb-28">
+        <div className="relative z-20 flex h-12 shrink-0 items-center gap-2 rounded-xl border border-white/12 bg-[#0b121a]/92 px-2 shadow-[0_8px_20px_rgba(2,6,23,0.28)] sm:hidden">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-lg border-white/15 bg-[#0b121a] text-slate-200"
+            aria-label="Exit mock draft room"
+            onClick={() => navigate("/draft")}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground">On the clock · Pick {getRoundNumber(draftState.currentPick, teamCount)}.{getRoundPick(draftState.currentPick, teamCount)}</p>
+            <p className="truncate text-sm font-black text-cyan-100">{draftState.status === "complete" ? "Draft complete" : currentTeam?.name ?? "Loading"}</p>
+          </div>
+          <div className={cn("shrink-0 text-right", timerDanger ? "text-red-300" : "text-cyan-100")}>
+            <p className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">Timer</p>
+            <p className="text-2xl font-black leading-none tabular-nums">{formatTimer(secondsRemaining)}</p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-lg border-white/15 bg-[#0b121a] text-slate-200"
+            aria-label="Reset mock draft"
+            onClick={resetDraft}
+          >
+            <RefreshCcw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+
+        <div className="relative z-20 hidden flex-wrap items-center justify-between gap-3 sm:flex">
           <div className="flex items-center gap-3">
             <Button
               type="button"
@@ -867,12 +900,35 @@ export default function SinglePlayerMockDraftRoom() {
         ) : null}
 
         {latestPick ? (
-          <div className="mx-auto flex w-fit items-center rounded-full border border-cyan-300/15 bg-cyan-400/10 px-5 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100">
-            Last pick&nbsp;<span className="text-white">{latestPick.playerName}</span>&nbsp;to {latestPick.teamName}
+          <div className="flex min-w-0 shrink-0 items-center rounded-xl border border-cyan-300/15 bg-cyan-400/10 px-3 py-2 text-[9px] font-black uppercase tracking-[0.08em] text-cyan-100 sm:mx-auto sm:w-fit sm:rounded-full sm:px-5 sm:text-[10px] sm:tracking-[0.18em]">
+            <span className="shrink-0">Last pick&nbsp;</span><span className="truncate text-white">{latestPick.playerName}</span><span className="shrink-0">&nbsp;to&nbsp;{latestPick.teamName}</span>
           </div>
         ) : null}
 
-        <section className={cn("overflow-hidden", draftMattePanelClass)}>
+        <section data-testid="mobile-draft-order" className={cn("shrink-0 overflow-hidden sm:hidden", draftMattePanelClass)}>
+          <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
+            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-amber-200">Draft order</p>
+            <p className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">{draftState.currentPick} / {totalPicks}</p>
+          </div>
+          <div className="grid grid-cols-5 gap-1 px-2 py-2">
+            {draftOrderPicks.slice(
+              Math.min(Math.max(0, draftState.currentPick - 3), Math.max(0, draftOrderPicks.length - 5)),
+              Math.min(draftOrderPicks.length, Math.min(Math.max(0, draftState.currentPick - 3), Math.max(0, draftOrderPicks.length - 5)) + 5),
+            ).map((slot) => {
+              const isCurrent = draftState.status !== "complete" && slot.overallPick === draftState.currentPick;
+              const isUser = slot.teamId === draftState.userTeamId;
+              return (
+                <div key={slot.overallPick} aria-current={isCurrent ? "step" : undefined} className={cn("flex min-w-0 flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}>
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/12 bg-black/20">{isUser ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}</span>
+                  <span className="mt-1 whitespace-nowrap text-[9px] font-black tabular-nums">{slot.round}.{slot.roundPick}</span>
+                  <span className="max-w-full truncate text-[8px] font-black uppercase tracking-[0.04em]">{isUser ? "You" : slot.team?.name?.replace("Bot Team", "B") ?? "Bot"}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className={cn("hidden overflow-hidden sm:block", draftMattePanelClass)}>
           <div className="relative flex min-h-[76px] items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.26em] text-amber-200">Draft Order</p>
@@ -942,15 +998,17 @@ export default function SinglePlayerMockDraftRoom() {
         </section>
 
         {draftState.status === "intermission" ? (
-          <div className="rounded-[2rem] border border-amber-300/20 bg-amber-300/10 p-5 text-center text-[10px] font-black uppercase tracking-[0.2em] text-amber-100">
+          <div className="shrink-0 rounded-xl border border-amber-300/20 bg-amber-300/10 p-2 text-center text-[9px] font-black uppercase tracking-[0.1em] text-amber-100 sm:rounded-[2rem] sm:p-5 sm:text-[10px] sm:tracking-[0.2em]">
             Draft is about to begin. Bot pick #1 starts after the pre-draft reveal.
           </div>
         ) : null}
 
-        {activeTab === "draft" ? renderAvailablePlayers() : null}
-        {activeTab === "queue" ? renderQueue() : null}
-        {activeTab === "roster" ? renderRoster() : null}
-        {activeTab === "history" ? renderHistory() : null}
+        <div className="flex min-h-0 flex-1 flex-col sm:block">
+          {activeTab === "draft" ? renderAvailablePlayers() : null}
+          {activeTab === "queue" ? <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y sm:block">{renderQueue()}</div> : null}
+          {activeTab === "roster" ? <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y sm:block">{renderRoster()}</div> : null}
+          {activeTab === "history" ? <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y sm:block">{renderHistory()}</div> : null}
+        </div>
       </div>
 
       {renderScoutingPanel()}
@@ -1012,18 +1070,18 @@ export default function SinglePlayerMockDraftRoom() {
         </div>
       ) : null}
 
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[1200] flex justify-center px-4 sm:bottom-4">
-        <div className={cn("pointer-events-auto grid w-full max-w-xl grid-cols-4 rounded-2xl p-1", draftMatteControlClass)}>
+      <div data-testid="draft-room-tabs" className="relative z-[1200] shrink-0 border-t border-white/10 bg-[#101317]/96 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl sm:pointer-events-none sm:fixed sm:inset-x-0 sm:bottom-4 sm:flex sm:border-0 sm:bg-transparent sm:px-4 sm:pb-0 sm:pt-0">
+        <div className={cn("grid w-full grid-cols-4 overflow-hidden rounded-xl sm:pointer-events-auto sm:mx-auto sm:max-w-xl", draftMatteControlClass)}>
           {MOCK_TABS.map((tab) => (
             <button
               key={tab.value}
               type="button"
               onClick={() => setActiveTab(tab.value)}
               className={cn(
-                "rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition",
+                "relative min-w-0 whitespace-nowrap px-1.5 py-3 text-[9px] font-bold uppercase leading-none tracking-[0.06em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-transparent sm:px-4 sm:text-[10px] sm:tracking-[0.16em]",
                 activeTab === tab.value
-                  ? "border border-cyan-100/35 bg-[#294d69] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_6px_16px_rgba(2,6,23,0.32)]"
-                  : "text-muted-foreground hover:bg-white/[0.06] hover:text-amber-100"
+                  ? "bg-white/[0.04] text-white after:bg-cfb-brand"
+                  : "text-muted-foreground hover:bg-white/[0.035] hover:text-white"
               )}
             >
               {tab.label}

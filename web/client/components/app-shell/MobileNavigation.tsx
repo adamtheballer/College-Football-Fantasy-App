@@ -33,11 +33,11 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
       <nav
         aria-label="Primary mobile navigation"
         className={cn(
-          "fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[170] rounded-2xl border border-cfb-border-subtle bg-cfb-sidebar/95 p-1.5 shadow-[0_18px_45px_rgba(2,6,23,0.45)] backdrop-blur-xl transition-opacity lg:hidden",
+          "fixed inset-x-3 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-[170] rounded-xl border border-cfb-border-subtle bg-cfb-sidebar/95 p-1 shadow-[0_12px_28px_rgba(2,6,23,0.32)] backdrop-blur-xl transition-opacity lg:hidden",
           isMoreOpen && "pointer-events-none opacity-0",
         )}
       >
-        <div className="grid grid-cols-5 gap-1">
+        <div className="grid grid-cols-5 gap-0.5">
           {items.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.path;
@@ -48,9 +48,9 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
                 to={item.path}
                 aria-label={item.badge ? `${item.name}: ${item.badge} unread chat messages` : item.name}
                 className={cn(
-                  "flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl px-1 text-[9px] font-black uppercase tracking-[0.08em] transition-colors",
+                  "relative flex min-h-[54px] min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-0.5 text-[10px] font-bold uppercase tracking-[0.03em] leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent",
                   isActive
-                    ? "bg-cfb-brand text-white shadow-[0_0_24px_hsl(var(--brand-primary)/0.24)]"
+                    ? "bg-cfb-brand/[0.12] text-cfb-text-primary after:bg-cfb-brand"
                     : "text-cfb-text-muted hover:bg-cfb-surface-hover/70 hover:text-cfb-text-primary",
                 )}
               >
@@ -66,7 +66,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
                     </span>
                   ) : null}
                 </span>
-                <span className="max-w-full truncate">{item.name.replace("MOCK ", "")}</span>
+                <span className="max-w-full whitespace-nowrap">{item.name.replace("MOCK ", "")}</span>
               </Link>
             );
           })}
@@ -77,14 +77,14 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
             aria-expanded={isMoreOpen}
             onClick={() => setIsMoreOpen(true)}
             className={cn(
-              "flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl px-1 text-[9px] font-black uppercase tracking-[0.08em] transition-colors",
+              "relative flex min-h-[54px] min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-0.5 text-[10px] font-bold uppercase tracking-[0.03em] leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent",
               isMoreActive
-                ? "bg-cfb-brand text-white shadow-[0_0_24px_hsl(var(--brand-primary)/0.24)]"
+                ? "bg-cfb-brand/[0.12] text-cfb-text-primary after:bg-cfb-brand"
                 : "text-cfb-text-muted hover:bg-cfb-surface-hover/70 hover:text-cfb-text-primary",
             )}
           >
             <Menu className="h-4 w-4" aria-hidden="true" />
-            <span>More</span>
+            <span className="whitespace-nowrap">More</span>
           </button>
         </div>
       </nav>
