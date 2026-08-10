@@ -55,19 +55,19 @@ const formatPlayerPoolError = (error: unknown) => {
 };
 
 const POSITION_STYLES: Record<string, string> = {
-  QB: "border-blue-300/40 bg-blue-500/15 text-blue-100 shadow-[0_0_16px_rgba(96,165,250,0.18)]",
-  RB: "border-emerald-300/40 bg-emerald-500/15 text-emerald-100 shadow-[0_0_16px_rgba(74,222,128,0.18)]",
-  WR: "border-violet-300/40 bg-violet-500/15 text-violet-100 shadow-[0_0_16px_rgba(196,181,253,0.18)]",
-  TE: "border-amber-300/40 bg-amber-500/15 text-amber-100 shadow-[0_0_16px_rgba(251,191,36,0.18)]",
-  K: "border-slate-300/40 bg-slate-400/15 text-slate-100 shadow-[0_0_16px_rgba(203,213,225,0.14)]",
+  QB: "border-blue-300/30 bg-blue-400/[0.08] text-blue-100",
+  RB: "border-emerald-300/30 bg-emerald-400/[0.08] text-emerald-100",
+  WR: "border-violet-300/30 bg-violet-400/[0.08] text-violet-100",
+  TE: "border-amber-300/30 bg-amber-400/[0.08] text-amber-100",
+  K: "border-slate-300/30 bg-slate-200/[0.08] text-slate-100",
 };
 
 const POSITION_ROW_HOVER_STYLES: Record<string, string> = {
-  QB: "hover:bg-blue-400/[0.06] hover:shadow-[inset_3px_0_0_rgba(96,165,250,0.65),0_0_28px_rgba(96,165,250,0.10)] focus:bg-blue-400/[0.08]",
-  RB: "hover:bg-emerald-400/[0.06] hover:shadow-[inset_3px_0_0_rgba(52,211,153,0.65),0_0_28px_rgba(52,211,153,0.10)] focus:bg-emerald-400/[0.08]",
-  WR: "hover:bg-violet-400/[0.06] hover:shadow-[inset_3px_0_0_rgba(167,139,250,0.65),0_0_28px_rgba(167,139,250,0.10)] focus:bg-violet-400/[0.08]",
-  TE: "hover:bg-amber-400/[0.06] hover:shadow-[inset_3px_0_0_rgba(251,191,36,0.65),0_0_28px_rgba(251,191,36,0.10)] focus:bg-amber-400/[0.08]",
-  K: "hover:bg-slate-200/[0.06] hover:shadow-[inset_3px_0_0_rgba(226,232,240,0.65),0_0_28px_rgba(226,232,240,0.10)] focus:bg-slate-200/[0.08]",
+  QB: "hover:bg-blue-400/[0.07] hover:shadow-[inset_2px_0_0_rgba(96,165,250,0.65)] focus:bg-blue-400/[0.10]",
+  RB: "hover:bg-emerald-400/[0.07] hover:shadow-[inset_2px_0_0_rgba(52,211,153,0.65)] focus:bg-emerald-400/[0.10]",
+  WR: "hover:bg-violet-400/[0.07] hover:shadow-[inset_2px_0_0_rgba(167,139,250,0.65)] focus:bg-violet-400/[0.10]",
+  TE: "hover:bg-amber-400/[0.07] hover:shadow-[inset_2px_0_0_rgba(251,191,36,0.65)] focus:bg-amber-400/[0.10]",
+  K: "hover:bg-slate-200/[0.07] hover:shadow-[inset_2px_0_0_rgba(226,232,240,0.65)] focus:bg-slate-200/[0.10]",
 };
 
 const ROSTER_POSITION_STYLES: Record<string, { border: string; bg: string; text: string; dot: string; hover: string }> = {
@@ -1070,18 +1070,18 @@ export default function SinglePlayerMockDraftRoom() {
         </div>
       ) : null}
 
-      <div data-testid="draft-room-tabs" className="relative z-[1200] shrink-0 border-t border-white/10 bg-[#08182c]/96 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl sm:pointer-events-none sm:fixed sm:inset-x-0 sm:bottom-4 sm:flex sm:border-0 sm:bg-transparent sm:px-4 sm:pb-0 sm:pt-0">
-        <div className={cn("grid w-full grid-cols-4 rounded-xl p-1 sm:pointer-events-auto sm:mx-auto sm:max-w-xl sm:rounded-2xl", draftMatteControlClass)}>
+      <div data-testid="draft-room-tabs" className="relative z-[1200] shrink-0 border-t border-white/10 bg-[#101317]/96 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl sm:pointer-events-none sm:fixed sm:inset-x-0 sm:bottom-4 sm:flex sm:border-0 sm:bg-transparent sm:px-4 sm:pb-0 sm:pt-0">
+        <div className={cn("grid w-full grid-cols-4 overflow-hidden rounded-xl sm:pointer-events-auto sm:mx-auto sm:max-w-xl", draftMatteControlClass)}>
           {MOCK_TABS.map((tab) => (
             <button
               key={tab.value}
               type="button"
               onClick={() => setActiveTab(tab.value)}
               className={cn(
-                "min-w-0 whitespace-nowrap rounded-lg px-1.5 py-2 text-[9px] font-black uppercase leading-none tracking-[0.06em] transition sm:rounded-xl sm:px-4 sm:py-3 sm:text-[10px] sm:tracking-[0.2em]",
+                "relative min-w-0 whitespace-nowrap px-1.5 py-3 text-[9px] font-bold uppercase leading-none tracking-[0.06em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-transparent sm:px-4 sm:text-[10px] sm:tracking-[0.16em]",
                 activeTab === tab.value
-                  ? "border border-cyan-100/35 bg-[#294d69] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_6px_16px_rgba(2,6,23,0.32)]"
-                  : "text-muted-foreground hover:bg-white/[0.06] hover:text-amber-100"
+                  ? "bg-white/[0.04] text-white after:bg-cfb-brand"
+                  : "text-muted-foreground hover:bg-white/[0.035] hover:text-white"
               )}
             >
               {tab.label}

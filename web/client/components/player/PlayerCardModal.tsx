@@ -72,7 +72,7 @@ const positionPalettes: Record<
     markerA: "rgba(96,165,250,0.28)",
     markerB: "rgba(14,165,233,0.22)",
     markerC: "rgba(15,23,42,0.34)",
-    glow: "shadow-[0_28px_100px_rgba(59,130,246,0.28)]",
+    glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
     accent: "text-blue-100",
     pill: "border-blue-200/45 bg-blue-200/15 text-blue-50",
     silhouette: "from-blue-200/35 via-blue-100/20 to-transparent",
@@ -82,7 +82,7 @@ const positionPalettes: Record<
     markerA: "rgba(52,211,153,0.24)",
     markerB: "rgba(20,184,166,0.20)",
     markerC: "rgba(6,78,59,0.42)",
-    glow: "shadow-[0_28px_100px_rgba(16,185,129,0.25)]",
+    glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
     accent: "text-emerald-100",
     pill: "border-emerald-200/45 bg-emerald-200/15 text-emerald-50",
     silhouette: "from-emerald-200/35 via-emerald-100/20 to-transparent",
@@ -92,7 +92,7 @@ const positionPalettes: Record<
     markerA: "rgba(167,139,250,0.28)",
     markerB: "rgba(217,70,239,0.18)",
     markerC: "rgba(76,29,149,0.42)",
-    glow: "shadow-[0_28px_100px_rgba(139,92,246,0.28)]",
+    glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
     accent: "text-violet-100",
     pill: "border-violet-200/45 bg-violet-200/15 text-violet-50",
     silhouette: "from-violet-200/35 via-violet-100/20 to-transparent",
@@ -102,7 +102,7 @@ const positionPalettes: Record<
     markerA: "rgba(251,191,36,0.26)",
     markerB: "rgba(249,115,22,0.24)",
     markerC: "rgba(120,53,15,0.42)",
-    glow: "shadow-[0_28px_100px_rgba(245,158,11,0.24)]",
+    glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
     accent: "text-amber-100",
     pill: "border-amber-200/45 bg-amber-200/15 text-amber-50",
     silhouette: "from-amber-200/35 via-amber-100/20 to-transparent",
@@ -112,7 +112,7 @@ const positionPalettes: Record<
     markerA: "rgba(203,213,225,0.18)",
     markerB: "rgba(100,116,139,0.22)",
     markerC: "rgba(15,23,42,0.45)",
-    glow: "shadow-[0_28px_100px_rgba(148,163,184,0.20)]",
+    glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
     accent: "text-slate-100",
     pill: "border-slate-200/40 bg-slate-200/15 text-slate-50",
     silhouette: "from-slate-200/30 via-slate-100/18 to-transparent",
@@ -124,7 +124,7 @@ const defaultPalette = {
   markerA: "rgba(34,211,238,0.24)",
   markerB: "rgba(59,130,246,0.20)",
   markerC: "rgba(14,116,144,0.42)",
-  glow: "shadow-[0_28px_100px_rgba(34,211,238,0.24)]",
+  glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
   accent: "text-cyan-100",
   pill: "border-cyan-200/45 bg-cyan-200/15 text-cyan-50",
   silhouette: "from-cyan-200/35 via-cyan-100/20 to-transparent",
@@ -416,7 +416,7 @@ export function PlayerCardModal({
     >
       <article
         className={cn(
-          "relative flex h-[100dvh] max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden rounded-none border-x-0 border-y border-white/12 bg-[#070d19] text-white sm:h-auto sm:max-h-[92vh] sm:rounded-[2rem] sm:border-x",
+          "relative flex h-[100dvh] max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden rounded-none border-x-0 border-y border-white/12 bg-[#0b0d10] text-white sm:h-auto sm:max-h-[92vh] sm:rounded-xl sm:border-x",
           palette.glow
         )}
         onClick={(event) => event.stopPropagation()}
