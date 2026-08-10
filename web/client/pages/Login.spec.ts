@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ApiError } from "@/lib/api";
-import { loginErrorMessage } from "./Login";
+import { getInitialLoginMode, loginErrorMessage } from "./Login";
 import { isAuthFlowRoute } from "@/components/app-shell/navigation";
 
 describe("loginErrorMessage", () => {
@@ -40,5 +40,14 @@ describe("reset password route", () => {
   it("uses the direct reset route instead of the retired token confirmation route", () => {
     expect(isAuthFlowRoute("/reset-password")).toBe(true);
     expect(isAuthFlowRoute("/password-reset/confirm")).toBe(false);
+  });
+});
+
+describe("login entry mode", () => {
+  it("uses the beta form only for an unknown device that explicitly requests it", () => {
+    expect(getInitialLoginMode("?flow=beta", true, false)).toBe("access");
+    expect(getInitialLoginMode("?flow=beta", true, true)).toBe("signin");
+    expect(getInitialLoginMode("", true, false)).toBe("signin");
+    expect(getInitialLoginMode("?flow=beta", false, false)).toBe("signin");
   });
 });

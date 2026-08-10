@@ -18,6 +18,7 @@ import {
   getStoredAccessToken,
   storeAccessTokenSession,
 } from "@/lib/api";
+import { rememberSignedInDevice } from "@/lib/auth-device";
 
 export interface User {
   firstName: string;
@@ -190,6 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         const nextUser = mapUserPayload(payload);
         safeStorageSet(USER_STORAGE_KEY, JSON.stringify(nextUser));
+        rememberSignedInDevice();
         setUser(nextUser);
       })
       .catch((error) => {
@@ -231,6 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const nextUser = mapAuthPayload(payload);
     persistUser(nextUser, payload.access_token, payload.access_token_expires_at);
+    rememberSignedInDevice();
     queryClient.clear();
     setUser(nextUser);
     dispatchAuthChanged();
@@ -246,6 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const nextUser = mapAuthPayload(payload);
     persistUser(nextUser, payload.access_token, payload.access_token_expires_at);
+    rememberSignedInDevice();
     queryClient.clear();
     setUser(nextUser);
     dispatchAuthChanged();

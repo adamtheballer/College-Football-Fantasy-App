@@ -24,6 +24,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError, apiUnavailableMessage } from "@/lib/api";
+import { hasSignedInOnDevice } from "@/lib/auth-device";
 import {
   BETA_ACCESS_CODE_PREFIX,
   betaAccessCodeFromSuffix,
@@ -86,6 +87,15 @@ export const loginErrorMessage = (error: unknown): string => {
   return "Sign in failed. Try again or contact support.";
 };
 
+export const getInitialLoginMode = (
+  search: string,
+  isBetaAccessEnabled: boolean,
+  isKnownSignInDevice: boolean,
+): "signin" | "access" => {
+  const requestedBetaFlow = new URLSearchParams(search).get("flow") === "beta";
+  return requestedBetaFlow && isBetaAccessEnabled && !isKnownSignInDevice ? "access" : "signin";
+};
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -104,7 +114,7 @@ export default function Login() {
   const [firstName, setFirstName] = useState("");
   const [accessCode, setAccessCode] = useState("");
   const [mode, setMode] = useState<"signin" | "access" | "signup">(
-    () => (new URLSearchParams(location.search).get("flow") === "beta" && betaAccessEnabled ? "access" : "signin")
+    () => getInitialLoginMode(location.search, betaAccessEnabled, hasSignedInOnDevice()),
   );
   const [showPassword, setShowPassword] = useState(false);
   const [createdPassword, setCreatedPassword] = useState<string | null>(null);
