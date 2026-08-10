@@ -1,6 +1,6 @@
 /**
- * Shared decorative layer for both draft rooms. It is deliberately inert so
- * background field and playbook details can never affect draft interactions.
+ * Shared visual layer for both draft rooms. It is deliberately inert so the
+ * restrained broadcast-style surface can never affect draft interactions.
  */
 export function DraftRoomVisuals() {
   return (

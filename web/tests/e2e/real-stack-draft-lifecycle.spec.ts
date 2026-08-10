@@ -108,10 +108,10 @@ test.describe("real two-manager draft lifecycle", () => {
         const room = await realApi<{ status: string }>(commissioner, `/leagues/${leagueId}/draft-room`);
         return room.body.status;
       }).toBe("pre_draft");
-      await expect(commissioner.getByText("Starting Soon")).toBeVisible();
+      await expect(commissioner.getByText("Starting Soon", { exact: true })).toBeVisible();
 
       await manager.goto(`/league/${leagueId}/draft`);
-      await expect(manager.getByText("Starting Soon")).toBeVisible();
+      await expect(manager.getByText("Starting Soon", { exact: true })).toBeVisible();
       await expect(manager).not.toHaveURL(/\/login$/);
 
       await expect(commissioner.getByText("Pick Timer")).toBeVisible({ timeout: 100_000 });

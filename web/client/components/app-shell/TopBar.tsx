@@ -12,7 +12,7 @@ export function TopBar({ isLoggedIn, user }: TopBarProps) {
   return (
     <header
       id="app-header"
-      className="sticky top-0 z-[120] border-b border-cfb-border-subtle bg-cfb-canvas/95 px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8"
+      className="sticky top-0 z-[120] border-b border-cfb-border-subtle bg-cfb-canvas/95 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-xl sm:px-6 sm:py-4 lg:px-8"
     >
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
@@ -34,7 +34,7 @@ export function TopBar({ isLoggedIn, user }: TopBarProps) {
                 Dashboard
               </span>
               <div className="hidden h-1 w-1 rounded-full bg-cfb-border-strong sm:block" />
-              <span className="text-xs font-black uppercase tracking-[0.12em] text-cfb-text-primary">
+              <span className="text-xs font-bold tracking-[0.04em] text-cfb-text-primary sm:font-black sm:uppercase sm:tracking-[0.12em]">
                 Welcome <span className="text-cfb-brand">{user?.firstName ?? "Manager"}</span>
               </span>
             </div>

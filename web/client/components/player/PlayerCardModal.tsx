@@ -72,7 +72,7 @@ const positionPalettes: Record<
     markerA: "rgba(96,165,250,0.28)",
     markerB: "rgba(14,165,233,0.22)",
     markerC: "rgba(15,23,42,0.34)",
-    glow: "shadow-[0_28px_100px_rgba(59,130,246,0.28)]",
+    glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
     accent: "text-blue-100",
     pill: "border-blue-200/45 bg-blue-200/15 text-blue-50",
     silhouette: "from-blue-200/35 via-blue-100/20 to-transparent",
@@ -82,7 +82,7 @@ const positionPalettes: Record<
     markerA: "rgba(52,211,153,0.24)",
     markerB: "rgba(20,184,166,0.20)",
     markerC: "rgba(6,78,59,0.42)",
-    glow: "shadow-[0_28px_100px_rgba(16,185,129,0.25)]",
+    glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
     accent: "text-emerald-100",
     pill: "border-emerald-200/45 bg-emerald-200/15 text-emerald-50",
     silhouette: "from-emerald-200/35 via-emerald-100/20 to-transparent",
@@ -92,7 +92,7 @@ const positionPalettes: Record<
     markerA: "rgba(167,139,250,0.28)",
     markerB: "rgba(217,70,239,0.18)",
     markerC: "rgba(76,29,149,0.42)",
-    glow: "shadow-[0_28px_100px_rgba(139,92,246,0.28)]",
+    glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
     accent: "text-violet-100",
     pill: "border-violet-200/45 bg-violet-200/15 text-violet-50",
     silhouette: "from-violet-200/35 via-violet-100/20 to-transparent",
@@ -102,7 +102,7 @@ const positionPalettes: Record<
     markerA: "rgba(251,191,36,0.26)",
     markerB: "rgba(249,115,22,0.24)",
     markerC: "rgba(120,53,15,0.42)",
-    glow: "shadow-[0_28px_100px_rgba(245,158,11,0.24)]",
+    glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
     accent: "text-amber-100",
     pill: "border-amber-200/45 bg-amber-200/15 text-amber-50",
     silhouette: "from-amber-200/35 via-amber-100/20 to-transparent",
@@ -112,7 +112,7 @@ const positionPalettes: Record<
     markerA: "rgba(203,213,225,0.18)",
     markerB: "rgba(100,116,139,0.22)",
     markerC: "rgba(15,23,42,0.45)",
-    glow: "shadow-[0_28px_100px_rgba(148,163,184,0.20)]",
+    glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
     accent: "text-slate-100",
     pill: "border-slate-200/40 bg-slate-200/15 text-slate-50",
     silhouette: "from-slate-200/30 via-slate-100/18 to-transparent",
@@ -124,7 +124,7 @@ const defaultPalette = {
   markerA: "rgba(34,211,238,0.24)",
   markerB: "rgba(59,130,246,0.20)",
   markerC: "rgba(14,116,144,0.42)",
-  glow: "shadow-[0_28px_100px_rgba(34,211,238,0.24)]",
+  glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
   accent: "text-cyan-100",
   pill: "border-cyan-200/45 bg-cyan-200/15 text-cyan-50",
   silhouette: "from-cyan-200/35 via-cyan-100/20 to-transparent",
@@ -408,7 +408,7 @@ export function PlayerCardModal({
 
   return (
     <div
-      className="fixed inset-0 z-[1400] flex items-center justify-center bg-slate-950/78 p-3 backdrop-blur-md sm:p-6"
+      className="fixed inset-0 z-[1400] flex items-center justify-center bg-slate-950/78 p-0 backdrop-blur-md sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label={`${player.name} player card`}
@@ -416,7 +416,7 @@ export function PlayerCardModal({
     >
       <article
         className={cn(
-          "relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-white/12 bg-[#070d19] text-white",
+          "relative flex h-[100dvh] max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden rounded-none border-x-0 border-y border-white/12 bg-[#0b0d10] text-white sm:h-auto sm:max-h-[92vh] sm:rounded-xl sm:border-x",
           palette.glow
         )}
         onClick={(event) => event.stopPropagation()}
@@ -431,7 +431,7 @@ export function PlayerCardModal({
           title={title}
         />
 
-        <nav className="flex gap-2 overflow-x-auto border-b border-white/10 bg-black/18 px-5 py-3 sm:flex-wrap sm:overflow-visible sm:px-8">
+        <nav className="flex gap-1 overflow-x-auto border-b border-white/10 bg-black/18 px-3 pt-1 sm:gap-3 sm:flex-wrap sm:overflow-visible sm:px-8 sm:pt-2">
           {visiblePlayerCardTabs(hasLeagueContext).map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -441,20 +441,20 @@ export function PlayerCardModal({
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "inline-flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] transition",
+                  "relative inline-flex shrink-0 items-center gap-1.5 px-2 py-2.5 text-[9px] font-bold uppercase tracking-[0.06em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent sm:gap-2 sm:px-1 sm:text-[10px] sm:font-black sm:tracking-[0.12em]",
                   active
-                    ? "border-white/35 bg-white text-slate-950"
-                    : "border-white/10 bg-white/[0.045] text-white/60 hover:border-white/25 hover:text-white"
+                    ? "text-white after:bg-cfb-brand"
+                    : "text-white/55 hover:text-white"
                 )}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 {tab.label}
               </button>
             );
           })}
         </nav>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-8">
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-8">
           {loading ? (
             <div className="flex min-h-56 items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/[0.04] text-[10px] font-black uppercase tracking-[0.22em] text-white/55">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading player card
@@ -475,9 +475,9 @@ export function PlayerCardModal({
             </div>
           ) : activeTab === "summary" ? (
             <div className="w-full">
-              <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
+              <section className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 sm:rounded-3xl sm:p-5">
                 <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Bio</p>
-                <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
                   {[
                     ["Height", card?.about.height],
                     ["Weight", card?.about.weight],
@@ -486,9 +486,9 @@ export function PlayerCardModal({
                     ["School", card?.about.team ?? player.school],
                     ["Status", playerStatus],
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                    <div key={label} className="rounded-xl border border-white/10 bg-black/20 p-2.5 sm:rounded-2xl sm:p-3">
                       <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
-                      <p className="mt-2 text-sm font-black text-white">{formatPlayerCardValue(value)}</p>
+                      <p className="mt-1 text-sm font-black text-white sm:mt-2">{formatPlayerCardValue(value)}</p>
                     </div>
                   ))}
                 </div>

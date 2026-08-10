@@ -76,7 +76,7 @@ const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]
 };
 
 test.describe("player card modal", () => {
-  test("opens centered with canonical bio details and no provider profile control", async ({ page }) => {
+  test("opens centered with canonical bio details and no provider profile control", async ({ page }, testInfo) => {
     await seedAuthenticatedSession(page);
     await page.route("**/stats/teams**", async (route) => {
       await route.fulfill({
@@ -226,6 +226,23 @@ test.describe("player card modal", () => {
       expect(Math.abs(dialogCenter - viewport.width / 2)).toBeLessThan(viewport.width * 0.12);
     }
 
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(dialog.getByText("Bio", { exact: true })).toBeVisible();
+    await expect(dialog.getByTestId("player-card-metric-rail")).toBeVisible();
+    await expect(dialog.getByText("Height", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("Status", { exact: true }).last()).toBeVisible();
+
+    const mobileArticle = dialog.locator("article");
+    const mobileBox = await mobileArticle.boundingBox();
+    expect(mobileBox).not.toBeNull();
+    if (mobileBox) {
+      expect(Math.abs(mobileBox.height - 844)).toBeLessThanOrEqual(2);
+      expect(mobileBox.width).toBe(390);
+    }
+    if (process.env.PLAYWRIGHT_CAPTURE_SCREENSHOTS === "1") {
+      await page.screenshot({ path: testInfo.outputPath("player-card-mobile-390x844.png"), fullPage: true });
+    }
+
     await dialog.getByRole("button", { name: "Stats" }).click();
     await expect(dialog.getByText("Historical Season Stats", { exact: true })).toBeVisible();
     await expect(dialog.getByRole("columnheader", { name: "Fantasy Points" })).toHaveCount(0);
@@ -240,7 +257,7 @@ test.describe("player card modal", () => {
 
     await page.getByRole("button", { name: /Jeremiah Smith/i }).first().click();
     await expect(dialog).toBeVisible();
-    await page.mouse.click(8, 8);
+    await page.getByRole("button", { name: "Close player card" }).click();
     await expect(dialog).toBeHidden();
   });
 });
