@@ -1,3 +1,6 @@
+from sqlalchemy import event
+
+from collegefootballfantasy_api.app.models.college_team import CollegeTeam
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.services import team_schedule_import
@@ -130,3 +133,47 @@ def test_schedule_import_reuses_existing_provider_game_by_canonical_identity(db_
     assert db_session.query(Game).count() == 1
     assert db_session.query(TeamSchedule).filter(TeamSchedule.game_id == existing_game.id).count() == 2
     assert db_session.get(Game, existing_game.id).external_id == "provider-2026-ohio-state-texas"
+
+
+def test_schedule_import_plans_canonical_teams_without_flushing(db_session):
+    csv_text = HEADER + (
+        "2026-27,Big10,Ohio State,1,2026-09-05,Texas,HOME,,No,TBD,,,,Yes\n"
+        "2026-27,SEC,Texas,1,2026-09-05,Ohio State,AWAY,,No,TBD,,,,Yes\n"
+    )
+    rows, report = parse_schedule_csv(csv_text, season=2026)
+
+    def fail_if_flushed(*_args, **_kwargs):
+        raise AssertionError("schedule dry runs must not flush canonical teams")
+
+    event.listen(db_session, "before_flush", fail_if_flushed)
+    try:
+        result = import_team_schedule_rows(db_session, rows, report, apply=False)
+    finally:
+        event.remove(db_session, "before_flush", fail_if_flushed)
+
+    assert result.has_errors is False
+    assert result.planned_college_teams == 2
+    assert db_session.query(CollegeTeam).count() == 0
+    assert not db_session.new
+
+
+def test_schedule_import_creates_canonical_teams_idempotently(db_session):
+    csv_text = HEADER + (
+        "2026-27,Big10,Ohio State,1,2026-09-05,Texas,HOME,,No,TBD,,,,Yes\n"
+        "2026-27,SEC,Texas,1,2026-09-05,Ohio State,AWAY,,No,TBD,,,,Yes\n"
+    )
+    rows, report = parse_schedule_csv(csv_text, season=2026)
+
+    result = import_team_schedule_rows(db_session, rows, report, apply=True)
+
+    assert result.has_errors is False
+    assert result.inserted_college_teams == 2
+    assert {
+        team.name for team in db_session.query(CollegeTeam).all()
+    } == {"Ohio State", "Texas"}
+
+    rows, report = parse_schedule_csv(csv_text, season=2026)
+    result = import_team_schedule_rows(db_session, rows, report, apply=True)
+
+    assert result.unchanged_college_teams == 2
+    assert db_session.query(CollegeTeam).count() == 2

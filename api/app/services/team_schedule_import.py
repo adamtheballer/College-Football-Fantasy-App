@@ -19,10 +19,12 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.models.college_team import CollegeTeam
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.services.player_game_log import canonical_team_name, normalize_team_name
+from collegefootballfantasy_api.app.services.power4 import conference_for_school, resolve_power4_school
 
 
 EASTERN_TIME = ZoneInfo("America/New_York")
@@ -152,6 +154,10 @@ class ScheduleImportReport:
     schedule_schema_ready: bool | None = None
     planned_schedules: int = 0
     planned_games: int = 0
+    planned_college_teams: int = 0
+    inserted_college_teams: int = 0
+    updated_college_teams: int = 0
+    unchanged_college_teams: int = 0
     applied: bool = False
 
     def to_dict(self) -> dict:
@@ -454,6 +460,74 @@ def _record_player_schedule_coverage(db: Session, rows: list[ScheduleSourceRow],
             )
 
 
+def _college_team_display_name(name: str | None) -> str | None:
+    raw = _text(name)
+    if raw is None:
+        return None
+    return resolve_power4_school(raw) or raw
+
+
+def _sync_canonical_college_teams(
+    db: Session,
+    rows: list[ScheduleSourceRow],
+    report: ScheduleImportReport,
+    *,
+    apply: bool,
+) -> None:
+    """Plan or persist the canonical teams required by schedule consumers.
+
+    ``TeamSchedule`` stores display names, while weekly projections require a
+    ``CollegeTeam`` foreign key.  The sealed schedule is the authoritative
+    source for both sides of every game, so its importer owns this small,
+    idempotent team catalog step.  Dry runs calculate the exact plan without
+    adding or flushing ORM rows.
+    """
+
+    source_teams: dict[str, tuple[str, str | None]] = {}
+    for row in rows:
+        display_name = _college_team_display_name(row.team_name)
+        canonical_name = canonical_team_name(display_name)
+        if display_name is None or canonical_name is None:
+            continue
+        source_teams[canonical_name] = (
+            display_name,
+            conference_for_school(display_name) or row.conference,
+        )
+
+    for row in rows:
+        display_name = _college_team_display_name(row.opponent_name)
+        canonical_name = canonical_team_name(display_name)
+        if display_name is None or canonical_name is None:
+            continue
+        source_teams.setdefault(
+            canonical_name,
+            (display_name, conference_for_school(display_name)),
+        )
+
+    existing = {
+        canonical_team_name(team.name): team
+        for team in db.query(CollegeTeam).all()
+        if canonical_team_name(team.name) is not None
+    }
+    for canonical_name, (display_name, conference) in source_teams.items():
+        team = existing.get(canonical_name)
+        if team is None:
+            report.planned_college_teams += 1
+            if apply:
+                db.add(CollegeTeam(name=display_name, conference=conference))
+                report.inserted_college_teams += 1
+            continue
+        if team.conference == conference:
+            report.unchanged_college_teams += 1
+            continue
+        if team.conference is None and conference is not None:
+            if apply:
+                team.conference = conference
+                report.updated_college_teams += 1
+            continue
+        report.unchanged_college_teams += 1
+
+
 def _team_schedule_table_exists(db: Session) -> bool:
     return inspect(db.get_bind()).has_table(TeamSchedule.__tablename__)
 
@@ -471,6 +545,7 @@ def import_team_schedule_rows(
         return report
 
     report.schedule_schema_ready = _team_schedule_table_exists(db)
+    _sync_canonical_college_teams(db, rows, report, apply=apply)
     if not report.schedule_schema_ready:
         report.planned_schedules = len(rows)
         report.planned_games = len({_external_game_id(row) for row in rows if not row.is_bye})
