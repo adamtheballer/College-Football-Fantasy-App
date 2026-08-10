@@ -76,17 +76,20 @@ export const getShellNavItems = (
 };
 
 export const getMobileNavItems = (items: ShellNavItem[]) => {
+  // Keep the bottom bar to four destinations. A fifth permanent item does not
+  // leave enough space for the elevated quick-action button on a phone; the
+  // complete sidebar remains reachable through MobileNavigation's More sheet.
   // Pick 6 is a dashboard challenge, not a permanent navigation destination.
-  const preferred = ["HOME", "LEAGUES", "CHATS", "MOCK DRAFT", "REPORT BUG"];
+  const preferred = ["HOME", "LEAGUES", "CHATS", "MOCK DRAFT"];
   const byName = new Map(items.map((item) => [item.name, item]));
   const filtered = preferred.flatMap((name) => {
     const item = byName.get(name);
     return item ? [item] : [];
   });
 
-  if (filtered.length >= 4) return filtered;
+  if (filtered.length >= 3) return filtered;
 
-  return items.filter((item) => item.kind !== "danger" && item.kind !== "admin").slice(0, 5);
+  return items.filter((item) => item.kind !== "danger" && item.kind !== "admin").slice(0, 4);
 };
 
 export const navDomId = (name: string) => `nav-${name.toLowerCase().replace(/\s+/g, "-")}`;
