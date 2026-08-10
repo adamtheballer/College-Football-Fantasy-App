@@ -8,7 +8,15 @@ import { AppShell } from "./AppShell";
 
 afterEach(cleanup);
 
-function renderShell({ compactContent, fixedViewport }: { compactContent: boolean; fixedViewport: boolean }) {
+function renderShell({
+  compactContent,
+  fixedViewport,
+  hideDecor = true,
+}: {
+  compactContent: boolean;
+  fixedViewport: boolean;
+  hideDecor?: boolean;
+}) {
   return render(
     <AppShell
       navItems={[]}
@@ -16,7 +24,7 @@ function renderShell({ compactContent, fixedViewport }: { compactContent: boolea
       user={null}
       isLoggedIn={false}
       hideChrome
-      hideDecor
+      hideDecor={hideDecor}
       hideFloatingActions
       compactContent={compactContent}
       fixedViewport={fixedViewport}
@@ -29,8 +37,22 @@ function renderShell({ compactContent, fixedViewport }: { compactContent: boolea
 }
 
 describe("AppShell scroll ownership", () => {
+  it("can render the shared collegiate canvas behind authenticated page content", () => {
+    const { container } = renderShell({
+      compactContent: false,
+      fixedViewport: false,
+      hideDecor: false,
+    });
+
+    expect(container.firstElementChild?.getAttribute("style")).toContain("linear-gradient");
+    expect(container.querySelector("[data-bg-effects='true']")).not.toBeNull();
+  });
+
   it("keeps standard pages on the single app-page scroller", () => {
-    const { container } = renderShell({ compactContent: false, fixedViewport: false });
+    const { container } = renderShell({
+      compactContent: false,
+      fixedViewport: false,
+    });
     const scrollArea = container.querySelector("main[data-app-scroll='true']");
 
     expect(scrollArea?.getAttribute("data-scroll-owner")).toBe("page");
@@ -40,7 +62,10 @@ describe("AppShell scroll ownership", () => {
 
   it("contains draft rooms without mutating the document scroll lock", () => {
     document.body.style.overflow = "auto";
-    const { container } = renderShell({ compactContent: true, fixedViewport: true });
+    const { container } = renderShell({
+      compactContent: true,
+      fixedViewport: true,
+    });
     const scrollArea = container.querySelector("main[data-app-scroll='true']");
 
     expect(scrollArea?.getAttribute("data-scroll-owner")).toBe("draft-room");
@@ -50,7 +75,10 @@ describe("AppShell scroll ownership", () => {
   });
 
   it("keeps compact non-draft routes on the normal page scroller", () => {
-    const { container } = renderShell({ compactContent: true, fixedViewport: false });
+    const { container } = renderShell({
+      compactContent: true,
+      fixedViewport: false,
+    });
     const scrollArea = container.querySelector("main[data-app-scroll='true']");
 
     expect(scrollArea?.getAttribute("data-scroll-owner")).toBe("page");
