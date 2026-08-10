@@ -18,6 +18,7 @@ from sqlalchemy import select
 from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.domain.scoring_engine import calculate_player_fantasy_points
+from collegefootballfantasy_api.app.domain.scoring_rules import BETA_KICKER_RULES
 from collegefootballfantasy_api.app.models.college_team import CollegeTeam
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
@@ -26,11 +27,11 @@ from scripts.audit_preseason_source_contract import _key, _position, _team
 from scripts.freeze_authoritative_sheet_snapshots import REQUIRED_WORKBOOKS
 
 MODEL_VERSION = "preseason_weekly_v1"
-POLICY_NAME = "component_stats_canonical_scoring_v1"
+POLICY_NAME = "component_stats_canonical_scoring_v2_beta_flat_kicker"
 COMPONENTS = {
     "pass_attempts": "ATTEMPTS", "receptions": "RECEPTIONS", "pass_yards": "PASS YDS", "pass_tds": "PASS TDS",
     "interceptions": "INTS", "rush_yards": "RUSH YDS", "rush_tds": "RUSH TDS", "rec_yards": "REC YDS",
-    "rec_tds": "REC TDS", "extra_points_made": "XP",
+    "rec_tds": "REC TDS", "field_goals_made_0_to_39": "FG", "extra_points_made": "XP",
 }
 
 
@@ -73,8 +74,6 @@ def _require_inputs(manifest_path: Path, annual_path: Path, schedule_path: Path,
 def _stats(row: dict[str, str], games: int) -> dict[str, float] | None:
     values = {target: _number(row.get(source)) for target, source in COMPONENTS.items()}
     if any(value is None for value in values.values()):
-        return None
-    if _position(row.get("POSITION")) == "K" and _number(row.get("FG")) not in (None, 0.0):
         return None
     return {key: value / games for key, value in values.items() if value is not None}
 
@@ -120,7 +119,7 @@ def main() -> int:
                 if not games:
                     report["counts"]["missing_schedule"] += 1; continue
                 weekly = _stats(annual, games)
-                status = "ACTIVE" if weekly is not None else ("MISSING_KICKER_SCORING_DETAIL" if player.position == "K" else "MISSING_BASELINE")
+                status = "ACTIVE" if weekly is not None else "MISSING_BASELINE"
                 for week in range(1, 14):
                     schedule = schedules.get((team_name, week))
                     if schedule is None:
@@ -131,7 +130,7 @@ def main() -> int:
                         row_status = "MISSING_OPPONENT"
                     points = 0.0 if row_status == "BYE" else None
                     if row_status == "ACTIVE" and weekly is not None:
-                        points, _ = calculate_player_fantasy_points({"pass_yards": weekly["pass_yards"], "pass_tds": weekly["pass_tds"], "interceptions": weekly["interceptions"], "rush_yards": weekly["rush_yards"], "rush_tds": weekly["rush_tds"], "receptions": weekly["receptions"], "rec_yards": weekly["rec_yards"], "rec_tds": weekly["rec_tds"], "xp_made": weekly["extra_points_made"]}, {}, player.position)
+                        points, _ = calculate_player_fantasy_points({"pass_yards": weekly["pass_yards"], "pass_tds": weekly["pass_tds"], "interceptions": weekly["interceptions"], "rush_yards": weekly["rush_yards"], "rush_tds": weekly["rush_tds"], "receptions": weekly["receptions"], "rec_yards": weekly["rec_yards"], "rec_tds": weekly["rec_tds"], "fg_made_0_30": weekly["field_goals_made_0_to_39"], "xp_made": weekly["extra_points_made"]}, BETA_KICKER_RULES if player.position == "K" else {}, player.position)
                     report["counts"][row_status.lower()] += 1
                     if not args.apply:
                         continue

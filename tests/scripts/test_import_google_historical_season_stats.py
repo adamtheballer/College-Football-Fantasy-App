@@ -5,6 +5,7 @@ from dataclasses import replace
 from scripts.import_google_historical_season_stats import (
     VERIFIED_SOURCE_NAME_ALIASES,
     SourceSeasonRow,
+    _canonical_fantasy_points,
     _identity_key,
     _resolve_player,
     build_report,
@@ -198,3 +199,36 @@ def test_report_blocks_one_trusted_espn_id_attached_to_two_canonical_players():
             "reason": "one_trusted_espn_id_maps_to_multiple_canonical_players",
         }
     ]
+
+
+def test_kicker_historical_totals_use_the_flat_beta_policy_without_distance_guessing():
+    source = SourceSeasonRow(
+        row_number=4,
+        current_team="Example",
+        depth_position="K",
+        player_name="Example Kicker",
+        season=2025,
+        college_team="Example",
+        passing_completions=0,
+        passing_attempts=0,
+        passing_yards=0,
+        passing_touchdowns=0,
+        interceptions=0,
+        rushing_attempts=0,
+        rushing_yards=0,
+        rushing_touchdowns=0,
+        receptions=0,
+        receiving_yards=0,
+        receiving_touchdowns=0,
+        field_goals_made=22,
+        field_goals_attempted=25,
+        extra_points_made=30,
+        extra_points_attempted=31,
+        kick_points=None,
+        source_url=None,
+    )
+
+    points, policy = _canonical_fantasy_points(source)
+
+    assert points == 96
+    assert policy == "component_stats_canonical_scoring_v2_beta_flat_kicker"

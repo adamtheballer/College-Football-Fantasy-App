@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from collegefootballfantasy_api.app.domain.scoring_engine import calculate_player_fantasy_points
+from collegefootballfantasy_api.app.domain.scoring_rules import BETA_KICKER_RULES
 
 
 SOURCE_COLUMNS = {
@@ -27,6 +28,13 @@ SOURCE_COLUMNS = {
     "receptions": "RECEPTIONS",
     "rec_yards": "REC YDS",
     "rec_tds": "REC TDS",
+    "xp_made": "XP",
+}
+
+POLICY_NAME = "component_stats_canonical_scoring_v2_beta_flat_kicker"
+
+KICKER_SOURCE_COLUMNS = {
+    "fg_made_0_30": "FG",
     "xp_made": "XP",
 }
 
@@ -51,6 +59,8 @@ def _position(row: dict[str, str]) -> str:
 
 
 def _canonical_stats(row: dict[str, str]) -> dict[str, str | None]:
+    if _position(row) == "K":
+        return {stat: row.get(column) for stat, column in KICKER_SOURCE_COLUMNS.items()}
     return {stat: row.get(column) for stat, column in SOURCE_COLUMNS.items()}
 
 
@@ -58,20 +68,22 @@ def canonical_projection_points(row: dict[str, str]) -> float | None:
     """Return a component-derived annual total when the source can prove one.
 
     ``FANTASY PROJ.`` is retained as a source-provided comparison value only.
-    It is not an input to the app's standard-scoring total.  In particular, a
-    kicker total-FG value cannot be translated into the app's distance-tiered
-    kicker scoring without inventing a distance distribution.
+    It is not an input to the app's standard-scoring total.  For the public
+    beta, a verified total-FG count is sufficient because every made FG is
+    worth three points irrespective of distance.
     """
 
     position = _position(row)
     if not position:
         return None
-    required_columns = tuple(SOURCE_COLUMNS.values())
+    required_columns = tuple((KICKER_SOURCE_COLUMNS if position == "K" else SOURCE_COLUMNS).values())
     if any(_component_state(row.get(column)) != "valid" for column in required_columns):
         return None
-    if position == "K" and _number(row.get("FG")) not in (None, 0.0):
-        return None
-    points, _ = calculate_player_fantasy_points(_canonical_stats(row), {}, position)
+    points, _ = calculate_player_fantasy_points(
+        _canonical_stats(row),
+        BETA_KICKER_RULES if position == "K" else {},
+        position,
+    )
     return points
 
 
@@ -88,7 +100,7 @@ def audit(rows: list[dict[str, str]]) -> dict[str, Any]:
             "position": position or None,
         }
         sheet_points = _number(row.get("FANTASY PROJ."))
-        required_columns = tuple(SOURCE_COLUMNS.values())
+        required_columns = tuple((KICKER_SOURCE_COLUMNS if position == "K" else SOURCE_COLUMNS).values())
         missing_components = [column for column in required_columns if _component_state(row.get(column)) == "missing"]
         invalid_components = [column for column in required_columns if _component_state(row.get(column)) == "invalid"]
         if not identity["player"] or not identity["team"] or not identity["position"]:
@@ -106,13 +118,6 @@ def audit(rows: list[dict[str, str]]) -> dict[str, Any]:
             canonical_points = None
             difference = None
             reason = "one_or_more_canonical_component_columns_are_blank"
-        elif position == "K" and _number(row.get("FG")) not in (None, 0.0):
-            # The canonical kicker model requires distance buckets.  A total
-            # FG count cannot safely be allocated across them.
-            outcome = "UNSCORABLE_KICKER_DISTANCE"
-            canonical_points = None
-            difference = None
-            reason = "annual_sheet_has_total_field_goals_without_distance_buckets"
         elif sheet_points is None:
             outcome = "MISSING_SHEET_TOTAL"
             canonical_points = canonical_projection_points(row)
@@ -145,7 +150,7 @@ def audit(rows: list[dict[str, str]]) -> dict[str, Any]:
                 "reason": reason,
             })
     return {
-        "policy_name": "component_stats_canonical_scoring_v1",
+        "policy_name": POLICY_NAME,
         "source_rows": len(rows),
         "canonical_scoring_profile": "app_default_rules",
         "outcome_counts": dict(sorted(outcomes.items())),

@@ -35,6 +35,7 @@ from collegefootballfantasy_api.app.models.historical_stats import (
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId, ProviderIdentityAudit
 from collegefootballfantasy_api.app.domain.scoring_engine import calculate_player_fantasy_points
+from collegefootballfantasy_api.app.domain.scoring_rules import BETA_KICKER_RULES
 from collegefootballfantasy_api.app.services.historical_stats import canonical_json_hash
 from collegefootballfantasy_api.app.services.power4 import resolve_power4_school
 
@@ -283,6 +284,41 @@ def _source_provider_id(row: SourceSeasonRow) -> str | None:
     return None
 
 
+def _canonical_fantasy_points(source: SourceSeasonRow) -> tuple[float | None, str | None]:
+    """Calculate only from source fields proven by the beta scoring policy."""
+
+    if source.position == "K":
+        if source.field_goals_made is None or source.extra_points_made is None:
+            return None, None
+        points, _ = calculate_player_fantasy_points(
+            {"fg_made_0_30": source.field_goals_made, "xp_made": source.extra_points_made},
+            BETA_KICKER_RULES,
+            source.position,
+        )
+        return points, "component_stats_canonical_scoring_v2_beta_flat_kicker"
+    if all(value is not None for value in (
+        source.passing_yards, source.passing_touchdowns, source.interceptions,
+        source.rushing_yards, source.rushing_touchdowns, source.receptions,
+        source.receiving_yards, source.receiving_touchdowns,
+    )):
+        points, _ = calculate_player_fantasy_points(
+            {
+                "pass_yards": source.passing_yards,
+                "pass_tds": source.passing_touchdowns,
+                "interceptions": source.interceptions,
+                "rush_yards": source.rushing_yards,
+                "rush_tds": source.rushing_touchdowns,
+                "receptions": source.receptions,
+                "rec_yards": source.receiving_yards,
+                "rec_tds": source.receiving_touchdowns,
+            },
+            {},
+            source.position,
+        )
+        return points, "component_stats_canonical_scoring_v2_beta_flat_kicker"
+    return None, None
+
+
 def _assign_row(
     target: PlayerHistoricalSeasonStat,
     source: SourceSeasonRow,
@@ -320,35 +356,7 @@ def _assign_row(
     target.extra_points_made = source.extra_points_made
     target.extra_points_attempted = source.extra_points_attempted
     target.kick_points = source.kick_points
-    if source.position == "K":
-        # The approved source has total field goals, not the distance buckets
-        # required by canonical kicker scoring. Preserve raw fields without
-        # fabricating a score.
-        target.fantasy_points = None
-        target.scoring_rules_version = None
-    elif all(value is not None for value in (
-        source.passing_yards, source.passing_touchdowns, source.interceptions,
-        source.rushing_yards, source.rushing_touchdowns, source.receptions,
-        source.receiving_yards, source.receiving_touchdowns,
-    )):
-        target.fantasy_points, _ = calculate_player_fantasy_points(
-            {
-                "pass_yards": source.passing_yards,
-                "pass_tds": source.passing_touchdowns,
-                "interceptions": source.interceptions,
-                "rush_yards": source.rushing_yards,
-                "rush_tds": source.rushing_touchdowns,
-                "receptions": source.receptions,
-                "rec_yards": source.receiving_yards,
-                "rec_tds": source.receiving_touchdowns,
-            },
-            {},
-            source.position,
-        )
-        target.scoring_rules_version = "component_stats_canonical_scoring_v1"
-    else:
-        target.fantasy_points = None
-        target.scoring_rules_version = None
+    target.fantasy_points, target.scoring_rules_version = _canonical_fantasy_points(source)
     target.games_played = source.games_played
     target.fantasy_points_per_game = (
         target.fantasy_points / source.games_played
@@ -370,11 +378,7 @@ def _assign_row(
         "college_team": source.college_team,
         "source_row": source.row_number,
     }
-    target.unknown_labels = (
-        {"fantasy_points": "kicker_distance_buckets_unavailable"}
-        if source.position == "K"
-        else ({"fantasy_points": "missing_canonical_component"} if target.fantasy_points is None else None)
-    )
+    target.unknown_labels = {"fantasy_points": "missing_canonical_component"} if target.fantasy_points is None else None
     target.is_final = True
 
 

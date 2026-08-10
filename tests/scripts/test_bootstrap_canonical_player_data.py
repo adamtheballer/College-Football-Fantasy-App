@@ -19,9 +19,10 @@ def test_bootstrap_uses_component_derived_fantasy_points_not_raw_sheet_total():
 
     assert stats["fpts"] == 291.2
     assert stats["source_fantasy_proj"] == 322.2
-    assert stats["scoring_policy_version"] == "component_stats_canonical_scoring_v1"
+    assert stats["scoring_policy_version"] == "component_stats_canonical_scoring_v2_beta_flat_kicker"
 
 
-def test_bootstrap_refuses_unscorable_kicker_total_instead_of_inventing_a_score():
-    with pytest.raises(ValueError, match="not a canonical fallback"):
-        projection_stats_for_row(_projection(POSITION="K", **{"FG": "22", "XP": "30"}))
+def test_bootstrap_scores_kicker_total_with_flat_beta_rules():
+    stats = projection_stats_for_row(_projection(POSITION="K", **{"FG": "22", "XP": "30"}))
+
+    assert stats["fpts"] == 96

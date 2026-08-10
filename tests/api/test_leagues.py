@@ -97,13 +97,13 @@ def test_create_and_list_leagues(client):
     assert data["data"][0]["draft"]["draft_type"] == "snake"
 
 
-def test_beta_scoring_requires_acknowledgment_and_locks_the_persisted_snapshot(client, monkeypatch):
+def test_beta_scoring_requires_acknowledgment_locks_snapshot_and_enforces_flat_kicker_policy(client, monkeypatch):
     monkeypatch.setattr(settings, "beta_scoring_lock_enabled", True)
     token = create_user_and_token(client, "beta-scoring-lock")
     payload = {
         "basics": {"name": "Beta Scoring Lock", "season_year": 2026, "max_teams": 4, "is_private": True},
         "settings": {
-            "scoring_json": {"ppr": 1},
+            "scoring_json": {"ppr": 1, "fg": 9, "xp": 4},
             "roster_slots_json": {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 1, "K": 1, "BENCH": 5},
             "playoff_teams": 2,
             "waiver_type": "faab",
@@ -126,7 +126,16 @@ def test_beta_scoring_requires_acknowledgment_and_locks_the_persisted_snapshot(c
     created = client.post("/leagues", json=payload, headers=auth_headers(token))
     assert created.status_code == 201
     league = created.json()["league"]
-    assert league["settings"]["scoring_snapshot_json"] == {"receptions": 1}
+    expected_beta_kicker_rules = {
+        "fg_made_0_30": 3,
+        "fg_made_31_40": 3,
+        "fg_made_41_50": 3,
+        "fg_made_51_60": 3,
+        "fg_made_61_plus": 3,
+        "xp_made": 1,
+    }
+    assert league["settings"]["scoring_snapshot_json"] == {"receptions": 1, **expected_beta_kicker_rules}
+    assert league["settings"]["scoring_json"] == {"receptions": 1, **expected_beta_kicker_rules}
     assert league["settings"]["scoring_locked_at"] is not None
 
     update = {**payload["settings"], "scoring_json": {"ppr": 0.5}}

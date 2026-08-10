@@ -29,11 +29,11 @@ def test_component_score_applies_the_standard_interception_penalty():
     assert canonical_projection_points(row) == -4.0
 
 
-def test_audit_refuses_to_score_kicker_total_without_distance_buckets():
+def test_audit_scores_kicker_total_with_flat_beta_rules():
     report = audit([_row(PLAYER="K", POSITION="K", FG="24", XP="30", **{"FANTASY PROJ.": "102"})])
 
-    assert report["outcome_counts"] == {"UNSCORABLE_KICKER_DISTANCE": 1}
-    assert report["review_required"][0]["canonical_fantasy_points"] is None
+    assert report["outcome_counts"] == {"EXACT_MATCH": 1}
+    assert report["review_required"] == []
 
 
 def test_audit_identifies_exact_match_and_missing_component_separately():

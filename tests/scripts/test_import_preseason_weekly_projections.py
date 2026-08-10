@@ -44,8 +44,15 @@ def test_weekly_projection_scoring_deducts_interceptions():
     assert points == -4.0
 
 
-def test_kicker_without_distance_buckets_and_missing_baseline_are_not_scored():
-    assert _stats({**_annual(), "POSITION": "K", "FG": "22"}, 12) is None
+def test_kicker_total_field_goals_uses_flat_beta_scoring_and_missing_baseline_is_rejected():
+    values = _stats({**_annual(), "POSITION": "K", "FG": "22", "XP": "30"}, 12)
+    assert values is not None
+    points, _ = calculate_player_fantasy_points(
+        {"fg_made_0_30": values["field_goals_made_0_to_39"], "xp_made": values["extra_points_made"]},
+        {"fg_made_0_30": 3, "fg_made_31_40": 3, "fg_made_41_50": 3, "fg_made_51_60": 3, "fg_made_61_plus": 3, "xp_made": 1},
+        "K",
+    )
+    assert points == pytest.approx((22 * 3 + 30) / 12)
     assert _stats({**_annual(), "RUSH YDS": ""}, 12) is None
 
 
@@ -63,7 +70,7 @@ def test_builder_requires_complete_matching_sealed_manifest_and_scoring_audit(tm
     manifest = tmp_path / "manifest.json"
     manifest.write_text(json.dumps({"snapshots": [{"workbook": name, "sha256": annual_hash if name == "annual_projections" else schedule_hash if name == "schedules" else name} for name in names]}), encoding="utf-8")
     audit = tmp_path / "audit.json"
-    audit.write_text(json.dumps({"policy_name": "component_stats_canonical_scoring_v1", "source_sha256": annual_hash}), encoding="utf-8")
+    audit.write_text(json.dumps({"policy_name": "component_stats_canonical_scoring_v2_beta_flat_kicker", "source_sha256": annual_hash}), encoding="utf-8")
     assert _require_inputs(manifest, annual, schedule, audit)[0] == annual_hash
     audit.write_text(json.dumps({"policy_name": "wrong", "source_sha256": annual_hash}), encoding="utf-8")
     with pytest.raises(ValueError, match="policy"):

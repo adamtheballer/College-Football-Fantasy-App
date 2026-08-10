@@ -97,7 +97,7 @@ def projection_stats_for_row(projection: dict[str, str]) -> dict[str, float | in
     canonical_points = canonical_projection_points(projection)
     if canonical_points is None:
         raise ValueError(
-            "Annual projection cannot be scored under component_stats_canonical_scoring_v1; "
+            "Annual projection cannot be scored under component_stats_canonical_scoring_v2_beta_flat_kicker; "
             "the source FANTASY PROJ. value is not a canonical fallback."
         )
     stats: dict[str, float | int | str] = {
@@ -107,7 +107,7 @@ def projection_stats_for_row(projection: dict[str, str]) -> dict[str, float | in
         {
             "fpts": canonical_points,
             "source_fantasy_proj": as_number(projection.get("FANTASY PROJ.")),
-            "scoring_policy_version": "component_stats_canonical_scoring_v1",
+            "scoring_policy_version": "component_stats_canonical_scoring_v2_beta_flat_kicker",
             "projection_season": 2026,
         }
     )
@@ -145,7 +145,7 @@ def bootstrap(
         raise ValueError(
             "Canonical player bootstrap is blocked because "
             f"{len(unscorable_projection_keys)} annual projections cannot be scored under "
-            "component_stats_canonical_scoring_v1. Supply the required component detail; "
+            "component_stats_canonical_scoring_v2_beta_flat_kicker. Supply the required component detail; "
             "the source FANTASY PROJ. value is not a canonical fallback."
         )
     reviewed_rows = [
