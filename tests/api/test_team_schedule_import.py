@@ -59,6 +59,25 @@ def test_schedule_import_rejects_duplicate_team_week_rows(db_session):
     assert db_session.query(TeamSchedule).count() == 0
 
 
+def test_schedule_parser_accepts_excel_whole_number_week_cells():
+    csv_text = HEADER + "2026-27,Big10,Ohio State,1.0,2026-09-05,Texas,HOME,,No,TBD,,,,Yes\n"
+
+    rows, report = parse_schedule_csv(csv_text, season=2026)
+
+    assert report.invalid_rows == []
+    assert len(rows) == 1
+    assert rows[0].week == 1
+
+
+def test_schedule_parser_rejects_fractional_week_cells():
+    csv_text = HEADER + "2026-27,Big10,Ohio State,1.5,2026-09-05,Texas,HOME,,No,TBD,,,,Yes\n"
+
+    _rows, report = parse_schedule_csv(csv_text, season=2026)
+
+    assert len(report.invalid_rows) == 1
+    assert "week must be a whole number" in report.invalid_rows[0]["error"]
+
+
 def test_schedule_import_normalizes_punctuation_for_reciprocal_opponents(db_session):
     csv_text = HEADER + (
         "2026-27,ACC,Miami,10,2026-11-07,Notre Dame,AWAY,,No,TBD,,,,Yes\n"

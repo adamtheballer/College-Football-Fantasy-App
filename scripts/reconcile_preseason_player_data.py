@@ -18,11 +18,7 @@ from collegefootballfantasy_api.app.services.cfb27_player_sync import (
     load_reviewed_cfb27_snapshot,
     sync_cfb27_players,
 )
-from scripts.audit_preseason_source_contract import (
-    WAYNE_KNIGHT_APPROVED_PROJECTION_SNAPSHOT_SHA256,
-    WAYNE_KNIGHT_APPROVED_SOURCE_BATCH,
-    require_valid_source_directory,
-)
+from scripts.audit_preseason_source_contract import require_valid_source_directory
 from scripts.bootstrap_canonical_player_data import (
     DEFAULT_IDENTITIES,
     DEFAULT_PROJECTIONS,
@@ -33,8 +29,13 @@ from scripts.bootstrap_canonical_player_data import (
 
 DEFAULT_RATINGS = ROOT_DIR / "api" / "app" / "data" / "cfb27_ratings_2026-08-05.csv"
 DEFAULT_RATINGS_MANIFEST = ROOT_DIR / "api" / "app" / "data" / "cfb27_ratings_2026-08-05.manifest.json"
-def verify_wayne_knight_postcondition(db, *, season: int) -> dict[str, object]:
+def verify_wayne_knight_postcondition(
+    db, *, season: int, source_batch_id: str
+) -> dict[str, object]:
     """Fail the shared reconciliation unless the reviewed Wayne row survives intact."""
+
+    if not source_batch_id.strip():
+        raise RuntimeError("Wayne Knight reconciliation requires a manifest-backed source batch ID.")
 
     rows = (
         db.query(Player)
@@ -45,7 +46,7 @@ def verify_wayne_knight_postcondition(db, *, season: int) -> dict[str, object]:
         raise RuntimeError(f"Wayne Knight reconciliation requires exactly one UCLA RB identity; found {len(rows)}.")
     player = rows[0]
     source_marker = player.sheet_source_sheet_id or ""
-    expected_marker = f"canonical-preseason:{int(season)}:{WAYNE_KNIGHT_APPROVED_SOURCE_BATCH}:Big10"
+    expected_marker = f"canonical-preseason:{int(season)}:{source_batch_id}:Big10"
     if source_marker != expected_marker:
         raise RuntimeError(f"Wayne Knight projection source batch mismatch: expected {expected_marker!r}, got {source_marker!r}.")
     if player.sheet_projected_season_points is None or not math.isclose(player.sheet_projected_season_points, 265.0):
@@ -69,7 +70,7 @@ def verify_wayne_knight_postcondition(db, *, season: int) -> dict[str, object]:
         candidate
         for candidate in same_name_rows
         if (candidate.sheet_source_sheet_id or "").startswith(
-            f"canonical-preseason:{int(season)}:{WAYNE_KNIGHT_APPROVED_SOURCE_BATCH}:"
+            f"canonical-preseason:{int(season)}:{source_batch_id}:"
         )
     ]
     if len(active_batch_rows) != 1 or active_batch_rows[0].id != player.id:
@@ -79,7 +80,7 @@ def verify_wayne_knight_postcondition(db, *, season: int) -> dict[str, object]:
         "name": player.name,
         "school": player.school,
         "position": player.position,
-        "source_batch_id": WAYNE_KNIGHT_APPROVED_SOURCE_BATCH,
+        "source_batch_id": source_batch_id,
         "sheet_projected_season_points": player.sheet_projected_season_points,
         "draft_eligible": source_marker.startswith(f"canonical-preseason:{int(season)}:"),
     }
@@ -89,8 +90,10 @@ def reconcile(*, identities: Path, projections: Path, ratings: Path, ratings_man
     """Reconcile every player-data source as one all-or-nothing release unit."""
     source_contract = require_valid_source_directory(identities.parent)
     wayne_source_contract = source_contract["wayne_knight_projection_integrity"]
-    if wayne_source_contract["projection_snapshot_sha256"] != WAYNE_KNIGHT_APPROVED_PROJECTION_SNAPSHOT_SHA256:
-        raise RuntimeError("Wayne Knight projection snapshot hash differs from the approved immutable source.")
+    source_provenance = source_contract["gate_context"]["source_provenance"]
+    source_batch_id = source_provenance.get("export_batch_id")
+    if wayne_source_contract.get("status") != "PASS" or not isinstance(source_batch_id, str) or not source_batch_id.strip():
+        raise RuntimeError("Wayne Knight source sentinel or immutable source provenance failed validation.")
     snapshot = load_reviewed_cfb27_snapshot(snapshot_path=ratings, manifest_path=ratings_manifest)
     with SessionLocal() as db:
         if dry_run:
@@ -105,7 +108,9 @@ def reconcile(*, identities: Path, projections: Path, ratings: Path, ratings_man
                     commit=False,
                     rollback_on_dry_run=False,
                 )
-                wayne_integrity = verify_wayne_knight_postcondition(db, season=season)
+                wayne_integrity = verify_wayne_knight_postcondition(
+                    db, season=season, source_batch_id=source_batch_id
+                )
                 ratings_result = sync_cfb27_players(db, snapshot=snapshot, dry_run=True, season=season, commit=False)
                 return {"catalog": catalog, "wayne_knight": wayne_integrity, "ratings": ratings_result}
             finally:
@@ -123,7 +128,9 @@ def reconcile(*, identities: Path, projections: Path, ratings: Path, ratings_man
                     commit=False,
                 )
                 ratings_result = sync_cfb27_players(db, snapshot=snapshot, season=season, commit=False)
-                wayne_integrity = verify_wayne_knight_postcondition(db, season=season)
+                wayne_integrity = verify_wayne_knight_postcondition(
+                    db, season=season, source_batch_id=source_batch_id
+                )
             return {"catalog": catalog, "wayne_knight": wayne_integrity, "ratings": ratings_result}
         except Exception:
             db.rollback()

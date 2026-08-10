@@ -33,6 +33,9 @@ from collegefootballfantasy_api.app.models.historical_stats import (
     PlayerHistoricalSeasonStat,
 )
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId, ProviderIdentityAudit
+from collegefootballfantasy_api.app.domain.scoring_engine import calculate_player_fantasy_points
+from collegefootballfantasy_api.app.domain.scoring_rules import BETA_KICKER_RULES
 from collegefootballfantasy_api.app.services.historical_stats import canonical_json_hash
 from collegefootballfantasy_api.app.services.power4 import resolve_power4_school
 
@@ -129,7 +132,9 @@ class SourceSeasonRow:
     extra_points_made: float | None
     extra_points_attempted: float | None
     kick_points: float | None
-    source_url: str | None
+    games_played: int | None = None
+    espn_player_id: str | None = None
+    source_url: str | None = None
 
     @property
     def position(self) -> str | None:
@@ -172,6 +177,8 @@ def _row_from_mapping(row_number: int, values: dict[str, object]) -> SourceSeaso
         extra_points_made=_number(value("XPM")),
         extra_points_attempted=_number(value("XPA")),
         kick_points=_number(value("KICK PTS")),
+        games_played=_integer(value("GAMES PLAYED") or value("GP")),
+        espn_player_id=_text(value("ESPN ID") or value("ESPN PLAYER ID")),
         source_url=_text(value("SOURCE URL")),
     )
 
@@ -263,12 +270,53 @@ def _resolve_player(
     return None, "unmatched"
 
 
-def _source_provider_id(row: SourceSeasonRow, player: Player) -> str:
-    if row.source_url:
-        match = re.search(r"(?:athlete|player)/(?:id/)?(\d+)", row.source_url, flags=re.IGNORECASE)
+def _source_provider_id(row: SourceSeasonRow) -> str | None:
+    """Only accept an explicit, source-verified ESPN identifier."""
+    if row.espn_player_id and row.espn_player_id.isdigit():
+        return row.espn_player_id
+    # The reviewed workbook also stores ESPN athlete URLs for some legacy
+    # rows. The ID segment is still an explicit workbook value; no provider is
+    # contacted and arbitrary non-ESPN URLs are never interpreted as IDs.
+    if row.source_url and re.match(r"https?://(?:www\.)?espn\.com/", row.source_url, re.IGNORECASE):
+        match = re.search(r"/(?:id/)?(\d+)(?:[/?#-]|$)", row.source_url)
         if match:
             return match.group(1)
-    return f"canonical:{player.id}"
+    return None
+
+
+def _canonical_fantasy_points(source: SourceSeasonRow) -> tuple[float | None, str | None]:
+    """Calculate only from source fields proven by the beta scoring policy."""
+
+    if source.position == "K":
+        if source.field_goals_made is None or source.extra_points_made is None:
+            return None, None
+        points, _ = calculate_player_fantasy_points(
+            {"fg_made_0_30": source.field_goals_made, "xp_made": source.extra_points_made},
+            BETA_KICKER_RULES,
+            source.position,
+        )
+        return points, "component_stats_canonical_scoring_v2_beta_flat_kicker"
+    if all(value is not None for value in (
+        source.passing_yards, source.passing_touchdowns, source.interceptions,
+        source.rushing_yards, source.rushing_touchdowns, source.receptions,
+        source.receiving_yards, source.receiving_touchdowns,
+    )):
+        points, _ = calculate_player_fantasy_points(
+            {
+                "pass_yards": source.passing_yards,
+                "pass_tds": source.passing_touchdowns,
+                "interceptions": source.interceptions,
+                "rush_yards": source.rushing_yards,
+                "rush_tds": source.rushing_touchdowns,
+                "receptions": source.receptions,
+                "rec_yards": source.receiving_yards,
+                "rec_tds": source.receiving_touchdowns,
+            },
+            {},
+            source.position,
+        )
+        return points, "component_stats_canonical_scoring_v2_beta_flat_kicker"
+    return None, None
 
 
 def _assign_row(
@@ -283,7 +331,8 @@ def _assign_row(
     historical_team = teams_by_normalized_name.get(_normalized(historical_canonical_name)) if historical_canonical_name else None
     current_canonical_name = resolve_power4_school(player.school)
     current_team = teams_by_normalized_name.get(_normalized(current_canonical_name)) if current_canonical_name else None
-    target.provider_player_id = _source_provider_id(source, player)
+    provider_id = _source_provider_id(source)
+    target.provider_player_id = provider_id or f"source-row:{source.row_number}"
     target.team_id = historical_team.id if historical_team else None
     target.historical_team_id = historical_team.id if historical_team else None
     target.current_team_at_import_id = current_team.id if current_team else None
@@ -307,14 +356,16 @@ def _assign_row(
     target.extra_points_made = source.extra_points_made
     target.extra_points_attempted = source.extra_points_attempted
     target.kick_points = source.kick_points
-    # The source does not expose FG distance splits or league scoring rules.
-    # Leave fantasy totals null rather than derive a value that could be wrong.
-    target.fantasy_points = None
-    target.fantasy_points_per_game = None
-    target.scoring_rules_version = None
+    target.fantasy_points, target.scoring_rules_version = _canonical_fantasy_points(source)
+    target.games_played = source.games_played
+    target.fantasy_points_per_game = (
+        target.fantasy_points / source.games_played
+        if target.fantasy_points is not None and source.games_played and source.games_played > 0
+        else None
+    )
     target.source_response_hash = canonical_json_hash(source.source_payload())
     target.source_url = source.source_url
-    target.source_external_player_id = _source_provider_id(source, player)
+    target.source_external_player_id = provider_id
     target.source_type = SOURCE_TYPE
     target.source_modified_at = None
     target.import_version = f"{PARSER_VERSION}:{source_hash[:12]}"
@@ -327,7 +378,7 @@ def _assign_row(
         "college_team": source.college_team,
         "source_row": source.row_number,
     }
-    target.unknown_labels = None
+    target.unknown_labels = {"fantasy_points": "missing_canonical_component"} if target.fantasy_points is None else None
     target.is_final = True
 
 
@@ -340,6 +391,8 @@ def build_report(source_rows: list[SourceSeasonRow], players: Iterable[Player]) 
     matched_source_keys: set[tuple[str, str, str]] = set()
     exact_matches = alias_matches = 0
     unmatched_rows: list[dict[str, object]] = []
+    provider_ids_by_player: dict[tuple[str, str, str], set[str]] = defaultdict(set)
+    players_by_provider_id: dict[str, set[tuple[str, str, str]]] = defaultdict(set)
     for row in season_rows:
         player, match_type = _resolve_player(row, players_by_key)
         if player is None:
@@ -357,6 +410,11 @@ def build_report(source_rows: list[SourceSeasonRow], players: Iterable[Player]) 
         matched_source_keys.add(_identity_key(player.name, player.school, player.position))
         exact_matches += int(match_type == "exact")
         alias_matches += int(match_type == "verified_alias")
+        provider_id = _source_provider_id(row)
+        if provider_id:
+            canonical_key = _identity_key(player.name, player.school, player.position)
+            provider_ids_by_player[canonical_key].add(provider_id)
+            players_by_provider_id[provider_id].add(canonical_key)
     catalog_without_history = []
     for player in players:
         player_key = _identity_key(player.name, player.school, player.position)
@@ -380,6 +438,26 @@ def build_report(source_rows: list[SourceSeasonRow], players: Iterable[Player]) 
                 "reason": reason,
             }
         )
+    provider_id_conflicts = [
+        {
+            "provider": "espn",
+            "provider_player_id": provider_id,
+            "canonical_player_keys": ["|".join(key) for key in sorted(player_keys)],
+            "reason": "one_trusted_espn_id_maps_to_multiple_canonical_players",
+        }
+        for provider_id, player_keys in sorted(players_by_provider_id.items())
+        if len(player_keys) > 1
+    ]
+    player_provider_id_conflicts = [
+        {
+            "canonical_player_key": "|".join(player_key),
+            "provider": "espn",
+            "provider_player_ids": sorted(provider_ids),
+            "reason": "one_canonical_player_has_multiple_trusted_espn_ids",
+        }
+        for player_key, provider_ids in sorted(provider_ids_by_player.items())
+        if len(provider_ids) > 1
+    ]
     return {
         "source_rows": len(source_rows),
         "season_rows": len(season_rows),
@@ -396,6 +474,10 @@ def build_report(source_rows: list[SourceSeasonRow], players: Iterable[Player]) 
                 item["reason"] == "no_source_identity_row" for item in catalog_without_history
             ),
         },
+        "trusted_espn_id_player_count": len(provider_ids_by_player),
+        "trusted_espn_id_conflicts": provider_id_conflicts,
+        "trusted_espn_id_player_conflicts": player_provider_id_conflicts,
+        "trusted_espn_id_conflict_count": len(provider_id_conflicts) + len(player_provider_id_conflicts),
     }
 
 
@@ -409,6 +491,11 @@ def import_rows(path: Path, *, apply: bool) -> dict[str, Any]:
         report.update({"source_path": str(path), "source_sha256": source_hash, "apply": apply})
         if not apply:
             return report
+        if report["trusted_espn_id_conflict_count"]:
+            raise ValueError(
+                "Trusted ESPN identity reconciliation is blocked by "
+                f"{report['trusted_espn_id_conflict_count']} source conflict(s)."
+            )
 
         players_by_key = {_identity_key(player.name, player.school, player.position): player for player in players}
         teams_by_normalized_name = _team_lookup(db.query(CollegeTeam).all())
@@ -427,11 +514,26 @@ def import_rows(path: Path, *, apply: bool) -> dict[str, Any]:
         imported_at = datetime.now(timezone.utc)
         touched_players: set[int] = set()
         rows_inserted = rows_updated = 0
+        mappings_inserted = mappings_unchanged = 0
         errors: list[dict[str, object]] = []
         for source in rows_to_import:
             player, match_type = _resolve_player(source, players_by_key)
             if not player:
                 continue
+            provider_id = _source_provider_id(source)
+            if source.espn_player_id and not provider_id:
+                raise ValueError(f"Malformed verified ESPN ID in source row {source.row_number}")
+            if provider_id:
+                by_provider_id = db.query(PlayerProviderId).filter_by(provider="espn", provider_player_id=provider_id).one_or_none()
+                by_player = db.query(PlayerProviderId).filter_by(provider="espn", player_id=player.id).one_or_none()
+                if (by_provider_id and by_provider_id.player_id != player.id) or (by_player and by_player.provider_player_id != provider_id):
+                    raise ValueError(f"ESPN identity conflict for source row {source.row_number}")
+                if by_provider_id is None:
+                    db.add(PlayerProviderId(player_id=player.id, provider="espn", provider_player_id=provider_id, match_confidence=1.0, verification_status="verified", verified_at=imported_at))
+                    db.add(ProviderIdentityAudit(entity_type="player", entity_id=player.id, action="source_workbook_import", provider="espn", provider_player_id=provider_id, after_state={"source_hash": source_hash, "source_row": source.row_number}, reason="approved previous-stats workbook import"))
+                    mappings_inserted += 1
+                else:
+                    mappings_unchanged += 1
             existing = (
                 db.query(PlayerHistoricalSeasonStat)
                 .filter(
@@ -447,7 +549,7 @@ def import_rows(path: Path, *, apply: bool) -> dict[str, Any]:
                 existing = PlayerHistoricalSeasonStat(
                     player_id=player.id,
                     provider=SOURCE_PROVIDER,
-                    provider_player_id=_source_provider_id(source, player),
+                    provider_player_id=provider_id or f"source-row:{source.row_number}",
                     season=source.season,
                     season_type=SEASON_TYPE,
                     parser_version=PARSER_VERSION,
@@ -480,6 +582,8 @@ def import_rows(path: Path, *, apply: bool) -> dict[str, Any]:
                 "players_imported": len(touched_players),
                 "rows_inserted": rows_inserted,
                 "rows_updated": rows_updated,
+                "provider_mappings_inserted": mappings_inserted,
+                "provider_mappings_unchanged": mappings_unchanged,
             }
         )
         return report
@@ -489,6 +593,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True, help="Approved CSV or XLSX export of the Season Stats tab.")
     parser.add_argument("--apply", action="store_true", help="Write verified source rows to the historical season table.")
+    parser.add_argument("--sealed-manifest", type=Path, help="Complete sealed source manifest required for --apply.")
     parser.add_argument("--report", type=Path, help="Write the reconciliation report as JSON.")
     return parser.parse_args()
 
@@ -498,6 +603,14 @@ def main() -> int:
     path = args.input.expanduser().resolve()
     if not path.is_file():
         raise SystemExit(f"Source export does not exist: {path}")
+    if args.apply:
+        if args.sealed_manifest is None or not args.sealed_manifest.is_file():
+            raise SystemExit("--apply requires a complete sealed source manifest.")
+        manifest = json.loads(args.sealed_manifest.read_text(encoding="utf-8"))
+        snapshots = manifest.get("snapshots", []) if isinstance(manifest, dict) else []
+        required_workbooks = {"player_id_details", "team_rankings", "player_previous_stats", "annual_projections", "schedules", "cfb27_ratings"}
+        if {item.get("workbook") for item in snapshots if isinstance(item, dict)} != required_workbooks or _file_hash(path) not in {item.get("sha256") for item in snapshots if isinstance(item, dict)}:
+            raise SystemExit("--apply requires the history file to be in a complete sealed six-workbook manifest.")
     try:
         report = import_rows(path, apply=args.apply)
     except Exception as exc:

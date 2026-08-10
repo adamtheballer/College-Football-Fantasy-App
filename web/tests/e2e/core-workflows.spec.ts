@@ -955,6 +955,32 @@ test.describe("critical browser workflows", () => {
 
     await page.goto("/league/1/draft");
     await expect(page.getByRole("heading", { name: /Draft Test League/i })).toBeVisible();
+    for (const viewport of [
+      { width: 320, height: 568 },
+      { width: 375, height: 667 },
+      { width: 390, height: 844 },
+      { width: 430, height: 932 },
+    ]) {
+      await page.setViewportSize(viewport);
+      const row = page.getByTestId("draft-player-row").filter({ hasText: "Arch Manning" });
+      await expect(row).toBeVisible();
+      await expect(row.getByRole("button", { name: /^Queue$/i })).toBeVisible();
+      await expect(row.getByRole("button", { name: /^Draft$/i })).toBeVisible();
+      const geometry = await row.evaluate((element) => ({
+        rowRight: element.getBoundingClientRect().right,
+        documentWidth: document.documentElement.scrollWidth,
+        queueHeight: Array.from(element.querySelectorAll("button"))
+          .find((button) => button.textContent?.trim() === "Queue")
+          ?.getBoundingClientRect().height,
+        draftHeight: Array.from(element.querySelectorAll("button"))
+          .find((button) => button.textContent?.trim() === "Draft")
+          ?.getBoundingClientRect().height,
+      }));
+      expect(geometry.documentWidth).toBeLessThanOrEqual(viewport.width);
+      expect(geometry.rowRight).toBeLessThanOrEqual(viewport.width);
+      expect(geometry.queueHeight).toBeGreaterThanOrEqual(44);
+      expect(geometry.draftHeight).toBeGreaterThanOrEqual(44);
+    }
     await page
       .getByTestId("draft-player-row")
       .filter({ hasText: "Arch Manning" })
@@ -1909,6 +1935,32 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText(/Draft is about to begin/i)).toBeVisible();
     await expect(page.getByText(/Unable to load players/i)).toHaveCount(0);
     await expect(page.getByText("Jeremiah Smith")).toBeVisible();
+    for (const viewport of [
+      { width: 320, height: 568 },
+      { width: 375, height: 667 },
+      { width: 390, height: 844 },
+      { width: 430, height: 932 },
+    ]) {
+      await page.setViewportSize(viewport);
+      const row = page.getByTestId("draft-player-row").filter({ hasText: "Jeremiah Smith" });
+      await expect(row).toBeVisible();
+      await expect(row.getByRole("button", { name: /^Queue$/i })).toBeVisible();
+      await expect(row.getByRole("button", { name: /^Draft$/i })).toBeVisible();
+      const geometry = await row.evaluate((element) => ({
+        rowRight: element.getBoundingClientRect().right,
+        documentWidth: document.documentElement.scrollWidth,
+        queueHeight: Array.from(element.querySelectorAll("button"))
+          .find((button) => button.textContent?.trim() === "Queue")
+          ?.getBoundingClientRect().height,
+        draftHeight: Array.from(element.querySelectorAll("button"))
+          .find((button) => button.textContent?.trim() === "Draft")
+          ?.getBoundingClientRect().height,
+      }));
+      expect(geometry.documentWidth).toBeLessThanOrEqual(viewport.width);
+      expect(geometry.rowRight).toBeLessThanOrEqual(viewport.width);
+      expect(geometry.queueHeight).toBeGreaterThanOrEqual(44);
+      expect(geometry.draftHeight).toBeGreaterThanOrEqual(44);
+    }
     expect(playerRequests.some((request) => request.limit > 100)).toBe(false);
     expect(playerRequests).toEqual(
       expect.arrayContaining([

@@ -5,17 +5,17 @@ import pytest
 
 from collegefootballfantasy_api.app.models.player import Player
 from scripts import reconcile_preseason_player_data
-from scripts.audit_preseason_source_contract import (
-    WAYNE_KNIGHT_APPROVED_PROJECTION_SNAPSHOT_SHA256,
-    WAYNE_KNIGHT_APPROVED_SOURCE_BATCH,
-)
+
+
+TEST_SOURCE_BATCH = "approved-test-batch"
 
 
 def _approved_wayne_source_contract():
     return {
         "wayne_knight_projection_integrity": {
-            "projection_snapshot_sha256": WAYNE_KNIGHT_APPROVED_PROJECTION_SNAPSHOT_SHA256,
-        }
+            "status": "PASS",
+        },
+        "gate_context": {"source_provenance": {"export_batch_id": TEST_SOURCE_BATCH}},
     }
 
 
@@ -58,7 +58,7 @@ def test_wayne_knight_postcondition_requires_one_current_265_point_identity(db_s
         name="Wayne Knight",
         school="UCLA",
         position="RB",
-        sheet_source_sheet_id=f"canonical-preseason:2026:{WAYNE_KNIGHT_APPROVED_SOURCE_BATCH}:Big10",
+        sheet_source_sheet_id=f"canonical-preseason:2026:{TEST_SOURCE_BATCH}:Big10",
         sheet_projected_season_points=265.0,
         sheet_projection_stats={
             "rush_yards": 1300.0,
@@ -72,7 +72,9 @@ def test_wayne_knight_postcondition_requires_one_current_265_point_identity(db_s
     db_session.add(player)
     db_session.flush()
 
-    result = reconcile_preseason_player_data.verify_wayne_knight_postcondition(db_session, season=2026)
+    result = reconcile_preseason_player_data.verify_wayne_knight_postcondition(
+        db_session, season=2026, source_batch_id=TEST_SOURCE_BATCH
+    )
 
     assert result["canonical_player_id"] == player.id
     assert result["sheet_projected_season_points"] == 265.0

@@ -222,6 +222,20 @@ def test_cfb27_sync_rejects_a_board_rank_as_an_overall_rating(tmp_path, monkeypa
     cfb27_player_sync.load_cfb27_ratings.cache_clear()
 
 
+def test_cfb27_accepts_xlsx_serialized_whole_number_ratings_and_rejects_fractions():
+    ratings = cfb27_player_sync._parse_cfb27_rating_rows(
+        [{"name": "Example Receiver", "school": "Ohio State", "position": "WR", "overall": "94.0"}],
+        source_label="xlsx-export",
+    )
+
+    assert ratings[0].overall == 94
+
+    with pytest.raises(ValueError, match="expected a whole number"):
+        cfb27_player_sync._parse_cfb27_rating_rows(
+            [{"name": "Example Receiver", "school": "Ohio State", "position": "WR", "overall": "94.5"}],
+            source_label="xlsx-export",
+        )
+
 def test_cfb27_seed_migration_uses_backend_rating_source():
     migration = _load_cfb27_seed_migration()
     rows = {

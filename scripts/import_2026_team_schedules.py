@@ -8,9 +8,9 @@ report, which lists every validation error and player-school schedule match.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
-from urllib.request import Request, urlopen
 
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.models.registry import load_all_models
@@ -20,12 +20,10 @@ from collegefootballfantasy_api.app.services.team_schedule_import import (
 )
 
 
-DEFAULT_SOURCE = "https://docs.google.com/spreadsheets/d/1JnoISIE2fr_l7ze5qtAe2DIN4nFlI3CaZMdvaNHEnZQ/export?format=csv&gid=1843438972"
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Import canonical 2026 team schedules for player Game Logs.")
-    parser.add_argument("--source", default=DEFAULT_SOURCE, help="Google Sheet CSV export URL or a local CSV file path.")
+    parser.add_argument("--source", required=True, help="Sealed local schedule CSV snapshot; live URLs are forbidden.")
+    parser.add_argument("--sealed-manifest", type=Path, help="Sealed source manifest required for --apply.")
     parser.add_argument("--season", type=int, default=2026)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="Validate and report only (default).")
@@ -35,16 +33,37 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_source(source: str) -> str:
+    if source.startswith(("http://", "https://", "docs.google.com/", "drive.google.com/")):
+        raise ValueError("Schedule imports require a sealed local CSV snapshot, never a mutable live URL.")
     source_path = Path(source).expanduser()
-    if source_path.exists():
-        return source_path.read_text(encoding="utf-8")
-    request = Request(source, headers={"User-Agent": "CollegeFootballFantasyScheduleImporter/1.0"})
-    with urlopen(request, timeout=30) as response:
-        return response.read().decode("utf-8-sig")
+    if not source_path.is_file():
+        raise ValueError("Schedule source must be an existing local CSV snapshot.")
+    return source_path.read_text(encoding="utf-8-sig")
+
+
+def require_sealed_schedule_manifest(manifest_path: Path | None, source: str) -> None:
+    if manifest_path is None or not manifest_path.is_file():
+        raise ValueError("--apply requires a sealed source manifest.")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    source_hash = hashlib.sha256(Path(source).read_bytes()).hexdigest()
+    snapshots = manifest.get("snapshots", []) if isinstance(manifest, dict) else []
+    required_workbooks = {"player_id_details", "team_rankings", "player_previous_stats", "annual_projections", "schedules", "cfb27_ratings"}
+    if {item.get("workbook") for item in snapshots if isinstance(item, dict)} != required_workbooks:
+        raise ValueError("The supplied manifest is not a complete sealed six-workbook batch.")
+    if not any(
+        item.get("workbook") == "schedules" and item.get("sha256") == source_hash
+        for item in snapshots if isinstance(item, dict)
+    ):
+        raise ValueError("The schedule CSV hash is not present in the sealed schedules manifest.")
 
 
 def main() -> int:
     args = parse_args()
+    if args.apply:
+        try:
+            require_sealed_schedule_manifest(args.sealed_manifest, args.source)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
     load_all_models()
     csv_text = load_source(args.source)
     rows, report = parse_schedule_csv(csv_text, season=args.season)

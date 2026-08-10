@@ -37,6 +37,18 @@ KICKER_RULES: dict[str, float] = {
     "fg_missed": -1,
 }
 
+# Beta has one fixed kicker policy.  This must be applied explicitly by beta
+# flows instead of changing the app-wide/default scoring contract for existing
+# non-beta leagues.
+BETA_KICKER_RULES: dict[str, float] = {
+    "fg_made_0_30": 3,
+    "fg_made_31_40": 3,
+    "fg_made_41_50": 3,
+    "fg_made_51_60": 3,
+    "fg_made_61_plus": 3,
+    "xp_made": 1,
+}
+
 RULES_BY_PROFILE = {
     "offense": OFFENSE_RULES,
     "kicker": KICKER_RULES,
@@ -166,6 +178,12 @@ def field_goal_tier_rules(base_points: Any) -> dict[str, float]:
         "fg_made_51_60": base + 6,
         "fg_made_61_plus": base + 8,
     }
+
+
+def apply_beta_kicker_scoring(scoring_rules: Mapping[str, Any]) -> dict[str, Any]:
+    """Force the public-beta kicker policy after request normalization."""
+
+    return {**scoring_rules, **BETA_KICKER_RULES}
 
 
 def _canonical_rule_key(raw_key: str, allowed: set[str]) -> str:

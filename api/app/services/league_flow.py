@@ -7,7 +7,11 @@ from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.security import generate_invite_code
-from collegefootballfantasy_api.app.domain.scoring_rules import ScoringRulesValidationError, field_goal_tier_rules
+from collegefootballfantasy_api.app.domain.scoring_rules import (
+    ScoringRulesValidationError,
+    apply_beta_kicker_scoring,
+    field_goal_tier_rules,
+)
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
@@ -174,8 +178,10 @@ def normalize_scoring_settings(scoring_json: dict | None) -> dict:
     return normalized
 
 
-def normalize_roster_settings(payload_settings):
+def normalize_roster_settings(payload_settings, *, enforce_beta_kicker_scoring: bool = False):
     payload_settings.scoring_json = normalize_scoring_settings(payload_settings.scoring_json)
+    if enforce_beta_kicker_scoring:
+        payload_settings.scoring_json = apply_beta_kicker_scoring(payload_settings.scoring_json)
     raw_slots = payload_settings.roster_slots_json or FIXED_ROSTER_SLOTS
     normalized_slots: dict[str, int] = {}
 
@@ -233,7 +239,10 @@ def create_league(
     payload.basics.icon_url = moderate_user_url(
         db, actor_user_id=current_user.id, field_name="league_icon_url", value=payload.basics.icon_url
     )
-    payload.settings = normalize_roster_settings(payload.settings)
+    payload.settings = normalize_roster_settings(
+        payload.settings,
+        enforce_beta_kicker_scoring=settings.beta_scoring_lock_enabled,
+    )
     code = generate_unique_invite(db)
     league = League(
         name=payload.basics.name,

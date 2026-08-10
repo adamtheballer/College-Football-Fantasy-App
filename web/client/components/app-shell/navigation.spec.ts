@@ -69,8 +69,8 @@ describe("app shell navigation helpers", () => {
     );
   });
 
-  it("includes Saturday Pick 6 in authenticated desktop navigation", () => {
-    expect(getShellNavItems(user, true)).toContainEqual(
+  it("keeps Saturday Pick 6 out of permanent authenticated desktop navigation", () => {
+    expect(getShellNavItems(user, true)).not.toContainEqual(
       expect.objectContaining({ name: "SATURDAY PICK 6", path: "/saturday-pick-6" }),
     );
   });
@@ -87,11 +87,11 @@ describe("app shell navigation helpers", () => {
     const mobileItems = getMobileNavItems(getShellNavItems(user, true, 1, true));
     const mobile = mobileItems.map((item) => item.name);
 
-    expect(mobile).toEqual(["HOME", "LEAGUES", "SATURDAY PICK 6", "CHATS", "MOCK DRAFT"]);
+    expect(mobile).toEqual(["HOME", "LEAGUES", "CHATS", "MOCK DRAFT", "REPORT BUG"]);
     expect(mobile).toHaveLength(5);
     expect(mobileItems.find((item) => item.name === "CHATS")?.badge).toBe("1");
     expect(mobile).not.toContain("SIGN OUT");
-    expect(mobile).not.toContain("REPORT BUG");
+    expect(mobile).not.toContain("SATURDAY PICK 6");
   });
 
   it("preserves stable onboarding target IDs", () => {

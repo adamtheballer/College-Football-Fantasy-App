@@ -26,6 +26,7 @@ from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.services.cfb27_player_sync import cfb27_identity_key, load_reviewed_cfb27_snapshot
 from collegefootballfantasy_api.app.services.player_bio import normalize_sheet_player_class
 from collegefootballfantasy_api.app.services.power4 import resolve_power4_school
+from scripts.audit_annual_projection_scoring import canonical_projection_points
 from scripts.audit_preseason_source_contract import require_valid_contract, require_valid_source_directory
 
 
@@ -86,6 +87,33 @@ def as_number(value: str | None) -> float:
         return 0.0
 
 
+def projection_stats_for_row(projection: dict[str, str]) -> dict[str, float | int | str]:
+    """Create a display-ready annual projection from canonical components.
+
+    The source workbook's ``FANTASY PROJ.`` value is retained for auditability,
+    but never substituted for the app's standard-scoring total.
+    """
+
+    canonical_points = canonical_projection_points(projection)
+    if canonical_points is None:
+        raise ValueError(
+            "Annual projection cannot be scored under component_stats_canonical_scoring_v2_beta_flat_kicker; "
+            "the source FANTASY PROJ. value is not a canonical fallback."
+        )
+    stats: dict[str, float | int | str] = {
+        target: as_number(projection.get(source)) for source, target in PROJECTION_COLUMNS.items()
+    }
+    stats.update(
+        {
+            "fpts": canonical_points,
+            "source_fantasy_proj": as_number(projection.get("FANTASY PROJ.")),
+            "scoring_policy_version": "component_stats_canonical_scoring_v2_beta_flat_kicker",
+            "projection_season": 2026,
+        }
+    )
+    return stats
+
+
 def read_rows(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
@@ -106,6 +134,20 @@ def bootstrap(
         for row in projection_rows
         if all(identity_key(row.get("PLAYER"), row.get("TEAM"), row.get("POSITION")))
     }
+    projection_points_by_key = {
+        key: canonical_projection_points(row)
+        for key, row in projections_by_key.items()
+    }
+    unscorable_projection_keys = [
+        key for key, points in projection_points_by_key.items() if points is None
+    ]
+    if unscorable_projection_keys:
+        raise ValueError(
+            "Canonical player bootstrap is blocked because "
+            f"{len(unscorable_projection_keys)} annual projections cannot be scored under "
+            "component_stats_canonical_scoring_v2_beta_flat_kicker. Supply the required component detail; "
+            "the source FANTASY PROJ. value is not a canonical fallback."
+        )
     reviewed_rows = [
         row
         for row in identity_rows
@@ -156,15 +198,7 @@ def bootstrap(
 
             raw_class = (identity.get("CLASS") or "").strip() or None
             source_sheet = (identity.get("source_sheet") or "unknown").strip()
-            projection_stats = {
-                target: as_number(projection.get(source)) for source, target in PROJECTION_COLUMNS.items()
-            }
-            projection_stats.update(
-                {
-                    "fpts": as_number(projection.get("FANTASY PROJ.")),
-                    "projection_season": 2026,
-                }
-            )
+            projection_stats = projection_stats_for_row(projection)
             player.name = name
             player.school = school
             player.position = position

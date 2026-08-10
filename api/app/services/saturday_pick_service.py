@@ -7,6 +7,7 @@ browser cannot bypass the same-position or deadline rules.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
@@ -43,6 +44,14 @@ from collegefootballfantasy_api.app.domain.stat_normalization import normalize_p
 PUBLIC_POSITIONS = ("QB", "RB", "WR", "TE")
 DEFAULT_ROTATION = PUBLIC_POSITIONS
 FINAL_GAME_STATUSES = {"FINAL", "STAT_CORRECTED"}
+
+
+@dataclass(frozen=True)
+class ContestReadiness:
+    """Read-only facts required before creating a Saturday Pick 6 contest."""
+
+    featured: list[tuple[Player, TeamSchedule]]
+    lock_at: datetime
 
 
 def utc_now() -> datetime:
@@ -143,7 +152,13 @@ def _validate_featured_players(
     return validated
 
 
-def create_contest(db: Session, payload: SaturdayPickContestCreate, actor: User) -> SaturdayPickContest:
+def validate_contest_readiness(db: Session, payload: SaturdayPickContestCreate) -> ContestReadiness:
+    """Validate contest creation with SELECT-only queries.
+
+    Operational dry runs must not add ORM objects or call ``flush``. PostgreSQL
+    sequence values advance on a flush even if the transaction is rolled back.
+    """
+
     if db.query(SaturdayPickContest.id).filter(
         SaturdayPickContest.season == payload.season,
         SaturdayPickContest.week_number == payload.week_number,
@@ -153,9 +168,15 @@ def create_contest(db: Session, payload: SaturdayPickContestCreate, actor: User)
     earliest_kickoff = min(as_utc(schedule.kickoff_at) for _, schedule in featured)
     if payload.lock_at is not None and as_utc(payload.lock_at) != earliest_kickoff:
         raise ValueError("Saturday Pick 6 locks exactly at the first featured player's kickoff.")
-    lock_at = earliest_kickoff
     if payload.position_overridden and not payload.override_reason:
         raise ValueError("A manual position override requires an audit reason.")
+    return ContestReadiness(featured=featured, lock_at=earliest_kickoff)
+
+
+def create_contest(db: Session, payload: SaturdayPickContestCreate, actor: User) -> SaturdayPickContest:
+    readiness = validate_contest_readiness(db, payload)
+    featured = readiness.featured
+    lock_at = readiness.lock_at
     contest = SaturdayPickContest(
         season=payload.season,
         week_number=payload.week_number,
