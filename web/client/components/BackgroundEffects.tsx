@@ -15,13 +15,13 @@ export const BackgroundEffects = ({ className }: BackgroundEffectsProps) => {
       )}
       style={{
         background:
-          "radial-gradient(ellipse at 18% 3%, rgba(154, 244, 246, 0.11), transparent 30%), radial-gradient(ellipse at 80% 12%, rgba(150, 189, 255, 0.11), transparent 28%), linear-gradient(135deg, rgba(37, 94, 128, 0.18), rgba(58, 114, 157, 0.06) 54%, rgba(64, 95, 150, 0.13))",
+          "radial-gradient(ellipse at 6% 2%, rgba(251, 191, 36, 0.14), transparent 28%), radial-gradient(ellipse at 94% 6%, rgba(59, 130, 246, 0.16), transparent 31%), radial-gradient(ellipse at 88% 92%, rgba(251, 191, 36, 0.10), transparent 29%), linear-gradient(135deg, #020611 0%, #06152a 42%, #071b35 61%, #020713 100%)",
       }}
     >
-      <div className="absolute inset-0 opacity-[0.44]">
+      <div className="absolute inset-0 opacity-[0.52]">
         {/* Dynamic Background Grid */}
         <div
-          className="absolute inset-0 text-cyan-100 opacity-[0.055]"
+          className="absolute inset-0 text-cyan-100 opacity-[0.04]"
           style={{
             backgroundImage:
               "radial-gradient(circle, currentColor 1px, transparent 1px)",
@@ -29,7 +29,7 @@ export const BackgroundEffects = ({ className }: BackgroundEffectsProps) => {
           }}
         />
         <div
-          className="absolute inset-0 opacity-[0.16]"
+          className="absolute inset-0 opacity-[0.12]"
           style={{
             backgroundImage:
               "linear-gradient(110deg, transparent 0 47%, rgba(56,189,248,0.16) 47.2% 47.45%, transparent 47.8% 100%), linear-gradient(145deg, transparent 0 63%, rgba(250,204,21,0.13) 63.2% 63.45%, transparent 63.8% 100%)",
@@ -38,11 +38,20 @@ export const BackgroundEffects = ({ className }: BackgroundEffectsProps) => {
         />
 
         {/* Color fields */}
-        <div className="absolute -left-24 top-4 h-[460px] w-[460px] rounded-full bg-cyan-400/20 blur-[120px]" />
-        <div className="absolute right-[-90px] top-10 h-[430px] w-[430px] rounded-full bg-blue-500/20 blur-[130px]" />
-        <div className="absolute bottom-[-120px] left-[18%] h-[420px] w-[420px] rounded-full bg-sky-400/11 blur-[140px]" />
-        <div className="absolute bottom-12 right-[18%] h-[370px] w-[370px] rounded-full bg-fuchsia-500/13 blur-[130px]" />
-        <div className="absolute right-[8%] top-[42%] h-[300px] w-[300px] rounded-full bg-amber-300/11 blur-[110px]" />
+        <div className="absolute -left-24 -top-28 h-[490px] w-[490px] rounded-full bg-amber-300/16 blur-[140px]" />
+        <div className="absolute right-[-90px] top-10 h-[430px] w-[430px] rounded-full bg-blue-500/16 blur-[145px]" />
+        <div className="absolute bottom-[-140px] left-[18%] h-[440px] w-[440px] rounded-full bg-sky-400/[0.075] blur-[155px]" />
+        <div className="absolute bottom-[-140px] right-[-90px] h-[420px] w-[420px] rounded-full bg-amber-300/14 blur-[150px]" />
+        <div className="absolute right-[8%] top-[42%] h-[300px] w-[300px] rounded-full bg-amber-300/[0.075] blur-[125px]" />
+
+        {/* Sparse gold speckles keep the field feeling collegiate without competing with content. */}
+        <div className="absolute left-10 top-16 h-1 w-1 rounded-full bg-amber-100/80 shadow-[0_0_12px_rgba(251,191,36,0.9)]" />
+        <div className="absolute left-24 top-28 h-1.5 w-1.5 rounded-full bg-amber-200/70 shadow-[0_0_14px_rgba(251,191,36,0.75)]" />
+        <div className="absolute left-16 top-44 h-1 w-1 rounded-full bg-amber-100/65" />
+        <div className="absolute right-16 top-24 h-1.5 w-1.5 rounded-full bg-amber-100/75 shadow-[0_0_12px_rgba(251,191,36,0.7)]" />
+        <div className="absolute right-32 top-14 h-1 w-1 rounded-full bg-amber-200/80" />
+        <div className="absolute bottom-24 right-12 h-1.5 w-1.5 rounded-full bg-amber-100/75 shadow-[0_0_14px_rgba(251,191,36,0.75)]" />
+        <div className="absolute bottom-16 right-28 h-1 w-1 rounded-full bg-amber-200/70" />
 
         {/* Edge paint streaks, kept outside the primary reading area */}
         <div className="absolute -left-20 top-20 h-2 w-72 rotate-[-24deg] rounded-full bg-gradient-to-r from-transparent via-cfb-pink/60 to-cfb-brand/45 blur-[1px]" />
@@ -78,7 +87,7 @@ export const BackgroundEffects = ({ className }: BackgroundEffectsProps) => {
 
         {/* Football/playbook symbols are low-contrast and anchored to page edges. */}
         <svg
-          className="absolute left-10 top-[38%] h-48 w-48 text-cfb-cyan/12"
+          className="absolute left-10 top-[38%] h-48 w-48 text-cfb-cyan/[0.085]"
           viewBox="0 0 160 160"
           fill="none"
           aria-hidden="true"
@@ -111,7 +120,7 @@ export const BackgroundEffects = ({ className }: BackgroundEffectsProps) => {
           />
         </svg>
         <svg
-          className="absolute right-10 top-[36%] h-52 w-52 text-cfb-gold/11"
+          className="absolute right-10 top-[36%] h-52 w-52 text-cfb-gold/[0.08]"
           viewBox="0 0 180 180"
           fill="none"
           aria-hidden="true"
@@ -144,7 +153,7 @@ export const BackgroundEffects = ({ className }: BackgroundEffectsProps) => {
           />
         </svg>
         <svg
-          className="absolute bottom-16 left-[42%] h-40 w-40 text-cfb-pink/10"
+          className="absolute bottom-16 left-[42%] h-40 w-40 text-cfb-pink/[0.065]"
           viewBox="0 0 150 150"
           fill="none"
           aria-hidden="true"
@@ -172,14 +181,13 @@ export const BackgroundEffects = ({ className }: BackgroundEffectsProps) => {
         </svg>
 
         {/* Vertical core beam */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/25 via-sky-500/[0.085] to-indigo-950/30" />
-          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[1040px] bg-blue-500/[0.08] blur-[220px]" />
-          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[520px] bg-sky-400/[0.11] blur-[160px] mix-blend-screen" />
-          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[150px] bg-cyan-100/[0.10] blur-[110px]" />
+        <div className="absolute top-0 left-1/2 h-full w-full -translate-x-1/2 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/45 via-sky-500/[0.035] to-slate-950/50" />
+          <div className="absolute inset-y-0 left-1/2 w-[1040px] -translate-x-1/2 bg-blue-500/[0.045] blur-[220px]" />
+          <div className="absolute inset-y-0 left-1/2 w-[520px] -translate-x-1/2 bg-sky-400/[0.055] blur-[180px]" />
         </div>
 
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,28,48,0.03),rgba(8,28,48,0.11))]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(1,7,18,0.10),rgba(1,7,18,0.44))]" />
       </div>
     </div>
   );

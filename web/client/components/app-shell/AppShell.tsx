@@ -47,7 +47,7 @@ export function AppShell({
       )}
       style={{
         background:
-          "radial-gradient(ellipse at 12% 8%, rgba(122, 235, 241, 0.19), transparent 33%), radial-gradient(ellipse at 89% 7%, rgba(141, 183, 255, 0.18), transparent 30%), radial-gradient(ellipse at 70% 88%, rgba(190, 153, 231, 0.12), transparent 35%), linear-gradient(135deg, #245a80 0%, #3a729d 47%, #405f96 100%)",
+          "radial-gradient(ellipse at 4% 0%, rgba(251, 191, 36, 0.10), transparent 27%), radial-gradient(ellipse at 94% 5%, rgba(59, 130, 246, 0.13), transparent 30%), radial-gradient(ellipse at 88% 96%, rgba(251, 191, 36, 0.08), transparent 28%), linear-gradient(135deg, #020611 0%, #06152a 43%, #071b35 62%, #020713 100%)",
       }}
     >
       {!hideDecor ? <BackgroundEffects /> : null}
