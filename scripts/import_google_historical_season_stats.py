@@ -499,6 +499,21 @@ def import_rows(path: Path, *, apply: bool) -> dict[str, Any]:
 
         players_by_key = {_identity_key(player.name, player.school, player.position): player for player in players}
         teams_by_normalized_name = _team_lookup(db.query(CollegeTeam).all())
+        # The source has one row per completed season, so a trusted ESPN
+        # athlete ID intentionally repeats for every historical season of the
+        # same canonical player.  SessionLocal disables autoflush; without a
+        # local view of mappings staged in this transaction, each season row
+        # attempts another INSERT and violates the provider-ID uniqueness
+        # constraint at commit time.  Seed both indexes from persisted rows
+        # and update them immediately for planned inserts so the dry-run
+        # identity contract and the atomic write path agree.
+        existing_espn_mappings = db.query(PlayerProviderId).filter_by(provider="espn").all()
+        mapping_by_provider_id = {
+            mapping.provider_player_id: mapping for mapping in existing_espn_mappings
+        }
+        mapping_by_player_id = {
+            mapping.player_id: mapping for mapping in existing_espn_mappings
+        }
         rows_to_import = [row for row in source_rows if row.season and row.season >= 1900]
         run = HistoricalStatImportRun(
             provider=SOURCE_PROVIDER,
@@ -524,12 +539,22 @@ def import_rows(path: Path, *, apply: bool) -> dict[str, Any]:
             if source.espn_player_id and not provider_id:
                 raise ValueError(f"Malformed verified ESPN ID in source row {source.row_number}")
             if provider_id:
-                by_provider_id = db.query(PlayerProviderId).filter_by(provider="espn", provider_player_id=provider_id).one_or_none()
-                by_player = db.query(PlayerProviderId).filter_by(provider="espn", player_id=player.id).one_or_none()
+                by_provider_id = mapping_by_provider_id.get(provider_id)
+                by_player = mapping_by_player_id.get(player.id)
                 if (by_provider_id and by_provider_id.player_id != player.id) or (by_player and by_player.provider_player_id != provider_id):
                     raise ValueError(f"ESPN identity conflict for source row {source.row_number}")
                 if by_provider_id is None:
-                    db.add(PlayerProviderId(player_id=player.id, provider="espn", provider_player_id=provider_id, match_confidence=1.0, verification_status="verified", verified_at=imported_at))
+                    mapping = PlayerProviderId(
+                        player_id=player.id,
+                        provider="espn",
+                        provider_player_id=provider_id,
+                        match_confidence=1.0,
+                        verification_status="verified",
+                        verified_at=imported_at,
+                    )
+                    db.add(mapping)
+                    mapping_by_provider_id[provider_id] = mapping
+                    mapping_by_player_id[player.id] = mapping
                     db.add(ProviderIdentityAudit(entity_type="player", entity_id=player.id, action="source_workbook_import", provider="espn", provider_player_id=provider_id, after_state={"source_hash": source_hash, "source_row": source.row_number}, reason="approved previous-stats workbook import"))
                     mappings_inserted += 1
                 else:
