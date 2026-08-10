@@ -1,6 +1,6 @@
 import * as React from "react";
 
-import { BackgroundEffects } from "@/components/BackgroundEffects";
+import { BackgroundEffects, collegiateCanvasBackground } from "@/components/BackgroundEffects";
 import { FloatingQuickActions } from "@/components/FloatingQuickActions";
 import type { User } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -46,8 +46,7 @@ export function AppShell({
         "isolate relative flex h-[100dvh] min-h-0 overflow-hidden bg-cfb-canvas font-sans text-cfb-text-primary selection:bg-cfb-brand/30 selection:text-white lg:h-screen",
       )}
       style={{
-        background:
-          "radial-gradient(ellipse at 4% 0%, rgba(251, 191, 36, 0.10), transparent 27%), radial-gradient(ellipse at 94% 5%, rgba(59, 130, 246, 0.13), transparent 30%), radial-gradient(ellipse at 88% 96%, rgba(251, 191, 36, 0.08), transparent 28%), linear-gradient(135deg, #020611 0%, #06152a 43%, #071b35 62%, #020713 100%)",
+        background: collegiateCanvasBackground,
       }}
     >
       {!hideDecor ? <BackgroundEffects /> : null}

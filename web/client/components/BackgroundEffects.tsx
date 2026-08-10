@@ -5,6 +5,11 @@ interface BackgroundEffectsProps {
   className?: string;
 }
 
+// The app shell and draft rooms share this canvas so their release styling
+// cannot diverge into separate blue themes again.
+export const collegiateCanvasBackground =
+  "radial-gradient(ellipse at 6% 2%, rgba(251, 191, 36, 0.14), transparent 28%), radial-gradient(ellipse at 94% 6%, rgba(59, 130, 246, 0.16), transparent 31%), radial-gradient(ellipse at 88% 92%, rgba(251, 191, 36, 0.10), transparent 29%), linear-gradient(135deg, #020611 0%, #06152a 42%, #071b35 61%, #020713 100%)";
+
 export const BackgroundEffects = ({ className }: BackgroundEffectsProps) => {
   return (
     <div
@@ -14,8 +19,7 @@ export const BackgroundEffects = ({ className }: BackgroundEffectsProps) => {
         className,
       )}
       style={{
-        background:
-          "radial-gradient(ellipse at 6% 2%, rgba(251, 191, 36, 0.14), transparent 28%), radial-gradient(ellipse at 94% 6%, rgba(59, 130, 246, 0.16), transparent 31%), radial-gradient(ellipse at 88% 92%, rgba(251, 191, 36, 0.10), transparent 29%), linear-gradient(135deg, #020611 0%, #06152a 42%, #071b35 61%, #020713 100%)",
+        background: collegiateCanvasBackground,
       }}
     >
       <div className="absolute inset-0 opacity-[0.52]">
