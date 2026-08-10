@@ -591,7 +591,7 @@ export function useDraftPlayerPool(
       const pageCount = pageOffsets.length;
       const remainingOffsets = pageOffsets.slice(1);
       const remainingPayloads = remainingOffsets.length
-        ? await Promise.all(remainingOffsets.map((pageOffset) => fetchPage(pageOffset)))
+        ? await fetchDraftPlayerPoolPagesSequentially(remainingOffsets, fetchPage)
         : [];
       const rows = [firstPayload, ...remainingPayloads].flatMap((payload) => payload.data);
       const conferenceBySchool = new Map(
@@ -621,6 +621,23 @@ export function useDraftPlayerPool(
 export function getDraftPlayerPoolBackendLimit(limit: number) {
   const safeLimit = Math.max(1, Math.floor(limit));
   return Math.min(PLAYER_API_MAX_LIMIT, safeLimit);
+}
+
+/**
+ * Keep the full draft board complete without asking one browser tab to occupy
+ * the API's entire database connection pool.  The initial player page,
+ * projections, and team summary still load together; remaining player pages
+ * follow one at a time once the total is known.
+ */
+export async function fetchDraftPlayerPoolPagesSequentially<T>(
+  offsets: number[],
+  fetchPage: (offset: number) => Promise<T>,
+): Promise<T[]> {
+  const pages: T[] = [];
+  for (const pageOffset of offsets) {
+    pages.push(await fetchPage(pageOffset));
+  }
+  return pages;
 }
 
 export function getDraftPlayerPoolPageOffsets({

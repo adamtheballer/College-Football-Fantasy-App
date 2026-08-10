@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  fetchDraftPlayerPoolPagesSequentially,
   getDraftPlayerPoolBackendLimit,
   getDraftPlayerPoolPageOffsets,
   normalizePlayer,
@@ -62,6 +63,24 @@ describe("getDraftPlayerPoolPageOffsets", () => {
         total: 1200,
       })
     ).toEqual([0, 100, 200]);
+  });
+});
+
+describe("fetchDraftPlayerPoolPagesSequentially", () => {
+  it("never fans a full draft board into concurrent player-page requests", async () => {
+    let inFlight = 0;
+    let peakInFlight = 0;
+
+    const pages = await fetchDraftPlayerPoolPagesSequentially([100, 200, 300], async (offset) => {
+      inFlight += 1;
+      peakInFlight = Math.max(peakInFlight, inFlight);
+      await Promise.resolve();
+      inFlight -= 1;
+      return offset;
+    });
+
+    expect(pages).toEqual([100, 200, 300]);
+    expect(peakInFlight).toBe(1);
   });
 });
 
