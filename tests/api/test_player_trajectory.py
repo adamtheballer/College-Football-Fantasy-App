@@ -1,8 +1,10 @@
 from datetime import date, datetime, timedelta, timezone
 
+from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.player_trade_value import PlayerTradeValue
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
@@ -73,9 +75,10 @@ def test_player_trajectory_uses_published_weekly_rows_without_converting_a_seaso
     assert body["preseason_projection_points"] == 260.0
     assert body["projection"][0]["week"] == 1
     assert body["projection"][0]["points"] == 14.0
-    assert body["projection"][0]["source"] == "published"
+    assert body["projection"][0]["actual_points"] is None
+    assert body["projection"][0]["source"] == "preweek"
     assert body["projection"][0]["projection_version"] == "FINAL"
-    assert body["projection"][1] == {"week": 2, "points": None, "source": "bye", "projection_status": "BYE", "projection_version": None, "published_at": None}
+    assert body["projection"][1] == {"week": 2, "points": None, "actual_points": None, "source": "bye", "projection_status": "BYE", "projection_version": None, "published_at": None}
     assert body["value"][0]["source"] == "preseason"
     assert all(0 <= point["value"] <= 100 for point in body["value"])
     assert all(point["points"] is None or point["points"] >= 0 for point in body["projection"])
@@ -101,9 +104,84 @@ def test_player_trajectory_includes_a_published_weekly_snapshot_without_a_wall_c
     assert [point["week"] for point in body["projection"]] == [1]
     assert body["projection"][0]["week"] == 1
     assert body["projection"][0]["points"] == 14.0
-    assert body["projection"][0]["source"] == "published"
+    assert body["projection"][0]["source"] == "preweek"
     assert [point["week"] for point in body["value"]] == [0, 1]
     assert body["value"][1] == {"week": 1, "value": 84.0, "source": "published"}
+
+
+def test_player_trajectory_emits_a_final_actual_only_for_a_final_scheduled_game(client, db_session):
+    player = Player(name="Final Stat Runner", position="RB", school="Texas", raw_cfb27_rating=92, cfb27_overall=92)
+    db_session.add(player)
+    db_session.flush()
+    game = Game(
+        season=2026,
+        week=1,
+        home_team="Texas",
+        away_team="Ohio State",
+        home_points=31,
+        away_points=17,
+    )
+    db_session.add(game)
+    db_session.flush()
+    db_session.add_all(
+        [
+            TeamSchedule(
+                team_name="Texas",
+                season=2026,
+                week=1,
+                opponent_name="Ohio State",
+                location="home",
+                is_bye=False,
+                game_id=game.id,
+                game_date=date.today() - timedelta(days=1),
+            ),
+            WeeklyProjection(
+                player_id=player.id,
+                season=2026,
+                week=1,
+                is_published=True,
+                fantasy_points=19.4,
+            ),
+            PlayerStat(
+                player_id=player.id,
+                season=2026,
+                week=1,
+                verified=True,
+                stats={"fantasy_points": 23.7},
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(f"/players/{player.id}/trajectory", params={"season": 2026})
+
+    assert response.status_code == 200
+    point = response.json()["projection"][0]
+    assert point["source"] == "preweek"
+    assert point["points"] == 19.4
+    assert point["actual_points"] == 23.7
+
+
+def test_player_trajectory_does_not_expose_an_actual_before_game_finalization(client, db_session):
+    player = Player(name="In Progress Runner", position="RB", school="Texas", raw_cfb27_rating=92, cfb27_overall=92)
+    db_session.add(player)
+    db_session.flush()
+    game = Game(season=2026, week=1, home_team="Texas", away_team="Ohio State")
+    db_session.add(game)
+    db_session.flush()
+    db_session.add_all(
+        [
+            TeamSchedule(team_name="Texas", season=2026, week=1, opponent_name="Ohio State", location="home", is_bye=False, game_id=game.id),
+            WeeklyProjection(player_id=player.id, season=2026, week=1, is_published=True, fantasy_points=19.4),
+            PlayerStat(player_id=player.id, season=2026, week=1, verified=True, stats={"fantasy_points": 23.7}),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(f"/players/{player.id}/trajectory", params={"season": 2026})
+
+    assert response.status_code == 200
+    assert response.json()["projection"][0]["actual_points"] is None
 
 
 def test_player_trajectory_rejects_unknown_league_context(client, db_session):

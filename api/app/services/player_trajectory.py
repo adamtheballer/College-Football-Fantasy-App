@@ -5,10 +5,14 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.domain.scoring_engine import calculate_player_fantasy_points
+from collegefootballfantasy_api.app.domain.stat_normalization import normalize_player_stats
 from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
+from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
+from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.player_trade_value import PlayerTradeValue
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
@@ -64,6 +68,27 @@ def _points_for_projection(player: Player, row: WeeklyProjection, scoring_rules:
         return max(0.0, float(row.fantasy_points or 0.0))
     points, _ = calculate_player_fantasy_points(stats, scoring_rules, player.position)
     return max(0.0, points)
+
+
+def _points_for_final_stat(
+    player: Player,
+    stat: PlayerGameStat | PlayerStat,
+    scoring_rules: dict | None,
+) -> float:
+    for key in ("fantasy_points", "fantasyPoints", "fpts", "FantasyPoints"):
+        value = (stat.stats or {}).get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return max(0.0, float(value))
+    points, _ = calculate_player_fantasy_points(
+        normalize_player_stats(stat.stats or {}, player.position),
+        scoring_rules,
+        player.position,
+    )
+    return max(0.0, points)
+
+
+def _game_is_final(game: Game | None) -> bool:
+    return game is not None and game.home_points is not None and game.away_points is not None
 
 
 def _season_projection(db: Session, player: Player) -> float:
@@ -126,6 +151,32 @@ def build_player_trajectory(
     scoring_rules = _league_scoring_rules(db, league_id)
     schedules = db.query(TeamSchedule).filter(TeamSchedule.team_name == player.school, TeamSchedule.season == season, TeamSchedule.week.in_(WEEKS)).all()
     schedule_by_week = {row.week: row for row in schedules}
+    game_ids = [schedule.game_id for schedule in schedules if schedule.game_id is not None]
+    games_by_id = {
+        game.id: game
+        for game in db.query(Game).filter(Game.id.in_(game_ids or [-1])).all()
+    }
+    player_stats_by_week = {
+        stat.week: stat
+        for stat in db.query(PlayerStat)
+        .filter(
+            PlayerStat.player_id == player.id,
+            PlayerStat.season == season,
+            PlayerStat.week.in_(WEEKS),
+            PlayerStat.verified.is_(True),
+        )
+        .all()
+    }
+    player_game_stats_by_game = {
+        stat.game_id: stat
+        for stat in db.query(PlayerGameStat)
+        .filter(
+            PlayerGameStat.player_id == player.id,
+            PlayerGameStat.season == season,
+            PlayerGameStat.game_id.in_(game_ids or [-1]),
+        )
+        .all()
+    }
     published_by_week = {
         week: db.scalar(
             current_published_projections_query(
@@ -147,7 +198,28 @@ def build_player_trajectory(
             projection.append(PlayerProjectionTrajectoryPointRead(week=week, points=None, source="bye", projection_status="BYE"))
         elif week in published_by_week:
             row = published_by_week[week]
-            projection.append(PlayerProjectionTrajectoryPointRead(week=week, points=round(_points_for_projection(player, row, scoring_rules), 1), source="published", projection_status=row.projection_status, projection_version=row.projection_version, published_at=row.updated_at))
+            game = games_by_id.get(schedule.game_id) if schedule and schedule.game_id is not None else None
+            actual_stat = (
+                player_game_stats_by_game.get(schedule.game_id)
+                if schedule and schedule.game_id is not None
+                else None
+            ) or player_stats_by_week.get(week)
+            actual_points = (
+                round(_points_for_final_stat(player, actual_stat, scoring_rules), 1)
+                if actual_stat is not None and _game_is_final(game)
+                else None
+            )
+            projection.append(
+                PlayerProjectionTrajectoryPointRead(
+                    week=week,
+                    points=round(_points_for_projection(player, row, scoring_rules), 1),
+                    actual_points=actual_points,
+                    source="preweek",
+                    projection_status=row.projection_status,
+                    projection_version=row.projection_version,
+                    published_at=row.updated_at,
+                )
+            )
 
     published_values = {
         row.week: row

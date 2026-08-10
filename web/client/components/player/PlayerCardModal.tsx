@@ -706,10 +706,11 @@ export function PlayerCardModal({
                     ) : null}
                     <PlayerTrajectoryChart
                       ariaLabel={`${player.name} projected fantasy points by week`}
-                      points={trajectoryQuery.data.projection.map((point) => ({ ...point, value: point.points }))}
+                      points={trajectoryQuery.data.projection.map((point) => ({ ...point, value: point.points, actualValue: point.actual_points }))}
                       yLabel="Points"
                       yMax={30}
                       valueFormatter={(value) => `${value.toFixed(1)} pts`}
+                      series="projection"
                     />
                   </>
                 ) : trajectoryQuery.data ? (
@@ -801,6 +802,7 @@ export function PlayerCardModal({
                     yLabel="Value"
                     yMax={100}
                     valueFormatter={(value) => value.toFixed(0)}
+                    series="value"
                   />
                 ) : (
                   <p className="rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4 text-sm font-bold text-rose-100">

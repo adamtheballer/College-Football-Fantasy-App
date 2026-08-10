@@ -164,7 +164,7 @@ export type PlayerTrajectoryResponse = {
   player_id: number;
   season: number;
   league_id?: number | null;
-  projection: Array<{ week: number; points: number | null; source: "published" | "bye"; projection_status: string; projection_version?: string | null; published_at?: string | null }>;
+  projection: Array<{ week: number; points: number | null; actual_points: number | null; source: "preweek" | "bye"; projection_status: string; projection_version?: string | null; published_at?: string | null }>;
   value: Array<{ week: number; value: number; source: "preseason" | "published" }>;
   preseason_projection_points?: number | null;
 };
