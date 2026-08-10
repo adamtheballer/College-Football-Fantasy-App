@@ -1961,6 +1961,21 @@ test.describe("critical browser workflows", () => {
       expect(geometry.queueHeight).toBeGreaterThanOrEqual(44);
       expect(geometry.draftHeight).toBeGreaterThanOrEqual(44);
     }
+    const scrollEvidence = await page.evaluate(() => {
+      const appScroller = document.querySelector<HTMLElement>("main[data-app-scroll='true']");
+      const playerList = document.querySelector<HTMLElement>("[data-testid='draft-player-list']");
+      const room = document.querySelector<HTMLElement>("[data-draft-room='mock']");
+      appScroller?.scrollTo({ top: 800, behavior: "auto" });
+      return {
+        appScrollTop: appScroller?.scrollTop ?? 0,
+        playerListOverflowY: playerList ? window.getComputedStyle(playerList).overflowY : null,
+        roomHeight: room?.scrollHeight ?? 0,
+        viewportHeight: window.innerHeight,
+      };
+    });
+    expect(scrollEvidence.playerListOverflowY).not.toMatch(/auto|scroll/);
+    expect(scrollEvidence.roomHeight).toBeGreaterThan(scrollEvidence.viewportHeight);
+    expect(scrollEvidence.appScrollTop).toBeGreaterThan(0);
     expect(playerRequests.some((request) => request.limit > 100)).toBe(false);
     expect(playerRequests).toEqual(
       expect.arrayContaining([
