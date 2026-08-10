@@ -236,6 +236,33 @@ def plan_bootstrap(
     }
 
 
+def planned_active_cfb27_identities(
+    *, identities_path: Path, projections_path: Path
+) -> tuple[tuple[str, str, str], ...]:
+    """Return the post-bootstrap CFB27 identities without staging ORM rows.
+
+    The catalog bootstrap can replace an old canonical identity with a newly
+    approved source identity in the same transaction. A dry run must validate
+    ratings against that *planned* pool, rather than the pre-bootstrap rows in
+    the database, but may not add or flush the replacement player merely to do
+    so.
+    """
+
+    source = load_catalog_source(
+        identities_path=identities_path,
+        projections_path=projections_path,
+    )
+    identities: list[tuple[str, str, str]] = []
+    for row in source.reviewed_rows:
+        name = (row.get("NAME") or "").strip()
+        school = canonical_school(row.get("SCHOOL"))
+        position = normalize_position(row.get("POSITION"))
+        if not name or not school or position is None:
+            continue
+        identities.append((name, school, position))
+    return tuple(identities)
+
+
 def bootstrap(
     *, identities_path: Path, projections_path: Path, ratings_path: Path | None = None,
     ratings_manifest_path: Path | None = None, apply: bool, db: Session | None = None, commit: bool = True,

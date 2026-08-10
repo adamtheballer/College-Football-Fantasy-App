@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
+from sqlalchemy import event
 
 from collegefootballfantasy_api.app.services import cfb27_player_sync
 from collegefootballfantasy_api.app.models.draft import Draft
@@ -421,6 +422,55 @@ def test_cfb27_sync_dry_run_reports_missing_current_identity_without_mutating(cl
     assert result["unused_source_rows"] == 0
     assert current.raw_cfb27_rating is None
     assert current.current_value_rating is None
+
+
+def test_cfb27_plan_uses_post_bootstrap_identity_without_staging_player_rows(client, db_session):
+    stale = Player(
+        name="Jonathan Bibbs",
+        position="WR",
+        school="Houston",
+        sheet_source_sheet_id="canonical-preseason:2026:Big12",
+        sheet_projected_season_points=100.0,
+    )
+    db_session.add(stale)
+    db_session.commit()
+    snapshot = replace(
+        reviewed_test_snapshot(),
+        row_count=1,
+        ratings=(
+            cfb27_player_sync.Cfb27Rating(
+                rank=1,
+                position_rank=1,
+                name="Harvey Broussard III",
+                school="Houston",
+                position="WR",
+                overall=77,
+            ),
+        ),
+    )
+
+    def fail_if_flushed(*_args, **_kwargs):
+        raise AssertionError("planned CFB27 validation must not flush")
+
+    event.listen(db_session, "before_flush", fail_if_flushed)
+    try:
+        result = cfb27_player_sync.plan_cfb27_players(
+            db_session,
+            snapshot=snapshot,
+            planned_active_identities=(("Harvey Broussard III", "Houston", "WR"),),
+        )
+    finally:
+        event.remove(db_session, "before_flush", fail_if_flushed)
+
+    assert result["current_eligible_players"] == 1
+    assert result["matched"] == 1
+    assert result["missing_current_players"] == 0
+    assert result["unused_source_rows"] == 0
+    assert not db_session.new
+    assert not db_session.dirty
+    db_session.refresh(stale)
+    assert stale.name == "Jonathan Bibbs"
+    assert stale.raw_cfb27_rating is None
 
 
 def test_cfb27_sync_rejects_duplicate_approved_source_identity_before_any_write(client, db_session):

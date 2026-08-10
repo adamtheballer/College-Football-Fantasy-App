@@ -16,6 +16,7 @@ from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.services.cfb27_player_sync import (
     load_reviewed_cfb27_snapshot,
+    plan_cfb27_players,
     sync_cfb27_players,
 )
 from scripts.audit_preseason_source_contract import require_valid_source_directory
@@ -25,6 +26,7 @@ from scripts.bootstrap_canonical_player_data import (
     ROOT_DIR,
     bootstrap,
     plan_bootstrap,
+    planned_active_cfb27_identities,
 )
 
 
@@ -160,7 +162,15 @@ def reconcile(*, identities: Path, projections: Path, ratings: Path, ratings_man
                     source_contract=source_contract,
                     catalog=catalog,
                 )
-                ratings_result = sync_cfb27_players(db, snapshot=snapshot, dry_run=True, season=season, commit=False)
+                ratings_result = plan_cfb27_players(
+                    db,
+                    snapshot=snapshot,
+                    planned_active_identities=planned_active_cfb27_identities(
+                        identities_path=identities,
+                        projections_path=projections,
+                    ),
+                    season=season,
+                )
                 return {"catalog": catalog, "wayne_knight": wayne_integrity, "ratings": ratings_result}
             finally:
                 db.rollback()
