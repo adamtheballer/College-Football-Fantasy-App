@@ -14,6 +14,7 @@ import csv
 import re
 import unicodedata
 from contextlib import nullcontext
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -23,7 +24,11 @@ from sqlalchemy.orm import Session
 from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.models.player import Player
-from collegefootballfantasy_api.app.services.cfb27_player_sync import cfb27_identity_key, load_reviewed_cfb27_snapshot
+from collegefootballfantasy_api.app.services.cfb27_player_sync import (
+    Cfb27Rating,
+    cfb27_identity_key,
+    load_reviewed_cfb27_snapshot,
+)
 from collegefootballfantasy_api.app.services.player_bio import normalize_sheet_player_class
 from collegefootballfantasy_api.app.services.power4 import resolve_power4_school
 from scripts.audit_annual_projection_scoring import canonical_projection_points
@@ -55,6 +60,17 @@ PROJECTION_COLUMNS = {
     "FG": "fg",
     "XP": "xp",
 }
+
+
+@dataclass(frozen=True)
+class CanonicalCatalogSource:
+    """Validated source state shared by mutation and zero-write planning."""
+
+    source_contract: dict
+    source_batch_id: str
+    projections_by_key: dict[tuple[str, str, str], dict[str, str]]
+    reviewed_rows: list[dict[str, str]]
+    ratings_by_key: dict[str, Cfb27Rating]
 
 
 def normalize(value: str | None) -> str:
@@ -119,27 +135,26 @@ def read_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
-def bootstrap(
+def load_catalog_source(
     *, identities_path: Path, projections_path: Path, ratings_path: Path | None = None,
-    ratings_manifest_path: Path | None = None, apply: bool, db: Session | None = None, commit: bool = True,
-    rollback_on_dry_run: bool = True,
-) -> dict[str, int | str]:
+    ratings_manifest_path: Path | None = None,
+) -> CanonicalCatalogSource:
+    """Validate immutable sources without staging ORM mutations."""
+
     identity_rows = read_rows(identities_path)
     projection_rows = read_rows(projections_path)
     source_contract = require_valid_contract(projection_rows, identity_rows)
     source_directory = require_valid_source_directory(identities_path.parent)
     source_batch_id = source_directory["gate_context"]["source_provenance"]["export_batch_id"]
+    if not isinstance(source_batch_id, str) or not source_batch_id.strip():
+        raise ValueError("Canonical player bootstrap requires a manifest-backed source batch ID.")
     projections_by_key = {
         identity_key(row.get("PLAYER"), row.get("TEAM"), row.get("POSITION")): row
         for row in projection_rows
         if all(identity_key(row.get("PLAYER"), row.get("TEAM"), row.get("POSITION")))
     }
-    projection_points_by_key = {
-        key: canonical_projection_points(row)
-        for key, row in projections_by_key.items()
-    }
     unscorable_projection_keys = [
-        key for key, points in projection_points_by_key.items() if points is None
+        key for key, row in projections_by_key.items() if canonical_projection_points(row) is None
     ]
     if unscorable_projection_keys:
         raise ValueError(
@@ -153,21 +168,84 @@ def bootstrap(
         for row in identity_rows
         if identity_key(row.get("NAME"), row.get("SCHOOL"), row.get("POSITION")) in projections_by_key
     ]
-    # Ratings are deliberately opt-in.  The legacy app-data JSON was a seed,
-    # not a reviewed upstream source, and must never overwrite the owner’s
-    # Sheets-backed catalog.  A release import supplies a captured export of
-    # the configured CFB27 Ratings Sheet alongside its source manifest.
-    ratings_by_key = {}
+    ratings_by_key: dict[str, Cfb27Rating] = {}
     if ratings_path is not None:
         if ratings_manifest_path is None:
             raise ValueError("CFB27 ratings import requires an approved snapshot manifest.")
         snapshot = load_reviewed_cfb27_snapshot(
-            snapshot_path=ratings_path, manifest_path=ratings_manifest_path
+            snapshot_path=ratings_path, manifest_path=ratings_manifest_path,
         )
         ratings_by_key = {
             cfb27_identity_key(name=rating.name, school=rating.school, position=rating.position): rating
             for rating in snapshot.ratings
         }
+    return CanonicalCatalogSource(
+        source_contract=source_contract,
+        source_batch_id=source_batch_id,
+        projections_by_key=projections_by_key,
+        reviewed_rows=reviewed_rows,
+        ratings_by_key=ratings_by_key,
+    )
+
+
+def plan_bootstrap(
+    *, identities_path: Path, projections_path: Path, ratings_path: Path | None = None,
+    ratings_manifest_path: Path | None = None, db: Session,
+) -> dict[str, int | str]:
+    """Return the exact bootstrap plan without adding, mutating, or flushing ORM rows."""
+
+    source = load_catalog_source(
+        identities_path=identities_path,
+        projections_path=projections_path,
+        ratings_path=ratings_path,
+        ratings_manifest_path=ratings_manifest_path,
+    )
+    ensure_models_registered()
+    existing = {
+        identity_key(player.name, player.school, player.position): player
+        for player in db.scalars(select(Player)).all()
+    }
+    reviewed_keys = {
+        identity_key(row.get("NAME"), row.get("SCHOOL"), row.get("POSITION"))
+        for row in source.reviewed_rows
+    }
+    created = sum(key not in existing for key in reviewed_keys)
+    legacy_snapshot_players = sum(
+        1
+        for key, player in existing.items()
+        if (player.sheet_source_sheet_id or "").strip().startswith(SOURCE_PREFIX)
+        and key not in source.projections_by_key
+    )
+    ratings_matched = sum(
+        cfb27_identity_key(
+            name=(row.get("NAME") or "").strip(),
+            school=canonical_school(row.get("SCHOOL")),
+            position=normalize_position(row.get("POSITION")),
+        ) in source.ratings_by_key
+        for row in source.reviewed_rows
+    )
+    return {
+        "reviewed_rows": len(source.reviewed_rows),
+        "eligible_players": len(source.reviewed_rows),
+        "source_contract_approved_players": int(source.source_contract["approved_player_count"]),
+        "created": created,
+        "updated": len(source.reviewed_rows) - created,
+        "ratings_matched": ratings_matched,
+        "legacy_snapshot_players_excluded_from_current_pool": legacy_snapshot_players,
+        "source_batch_id": source.source_batch_id,
+    }
+
+
+def bootstrap(
+    *, identities_path: Path, projections_path: Path, ratings_path: Path | None = None,
+    ratings_manifest_path: Path | None = None, apply: bool, db: Session | None = None, commit: bool = True,
+) -> dict[str, int | str]:
+    source = load_catalog_source(
+        identities_path=identities_path,
+        projections_path=projections_path,
+        ratings_path=ratings_path,
+        ratings_manifest_path=ratings_manifest_path,
+    )
 
     ensure_models_registered()
     now = datetime.now(timezone.utc)
@@ -178,9 +256,9 @@ def bootstrap(
             identity_key(player.name, player.school, player.position): player
             for player in db.scalars(select(Player)).all()
         }
-        for identity in reviewed_rows:
+        for identity in source.reviewed_rows:
             key = identity_key(identity.get("NAME"), identity.get("SCHOOL"), identity.get("POSITION"))
-            projection = projections_by_key[key]
+            projection = source.projections_by_key[key]
             name = (identity.get("NAME") or "").strip()
             school = canonical_school(identity.get("SCHOOL"))
             position = normalize_position(identity.get("POSITION"))
@@ -212,11 +290,11 @@ def bootstrap(
             player.sheet_projected_season_points = projection_stats["fpts"]
             player.sheet_projection_stats = projection_stats
             player.sheet_source_sheet_id = (
-                f"canonical-preseason:2026:{source_batch_id}:{projection.get('source_sheet') or 'unknown'}"
+                f"canonical-preseason:2026:{source.source_batch_id}:{projection.get('source_sheet') or 'unknown'}"
             )
             player.sheet_synced_at = now
 
-            rating = ratings_by_key.get(cfb27_identity_key(name=name, school=school, position=position))
+            rating = source.ratings_by_key.get(cfb27_identity_key(name=name, school=school, position=position))
             if rating is not None:
                 player.cfb27_rank = rating.rank
                 player.cfb27_overall = rating.overall
@@ -233,7 +311,7 @@ def bootstrap(
             if not source_marker.startswith(SOURCE_PREFIX):
                 continue
             key = identity_key(player.name, player.school, player.position)
-            if key in projections_by_key:
+            if key in source.projections_by_key:
                 continue
             player.sheet_source_sheet_id = (
                 f"{LEGACY_SOURCE_PREFIX}{source_marker.removeprefix(SOURCE_PREFIX)}"
@@ -241,10 +319,7 @@ def bootstrap(
             legacy_snapshot_players += 1
 
         if not apply:
-            if rollback_on_dry_run:
-                db.rollback()
-            else:
-                db.flush()
+            db.rollback()
         elif commit:
             db.commit()
         else:
@@ -252,21 +327,21 @@ def bootstrap(
 
         eligible_count = sum(
             1
-            for row in reviewed_rows
-            if projections_by_key.get(identity_key(row.get("NAME"), row.get("SCHOOL"), row.get("POSITION")))
+            for row in source.reviewed_rows
+            if source.projections_by_key.get(identity_key(row.get("NAME"), row.get("SCHOOL"), row.get("POSITION")))
         )
 
     if eligible_count == 0:
         raise RuntimeError("Canonical player bootstrap found no reviewed players with seasonal projections.")
     return {
-        "reviewed_rows": len(reviewed_rows),
+        "reviewed_rows": len(source.reviewed_rows),
         "eligible_players": eligible_count,
-        "source_contract_approved_players": int(source_contract["approved_player_count"]),
+        "source_contract_approved_players": int(source.source_contract["approved_player_count"]),
         "created": created,
         "updated": updated,
         "ratings_matched": ratings_matched,
         "legacy_snapshot_players_excluded_from_current_pool": legacy_snapshot_players,
-        "source_batch_id": source_batch_id,
+        "source_batch_id": source.source_batch_id,
     }
 
 

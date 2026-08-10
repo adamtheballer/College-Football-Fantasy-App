@@ -24,6 +24,7 @@ from scripts.bootstrap_canonical_player_data import (
     DEFAULT_PROJECTIONS,
     ROOT_DIR,
     bootstrap,
+    plan_bootstrap,
 )
 
 
@@ -86,6 +87,53 @@ def verify_wayne_knight_postcondition(
     }
 
 
+def verify_wayne_knight_dry_run_postcondition(
+    db, *, season: int, source_batch_id: str, source_contract: dict, catalog: dict[str, object],
+) -> dict[str, object]:
+    """Validate the intended Wayne result without adding a Player or flushing the session."""
+
+    source_wayne = source_contract.get("wayne_knight_projection_integrity")
+    if not isinstance(source_wayne, dict) or source_wayne.get("status") != "PASS":
+        raise RuntimeError("Wayne Knight source contract must pass before a dry-run reconciliation.")
+    projection = source_wayne.get("projection")
+    if not isinstance(projection, dict):
+        raise RuntimeError("Wayne Knight source contract is missing its projection components.")
+    expected_stats = {
+        "rush_yards": 1300.0,
+        "rush_tds": 12.0,
+        "receptions": 28.0,
+        "rec_yards": 230.0,
+        "rec_tds": 2.0,
+    }
+    if projection.get("name") != "Wayne Knight" or projection.get("team") != "UCLA" or projection.get("position") != "RB":
+        raise RuntimeError("Wayne Knight source identity must remain UCLA RB.")
+    if not math.isclose(float(projection.get("fantasy_points", -1)), 265.0):
+        raise RuntimeError("Wayne Knight source projection must equal 265.")
+    for field, expected in expected_stats.items():
+        value = projection.get(field)
+        if not isinstance(value, (int, float)) or not math.isclose(float(value), expected):
+            raise RuntimeError(f"Wayne Knight source stat {field!r} must equal {expected:g}, got {value!r}.")
+    if catalog.get("source_batch_id") != source_batch_id:
+        raise RuntimeError("Wayne Knight dry-run catalog must use the approved source batch.")
+    rows = (
+        db.query(Player)
+        .filter(Player.name == "Wayne Knight", Player.school == "UCLA", Player.position == "RB")
+        .all()
+    )
+    if len(rows) > 1:
+        raise RuntimeError(f"Wayne Knight reconciliation requires at most one existing UCLA RB identity; found {len(rows)}.")
+    return {
+        "canonical_player_id": rows[0].id if rows else None,
+        "name": "Wayne Knight",
+        "school": "UCLA",
+        "position": "RB",
+        "source_batch_id": source_batch_id,
+        "sheet_projected_season_points": 265.0,
+        "draft_eligible": True,
+        "would_create": not rows,
+    }
+
+
 def reconcile(*, identities: Path, projections: Path, ratings: Path, ratings_manifest: Path, season: int, dry_run: bool) -> dict[str, object]:
     """Reconcile every player-data source as one all-or-nothing release unit."""
     source_contract = require_valid_source_directory(identities.parent)
@@ -98,18 +146,19 @@ def reconcile(*, identities: Path, projections: Path, ratings: Path, ratings_man
     with SessionLocal() as db:
         if dry_run:
             try:
-                catalog = bootstrap(
+                catalog = plan_bootstrap(
                     identities_path=identities,
                     projections_path=projections,
                     ratings_path=ratings,
                     ratings_manifest_path=ratings_manifest,
-                    apply=False,
                     db=db,
-                    commit=False,
-                    rollback_on_dry_run=False,
                 )
-                wayne_integrity = verify_wayne_knight_postcondition(
-                    db, season=season, source_batch_id=source_batch_id
+                wayne_integrity = verify_wayne_knight_dry_run_postcondition(
+                    db,
+                    season=season,
+                    source_batch_id=source_batch_id,
+                    source_contract=source_contract,
+                    catalog=catalog,
                 )
                 ratings_result = sync_cfb27_players(db, snapshot=snapshot, dry_run=True, season=season, commit=False)
                 return {"catalog": catalog, "wayne_knight": wayne_integrity, "ratings": ratings_result}
