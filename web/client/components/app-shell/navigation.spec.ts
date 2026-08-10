@@ -31,6 +31,8 @@ describe("app shell navigation helpers", () => {
     expect(isSaturdayPick6Route("/saturday-pick-6")).toBe(true);
     expect(isSaturdayPick6Route("/")).toBe(false);
     expect(isAuthFlowRoute("/login")).toBe(true);
+    expect(isAuthFlowRoute("/beta-access")).toBe(true);
+    expect(isAuthFlowRoute("/signup")).toBe(true);
     expect(isAuthFlowRoute("/league/1/roster")).toBe(false);
   });
 

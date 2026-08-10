@@ -33,6 +33,7 @@ export const isSaturdayPick6Route = (pathname: string) => pathname === "/saturda
 
 export const isAuthFlowRoute = (pathname: string) =>
   pathname === "/login" ||
+  pathname === "/beta-access" ||
   pathname === "/signup" ||
   pathname === "/reset-password";
 

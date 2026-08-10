@@ -85,9 +85,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         pathname={location.pathname}
         user={user}
         isLoggedIn={isLoggedIn}
-        hideChrome={isDraftRoomPage}
+        hideChrome={isDraftRoomPage || isAuthFlowPage}
         hideDecor={isCreateLeaguePage}
-        hideFloatingActions={isDraftRoomPage || isCreateLeaguePage || isSaturdayPick6Page}
+        hideFloatingActions={isDraftRoomPage || isCreateLeaguePage || isSaturdayPick6Page || isAuthFlowPage}
         compactContent={isDraftRoomPage || isCreateLeaguePage}
         onSignOut={logout}
         mainScrollRef={mainScrollRef}
