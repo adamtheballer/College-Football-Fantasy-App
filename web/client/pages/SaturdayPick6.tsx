@@ -10,6 +10,9 @@ import { getSaturdayPickSponsorLogo, saturdayPick6Sponsor } from "@/lib/saturday
 export const SATURDAY_PICK_6_COMING_SOON_MESSAGE =
   "Week 1 picks are coming soon. Six featured players will be available once weekly projections are published.";
 
+export const SATURDAY_PICK_6_HOW_IT_WORKS =
+  "How it works: choose one of six featured players before the first kickoff. If your player scores the most fantasy points that week, you unlock that week's featured-brand discount code.";
+
 const formatPoints = (value: number | null) =>
   typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "—";
 
@@ -179,6 +182,10 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
             </div>
             <h1 className="mt-5 font-display text-4xl font-black italic tracking-[-0.05em] text-cfb-text-primary sm:text-6xl">{isResults ? "LIVE RESULTS" : isOpen ? "MAKE YOUR PICK" : contest.status === "SCHEDULED" ? "PICKS OPENING SOON" : "PICKS LOCKED"}</h1>
             <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-cfb-text-secondary sm:text-lg">Which featured {positionLabel(contest.contest_position)} will score the most fantasy points this week?</p>
+            <p className="mt-4 max-w-2xl rounded-2xl border border-cyan-100/20 bg-slate-950/20 px-4 py-3 text-sm font-semibold leading-6 text-cyan-50/90">
+              <span className="mr-2 font-black uppercase tracking-[0.16em] text-cyan-200">How it works</span>
+              {SATURDAY_PICK_6_HOW_IT_WORKS.replace("How it works: ", "")}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-6">
             {sponsor ? <>
