@@ -23,6 +23,7 @@ import { apiGet } from "@/lib/api";
 import { betaAccessEnabled } from "@/lib/beta-access";
 import type { LeagueDetail } from "@/types/league";
 import SaturdayPick6 from "./SaturdayPick6";
+import PublicHome from "./PublicHome";
 
 type AlertItem = {
   id: number;
@@ -204,7 +205,7 @@ export default function Index() {
     if (betaAccessEnabled) {
       return <Navigate to="/beta-access" replace />;
     }
-    return <GuestHome />;
+    return <PublicHome />;
   }
 
   const matchup = workspace?.matchup_summary ?? null;
