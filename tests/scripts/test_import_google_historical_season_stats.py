@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import scripts.import_google_historical_season_stats as historical_import
+from collegefootballfantasy_api.app.models.historical_stats import PlayerHistoricalSeasonStat
+from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from scripts.import_google_historical_season_stats import (
     VERIFIED_SOURCE_NAME_ALIASES,
     SourceSeasonRow,
@@ -11,6 +15,29 @@ from scripts.import_google_historical_season_stats import (
     build_report,
     read_source_rows,
 )
+
+
+def test_apply_deduplicates_one_trusted_espn_id_across_multiple_seasons(tmp_path, db_session, monkeypatch):
+    """One athlete mapping must be inserted once even when history has many seasons."""
+    player = Player(name="Example Runner", school="Example", position="RB")
+    db_session.add(player)
+    db_session.commit()
+    player_id = player.id
+    source = tmp_path / "season-stats.csv"
+    source.write_text(
+        "CURRENT TEAM,DEPTH POS,PLAYER,SEASON,COLLEGE TEAM,ESPN ID,GP\n"
+        "Example,RB1,Example Runner,2024,Example,9999999,12\n"
+        "Example,RB1,Example Runner,2025,Example,9999999,12\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(historical_import, "SessionLocal", lambda: db_session)
+
+    report = historical_import.import_rows(source, apply=True)
+
+    assert report["trusted_espn_id_conflict_count"] == 0
+    assert report["provider_mappings_inserted"] == 1
+    assert db_session.query(PlayerProviderId).filter_by(provider="espn", provider_player_id="9999999").count() == 1
+    assert db_session.query(PlayerHistoricalSeasonStat).filter_by(player_id=player_id).count() == 2
 
 
 class PlayerStub:
