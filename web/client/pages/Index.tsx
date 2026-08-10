@@ -212,23 +212,23 @@ export default function Index() {
   const ownedTeamName = workspace?.owned_team?.name ?? "Your Team";
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-7 pb-24 pt-4">
-      <section className="relative grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+    <div className="mx-auto w-full max-w-7xl space-y-5 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] pt-3 sm:space-y-7 sm:pb-24 sm:pt-4">
+      <section className="relative grid gap-4 sm:gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div aria-hidden="true" className="pointer-events-none absolute -left-8 -top-8 h-28 w-80 rotate-[-14deg] rounded-full bg-gradient-to-r from-cfb-pink/45 via-cfb-brand/35 to-transparent blur-xl" />
         <div aria-hidden="true" className="pointer-events-none absolute -right-8 top-20 h-24 w-96 rotate-[-18deg] rounded-full bg-gradient-to-r from-transparent via-cfb-cyan/35 to-cfb-gold/30 blur-xl" />
         <div aria-hidden="true" className="pointer-events-none absolute bottom-2 left-16 h-20 w-96 rotate-[-10deg] rounded-full bg-gradient-to-r from-cfb-gold/30 via-cfb-brand/20 to-transparent blur-xl" />
-        <SurfaceCard variant="scoreboard" padding="spacious" className="cfb-playbook-pattern relative min-h-[330px]">
-          <div className="flex h-full flex-col justify-between gap-8">
-            <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 rounded-full border border-cfb-brand/35 bg-cfb-brand/[0.12] px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-blue-100">
+        <SurfaceCard variant="scoreboard" padding="compact" className="cfb-playbook-pattern relative min-h-0 sm:min-h-[330px] sm:p-8">
+          <div className="flex h-full flex-col justify-between gap-5 sm:gap-8">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="inline-flex items-center gap-2 rounded-full border border-cfb-brand/35 bg-cfb-brand/[0.12] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-blue-100 sm:px-4 sm:py-2 sm:text-[11px] sm:tracking-[0.18em]">
                 <Zap className="h-4 w-4" aria-hidden="true" />
                 Game Week Command Center
               </div>
               <div>
-                <h1 className="text-4xl font-black tracking-[-0.04em] text-cfb-text-primary sm:text-5xl">
+                <h1 className="text-3xl font-black leading-[1.03] tracking-[-0.04em] text-cfb-text-primary sm:text-5xl">
                   Good to see you, {user?.firstName ?? "Manager"}.
                 </h1>
-                <p className="mt-3 max-w-2xl text-base font-medium leading-7 text-cfb-text-secondary">
+                <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-cfb-text-secondary sm:mt-3 sm:text-base sm:leading-7">
                   Resume your active league, check the matchup board, and handle roster decisions
                   before kickoff.
                 </p>
@@ -247,16 +247,16 @@ export default function Index() {
                     {selectedLeague.max_teams} managers • {formatDraftTime(selectedLeague.draft?.draft_datetime_utc)}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex gap-3 max-[360px]:flex-col sm:flex-wrap">
                   <Button
-                    className="h-11 rounded-xl text-[11px] font-black uppercase tracking-[0.16em]"
+                    className="h-12 flex-1 justify-center rounded-xl text-[11px] font-black uppercase tracking-[0.13em] sm:h-11 sm:flex-none sm:tracking-[0.16em]"
                     onClick={() => navigate(`/league/${selectedLeague.id}`)}
                   >
                     Open League
                   </Button>
                   <Button
                     variant="outline"
-                    className="h-11 rounded-xl text-[11px] font-black uppercase tracking-[0.16em]"
+                    className="h-12 flex-1 justify-center rounded-xl text-[11px] font-black uppercase tracking-[0.13em] sm:h-11 sm:flex-none sm:tracking-[0.16em]"
                     onClick={() => navigate(`/league/${selectedLeague.id}/matchup`)}
                   >
                     View Matchup
@@ -264,9 +264,9 @@ export default function Index() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-wrap gap-3">
-                <Button onClick={() => navigate("/leagues/create")}>Create League</Button>
-                <Button variant="outline" onClick={() => navigate("/leagues/join")}>
+              <div className="flex gap-3 max-[360px]:flex-col sm:flex-wrap">
+                <Button className="h-12 flex-1 sm:flex-none" onClick={() => navigate("/leagues/create")}>Create League</Button>
+                <Button className="h-12 flex-1 sm:flex-none" variant="outline" onClick={() => navigate("/leagues/join")}>
                   Join League
                 </Button>
               </div>
@@ -274,13 +274,13 @@ export default function Index() {
           </div>
         </SurfaceCard>
 
-        <SurfaceCard variant="raised" padding="default" className="space-y-5">
+        <SurfaceCard variant="raised" padding="compact" className="space-y-4 sm:space-y-5 sm:p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="cfb-micro-label text-cfb-brand">Week {matchup?.week ?? 1}</p>
-              <h2 className="mt-2 text-2xl font-black text-cfb-text-primary">Matchup Snapshot</h2>
+              <h2 className="mt-1 text-xl font-black text-cfb-text-primary sm:mt-2 sm:text-2xl">Matchup Snapshot</h2>
             </div>
-            <StatusBadge variant={matchup?.status === "live" ? "live" : "projected"}>
+            <StatusBadge className="text-[10px] tracking-[0.1em] sm:text-[11px] sm:tracking-[0.14em]" variant={matchup?.status === "live" ? "live" : "projected"}>
               {matchup?.status ? formatDashboardStatus(matchup.status) : "Projected"}
             </StatusBadge>
           </div>
@@ -288,7 +288,7 @@ export default function Index() {
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
             <div>
               <p className="truncate text-sm font-black text-cfb-text-primary">{ownedTeamName}</p>
-              <p className="mt-2 font-display text-4xl font-black tracking-[-0.06em] text-cfb-brand">
+              <p className="mt-1 font-display text-3xl font-black tracking-[-0.06em] text-cfb-brand sm:mt-2 sm:text-4xl">
                 {formatDashboardPoints(matchup?.projected_points_for)}
               </p>
             </div>
@@ -299,7 +299,7 @@ export default function Index() {
               <p className="truncate text-sm font-black text-cfb-text-primary">
                 {matchup?.opponent_team_name ?? "Opponent TBD"}
               </p>
-              <p className="mt-2 font-display text-4xl font-black tracking-[-0.06em] text-cfb-pink">
+              <p className="mt-1 font-display text-3xl font-black tracking-[-0.06em] text-cfb-pink sm:mt-2 sm:text-4xl">
                 {formatDashboardPoints(matchup?.projected_points_against)}
               </p>
             </div>

@@ -87,9 +87,10 @@ describe("app shell navigation helpers", () => {
     const mobileItems = getMobileNavItems(getShellNavItems(user, true, 1, true));
     const mobile = mobileItems.map((item) => item.name);
 
-    expect(mobile).toEqual(["HOME", "LEAGUES", "CHATS", "MOCK DRAFT", "REPORT BUG"]);
-    expect(mobile).toHaveLength(5);
+    expect(mobile).toEqual(["HOME", "LEAGUES", "CHATS", "MOCK DRAFT"]);
+    expect(mobile).toHaveLength(4);
     expect(mobileItems.find((item) => item.name === "CHATS")?.badge).toBe("1");
+    expect(mobile).not.toContain("REPORT BUG");
     expect(mobile).not.toContain("SIGN OUT");
     expect(mobile).not.toContain("SATURDAY PICK 6");
   });

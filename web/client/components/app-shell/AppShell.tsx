@@ -65,7 +65,12 @@ export function AppShell({
       </main>
 
       {!hideChrome && mobileNavItems.length > 0 ? (
-        <MobileNavigation items={mobileNavItems} pathname={pathname} />
+        <MobileNavigation
+          items={mobileNavItems}
+          allItems={navItems}
+          pathname={pathname}
+          onSignOut={onSignOut}
+        />
       ) : null}
     </div>
   );
