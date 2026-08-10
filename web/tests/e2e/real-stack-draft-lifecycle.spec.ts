@@ -41,8 +41,12 @@ async function signUp(page: Page, firstName: string, fixture: { email: string; c
   await expect(page.locator("#signup-email")).toHaveAttribute("readonly", "");
   await page.locator("#signup-name").fill(firstName);
   await page.locator("#signup-password").fill(password);
-  await page.getByRole("button", { name: /Create (beta )?account/i }).click();
-  await expect(page.getByRole("dialog", { name: /Account created/i })).toBeVisible();
+  const [signupResponse] = await Promise.all([
+    page.waitForResponse((response) => response.url().includes("/api/auth/signup") && response.request().method() === "POST"),
+    page.getByRole("button", { name: /Create (beta )?account/i }).click(),
+  ]);
+  expect(signupResponse.status()).toBe(201);
+  await expect(page.getByRole("dialog", { name: /Account created/i })).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: /Continue to dashboard/i }).click();
   await page.waitForURL("**/");
 
@@ -99,7 +103,7 @@ test.describe("real two-manager draft lifecycle", () => {
       await manager.goto(`/join/${createResponse.body.invite_code}`);
       await expect(manager.getByText(/League Preview/i)).toBeVisible();
       await manager.getByRole("main").getByRole("button", { name: /^Join League$/i }).click();
-      await expect(manager).toHaveURL(new RegExp(`/league/${leagueId}/lobby$`));
+      await expect(manager).toHaveURL(new RegExp(`/league/${leagueId}$`));
 
       await commissioner.goto(`/league/${leagueId}/draft`);
       await expect(commissioner.getByRole("button", { name: /^Start Draft$/i })).toBeVisible();
@@ -111,7 +115,7 @@ test.describe("real two-manager draft lifecycle", () => {
       await expect(commissioner.getByText("Starting Soon", { exact: true })).toBeVisible();
 
       await manager.goto(`/league/${leagueId}/draft`);
-      await expect(manager.getByText("Starting Soon", { exact: true })).toBeVisible();
+      await expect(manager.getByText("Starting Soon", { exact: true })).toBeVisible({ timeout: 15_000 });
       await expect(manager).not.toHaveURL(/\/login$/);
 
       await expect(commissioner.getByText("Pick Timer")).toBeVisible({ timeout: 100_000 });

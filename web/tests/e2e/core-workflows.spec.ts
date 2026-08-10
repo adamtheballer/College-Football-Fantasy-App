@@ -350,7 +350,7 @@ test.describe("critical browser workflows", () => {
     await page.getByRole("button", { name: /Sign In to Dashboard/i }).click();
 
     await page.waitForURL("**/");
-    await expect(page.getByText(/COLLEGE FOOTBALL FANTASY/i).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Good to see you, Codex/i })).toBeVisible();
 
     const token = await page.evaluate(() => window.localStorage.getItem("cfb_access_token"));
     const user = await page.evaluate(() => window.localStorage.getItem("cfb_user"));
