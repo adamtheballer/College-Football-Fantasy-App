@@ -113,6 +113,30 @@ def _birthplace(athlete: dict) -> str | None:
     return ", ".join(part for part in parts if part) or None
 
 
+def _preferred_bio_value(*values: object) -> str | None:
+    """Use ESPN enrichment when present, otherwise the sealed identity source.
+
+    The production player registry imports height, weight, and birthplace from
+    the reviewed identity workbook.  ESPN profile enrichment is optional for
+    beta, so a missing provider refresh must not make those verified fields
+    disappear from a player card.
+    """
+
+    for value in values:
+        text = _profile_text(value)
+        if text:
+            return text
+    return None
+
+
+def _about_source(stored_player: Player) -> str:
+    if stored_player.espn_profile_synced_at:
+        return "espn"
+    if any((stored_player.sheet_bio_height, stored_player.sheet_bio_weight, stored_player.sheet_bio_birthplace)):
+        return "verified_sheet"
+    return "local"
+
+
 def _map_espn_about(
     stored_player: Player,
     player: PlayerRead,
@@ -124,10 +148,10 @@ def _map_espn_about(
     if not isinstance(athlete, dict):
         return PlayerCardAboutRead(
             espn_player_id=espn_player_id or _espn_player_id(player.external_id),
-            height=stored_player.espn_height,
-            weight=stored_player.espn_weight,
+            height=_preferred_bio_value(stored_player.espn_height, stored_player.sheet_bio_height),
+            weight=_preferred_bio_value(stored_player.espn_weight, stored_player.sheet_bio_weight),
             player_class=player.player_class,
-            birthplace=stored_player.espn_birthplace,
+            birthplace=_preferred_bio_value(stored_player.espn_birthplace, stored_player.sheet_bio_birthplace),
             status=stored_player.espn_status or "Active",
             jersey=stored_player.espn_jersey,
             position=player.position,
@@ -135,7 +159,7 @@ def _map_espn_about(
             headshot_url=(stored_player.espn_headshot_url or player.image_url)
             if settings.player_headshots_enabled
             else None,
-            source="espn" if stored_player.espn_profile_synced_at else "local",
+            source=_about_source(stored_player),
             message=message,
         )
     status = athlete.get("status") if isinstance(athlete.get("status"), dict) else {}
@@ -144,10 +168,10 @@ def _map_espn_about(
     headshot = athlete.get("headshot") if isinstance(athlete.get("headshot"), dict) else {}
     return PlayerCardAboutRead(
         espn_player_id=_profile_text(athlete.get("id")) or espn_player_id or _espn_player_id(player.external_id),
-        height=_profile_text(athlete.get("displayHeight")) or stored_player.espn_height,
-        weight=_profile_text(athlete.get("displayWeight")) or stored_player.espn_weight,
+        height=_preferred_bio_value(athlete.get("displayHeight"), stored_player.espn_height, stored_player.sheet_bio_height),
+        weight=_preferred_bio_value(athlete.get("displayWeight"), stored_player.espn_weight, stored_player.sheet_bio_weight),
         player_class=player.player_class,
-        birthplace=_birthplace(athlete) or stored_player.espn_birthplace,
+        birthplace=_preferred_bio_value(_birthplace(athlete), stored_player.espn_birthplace, stored_player.sheet_bio_birthplace),
         status=_profile_text(status.get("name") or status.get("abbreviation")) or stored_player.espn_status or "Active",
         jersey=_profile_text(athlete.get("jersey")) or stored_player.espn_jersey,
         position=_profile_text(position.get("displayName") or position.get("abbreviation")) or player.position,

@@ -16,19 +16,27 @@ from sqlalchemy import select
 from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
-from scripts.import_preseason_weekly_projections import MODEL_VERSION
+from scripts.import_preseason_weekly_projections import MODEL_VERSION, sealed_annual_baseline_source
 
 
-def main() -> int:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--season", type=int, required=True)
     parser.add_argument("--week", type=int, required=True)
-    parser.add_argument("--source-manifest-hash", required=True)
+    parser.add_argument(
+        "--annual-source-hash",
+        required=True,
+        help="SHA-256 of the sealed annual-projection export used to build the PRESEASON rows.",
+    )
     parser.add_argument("--player-id", type=int, action="append", required=True)
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--report", type=Path, required=True)
-    args = parser.parse_args()
-    expected_source = f"sealed:{args.source_manifest_hash[:12]}"
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    expected_source = sealed_annual_baseline_source(args.annual_source_hash)
     ensure_models_registered()
     report = {"mode": "apply" if args.apply else "preview", "approved": [], "blocked": []}
     with SessionLocal() as db:

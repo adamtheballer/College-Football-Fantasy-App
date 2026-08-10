@@ -84,6 +84,50 @@ def test_player_card_exposes_verified_sheet_history_without_an_espn_row(client, 
     assert 64 in [stat["value"] for category in body["historical_stats"]["seasons"][0]["categories"] for stat in category["stats"]]
 
 
+def test_player_card_uses_verified_sheet_bio_when_optional_espn_profile_is_not_synced(client, db_session):
+    player = Player(
+        name="Verified Bio Receiver",
+        position="WR",
+        school="Ohio State",
+        player_class="Junior",
+        sheet_bio_height="6' 3\"",
+        sheet_bio_weight="223 lbs",
+        sheet_bio_birthplace="Miami Gardens, FL",
+        sheet_bio_source_sheet_id="canonical-preseason:2026:Big 10",
+    )
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        PlayerProviderId(
+            player_id=player.id,
+            provider="espn",
+            provider_player_id="5079720",
+            verification_status="verified",
+            match_confidence=1.0,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/players/{player.id}/card")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["about"] == {
+        "espn_player_id": "5079720",
+        "height": "6' 3\"",
+        "weight": "223 lbs",
+        "player_class": "Junior",
+        "birthplace": "Miami Gardens, FL",
+        "status": "Active",
+        "jersey": None,
+        "position": "WR",
+        "team": "Ohio State",
+        "headshot_url": None,
+        "source": "verified_sheet",
+        "message": None,
+    }
+
+
 def test_player_season_stats_missing_sportsdata_key_returns_nullable_response(
     client, db_session, monkeypatch
 ):

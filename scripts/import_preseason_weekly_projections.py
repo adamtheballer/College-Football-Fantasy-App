@@ -46,6 +46,21 @@ def _source_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def sealed_annual_baseline_source(source_hash: str) -> str:
+    """Return the exact provenance marker stored on PRESEASON weekly rows.
+
+    Weekly rows are derived from the sealed annual-projection workbook, not
+    the umbrella six-workbook manifest.  Publishing must compare the same
+    immutable annual-source hash the importer stored, otherwise verified rows
+    can never become visible on player cards.
+    """
+
+    normalized = source_hash.strip().lower()
+    if len(normalized) != 64 or any(character not in "0123456789abcdef" for character in normalized):
+        raise ValueError("Annual projection source hash must be a SHA-256 digest.")
+    return f"sealed:{normalized[:12]}"
+
+
 def _canonical_source_team(value: str | None) -> str:
     """Use the same reviewed-team normalization as the source contract.
 
@@ -135,7 +150,7 @@ def main() -> int:
                     if not args.apply:
                         continue
                     existing = db.scalar(select(WeeklyProjection).where(WeeklyProjection.player_id == player.id, WeeklyProjection.season == args.season, WeeklyProjection.week == week, WeeklyProjection.projection_version == "PRESEASON"))
-                    baseline_source = f"sealed:{annual_hash[:12]}"
+                    baseline_source = sealed_annual_baseline_source(annual_hash)
                     if existing and existing.baseline_source != baseline_source:
                         raise ValueError(f"Refusing to overwrite a different sealed PRESEASON source for player {player.id} week {week}.")
                     values = dict(player_id=player.id, season=args.season, week=week, projection_version="PRESEASON", is_published=False, model_version=MODEL_VERSION, baseline_source=baseline_source, team_id=canonical_team.id, opponent_team_id=opponent_team.id if opponent_team else None, projection_status=row_status, baseline_games_played=games, neutral_baseline=points or 0.0, fantasy_points=points or 0.0, floor=points or 0.0, ceiling=points or 0.0, boom_prob=0.0, bust_prob=0.0, availability_multiplier=1.0, usage_multiplier=1.0, offense_multiplier=1.0, opponent_defense_multiplier=1.0, confidence=1.0 if row_status == "ACTIVE" else 0.0, fallback_reason=None if row_status == "ACTIVE" else row_status)
