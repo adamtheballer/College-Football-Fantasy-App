@@ -1,4 +1,5 @@
 import { getDraftPlayerIdentityKey, type DraftPlayer } from "@/lib/draftRankings";
+import { getCenteredDraftOrderScrollLeft, type DraftOrderCarouselScrollInput } from "@/lib/draftOrderCarousel";
 import {
   assignBestRosterSlotForPosition,
   filterDraftablePlayers,
@@ -81,12 +82,7 @@ export type MockDraftStateReconciliation = {
   wasReset: boolean;
 };
 
-export type CarouselScrollInput = {
-  overallPick: number;
-  cardOffsetLeft: number;
-  cardWidth: number;
-  containerWidth: number;
-};
+export type CarouselScrollInput = DraftOrderCarouselScrollInput;
 
 const STARTER_SLOTS: Array<{ label: string; allowedPositions: string[] }> = [
   { label: "QB", allowedPositions: ["QB"] },
@@ -279,17 +275,7 @@ export const isPickTimerDanger = (
   secondsRemaining: number
 ) => state.status === "live" && secondsRemaining > 0 && secondsRemaining <= 10;
 
-export const getCenteredDraftCarouselScrollLeft = ({
-  overallPick,
-  cardOffsetLeft,
-  cardWidth,
-  containerWidth,
-}: CarouselScrollInput) => {
-  if (overallPick <= 3) {
-    return 0;
-  }
-  return Math.max(0, cardOffsetLeft - containerWidth / 2 + cardWidth / 2);
-};
+export const getCenteredDraftCarouselScrollLeft = getCenteredDraftOrderScrollLeft;
 
 const draftedPlayerIds = (state: SinglePlayerMockDraftState) =>
   new Set(state.picks.map((pick) => pick.playerId));

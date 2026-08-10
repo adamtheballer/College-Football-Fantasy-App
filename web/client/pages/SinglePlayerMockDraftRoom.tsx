@@ -228,19 +228,24 @@ export default function SinglePlayerMockDraftRoom() {
 
   const centerDraftCarouselOnPick = useCallback(
     (overallPick: number, behavior: ScrollBehavior = "smooth") => {
-      const container = carouselRef.current;
-      const activeCard = pickRefs.current.get(overallPick);
-      if (!container || !activeCard) return;
+      const center = (
+        container: HTMLDivElement | null,
+        cards: Map<number, HTMLDivElement | null>,
+      ) => {
+        const activeCard = cards.get(overallPick);
+        if (!container || !activeCard) return;
+        container.scrollTo({
+          left: getCenteredDraftCarouselScrollLeft({
+            overallPick,
+            cardOffsetLeft: activeCard.offsetLeft,
+            cardWidth: activeCard.offsetWidth,
+            containerWidth: container.clientWidth,
+          }),
+          behavior,
+        });
+      };
 
-      container.scrollTo({
-        left: getCenteredDraftCarouselScrollLeft({
-          overallPick,
-          cardOffsetLeft: activeCard.offsetLeft,
-          cardWidth: activeCard.offsetWidth,
-          containerWidth: container.clientWidth,
-        }),
-        behavior,
-      });
+      center(carouselRef.current, pickRefs.current);
     },
     []
   );
@@ -248,6 +253,14 @@ export default function SinglePlayerMockDraftRoom() {
   const recenterDraftCarousel = () => {
     centerDraftCarouselOnPick(draftState.currentPick);
   };
+
+  useEffect(() => {
+    if (draftState.status === "complete") return;
+    const frame = window.requestAnimationFrame(() => {
+      centerDraftCarouselOnPick(draftState.currentPick, draftState.currentPick >= 4 ? "smooth" : "auto");
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [centerDraftCarouselOnPick, draftState.currentPick, draftState.status]);
 
   const currentTeam = getCurrentTeam(draftState);
   const userDraftBoardTeam = useMemo(
