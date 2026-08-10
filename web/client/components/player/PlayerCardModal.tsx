@@ -408,7 +408,7 @@ export function PlayerCardModal({
 
   return (
     <div
-      className="fixed inset-0 z-[1400] flex items-center justify-center bg-slate-950/78 p-3 backdrop-blur-md sm:p-6"
+      className="fixed inset-0 z-[1400] flex items-center justify-center bg-slate-950/78 p-0 backdrop-blur-md sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label={`${player.name} player card`}
@@ -416,7 +416,7 @@ export function PlayerCardModal({
     >
       <article
         className={cn(
-          "relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-white/12 bg-[#070d19] text-white",
+          "relative flex h-[100dvh] max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden rounded-none border-x-0 border-y border-white/12 bg-[#070d19] text-white sm:h-auto sm:max-h-[92vh] sm:rounded-[2rem] sm:border-x",
           palette.glow
         )}
         onClick={(event) => event.stopPropagation()}
@@ -431,7 +431,7 @@ export function PlayerCardModal({
           title={title}
         />
 
-        <nav className="flex gap-2 overflow-x-auto border-b border-white/10 bg-black/18 px-5 py-3 sm:flex-wrap sm:overflow-visible sm:px-8">
+        <nav className="flex gap-1.5 overflow-x-auto border-b border-white/10 bg-black/18 px-3 py-2 sm:gap-2 sm:flex-wrap sm:overflow-visible sm:px-8 sm:py-3">
           {visiblePlayerCardTabs(hasLeagueContext).map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -441,20 +441,20 @@ export function PlayerCardModal({
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "inline-flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] transition",
+                  "inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-[9px] font-black uppercase tracking-[0.12em] transition sm:gap-2 sm:rounded-2xl sm:px-4 sm:text-[10px] sm:tracking-[0.18em]",
                   active
                     ? "border-white/35 bg-white text-slate-950"
                     : "border-white/10 bg-white/[0.045] text-white/60 hover:border-white/25 hover:text-white"
                 )}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 {tab.label}
               </button>
             );
           })}
         </nav>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-8">
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-8">
           {loading ? (
             <div className="flex min-h-56 items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/[0.04] text-[10px] font-black uppercase tracking-[0.22em] text-white/55">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading player card
@@ -475,9 +475,9 @@ export function PlayerCardModal({
             </div>
           ) : activeTab === "summary" ? (
             <div className="w-full">
-              <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
+              <section className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 sm:rounded-3xl sm:p-5">
                 <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Bio</p>
-                <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
                   {[
                     ["Height", card?.about.height],
                     ["Weight", card?.about.weight],
@@ -486,9 +486,9 @@ export function PlayerCardModal({
                     ["School", card?.about.team ?? player.school],
                     ["Status", playerStatus],
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                    <div key={label} className="rounded-xl border border-white/10 bg-black/20 p-2.5 sm:rounded-2xl sm:p-3">
                       <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
-                      <p className="mt-2 text-sm font-black text-white">{formatPlayerCardValue(value)}</p>
+                      <p className="mt-1 text-sm font-black text-white sm:mt-2">{formatPlayerCardValue(value)}</p>
                     </div>
                   ))}
                 </div>

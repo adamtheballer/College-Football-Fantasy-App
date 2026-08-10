@@ -56,10 +56,18 @@ export function PlayerCardHeader({
 }) {
   const playerStatus = resolvePlayerCardStatus(card, player.status);
   const metricCards = [
-    ["Proj", typeof player.projectedPoints === "number" ? player.projectedPoints.toFixed(1) : "—"],
-    [CURRENT_VALUE_RATING_LABEL, formatCurrentValueRating(currentValue)],
-    ["Class", card?.about.player_class ?? player.playerClass ?? "—"],
-    ["Status", playerStatus],
+    {
+      label: "Proj",
+      mobileLabel: "Proj",
+      value: typeof player.projectedPoints === "number" ? player.projectedPoints.toFixed(1) : "—",
+    },
+    {
+      label: CURRENT_VALUE_RATING_LABEL,
+      mobileLabel: "Value",
+      value: formatCurrentValueRating(currentValue),
+    },
+    { label: "Class", mobileLabel: "Class", value: card?.about.player_class ?? player.playerClass ?? "—" },
+    { label: "Status", mobileLabel: "Status", value: playerStatus },
   ];
   const playerPills = [
     card?.about.jersey ? `#${card.about.jersey}` : null,
@@ -82,12 +90,12 @@ export function PlayerCardHeader({
         type="button"
         aria-label="Close player card"
         onClick={onClose}
-        className="absolute right-4 top-4 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/25 text-white/75 backdrop-blur transition hover:bg-white/10 hover:text-white"
+        className="absolute right-3 top-3 z-30 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/25 text-white/75 backdrop-blur transition hover:bg-white/10 hover:text-white sm:right-4 sm:top-4 sm:h-11 sm:w-11"
       >
         <X className="h-5 w-5" />
       </button>
 
-      <header className={cn("relative shrink-0 overflow-hidden px-5 py-6 pr-20 sm:px-8 sm:pr-24", palette.headerBase)}>
+      <header className={cn("relative shrink-0 overflow-hidden px-4 py-4 pr-14 sm:px-8 sm:py-6 sm:pr-24", palette.headerBase)}>
         <div className="absolute inset-0 opacity-75 mix-blend-screen" style={headerStreakStyle} />
         <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent_0_28px,rgba(255,255,255,0.07)_29px,transparent_31px_58px)] opacity-30" />
         <div
@@ -110,31 +118,31 @@ export function PlayerCardHeader({
             </span>
           ))}
         </div>
-        <div className="relative z-10 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,440px)] xl:items-end">
+        <div className="relative z-10 grid gap-3 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,440px)] xl:items-end">
           <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/70">{title}</p>
-            <div className="mt-4 flex min-w-0 items-center gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/25 bg-white/10 shadow-[0_16px_34px_rgba(2,6,23,0.28)] sm:h-20 sm:w-20">
+            <p className="hidden text-[10px] font-black uppercase tracking-[0.28em] text-white/70 sm:block">{title}</p>
+            <div className="flex min-w-0 items-center gap-3 sm:mt-4 sm:gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/25 bg-white/10 shadow-[0_16px_34px_rgba(2,6,23,0.28)] sm:h-20 sm:w-20 sm:rounded-2xl">
                 {card?.about.headshot_url ? (
                   <img src={card.about.headshot_url} alt={player.name} className="h-full w-full object-cover" />
                 ) : (
                   <div className={cn("flex h-full w-full items-center justify-center bg-gradient-to-b", palette.silhouette)}>
-                    <UserRound className="h-9 w-9 text-white/70 sm:h-10 sm:w-10" />
+                    <UserRound className="h-7 w-7 text-white/70 sm:h-10 sm:w-10" />
                   </div>
                 )}
               </div>
               <div className="min-w-0">
-                <h2 className="max-w-2xl break-words text-3xl font-black italic leading-[0.9] tracking-tight text-white sm:text-5xl">
+                <h2 className="max-w-2xl break-words text-2xl font-black italic leading-[0.9] tracking-tight text-white sm:text-5xl">
                   {player.name}
                 </h2>
-                <p className="mt-3 truncate text-xs font-black uppercase tracking-[0.18em] text-white/75">
+                <p className="mt-2 truncate text-[10px] font-black uppercase tracking-[0.15em] text-white/75 sm:mt-3 sm:text-xs sm:tracking-[0.18em]">
                   {[card?.about.jersey ? `#${card.about.jersey}` : null, position || player.position, card?.about.team ?? player.school]
                     .filter(Boolean)
                     .join(" • ")}
                 </p>
               </div>
             </div>
-            <div className="mt-5 flex flex-wrap gap-2">
+            <div className="mt-5 hidden flex-wrap gap-2 sm:flex">
               {playerPills.map((value, index) => (
                 <span
                   key={`${value}-${index}`}
@@ -148,14 +156,17 @@ export function PlayerCardHeader({
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-2 xl:self-end 2xl:grid-cols-4">
-            {metricCards.map(([label, value]) => (
+          <div data-testid="player-card-metric-rail" className="grid grid-cols-4 gap-1.5 sm:gap-2 xl:grid-cols-2 xl:self-end 2xl:grid-cols-4">
+            {metricCards.map(({ label, mobileLabel, value }) => (
               <div
                 key={label}
-                className="flex min-h-[5.75rem] min-w-0 flex-col justify-center rounded-2xl border border-white/15 bg-black/25 p-3 backdrop-blur"
+                className="flex min-h-[3.8rem] min-w-0 flex-col justify-center rounded-xl border border-white/15 bg-black/25 p-2 backdrop-blur sm:min-h-[5.75rem] sm:rounded-2xl sm:p-3"
               >
-                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/55">{label}</p>
-                <p className="mt-2 truncate text-xl font-black tabular-nums text-white">{value}</p>
+                <p className="truncate text-[8px] font-black uppercase tracking-[0.1em] text-white/55 sm:text-[9px] sm:tracking-[0.18em]">
+                  <span className="sm:hidden" aria-label={label}>{mobileLabel}</span>
+                  <span className="hidden sm:inline">{label}</span>
+                </p>
+                <p className="mt-1 truncate text-base font-black tabular-nums text-white sm:mt-2 sm:text-xl">{value}</p>
               </div>
             ))}
           </div>
