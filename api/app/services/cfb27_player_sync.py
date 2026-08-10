@@ -4,6 +4,7 @@ import json
 import csv
 import hashlib
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone
@@ -385,6 +386,85 @@ def _clear_current_batch_rating_from_legacy_player(player: Player) -> bool:
     player.value_source_batch_id = None
     player.value_input_json = None
     return True
+
+
+def plan_cfb27_players(
+    db: Session,
+    *,
+    snapshot: ReviewedCfb27Snapshot | None = None,
+    planned_active_identities: Iterable[tuple[str, str, str]],
+    season: int = 2026,
+) -> dict[str, int]:
+    """Validate CFB27 coverage for a post-bootstrap player plan without ORM writes.
+
+    A reconciliation dry run cannot stage the catalog bootstrap's replacement
+    identities: staging then flushing a would-create player consumes a
+    PostgreSQL sequence value.  This planner therefore receives the exact
+    source-derived identities that the bootstrap would make active and compares
+    them to the sealed CFB27 snapshot using the same composite-key rules as the
+    mutating sync.
+    """
+
+    if snapshot is None:
+        raise RuntimeError(
+            "CFB27 sync requires an explicit reviewed ratings snapshot; the legacy packaged rating seed is not an import source."
+        )
+    from collegefootballfantasy_api.app.services.player_trade_value import week_one_is_authoritatively_finalized
+
+    if week_one_is_authoritatively_finalized(db, season=season):
+        raise RuntimeError("CFB27 preseason reconciliation is blocked after authoritative Week 1 finalization.")
+
+    planned_by_key: dict[str, list[tuple[str, str, str]]] = {}
+    for name, school, position in planned_active_identities:
+        key = cfb27_identity_key(name=name, school=school, position=position)
+        planned_by_key.setdefault(key, []).append((name, school, position))
+    duplicate_keys = sorted(key for key, candidates in planned_by_key.items() if len(candidates) > 1)
+
+    ratings_by_key: dict[str, list[Cfb27Rating]] = {}
+    for rating in snapshot.ratings:
+        if not is_approved_fantasy_school(rating.school):
+            continue
+        key = cfb27_identity_key(name=rating.name, school=rating.school, position=rating.position)
+        ratings_by_key.setdefault(key, []).append(rating)
+    snapshot_keys = set(ratings_by_key)
+    duplicate_source_keys = sorted(key for key, rows in ratings_by_key.items() if len(rows) > 1)
+    if duplicate_source_keys:
+        raise ValueError(f"CFB27 sync blocked by duplicate approved source identities: {', '.join(duplicate_source_keys)}")
+    conflicting_keys = sorted(set(duplicate_keys).intersection(snapshot_keys))
+    if conflicting_keys:
+        raise ValueError(f"CFB27 sync blocked by duplicate canonical identities: {', '.join(conflicting_keys)}")
+
+    active_keys = set(planned_by_key)
+    matched_keys = sorted(active_keys.intersection(snapshot_keys))
+    missing_current_keys = sorted(active_keys.difference(snapshot_keys))
+    unused_source_keys = sorted(snapshot_keys.difference(active_keys))
+    legacy_assignments = (
+        db.query(Player)
+        .filter(generated_test_player_filter())
+        .filter(Player.sheet_source_sheet_id.like(f"legacy-canonical-preseason:{int(season)}:%"))
+        .filter(Player.value_policy_version == "cfb27_exact_preseason_v1")
+        .filter(Player.value_calculation_week == 0)
+        .filter(Player.value_source_batch_id.isnot(None))
+        .all()
+    )
+    return {
+        "created": 0,
+        "updated": 0,
+        "already_present": len(matched_keys),
+        "matched": len(matched_keys),
+        "current_eligible_players": len(active_keys),
+        "missing": len(missing_current_keys),
+        "missing_current_players": len(missing_current_keys),
+        "unmatched_approved": len(unused_source_keys),
+        "unused_source_rows": len(unused_source_keys),
+        "skipped_non_power4": len(snapshot.ratings) - len(snapshot_keys),
+        "duplicate_matches": 0,
+        "duplicate_current_identities": len(duplicate_keys),
+        "duplicate_source_rows": len(duplicate_source_keys),
+        "legacy_assignments_to_clear": len(legacy_assignments),
+        "manual_review_rows": len(missing_current_keys),
+        "total": snapshot.row_count,
+    }
 
 
 def sync_cfb27_players(

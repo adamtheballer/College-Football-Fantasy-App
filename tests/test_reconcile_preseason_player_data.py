@@ -122,7 +122,12 @@ def test_dry_run_plans_without_flushing_or_consuming_a_primary_key(db_session, m
     )
     monkeypatch.setattr(
         reconcile_preseason_player_data,
-        "sync_cfb27_players",
+        "planned_active_cfb27_identities",
+        lambda **_kwargs: (("Wayne Knight", "UCLA", "RB"),),
+    )
+    monkeypatch.setattr(
+        reconcile_preseason_player_data,
+        "plan_cfb27_players",
         lambda *_args, **_kwargs: {"matched": 814, "missing": 0, "unmatched_approved": 0},
     )
 
