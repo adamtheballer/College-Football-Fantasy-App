@@ -95,7 +95,7 @@ environments:
       port_env: PORT
       migrate_command: PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head
       verify_migrations_command: PYTHONPATH=. uv run python scripts/check_alembic_head.py
-      railway_predeploy_command: PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head && PYTHONPATH=. uv run python scripts/check_alembic_head.py
+      railway_predeploy_command: sh -c 'uv run alembic -c api/alembic.ini upgrade head && uv run python scripts/check_alembic_head.py'
       start_command: sh -c 'exec uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port "$PORT"'
       health_path: /health
       readiness_path: /health/ready

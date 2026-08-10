@@ -43,8 +43,8 @@ def test_production_manifest_names_one_canonical_frontend_and_railway_api_contra
     assert api["migrate_command"] == "PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head"
     assert api["verify_migrations_command"] == "PYTHONPATH=. uv run python scripts/check_alembic_head.py"
     assert api["railway_predeploy_command"] == (
-        "PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head "
-        "&& PYTHONPATH=. uv run python scripts/check_alembic_head.py"
+        "sh -c 'uv run alembic -c api/alembic.ini upgrade head "
+        "&& uv run python scripts/check_alembic_head.py'"
     )
 
     assert web["canonical_project"] == "college-football-fantasy-app"
@@ -61,8 +61,8 @@ def test_railway_api_config_runs_one_atomic_migration_gate_before_readiness():
 
     assert config["build"] == {"builder": "DOCKERFILE", "dockerfilePath": "Dockerfile.api"}
     assert config["deploy"]["preDeployCommand"] == [
-        "PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head "
-        "&& PYTHONPATH=. uv run python scripts/check_alembic_head.py"
+        "sh -c 'uv run alembic -c api/alembic.ini upgrade head "
+        "&& uv run python scripts/check_alembic_head.py'"
     ]
     start_command = config["deploy"]["startCommand"]
     assert start_command == (
