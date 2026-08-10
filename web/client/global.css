@@ -12,7 +12,7 @@
    * A different format will require also updating the theme in tailwind.config.ts.
   */
   :root {
-    --background-canvas: 224 58% 8%;
+    --background-canvas: 222 62% 5%;
     --background-sidebar: 224 52% 7%;
     --background-surface: 222 48% 12%;
     --background-surface-raised: 221 44% 16%;
@@ -38,7 +38,7 @@
     --unavailable: 215 16% 52%;
     --locked: 24 94% 58%;
 
-    --background: 224 58% 8%;
+    --background: 222 62% 5%;
     --foreground: 213 31% 91%;
 
     --card: 222 48% 12%;
@@ -79,7 +79,7 @@
   }
 
   .dark {
-    --background-canvas: 224 58% 8%;
+    --background-canvas: 222 62% 5%;
     --background-sidebar: 224 52% 7%;
     --background-surface: 222 48% 12%;
     --background-surface-raised: 221 44% 16%;
@@ -105,7 +105,7 @@
     --unavailable: 215 16% 52%;
     --locked: 24 94% 58%;
 
-    --background: 224 58% 8%;
+    --background: 222 62% 5%;
     --foreground: 213 31% 91%;
 
     --card: 222 48% 12%;
@@ -161,11 +161,10 @@
   body {
     @apply bg-background text-foreground;
     background:
-      radial-gradient(circle at 16% 8%, rgba(34, 211, 238, 0.15), transparent 31%),
-      radial-gradient(circle at 76% 2%, rgba(96, 165, 250, 0.15), transparent 28%),
-      radial-gradient(circle at 88% 72%, rgba(244, 114, 182, 0.10), transparent 30%),
-      radial-gradient(circle at 8% 88%, rgba(250, 204, 21, 0.06), transparent 28%),
-      linear-gradient(135deg, hsl(var(--background)), #07162b 52%, #110c2d);
+      radial-gradient(circle at 7% 4%, rgba(251, 191, 36, 0.10), transparent 28%),
+      radial-gradient(circle at 92% 6%, rgba(59, 130, 246, 0.13), transparent 30%),
+      radial-gradient(circle at 88% 90%, rgba(251, 191, 36, 0.08), transparent 28%),
+      linear-gradient(135deg, hsl(var(--background)), #06152a 48%, #020713);
   }
 
   :focus-visible {
