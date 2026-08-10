@@ -212,7 +212,7 @@ export default function Index() {
   const ownedTeamName = workspace?.owned_team?.name ?? "Your Team";
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-5 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] pt-3 sm:space-y-7 sm:pb-24 sm:pt-4">
+    <div className="mx-auto w-full touch-pan-y max-w-7xl space-y-5 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] pt-3 sm:space-y-7 sm:pb-24 sm:pt-4">
       <section className="relative grid gap-4 sm:gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div aria-hidden="true" className="pointer-events-none absolute -left-8 -top-8 h-28 w-80 rotate-[-14deg] rounded-full bg-gradient-to-r from-cfb-pink/45 via-cfb-brand/35 to-transparent blur-xl" />
         <div aria-hidden="true" className="pointer-events-none absolute -right-8 top-20 h-24 w-96 rotate-[-18deg] rounded-full bg-gradient-to-r from-transparent via-cfb-cyan/35 to-cfb-gold/30 blur-xl" />

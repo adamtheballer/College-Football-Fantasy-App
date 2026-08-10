@@ -89,6 +89,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         hideDecor={isCreateLeaguePage}
         hideFloatingActions={isDraftRoomPage || isCreateLeaguePage || isSaturdayPick6Page}
         compactContent={isDraftRoomPage || isCreateLeaguePage}
+        fixedViewport={isDraftRoomPage}
         onSignOut={logout}
         mainScrollRef={mainScrollRef}
       >

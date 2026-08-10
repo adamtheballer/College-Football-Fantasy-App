@@ -37,7 +37,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
           isMoreOpen && "pointer-events-none opacity-0",
         )}
       >
-        <div className="grid grid-cols-5 gap-1">
+        <div className="grid grid-cols-5 gap-0.5">
           {items.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.path;
@@ -48,7 +48,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
                 to={item.path}
                 aria-label={item.badge ? `${item.name}: ${item.badge} unread chat messages` : item.name}
                 className={cn(
-                  "flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl px-1 text-[9px] font-black uppercase tracking-[0.08em] transition-colors",
+                  "flex min-h-[58px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 text-[10px] font-black uppercase tracking-[0.04em] leading-none transition-colors",
                   isActive
                     ? "bg-cfb-brand text-white shadow-[0_0_24px_hsl(var(--brand-primary)/0.24)]"
                     : "text-cfb-text-muted hover:bg-cfb-surface-hover/70 hover:text-cfb-text-primary",
@@ -66,7 +66,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
                     </span>
                   ) : null}
                 </span>
-                <span className="max-w-full truncate">{item.name.replace("MOCK ", "")}</span>
+                <span className="max-w-full whitespace-nowrap">{item.name.replace("MOCK ", "")}</span>
               </Link>
             );
           })}
@@ -77,14 +77,14 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
             aria-expanded={isMoreOpen}
             onClick={() => setIsMoreOpen(true)}
             className={cn(
-              "flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl px-1 text-[9px] font-black uppercase tracking-[0.08em] transition-colors",
+              "flex min-h-[58px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 text-[10px] font-black uppercase tracking-[0.04em] leading-none transition-colors",
               isMoreActive
                 ? "bg-cfb-brand text-white shadow-[0_0_24px_hsl(var(--brand-primary)/0.24)]"
                 : "text-cfb-text-muted hover:bg-cfb-surface-hover/70 hover:text-cfb-text-primary",
             )}
           >
             <Menu className="h-4 w-4" aria-hidden="true" />
-            <span>More</span>
+            <span className="whitespace-nowrap">More</span>
           </button>
         </div>
       </nav>
