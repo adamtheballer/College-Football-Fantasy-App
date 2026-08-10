@@ -43,11 +43,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   // otherwise navigating from a long page can leave the next page at its old
   // bottom offset on mobile Safari.
   useLayoutEffect(() => {
-    if (isDraftRoomPage) return;
-
     mainScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  }, [isDraftRoomPage, location.key, location.pathname, location.search]);
+  }, [location.key, location.pathname, location.search]);
 
   useEffect(() => {
     if (!user) {
@@ -102,7 +100,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         hideDecor={isLoggedIn || isCreateLeaguePage}
         hideFloatingActions={isLoggedIn || isDraftRoomPage || isCreateLeaguePage || isSaturdayPick6Page}
         compactContent={isDraftRoomPage || isCreateLeaguePage}
-        fixedViewport={isDraftRoomPage}
+        // Draft rooms use the same page-level scroll owner as every other
+        // route. A fixed outer viewport plus a nested player-board scroller
+        // traps touch gestures and makes the board feel stuck on mobile.
+        fixedViewport={false}
         onSignOut={logout}
         mainScrollRef={mainScrollRef}
       >
