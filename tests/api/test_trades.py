@@ -7,7 +7,7 @@ from collegefootballfantasy_api.app.api.routes.trades import (
 )
 from conftest import TestingSessionLocal
 from collegefootballfantasy_api.app.models.game import Game
-from collegefootballfantasy_api.app.models.chat import ChatAuditEvent, ChatMessage
+from collegefootballfantasy_api.app.models.chat import ChatAuditEvent, ChatMessage, ChatThread
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.notification import NotificationLog
@@ -48,14 +48,21 @@ def create_user_and_token(client, suffix: str = "trade", *, admin: bool = False)
     return response.json()["access_token"]
 
 
-def create_league(client, token: str, suffix: str = "trade", review_type: str = "none") -> dict:
+def create_league(
+    client,
+    token: str,
+    suffix: str = "trade",
+    review_type: str = "none",
+    *,
+    max_teams: int = 2,
+) -> dict:
     response = client.post(
         "/leagues",
         json={
             "basics": {
                 "name": f"Trade League {suffix}",
                 "season_year": 2026,
-                "max_teams": 2,
+                "max_teams": max_teams,
                 "is_private": True,
                 "description": None,
                 "icon_url": None,
@@ -144,6 +151,8 @@ def test_trade_offer_contract_uses_canonical_lifecycle_fields():
 
     assert canonical_fields.issubset(model_columns)
     assert canonical_fields.issubset(schema_fields)
+    assert "client_request_id" in model_columns
+    assert "client_request_id" not in schema_fields
     assert "created_by" not in model_columns
     assert "created_by" not in schema_fields
 
@@ -156,11 +165,13 @@ def test_trade_offer_create_uses_give_receive_items_contract():
             "give_items": [{"team_id": 1, "player_id": 10}],
             "receive_items": [{"team_id": 2, "player_id": 20}],
             "message": "Fair offer",
+            "client_request_id": "trade-offer-contract-0001",
         }
     )
 
     assert payload.give_items[0].team_id == 1
     assert payload.receive_items[0].team_id == 2
+    assert payload.client_request_id == "trade-offer-contract-0001"
     assert not hasattr(payload, "proposing_items")
     assert not hasattr(payload, "receiving_items")
 
@@ -403,6 +414,214 @@ def test_trade_proposal_creates_recipient_alert(client, db_session):
     assert legacy_response.status_code == 404
 
 
+def test_trade_proposal_creates_one_private_card_in_a_reused_direct_thread(client, db_session):
+    proposing_token = create_user_and_token(client, "private-card-a")
+    receiving_token = create_user_and_token(client, "private-card-b")
+    league = create_league(client, proposing_token, "private-card")
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+
+    direct_response = client.post(
+        f"/leagues/{league['id']}/chats/direct",
+        json={"recipient_user_id": seed["receiving"].owner_user_id},
+        headers=auth_headers(proposing_token),
+    )
+    assert direct_response.status_code == 201
+    direct_thread_id = direct_response.json()["id"]
+
+    response = client.post(
+        f"/leagues/{league['id']}/trades",
+        json=trade_offer_payload(seed),
+        headers=auth_headers(proposing_token),
+    )
+
+    assert response.status_code == 201
+    trade_id = response.json()["id"]
+    direct_threads = (
+        db_session.query(ChatThread)
+        .filter_by(league_id=league["id"], thread_type="direct")
+        .all()
+    )
+    assert [thread.id for thread in direct_threads] == [direct_thread_id]
+    message = db_session.query(ChatMessage).filter_by(event_key=f"trade:{trade_id}:created").one()
+    assert message.thread_id == direct_thread_id
+    assert message.message_type == "system"
+    assert message.metadata_json["card_type"] == "private_trade_offer"
+    assert message.metadata_json["trade_status"] == "proposed"
+    assert message.metadata_json["league"] == {"id": league["id"], "name": league["name"]}
+    assert message.metadata_json["created_at"] is not None
+    assert message.metadata_json["expires_at"] is not None
+    assert message.metadata_json["proposing_team_sends"][0]["player_id"] == seed["give"].id
+    assert message.metadata_json["receiving_team_sends"][0]["player_id"] == seed["receive"].id
+
+    for token in (proposing_token, receiving_token):
+        direct_messages = client.get(
+            f"/leagues/{league['id']}/chats/{direct_thread_id}/messages",
+            headers=auth_headers(token),
+        )
+        assert direct_messages.status_code == 200
+        cards = [
+            row
+            for row in direct_messages.json()["data"]
+            if row["metadata"].get("card_type") == "private_trade_offer"
+        ]
+        assert len(cards) == 1
+        assert cards[0]["metadata"]["event_key"] == f"trade:{trade_id}:created"
+
+
+def test_trade_proposal_is_idempotent_and_writes_only_one_private_card(client, db_session):
+    proposing_token = create_user_and_token(client, "private-idempotent-a")
+    receiving_token = create_user_and_token(client, "private-idempotent-b")
+    league = create_league(client, proposing_token, "private-idempotent")
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+    payload = {
+        **trade_offer_payload(seed),
+        "message": "  Fair offer  ",
+        "client_request_id": "trade-offer-submit-0001",
+    }
+
+    first = client.post(f"/leagues/{league['id']}/trades", json=payload, headers=auth_headers(proposing_token))
+    second = client.post(f"/leagues/{league['id']}/trades", json=payload, headers=auth_headers(proposing_token))
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert second.json()["id"] == first.json()["id"]
+    assert first.json()["message"] == "Fair offer"
+    assert db_session.query(TradeOffer).filter_by(league_id=league["id"]).count() == 1
+    assert db_session.query(ChatThread).filter_by(league_id=league["id"], thread_type="direct").count() == 1
+    assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{first.json()['id']}:created").count() == 1
+    assert db_session.query(NotificationLog).filter_by(alert_type="TRADE_PROPOSED").count() == 1
+
+    changed_payload = {**payload, "message": "A different offer under the same request id"}
+    conflict = client.post(
+        f"/leagues/{league['id']}/trades",
+        json=changed_payload,
+        headers=auth_headers(proposing_token),
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"] == "client_request_id was already used for a different trade offer"
+
+
+def test_trade_offer_rejects_cross_league_team_injection_before_private_card_creation(client, db_session):
+    proposing_token = create_user_and_token(client, "private-cross-league-a")
+    receiving_token = create_user_and_token(client, "private-cross-league-b")
+    foreign_token = create_user_and_token(client, "private-cross-league-c")
+    league = create_league(client, proposing_token, "private-cross-league")
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+    foreign_league = create_league(client, foreign_token, "private-cross-league-foreign")
+    foreign_team = db_session.query(Team).filter_by(league_id=foreign_league["id"]).one()
+
+    injected_payload = {
+        **trade_offer_payload(seed),
+        "receiving_team_id": foreign_team.id,
+        "receive_items": [{"team_id": foreign_team.id, "player_id": seed["receive"].id}],
+    }
+    response = client.post(
+        f"/leagues/{league['id']}/trades",
+        json=injected_payload,
+        headers=auth_headers(proposing_token),
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "team not found in league"
+    assert db_session.query(TradeOffer).filter_by(league_id=league["id"]).count() == 0
+    assert db_session.query(ChatMessage).filter_by(league_id=league["id"]).count() == 0
+
+
+def test_private_trade_card_is_invisible_to_another_league_member(client, db_session):
+    proposing_token = create_user_and_token(client, "private-access-a")
+    receiving_token = create_user_and_token(client, "private-access-b")
+    unrelated_token = create_user_and_token(client, "private-access-c")
+    league = create_league(client, proposing_token, "private-access", max_teams=4)
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+    join_league(client, unrelated_token, league["id"])
+    created = client.post(
+        f"/leagues/{league['id']}/trades",
+        json=trade_offer_payload(seed),
+        headers=auth_headers(proposing_token),
+    )
+    assert created.status_code == 201
+    private_message = db_session.query(ChatMessage).filter_by(event_key=f"trade:{created.json()['id']}:created").one()
+
+    blocked = client.get(
+        f"/leagues/{league['id']}/chats/{private_message.thread_id}/messages",
+        headers=auth_headers(unrelated_token),
+    )
+
+    assert blocked.status_code == 404
+    assert blocked.json()["detail"] == "chat thread not found"
+
+
+def test_private_trade_card_fails_closed_for_cpu_or_inactive_owner(client, db_session):
+    proposing_token = create_user_and_token(client, "private-cpu-a")
+    receiving_token = create_user_and_token(client, "private-cpu-b")
+    league = create_league(client, proposing_token, "private-cpu")
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+    seed["receiving"].owner_user_id = None
+    db_session.commit()
+
+    cpu_offer = client.post(
+        f"/leagues/{league['id']}/trades",
+        json=trade_offer_payload(seed),
+        headers=auth_headers(proposing_token),
+    )
+    assert cpu_offer.status_code == 422
+    assert db_session.query(TradeOffer).filter_by(league_id=league["id"]).count() == 0
+    assert db_session.query(ChatMessage).filter_by(league_id=league["id"]).count() == 0
+
+    inactive_proposing_token = create_user_and_token(client, "private-inactive-a")
+    inactive_receiving_token = create_user_and_token(client, "private-inactive-b")
+    inactive_league = create_league(client, inactive_proposing_token, "private-inactive")
+    join_league(client, inactive_receiving_token, inactive_league["id"])
+    inactive_seed = seed_trade_rosters(db_session, inactive_league["id"])
+    receiving_user = db_session.get(User, inactive_seed["receiving"].owner_user_id)
+    assert receiving_user is not None
+    receiving_user.is_active = False
+    db_session.commit()
+
+    inactive_offer = client.post(
+        f"/leagues/{inactive_league['id']}/trades",
+        json=trade_offer_payload(inactive_seed),
+        headers=auth_headers(inactive_proposing_token),
+    )
+    assert inactive_offer.status_code == 409
+    assert db_session.query(TradeOffer).filter_by(league_id=inactive_league["id"]).count() == 0
+    assert db_session.query(ChatMessage).filter_by(league_id=inactive_league["id"]).count() == 0
+
+
+def test_private_trade_card_failure_rolls_back_trade_and_notification(client, db_session, monkeypatch):
+    proposing_token = create_user_and_token(client, "private-atomic-a")
+    receiving_token = create_user_and_token(client, "private-atomic-b")
+    league = create_league(client, proposing_token, "private-atomic")
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+
+    def fail_private_trade_card(*_args, **_kwargs):
+        raise RuntimeError("private chat persistence unavailable")
+
+    monkeypatch.setattr(trade_service, "create_trade_private_chat_message", fail_private_trade_card)
+    with pytest.raises(RuntimeError, match="private chat persistence unavailable"):
+        client.post(
+            f"/leagues/{league['id']}/trades",
+            json=trade_offer_payload(seed),
+            headers=auth_headers(proposing_token),
+        )
+
+    db_session.expire_all()
+    assert db_session.query(TradeOffer).filter_by(league_id=league["id"]).count() == 0
+    assert db_session.query(ChatMessage).filter_by(league_id=league["id"]).count() == 0
+    assert (
+        db_session.query(NotificationLog)
+        .filter_by(user_id=seed["receiving"].owner_user_id, alert_type="TRADE_PROPOSED")
+        .count()
+        == 0
+    )
+
+
 def test_accept_no_review_trade_processes_roster_swap_and_writes_chat(client, db_session, monkeypatch):
     monkeypatch.setattr(trade_service, "is_cfb_game_week_active", lambda now=None, timezone_name="UTC": False)
     proposing_token = create_user_and_token(client, "accept-a")
@@ -431,6 +650,19 @@ def test_accept_no_review_trade_processes_roster_swap_and_writes_chat(client, db
     db_session.expire_all()
     assert db_session.query(RosterEntry).filter_by(team_id=seed["receiving"].id, player_id=seed["give"].id).one()
     assert db_session.query(RosterEntry).filter_by(team_id=seed["proposing"].id, player_id=seed["receive"].id).one()
+    private_created = db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:created").one()
+    private_accepted = db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:accepted").one()
+    assert private_created.thread_id == private_accepted.thread_id
+    assert private_accepted.metadata_json["card_type"] == "private_trade_offer"
+    assert private_accepted.metadata_json["trade_status"] == "accepted"
+    assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:accepted").count() == 1
+    replay = client.post(
+        f"/leagues/{league['id']}/trades/{created['id']}/accept",
+        json={},
+        headers=auth_headers(receiving_token),
+    )
+    assert replay.status_code == 409
+    assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:accepted").count() == 1
     message = db_session.query(ChatMessage).filter(ChatMessage.message_type == "trade_finalized").one()
     assert message.event_key == f"trade:{created['id']}:finalized"
     assert message.metadata_json["event_key"] == message.event_key
@@ -701,6 +933,10 @@ def test_trade_reject_cancel_counter_and_veto_endpoints(client, db_session):
     )
     assert reject_response.status_code == 200
     assert reject_response.json()["status"] == "rejected"
+    rejected_message = db_session.query(ChatMessage).filter_by(event_key=f"trade:{rejected['id']}:rejected").one()
+    assert rejected_message.metadata_json["trade_status"] == "rejected"
+    assert db_session.query(RosterEntry).filter_by(team_id=seed["proposing"].id, player_id=seed["give"].id).one()
+    assert db_session.query(RosterEntry).filter_by(team_id=seed["receiving"].id, player_id=seed["receive"].id).one()
 
     seed = seed_trade_rosters(db_session, league["id"])
     cancelled = client.post(
@@ -715,6 +951,8 @@ def test_trade_reject_cancel_counter_and_veto_endpoints(client, db_session):
     )
     assert cancel_response.status_code == 200
     assert cancel_response.json()["status"] == "cancelled"
+    cancelled_message = db_session.query(ChatMessage).filter_by(event_key=f"trade:{cancelled['id']}:canceled").one()
+    assert cancelled_message.metadata_json["trade_status"] == "cancelled"
 
     seed = seed_trade_rosters(db_session, league["id"])
     countered = client.post(
@@ -739,6 +977,8 @@ def test_trade_reject_cancel_counter_and_veto_endpoints(client, db_session):
     assert replacement["countered_from_trade_id"] == countered["id"]
     assert db_session.get(TradeOffer, countered["id"]).status == "countered"
     assert db_session.query(TradeReview).filter_by(trade_offer_id=countered["id"], action="countered").one()
+    assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{countered['id']}:countered").one()
+    assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{replacement['id']}:created").one()
 
     seed = seed_trade_rosters(db_session, league["id"])
     vetoed = client.post(
@@ -758,6 +998,7 @@ def test_trade_reject_cancel_counter_and_veto_endpoints(client, db_session):
     )
     assert veto_response.status_code == 200
     assert veto_response.json()["status"] == "vetoed"
+    assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{vetoed['id']}:vetoed").one()
 
 
 def test_locked_player_cannot_be_traded(client, db_session):
@@ -830,6 +1071,8 @@ def test_lifecycle_worker_marks_expired_trade_as_final(client, db_session):
     assert expire_trade_offers_once(db_session) == {"expired": 1}
     assert db_session.get(TradeOffer, created["id"]).status == "expired"
     assert db_session.query(TradeReview).filter_by(trade_offer_id=created["id"], action="expired").one()
+    expired_message = db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:expired").one()
+    assert expired_message.metadata_json["trade_status"] == "expired"
 
 
 def test_counter_offer_must_reverse_the_original_participants(client, db_session):

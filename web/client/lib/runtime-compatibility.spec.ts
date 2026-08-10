@@ -20,7 +20,7 @@ const runtime = (overrides: Partial<RuntimeIdentity> = {}): RuntimeIdentity => (
   web_git_sha: "release-sha",
   worker_git_sha: "release-sha",
   database_instance_uuid: "database-instance",
-  alembic_revision: "0088_beta_scoring_lock",
+  alembic_revision: "0089_trade_private_chat",
   readiness_status: "ready",
   scoring_mode: "disabled",
   sportsdata_enabled: false,
@@ -36,7 +36,7 @@ describe("publishRuntimeDebugIdentity", () => {
       frontend_git_sha: expect.any(String),
       git_sha: "release-sha",
       database_instance_uuid: "database-instance",
-      alembic_revision: "0088_beta_scoring_lock",
+      alembic_revision: "0089_trade_private_chat",
       deployment_skew: null,
     });
     expect(JSON.stringify(window.__CFF_RUNTIME__)).not.toContain("secret");

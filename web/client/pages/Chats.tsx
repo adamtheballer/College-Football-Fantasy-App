@@ -131,6 +131,99 @@ export function TradeFinalizedCard({
   );
 }
 
+const privateTradeStatusLabel = (status: unknown) => {
+  switch (status) {
+    case "proposed": return "Trade offer pending";
+    case "accepted": return "Trade accepted";
+    case "rejected": return "Trade rejected";
+    case "cancelled": return "Trade cancelled";
+    case "countered": return "Trade countered";
+    case "vetoed": return "Trade vetoed";
+    case "expired": return "Trade expired";
+    case "failed": return "Trade failed";
+    default: return "Trade update";
+  }
+};
+
+const ownerUserId = (team: unknown): number | null =>
+  isRecord(team) && typeof team.owner_user_id === "number" ? team.owner_user_id : null;
+
+const teamName = (team: unknown, fallback: string): string =>
+  isRecord(team) && typeof team.name === "string" ? team.name : fallback;
+
+export const isPrivateTradeMessage = (message: Pick<ChatMessage, "message_type" | "metadata">) =>
+  message.message_type === "system" && message.metadata.card_type === "private_trade_offer";
+
+export function PrivateTradeOfferCard({
+  message,
+  currentUserId,
+  returnTo,
+}: {
+  message: { league_id: number; body: string | null; metadata: Record<string, unknown> };
+  currentUserId?: number;
+  returnTo?: string;
+}) {
+  const metadata = message.metadata;
+  const proposingTeam = teamName(metadata.proposing_team, "Proposing team");
+  const receivingTeam = teamName(metadata.receiving_team, "Receiving team");
+  const proposingSends = tradeAssets(metadata.proposing_team_sends);
+  const receivingSends = tradeAssets(metadata.receiving_team_sends);
+  const status = metadata.trade_status;
+  const statusLabel = privateTradeStatusLabel(status);
+  const createdAt = typeof metadata.created_at === "string" ? metadata.created_at : null;
+  const expiresAt = typeof metadata.expires_at === "string" ? metadata.expires_at : null;
+  const leagueName = isRecord(metadata.league) && typeof metadata.league.name === "string"
+    ? metadata.league.name
+    : "League";
+  const proposerUserId = ownerUserId(metadata.proposing_team);
+  const recipientUserId = ownerUserId(metadata.receiving_team);
+  const isRecipient = currentUserId !== undefined && currentUserId === recipientUserId;
+  const isProposer = currentUserId !== undefined && currentUserId === proposerUserId;
+  const tradePath = tradeOfferPath(
+    message.league_id,
+    metadata.trade_id,
+    returnTo ?? `/chats?leagueId=${message.league_id}`,
+  );
+  const playerList = (assets: TradeAsset[]) => assets.length
+    ? assets.map((asset) => <li key={`${asset.player_id ?? asset.name}-${asset.position ?? ""}`}>{asset.name}{asset.position ? ` · ${asset.position}` : ""}{asset.school ? ` · ${asset.school}` : ""}</li>)
+    : <li>No players listed</li>;
+  const actionLabel = status === "proposed" && isRecipient
+    ? "Review trade"
+    : isProposer || status !== "proposed"
+      ? "View trade"
+      : null;
+
+  return (
+    <div className="space-y-3" data-testid="private-trade-card">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-cfb-gold">
+          <ArrowRightLeft className="h-4 w-4" /> Private trade
+        </div>
+        <span className="rounded-full border border-cfb-gold/30 bg-cfb-gold/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-cfb-gold">{statusLabel}</span>
+      </div>
+      <p className="text-xs font-semibold text-foreground">{leagueName} · {proposingTeam} ↔ {receivingTeam}</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div className="rounded-xl border border-white/10 bg-black/15 p-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">{proposingTeam} sends</p>
+          <ul className="mt-2 space-y-1 text-sm font-semibold text-foreground">{playerList(proposingSends)}</ul>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-black/15 p-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">{receivingTeam} sends</p>
+          <ul className="mt-2 space-y-1 text-sm font-semibold text-foreground">{playerList(receivingSends)}</ul>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+        <span>{createdAt ? `Sent ${formatTime(createdAt)}` : "Sent time unavailable"}{expiresAt ? ` · Expires ${formatTime(expiresAt)}` : ""}</span>
+        {tradePath && actionLabel ? (
+          <Link to={tradePath} className="rounded-lg border border-primary/50 bg-primary/10 px-3 py-2 text-primary transition hover:bg-primary/20">
+            {actionLabel}
+          </Link>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export default function Chats() {
   const { user } = useAuth();
   const { data: leagues = [], isLoading: leaguesLoading } = useLeagues(50, Boolean(user));
@@ -392,7 +485,7 @@ export default function Chats() {
                   {index === 0 || !sameDay(allMessages[index - 1].created_at, message.created_at) ? <div className="flex items-center gap-3 py-2"><span className="h-px flex-1 bg-white/10" /><span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">{dateLabel(message.created_at)}</span><span className="h-px flex-1 bg-white/10" /></div> : null}
                   <div className={cn("max-w-[88%] rounded-2xl border px-4 py-3", isSystemMessage(message.message_type) ? "mx-auto max-w-[96%] border-cfb-gold/30 bg-cfb-gold/10" : message.sender_user_id === user?.id ? "ml-auto border-primary/40 bg-primary/15" : "border-white/10 bg-white/[0.04]")}>
                     <div className="flex items-center justify-between gap-4 text-[9px] font-black uppercase tracking-[0.13em] text-muted-foreground/70"><span>{isSystemMessage(message.message_type) ? message.message_type.replace("_", " ") : message.sender_user_id === user?.id ? "You" : message.sender_display_name ?? `Manager #${message.sender_user_id}`}{message.sender_fantasy_team_name ? ` · ${message.sender_fantasy_team_name}` : ""}</span><span>{formatTime(message.created_at)}</span></div>
-                    {message.message_type === "trade_finalized" ? <div className="mt-2"><TradeFinalizedCard message={message} returnTo={`/chats?leagueId=${selectedLeagueId}&threadId=${selectedThreadId}`} /></div> : message.deleted_at ? <p className="mt-2 text-sm italic text-muted-foreground">Message deleted</p> : message.body ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">{message.body}</p> : null}
+                    {isPrivateTradeMessage(message) ? <div className="mt-2"><PrivateTradeOfferCard message={message} currentUserId={user?.id} returnTo={`/chats?leagueId=${selectedLeagueId}&threadId=${selectedThreadId}`} /></div> : message.message_type === "trade_finalized" ? <div className="mt-2"><TradeFinalizedCard message={message} returnTo={`/chats?leagueId=${selectedLeagueId}&threadId=${selectedThreadId}`} /></div> : message.deleted_at ? <p className="mt-2 text-sm italic text-muted-foreground">Message deleted</p> : message.body ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">{message.body}</p> : null}
                     {message.delivery_status === "sending" ? <p className="mt-2 flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.12em] text-primary"><LoaderCircle className="h-3 w-3 animate-spin" />Sending</p> : null}
                     {message.delivery_status === "failed" ? <div className="mt-2 flex items-center justify-between gap-2 text-[9px] font-black uppercase tracking-[0.12em] text-red-200"><span className="flex items-center gap-1"><CircleAlert className="h-3 w-3" />Failed to send</span><button type="button" onClick={() => handleRetry(message)} className="inline-flex items-center gap-1 rounded-md border border-red-300/40 px-2 py-1 hover:bg-red-500/10"><RotateCcw className="h-3 w-3" />Retry</button></div> : null}
                   </div>

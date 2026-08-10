@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String
+from sqlalchemy import DateTime, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -15,6 +15,11 @@ class TradeOffer(TimestampMixin, Base):
         Index("ix_trade_offers_proposing_team_id", "proposing_team_id"),
         Index("ix_trade_offers_receiving_team_id", "receiving_team_id"),
         Index("ix_trade_offers_countered_from_trade_id", "countered_from_trade_id"),
+        UniqueConstraint(
+            "created_by_user_id",
+            "client_request_id",
+            name="uq_trade_offers_creator_client_request",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -29,6 +34,9 @@ class TradeOffer(TimestampMixin, Base):
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     failure_reason: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    # Supplied once per submit intent so retries and duplicate taps can safely
+    # return the original offer instead of creating a second one.
+    client_request_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     countered_from_trade_id: Mapped[int | None] = mapped_column(
         ForeignKey("trade_offers.id", ondelete="SET NULL"), nullable=True
     )

@@ -1,7 +1,11 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
-const enabled = process.env.E2E_REAL_STACK === "1";
+const enabled = process.env.REAL_STACK_E2E === "1";
 const apiBaseUrl = process.env.E2E_API_BASE_URL ?? "http://127.0.0.1:8000";
+const betaFixtures = {
+  proposer: { email: "ci-beta-trade-proposer@example.test", code: "EARLY-CI1237" },
+  recipient: { email: "ci-beta-trade-recipient@example.test", code: "EARLY-CI1238" },
+} as const;
 
 type AuthSession = {
   access_token: string;
@@ -15,10 +19,23 @@ type Player = { id: number; name: string; position: string };
 const authHeaders = (session: AuthSession) => ({ Authorization: `Bearer ${session.access_token}` });
 const unique = (label: string) => `${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-async function signup(request: APIRequestContext, firstName: string): Promise<AuthSession> {
-  const suffix = unique(firstName.toLowerCase());
+async function signup(
+  request: APIRequestContext,
+  firstName: string,
+  fixture: { email: string; code: string },
+): Promise<AuthSession> {
+  const betaAccess = await request.post(`${apiBaseUrl}/beta-access/validate`, {
+    data: { email: fixture.email, code: fixture.code },
+  });
+  expect(betaAccess.status()).toBe(200);
+  const reservation = await betaAccess.json() as { reservation_token: string };
   const response = await request.post(`${apiBaseUrl}/auth/signup`, {
-    data: { first_name: firstName, email: `${suffix}@example.test`, password: "StrongPass123!" },
+    data: {
+      first_name: firstName,
+      email: fixture.email,
+      password: "StrongPass123!",
+      beta_access_reservation: reservation.reservation_token,
+    },
   });
   expect(response.status()).toBe(201);
   return response.json();
@@ -67,6 +84,14 @@ async function addRosterPlayer(request: APIRequestContext, session: AuthSession,
   expect(response.status()).toBe(201);
 }
 
+async function rosterPlayerIds(request: APIRequestContext, session: AuthSession, teamId: number): Promise<number[]> {
+  const response = await request.get(`${apiBaseUrl}/teams/${teamId}/roster`, { headers: authHeaders(session) });
+  expect(response.status()).toBe(200);
+  return (await response.json()).data
+    .map((entry: { player: { id: number } | null }) => entry.player?.id)
+    .filter((playerId: number | undefined): playerId is number => playerId !== undefined);
+}
+
 async function primeBrowserSession(page: Page, session: AuthSession) {
   await page.addInitScript((payload) => {
     window.localStorage.setItem("cfb_access_token", payload.accessToken);
@@ -77,11 +102,11 @@ async function primeBrowserSession(page: Page, session: AuthSession) {
 }
 
 test.describe("real FastAPI/PostgreSQL league chat", () => {
-  test.skip(!enabled, "Set E2E_REAL_STACK=1 after starting FastAPI and PostgreSQL; this suite never mocks chat endpoints.");
+  test.skip(!enabled, "Set REAL_STACK_E2E=1 after starting FastAPI and PostgreSQL; this suite never mocks chat endpoints.");
 
   test("two league members exchange messages and see a binding trade card without cross-league leakage", async ({ browser, request }) => {
-    const userA = await signup(request, "Avery");
-    const userB = await signup(request, "Blake");
+    const userA = await signup(request, "Avery", betaFixtures.proposer);
+    const userB = await signup(request, "Blake", betaFixtures.recipient);
     const leagueOne = await createLeague(request, userA, unique("Chat League One"));
     await joinLeague(request, userB, leagueOne.id);
 
@@ -148,6 +173,28 @@ test.describe("real FastAPI/PostgreSQL league chat", () => {
     });
     expect(tradeCreate.status()).toBe(201);
     const trade = await tradeCreate.json();
+
+    const privateThreadsResponse = await request.get(`${apiBaseUrl}/leagues/${leagueOne.id}/chats`, { headers: authHeaders(userB) });
+    expect(privateThreadsResponse.status()).toBe(200);
+    const privateThread = (await privateThreadsResponse.json()).data.find((thread: { thread_type: string }) => thread.thread_type === "direct");
+    expect(privateThread).toBeTruthy();
+    const privateMessagesResponse = await request.get(
+      `${apiBaseUrl}/leagues/${leagueOne.id}/chats/${privateThread.id}/messages`,
+      { headers: authHeaders(userB) },
+    );
+    expect(privateMessagesResponse.status()).toBe(200);
+    const pendingPrivateCards = (await privateMessagesResponse.json()).data.filter((message: { metadata: { card_type?: string; trade_id?: number; trade_status?: string } }) => (
+      message.metadata.card_type === "private_trade_offer"
+      && message.metadata.trade_id === trade.id
+      && message.metadata.trade_status === "proposed"
+    ));
+    expect(pendingPrivateCards).toHaveLength(1);
+
+    await pageB.reload();
+    await pageB.getByRole("button", { name: /Avery/i }).last().click();
+    await expect(pageB.getByText("Trade offer pending").last()).toBeVisible();
+    await expect(pageB.getByRole("link", { name: "Review trade" }).last()).toBeVisible();
+
     const tradeAccept = await request.post(`${apiBaseUrl}/leagues/${leagueOne.id}/trades/${trade.id}/accept`, {
       headers: authHeaders(userB),
       data: {},
@@ -165,6 +212,24 @@ test.describe("real FastAPI/PostgreSQL league chat", () => {
     expect(finalizedTrades[0].metadata.processing_status).toBe(
       acceptedTrade.status === "accepted_pending" ? "pending_transfer" : "processed",
     );
+
+    const acceptedPrivateMessages = await request.get(
+      `${apiBaseUrl}/leagues/${leagueOne.id}/chats/${privateThread.id}/messages`,
+      { headers: authHeaders(userA) },
+    );
+    expect(acceptedPrivateMessages.status()).toBe(200);
+    const acceptedPrivateCards = (await acceptedPrivateMessages.json()).data.filter((message: { metadata: { card_type?: string; trade_id?: number; trade_status?: string } }) => (
+      message.metadata.card_type === "private_trade_offer"
+      && message.metadata.trade_id === trade.id
+      && message.metadata.trade_status === "accepted"
+    ));
+    expect(acceptedPrivateCards).toHaveLength(1);
+    expect(await rosterPlayerIds(request, userA, averyTeam!.id)).toContain(runningBack.id);
+    expect(await rosterPlayerIds(request, userB, blakeTeam!.id)).toContain(quarterback.id);
+
+    await pageB.reload();
+    await pageB.getByRole("button", { name: /Avery/i }).last().click();
+    await expect(pageB.getByText("Trade accepted").last()).toBeVisible();
 
     await pageB.getByRole("button", { name: "# General" }).click();
     await expect(pageB.getByText("Trade Finalized").last()).toBeVisible();

@@ -137,7 +137,7 @@ vi.mock("@/hooks/use-chat", () => ({
   useCreateDirectChatThread: () => ({ mutate: state.directMutate, isPending: false, isError: false }),
 }));
 
-import Chats, { TradeFinalizedCard } from "./Chats";
+import Chats, { isPrivateTradeMessage, PrivateTradeOfferCard, TradeFinalizedCard } from "./Chats";
 
 afterEach(() => {
   cleanup();
@@ -232,5 +232,60 @@ describe("TradeFinalizedCard", () => {
     render(<MemoryRouter><TradeFinalizedCard message={{ league_id: 4, body: null, metadata: { trade_id: "18" } }} /></MemoryRouter>);
 
     expect(screen.queryByRole("link", { name: "View trade" })).toBeNull();
+  });
+});
+
+describe("PrivateTradeOfferCard", () => {
+  const message = {
+    league_id: 4,
+    body: "Trade offer sent",
+    metadata: {
+      card_type: "private_trade_offer",
+      trade_id: 18,
+      league: { id: 4, name: "Saturday Stars" },
+      proposing_team: { id: 8, name: "Avery Aces", owner_user_id: 1 },
+      receiving_team: { id: 9, name: "Blake Bears", owner_user_id: 2 },
+      proposing_team_sends: [{ player_id: 9, name: "Jeremiah Smith", position: "WR", school: "Ohio State" }],
+      receiving_team_sends: [{ player_id: 10, name: "Ahmad Hardy", position: "RB", school: "Missouri" }],
+      trade_status: "proposed",
+      created_at: "2026-08-10T12:00:00Z",
+      expires_at: "2026-08-17T12:00:00Z",
+    },
+  };
+
+  it("identifies structured private trade messages without treating unrelated system text as a card", () => {
+    expect(isPrivateTradeMessage({ message_type: "system", metadata: message.metadata } as Pick<ChatMessage, "message_type" | "metadata">)).toBe(true);
+    expect(isPrivateTradeMessage({ message_type: "system", metadata: {} } as Pick<ChatMessage, "message_type" | "metadata">)).toBe(false);
+  });
+
+  it("shows a review action only to the receiving manager and keeps both player groups explicit", () => {
+    const { rerender } = render(
+      <MemoryRouter><PrivateTradeOfferCard message={message} currentUserId={2} /></MemoryRouter>,
+    );
+
+    expect(screen.getByText("Trade offer pending")).toBeTruthy();
+    expect(screen.getByText("Avery Aces sends")).toBeTruthy();
+    expect(screen.getByText("Blake Bears sends")).toBeTruthy();
+    expect(screen.getByText(/Jeremiah Smith/)).toBeTruthy();
+    expect(screen.getByText(/Ahmad Hardy/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Review trade" }).getAttribute("href")).toBe("/leagues/4/trades/18?returnTo=%2Fchats%3FleagueId%3D4");
+
+    rerender(<MemoryRouter><PrivateTradeOfferCard message={message} currentUserId={1} /></MemoryRouter>);
+    expect(screen.getByRole("link", { name: "View trade" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Review trade" })).toBeNull();
+  });
+
+  it.each([
+    ["accepted", "Trade accepted"],
+    ["rejected", "Trade rejected"],
+    ["cancelled", "Trade cancelled"],
+    ["expired", "Trade expired"],
+  ])("renders %s as %s", (tradeStatus, label) => {
+    render(
+      <MemoryRouter><PrivateTradeOfferCard message={{ ...message, metadata: { ...message.metadata, trade_status: tradeStatus } }} currentUserId={1} /></MemoryRouter>,
+    );
+
+    expect(screen.getByText(label)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "View trade" })).toBeTruthy();
   });
 });
