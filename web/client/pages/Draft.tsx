@@ -1099,7 +1099,7 @@ export default function Draft() {
           <div className="grid grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground sm:grid-cols-[64px_minmax(0,1fr)_110px_140px] sm:gap-3 sm:px-5 sm:py-3 sm:text-[9px] sm:tracking-[0.22em]">
             <span>RK</span>
             <span>Player</span>
-            <span>Proj</span>
+            <span className="text-right">Proj</span>
             <span className="text-right">Action</span>
           </div>
 
