@@ -91,6 +91,14 @@ def _seed_due_work() -> dict[str, int | datetime]:
                 trade_review_type="none",
             )
         )
+        # Trade-offer chat cards are available only to the two active league
+        # members, exactly as they are in a real two-manager league.
+        db.add_all(
+            [
+                LeagueMember(league_id=league.id, user_id=proposing_user.id, role="commissioner"),
+                LeagueMember(league_id=league.id, user_id=receiving_user.id, role="manager"),
+            ]
+        )
 
         proposing_team = Team(
             league_id=league.id,
