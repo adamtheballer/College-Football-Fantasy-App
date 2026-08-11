@@ -57,7 +57,7 @@ test.describe("real two-manager draft lifecycle", () => {
   test.skip(!realStackEnabled, "Run through npm run test:e2e:real against the isolated Compose stack.");
   test.setTimeout(220_000);
 
-  test("keeps two signed-in managers synchronized through countdown and timeout auto-picks", async ({ browser }) => {
+  test("enforces the standard beta roster and keeps two signed-in managers synchronized through timeout auto-picks", async ({ browser }) => {
     const commissionerContext = await browser.newContext();
     const managerContext = await browser.newContext();
     const commissioner = await commissionerContext.newPage();
@@ -116,22 +116,35 @@ test.describe("real two-manager draft lifecycle", () => {
       await expect(manager).not.toHaveURL(/\/login$/);
 
       await expect(commissioner.getByText("Pick Timer")).toBeVisible({ timeout: 100_000 });
-      await expect(commissioner.getByText("Draft Complete")).toBeVisible({ timeout: 90_000 });
-      await expect(manager.getByText("Draft Complete")).toBeVisible({ timeout: 20_000 });
 
       await expect.poll(async () => {
-        const room = await realApi<{ status: string }>(commissioner, `/leagues/${leagueId}/draft-room`);
-        return room.body.status;
-      }, { timeout: 20_000 }).toBe("completed");
+        const room = await realApi<{ picks: Array<{ auto_pick: boolean }> }>(commissioner, `/leagues/${leagueId}/draft-room`);
+        return room.body.picks.filter((pick) => pick.auto_pick).length;
+      }, { timeout: 90_000 }).toBeGreaterThanOrEqual(2);
 
       const room = await realApi<{
         status: string;
+        roster_slots: Record<string, number>;
         picks: Array<{ player_id: number; auto_pick: boolean }>;
       }>(commissioner, `/leagues/${leagueId}/draft-room`);
+      const managerRoom = await realApi<{
+        picks: Array<{ player_id: number; auto_pick: boolean }>;
+      }>(manager, `/leagues/${leagueId}/draft-room`);
       expect(room.status).toBe(200);
-      expect(room.body.status).toBe("completed");
+      expect(room.body.roster_slots).toEqual({
+        QB: 1,
+        RB: 2,
+        WR: 2,
+        TE: 1,
+        FLEX: 1,
+        SUPERFLEX: 0,
+        K: 1,
+        BENCH: 5,
+        IR: 1,
+      });
       expect(room.body.picks).toHaveLength(2);
-      expect(new Set(room.body.picks.map((pick) => pick.player_id)).size).toBe(2);
+      expect(managerRoom.body.picks.map((pick) => pick.player_id)).toEqual(room.body.picks.map((pick) => pick.player_id));
+      expect(new Set(room.body.picks.map((pick) => pick.player_id)).size).toBe(room.body.picks.length);
       expect(room.body.picks.every((pick) => pick.auto_pick)).toBe(true);
     } finally {
       await commissionerContext.close();
