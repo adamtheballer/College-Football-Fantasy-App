@@ -2073,6 +2073,13 @@ test.describe("critical browser workflows", () => {
     await expect(reviewDialog).toBeVisible();
     await expect(reviewDialog.getByText("Strong Loss")).toBeVisible();
     await expect(reviewDialog.getByText("-6.00")).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(reviewDialog.getByRole("button", { name: "Close" })).toBeVisible();
+    const mobileDialogBox = await reviewDialog.boundingBox();
+    expect(mobileDialogBox).not.toBeNull();
+    if (mobileDialogBox) {
+      expect(mobileDialogBox.height).toBeLessThanOrEqual(844 - 24);
+    }
     await expect.poll(() => analyzePayload).not.toBeNull();
     expect(analyzePayload).toMatchObject({
       give_ids: [201],
