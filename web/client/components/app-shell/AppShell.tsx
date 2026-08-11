@@ -24,6 +24,10 @@ type AppShellProps = {
   mainScrollRef: React.RefObject<HTMLElement>;
 };
 
+export function shouldShowHomeHeader(pathname: string, hideChrome: boolean) {
+  return !hideChrome && pathname === "/";
+}
+
 export function AppShell({
   children,
   navItems,
@@ -39,6 +43,10 @@ export function AppShell({
   mainScrollRef,
 }: AppShellProps) {
   const mobileNavItems = getMobileNavItems(navItems);
+  // The Early Access lockup and manager greeting are home-dashboard context,
+  // not global navigation. Keeping them off data-heavy league routes returns
+  // meaningful vertical space on phones without removing the persistent nav.
+  const showHomeHeader = shouldShowHomeHeader(pathname, hideChrome);
 
   return (
     <div
@@ -71,7 +79,7 @@ export function AppShell({
             : "overflow-y-auto overscroll-y-contain touch-pan-y",
         )}
       >
-        {!hideChrome ? <TopBar isLoggedIn={isLoggedIn} user={user} /> : null}
+        {showHomeHeader ? <TopBar isLoggedIn={isLoggedIn} user={user} /> : null}
 
         <div
           className={cn(
