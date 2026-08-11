@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { Copy, Search, Users } from "lucide-react";
@@ -18,33 +18,54 @@ export default function JoinLeague() {
   const [preview, setPreview] = useState<LeaguePreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const previewRequestId = useRef(0);
+
+  const previewErrorMessage = (err: unknown) => {
+    const message = err instanceof Error ? err.message : "";
+    if (/internal server error|api 5\d\d/i.test(message)) {
+      return "We could not load this invite just now. Please try again.";
+    }
+    return message || "Invite code not found.";
+  };
+
+  const handlePreview = useCallback(async (rawInvite: string) => {
+    const invite = rawInvite.trim().toUpperCase();
+    const requestId = previewRequestId.current + 1;
+    previewRequestId.current = requestId;
+
+    if (invite.length < 6) {
+      setPreview(null);
+      setError("Enter a valid invite code.");
+      setLoading(false);
+      return;
+    }
+
+    setError(null);
+    setPreview(null);
+    setLoading(true);
+    try {
+      const payload = await apiPost<LeaguePreview>("/leagues/join-by-code", { invite_code: invite });
+      if (previewRequestId.current === requestId) {
+        setPreview(payload);
+      }
+    } catch (err: unknown) {
+      if (previewRequestId.current === requestId) {
+        setPreview(null);
+        setError(previewErrorMessage(err));
+      }
+    } finally {
+      if (previewRequestId.current === requestId) {
+        setLoading(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (inviteCode) {
       setCode(inviteCode.toUpperCase());
-      handlePreview(inviteCode);
+      void handlePreview(inviteCode);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inviteCode]);
-
-  const handlePreview = async (value?: string) => {
-    const invite = (value ?? code).trim().toUpperCase();
-    if (invite.length < 6) {
-      setError("Enter a valid invite code.");
-      return;
-    }
-    setError(null);
-    setLoading(true);
-    try {
-      const payload = await apiPost<LeaguePreview>("/leagues/join-by-code", { invite_code: invite });
-      setPreview(payload);
-    } catch (err: any) {
-      setPreview(null);
-      setError(err.message || "Invite code not found.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [handlePreview, inviteCode]);
 
   const handleJoin = async () => {
     if (!preview) return;
@@ -108,7 +129,7 @@ export default function JoinLeague() {
             </div>
             <Button
               className="h-12 px-6 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em]"
-              onClick={() => handlePreview()}
+              onClick={() => void handlePreview(code)}
               disabled={loading}
             >
               Preview League
