@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
 import { cn } from "@/lib/utils";
+import { AppBrandLockup } from "./AppBrandLockup";
 import { navDomId, type ShellNavItem } from "./navigation";
 
 type DesktopSidebarProps = {
@@ -16,13 +17,12 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
       <div className="pointer-events-none absolute inset-y-10 right-0 w-px bg-gradient-to-b from-transparent via-cfb-border-strong/70 to-transparent" />
 
       <div className="relative z-10 p-8">
-        <Link to="/" className="group inline-flex flex-col">
-          <span className="font-display text-[1.75rem] font-black uppercase italic tracking-[-0.08em] text-cfb-text-primary transition group-hover:text-white">
-            CFB Fantasy
-          </span>
-          <span className="mt-1 text-[10px] font-black uppercase tracking-[0.22em] text-cfb-brand">
-            College Football
-          </span>
+        <Link
+          to="/"
+          aria-label="Early Access CFB Fantasy Beta"
+          className="group relative inline-flex min-h-14 items-center rounded-xl px-1 py-1"
+        >
+          <AppBrandLockup variant="desktop" />
         </Link>
       </div>
 
