@@ -499,6 +499,65 @@ def test_two_managers_complete_the_full_server_authoritative_draft_lifecycle(cli
     ]
 
 
+def test_ir_slot_does_not_create_an_impossible_final_draft_pick_or_running_timer(client, db_session):
+    commissioner_token = create_user_and_token(client, "ir-terminal-commissioner")
+    league = create_league(
+        client,
+        commissioner_token,
+        roster_slots={"QB": 1, "IR": 1},
+        max_teams=2,
+        fill_league=False,
+        activate_for_direct_pick_tests=False,
+    )
+    manager_token = join_league(client, league["id"], "ir-terminal-manager")
+    first_player_id = create_player(client, "IR Terminal QB One", "QB")
+    second_player_id = create_player(client, "IR Terminal QB Two", "QB")
+
+    assert client.post(f"/leagues/{league['id']}/draft/start", headers=auth_headers(commissioner_token)).status_code == 200
+    first_room = client.get(f"/leagues/{league['id']}/draft-room", headers=auth_headers(commissioner_token)).json()
+    first_token = commissioner_token if first_room["can_make_pick"] else manager_token
+    assert client.post(
+        f"/leagues/{league['id']}/draft-picks",
+        json={"player_id": first_player_id, "pick_number": 1, "draft_version": first_room["draft_version"]},
+        headers=auth_headers(first_token),
+    ).status_code == 201
+
+    second_room = client.get(f"/leagues/{league['id']}/draft-room", headers=auth_headers(commissioner_token)).json()
+    second_token = commissioner_token if second_room["can_make_pick"] else manager_token
+    completed_response = client.post(
+        f"/leagues/{league['id']}/draft-picks",
+        json={"player_id": second_player_id, "pick_number": 2, "draft_version": second_room["draft_version"]},
+        headers=auth_headers(second_token),
+    )
+    assert completed_response.status_code == 201
+    completed = completed_response.json()
+    assert completed["status"] == "completed"
+    assert len(completed["picks"]) == 2
+    assert completed["current_pick_deadline"] is None
+
+    # A room stalled by the prior release's IR-inclusive count is finalized by
+    # the lifecycle worker without waiting for another timer or auto-pick.
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    league_row = db_session.get(League, league["id"])
+    now = datetime.now(timezone.utc)
+    draft.status = "on_clock"
+    draft.completed_at = None
+    draft.current_pick_number = 3
+    draft.current_pick_started_at = now
+    draft.current_pick_deadline = now + timedelta(seconds=90)
+    league_row.status = "draft_live"
+    db_session.commit()
+
+    assert process_expired_draft_picks_once(db_session, now=now) == {"auto_picked": 0, "skipped": 1}
+    db_session.expire_all()
+    recovered = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    assert recovered.status == "completed"
+    assert recovered.current_pick_started_at is None
+    assert recovered.current_pick_deadline is None
+    assert db_session.get(League, league["id"]).status == "post_draft"
+    assert db_session.query(RosterEntry).filter(RosterEntry.league_id == league["id"]).count() == 2
+
+
 def test_cpu_seats_pick_individually_after_their_server_delay(client, db_session, monkeypatch):
     monkeypatch.setattr(settings, "draft_cpu_pick_delay_seconds", 2)
     commissioner_token = create_user_and_token(client, "cpu-lifecycle-commissioner")
