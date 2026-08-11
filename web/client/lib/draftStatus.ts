@@ -6,6 +6,16 @@ export type DraftCountdownParts = {
   seconds: number;
 };
 
+/**
+ * Only these terminal states mean a league draft has finished.  Transient
+ * lifecycle states intentionally have no current team while the server moves
+ * between picks, so they must never be treated as completion by the UI.
+ */
+export const isTerminalDraftStatus = (status?: string | null) => {
+  const normalized = status?.trim().toLowerCase();
+  return normalized === "complete" || normalized === "completed";
+};
+
 export const getDraftTimeMs = (draftDateTime?: string | Date | null) => {
   if (!draftDateTime) return null;
   const value = draftDateTime instanceof Date ? draftDateTime : new Date(draftDateTime);

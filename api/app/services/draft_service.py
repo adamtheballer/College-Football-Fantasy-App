@@ -68,14 +68,48 @@ def draft_pick_team_for_number(teams: list[Team], pick_number: int) -> tuple[int
     return round_number, round_pick, ordered_teams[round_pick - 1]
 
 
-PRE_DRAFT_DURATION_SECONDS = 60
-PICK_TRANSITION_SECONDS = 3
+# ``pre_draft`` and ``transition`` remain understood by the lifecycle worker so
+# that an in-progress draft created by an older release can still be recovered.
+# New drafts deliberately do not enter either holding state: once the
+# commissioner starts a full league, pick one is immediately on the clock, and
+# each subsequent pick immediately starts the next manager's configured timer.
 ACTIVE_DRAFT_STATUSES = {"pre_draft", "on_clock", "transition"}
+
+# IR is part of every league's roster configuration, but it is deliberately not
+# a draftable slot. A player only moves there after acquiring an injury
+# designation, so including it in the pick count leaves a full draft stuck with
+# an impossible final pick for every team.
+NON_DRAFTABLE_ROSTER_SLOTS = {"IR"}
 
 
 def _draft_total_picks(settings_row: LeagueSettings, teams: list[Team]) -> int:
     roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
-    return sum(int(value) for value in normalize_roster_slot_limits(roster_slots).values()) * len(teams)
+    return (
+        sum(
+            int(value)
+            for slot, value in normalize_roster_slot_limits(roster_slots).items()
+            if slot not in NON_DRAFTABLE_ROSTER_SLOTS
+        )
+        * len(teams)
+    )
+
+
+def _complete_draft(
+    db: Session,
+    *,
+    league: League,
+    draft_row: Draft,
+    now: datetime,
+) -> None:
+    """Move a fully drafted league into its sole terminal state."""
+    draft_row.status = "completed"
+    draft_row.completed_at = now
+    draft_row.current_pick_started_at = None
+    draft_row.current_pick_deadline = None
+    draft_row.transition_ends_at = None
+    draft_row.draft_version += 1
+    league.status = "post_draft"
+    finalize_draft_rosters_and_matchups(db, league)
 
 
 def _draft_teams_are_ready(db: Session, league: League, teams: list[Team]) -> bool:
@@ -113,11 +147,6 @@ def start_draft(db: Session, *, league: League, current_user: User) -> DraftRoom
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
     if current_user.id != league.commissioner_user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="commissioner access required")
-    if draft_row.status != "scheduled":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="draft has already been started")
-    scheduled_start = _ensure_aware(draft_row.draft_datetime_utc)
-    if scheduled_start is not None and scheduled_start > now:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="draft has not reached its scheduled start time")
 
     teams = (
         db.query(Team)
@@ -127,6 +156,27 @@ def start_draft(db: Session, *, league: League, current_user: User) -> DraftRoom
     )
     if not _draft_teams_are_ready(db, league, teams):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="draft requires a full finalized manager order")
+
+    # Old deployments created a minute-long pre_draft holding state.  Let a
+    # commissioner recover one of those rooms without changing its already
+    # locked order; new deployments transition scheduled drafts immediately.
+    if draft_row.status == "pre_draft":
+        draft_row.draft_starts_at = now
+        draft_row.transition_ends_at = None
+        _transition_to_on_clock(
+            draft_row,
+            pick_number=max(1, draft_row.current_pick_number or 1),
+            now=now,
+        )
+        league.status = "draft_live"
+        db.commit()
+        return build_draft_room_state(db, league, current_user)
+
+    if draft_row.status != "scheduled":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="draft has already been started")
+    scheduled_start = _ensure_aware(draft_row.draft_datetime_utc)
+    if scheduled_start is not None and scheduled_start > now:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="draft has not reached its scheduled start time")
 
     if (draft_row.draft_order_mode or "random") == "random":
         random.SystemRandom().shuffle(teams)
@@ -141,16 +191,12 @@ def start_draft(db: Session, *, league: League, current_user: User) -> DraftRoom
             )
         teams = sorted(teams, key=lambda team: team.draft_position or 0)
 
-    draft_row.status = "pre_draft"
     draft_row.pre_draft_starts_at = now
-    draft_row.draft_starts_at = now + timedelta(seconds=PRE_DRAFT_DURATION_SECONDS)
-    draft_row.current_pick_number = 0
-    draft_row.current_pick_started_at = None
-    draft_row.current_pick_deadline = None
+    draft_row.draft_starts_at = now
     draft_row.transition_ends_at = None
     draft_row.completed_at = None
-    draft_row.draft_version += 1
-    league.status = "draft_pre_draft"
+    _transition_to_on_clock(draft_row, pick_number=1, now=now)
+    league.status = "draft_live"
     db.commit()
     return build_draft_room_state(db, league, current_user)
 
@@ -176,8 +222,7 @@ def build_draft_room_state(db: Session, league: League, current_user: User) -> D
     )
 
     roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
-    draft_roster_slots = normalize_roster_slot_limits(roster_slots)
-    total_picks = sum(int(value) for value in draft_roster_slots.values()) * len(teams)
+    total_picks = _draft_total_picks(settings_row, teams)
     current_pick = draft_row.current_pick_number or (len(picks_rows) + 1)
     current_round, current_round_pick, current_team = draft_pick_team_for_number(teams, current_pick)
     if draft_row.status != "on_clock" or (total_picks and len(picks_rows) >= total_picks):
@@ -241,10 +286,14 @@ def build_draft_room_state(db: Session, league: League, current_user: User) -> D
         user_team_id=user_team.id if user_team else None,
         can_make_pick=can_make_pick,
         can_start_draft=bool(
-            draft_row.status == "scheduled"
+            draft_row.status in {"scheduled", "pre_draft"}
             and current_user.id == league.commissioner_user_id
             and league_is_full
-            and (_ensure_aware(draft_row.draft_datetime_utc) is None or _ensure_aware(draft_row.draft_datetime_utc) <= now)
+            and (
+                draft_row.status == "pre_draft"
+                or _ensure_aware(draft_row.draft_datetime_utc) is None
+                or _ensure_aware(draft_row.draft_datetime_utc) <= now
+            )
         ),
         pre_draft_starts_at=draft_row.pre_draft_starts_at,
         draft_starts_at=draft_row.draft_starts_at,
@@ -405,20 +454,10 @@ def _record_draft_pick(
     )
     total_picks = _draft_total_picks(settings_row, teams)
     if draft_row.current_pick_number >= total_picks:
-        draft_row.status = "completed"
-        draft_row.completed_at = now
-        draft_row.current_pick_started_at = None
-        draft_row.current_pick_deadline = None
-        draft_row.transition_ends_at = None
-        league.status = "post_draft"
-        finalize_draft_rosters_and_matchups(db, league)
+        _complete_draft(db, league=league, draft_row=draft_row, now=now)
     else:
-        draft_row.status = "transition"
-        draft_row.current_pick_started_at = None
-        draft_row.current_pick_deadline = None
-        draft_row.transition_ends_at = now + timedelta(seconds=PICK_TRANSITION_SECONDS)
+        _transition_to_on_clock(draft_row, pick_number=draft_row.current_pick_number + 1, now=now)
         league.status = "draft_live"
-    draft_row.draft_version += 1
 
 
 def _auto_pick_current_turn(
@@ -513,6 +552,22 @@ def process_expired_draft_picks_once(
             continue
         before_count = db.query(DraftPick).filter(DraftPick.draft_id == draft_row.id).count()
         try:
+            settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
+            teams = ordered_draft_teams(db, league.id)
+            # Reconcile legacy rooms before inspecting the timer. This covers
+            # drafts that were completed while IR was incorrectly included in
+            # the server-side total, leaving their final on-clock timer alive.
+            if (
+                draft_row.status in {"on_clock", "transition"}
+                and settings_row is not None
+                and teams
+                and before_count >= _draft_total_picks(settings_row, teams)
+            ):
+                _complete_draft(db, league=league, draft_row=draft_row, now=current)
+                db.commit()
+                summary["skipped"] += 1
+                continue
+
             draft_starts_at = _ensure_aware(draft_row.draft_starts_at)
             transition_ends_at = _ensure_aware(draft_row.transition_ends_at)
             if draft_row.status == "pre_draft" and draft_starts_at is not None and draft_starts_at <= current:
@@ -520,18 +575,11 @@ def process_expired_draft_picks_once(
                 league.status = "draft_live"
                 db.commit()
             elif draft_row.status == "transition" and transition_ends_at is not None and transition_ends_at <= current:
-                settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
-                teams = ordered_draft_teams(db, league.id)
                 pick_count = db.query(DraftPick).filter(DraftPick.draft_id == draft_row.id).count()
                 if settings_row is None or not teams:
                     raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="draft state changed")
                 if pick_count >= _draft_total_picks(settings_row, teams):
-                    draft_row.status = "completed"
-                    draft_row.completed_at = current
-                    draft_row.transition_ends_at = None
-                    draft_row.draft_version += 1
-                    league.status = "post_draft"
-                    finalize_draft_rosters_and_matchups(db, league)
+                    _complete_draft(db, league=league, draft_row=draft_row, now=current)
                     db.commit()
                 else:
                     _transition_to_on_clock(draft_row, pick_number=pick_count + 1, now=current)

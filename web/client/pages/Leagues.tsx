@@ -62,6 +62,7 @@ export const LeagueCard = ({
     leagueStatus: status,
     draftDateTime,
   });
+  const postDraft = isLeaguePostDraft({ draftStatus, leagueStatus: status });
   const completeStatuses = ["completed", "complete", "draft_completed", "final", "closed", "post_draft"];
   const inviteShouldBeVisible =
     Boolean(inviteCode) &&
@@ -203,7 +204,7 @@ export const LeagueCard = ({
             openLeague();
           }}
         >
-          League Hub
+          {postDraft ? "Open League Hub" : "League Hub"}
           <ChevronRight className="w-3 h-3 ml-2" />
         </Button>
         {shouldShowDraftAction && (

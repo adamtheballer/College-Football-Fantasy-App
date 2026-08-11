@@ -14,6 +14,7 @@ import { ApiError } from "@/lib/api";
 import { buildDraftBoard, type DraftConfig, type DraftPlayer } from "@/lib/draftRankings";
 import { formatDraftProjection } from "@/lib/draft-projections";
 import { getCenteredDraftOrderScrollLeft } from "@/lib/draftOrderCarousel";
+import { isTerminalDraftStatus } from "@/lib/draftStatus";
 import { filterDraftablePlayers, getLegalPositionsForRoster } from "@/lib/rosterLegality";
 import { cn } from "@/lib/utils";
 import type { DraftRoomPick, DraftRoomTeam } from "@/types/draft";
@@ -214,6 +215,7 @@ export default function Draft() {
   const [selectedRosterTeamId, setSelectedRosterTeamId] = useState<number | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [dismissedCompletedDraftId, setDismissedCompletedDraftId] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const pickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
@@ -283,7 +285,7 @@ export default function Draft() {
   const viewerDraftBoardTeamId = draftRoom?.user_team_id ?? draftRoom?.current_team_id ?? null;
   const viewerDraftBoardTeamName =
     draftRoom?.teams.find((team) => team.id === viewerDraftBoardTeamId)?.name ??
-    (viewerDraftBoardTeamId ? "Your Team" : "Draft complete");
+    "Your Team";
 
   const viewerTeamRoster = useMemo(() => {
     if (!viewerDraftBoardTeamId || !draftRoom?.picks) return [];
@@ -314,7 +316,10 @@ export default function Draft() {
     error: playersErrorObject,
   } = useDraftPlayerPool({
     league_id: parsedLeagueId,
-    available_only: Boolean(parsedLeagueId),
+    // Keep the full board in memory and remove drafted players below.  Rebuilding
+    // a dense board from the already-filtered API response renumbered every
+    // remaining player after each pick.
+    available_only: false,
     limit: DRAFT_PLAYER_PAGE_SIZE,
     offset: 0,
     fetchAll: true,
@@ -430,6 +435,25 @@ export default function Draft() {
     [draftRoom?.picks, previewTeams, totalPicks]
   );
 
+  const completed = isTerminalDraftStatus(draftRoom?.status);
+  const showCompletionModal = Boolean(
+    completed && draftRoom?.draft_id && dismissedCompletedDraftId !== draftRoom.draft_id
+  );
+  const currentPick = draftRoom?.current_pick ?? 1;
+  const displayPick = completed
+    ? Math.min(totalPicks, Math.max(1, draftRoom?.picks.length ?? currentPick))
+    : isTransition
+      ? Math.min(totalPicks, Math.max(1, draftRoom?.picks.length + 1))
+      : currentPick;
+  const totalRounds = Math.max(1, Math.ceil(totalPicks / Math.max(1, previewTeams.length)));
+  const currentSlot = draftOrderPicks.find((slot) => slot.overallPick === displayPick);
+  const draftProgressLabel = `Round ${currentSlot?.round ?? draftRoom?.current_round ?? 1} of ${totalRounds} · Pick ${displayPick} of ${totalPicks}`;
+  const currentTeamLabel = completed
+    ? "Draft complete"
+    : isTransition
+      ? `Next: ${currentSlot?.team?.name ?? "next manager"}`
+      : draftRoom?.current_team_name ?? "Draft in progress";
+
   const selectedRosterTeam = useMemo(() => {
     const fallbackTeam =
       draftRoom?.teams.find((team) => team.id === draftRoom.user_team_id) ?? draftRoom?.teams[0] ?? null;
@@ -479,18 +503,17 @@ export default function Draft() {
   );
 
   const recenterDraftCarousel = () => {
-    centerDraftCarouselOnPick(draftRoom?.current_pick ?? 1);
+    centerDraftCarouselOnPick(displayPick);
   };
 
   useEffect(() => {
-    const currentPick = draftRoom?.current_pick;
-    if (!currentPick || ["complete", "completed"].includes(draftRoom.status)) return;
+    if (!displayPick || completed) return;
 
     const frame = window.requestAnimationFrame(() => {
-      centerDraftCarouselOnPick(currentPick, currentPick >= 4 ? "smooth" : "auto");
+      centerDraftCarouselOnPick(displayPick, displayPick >= 4 ? "smooth" : "auto");
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [centerDraftCarouselOnPick, draftRoom?.current_pick, draftRoom?.status]);
+  }, [centerDraftCarouselOnPick, completed, displayPick]);
 
   const makePick = async (player: DraftPlayer) => {
     if (!isLeagueFull) {
@@ -498,7 +521,7 @@ export default function Draft() {
       return;
     }
     if (!isDraftActive) {
-      setLocalError("Draft is locked until the scheduled start time.");
+      setLocalError("Draft is not live yet. The commissioner must start it first.");
       return;
     }
     if (!draftRoom?.can_make_pick) {
@@ -569,12 +592,9 @@ export default function Draft() {
   }
 
   const leagueName = league?.name || `League ${draftRoom.league_id}`;
-  const currentTeamLabel = draftRoom.current_team_name || "Draft complete";
   const latestPick = draftRoom.picks[draftRoom.picks.length - 1];
-  const currentPick = draftRoom.current_pick;
   const isUserTurn = isDraftActive && draftRoom.can_make_pick;
   const canPick = isUserTurn && !pickMutation.isPending;
-  const completed = draftRoom.current_team_id === null || ["complete", "completed"].includes(draftRoom.status);
   const exitPath = completed ? `/league/${parsedLeagueId}/roster` : `/league/${parsedLeagueId}/lobby`;
   const backendPlayerCount = playersPayload?.total ?? 0;
   const masterBoardCount = draftBoard.length;
@@ -781,6 +801,9 @@ export default function Draft() {
           <div className="min-w-0 flex-1">
             <p className="truncate text-[9px] font-black uppercase tracking-[0.1em] text-muted-foreground">{leagueName}</p>
             <p className="truncate text-sm font-black text-cyan-100">{isScheduledPreview ? "Draft lobby" : isPreDraft ? "Starting soon" : isTransition ? "Updating board" : completed ? "Draft complete" : currentTeamLabel}</p>
+            {!isScheduledPreview && !completed ? (
+              <p className="truncate text-[8px] font-black uppercase tracking-[0.08em] text-amber-100/90">{draftProgressLabel}</p>
+            ) : null}
           </div>
           {(isPreDraft || isDraftActive || isTransition) && !completed ? (
             <div className={cn("shrink-0 text-right", timerDanger ? "text-red-300" : "text-cyan-100")}>
@@ -870,6 +893,9 @@ export default function Draft() {
                         ? "Complete"
                         : currentTeamLabel}
               </p>
+              {!isScheduledPreview && !completed ? (
+                <p className="mt-1 text-[9px] font-black uppercase tracking-[0.18em] text-amber-100/90">{draftProgressLabel}</p>
+              ) : null}
             </div>
             <Button asChild variant="outline" className="h-12 rounded-2xl border-sky-100/20 bg-[#102f4e]/90 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-white hover:bg-sky-100/10">
               <Link to={`/league/${parsedLeagueId}`}>League Hub</Link>
@@ -902,7 +928,7 @@ export default function Draft() {
           {isScheduledPreview ? (
             <p className="mt-5 max-w-3xl text-[11px] font-black uppercase leading-6 tracking-[0.18em] text-muted-foreground">
               {isLeagueFull
-                ? "The commissioner starts the one-minute pre-draft countdown when the scheduled time arrives. Picks unlock only after the countdown ends."
+                ? "When the commissioner starts the draft, pick one is immediately on the clock and each manager receives the league's configured pick timer."
                 : "Draft order remains locked until every league slot is filled. Invite more managers or reschedule the draft."}
             </p>
           ) : null}
@@ -938,7 +964,7 @@ export default function Draft() {
               <p className="text-[9px] font-black uppercase tracking-[0.14em] text-amber-200">Draft order</p>
               <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Swipe for future rounds</p>
             </div>
-            <p className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">{currentPick} / {totalPicks}</p>
+            <p className="text-right text-[8px] font-black uppercase leading-3 tracking-[0.08em] text-amber-100/90">{draftProgressLabel}</p>
           </div>
           <div
             data-testid="mobile-draft-order-scroll"
@@ -947,13 +973,15 @@ export default function Draft() {
           >
             <div className="flex min-w-max gap-1.5">
               {draftOrderPicks.map((slot) => {
-                const isCurrent = !completed && slot.overallPick === currentPick;
+                const isCurrent = !completed && slot.overallPick === displayPick;
                 const isUser = slot.team?.id === draftRoom.user_team_id;
+                const pickerName = slot.team?.owner_name || slot.pick?.team_name || slot.team?.name || "Manager";
                 return (
                   <div key={slot.overallPick} aria-current={isCurrent ? "step" : undefined} className={cn("flex w-[4.15rem] shrink-0 snap-start flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}>
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/12 bg-black/20">{slot.team?.is_cpu ? <Bot className="h-3 w-3" /> : <User className="h-3 w-3" />}</span>
                     <span className="mt-1 whitespace-nowrap text-[9px] font-black tabular-nums">{slot.round}.{slot.roundPick}</span>
-                    <span className="max-w-full truncate text-[8px] font-black uppercase tracking-[0.04em]">{isUser ? "You" : slot.team?.name?.replace("Bot Team", "B") ?? "Team"}</span>
+                    <span className="mt-0.5 max-w-full truncate text-[8px] font-black uppercase tracking-[0.04em]">{slot.pick?.player_name ?? (isUser ? "You" : slot.team?.name?.replace("Bot Team", "B") ?? "Team")}</span>
+                    <span className="max-w-full truncate text-[7px] font-bold uppercase tracking-[0.03em] text-cyan-100/80">{slot.pick ? `By ${pickerName}` : pickerName}</span>
                   </div>
                 );
               })}
@@ -979,17 +1007,18 @@ export default function Draft() {
               <LocateFixed className="h-5 w-5" />
             </button>
             <div className="ml-auto text-right">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{totalPicks} Picks</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-100">{totalRounds} Rounds · {totalPicks} Picks</p>
               <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">
-                {Math.max(0, totalPicks - draftRoom.picks.length)} Unlocked
+                {draftProgressLabel}
               </p>
             </div>
           </div>
           <div ref={carouselRef} className="flex gap-4 overflow-x-auto px-5 py-5 scroll-smooth">
             {draftOrderPicks.map((slot) => {
-              const isCurrent = !completed && slot.overallPick === currentPick;
+              const isCurrent = !completed && slot.overallPick === displayPick;
               const isUser = slot.team?.id === draftRoom.user_team_id;
               const isLocked = Boolean(slot.pick);
+              const pickerName = slot.team?.owner_name || slot.pick?.team_name || slot.team?.name || "Manager";
               return (
                 <div
                   key={slot.overallPick}
@@ -1038,6 +1067,11 @@ export default function Draft() {
                           ? "CPU manager"
                           : slot.team?.owner_name || "Manager"}
                   </p>
+                  {slot.pick ? (
+                    <p className="mt-3 truncate border-t border-cyan-200/10 pt-2 text-[9px] font-black uppercase tracking-[0.14em] text-cyan-100/90">
+                      Picked by <span className="text-white">{pickerName}</span>
+                    </p>
+                  ) : null}
                 </div>
               );
             })}
@@ -1234,6 +1268,65 @@ export default function Draft() {
           }}
           title="Player Card"
         />
+      ) : null}
+
+      {showCompletionModal ? (
+        <div className="fixed inset-0 z-[1450] flex items-center justify-center bg-slate-950/72 px-4 py-6 backdrop-blur-md">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="real-draft-complete-title"
+            className="relative w-full max-w-xl overflow-hidden rounded-[2rem] border border-amber-100/30 bg-[#071225]/95 text-center shadow-[0_0_90px_rgba(251,191,36,0.16),inset_0_1px_0_rgba(255,255,255,0.10)]"
+          >
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+              <span className="absolute left-[9%] top-[16%] h-2 w-8 rotate-[24deg] rounded-full bg-cyan-300/70" />
+              <span className="absolute right-[12%] top-[13%] h-2 w-6 -rotate-[34deg] rounded-full bg-amber-200/80" />
+              <span className="absolute left-[18%] top-[39%] h-3 w-3 rotate-45 bg-fuchsia-300/65" />
+              <span className="absolute right-[20%] top-[43%] h-3 w-3 rotate-45 bg-cyan-200/70" />
+              <span className="absolute bottom-[18%] left-[11%] h-2 w-7 -rotate-[18deg] rounded-full bg-amber-200/75" />
+              <span className="absolute bottom-[13%] right-[9%] h-2 w-8 rotate-[28deg] rounded-full bg-fuchsia-300/60" />
+            </div>
+            <button
+              type="button"
+              onClick={() => setDismissedCompletedDraftId(draftRoom.draft_id)}
+              className="absolute right-5 top-5 z-10 rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-[9px] font-black uppercase tracking-[0.14em] text-slate-200 transition hover:border-cyan-100/45 hover:bg-white/10 hover:text-white"
+            >
+              Keep viewing
+            </button>
+            <div className="relative border-b border-cyan-100/10 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.18),transparent_47%),linear-gradient(135deg,rgba(34,211,238,0.16),rgba(30,64,175,0.12),rgba(236,72,153,0.08))] px-8 pb-8 pt-12 sm:px-12 sm:pb-10">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-amber-100/45 bg-amber-300/12 text-amber-100 shadow-[0_0_48px_rgba(251,191,36,0.30)]">
+                <Trophy className="h-10 w-10" />
+              </div>
+              <p className="mt-6 text-[10px] font-black uppercase tracking-[0.30em] text-amber-100">
+                Rosters finalized
+              </p>
+              <h2 id="real-draft-complete-title" className="mt-3 text-4xl font-black uppercase tracking-tight text-white sm:text-5xl">
+                Draft Complete
+              </h2>
+              <p className="mx-auto mt-4 max-w-md text-sm font-bold leading-6 text-slate-200/80">
+                Every draftable roster slot is full. Your league is ready for lineup decisions and Week 1 matchups.
+              </p>
+            </div>
+            <div className="relative grid gap-3 px-6 py-6 sm:grid-cols-2 sm:px-8">
+              <Button
+                type="button"
+                className="h-16 rounded-2xl border border-cyan-100/45 bg-gradient-to-r from-cyan-300 to-blue-500 px-6 text-[11px] font-black uppercase tracking-[0.16em] text-slate-950 shadow-[0_12px_28px_rgba(34,211,238,0.25)] transition hover:brightness-110"
+                onClick={() => navigate(`/league/${parsedLeagueId}/roster`)}
+              >
+                <Users className="mr-2 h-5 w-5" />
+                View Your Roster
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-16 rounded-2xl border-cyan-200/20 bg-white/[0.04] px-6 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100 hover:border-cyan-200/45 hover:bg-cyan-400/12 hover:text-white"
+                onClick={() => setDismissedCompletedDraftId(draftRoom.draft_id)}
+              >
+                Stay in Draft Room
+              </Button>
+            </div>
+          </section>
+        </div>
       ) : null}
 
       <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-sky-100/20 bg-[#102f4e]/96 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(7,27,49,0.26)] backdrop-blur-xl sm:pointer-events-none sm:inset-x-auto sm:left-1/2 sm:flex sm:w-auto sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">

@@ -43,4 +43,24 @@ describe("LeagueCard", () => {
     fireEvent.error(screen.getByRole("img", { name: "Saturday League league logo" }));
     expect(screen.getByLabelText("Default league trophy")).toBeTruthy();
   });
+
+  it("opens the post-draft hub and never offers a completed league's draft room", () => {
+    render(
+      <LeagueCard
+        {...props}
+        status="post_draft"
+        draftStatus="completed"
+        iconUrl={null}
+      />
+    );
+
+    const openHubButton = screen
+      .getAllByRole("button", { name: /Open League Hub/i })
+      .find((element) => element.tagName === "BUTTON");
+    expect(openHubButton).toBeTruthy();
+    fireEvent.click(openHubButton!);
+    expect(props.onOpen).toHaveBeenCalledWith(1);
+    expect(screen.queryByRole("button", { name: /Join Draft Room/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Draft Room Locked/i })).toBeNull();
+  });
 });

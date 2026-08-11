@@ -394,7 +394,9 @@ def _assert_exactly_once(seed: dict[str, int | datetime], results: list[dict[str
     assert stale_trade is not None and stale_trade.status == "failed", (
         f"failed trade did not remain isolated: {stale_trade.status if stale_trade else None}; workers={results}"
     )
-    assert draft is not None and draft.status == "transition", f"due draft pick did not process: {draft.status if draft else None}; workers={results}"
+    # There is deliberately no inter-pick holding state: once an auto-pick is
+    # committed, the next manager's configured timer starts immediately.
+    assert draft is not None and draft.status == "on_clock", f"due draft pick did not process: {draft.status if draft else None}; workers={results}"
     assert draft_pick_count == 1, f"due draft pick was not recorded exactly once: workers={results}"
     assert draft_roster_entry_count == 1, (
         f"drafted player was not added to exactly one roster: count={draft_roster_entry_count}; workers={results}"

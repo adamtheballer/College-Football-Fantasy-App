@@ -1083,11 +1083,168 @@ test.describe("critical browser workflows", () => {
       .click();
     await expect(page.getByText(/Last pick/i)).toBeVisible();
     await expect(page.getByText(/Arch Manning/i).first()).toBeVisible();
+    await expect(page.getByText(/^By Codex$/i)).toBeVisible();
     await expect(page.getByText(/Other Team/i).first()).toBeVisible();
     const queuedRow = page.getByTestId("draft-player-row").filter({ hasText: "Quinn Ewers" });
+    await expect(page.getByTestId("draft-player-row").filter({ hasText: "Arch Manning" })).toHaveCount(0);
+    await expect(queuedRow).toHaveText(/^2/);
+    await expect(page.getByText(/^Draft Complete$/i)).toHaveCount(0);
     await expect(queuedRow.getByRole("button", { name: /^Draft Quinn Ewers$/i })).toHaveCount(0);
     await queuedRow.getByRole("button", { name: /^Queue Quinn Ewers$/i }).click();
     await expect(queuedRow.getByRole("button", { name: /Remove Quinn Ewers from queue/i })).toBeVisible();
+  });
+
+  test("a completed draft stops the timer and offers one clear roster exit", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+
+    const leagueDetail = {
+      id: 1,
+      name: "Completed Draft League",
+      commissioner_user_id: 42,
+      season_year: 2026,
+      max_teams: 2,
+      is_private: true,
+      invite_code: "COMPLETEDDRAFTCODE",
+      description: null,
+      icon_url: null,
+      status: "post_draft",
+      created_at: "2026-03-01T10:00:00Z",
+      updated_at: "2026-03-05T10:00:00Z",
+      settings: {
+        id: 1,
+        league_id: 1,
+        scoring_json: {},
+        roster_slots_json: { QB: 1, IR: 1 },
+        playoff_teams: 4,
+        waiver_type: "rolling",
+        trade_review_type: "commissioner",
+        superflex_enabled: false,
+        kicker_enabled: true,
+        defense_enabled: false,
+      },
+      draft: {
+        id: 22,
+        league_id: 1,
+        draft_datetime_utc: "2026-08-30T23:00:00Z",
+        timezone: "America/New_York",
+        draft_type: "snake",
+        pick_timer_seconds: 90,
+        status: "completed",
+      },
+      members: [
+        { id: 701, user_id: 42, role: "commissioner", joined_at: "2026-03-01T10:01:00Z" },
+        { id: 702, user_id: 99, role: "manager", joined_at: "2026-03-01T10:01:00Z" },
+      ],
+    };
+
+    const completedDraftRoom = {
+      league_id: 1,
+      draft_id: 22,
+      status: "completed",
+      pick_timer_seconds: 90,
+      roster_slots: { QB: 1, IR: 1 },
+      teams: [
+        { id: 11, name: "Codex Team", owner_user_id: 42, owner_name: "Codex" },
+        { id: 12, name: "Other Team", owner_user_id: 99, owner_name: "Other" },
+      ],
+      picks: [
+        {
+          id: 1,
+          overall_pick: 1,
+          round_number: 1,
+          round_pick: 1,
+          team_id: 11,
+          team_name: "Codex Team",
+          player_id: 501,
+          player_name: "Arch Manning",
+          player_position: "QB",
+          player_school: "Texas",
+          made_by_user_id: 42,
+          created_at: "2026-03-21T10:00:00Z",
+        },
+        {
+          id: 2,
+          overall_pick: 2,
+          round_number: 1,
+          round_pick: 2,
+          team_id: 12,
+          team_name: "Other Team",
+          player_id: 502,
+          player_name: "Drew Allar",
+          player_position: "QB",
+          player_school: "Penn State",
+          made_by_user_id: 99,
+          created_at: "2026-03-21T10:01:00Z",
+        },
+      ],
+      current_pick: 2,
+      current_round: 1,
+      current_round_pick: 2,
+      current_team_id: null,
+      current_team_name: null,
+      user_team_id: 11,
+      can_make_pick: false,
+      can_start_draft: false,
+      current_pick_started_at: null,
+      current_pick_deadline: null,
+      transition_ends_at: null,
+      seconds_remaining: 0,
+      draft_version: 3,
+      server_time: "2026-03-21T10:01:00Z",
+    };
+
+    await page.route("**/leagues/1", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(leagueDetail) });
+    });
+    await page.route("**/leagues/1/draft-room", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(completedDraftRoom) });
+    });
+    await page.route("**/players?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [], total: 0, limit: 250, offset: 0 }),
+      });
+    });
+    await page.route("**/stats/teams?**", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [] }) });
+    });
+    await page.route("**/leagues/1/roster?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          league_id: 1,
+          week: 1,
+          owned_team: { id: 11, name: "Codex Team", owner_user_id: 42, record: null },
+          team_rosters: [],
+          slots: [],
+          roster_slot_limits: { QB: 1, IR: 1 },
+          ir_slots: 1,
+        }),
+      });
+    });
+
+    await page.goto("/league/1/draft");
+    const completionDialog = page.getByRole("dialog", { name: /Draft Complete/i });
+    await expect(completionDialog).toBeVisible();
+    await expect(completionDialog.getByText(/Rosters finalized/i)).toBeVisible();
+    await expect(page.getByText("Pick Timer", { exact: true })).toHaveCount(0);
+
+    await completionDialog.getByRole("button", { name: "Stay in Draft Room" }).click();
+    await expect(completionDialog).toHaveCount(0);
+
+    await page.reload();
+    await expect(completionDialog).toBeVisible();
+    await completionDialog.getByRole("button", { name: "View Your Roster" }).click();
+    await expect(page).toHaveURL(/\/league\/1\/roster$/);
+
+    // A completed league must never reopen the pre-draft lobby through a
+    // stale card link, browser history, or a copied lobby URL.
+    await page.goto("/league/1/lobby");
+    await expect(page).toHaveURL(/\/league\/1\/roster$/);
+    await expect(page.getByText("Loading draft lobby...", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /^Draft$/i })).toHaveCount(0);
   });
 
   test("league matchup page renders projected teams and honest empty state", async ({ page }) => {
