@@ -43,7 +43,7 @@ export function AppShell({
   return (
     <div
       className={cn(
-        "isolate relative flex h-[100dvh] min-h-0 overflow-hidden bg-cfb-canvas font-sans text-cfb-text-primary selection:bg-cfb-brand/30 selection:text-white lg:h-screen",
+        "isolate relative flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-cfb-canvas font-sans text-cfb-text-primary selection:bg-cfb-brand/30 selection:text-white lg:h-screen lg:flex-row",
       )}
       style={{
         background: collegiateCanvasBackground,
@@ -65,7 +65,7 @@ export function AppShell({
         data-app-scroll="true"
         data-scroll-owner={fixedViewport ? "draft-room" : "page"}
         className={cn(
-          "relative z-10 flex h-full min-h-0 min-w-0 flex-1 flex-col",
+          "relative z-10 flex min-h-0 min-w-0 flex-1 flex-col lg:h-full",
           fixedViewport
             ? "overflow-hidden"
             : "overflow-y-auto overscroll-y-contain touch-pan-y",
@@ -78,7 +78,7 @@ export function AppShell({
             "flex-1",
             compactContent
               ? "p-0"
-              : "px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] sm:px-6 sm:py-6 sm:pb-24 lg:p-8",
+              : "px-4 py-4 pb-5 sm:px-6 sm:py-6 sm:pb-6 lg:p-8",
           )}
         >
           {children}

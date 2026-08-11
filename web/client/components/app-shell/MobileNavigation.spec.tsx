@@ -38,7 +38,11 @@ describe("MobileNavigation", () => {
   it("keeps four tap-friendly primary destinations visible and opens the full sidebar in More", () => {
     renderNavigation();
 
-    expect(screen.getByRole("navigation", { name: "Primary mobile navigation" })).toBeTruthy();
+    const navigation = screen.getByRole("navigation", { name: "Primary mobile navigation" });
+    expect(navigation).toBeTruthy();
+    expect(navigation.className).toContain("relative");
+    expect(navigation.className).toContain("shrink-0");
+    expect(navigation.className).not.toContain("fixed");
     expect(screen.getByLabelText("HOME")).toBeTruthy();
     expect(screen.getByLabelText("LEAGUES")).toBeTruthy();
     expect(screen.getByLabelText("CHATS: 2 unread chat messages")).toBeTruthy();

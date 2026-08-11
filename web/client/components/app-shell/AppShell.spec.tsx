@@ -63,6 +63,8 @@ describe("AppShell scroll ownership", () => {
     expect(scrollArea?.getAttribute("data-scroll-owner")).toBe("page");
     expect(scrollArea?.className).toContain("overflow-y-auto");
     expect(scrollArea?.className).toContain("touch-pan-y");
+    expect(container.firstElementChild?.className).toContain("flex-col");
+    expect(scrollArea?.className).not.toMatch(/(^|\s)h-full(\s|$)/);
   });
 
   it("contains draft rooms without mutating the document scroll lock", () => {

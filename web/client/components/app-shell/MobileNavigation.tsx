@@ -33,7 +33,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
       <nav
         aria-label="Primary mobile navigation"
         className={cn(
-          "fixed inset-x-3 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-[170] rounded-xl border border-cfb-border-subtle bg-cfb-sidebar/95 p-1 shadow-[0_12px_28px_rgba(2,6,23,0.32)] backdrop-blur-xl transition-opacity lg:hidden",
+          "relative z-[170] mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))] mt-2 shrink-0 rounded-xl border border-cfb-border-subtle bg-cfb-sidebar/95 p-1 shadow-[0_12px_28px_rgba(2,6,23,0.32)] backdrop-blur-xl transition-opacity lg:hidden",
           isMoreOpen && "pointer-events-none opacity-0",
         )}
       >
