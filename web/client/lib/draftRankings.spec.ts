@@ -247,8 +247,10 @@ describe("buildDraftBoard", () => {
       (player) => player.name === "Elite Kicker"
     );
 
-    expect(getEarliestKickerDraftRank(eightTeamConfig)).toBe(88);
-    expect(eliteKicker?.masterDraftRank).toBeGreaterThanOrEqual(88);
+    // The universal kicker floor prevents a small league from surfacing a
+    // kicker before the RB/WR depth that should remain draftable first.
+    expect(getEarliestKickerDraftRank(eightTeamConfig)).toBe(100);
+    expect(eliteKicker?.masterDraftRank).toBeGreaterThanOrEqual(100);
   });
 
   it("forces early-ranked low-projection backup QBs to the end of the draft board", () => {
