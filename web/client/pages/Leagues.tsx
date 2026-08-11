@@ -245,9 +245,12 @@ export default function Leagues() {
     <div className="relative z-10 mx-auto max-w-6xl space-y-6 pb-4 pt-1 animate-in fade-in duration-300">
       <div className="space-y-3 border-b border-cfb-border-subtle pb-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="break-normal text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Leagues
-          </h1>
+          <div>
+            <p className="cfb-micro-label text-cfb-brand">League Command Center</p>
+            <h1 className="mt-1 break-normal font-display text-3xl font-black tracking-[-0.04em] text-foreground sm:text-4xl">
+              Leagues
+            </h1>
+          </div>
           {isLoggedIn && (
             <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
               <Button

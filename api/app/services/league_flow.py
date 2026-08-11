@@ -48,6 +48,23 @@ FIXED_ROSTER_SLOTS = {
     "IR": 1,
 }
 
+# League creation is intentionally constrained during beta. These defaults are
+# server-owned so a hidden or stale client cannot create a league with a custom
+# roster or a different processing window.
+BETA_LEAGUE_CREATION_DEFAULTS = {
+    "waiver_period_hours": 24,
+    "waiver_processing_weekday": 1,
+    "waiver_processing_hour": 8,
+    "waiver_timezone": "America/New_York",
+    "faab_starting_budget": 100,
+    "allow_zero_faab_bids": True,
+    "reveal_all_waiver_bids": False,
+    "post_drop_waiver_hours": 24,
+    "superflex_enabled": False,
+    "kicker_enabled": True,
+    "defense_enabled": False,
+}
+
 ROSTER_SLOT_BOUNDS = {
     "QB": (1, 3),
     "RB": (1, 5),
@@ -211,6 +228,15 @@ def normalize_roster_settings(payload_settings, *, enforce_beta_kicker_scoring: 
     return payload_settings
 
 
+def apply_beta_league_creation_defaults(payload_settings):
+    """Apply the standard beta roster and managed processing schedule."""
+
+    payload_settings.roster_slots_json = FIXED_ROSTER_SLOTS.copy()
+    for field_name, value in BETA_LEAGUE_CREATION_DEFAULTS.items():
+        setattr(payload_settings, field_name, value)
+    return payload_settings
+
+
 def generate_unique_invite(db: Session) -> str:
     for _ in range(20):
         code = generate_invite_code(20)
@@ -240,7 +266,7 @@ def create_league(
         db, actor_user_id=current_user.id, field_name="league_icon_url", value=payload.basics.icon_url
     )
     payload.settings = normalize_roster_settings(
-        payload.settings,
+        apply_beta_league_creation_defaults(payload.settings),
         enforce_beta_kicker_scoring=settings.beta_scoring_lock_enabled,
     )
     code = generate_unique_invite(db)

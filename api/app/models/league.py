@@ -17,7 +17,7 @@ class League(TimestampMixin, Base):
     is_private: Mapped[bool] = mapped_column(Boolean, default=True)
     invite_code: Mapped[str | None] = mapped_column(String(30), nullable=True)
     description: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    icon_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    icon_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="pre_draft")
 
     teams = relationship("Team", back_populates="league", cascade="all, delete-orphan")

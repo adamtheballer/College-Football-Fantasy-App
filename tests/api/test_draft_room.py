@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
@@ -98,6 +99,15 @@ def create_league(
     )
     assert response.status_code == 201
     league = response.json()["league"]
+    # The public endpoint now correctly applies the standard beta roster for
+    # every new league. Keep this test helper's minimal synthetic roster
+    # isolated to the test database so lifecycle tests can exercise a compact
+    # two-pick draft without weakening the production creation contract.
+    with TestingSessionLocal() as session:
+        league_settings = session.query(LeagueSettings).filter(LeagueSettings.league_id == league["id"]).one()
+        league_settings.roster_slots_json = roster_slots or {"QB": 1}
+        league_settings.kicker_enabled = kicker_enabled
+        session.commit()
     if fill_league:
         for index in range(len(league["members"]), max_teams):
             join_league(client, league["id"], f"autofill-{league['id']}-{index}")
