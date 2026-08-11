@@ -309,6 +309,7 @@ export function RosterSlotTable({
               <button
                 key={player.slot_id ?? `${player.team_id ?? player.fantasy_team_id}-${slotType(player)}-${player.slot_index ?? 0}`}
                 type="button"
+                data-roster-mobile-row
                 onClick={() => {
                   if (!isRealPlayer) return;
                   setSelectedPlayer(player);
@@ -316,7 +317,7 @@ export function RosterSlotTable({
                 disabled={!isRealPlayer}
                 aria-disabled={!isRealPlayer}
                 className={cn(
-                  "grid w-full gap-3 px-5 py-4 text-left text-sm text-cfb-text-secondary transition focus:outline-none focus-visible:bg-cfb-brand/[0.08] focus-visible:ring-2 focus-visible:ring-cfb-brand/50 md:items-center",
+                  "grid min-h-[76px] w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-3 text-left text-sm text-cfb-text-secondary transition focus:outline-none focus-visible:bg-cfb-brand/[0.08] focus-visible:ring-2 focus-visible:ring-cfb-brand/50 md:min-h-0 md:gap-3 md:px-5 md:py-4",
                   tableColumns,
                   isRealPlayer ? style.row : "cursor-not-allowed opacity-75"
                 )}
@@ -324,32 +325,38 @@ export function RosterSlotTable({
                 <span className="flex items-center gap-2">
                   <span
                     className={cn(
-                      "inline-flex min-w-[3.25rem] shrink-0 justify-center whitespace-nowrap rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em]",
+                      "inline-flex min-w-[3.4rem] shrink-0 justify-center whitespace-nowrap rounded-full border px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] md:min-w-[3.25rem] md:px-3 md:py-1 md:tracking-[0.14em]",
                       style.pill
                     )}
                   >
                     {slotLabel(player)}
                   </span>
-                  <span className={cn("h-2.5 w-2.5 rounded-full", style.dot)} />
+                  <span className={cn("hidden h-2.5 w-2.5 rounded-full md:block", style.dot)} />
                 </span>
-                <span className="flex flex-col gap-1">
-                  <span className="font-black text-cfb-text-primary">{isRealPlayer ? player.player_name : "N/A"}</span>
+                <span className="flex min-w-0 flex-col gap-1">
+                  <span className="truncate font-black text-cfb-text-primary">{isRealPlayer ? player.player_name : "N/A"}</span>
                   <span
                     className={cn(
-                      "inline-flex w-fit shrink-0 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em]",
+                      "hidden w-fit shrink-0 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] md:inline-flex",
                       style.pill
                     )}
                   >
                     {position}
                   </span>
+                  <span className="truncate text-[10px] font-bold text-cfb-text-muted md:hidden">
+                    {isRealPlayer
+                      ? [displaySchoolName(player.school ?? player.player_school), player.opponent ? `vs ${player.opponent}` : "Opponent TBD"].filter(Boolean).join(" · ")
+                      : "Open roster slot"}
+                  </span>
                 </span>
-                <span className="text-cfb-text-muted">{isRealPlayer ? displaySchoolName(player.school ?? player.player_school) || "—" : "—"}</span>
+                <span className="hidden text-cfb-text-muted md:block">{isRealPlayer ? displaySchoolName(player.school ?? player.player_school) || "—" : "—"}</span>
                 {showPositionColumn ? (
-                  <span className={cn("font-black", style.text)}>{position}</span>
+                  <span className={cn("hidden font-black md:block", style.text)}>{position}</span>
                 ) : null}
-                <span className="text-cfb-text-muted">{isRealPlayer ? player.opponent ?? "TBD" : "—"}</span>
-                <span className={cn("text-right font-black", style.text)}>
-                  {formatProjectionDisplay(projection, player.projection_status)}
+                <span className="hidden text-cfb-text-muted md:block">{isRealPlayer ? player.opponent ?? "TBD" : "—"}</span>
+                <span className={cn("flex flex-col items-end text-right font-black tabular-nums", style.text)}>
+                  <span className="text-[8px] uppercase tracking-[0.12em] text-cfb-text-muted md:hidden">Proj</span>
+                  <span>{formatProjectionDisplay(projection, player.projection_status)}</span>
                 </span>
               </button>
             );

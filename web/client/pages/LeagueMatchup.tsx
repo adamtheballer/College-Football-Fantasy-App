@@ -128,11 +128,12 @@ function MatchupTeamSummary({
         </div>
         <p className="hidden cfb-micro-label text-cfb-text-muted sm:block">{label}</p>
       </div>
-      <p className="mt-2 truncate text-sm font-black text-cfb-text-primary sm:text-base">
+      <p className="mt-2 truncate text-[9px] font-black uppercase tracking-[0.1em] text-cfb-text-muted sm:hidden">{label}</p>
+      <p className="mt-1 truncate text-xs font-black text-cfb-text-primary sm:mt-2 sm:text-base">
         {team?.fantasy_team_name ?? "Team TBD"}
       </p>
-      <p className="mt-0.5 text-xs font-bold text-cfb-text-muted">{team?.record ?? "0-0-0"}</p>
-      <p className={`mt-2 font-display text-3xl font-black tracking-[-0.06em] sm:text-4xl ${isBrand ? "text-cfb-brand" : "text-cfb-pink"}`}>
+      <p className="mt-0.5 text-[10px] font-bold text-cfb-text-muted sm:text-xs">{team?.record ?? "0-0-0"}</p>
+      <p className={`mt-1 font-display text-2xl font-black tracking-[-0.06em] sm:mt-2 sm:text-4xl ${isBrand ? "text-cfb-brand" : "text-cfb-pink"}`}>
         {formatMatchupPoints(teamTotal(team))}
       </p>
       <p className={`mt-0.5 text-[9px] font-black uppercase tracking-[0.15em] ${isBrand ? "text-cfb-brand" : "text-cfb-pink"}`}>
@@ -181,7 +182,7 @@ function CompactMatchupScoreboard({
 
       <div className="relative mt-5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:mt-6 sm:gap-6">
         <MatchupTeamSummary
-          label={isViewingOwnMatchup ? "Your team" : "Home team"}
+          label={isViewingOwnMatchup ? "My proj" : "Home proj"}
           team={myTeam}
           accent="brand"
           align="left"
@@ -209,7 +210,7 @@ function CompactMatchupScoreboard({
         </div>
 
         <MatchupTeamSummary
-          label={isViewingOwnMatchup ? "Opponent" : "Away team"}
+          label={isViewingOwnMatchup ? "Their proj" : "Away proj"}
           team={opponentTeam}
           accent="pink"
           align="right"
@@ -291,15 +292,15 @@ export default function LeagueMatchup() {
   }
 
   return (
-    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-0 py-2 sm:px-2">
+    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-4 px-3 pb-24 pt-3 sm:gap-6 sm:px-2 sm:py-2">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[380px] rounded-[3rem] bg-[radial-gradient(circle_at_20%_10%,hsl(var(--brand-primary)/0.18),transparent_32%),radial-gradient(circle_at_76%_8%,hsl(var(--accent-pink)/0.12),transparent_34%)] blur-2xl" />
 
       <div className="space-y-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="cfb-micro-label text-cfb-brand">League Matchup</p>
-            <h1 className="cfb-display-title mt-2 text-4xl sm:text-5xl">Matchup</h1>
-            <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-cfb-text-secondary">
+            <h1 className="cfb-display-title mt-1 text-3xl sm:mt-2 sm:text-5xl">Matchup</h1>
+            <p className="mt-2 hidden max-w-2xl text-sm font-medium leading-6 text-cfb-text-secondary sm:block">
               Week {displayWeek} scoring view with honest projected, live, final, corrected,
               delayed, and unavailable states.
             </p>

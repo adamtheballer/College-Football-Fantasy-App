@@ -42,6 +42,25 @@ const emptyQuarterbackSlot: LeagueRosterPlayer = {
   weekly_projected_fantasy_points: 0,
 };
 
+const projectedReceiver: LeagueRosterPlayer = {
+  id: 9,
+  league_id: 2,
+  team_id: 5,
+  fantasy_team_id: 5,
+  fantasy_team_name: "Adam's Team",
+  player_id: 99,
+  player_name: "A Very Long Receiver Name That Must Stay Compact",
+  school: "Ohio State",
+  position: "WR",
+  slot: "WR",
+  slot_id: "team-5-WR-1",
+  slot_index: 1,
+  status: "ACTIVE",
+  opponent: "Michigan",
+  projected_points: 18.4,
+  weekly_projected_fantasy_points: 18.4,
+};
+
 describe("RosterSlotTable", () => {
   it("renders an empty configured slot instead of removing its roster row", () => {
     render(<RosterSlotTable title="Starters" players={[emptyQuarterbackSlot]} />);
@@ -50,5 +69,14 @@ describe("RosterSlotTable", () => {
     expect(screen.getByText("N/A")).toBeTruthy();
     expect(screen.getByText("0.0")).toBeTruthy();
     expect(screen.queryByText("No roster players yet.")).toBeNull();
+  });
+
+  it("keeps mobile roster data in one compact row with a weekly projection", () => {
+    const { container } = render(<RosterSlotTable title="Starters" players={[projectedReceiver]} />);
+
+    expect(container.querySelectorAll("[data-roster-mobile-row]")).toHaveLength(1);
+    expect(screen.getByText("A Very Long Receiver Name That Must Stay Compact")).toBeTruthy();
+    expect(screen.getByText("Ohio State · vs Michigan")).toBeTruthy();
+    expect(screen.getByText("18.4")).toBeTruthy();
   });
 });
