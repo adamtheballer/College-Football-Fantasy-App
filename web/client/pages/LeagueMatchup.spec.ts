@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createElement } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const routerMocks = vi.hoisted(() => ({ setSearchParams: vi.fn() }));
 
@@ -56,6 +56,8 @@ import {
   shouldShowMatchupScorePanels,
 } from "./LeagueMatchup";
 
+afterEach(cleanup);
+
 describe("league matchup helpers", () => {
   it("maps backend matchup statuses to honest UI labels", () => {
     expect(formatMatchupStatus("live")).toBe("Live");
@@ -91,6 +93,19 @@ describe("league matchup helpers", () => {
 });
 
 describe("league matchup scoreboard", () => {
+  it("renders a compact Week 1 preweek-baseline scoreboard with both projected totals and win chances", () => {
+    render(createElement(LeagueMatchup));
+
+    expect(screen.getByText("Week 1 Matchup")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "My Team vs My Opponent" })).toBeTruthy();
+    expect(screen.getByText("Preweek baseline")).toBeTruthy();
+    expect(screen.getByText("111.2")).toBeTruthy();
+    expect(screen.getByText("106.4")).toBeTruthy();
+    expect(screen.getAllByText("54.0%")).toHaveLength(2);
+    expect(screen.getAllByText("46.0%")).toHaveLength(1);
+    expect(screen.getByText("Win chance from weekly lineup totals")).toBeTruthy();
+  });
+
   it("lets a member load another same-league matchup through the canonical detail query", () => {
     render(createElement(LeagueMatchup));
 
