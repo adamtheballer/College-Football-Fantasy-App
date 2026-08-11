@@ -703,7 +703,7 @@ test.describe("critical browser workflows", () => {
     await page.getByRole("button", { name: "Continue to Review", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Review", exact: true })).toBeVisible();
     const scoringAcknowledgment = page.getByRole("checkbox", {
-      name: "I understand that scoring settings cannot be changed during the beta, and I have reviewed this league’s point system.",
+      name: "I understand that standard scoring and roster rules cannot be changed during the beta.",
     });
     const createLeagueButton = page.getByRole("button", { name: /Create League/i });
     await expect(scoringAcknowledgment).not.toBeChecked();
