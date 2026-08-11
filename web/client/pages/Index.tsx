@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 import { EmptyState } from "@/components/states";
-import { WinChanceMeter } from "@/components/league/WinChanceMeter";
+import { formatDisplayedProbabilityPair, WinChanceBar } from "@/components/league/WinChanceMeter";
 import { Button } from "@/components/ui/button";
 import { PlaybookDecor, PositionBadge, StatusBadge, SurfaceCard } from "@/components/fantasy";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
@@ -53,6 +53,27 @@ export const formatDraftTime = (value: string | null | undefined) => {
 
 export const formatDashboardPoints = (value: number | null | undefined) =>
   typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "—";
+
+export const formatDashboardWinChance = (
+  myPercent: number | null | undefined,
+  opponentPercent: number | null | undefined,
+) => {
+  if (
+    typeof myPercent !== "number" ||
+    typeof opponentPercent !== "number" ||
+    !Number.isFinite(myPercent) ||
+    !Number.isFinite(opponentPercent) ||
+    myPercent < 5 ||
+    opponentPercent < 5 ||
+    myPercent > 95 ||
+    opponentPercent > 95 ||
+    Math.abs(myPercent + opponentPercent - 100) > 0.000001
+  ) {
+    return null;
+  }
+
+  return formatDisplayedProbabilityPair(myPercent, opponentPercent);
+};
 
 export const isUpcomingDraft = (league: LeagueDetail, now = Date.now()) => {
   const scheduledAt = league.draft?.draft_datetime_utc;
@@ -206,6 +227,10 @@ export default function Index() {
   const matchup = workspace?.matchup_summary ?? null;
   const standings = workspace?.standings_summary ?? [];
   const ownedTeamName = workspace?.owned_team?.name ?? "Your Team";
+  const winChance = formatDashboardWinChance(
+    matchup?.win_probability_for,
+    matchup?.win_probability_against,
+  );
 
   return (
     <div className="mx-auto w-full touch-pan-y max-w-7xl space-y-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] pt-1 sm:space-y-6 sm:pb-24 sm:pt-3">
@@ -298,12 +323,20 @@ export default function Index() {
             </div>
           </div>
 
-          <WinChanceMeter
-            myPercent={matchup?.win_probability_for}
-            opponentPercent={matchup?.win_probability_against}
-            myProjectedTotal={matchup?.projected_points_for}
-            opponentProjectedTotal={matchup?.projected_points_against}
-          />
+          <div className="space-y-2 rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 px-3 py-2.5 sm:px-4 sm:py-3">
+            <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
+              <span>Win chance</span>
+              <span className="whitespace-nowrap text-cfb-text-secondary">
+                {winChance ? `${winChance.left.toFixed(1)}% / ${winChance.right.toFixed(1)}%` : "Unavailable"}
+              </span>
+            </div>
+            <WinChanceBar
+              myPercent={matchup?.win_probability_for}
+              opponentPercent={matchup?.win_probability_against}
+              className="h-2.5"
+              testIdPrefix="dashboard-win-chance"
+            />
+          </div>
 
           <div className="border-t border-cfb-border-subtle pt-3">
             <p className="text-sm text-cfb-text-secondary">

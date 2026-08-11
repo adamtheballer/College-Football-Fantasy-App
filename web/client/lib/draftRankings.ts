@@ -35,6 +35,10 @@ export type DraftPlayer = Player & {
 
 const DRAFT_POSITIONS = new Set(["QB", "RB", "WR", "TE", "K"]);
 const SEASON_GAMES = 12;
+// Kickers should remain a late-draft consideration even in small leagues.
+// The former roster-relative-only floor could surface them around pick 44 in
+// a four-team league, ahead of high-end RB/WR depth on the shared player board.
+const KICKER_MINIMUM_BOARD_RANK = 100;
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
@@ -216,7 +220,7 @@ export const getEarliestKickerDraftRank = (config: DraftConfig) => {
     config.totalRosterSpots ??
     Object.values(config.rosterSlots).reduce((total, slots) => total + slots, 0);
   const totalPicks = config.leagueSize * rounds;
-  return Math.max(1, totalPicks - config.leagueSize * 2);
+  return Math.max(KICKER_MINIMUM_BOARD_RANK, totalPicks - config.leagueSize * 2);
 };
 
 const isLowProjectionQb = (

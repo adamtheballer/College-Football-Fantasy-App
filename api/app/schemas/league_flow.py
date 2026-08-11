@@ -363,6 +363,19 @@ class DraftUpdate(BaseModel):
         return normalized
 
 
+class LeagueListCurrentUserSummaryRead(BaseModel):
+    """The signed-in member's compact, source-of-truth league card summary."""
+
+    team_name: str | None = None
+    wins: int | None = None
+    losses: int | None = None
+    ties: int | None = None
+    opponent_team_name: str | None = None
+    matchup_week: int | None = None
+    win_probability_for: float | None = None
+    win_probability_against: float | None = None
+
+
 class LeagueDetailRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -381,6 +394,7 @@ class LeagueDetailRead(BaseModel):
     draft: DraftRead | None
     draft_order: DraftOrderRead | None = None
     members: list[LeagueMemberRead]
+    current_user_summary: LeagueListCurrentUserSummaryRead | None = None
 
 
 class LeagueWorkspaceTeamRead(BaseModel):

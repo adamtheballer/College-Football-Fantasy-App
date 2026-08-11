@@ -290,8 +290,8 @@ const TradeList = ({
     return (
       <Card className="overflow-hidden rounded-[2rem] border border-white/10 bg-card/40">
         <CardHeader className="border-b border-white/10 bg-white/[0.02]">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <div className="min-w-0">
               <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] text-foreground">
                 {title}
               </CardTitle>
@@ -299,7 +299,7 @@ const TradeList = ({
                 {subtitle}
               </p>
             </div>
-            <span className={cn("rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em]", accentClasses)}>
+            <span className={cn("w-fit shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em]", accentClasses)}>
               {isGiving ? "You send" : "You receive"}
             </span>
           </div>
@@ -316,8 +316,8 @@ const TradeList = ({
   return (
     <Card className="overflow-hidden rounded-[2rem] border border-white/10 bg-card/40">
       <CardHeader className="border-b border-white/10 bg-white/[0.02]">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div className="min-w-0">
             <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] text-foreground">
               {title}
             </CardTitle>
@@ -325,7 +325,7 @@ const TradeList = ({
               {subtitle}
             </p>
           </div>
-          <span className={cn("rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em]", accentClasses)}>
+          <span className={cn("w-fit shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em]", accentClasses)}>
             {selectedIds.size} chosen
           </span>
         </div>
@@ -1009,7 +1009,7 @@ export default function Trade() {
       <Dialog open={isAnalysisReviewOpen} onOpenChange={setIsAnalysisReviewOpen}>
         <DialogContent className="max-w-2xl border-cfb-brand/30 bg-[#081321] text-foreground">
           <DialogHeader>
-            <DialogTitle className="pr-8 text-3xl font-black uppercase italic tracking-tight">
+            <DialogTitle className="pr-10 text-2xl font-black uppercase italic tracking-tight sm:text-3xl">
               Review Trade Offer
             </DialogTitle>
             <DialogDescription className="text-sm font-semibold leading-6 text-muted-foreground">
@@ -1132,7 +1132,7 @@ export default function Trade() {
             );
           })() : null}
 
-          <DialogFooter>
+          <DialogFooter className="sticky bottom-0 border-t border-white/10 bg-[#081321]/95 pt-3 backdrop-blur">
             <Button variant="outline" onClick={closeFocusedOffer}>
               {focusedOfferReturnPath.startsWith("/chats") ? "Back to league chat" : "Close"}
             </Button>

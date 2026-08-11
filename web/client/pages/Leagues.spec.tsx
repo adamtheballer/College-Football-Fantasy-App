@@ -15,6 +15,14 @@ const props = {
   draftDateTime: "2026-08-20T19:00:00Z",
   isPrivate: true,
   draftStatus: "scheduled",
+  currentUserSummary: {
+    wins: 2,
+    losses: 1,
+    ties: 0,
+    opponent_team_name: "Sunday Stars",
+    matchup_week: 1,
+    win_probability_for: 52.4,
+  },
   onOpen: vi.fn(),
   onOpenDraft: vi.fn(),
 };
@@ -62,5 +70,13 @@ describe("LeagueCard", () => {
     expect(props.onOpen).toHaveBeenCalledWith(1);
     expect(screen.queryByRole("button", { name: /Join Draft Room/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /Draft Room Locked/i })).toBeNull();
+  });
+
+  it("shows the signed-in manager's record, opponent, and canonical win chance", () => {
+    render(<LeagueCard {...props} iconUrl={null} />);
+
+    expect(screen.getByText("2-1")).toBeTruthy();
+    expect(screen.getByText("Sunday Stars")).toBeTruthy();
+    expect(screen.getByText("Win chance 52%")).toBeTruthy();
   });
 });
