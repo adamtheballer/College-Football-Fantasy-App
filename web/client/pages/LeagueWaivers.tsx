@@ -479,20 +479,23 @@ export default function LeagueWaivers() {
         </DialogContent>
       </Dialog>
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[460px] rounded-[3rem] bg-[radial-gradient(circle_at_20%_8%,rgba(56,189,248,0.2),transparent_32%),radial-gradient(circle_at_72%_0%,rgba(99,102,241,0.18),transparent_38%),radial-gradient(circle_at_50%_30%,rgba(14,165,233,0.12),transparent_42%)] blur-2xl" />
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         <p className="text-[11px] font-black uppercase tracking-[0.24em] text-sky-300">
           League Players
         </p>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-4xl font-black italic text-slate-50">Available Players</h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-400">
+            <h1 className="text-2xl font-black italic text-slate-50 sm:text-4xl">Available Players</h1>
+            <p className="mt-1.5 max-w-2xl text-sm text-slate-400 sm:mt-2">
               {isFreeAgentPhase
                 ? "This week’s waivers have cleared. Remaining unrostered players are instant adds with no FAAB or priority; each player locks at their own kickoff."
                 : `Waiver bids are open until ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}. After processing, remaining unrostered players become instant adds until their own kickoff.`}
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-3 sm:min-w-[430px]">
+          <p className="text-xs font-bold text-slate-400 sm:hidden">
+            {players.length} available · Top proj {topProjection?.toFixed(1) ?? "—"} · {waiverData?.claims.length ?? 0} claims
+          </p>
+          <div className="hidden grid-cols-3 gap-3 sm:grid sm:min-w-[430px]">
             <div className="rounded-[1.25rem] border border-sky-300/20 bg-sky-400/10 p-4 shadow-[0_0_34px_rgba(56,189,248,0.12)]">
               <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Available</p>
               <p className="mt-1 text-2xl font-black text-sky-100">{players.length}</p>
@@ -515,20 +518,20 @@ export default function LeagueWaivers() {
       </div>
 
       <section className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(13,23,39,0.96),rgba(16,30,52,0.9)_48%,rgba(15,23,42,0.96))] shadow-[0_24px_90px_rgba(14,165,233,0.12)]">
-        <div className="border-b border-sky-300/10 px-5 py-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="border-b border-sky-300/10 px-4 py-4 sm:px-5 sm:py-5">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <h2 className="text-[11px] font-black uppercase tracking-[0.22em] text-sky-300">
                 Available Players
               </h2>
-              <p className="mt-2 text-xs font-semibold text-slate-500">
+              <p className="mt-1.5 text-xs font-semibold leading-5 text-slate-500 sm:mt-2">
                 {isFreeAgentPhase
                   ? "Waivers cleared for this week. Add eligible players immediately; no bid or priority is used."
                   : `Claims process at ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}. Eligible players become instant adds only after the clear.`}
               </p>
             </div>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <div className="relative min-w-[280px]">
+              <div className="relative w-full sm:min-w-[280px]">
                 <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-sky-200/45" />
                 <Input
                   value={search}
@@ -537,7 +540,7 @@ export default function LeagueWaivers() {
                   className="h-12 rounded-2xl border-sky-300/15 bg-slate-950/55 pl-11 text-sm font-bold text-slate-50 placeholder:text-slate-500 focus:border-sky-300/45 focus:ring-sky-300/20"
                 />
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {positions.map((item) => {
                   const active = position === item;
                   const tone = positionTone(item === "ALL" ? null : item);
@@ -547,7 +550,7 @@ export default function LeagueWaivers() {
                       type="button"
                       onClick={() => setPosition(item)}
                       className={[
-                        "rounded-2xl border px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] transition-all duration-200",
+                        "shrink-0 rounded-xl border px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.16em] transition-all duration-200 sm:rounded-2xl sm:px-4 sm:py-3",
                         active
                           ? `${tone.border} ${tone.bg} ${tone.text} ${tone.glow}`
                           : "border-white/10 bg-white/[0.04] text-slate-400 hover:border-sky-300/25 hover:bg-sky-300/[0.07] hover:text-slate-100",
@@ -575,7 +578,85 @@ export default function LeagueWaivers() {
             No league-scoped available players match the current filters.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <div className="divide-y divide-sky-300/10 sm:hidden">
+            {filteredPlayers.map((player) => {
+              const tone = positionTone(player.position);
+              const projectionLabel = waiverProjectionLabel(
+                player.weekly_projected_fantasy_points,
+                player.projection_status,
+              );
+              const claimable = canClaimAvailability(player.availability_state);
+              const watching = watchedPlayerIds.has(player.id);
+              return (
+                <div
+                  key={player.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedPlayer(player)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelectedPlayer(player);
+                    }
+                  }}
+                  className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-sky-300/[0.045] focus:outline-none focus-visible:bg-sky-300/[0.065]"
+                  data-testid={`waiver-mobile-player-row-${player.id}`}
+                >
+                  <span
+                    data-testid={`waiver-mobile-rank-${player.id}`}
+                    className="min-w-[2ch] text-right text-lg font-black italic tabular-nums text-slate-500"
+                  >
+                    {player.rank}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <p className="truncate text-sm font-black text-slate-50">{player.name}</p>
+                      <span className={`inline-flex shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.1em] ${tone.border} ${tone.bg} ${tone.text}`}>
+                        {player.position ?? "-"}
+                      </span>
+                    </div>
+                    <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                      {player.school ?? "School unavailable"}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <div className="text-right">
+                      <p className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-500">W{waiverData?.current_period?.week ?? 1}</p>
+                      <p className={`mt-0.5 text-base font-black tabular-nums ${projectionLabel === "BYE" ? "text-amber-200" : projectionLabel === "OUT" ? "text-rose-200" : "text-sky-100"}`}>
+                        {projectionLabel}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-label={watching ? `Remove ${player.name} from watchlist` : `Watch ${player.name}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleWatchPlayer(player.id);
+                      }}
+                      disabled={createWatchlist.isPending || toggleWatchlistPlayer.isPending || watchlistsQuery.isError}
+                      className="h-9 w-9 rounded-xl border-sky-300/20 bg-sky-300/[0.06] p-0 text-sky-100 hover:border-sky-200/45 hover:bg-sky-300/15"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      disabled={!waiverData?.fantasy_team_id || !claimable}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openClaimDialog(player);
+                      }}
+                      className="h-9 rounded-xl bg-sky-300 px-3 text-[9px] font-black uppercase tracking-[0.1em] text-slate-950 shadow-none hover:bg-sky-200 disabled:opacity-50"
+                    >
+                      {claimable ? (player.availability_state === "free_agent" ? "Add" : "Claim") : "Locked"}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+            </div>
+            <div className="hidden overflow-x-auto sm:block">
             <table className="min-w-[980px] w-full table-fixed text-left">
               <thead className="border-b border-sky-300/10 bg-slate-950/35">
                 <tr className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
@@ -684,7 +765,8 @@ export default function LeagueWaivers() {
                 })}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </section>
 

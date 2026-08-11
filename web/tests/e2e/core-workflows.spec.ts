@@ -1461,6 +1461,16 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByRole("button", { name: "Next week" })).toBeVisible();
     await expect(page.getByText("Prev", { exact: true })).toHaveCount(0);
     await expect(page.getByText("Next", { exact: true })).toHaveCount(0);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByTestId("compact-win-chance-left-bar")).toBeVisible();
+    await expect(page.getByTestId("compact-win-chance-left-bar")).toHaveClass(/from-rose-800/);
+    await expect(page.getByTestId("compact-win-chance-right-bar")).toHaveClass(/from-emerald-700/);
+    await expect(page.locator('[style*="conic-gradient"]')).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
+    await page.screenshot({ path: "test-results/mobile-matchup-linear-meter.png", fullPage: true });
+
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page.reload();
     await expect(page.getByText("48.1% / 51.9%")).toBeVisible();
     await page.getByRole("combobox", { name: "League matchup" }).selectOption("102");
@@ -2581,6 +2591,14 @@ test.describe("critical browser workflows", () => {
     const archManningRow = page.getByText("Arch Manning").locator("xpath=ancestor::tr");
     await archManningRow.getByRole("button", { name: /^Watch$/i }).click();
     await expect(archManningRow.getByRole("button", { name: /^Watching$/i })).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobileRow = page.getByTestId("waiver-mobile-player-row-801");
+    await expect(mobileRow).toBeVisible();
+    await expect(mobileRow.getByText("Arch Manning")).toBeVisible();
+    await expect(mobileRow.getByRole("button", { name: /Remove Arch Manning from watchlist/i })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
+    await page.screenshot({ path: "test-results/mobile-waivers-compact.png", fullPage: true });
 
     await page.goto("/league/1/watchlist");
     await expect(page.getByRole("heading", { name: /^Watchlist$/i })).toBeVisible();

@@ -4,7 +4,7 @@ import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
 import { WeekSelector } from "@/components/league/WeekSelector";
-import { WinChanceMeter } from "@/components/league/WinChanceMeter";
+import { WinChanceBar, WinChanceMeter } from "@/components/league/WinChanceMeter";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
 import { useLeagueDetail, useLeagueMatchupTab, useLeagueScoreboard } from "@/hooks/use-leagues";
@@ -160,9 +160,7 @@ function CompactMatchupScoreboard({
   isViewingOwnMatchup: boolean;
 }) {
   const winChance = displayedProbabilityPair(myTeam?.win_probability, opponentTeam?.win_probability);
-  const ringGradient = winChance
-    ? `conic-gradient(from 270deg, hsl(var(--brand-primary)) 0 ${winChance.my}%, hsl(var(--accent-pink)) ${winChance.my}% 100%)`
-    : "conic-gradient(hsl(var(--border-subtle)) 0 100%)";
+  const myTeamIsLeading = Boolean(winChance && winChance.my >= winChance.opponent);
   const statusLabel = formatMatchupStatus(data.status);
 
   return (
@@ -196,24 +194,23 @@ function CompactMatchupScoreboard({
           status={data.status ?? "projected"}
         />
 
-        <div className="flex flex-col items-center gap-2 text-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full p-[4px] shadow-[0_0_30px_rgba(62,155,255,0.16)] sm:h-24 sm:w-24" style={{ background: ringGradient }}>
-            <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-cfb-canvas/95 px-1">
-              <span className="text-[9px] font-black uppercase tracking-[0.13em] text-cfb-text-muted">Win</span>
-              {winChance ? (
-                <span className="mt-0.5 whitespace-nowrap text-sm font-black text-cfb-text-primary sm:text-base">
-                  {winChance.my.toFixed(1)}%
-                </span>
-              ) : (
-                <span className="mt-0.5 text-xs font-black text-cfb-text-muted">—</span>
-              )}
-            </div>
-          </div>
+        <div className="flex min-w-[112px] flex-col items-center gap-2 text-center">
+          <span className="text-[9px] font-black uppercase tracking-[0.13em] text-cfb-text-muted">Win chance</span>
           <div className="flex items-center gap-1.5 whitespace-nowrap text-[10px] font-black tabular-nums sm:text-xs">
-            <span className="text-cfb-brand">{winChance ? `${winChance.my.toFixed(1)}%` : "—"}</span>
+            <span className={myTeamIsLeading ? "text-emerald-300" : "text-red-300"}>
+              {winChance ? `${winChance.my.toFixed(1)}%` : "—"}
+            </span>
             <span className="text-cfb-text-muted">VS</span>
-            <span className="text-cfb-pink">{winChance ? `${winChance.opponent.toFixed(1)}%` : "—"}</span>
+            <span className={myTeamIsLeading ? "text-red-300" : "text-emerald-300"}>
+              {winChance ? `${winChance.opponent.toFixed(1)}%` : "—"}
+            </span>
           </div>
+          <WinChanceBar
+            myPercent={myTeam?.win_probability}
+            opponentPercent={opponentTeam?.win_probability}
+            className="h-2.5 w-full"
+            testIdPrefix="compact-win-chance"
+          />
         </div>
 
         <MatchupTeamSummary

@@ -15,7 +15,10 @@ vi.mock("react-router-dom", () => ({
 vi.mock("@/components/league/LeagueTabs", () => ({ LeagueTabs: () => null }));
 vi.mock("@/components/league/SideBySideMatchup", () => ({ SideBySideMatchup: () => null }));
 vi.mock("@/components/league/WeekSelector", () => ({ WeekSelector: () => null }));
-vi.mock("@/components/league/WinChanceMeter", () => ({ WinChanceMeter: () => null }));
+vi.mock("@/components/league/WinChanceMeter", () => ({
+  WinChanceMeter: () => null,
+  WinChanceBar: () => null,
+}));
 
 vi.mock("@/hooks/use-leagues", () => ({
   useLeagueDetail: () => ({
@@ -101,7 +104,7 @@ describe("league matchup scoreboard", () => {
     expect(screen.getByText("Preweek baseline")).toBeTruthy();
     expect(screen.getByText("111.2")).toBeTruthy();
     expect(screen.getByText("106.4")).toBeTruthy();
-    expect(screen.getAllByText("54.0%")).toHaveLength(2);
+    expect(screen.getAllByText("54.0%")).toHaveLength(1);
     expect(screen.getAllByText("46.0%")).toHaveLength(1);
     expect(screen.getByText("Win chance from weekly lineup totals")).toBeTruthy();
   });
