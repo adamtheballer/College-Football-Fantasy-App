@@ -23,7 +23,7 @@ class LeagueBasics(BaseModel):
     max_teams: int
     is_private: bool = True
     description: str | None = Field(default=None, max_length=500)
-    icon_url: str | None = Field(default=None, max_length=500)
+    icon_url: str | None = Field(default=None, max_length=2048)
 
     @field_validator("max_teams")
     @classmethod

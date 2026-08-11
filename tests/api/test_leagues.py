@@ -219,7 +219,7 @@ def test_scoring_rules_normalize_create_form_aliases():
     assert rules["xp_made"] == 1
 
 
-def test_create_league_persists_custom_roster_format_and_flags(client):
+def test_create_league_enforces_standard_beta_roster_and_managed_processing(client):
     token = create_user_and_token(client, "custom-format")
     payload = {
         "basics": {
@@ -264,21 +264,29 @@ def test_create_league_persists_custom_roster_format_and_flags(client):
     settings = response.json()["league"]["settings"]
     assert settings["roster_slots_json"] == {
         "QB": 1,
-        "RB": 3,
+        "RB": 2,
         "WR": 2,
         "TE": 1,
-        "FLEX": 2,
-        "SUPERFLEX": 1,
-        "K": 0,
-        "BENCH": 7,
-        "IR": 2,
+        "FLEX": 1,
+        "SUPERFLEX": 0,
+        "K": 1,
+        "BENCH": 5,
+        "IR": 1,
     }
-    assert settings["superflex_enabled"] is True
-    assert settings["kicker_enabled"] is False
-    assert settings["defense_enabled"] is True
+    assert settings["superflex_enabled"] is False
+    assert settings["kicker_enabled"] is True
+    assert settings["defense_enabled"] is False
     assert settings["playoff_teams"] == 6
     assert settings["waiver_type"] == "priority"
     assert settings["trade_review_type"] == "commissioner"
+    assert settings["waiver_period_hours"] == 24
+    assert settings["waiver_processing_weekday"] == 1
+    assert settings["waiver_processing_hour"] == 8
+    assert settings["waiver_timezone"] == "America/New_York"
+    assert settings["faab_starting_budget"] == 100
+    assert settings["allow_zero_faab_bids"] is True
+    assert settings["reveal_all_waiver_bids"] is False
+    assert settings["post_drop_waiver_hours"] == 24
 
 
 def test_create_league_accepts_create_form_scoring_keys(client):

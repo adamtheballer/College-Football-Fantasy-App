@@ -109,6 +109,19 @@ def test_league_and_profile_names_are_moderated_before_creation(client):
         assert all("faggot" not in str(event.metadata_json).casefold() for event in events)
 
 
+def test_league_accepts_a_standard_length_safe_https_image_url(client):
+    token, _user_id = _signup(client, "long-league-image")
+    image_url = "https://images.example.com/" + ("a" * (2048 - len("https://images.example.com/")))
+    assert len(image_url) == 2048
+    payload = _league_payload("Long Image URL League")
+    payload["basics"]["icon_url"] = image_url
+
+    response = client.post("/leagues", json=payload, headers=_headers(token))
+
+    assert response.status_code == 201
+    assert response.json()["league"]["icon_url"] == image_url
+
+
 def test_chat_blocks_persists_only_clean_messages_and_records_admin_safe_audit(client):
     token, user_id = _signup(client, "chat")
     league = _create_league(client, token)

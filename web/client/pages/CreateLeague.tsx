@@ -8,8 +8,6 @@ import {
   ChevronRight,
   Copy,
   Loader2,
-  Minus,
-  Plus,
   ShieldCheck,
   Sparkles,
   Trophy,
@@ -47,7 +45,6 @@ const waiverOptions = [
 ];
 const tradeReviewOptions = [
   { label: "Commissioner", value: "commissioner" },
-  { label: "League Vote", value: "league_vote" },
   { label: "None", value: "none" },
 ];
 
@@ -62,9 +59,7 @@ const timezoneOptions = [
   { label: "UTC", value: "UTC" },
 ];
 
-type RosterSlotKey = "QB" | "RB" | "WR" | "TE" | "FLEX" | "SUPERFLEX" | "K" | "BENCH" | "IR";
-
-const defaultRosterSlots: Record<RosterSlotKey, number> = {
+const standardRosterSlots = {
   QB: 1,
   RB: 2,
   WR: 2,
@@ -76,24 +71,7 @@ const defaultRosterSlots: Record<RosterSlotKey, number> = {
   IR: 1,
 };
 
-const rosterSlotControls: Array<{
-  key: RosterSlotKey;
-  label: string;
-  min: number;
-  max: number;
-  helper: string;
-}> = [
-  { key: "QB", label: "QB", min: 1, max: 3, helper: "Starting quarterbacks" },
-  { key: "RB", label: "RB", min: 1, max: 5, helper: "Starting running backs" },
-  { key: "WR", label: "WR", min: 1, max: 5, helper: "Starting wide receivers" },
-  { key: "TE", label: "TE", min: 1, max: 3, helper: "Starting tight ends" },
-  { key: "FLEX", label: "FLEX", min: 0, max: 3, helper: "RB / WR / TE slot" },
-  { key: "K", label: "K", min: 1, max: 2, helper: "Kicker slots" },
-  { key: "BENCH", label: "Bench", min: 0, max: 10, helper: "Reserve spots" },
-  { key: "IR", label: "IR", min: 0, max: 4, helper: "Injury reserve" },
-];
-
-const defaultScoring = {
+const standardBetaScoring = {
   ppr: 1,
   pass_td: 4,
   pass_yds_per_pt: 25,
@@ -107,32 +85,18 @@ const defaultScoring = {
   xp: 1,
 };
 
-type ScoringKey = keyof typeof defaultScoring;
-
-const scoringControls: Array<{
-  key: ScoringKey;
-  label: string;
-  step?: string;
-  helper: string;
-}> = [
-  { key: "ppr", label: "Reception", step: "0.5", helper: "Points per reception" },
-  { key: "pass_td", label: "Passing TD", helper: "Points per passing touchdown" },
-  { key: "pass_yds_per_pt", label: "Pass yards / point", helper: "Passing yards required for 1 point" },
-  { key: "rush_yds_per_pt", label: "Rush yards / point", helper: "Rushing yards required for 1 point" },
-  { key: "rec_yds_per_pt", label: "Receiving yards / point", helper: "Receiving yards required for 1 point" },
-  { key: "rush_td", label: "Rushing TD", helper: "Points per rushing touchdown" },
-  { key: "rec_td", label: "Receiving TD", helper: "Points per receiving touchdown" },
-  { key: "int", label: "Interception", helper: "Penalty for thrown interceptions" },
-  { key: "fumble_lost", label: "Fumble lost", helper: "Penalty for lost fumbles" },
-  {
-    key: "fg",
-    label: "Field goal (30 yards or less)",
-    helper: "3 points through 30 yards; +2 every 10 yards: 31–40 = 5, 41–50 = 7, 51–60 = 9, 61+ = 11",
-  },
-  { key: "xp", label: "Extra point", helper: "Points per made extra point" },
-];
-
-const clampNumber = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const standardRosterSummary = "QB 1 · RB 2 · WR 2 · TE 1 · FLEX 1 · K 1 · Bench 5 · IR 1";
+const standardBetaScoringSummary = "Standard PPR · 3-point field goals · 1-point extra points";
+const managedWaiverSchedule = {
+  waiver_period_hours: 24,
+  waiver_processing_weekday: 1,
+  waiver_processing_hour: 8,
+  waiver_timezone: "America/New_York",
+  faab_starting_budget: 100,
+  allow_zero_faab_bids: true,
+  reveal_all_waiver_bids: false,
+  post_drop_waiver_hours: 24,
+} as const;
 
 const getDefaultDraftDate = () => {
   const now = new Date();
@@ -163,8 +127,6 @@ const primaryButtonClass =
   "h-12 rounded-[10px] bg-[#60A5FA] bg-none px-6 text-sm font-bold text-[#06111F] shadow-none hover:bg-[#7DD3FC] hover:shadow-none focus-visible:ring-[#60A5FA]/30 disabled:bg-[#334155] disabled:text-[#94A3B8]";
 const secondaryButtonClass =
   "h-12 rounded-[10px] border border-white/[0.08] bg-[#161E2E] bg-none px-6 text-sm font-semibold text-[#F8FAFC] shadow-none hover:border-white/15 hover:bg-[#1E293B] hover:text-white";
-const smallControlButtonClass =
-  "flex h-8 w-8 items-center justify-center rounded-[8px] border border-white/[0.08] bg-[#0B1020] text-[#CBD5E1] transition hover:border-[#60A5FA]/35 hover:bg-[#60A5FA]/10 hover:text-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-35";
 
 function CreateLeagueBackdrop() {
   return (
@@ -419,21 +381,9 @@ function CreateLeagueForm() {
     icon_url: "",
   });
 
-  const [scoring, setScoring] = useState(defaultScoring);
-
-  const [rosterSlots, setRosterSlots] = useState<Record<RosterSlotKey, number>>(defaultRosterSlots);
-
   const [settings, setSettings] = useState({
     playoff_teams: 4,
     waiver_type: "faab",
-    waiver_period_hours: 24,
-    waiver_processing_weekday: 1,
-    waiver_processing_hour: 8,
-    waiver_timezone: timezone,
-    faab_starting_budget: 100,
-    allow_zero_faab_bids: true,
-    reveal_all_waiver_bids: false,
-    post_drop_waiver_hours: 24,
     trade_review_type: "commissioner",
   });
 
@@ -470,45 +420,6 @@ function CreateLeagueForm() {
 
   const nextStepLabel = step < steps.length - 1 ? `Continue to ${steps[step + 1]}` : "Create League";
 
-  const effectiveRosterSlots = useMemo(
-    () => ({
-      ...rosterSlots,
-      SUPERFLEX: 0,
-      K: Math.max(1, rosterSlots.K),
-    }),
-    [rosterSlots],
-  );
-
-  const rosterSummary = useMemo(
-    () =>
-      rosterSlotControls
-        .filter((control) => effectiveRosterSlots[control.key] > 0)
-        .map((control) => `${control.label} ${effectiveRosterSlots[control.key]}`)
-        .join(" · "),
-    [effectiveRosterSlots],
-  );
-
-  const scoringSummary = useMemo(
-    () => `PPR ${scoring.ppr} · Pass TD ${scoring.pass_td} · Rush TD ${scoring.rush_td} · Rec TD ${scoring.rec_td}`,
-    [scoring.pass_td, scoring.ppr, scoring.rec_td, scoring.rush_td],
-  );
-
-  const updateScoring = (key: ScoringKey, rawValue: number) => {
-    setBetaScoringAcknowledged(false);
-    setScoring((prev) => ({
-      ...prev,
-      [key]: Number.isFinite(rawValue) ? rawValue : defaultScoring[key],
-    }));
-  };
-
-  const updateRosterSlot = (slot: RosterSlotKey, rawValue: number) => {
-    const control = rosterSlotControls.find((item) => item.key === slot);
-    if (!control) return;
-
-    const nextValue = clampNumber(Number.isFinite(rawValue) ? rawValue : control.min, control.min, control.max);
-    setRosterSlots((prev) => ({ ...prev, [slot]: nextValue }));
-  };
-
   const updateLeagueSize = (rawValue: number) => {
     setBasics((prev) => ({ ...prev, max_teams: rawValue }));
     setSettings((prev) => ({
@@ -539,7 +450,7 @@ function CreateLeagueForm() {
       return;
     }
     if (!betaScoringAcknowledged) {
-      setError("Review the point system and acknowledge the beta scoring notice before creating the league.");
+      setError("Acknowledge the standard beta rules before creating the league.");
       return;
     }
 
@@ -556,18 +467,11 @@ function CreateLeagueForm() {
           icon_url: basics.icon_url || null,
         },
         settings: {
-          scoring_json: createLeagueScoringToApi(scoring),
-          roster_slots_json: effectiveRosterSlots,
+          scoring_json: createLeagueScoringToApi(standardBetaScoring),
+          roster_slots_json: standardRosterSlots,
           playoff_teams: settings.playoff_teams,
           waiver_type: settings.waiver_type,
-          waiver_period_hours: settings.waiver_period_hours,
-          waiver_processing_weekday: settings.waiver_processing_weekday,
-          waiver_processing_hour: settings.waiver_processing_hour,
-          waiver_timezone: settings.waiver_timezone,
-          faab_starting_budget: settings.faab_starting_budget,
-          allow_zero_faab_bids: settings.allow_zero_faab_bids,
-          reveal_all_waiver_bids: settings.reveal_all_waiver_bids,
-          post_drop_waiver_hours: settings.post_drop_waiver_hours,
+          ...managedWaiverSchedule,
           trade_review_type: settings.trade_review_type,
           superflex_enabled: false,
           kicker_enabled: true,
@@ -767,7 +671,11 @@ function CreateLeagueForm() {
                       className={inputClass}
                     />
                   </Field>
-                  <Field label="League image URL (optional)" className="md:col-span-2">
+                  <Field
+                    label="League image URL (optional)"
+                    helper="Paste a public HTTPS image address. Standard image links up to 2,048 characters are supported."
+                    className="md:col-span-2"
+                  >
                     <Input
                       value={basics.icon_url}
                       onChange={(e) => setBasics((prev) => ({ ...prev, icon_url: e.target.value }))}
@@ -782,75 +690,8 @@ function CreateLeagueForm() {
               <div className="space-y-8">
                 <SectionHeader
                   title="League Settings"
-                  description="Customize roster structure and scoring settings that will be persisted with this league."
+                  description="Choose the three league rules available in beta. Standard roster, scoring, and processing rules apply to every league."
                 />
-
-                <div className="space-y-4">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <Label className={fieldLabelClass}>Roster format</Label>
-                      <p className="mt-2 text-sm leading-6 text-[#94A3B8]">
-                        Set starters, flex spots, bench depth, and IR. These settings drive draft length and roster rules.
-                      </p>
-                    </div>
-                    <p className="text-sm font-semibold text-[#60A5FA]">{rosterSummary || "No active slots"}</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {rosterSlotControls.map((control) => {
-                      const value = effectiveRosterSlots[control.key];
-
-                      return (
-                        <div
-                          key={control.key}
-                          className={cn(
-                            "rounded-[14px] border bg-[#161E2E] p-4 transition",
-                            "border-white/[0.08] hover:border-[#60A5FA]/25",
-                          )}
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <span className="text-sm font-bold text-[#F8FAFC]">{control.label}</span>
-                              <p className="mt-1 text-xs leading-5 text-[#64748B]">{control.helper}</p>
-                            </div>
-                            <span className="rounded-full border border-[#60A5FA]/25 bg-[#60A5FA]/10 px-3 py-1 text-sm font-bold text-[#BFDBFE]">
-                              {value}
-                            </span>
-                          </div>
-                          <div className="mt-4 flex items-center gap-2">
-                            <button
-                              type="button"
-                              className={smallControlButtonClass}
-                              disabled={value <= control.min}
-                              onClick={() => updateRosterSlot(control.key, value - 1)}
-                              aria-label={`Decrease ${control.label} slots`}
-                            >
-                              <Minus className="h-4 w-4" />
-                            </button>
-                            <Input
-                              type="number"
-                              min={control.min}
-                              max={control.max}
-                              value={value}
-                              onChange={(e) => updateRosterSlot(control.key, Number(e.target.value))}
-                              className={cn(inputClass, "h-10 text-center")}
-                              aria-label={`${control.label} slots`}
-                            />
-                            <button
-                              type="button"
-                              className={smallControlButtonClass}
-                              disabled={value >= control.max}
-                              onClick={() => updateRosterSlot(control.key, value + 1)}
-                              aria-label={`Increase ${control.label} slots`}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                   <Field label="Playoff teams">
@@ -907,123 +748,6 @@ function CreateLeagueForm() {
                     </Select>
                   </Field>
                 </div>
-
-                <div className="rounded-[1.25rem] border border-sky-300/15 bg-sky-300/[0.04] p-5">
-                  <div className="flex flex-col gap-2 border-b border-white/[0.08] pb-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className={fieldLabelClass}>Waiver processing</p>
-                      <p className="mt-2 max-w-2xl text-sm leading-6 text-[#94A3B8]">
-                        {waiverOptions.find((option) => option.value === settings.waiver_type)?.description}
-                      </p>
-                    </div>
-                    <span className="rounded-full border border-sky-300/25 bg-sky-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-sky-100">
-                      {settings.waiver_type === "faab" ? "FAAB" : "Priority"}
-                    </span>
-                  </div>
-                  <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <Field label="Processing day">
-                      <Select
-                        value={String(settings.waiver_processing_weekday)}
-                        onValueChange={(value) => setSettings((prev) => ({ ...prev, waiver_processing_weekday: Number(value) }))}
-                      >
-                        <SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger>
-                        <SelectContent className={selectContentClass}>
-                          {[
-                            [0, "Monday"], [1, "Tuesday"], [2, "Wednesday"], [3, "Thursday"],
-                            [4, "Friday"], [5, "Saturday"], [6, "Sunday"],
-                          ].map(([value, label]) => <SelectItem key={value} value={String(value)}>{label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <Field label="Processing time (local hour)">
-                      <Input
-                        type="number"
-                        min="0"
-                        max="23"
-                        value={settings.waiver_processing_hour}
-                        onChange={(event) => setSettings((prev) => ({ ...prev, waiver_processing_hour: clampNumber(Number(event.target.value), 0, 23) }))}
-                        className={inputClass}
-                      />
-                    </Field>
-                    <Field label="League time zone">
-                      <Select
-                        value={settings.waiver_timezone}
-                        onValueChange={(value) => setSettings((prev) => ({ ...prev, waiver_timezone: value }))}
-                      >
-                        <SelectTrigger className={selectTriggerClass}><SelectValue /></SelectTrigger>
-                        <SelectContent className={selectContentClass}>
-                          {timezoneOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <Field label="Dropped-player waiver hours" helper="How long a dropped player remains on waivers.">
-                      <Input
-                        type="number"
-                        min="0"
-                        max="168"
-                        value={settings.post_drop_waiver_hours}
-                        onChange={(event) => setSettings((prev) => ({ ...prev, post_drop_waiver_hours: clampNumber(Number(event.target.value), 0, 168) }))}
-                        className={inputClass}
-                      />
-                    </Field>
-                    {settings.waiver_type === "faab" ? (
-                      <>
-                        <Field label="Starting FAAB budget">
-                          <Input
-                            type="number"
-                            min="0"
-                            value={settings.faab_starting_budget}
-                            onChange={(event) => setSettings((prev) => ({ ...prev, faab_starting_budget: Math.max(0, Number(event.target.value) || 0) }))}
-                            className={inputClass}
-                          />
-                        </Field>
-                        <Field label="FAAB options">
-                          <div className="grid gap-3 rounded-[10px] border border-white/[0.08] bg-[#161E2E] p-3">
-                            <label className="flex items-center justify-between gap-3 text-sm font-medium text-[#CBD5E1]">
-                              Allow $0 bids
-                              <Switch checked={settings.allow_zero_faab_bids} onCheckedChange={(value) => setSettings((prev) => ({ ...prev, allow_zero_faab_bids: value }))} />
-                            </label>
-                            <label className="flex items-center justify-between gap-3 text-sm font-medium text-[#CBD5E1]">
-                              Reveal all bids after processing
-                              <Switch checked={settings.reveal_all_waiver_bids} onCheckedChange={(value) => setSettings((prev) => ({ ...prev, reveal_all_waiver_bids: value }))} />
-                            </label>
-                          </div>
-                        </Field>
-                      </>
-                    ) : (
-                      <div className="rounded-[10px] border border-violet-300/20 bg-violet-300/[0.06] p-4 text-sm leading-6 text-violet-100">
-                        <p className="font-bold">Initial priority: Reverse Draft Order</p>
-                        <p className="mt-1 text-violet-100/70">The official draft initializes the order. Successful claims move teams to the back.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <Label className={fieldLabelClass}>Scoring settings</Label>
-                      <p className="mt-2 text-sm leading-6 text-[#94A3B8]">
-                        Customize every scoring value used for projections, matchups, and standings.
-                      </p>
-                    </div>
-                    <p className="text-sm font-semibold text-[#60A5FA]">{scoringSummary}</p>
-                  </div>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {scoringControls.map((control) => (
-                      <Field key={control.key} label={control.label} helper={control.helper}>
-                        <Input
-                          type="number"
-                          step={control.step ?? "1"}
-                          value={scoring[control.key]}
-                          onChange={(e) => updateScoring(control.key, Number(e.target.value))}
-                          className={inputClass}
-                        />
-                      </Field>
-                    ))}
-                  </div>
-                </div>
-
               </div>
             )}
 
@@ -1142,20 +866,20 @@ function CreateLeagueForm() {
                   <ReviewItem label="Teams" value={basics.max_teams} />
                   <ReviewItem label="Draft" value={formatDraftDateTime(draftDateTime)} />
                   <ReviewItem label="Commissioner" value="You" />
-                  <ReviewItem label="Roster format" value={rosterSummary || "--"} />
-                  <ReviewItem label="Scoring" value={scoringSummary} />
+                  <ReviewItem label="Roster" value={standardRosterSummary} />
+                  <ReviewItem label="Scoring" value={standardBetaScoringSummary} />
                 </div>
                 <div className="rounded-[16px] border border-amber-300/20 bg-amber-300/10 p-5">
                   <p className="text-sm font-bold text-amber-100">
-                    Beta notice: Scoring settings cannot be changed after the league is created. Review your point system carefully before continuing.
+                    Beta notice: Standard scoring and roster rules are applied to every league and cannot be changed after creation.
                   </p>
                   <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm font-semibold leading-6 text-slate-100">
                     <Checkbox
                       checked={betaScoringAcknowledged}
                       onCheckedChange={(checked) => setBetaScoringAcknowledged(checked === true)}
-                      aria-label="I understand that scoring settings cannot be changed during the beta, and I have reviewed this league’s point system."
+                      aria-label="I understand that standard scoring and roster rules cannot be changed during the beta."
                     />
-                    <span>I understand that scoring settings cannot be changed during the beta, and I have reviewed this league’s point system.</span>
+                    <span>I understand that standard scoring and roster rules cannot be changed during the beta.</span>
                   </label>
                 </div>
               </div>
