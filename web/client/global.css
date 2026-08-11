@@ -172,6 +172,19 @@
     outline-offset: 3px;
   }
 
+  /*
+   * Mobile Safari enlarges the entire visual viewport when a form control uses
+   * a font smaller than 16px. Keep native controls at the iOS-safe size on
+   * phone layouts; desktop can retain the denser app typography.
+   */
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+
   :where(p, span, li, h1, h2, h3, h4, h5, h6, a, button, label, td, th) {
     overflow-wrap: anywhere;
     word-break: break-word;

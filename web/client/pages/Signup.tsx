@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,7 @@ import {
 
 export default function Signup() {
   const navigate = useNavigate();
-  const { signup } = useAuth();
+  const { signup, isBootstrapping, isLoggedIn } = useAuth();
   const reservation = getBetaAccessReservation();
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState(reservation?.email ?? "");
@@ -39,6 +39,22 @@ export default function Signup() {
   const [error, setError] = useState<string | null>(null);
   const passwordChecks = passwordPolicyChecks(password);
   const isPasswordStrong = passwordMeetsPolicy(password);
+
+  useEffect(() => {
+    if (!isBootstrapping && isLoggedIn) {
+      navigate("/", { replace: true });
+    }
+  }, [isBootstrapping, isLoggedIn, navigate]);
+
+  if (isBootstrapping || isLoggedIn) {
+    return (
+      <main className="mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-xl items-center justify-center px-4 py-8">
+        <p className="cfb-micro-label text-center text-cfb-text-secondary" role="status">
+          Restoring your signed-in session…
+        </p>
+      </main>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,7 +183,7 @@ export default function Signup() {
                       <Input
                         type="text"
                         placeholder="Enter your first name"
-                        className="h-11 rounded-2xl border-cyan-200/10 bg-white/10 pl-12 text-sm font-bold text-white placeholder:text-slate-300/40 transition-all focus:border-cyan-200/50 focus:ring-cyan-300/25 sm:h-12 [@media(max-height:760px)]:h-10"
+                        className="h-11 rounded-2xl border-cyan-200/10 bg-white/10 pl-12 text-base font-bold text-white placeholder:text-slate-300/40 transition-all focus:border-cyan-200/50 focus:ring-cyan-300/25 sm:h-12 sm:text-sm [@media(max-height:760px)]:h-10"
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
                         required
@@ -181,7 +197,7 @@ export default function Signup() {
                       <Input
                         type="email"
                         placeholder="coach@saturday.com"
-                        className="h-11 rounded-2xl border-cyan-200/10 bg-white/10 pl-12 text-sm font-bold text-white placeholder:text-slate-300/40 transition-all focus:border-cyan-200/50 focus:ring-cyan-300/25 sm:h-12 [@media(max-height:760px)]:h-10"
+                        className="h-11 rounded-2xl border-cyan-200/10 bg-white/10 pl-12 text-base font-bold text-white placeholder:text-slate-300/40 transition-all focus:border-cyan-200/50 focus:ring-cyan-300/25 sm:h-12 sm:text-sm [@media(max-height:760px)]:h-10"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         readOnly={Boolean(reservation)}
@@ -205,7 +221,7 @@ export default function Signup() {
                         id="signup-password"
                         type={showPassword ? "text" : "password"}
                         placeholder="••••••••"
-                        className="h-11 rounded-2xl border-cyan-200/10 bg-white/10 pl-12 pr-12 text-sm font-bold text-white placeholder:text-slate-300/40 transition-all focus:border-cyan-200/50 focus:ring-cyan-300/25 sm:h-12 [@media(max-height:760px)]:h-10"
+                        className="h-11 rounded-2xl border-cyan-200/10 bg-white/10 pl-12 pr-12 text-base font-bold text-white placeholder:text-slate-300/40 transition-all focus:border-cyan-200/50 focus:ring-cyan-300/25 sm:h-12 sm:text-sm [@media(max-height:760px)]:h-10"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
