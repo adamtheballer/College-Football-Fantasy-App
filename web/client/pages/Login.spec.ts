@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ApiError } from "@/lib/api";
-import { initialLoginMode, loginErrorMessage, loginPathForMode } from "./Login";
+import { initialLoginMode, loginErrorMessage, loginPathForMode, shouldHoldAuthEntry } from "./Login";
 import { isAuthFlowRoute } from "@/components/app-shell/navigation";
 
 describe("loginErrorMessage", () => {
@@ -56,5 +56,12 @@ describe("optional Early Access Pro flow", () => {
     expect(loginPathForMode("signin")).toBe("/login");
     expect(loginPathForMode("signup")).toBe("/login?flow=signup");
     expect(loginPathForMode("access")).toBe("/login?flow=pro");
+  });
+
+  it("holds auth forms until a remembered session resolves, then keeps new-account confirmation available", () => {
+    expect(shouldHoldAuthEntry(true, false, false)).toBe(true);
+    expect(shouldHoldAuthEntry(false, true, false)).toBe(true);
+    expect(shouldHoldAuthEntry(false, true, true)).toBe(false);
+    expect(shouldHoldAuthEntry(false, false, false)).toBe(false);
   });
 });

@@ -98,10 +98,16 @@ export const initialLoginMode = (flow: string | null, earlyAccessProEnabled: boo
 export const loginPathForMode = (mode: LoginMode) =>
   mode === "signin" ? "/login" : mode === "signup" ? "/login?flow=signup" : "/login?flow=pro";
 
+export const shouldHoldAuthEntry = (
+  isBootstrapping: boolean,
+  isLoggedIn: boolean,
+  holdPostSignupRedirect: boolean,
+) => isBootstrapping || (isLoggedIn && !holdPostSignupRedirect);
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, signup, isLoggedIn } = useAuth();
+  const { login, signup, isBootstrapping, isLoggedIn } = useAuth();
   const { email_enabled: emailEnabled } = useRuntimeCapabilities();
   const redirectTarget =
     typeof location.state === "object" &&
@@ -251,6 +257,19 @@ export default function Login() {
     navigate(redirectTarget, { replace: true });
   };
 
+  // A remembered user is validated by AuthProvider before this route becomes
+  // interactive. That keeps returning users out of sign-in, signup, and Pro
+  // claim forms unless they deliberately sign out first.
+  if (shouldHoldAuthEntry(isBootstrapping, isLoggedIn, holdPostSignupRedirect)) {
+    return (
+      <main className="mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-xl items-center justify-center px-4 py-8">
+        <p className="cfb-micro-label text-center text-cfb-text-secondary" role="status">
+          Restoring your signed-in session…
+        </p>
+      </main>
+    );
+  }
+
   return (
     <main className="relative mx-auto grid min-h-[calc(100vh-8rem)] w-full max-w-7xl items-center gap-6 overflow-hidden px-4 py-8 sm:px-6 lg:grid-cols-[1.02fr_0.98fr] lg:px-8">
       <div aria-hidden="true" className="pointer-events-none absolute -left-20 top-10 h-32 w-96 rotate-[-18deg] rounded-full bg-gradient-to-r from-cfb-pink/35 via-cfb-brand/30 to-transparent blur-2xl" />
@@ -346,7 +365,7 @@ export default function Login() {
                   <label htmlFor="login-email" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Email address</label>
                   <span className="group relative block">
                     <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted transition-colors group-focus-within:text-cfb-cyan" />
-                    <Input id="login-email" type="email" placeholder="coach@saturday.com" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-sm font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                    <Input id="login-email" type="email" placeholder="coach@saturday.com" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25 md:text-sm" value={email} onChange={(e) => setEmail(e.target.value)} required />
                   </span>
                 </div>
                 <div className="space-y-2">
@@ -358,7 +377,7 @@ export default function Login() {
                   </span>
                   <span className="group relative block">
                     <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted transition-colors group-focus-within:text-cfb-cyan" />
-                    <Input id="login-password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 pr-12 text-sm font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                    <Input id="login-password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 pr-12 text-base font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25 md:text-sm" value={password} onChange={(e) => setPassword(e.target.value)} required />
                     <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword((value) => !value)} className="absolute right-4 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-cfb-text-muted transition hover:bg-white/10 hover:text-cfb-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-cyan/60">
                       {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                     </button>
@@ -375,7 +394,7 @@ export default function Login() {
               <form onSubmit={handleAccessSubmit} className="space-y-5">
                 <div className="space-y-2">
                   <label htmlFor="beta-email" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Email address</label>
-                  <span className="group relative block"><Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="beta-email" type="email" autoComplete="email" placeholder="coach@saturday.com" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-sm font-bold text-cfb-text-primary" value={email} onChange={(event) => setEmail(event.target.value)} required /></span>
+                  <span className="group relative block"><Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="beta-email" type="email" autoComplete="email" placeholder="coach@saturday.com" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary md:text-sm" value={email} onChange={(event) => setEmail(event.target.value)} required /></span>
                 </div>
                 <div className="space-y-2">
                   <label htmlFor="beta-code" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Early Access Pro code</label>
@@ -388,7 +407,7 @@ export default function Login() {
                       id="beta-code"
                       value={accessCode}
                       onChange={(event) => setAccessCode(normalizeBetaAccessCodeSuffix(event.target.value))}
-                      className="h-full min-w-0 flex-1 border-0 bg-transparent px-3 text-sm font-bold uppercase tracking-[0.16em] text-cfb-text-primary shadow-none placeholder:text-cfb-text-muted focus-visible:ring-0"
+                      className="h-full min-w-0 flex-1 border-0 bg-transparent px-3 text-base font-bold uppercase tracking-[0.16em] text-cfb-text-primary shadow-none placeholder:text-cfb-text-muted focus-visible:ring-0 md:text-sm"
                       placeholder="XXXXXX"
                       maxLength={12}
                       autoCapitalize="characters"
@@ -403,9 +422,9 @@ export default function Login() {
               </form>
             ) : (
               <form onSubmit={handleSignupSubmit} className="space-y-5">
-                <div className="space-y-2"><label htmlFor="signup-name" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">First name</label><span className="group relative block"><User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-name" type="text" placeholder="Your first name" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-sm font-bold text-cfb-text-primary" value={firstName} onChange={(event) => setFirstName(event.target.value)} required /></span></div>
-                <div className="space-y-2"><label htmlFor="signup-email" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">{signupHasVerifiedProCode ? "Verified email" : "Email address"}</label><span className="group relative block"><Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-email" type="email" placeholder="coach@saturday.com" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-sm font-bold text-cfb-text-primary" value={email} onChange={(event) => setEmail(event.target.value)} readOnly={Boolean(signupHasVerifiedProCode)} required /></span></div>
-                <div className="space-y-2"><label htmlFor="signup-password" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Password</label><span className="group relative block"><Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 pr-12 text-sm font-bold text-cfb-text-primary" value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)} className="absolute right-4 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-cfb-text-muted">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span></div>
+                <div className="space-y-2"><label htmlFor="signup-name" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">First name</label><span className="group relative block"><User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-name" type="text" placeholder="Your first name" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary md:text-sm" value={firstName} onChange={(event) => setFirstName(event.target.value)} required /></span></div>
+                <div className="space-y-2"><label htmlFor="signup-email" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">{signupHasVerifiedProCode ? "Verified email" : "Email address"}</label><span className="group relative block"><Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-email" type="email" placeholder="coach@saturday.com" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary md:text-sm" value={email} onChange={(event) => setEmail(event.target.value)} readOnly={Boolean(signupHasVerifiedProCode)} required /></span></div>
+                <div className="space-y-2"><label htmlFor="signup-password" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Password</label><span className="group relative block"><Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 pr-12 text-base font-bold text-cfb-text-primary md:text-sm" value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)} className="absolute right-4 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-cfb-text-muted">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span></div>
                 <p className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface/60 px-4 py-3 text-xs font-semibold text-cfb-text-secondary">{PASSWORD_POLICY_MESSAGE}</p>
                 {error ? <div role="alert" className="rounded-2xl border border-cfb-danger/35 bg-cfb-danger/[0.14] px-4 py-3 text-xs font-bold text-red-100">{error}</div> : null}
                 <Button type="submit" className="group h-14 w-full rounded-2xl bg-gradient-to-r from-cfb-cyan to-cfb-brand text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-[0_18px_42px_hsl(var(--brand-primary)/0.26)] hover:brightness-110" disabled={isLoading}>{isLoading ? <span className="h-5 w-5 rounded-full border-2 border-slate-950/30 border-t-slate-950 animate-spin" /> : <span className="flex items-center gap-2 transition-all group-hover:gap-4">Create account <ArrowRight className="h-4 w-4" aria-hidden="true" /></span>}</Button>
