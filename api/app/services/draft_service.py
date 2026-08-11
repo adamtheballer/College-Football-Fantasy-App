@@ -256,10 +256,14 @@ def build_draft_room_state(db: Session, league: League, current_user: User) -> D
         user_team_id=user_team.id if user_team else None,
         can_make_pick=can_make_pick,
         can_start_draft=bool(
-            draft_row.status == "scheduled"
+            draft_row.status in {"scheduled", "pre_draft"}
             and current_user.id == league.commissioner_user_id
             and league_is_full
-            and (_ensure_aware(draft_row.draft_datetime_utc) is None or _ensure_aware(draft_row.draft_datetime_utc) <= now)
+            and (
+                draft_row.status == "pre_draft"
+                or _ensure_aware(draft_row.draft_datetime_utc) is None
+                or _ensure_aware(draft_row.draft_datetime_utc) <= now
+            )
         ),
         pre_draft_starts_at=draft_row.pre_draft_starts_at,
         draft_starts_at=draft_row.draft_starts_at,

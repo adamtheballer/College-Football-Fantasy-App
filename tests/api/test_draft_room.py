@@ -380,6 +380,13 @@ def test_commissioner_recovers_legacy_pre_draft_without_reshuffling_the_order(cl
     draft.current_pick_deadline = None
     db_session.commit()
 
+    legacy_room = client.get(
+        f"/leagues/{league['id']}/draft-room",
+        headers=auth_headers(commissioner_token),
+    ).json()
+    assert legacy_room["status"] == "pre_draft"
+    assert legacy_room["can_start_draft"] is True
+
     response = client.post(
         f"/leagues/{league['id']}/draft/start",
         headers=auth_headers(commissioner_token),
