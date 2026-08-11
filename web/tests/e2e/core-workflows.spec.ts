@@ -2728,9 +2728,9 @@ test.describe("critical browser workflows", () => {
     await page.goto("/league/1/waivers");
     await expect(page.getByRole("heading", { level: 1, name: /^Available Players$/i })).toBeVisible();
     await expect(page.getByText(/No active or recent waiver claims/i)).toBeVisible();
-    await expect(page.getByText("Arch Manning")).toBeVisible();
+    const archManningRow = page.getByRole("button", { name: "1 Arch Manning Available" });
+    await expect(archManningRow).toBeVisible();
     await expect(page.getByRole("button", { name: /^Add$/i })).toHaveCount(0);
-    const archManningRow = page.getByText("Arch Manning").locator("xpath=ancestor::tr");
     await archManningRow.getByRole("button", { name: /^Claim$/i }).click();
     const claimDialog = page.getByRole("dialog", { name: /Submit Waiver Claim/i });
     await expect(claimDialog).toBeVisible();
