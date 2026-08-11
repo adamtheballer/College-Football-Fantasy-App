@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDashboardPoints, formatDashboardStatus, formatDraftTime } from "./Index";
+import { formatDashboardPoints, formatDashboardStatus, formatDashboardWinChance, formatDraftTime } from "./Index";
 
 describe("home dashboard helpers", () => {
   it("formats backend statuses for user-facing copy", () => {
@@ -17,5 +17,10 @@ describe("home dashboard helpers", () => {
     expect(formatDashboardPoints(118.44)).toBe("118.4");
     expect(formatDashboardPoints(null)).toBe("—");
     expect(formatDashboardPoints(Number.NaN)).toBe("—");
+  });
+
+  it("uses one complementary probability pair for the straight dashboard meter", () => {
+    expect(formatDashboardWinChance(48.05, 51.95)).toEqual({ left: 48.1, right: 51.9 });
+    expect(formatDashboardWinChance(48, 49)).toBeNull();
   });
 });

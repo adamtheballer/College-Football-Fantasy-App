@@ -1,9 +1,3 @@
-function meterClass(percent: number) {
-  if (percent >= 60) return "from-cfb-success via-cfb-cyan to-cfb-brand";
-  if (percent >= 45) return "from-cfb-gold via-cfb-cyan to-cfb-brand";
-  return "from-cfb-pink via-cfb-danger to-cfb-gold";
-}
-
 function validProbability(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 5 && value <= 95;
 }
@@ -14,6 +8,57 @@ function formatDisplayedProbabilityPair(left: number, right: number) {
   const displayedLeft = Math.round((left + Number.EPSILON) * 10) / 10;
   const displayedRight = Math.round((100 - displayedLeft + Number.EPSILON) * 10) / 10;
   return { left: displayedLeft, right: displayedRight };
+}
+
+function chanceGradient(left: number, right: number, side: "left" | "right") {
+  const leftIsLeading = left >= right;
+  const sideIsLeading = side === "left" ? leftIsLeading : !leftIsLeading;
+  return sideIsLeading
+    ? "from-emerald-700 via-emerald-500 to-emerald-300"
+    : "from-rose-800 via-rose-600 to-red-400";
+}
+
+export function WinChanceBar({
+  myPercent,
+  opponentPercent,
+  className = "",
+  testIdPrefix = "win-chance",
+}: {
+  myPercent?: number | null;
+  opponentPercent?: number | null;
+  className?: string;
+  testIdPrefix?: string;
+}) {
+  const hasWinChance =
+    validProbability(myPercent) &&
+    validProbability(opponentPercent) &&
+    Math.abs(myPercent + opponentPercent - 100) < 0.000001;
+  const leftProbability = hasWinChance ? Number(myPercent) : 0;
+  const rightProbability = hasWinChance ? Number(opponentPercent) : 0;
+  const displayedWinChance = hasWinChance
+    ? formatDisplayedProbabilityPair(leftProbability, rightProbability)
+    : null;
+
+  if (!hasWinChance) return null;
+
+  return (
+    <div
+      aria-label={`Win chance: ${displayedWinChance?.left.toFixed(1)}% to ${displayedWinChance?.right.toFixed(1)}%`}
+      className={`flex h-5 overflow-hidden rounded-full border border-cfb-border-subtle bg-cfb-canvas shadow-[inset_0_1px_8px_rgba(2,6,23,0.85)] ${className}`}
+      role="img"
+    >
+      <div
+        className={`h-full shrink-0 bg-gradient-to-r ${chanceGradient(leftProbability, rightProbability, "left")} shadow-[0_0_26px_rgba(16,185,129,0.22)] transition-[width] duration-500`}
+        data-testid={`${testIdPrefix}-left-bar`}
+        style={{ width: `${leftProbability}%` }}
+      />
+      <div
+        className={`h-full shrink-0 bg-gradient-to-r ${chanceGradient(leftProbability, rightProbability, "right")} shadow-[0_0_26px_rgba(244,63,94,0.2)] transition-[width] duration-500`}
+        data-testid={`${testIdPrefix}-right-bar`}
+        style={{ width: `${rightProbability}%` }}
+      />
+    </div>
+  );
 }
 
 export function WinChanceMeter({
@@ -80,22 +125,7 @@ export function WinChanceMeter({
         </div>
       )}
       {hasWinChance ? (
-        <div
-          aria-label={`Win chance: ${displayedWinChance?.left.toFixed(1)}% to ${displayedWinChance?.right.toFixed(1)}%`}
-          className="flex h-5 overflow-hidden rounded-full border border-cfb-border-subtle bg-cfb-canvas shadow-[inset_0_1px_8px_rgba(2,6,23,0.85)]"
-          role="img"
-        >
-          <div
-            className={`h-full shrink-0 bg-gradient-to-r ${meterClass(leftProbability)} shadow-[0_0_26px_hsl(var(--brand-primary)/0.24)] transition-[width] duration-500`}
-            data-testid="win-chance-left-bar"
-            style={{ width: `${leftProbability}%` }}
-          />
-          <div
-            className="h-full shrink-0 bg-gradient-to-r from-cfb-pink via-cfb-danger to-cfb-gold transition-[width] duration-500"
-            data-testid="win-chance-right-bar"
-            style={{ width: `${rightProbability}%` }}
-          />
-        </div>
+        <WinChanceBar myPercent={leftProbability} opponentPercent={rightProbability} />
       ) : (
         <p className="text-center text-xs font-bold text-cfb-text-muted">Win chance unavailable</p>
       )}

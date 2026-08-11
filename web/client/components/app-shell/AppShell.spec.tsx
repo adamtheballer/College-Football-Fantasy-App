@@ -4,7 +4,7 @@ import * as React from "react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AppShell } from "./AppShell";
+import { AppShell, shouldShowHomeHeader } from "./AppShell";
 
 afterEach(cleanup);
 
@@ -90,5 +90,13 @@ describe("AppShell scroll ownership", () => {
 
     expect(scrollArea?.getAttribute("data-scroll-owner")).toBe("page");
     expect(scrollArea?.className).toContain("overflow-y-auto");
+  });
+
+  it("shows the Early Access header only on the home route", () => {
+    expect(shouldShowHomeHeader("/", false)).toBe(true);
+    expect(shouldShowHomeHeader("/leagues/roster", false)).toBe(false);
+    expect(shouldShowHomeHeader("/chats", false)).toBe(false);
+    expect(shouldShowHomeHeader("/drafts/123", false)).toBe(false);
+    expect(shouldShowHomeHeader("/", true)).toBe(false);
   });
 });

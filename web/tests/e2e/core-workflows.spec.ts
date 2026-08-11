@@ -1452,12 +1452,25 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("Projected Leader").locator("..").getByText("Adam 2's Team")).toBeVisible();
     await expect(page.getByTestId("win-chance-left-bar")).toHaveAttribute("style", /width: 48\.05%/);
     await expect(page.getByTestId("win-chance-right-bar")).toHaveAttribute("style", /width: 51\.95%/);
-    await expect(page.getByText("Arch Manning")).toBeVisible();
-    await expect(page.getByText("Rival QB")).toBeVisible();
+    // The responsive matchup view keeps a compact mobile lineup mounted alongside
+    // the desktop tables. Assert against the visible desktop player controls here
+    // rather than an ambiguous text locator shared by both representations.
+    await expect(page.getByRole("button", { name: /Arch Manning/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Rival QB/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "Previous week" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Next week" })).toBeVisible();
     await expect(page.getByText("Prev", { exact: true })).toHaveCount(0);
     await expect(page.getByText("Next", { exact: true })).toHaveCount(0);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByTestId("compact-win-chance-left-bar")).toBeVisible();
+    await expect(page.getByTestId("compact-win-chance-left-bar")).toHaveClass(/from-rose-800/);
+    await expect(page.getByTestId("compact-win-chance-right-bar")).toHaveClass(/from-emerald-700/);
+    await expect(page.locator('[style*="conic-gradient"]')).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
+    await page.screenshot({ path: "test-results/mobile-matchup-linear-meter.png", fullPage: true });
+
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page.reload();
     await expect(page.getByText("48.1% / 51.9%")).toBeVisible();
     await page.getByRole("combobox", { name: "League matchup" }).selectOption("102");
@@ -2060,6 +2073,13 @@ test.describe("critical browser workflows", () => {
     await expect(reviewDialog).toBeVisible();
     await expect(reviewDialog.getByText("Strong Loss")).toBeVisible();
     await expect(reviewDialog.getByText("-6.00")).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(reviewDialog.getByRole("button", { name: "Close" })).toBeVisible();
+    const mobileDialogBox = await reviewDialog.boundingBox();
+    expect(mobileDialogBox).not.toBeNull();
+    if (mobileDialogBox) {
+      expect(mobileDialogBox.height).toBeLessThanOrEqual(844 - 24);
+    }
     await expect.poll(() => analyzePayload).not.toBeNull();
     expect(analyzePayload).toMatchObject({
       give_ids: [201],
@@ -2579,6 +2599,14 @@ test.describe("critical browser workflows", () => {
     await archManningRow.getByRole("button", { name: /^Watch$/i }).click();
     await expect(archManningRow.getByRole("button", { name: /^Watching$/i })).toBeVisible();
 
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobileRow = page.getByTestId("waiver-mobile-player-row-801");
+    await expect(mobileRow).toBeVisible();
+    await expect(mobileRow.getByText("Arch Manning")).toBeVisible();
+    await expect(mobileRow.getByRole("button", { name: /Remove Arch Manning from watchlist/i })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
+    await page.screenshot({ path: "test-results/mobile-waivers-compact.png", fullPage: true });
+
     await page.goto("/league/1/watchlist");
     await expect(page.getByRole("heading", { name: /^Watchlist$/i })).toBeVisible();
     await expect(page.getByText("Arch Manning").first()).toBeVisible();
@@ -2700,9 +2728,9 @@ test.describe("critical browser workflows", () => {
     await page.goto("/league/1/waivers");
     await expect(page.getByRole("heading", { level: 1, name: /^Available Players$/i })).toBeVisible();
     await expect(page.getByText(/No active or recent waiver claims/i)).toBeVisible();
-    await expect(page.getByText("Arch Manning")).toBeVisible();
+    const archManningRow = page.getByRole("button", { name: "1 Arch Manning Available" });
+    await expect(archManningRow).toBeVisible();
     await expect(page.getByRole("button", { name: /^Add$/i })).toHaveCount(0);
-    const archManningRow = page.getByText("Arch Manning").locator("xpath=ancestor::tr");
     await archManningRow.getByRole("button", { name: /^Claim$/i }).click();
     const claimDialog = page.getByRole("dialog", { name: /Submit Waiver Claim/i });
     await expect(claimDialog).toBeVisible();

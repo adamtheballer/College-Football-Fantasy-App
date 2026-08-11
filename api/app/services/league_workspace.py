@@ -19,6 +19,7 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     DraftOrderRead,
     DraftRead,
     LeagueDetailRead,
+    LeagueListCurrentUserSummaryRead,
     LeagueNewsItem,
     LeagueMemberRead,
     LeaguePowerRankingRow,
@@ -37,6 +38,7 @@ def get_league_detail(
     league: League,
     *,
     viewer: User | None = None,
+    include_current_user_summary: bool = False,
 ) -> LeagueDetailRead:
     settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
     if not settings_row:
@@ -89,6 +91,11 @@ def get_league_detail(
         draft=DraftRead.model_validate(draft_row) if draft_row else None,
         draft_order=draft_order,
         members=[LeagueMemberRead.model_validate(m) for m in members_rows],
+        current_user_summary=(
+            build_league_list_current_user_summary(db, league, viewer)
+            if include_current_user_summary and viewer is not None
+            else None
+        ),
     )
 
 
@@ -140,6 +147,44 @@ def build_matchup_summary(
         projected_points_against=opponent_team.projected_total,
         win_probability_for=my_team.win_probability,
         win_probability_against=opponent_team.win_probability,
+    )
+
+
+def build_league_list_current_user_summary(
+    db: Session,
+    league: League,
+    current_user: User,
+) -> LeagueListCurrentUserSummaryRead | None:
+    """Build the league-card summary from the canonical workspace calculations.
+
+    The list card must never independently calculate records or matchup odds:
+    doing so could make it disagree with the League Hub.  Reuse the standings
+    and matchup builders that already power that authenticated workspace.
+    """
+
+    owned_team = (
+        db.query(Team)
+        .filter(Team.league_id == league.id, Team.owner_user_id == current_user.id)
+        .one_or_none()
+    )
+    if owned_team is None:
+        return None
+
+    standing = next(
+        (row for row in build_standings_summary(db, league) if row.team_id == owned_team.id),
+        None,
+    )
+    matchup = build_matchup_summary(db, league, owned_team, current_user)
+
+    return LeagueListCurrentUserSummaryRead(
+        team_name=owned_team.name,
+        wins=standing.wins if standing else 0,
+        losses=standing.losses if standing else 0,
+        ties=standing.ties if standing else 0,
+        opponent_team_name=matchup.opponent_team_name if matchup else None,
+        matchup_week=matchup.week if matchup else None,
+        win_probability_for=matchup.win_probability_for if matchup else None,
+        win_probability_against=matchup.win_probability_against if matchup else None,
     )
 
 

@@ -168,16 +168,16 @@ export default function LeagueRoster() {
   }
 
   return (
-    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
+    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-4 px-3 pb-24 pt-4 sm:gap-6 sm:px-6 sm:py-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] rounded-[3rem] bg-[radial-gradient(circle_at_18%_12%,rgba(56,189,248,0.2),transparent_34%),radial-gradient(circle_at_78%_8%,rgba(59,130,246,0.18),transparent_36%)] blur-2xl" />
       <div className="space-y-4">
         <p className="text-[11px] font-black uppercase tracking-[0.24em] text-sky-300">
           League Roster
         </p>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-4xl font-black italic text-slate-50">Roster</h1>
-            <p className="mt-2 text-sm text-slate-400">
+            <h1 className="text-3xl font-black italic text-slate-50 sm:text-4xl">Roster</h1>
+            <p className="mt-1 hidden text-sm text-slate-400 sm:block">
               Manage your lineup or inspect every league team&apos;s current roster.
             </p>
           </div>
@@ -221,7 +221,7 @@ export default function LeagueRoster() {
         </section>
       ) : null}
 
-      <section className="rounded-[1.25rem] border border-sky-300/20 bg-sky-300/[0.055] px-5 py-4">
+      <section className="rounded-[1.25rem] border border-sky-300/20 bg-sky-300/[0.055] px-4 py-3 sm:px-5 sm:py-4">
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-300">
           {viewingOwnedTeam ? "Managing your roster" : "Viewing league roster"}
         </p>
@@ -231,24 +231,24 @@ export default function LeagueRoster() {
         </p>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-[1.35rem] border border-cfb-brand/30 bg-[linear-gradient(135deg,hsl(var(--brand-primary)/0.16),hsl(var(--background-surface-raised)/0.94))] p-5 shadow-[0_18px_60px_hsl(var(--brand-primary)/0.12)]">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-            Starter Projection
+      <section className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="rounded-[1.1rem] border border-cfb-brand/30 bg-[linear-gradient(135deg,hsl(var(--brand-primary)/0.16),hsl(var(--background-surface-raised)/0.94))] p-3 shadow-[0_18px_60px_hsl(var(--brand-primary)/0.12)] sm:rounded-[1.35rem] sm:p-5">
+          <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-slate-400 sm:text-[10px] sm:tracking-[0.2em]">
+            Starter Proj
           </p>
-          <p className="mt-1 text-3xl font-black text-sky-100">{starterTotal === null ? "N/A" : starterTotal.toFixed(1)}</p>
+          <p className="mt-1 text-xl font-black tabular-nums text-sky-100 sm:text-3xl">{starterTotal === null ? "N/A" : starterTotal.toFixed(1)}</p>
         </div>
-        <div className="rounded-[1.35rem] border border-cfb-border-subtle bg-cfb-surface-raised/90 p-5">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+        <div className="rounded-[1.1rem] border border-cfb-border-subtle bg-cfb-surface-raised/90 p-3 sm:rounded-[1.35rem] sm:p-5">
+          <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-slate-500 sm:text-[10px] sm:tracking-[0.2em]">
             Bench Depth
           </p>
-          <p className="mt-1 text-3xl font-black text-slate-100">{benchTotal === null ? "N/A" : benchTotal.toFixed(1)}</p>
+          <p className="mt-1 text-xl font-black tabular-nums text-slate-100 sm:text-3xl">{benchTotal === null ? "N/A" : benchTotal.toFixed(1)}</p>
         </div>
-        <div className="rounded-[1.35rem] border border-cfb-border-subtle bg-cfb-surface-raised/90 p-5">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+        <div className="rounded-[1.1rem] border border-cfb-border-subtle bg-cfb-surface-raised/90 p-3 sm:rounded-[1.35rem] sm:p-5">
+          <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-slate-500 sm:text-[10px] sm:tracking-[0.2em]">
             Week
           </p>
-          <p className="mt-1 text-3xl font-black text-slate-100">{selectedWeek ?? rosterData?.week ?? 1}</p>
+          <p className="mt-1 text-xl font-black tabular-nums text-slate-100 sm:text-3xl">{selectedWeek ?? rosterData?.week ?? 1}</p>
           {rosterData?.message ? (
             <p className="mt-2 text-xs font-semibold text-slate-400">{rosterData.message}</p>
           ) : null}

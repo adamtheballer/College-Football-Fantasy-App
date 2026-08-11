@@ -454,7 +454,7 @@ export function PlayerCardModal({
           })}
         </nav>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-8">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] scroll-pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-8">
           {loading ? (
             <div className="flex min-h-56 items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/[0.04] text-[10px] font-black uppercase tracking-[0.22em] text-white/55">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading player card
@@ -710,6 +710,7 @@ export function PlayerCardModal({
                       yLabel="Points"
                       yMax={30}
                       valueFormatter={(value) => `${value.toFixed(1)} pts`}
+                      seriesKind="projection"
                     />
                   </>
                 ) : trajectoryQuery.data ? (
@@ -801,6 +802,7 @@ export function PlayerCardModal({
                     yLabel="Value"
                     yMax={100}
                     valueFormatter={(value) => value.toFixed(0)}
+                    seriesKind="value"
                   />
                 ) : (
                   <p className="rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4 text-sm font-bold text-rose-100">
