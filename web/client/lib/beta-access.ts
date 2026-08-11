@@ -4,6 +4,8 @@ const RESERVATION_STORAGE_KEY = "cfb_beta_access_reservation";
 
 export const BETA_ACCESS_CODE_PREFIX = "EARLY-";
 
+// Legacy variable name: controls only the optional Early Access Pro-code offer.
+// It must never determine whether a visitor can create or use an account.
 export const betaAccessEnabled = import.meta.env.VITE_BETA_ACCESS_ENABLED === "true";
 
 type BetaAccessValidationPayload = {
@@ -32,8 +34,8 @@ const safeSessionSet = (key: string, value: string) => {
   try {
     sessionStorage.setItem(key, value);
   } catch {
-    // A private-browser storage failure should not expose a bypass; signup
-    // remains blocked because no reservation can be retrieved.
+    // A private-browser storage failure simply prevents this optional benefit
+    // from being claimed in the current session; normal signup still works.
   }
 };
 
@@ -46,7 +48,6 @@ const safeSessionRemove = (key: string) => {
 };
 
 export const getBetaAccessReservation = (): BetaAccessReservation | null => {
-  if (!betaAccessEnabled) return null;
   const stored = safeSessionGet(RESERVATION_STORAGE_KEY);
   if (!stored) return null;
   try {
@@ -89,7 +90,7 @@ export const validateBetaAccess = async (email: string, code: string): Promise<B
     existingAccount: !!payload.existing_account,
   };
   if (!reservation.token || !reservation.email || Number.isNaN(Date.parse(reservation.expiresAt))) {
-    throw new Error("Unable to verify early access. Please try again.");
+    throw new Error("Unable to verify your Early Access Pro code. Please try again.");
   }
   safeSessionSet(RESERVATION_STORAGE_KEY, JSON.stringify(reservation));
   return reservation;

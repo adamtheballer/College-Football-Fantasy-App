@@ -230,13 +230,16 @@ def signup(payload: UserCreate, response: Response, request: Request, db: Sessio
     )
     beta_access_code = None
     signup_email = payload.email
-    if settings.beta_access_enabled:
-        if not payload.beta_access_reservation:
+    # An Early Access code is optional: it records a future one-year Pro
+    # benefit, but must never decide whether someone can create an account.
+    if payload.beta_access_reservation:
+        if not settings.beta_access_enabled:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=GENERIC_MISMATCH_MESSAGE)
         beta_access_code = consume_beta_access_reservation(db, token=payload.beta_access_reservation)
-        # The verified reservation is the only authority for a beta account's
-        # email; a direct client request cannot substitute another address.
-        signup_email = beta_access_code.email
+        if beta_access_code.email != signup_email:
+            release_beta_access_reservation(db, code=beta_access_code, request=request)
+            db.commit()
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=GENERIC_MISMATCH_MESSAGE)
 
     try:
         enforce_auth_rate_limit(
@@ -343,13 +346,11 @@ def login(payload: UserLogin, response: Response, request: Request, db: Session 
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
 
     beta_access_code = None
-    # Existing accounts are not implicitly beta-approved merely because they
-    # predate this gate.  They must validate their own code once, after which
-    # beta_access_granted_at allows normal returning-user sign-in forever.
-    requires_beta_entitlement = settings.beta_access_enabled and user.beta_access_granted_at is None
-    if requires_beta_entitlement and not payload.beta_access_reservation:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=GENERIC_MISMATCH_MESSAGE)
-    if requires_beta_entitlement and payload.beta_access_reservation:
+    # Signing in never requires a code.  A reservation is accepted only when a
+    # returning user voluntarily claims their future one-year Pro benefit.
+    if payload.beta_access_reservation:
+        if not settings.beta_access_enabled:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=GENERIC_MISMATCH_MESSAGE)
         beta_access_code = consume_beta_access_reservation(db, token=payload.beta_access_reservation)
         if beta_access_code.email != normalized_email:
             # Preserve a valid reservation for its intended owner, but never

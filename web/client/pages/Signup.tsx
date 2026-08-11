@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { setPendingGuide } from "@/lib/onboarding";
 import { ApiError, apiUnavailableMessage } from "@/lib/api";
 import { PASSWORD_POLICY_MESSAGE, passwordMeetsPolicy, passwordPolicyChecks } from "@/lib/password-policy";
-import { betaAccessEnabled, clearBetaAccessReservation, getBetaAccessReservation } from "@/lib/beta-access";
+import { clearBetaAccessReservation, getBetaAccessReservation } from "@/lib/beta-access";
 import {
   Trophy,
   Mail,
@@ -68,10 +68,6 @@ export default function Signup() {
       setIsLoading(false);
     }
   };
-
-  if (betaAccessEnabled && !reservation) {
-    return <Navigate to="/beta-access" replace />;
-  }
 
   return (
     <div className="relative h-[calc(100vh-4rem)] min-h-[620px] overflow-hidden rounded-[2.25rem] border border-white/10 bg-[#06111f] p-4 shadow-[0_0_80px_rgba(14,165,233,0.18)] sm:p-5 lg:min-h-0 lg:p-6">
@@ -188,7 +184,7 @@ export default function Signup() {
                         className="h-11 rounded-2xl border-cyan-200/10 bg-white/10 pl-12 text-sm font-bold text-white placeholder:text-slate-300/40 transition-all focus:border-cyan-200/50 focus:ring-cyan-300/25 sm:h-12 [@media(max-height:760px)]:h-10"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        readOnly={betaAccessEnabled}
+                        readOnly={Boolean(reservation)}
                         required
                       />
                     </div>

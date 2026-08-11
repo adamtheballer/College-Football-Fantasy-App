@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.beta_access import (
@@ -18,6 +19,10 @@ def validate_beta_access(
     request: Request,
     db: Session = Depends(get_db),
 ) -> BetaAccessValidationResponse:
+    # Codes are a voluntary alpha-Pro benefit.  They are not an account-access
+    # gate, and disabling this optional program must leave authentication open.
+    if not settings.beta_access_enabled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Early Access Pro codes are unavailable.")
     reservation_token, expires_at, email = validate_and_reserve_beta_access(
         db,
         email_input=payload.email,

@@ -20,7 +20,6 @@ import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagueWorkspace, useLeagues } from "@/hooks/use-leagues";
 import { apiGet } from "@/lib/api";
-import { betaAccessEnabled } from "@/lib/beta-access";
 import type { LeagueDetail } from "@/types/league";
 import SaturdayPick6 from "./SaturdayPick6";
 
@@ -201,9 +200,6 @@ export default function Index() {
   );
 
   if (!isLoggedIn) {
-    if (betaAccessEnabled) {
-      return <Navigate to="/beta-access" replace />;
-    }
     return <GuestHome />;
   }
 

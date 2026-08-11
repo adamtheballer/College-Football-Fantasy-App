@@ -3,8 +3,8 @@ import { expect, test, type Page } from "@playwright/test";
 const realStackEnabled = process.env.REAL_STACK_E2E === "1";
 const password = "RealE2ePass123!";
 const betaFixtures = {
-  commissioner: { email: "ci-beta-commissioner@example.test", code: "EARLY-CI1235" },
-  manager: { email: "ci-beta-manager@example.test", code: "EARLY-CI1236" },
+  commissioner: { email: "ci-beta-commissioner@example.test" },
+  manager: { email: "ci-beta-manager@example.test" },
 } as const;
 
 type ApiResult<T> = {
@@ -31,14 +31,11 @@ async function realApi<T>(page: Page, path: string, body?: unknown): Promise<Api
   ) as Promise<ApiResult<T>>;
 }
 
-async function signUp(page: Page, firstName: string, fixture: { email: string; code: string }) {
+async function signUp(page: Page, firstName: string, fixture: { email: string }) {
   await page.goto("/signup");
-  await expect(page).toHaveURL(/\/login\?flow=beta$/);
-  await page.locator("#beta-email").fill(fixture.email);
-  await page.locator("#beta-code").fill(fixture.code);
-  await page.getByRole("button", { name: /Verify and continue/i }).click();
-  await expect(page.locator("#signup-email")).toHaveValue(fixture.email);
-  await expect(page.locator("#signup-email")).toHaveAttribute("readonly", "");
+  await expect(page).toHaveURL(/\/login\?flow=signup$/);
+  await expect(page.locator("#signup-email")).not.toHaveAttribute("readonly", "");
+  await page.locator("#signup-email").fill(fixture.email);
   await page.locator("#signup-name").fill(firstName);
   await page.locator("#signup-password").fill(password);
   const [signupResponse] = await Promise.all([

@@ -60,12 +60,14 @@ def signup_payload(*, reservation: str | None = None, email: str = TEST_EMAIL) -
     return payload
 
 
-def test_beta_access_requires_valid_reservation_and_redeems_atomically(client, db_session, beta_access_enabled):
+def test_normal_signup_is_open_and_optional_early_access_code_redeems_atomically(client, db_session, beta_access_enabled):
     seed_beta_code(db_session)
 
-    direct_signup = client.post("/auth/signup", json=signup_payload())
-    assert direct_signup.status_code == 403
-    assert direct_signup.json()["detail"] == GENERIC_MISMATCH_MESSAGE
+    # BETA_ACCESS_ENABLED governs the optional Pro-code program only. It must
+    # never block a normal account from using the beta.
+    direct_signup = client.post("/auth/signup", json=signup_payload(email="normal-user@example.com"))
+    assert direct_signup.status_code == 201
+    assert direct_signup.json()["user"]["early_access_pro_eligible"] is False
 
     validation = client.post(
         "/beta-access/validate",
@@ -77,14 +79,14 @@ def test_beta_access_requires_valid_reservation_and_redeems_atomically(client, d
     assert response["existing_account"] is False
     assert TEST_CODE not in validation.text
 
-    # The server derives the account e-mail from the signed reservation, rather
-    # than accepting a client-supplied substitute.
+    # A valid optional reservation remains bound to the verified email.
     signup = client.post(
         "/auth/signup",
-        json=signup_payload(reservation=response["reservation_token"], email="substitute@example.com"),
+        json=signup_payload(reservation=response["reservation_token"]),
     )
     assert signup.status_code == 201
     assert signup.json()["user"]["email"] == TEST_EMAIL
+    assert signup.json()["user"]["early_access_pro_eligible"] is True
 
     db_session.expire_all()
     record = db_session.query(BetaAccessCode).filter(BetaAccessCode.email == TEST_EMAIL).one()
@@ -93,7 +95,7 @@ def test_beta_access_requires_valid_reservation_and_redeems_atomically(client, d
     assert record.redeemed_user_id == user.id
     assert user.beta_access_granted_at is not None
 
-    # Returning users never need to submit an early-access code again.
+    # Returning users never need to submit the optional code again.
     login = client.post("/auth/login", json={"email": TEST_EMAIL, "password": "StrongPass123!"})
     assert login.status_code == 200
 
@@ -138,6 +140,25 @@ def test_beta_access_rejects_manual_review_and_malformed_tokens_without_500(clie
     assert record.state == "AVAILABLE"
 
 
+def test_early_access_reservation_cannot_be_attached_to_a_different_signup_email(
+    client, db_session, beta_access_enabled
+):
+    record = seed_beta_code(db_session)
+    validation = client.post("/beta-access/validate", json={"email": TEST_EMAIL, "code": TEST_CODE})
+    assert validation.status_code == 200
+
+    mismatch = client.post(
+        "/auth/signup",
+        json=signup_payload(reservation=validation.json()["reservation_token"], email="different@example.com"),
+    )
+    assert mismatch.status_code == 403
+    assert mismatch.json()["detail"] == GENERIC_MISMATCH_MESSAGE
+
+    db_session.refresh(record)
+    assert record.state == "AVAILABLE"
+    assert record.redeemed_user_id is None
+
+
 def test_beta_access_links_a_verified_code_to_an_existing_account_after_password_login(
     client, db_session, beta_access_enabled
 ):
@@ -152,9 +173,11 @@ def test_beta_access_links_a_verified_code_to_an_existing_account_after_password
     db_session.add(existing)
     db_session.commit()
 
-    blocked = client.post("/auth/login", json={"email": TEST_EMAIL, "password": "StrongPass123!"})
-    assert blocked.status_code == 403
-    assert blocked.json()["detail"] == GENERIC_MISMATCH_MESSAGE
+    # Existing users can sign in normally; the code is only a voluntary
+    # future-Pro entitlement claim.
+    ordinary_login = client.post("/auth/login", json={"email": TEST_EMAIL, "password": "StrongPass123!"})
+    assert ordinary_login.status_code == 200
+    assert ordinary_login.json()["user"]["early_access_pro_eligible"] is False
 
     validation = client.post("/beta-access/validate", json={"email": TEST_EMAIL, "code": TEST_CODE})
     assert validation.status_code == 200
@@ -176,3 +199,21 @@ def test_beta_access_links_a_verified_code_to_an_existing_account_after_password
     assert record.state == "REDEEMED"
     assert record.redeemed_user_id == existing.id
     assert existing.beta_access_granted_at is not None
+
+
+def test_early_access_validation_is_unavailable_without_the_optional_program(client, db_session, beta_access_enabled):
+    record = seed_beta_code(db_session)
+    validation = client.post("/beta-access/validate", json={"email": TEST_EMAIL, "code": TEST_CODE})
+    assert validation.status_code == 200
+    settings.beta_access_enabled = False
+    response = client.post("/beta-access/validate", json={"email": TEST_EMAIL, "code": TEST_CODE})
+    assert response.status_code == 404
+    assert TEST_CODE not in response.text
+
+    attempted_claim = client.post(
+        "/auth/signup",
+        json=signup_payload(reservation=validation.json()["reservation_token"]),
+    )
+    assert attempted_claim.status_code == 403
+    db_session.refresh(record)
+    assert record.state == "RESERVED"

@@ -86,6 +86,18 @@ export const loginErrorMessage = (error: unknown): string => {
   return "Sign in failed. Try again or contact support.";
 };
 
+export type LoginMode = "signin" | "access" | "signup";
+
+export const initialLoginMode = (flow: string | null, earlyAccessProEnabled: boolean): LoginMode => {
+  if (flow === "signup") return "signup";
+  // Preserve existing waitlist URLs while changing their meaning from a gate
+  // to an optional future-Pro benefit.
+  return (flow === "pro" || flow === "beta") && earlyAccessProEnabled ? "access" : "signin";
+};
+
+export const loginPathForMode = (mode: LoginMode) =>
+  mode === "signin" ? "/login" : mode === "signup" ? "/login?flow=signup" : "/login?flow=pro";
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -103,8 +115,8 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [accessCode, setAccessCode] = useState("");
-  const [mode, setMode] = useState<"signin" | "access" | "signup">(
-    () => (new URLSearchParams(location.search).get("flow") === "beta" && betaAccessEnabled ? "access" : "signin")
+  const [mode, setMode] = useState<LoginMode>(
+    () => initialLoginMode(new URLSearchParams(location.search).get("flow"), betaAccessEnabled),
   );
   const [showPassword, setShowPassword] = useState(false);
   const [createdPassword, setCreatedPassword] = useState<string | null>(null);
@@ -122,6 +134,9 @@ export default function Login() {
     location.state &&
     "betaAccessPending" in location.state &&
     location.state.betaAccessPending === true;
+  const activeReservation = getBetaAccessReservation();
+  const signupHasVerifiedProCode =
+    activeReservation?.email === email.trim().toLowerCase() ? activeReservation : null;
 
   useEffect(() => {
     if (isLoggedIn && !holdPostSignupRedirect) {
@@ -129,10 +144,10 @@ export default function Login() {
     }
   }, [holdPostSignupRedirect, isLoggedIn, navigate, redirectTarget]);
 
-  const selectMode = (nextMode: "signin" | "access" | "signup", clearError = true) => {
+  const selectMode = (nextMode: LoginMode, clearError = true) => {
     if (clearError) setError(null);
     setMode(nextMode);
-    navigate(nextMode === "signin" ? "/login" : "/login?flow=beta", { replace: true });
+    navigate(loginPathForMode(nextMode), { replace: true });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -168,7 +183,7 @@ export default function Login() {
       setAccessCode("");
       if (reservation.existingAccount) {
         selectMode("signin");
-        setError("Your early-access code was verified. Sign in with that same email to continue.");
+        setError("Your Early Access Pro code was verified. Sign in with that same email to record your free year for alpha.");
       } else {
         setMode("signup");
       }
@@ -178,7 +193,7 @@ export default function Login() {
       } else if (caught instanceof Error) {
         setError(caught.message);
       } else {
-        setError("Unable to verify early access. Please try again.");
+        setError("Unable to verify your Early Access Pro code. Please try again.");
       }
     } finally {
       setIsLoading(false);
@@ -193,17 +208,14 @@ export default function Login() {
       return;
     }
     const reservation = getBetaAccessReservation();
-    if (betaAccessEnabled && !reservation) {
-      setError("Verify your early-access code before creating an account.");
-      selectMode("access", false);
-      return;
-    }
+    const matchingReservation =
+      reservation && reservation.email === email.trim().toLowerCase() ? reservation.token : undefined;
     setIsLoading(true);
     setHoldPostSignupRedirect(true);
     const passwordForConfirmation = password;
     try {
-      const nextUser = await signup(firstName, email, password, reservation?.token);
-      clearBetaAccessReservation();
+      const nextUser = await signup(firstName, email, password, matchingReservation);
+      if (matchingReservation) clearBetaAccessReservation();
       setPendingGuide(nextUser.id);
       setCreatedPassword(passwordForConfirmation);
     } catch (caught) {
@@ -311,17 +323,19 @@ export default function Login() {
               </div>
               <div>
                 <p className="cfb-micro-label text-cfb-brand">
-                  {mode === "signin" ? "Welcome back" : "College Football Fantasy beta"}
+                  {mode === "signin" ? "Welcome back" : mode === "access" ? "Early Access Pro" : "Create your account"}
                 </p>
                 <h2 className="mt-2 text-4xl font-black uppercase italic tracking-[-0.04em] text-cfb-text-primary">
-                  {mode === "signin" ? "Sign in" : mode === "access" ? "Join the beta" : "Create account"}
+                  {mode === "signin" ? "Sign in" : mode === "access" ? "Claim your free year" : "Create account"}
                 </h2>
                 <p className="mt-2 text-sm font-semibold text-cfb-text-secondary">
                   {mode === "signin"
                     ? "Continue to your leagues, draft rooms, and matchup dashboard."
                     : mode === "access"
-                      ? "Verify your invitation here, then create your account without leaving sign in."
-                      : "Your verified email is locked while you finish creating your beta account."}
+                      ? "Your code is optional: it records one free year of CFB Fantasy Pro for alpha launch."
+                      : signupHasVerifiedProCode
+                        ? "Your verified email is locked while we attach your free year of CFB Fantasy Pro."
+                        : "No code is needed to create a normal account and use the beta."}
                 </p>
               </div>
             </div>
@@ -351,7 +365,7 @@ export default function Login() {
                   </span>
                 </div>
                 {resetSuccess ? <div className="rounded-2xl border border-cfb-gold/35 bg-cfb-gold/[0.12] px-4 py-3 text-xs font-bold text-yellow-100">Password reset successfully. Sign in with your new password.</div> : null}
-                {betaAccessPending ? <div className="rounded-2xl border border-cfb-cyan/35 bg-cfb-cyan/[0.10] px-4 py-3 text-xs font-bold text-cyan-50">Your early-access code was verified. Sign in with that same email to finish linking beta access.</div> : null}
+                {betaAccessPending ? <div className="rounded-2xl border border-cfb-cyan/35 bg-cfb-cyan/[0.10] px-4 py-3 text-xs font-bold text-cyan-50">Your Early Access Pro code was verified. Sign in with that same email to record your free year for alpha.</div> : null}
                 {error ? <div role="alert" className="rounded-2xl border border-cfb-danger/35 bg-cfb-danger/[0.14] px-4 py-3 text-xs font-bold text-red-100">{error}</div> : null}
                 <Button type="submit" className="group h-14 w-full rounded-2xl bg-gradient-to-r from-cfb-cyan to-cfb-brand text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-[0_18px_42px_hsl(var(--brand-primary)/0.26)] hover:brightness-110" disabled={isLoading}>
                   {isLoading ? <span className="h-5 w-5 rounded-full border-2 border-slate-950/30 border-t-slate-950 animate-spin" /> : <span className="flex items-center gap-2 transition-all group-hover:gap-4">Sign in to dashboard <ArrowRight className="h-4 w-4" aria-hidden="true" /></span>}
@@ -364,7 +378,7 @@ export default function Login() {
                   <span className="group relative block"><Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="beta-email" type="email" autoComplete="email" placeholder="coach@saturday.com" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-sm font-bold text-cfb-text-primary" value={email} onChange={(event) => setEmail(event.target.value)} required /></span>
                 </div>
                 <div className="space-y-2">
-                  <label htmlFor="beta-code" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Early-access code</label>
+                  <label htmlFor="beta-code" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Early Access Pro code</label>
                   <span className="group flex h-14 items-center rounded-2xl border border-cfb-border-subtle bg-cfb-surface/80 transition focus-within:border-cfb-brand/60 focus-within:ring-2 focus-within:ring-cfb-brand/25">
                     <span aria-hidden="true" className="ml-2 inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-cfb-brand/[0.12] px-3 text-sm font-black uppercase tracking-[0.16em] text-cfb-cyan">
                       <KeyRound className="h-4 w-4" />
@@ -382,32 +396,32 @@ export default function Login() {
                       required
                     />
                   </span>
-                  <p className="ml-3 text-[11px] font-semibold text-cfb-text-muted">Enter the six characters after {BETA_ACCESS_CODE_PREFIX}</p>
+                  <p className="ml-3 text-[11px] font-semibold text-cfb-text-muted">Optional. Enter the six characters after {BETA_ACCESS_CODE_PREFIX}; this does not control beta access.</p>
                 </div>
                 {error ? <div role="alert" className="rounded-2xl border border-cfb-danger/35 bg-cfb-danger/[0.14] px-4 py-3 text-xs font-bold text-red-100">{error}</div> : null}
-                <Button type="submit" className="h-14 w-full rounded-2xl bg-gradient-to-r from-cfb-cyan to-cfb-brand text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-[0_18px_42px_hsl(var(--brand-primary)/0.26)] hover:brightness-110" disabled={isLoading}>{isLoading ? "Verifying access..." : "Verify and continue"}</Button>
+                <Button type="submit" className="h-14 w-full rounded-2xl bg-gradient-to-r from-cfb-cyan to-cfb-brand text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-[0_18px_42px_hsl(var(--brand-primary)/0.26)] hover:brightness-110" disabled={isLoading}>{isLoading ? "Verifying code..." : "Claim free Pro year"}</Button>
               </form>
             ) : (
               <form onSubmit={handleSignupSubmit} className="space-y-5">
                 <div className="space-y-2"><label htmlFor="signup-name" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">First name</label><span className="group relative block"><User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-name" type="text" placeholder="Your first name" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-sm font-bold text-cfb-text-primary" value={firstName} onChange={(event) => setFirstName(event.target.value)} required /></span></div>
-                <div className="space-y-2"><label htmlFor="signup-email" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Verified email</label><span className="group relative block"><Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-email" type="email" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-sm font-bold text-cfb-text-primary" value={email} readOnly required /></span></div>
+                <div className="space-y-2"><label htmlFor="signup-email" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">{signupHasVerifiedProCode ? "Verified email" : "Email address"}</label><span className="group relative block"><Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-email" type="email" placeholder="coach@saturday.com" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-sm font-bold text-cfb-text-primary" value={email} onChange={(event) => setEmail(event.target.value)} readOnly={Boolean(signupHasVerifiedProCode)} required /></span></div>
                 <div className="space-y-2"><label htmlFor="signup-password" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Password</label><span className="group relative block"><Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 pr-12 text-sm font-bold text-cfb-text-primary" value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)} className="absolute right-4 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-cfb-text-muted">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span></div>
                 <p className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface/60 px-4 py-3 text-xs font-semibold text-cfb-text-secondary">{PASSWORD_POLICY_MESSAGE}</p>
                 {error ? <div role="alert" className="rounded-2xl border border-cfb-danger/35 bg-cfb-danger/[0.14] px-4 py-3 text-xs font-bold text-red-100">{error}</div> : null}
-                <Button type="submit" className="group h-14 w-full rounded-2xl bg-gradient-to-r from-cfb-cyan to-cfb-brand text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-[0_18px_42px_hsl(var(--brand-primary)/0.26)] hover:brightness-110" disabled={isLoading}>{isLoading ? <span className="h-5 w-5 rounded-full border-2 border-slate-950/30 border-t-slate-950 animate-spin" /> : <span className="flex items-center gap-2 transition-all group-hover:gap-4">Create beta account <ArrowRight className="h-4 w-4" aria-hidden="true" /></span>}</Button>
+                <Button type="submit" className="group h-14 w-full rounded-2xl bg-gradient-to-r from-cfb-cyan to-cfb-brand text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-[0_18px_42px_hsl(var(--brand-primary)/0.26)] hover:brightness-110" disabled={isLoading}>{isLoading ? <span className="h-5 w-5 rounded-full border-2 border-slate-950/30 border-t-slate-950 animate-spin" /> : <span className="flex items-center gap-2 transition-all group-hover:gap-4">Create account <ArrowRight className="h-4 w-4" aria-hidden="true" /></span>}</Button>
               </form>
             )}
 
             <div className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface/60 p-4">
               <div className="flex items-center gap-3">
                 <CalendarClock className="h-5 w-5 text-cfb-gold" aria-hidden="true" />
-                <p className="text-sm font-semibold text-cfb-text-secondary">{mode === "signin" ? "New to the beta? Verify your invitation and create an account here." : "Sign in if you already created your account and entered your code."}</p>
+                <p className="text-sm font-semibold text-cfb-text-secondary">{mode === "signin" ? "New here? Create an account with no code required. An Early Access code records a free year of Pro for alpha launch." : mode === "access" ? "A valid code is tied to your email and can be redeemed only once. It does not restrict beta access." : "Already have an account? Sign in. You can optionally claim an Early Access Pro code from this page."}</p>
               </div>
             </div>
           </div>
 
           <div className="relative border-t border-cfb-border-subtle bg-cfb-surface/70 px-6 py-5 text-center">
-            {mode === "signin" && betaAccessEnabled ? <button type="button" onClick={() => selectMode("access")} className="text-[10px] font-bold uppercase tracking-widest text-cfb-text-secondary">Don&apos;t have an account?<span className="ml-1 font-black text-cfb-gold hover:text-yellow-100">Use early access</span></button> : <button type="button" onClick={() => selectMode("signin")} className="text-[10px] font-bold uppercase tracking-widest text-cfb-text-secondary">Already have an account?<span className="ml-1 font-black text-cfb-gold hover:text-yellow-100">Sign in</span></button>}
+            {mode === "signin" ? <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[10px] font-bold uppercase tracking-widest text-cfb-text-secondary"><button type="button" onClick={() => selectMode("signup")}>Don&apos;t have an account?<span className="ml-1 font-black text-cfb-gold hover:text-yellow-100">Create one</span></button>{betaAccessEnabled ? <button type="button" onClick={() => selectMode("access")}>Have a code?<span className="ml-1 font-black text-cfb-cyan hover:text-cyan-100">Claim Pro</span></button> : null}</div> : <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[10px] font-bold uppercase tracking-widest text-cfb-text-secondary"><button type="button" onClick={() => selectMode("signin")}>Already have an account?<span className="ml-1 font-black text-cfb-gold hover:text-yellow-100">Sign in</span></button>{mode === "signup" && betaAccessEnabled ? <button type="button" onClick={() => selectMode("access")}>Have a code?<span className="ml-1 font-black text-cfb-cyan hover:text-cyan-100">Claim Pro</span></button> : null}</div>}
           </div>
         </SurfaceCard>
       </section>
