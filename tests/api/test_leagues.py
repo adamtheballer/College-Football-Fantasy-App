@@ -903,6 +903,16 @@ def test_league_workspace_returns_real_matchup_and_standings(client, db_session)
     assert body["standings_summary"][0]["wins"] == 2
     assert body["standings_summary"][1]["team_id"] == member_team.id
 
+    list_response = client.get("/leagues", headers=auth_headers(token))
+    assert list_response.status_code == 200
+    card_summary = list_response.json()["data"][0]["current_user_summary"]
+    assert card_summary["team_name"] == commissioner_team.name
+    assert card_summary["wins"] == 2
+    assert card_summary["losses"] == 0
+    assert card_summary["opponent_team_name"] == member_team.name
+    assert card_summary["matchup_week"] == 3
+    assert card_summary["win_probability_for"] == 48.05
+
 
 def test_member_can_load_another_same_league_matchup_for_selected_week(client, db_session):
     commissioner_token = create_user_and_token(client, "matchup-selector-commissioner")

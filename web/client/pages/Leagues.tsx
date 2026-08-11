@@ -18,6 +18,21 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLeagues } from "@/hooks/use-leagues";
 import { formatDraftCountdown, hasDraftStarted } from "@/lib/draftStatus";
 import { isLeaguePostDraft, shouldShowLeagueDraftRoomAction } from "@/lib/leagueLifecycle";
+import type { LeagueListCurrentUserSummary } from "@/types/league";
+
+const formatWinProbability = (value: number | null | undefined) => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "Pending";
+  const percentage = value <= 1 ? value * 100 : value;
+  return `${Math.round(percentage)}%`;
+};
+
+const formatRecord = (summary: LeagueListCurrentUserSummary | null | undefined) => {
+  if (!summary) return "0-0";
+  const wins = summary.wins ?? 0;
+  const losses = summary.losses ?? 0;
+  const ties = summary.ties ?? 0;
+  return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
+};
 
 export const LeagueCard = ({
   id,
@@ -31,6 +46,7 @@ export const LeagueCard = ({
   draftStatus,
   inviteCode,
   iconUrl,
+  currentUserSummary,
   onOpen,
   onOpenDraft,
 }: {
@@ -45,6 +61,7 @@ export const LeagueCard = ({
   draftStatus: string;
   inviteCode?: string | null;
   iconUrl?: string | null;
+  currentUserSummary?: LeagueListCurrentUserSummary | null;
   onOpen: (leagueId: number) => void;
   onOpenDraft: (leagueId: number, draftUnlocked: boolean) => void;
 }) => {
@@ -185,11 +202,32 @@ export const LeagueCard = ({
             League snapshot
           </h4>
           <div>
-            <div className="rounded-lg border border-white/10 bg-black/15 p-3">
-              <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
-                Draft
-              </p>
-              <p className="mt-1.5 text-sm font-semibold text-foreground">{draftLabel}</p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <div className="rounded-lg border border-white/10 bg-black/15 p-3">
+                <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
+                  Draft
+                </p>
+                <p className="mt-1.5 text-sm font-semibold text-foreground">{draftLabel}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-black/15 p-3">
+                <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
+                  Your record
+                </p>
+                <p className="mt-1.5 text-sm font-semibold text-foreground">
+                  {formatRecord(currentUserSummary)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-black/15 p-3">
+                <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
+                  {currentUserSummary?.matchup_week ? `Week ${currentUserSummary.matchup_week}` : "Matchup"}
+                </p>
+                <p className="mt-1.5 truncate text-sm font-semibold text-foreground">
+                  {currentUserSummary?.opponent_team_name || "Schedule pending"}
+                </p>
+                <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-sky-200">
+                  Win chance {formatWinProbability(currentUserSummary?.win_probability_for)}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -313,6 +351,7 @@ export default function Leagues() {
               draftStatus={league.draft?.status || "none"}
               inviteCode={league.invite_code}
               iconUrl={league.icon_url}
+              currentUserSummary={league.current_user_summary}
               onOpen={(leagueId) => {
                 setActiveLeagueId(leagueId);
                 const postDraft = isLeaguePostDraft({

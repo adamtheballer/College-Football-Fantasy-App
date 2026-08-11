@@ -72,6 +72,17 @@ export interface LeagueMember {
   joined_at: string;
 }
 
+export interface LeagueListCurrentUserSummary {
+  team_name?: string | null;
+  wins?: number | null;
+  losses?: number | null;
+  ties?: number | null;
+  opponent_team_name?: string | null;
+  matchup_week?: number | null;
+  win_probability_for?: number | null;
+  win_probability_against?: number | null;
+}
+
 export interface LeagueDetail {
   id: number;
   name: string;
@@ -89,6 +100,7 @@ export interface LeagueDetail {
   draft: DraftInfo | null;
   draft_order: DraftOrder | null;
   members: LeagueMember[];
+  current_user_summary?: LeagueListCurrentUserSummary | null;
 }
 
 export interface LeaguePreview {

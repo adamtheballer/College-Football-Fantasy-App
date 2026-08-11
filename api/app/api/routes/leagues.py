@@ -108,7 +108,15 @@ def list_leagues_endpoint(
         scope=scope,
     )
     return LeagueList(
-        data=[get_league_detail(db, league, viewer=current_user) for league in leagues],
+        data=[
+            get_league_detail(
+                db,
+                league,
+                viewer=current_user,
+                include_current_user_summary=True,
+            )
+            for league in leagues
+        ],
         total=total,
         limit=limit,
         offset=offset,
