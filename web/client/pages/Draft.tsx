@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Bot, ClipboardList, History, LocateFixed, Loader2, Lock, Search, ShieldAlert, Trophy, User, Users } from "lucide-react";
 
@@ -207,6 +208,7 @@ const formatTimer = (seconds: number) => {
 export default function Draft() {
   const { leagueId } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 150);
   const [position, setPosition] = useState("ALL");
@@ -232,6 +234,17 @@ export default function Draft() {
   } = useDraftRoom(parsedLeagueId);
   const pickMutation = useDraftPick(parsedLeagueId);
   const startDraftMutation = useStartDraft(parsedLeagueId);
+
+  const viewFinalRoster = useCallback(async () => {
+    if (!parsedLeagueId) return;
+
+    // The draft-room poll can observe completion before the cached league
+    // detail does. Refresh that exact cache before moving to the post-draft
+    // route so LeagueRoster does not briefly redirect back to the lobby.
+    await queryClient.invalidateQueries({ queryKey: ["league", parsedLeagueId] });
+    await queryClient.refetchQueries({ queryKey: ["league", parsedLeagueId], type: "active" });
+    navigate(`/league/${parsedLeagueId}/roster`);
+  }, [navigate, parsedLeagueId, queryClient]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 250);
@@ -1286,13 +1299,6 @@ export default function Draft() {
               <span className="absolute bottom-[18%] left-[11%] h-2 w-7 -rotate-[18deg] rounded-full bg-amber-200/75" />
               <span className="absolute bottom-[13%] right-[9%] h-2 w-8 rotate-[28deg] rounded-full bg-fuchsia-300/60" />
             </div>
-            <button
-              type="button"
-              onClick={() => setDismissedCompletedDraftId(draftRoom.draft_id)}
-              className="absolute right-5 top-5 z-10 rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-[9px] font-black uppercase tracking-[0.14em] text-slate-200 transition hover:border-cyan-100/45 hover:bg-white/10 hover:text-white"
-            >
-              Keep viewing
-            </button>
             <div className="relative border-b border-cyan-100/10 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.18),transparent_47%),linear-gradient(135deg,rgba(34,211,238,0.16),rgba(30,64,175,0.12),rgba(236,72,153,0.08))] px-8 pb-8 pt-12 sm:px-12 sm:pb-10">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-amber-100/45 bg-amber-300/12 text-amber-100 shadow-[0_0_48px_rgba(251,191,36,0.30)]">
                 <Trophy className="h-10 w-10" />
@@ -1311,7 +1317,7 @@ export default function Draft() {
               <Button
                 type="button"
                 className="h-16 rounded-2xl border border-cyan-100/45 bg-gradient-to-r from-cyan-300 to-blue-500 px-6 text-[11px] font-black uppercase tracking-[0.16em] text-slate-950 shadow-[0_12px_28px_rgba(34,211,238,0.25)] transition hover:brightness-110"
-                onClick={() => navigate(`/league/${parsedLeagueId}/roster`)}
+                onClick={() => void viewFinalRoster()}
               >
                 <Users className="mr-2 h-5 w-5" />
                 View Your Roster
