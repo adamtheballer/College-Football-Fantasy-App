@@ -1452,8 +1452,11 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("Projected Leader").locator("..").getByText("Adam 2's Team")).toBeVisible();
     await expect(page.getByTestId("win-chance-left-bar")).toHaveAttribute("style", /width: 48\.05%/);
     await expect(page.getByTestId("win-chance-right-bar")).toHaveAttribute("style", /width: 51\.95%/);
-    await expect(page.getByText("Arch Manning")).toBeVisible();
-    await expect(page.getByText("Rival QB")).toBeVisible();
+    // The responsive matchup view keeps a compact mobile lineup mounted alongside
+    // the desktop tables. Assert against the visible desktop player controls here
+    // rather than an ambiguous text locator shared by both representations.
+    await expect(page.getByRole("button", { name: /Arch Manning/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Rival QB/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "Previous week" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Next week" })).toBeVisible();
     await expect(page.getByText("Prev", { exact: true })).toHaveCount(0);

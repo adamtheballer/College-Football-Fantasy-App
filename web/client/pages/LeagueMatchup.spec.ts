@@ -97,6 +97,7 @@ describe("league matchup scoreboard", () => {
     render(createElement(LeagueMatchup));
 
     expect(screen.getByText("Week 1 Matchup")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "My Team vs My Opponent" })).toBeTruthy();
     expect(screen.getByText("Preweek baseline")).toBeTruthy();
     expect(screen.getByText("111.2")).toBeTruthy();
     expect(screen.getByText("106.4")).toBeTruthy();

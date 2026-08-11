@@ -4,6 +4,7 @@ import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
 import { WeekSelector } from "@/components/league/WeekSelector";
+import { WinChanceMeter } from "@/components/league/WinChanceMeter";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
 import { useLeagueDetail, useLeagueMatchupTab, useLeagueScoreboard } from "@/hooks/use-leagues";
@@ -102,12 +103,14 @@ function MatchupTeamSummary({
   accent,
   align,
   label,
+  compactLabel,
   status,
 }: {
   team: LeagueMatchupTeam | null;
   accent: "brand" | "pink";
   align: "left" | "right";
   label: string;
+  compactLabel: string;
   status: string;
 }) {
   const isBrand = accent === "brand";
@@ -128,7 +131,7 @@ function MatchupTeamSummary({
         </div>
         <p className="hidden cfb-micro-label text-cfb-text-muted sm:block">{label}</p>
       </div>
-      <p className="mt-2 truncate text-[9px] font-black uppercase tracking-[0.1em] text-cfb-text-muted sm:hidden">{label}</p>
+      <p className="mt-2 truncate text-[9px] font-black uppercase tracking-[0.1em] text-cfb-text-muted sm:hidden">{compactLabel}</p>
       <p className="mt-1 truncate text-xs font-black text-cfb-text-primary sm:mt-2 sm:text-base">
         {team?.fantasy_team_name ?? "Team TBD"}
       </p>
@@ -164,6 +167,9 @@ function CompactMatchupScoreboard({
 
   return (
     <section className="relative overflow-hidden rounded-[1.65rem] border border-cfb-border-strong bg-[linear-gradient(135deg,hsl(var(--background-surface-raised)/0.98),hsl(var(--background-surface)/0.94))] p-4 shadow-[0_22px_60px_rgba(2,6,23,0.34)] sm:p-6">
+      <h2 className="sr-only">
+        {myTeam?.fantasy_team_name ?? "Your team"} vs {opponentTeam?.fantasy_team_name ?? "Opponent"}
+      </h2>
       <div className="pointer-events-none absolute inset-x-[22%] top-0 h-px bg-gradient-to-r from-transparent via-cfb-brand/60 to-transparent" />
       <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-cfb-pink/10 blur-3xl" />
       <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-cfb-brand/10 blur-3xl" />
@@ -182,7 +188,8 @@ function CompactMatchupScoreboard({
 
       <div className="relative mt-5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:mt-6 sm:gap-6">
         <MatchupTeamSummary
-          label={isViewingOwnMatchup ? "My proj" : "Home proj"}
+          label={isViewingOwnMatchup ? "My Projection" : "Home Projection"}
+          compactLabel={isViewingOwnMatchup ? "My proj" : "Home proj"}
           team={myTeam}
           accent="brand"
           align="left"
@@ -210,7 +217,8 @@ function CompactMatchupScoreboard({
         </div>
 
         <MatchupTeamSummary
-          label={isViewingOwnMatchup ? "Their proj" : "Away proj"}
+          label={isViewingOwnMatchup ? "Their Projection" : "Away Projection"}
+          compactLabel={isViewingOwnMatchup ? "Their proj" : "Away proj"}
           team={opponentTeam}
           accent="pink"
           align="right"
@@ -221,6 +229,21 @@ function CompactMatchupScoreboard({
       <div className="relative mt-5 flex items-center justify-between gap-3 border-t border-cfb-border-subtle pt-3 text-[10px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
         <span>Week {displayWeek}</span>
         <span className="text-right">{winChance ? "Win chance from weekly lineup totals" : "Win chance unavailable"}</span>
+      </div>
+
+      <div className="relative mt-4 hidden grid-cols-[1fr_auto] items-center gap-4 border-t border-cfb-border-subtle pt-4 sm:grid">
+        <WinChanceMeter
+          myPercent={myTeam?.win_probability}
+          opponentPercent={opponentTeam?.win_probability}
+          myProjectedTotal={null}
+          opponentProjectedTotal={null}
+        />
+        <div className="rounded-xl border border-cfb-border-subtle bg-cfb-canvas/70 px-4 py-3 text-right">
+          <p className="cfb-micro-label text-cfb-text-muted">Projected Leader</p>
+          <p className="mt-1 text-sm font-black text-cfb-text-primary">
+            {leadingTeam(myTeam, opponentTeam)}
+          </p>
+        </div>
       </div>
     </section>
   );
