@@ -1083,6 +1083,7 @@ test.describe("critical browser workflows", () => {
       .click();
     await expect(page.getByText(/Last pick/i)).toBeVisible();
     await expect(page.getByText(/Arch Manning/i).first()).toBeVisible();
+    await expect(page.getByText(/^By Codex$/i)).toBeVisible();
     await expect(page.getByText(/Other Team/i).first()).toBeVisible();
     const queuedRow = page.getByTestId("draft-player-row").filter({ hasText: "Quinn Ewers" });
     await expect(page.getByTestId("draft-player-row").filter({ hasText: "Arch Manning" })).toHaveCount(0);

@@ -969,11 +969,13 @@ export default function Draft() {
               {draftOrderPicks.map((slot) => {
                 const isCurrent = !completed && slot.overallPick === displayPick;
                 const isUser = slot.team?.id === draftRoom.user_team_id;
+                const pickerName = slot.team?.owner_name || slot.pick?.team_name || slot.team?.name || "Manager";
                 return (
                   <div key={slot.overallPick} aria-current={isCurrent ? "step" : undefined} className={cn("flex w-[4.15rem] shrink-0 snap-start flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}>
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/12 bg-black/20">{slot.team?.is_cpu ? <Bot className="h-3 w-3" /> : <User className="h-3 w-3" />}</span>
                     <span className="mt-1 whitespace-nowrap text-[9px] font-black tabular-nums">{slot.round}.{slot.roundPick}</span>
-                    <span className="max-w-full truncate text-[8px] font-black uppercase tracking-[0.04em]">{isUser ? "You" : slot.team?.name?.replace("Bot Team", "B") ?? "Team"}</span>
+                    <span className="mt-0.5 max-w-full truncate text-[8px] font-black uppercase tracking-[0.04em]">{slot.pick?.player_name ?? (isUser ? "You" : slot.team?.name?.replace("Bot Team", "B") ?? "Team")}</span>
+                    <span className="max-w-full truncate text-[7px] font-bold uppercase tracking-[0.03em] text-cyan-100/80">{slot.pick ? `By ${pickerName}` : pickerName}</span>
                   </div>
                 );
               })}
@@ -1010,6 +1012,7 @@ export default function Draft() {
               const isCurrent = !completed && slot.overallPick === displayPick;
               const isUser = slot.team?.id === draftRoom.user_team_id;
               const isLocked = Boolean(slot.pick);
+              const pickerName = slot.team?.owner_name || slot.pick?.team_name || slot.team?.name || "Manager";
               return (
                 <div
                   key={slot.overallPick}
@@ -1058,6 +1061,11 @@ export default function Draft() {
                           ? "CPU manager"
                           : slot.team?.owner_name || "Manager"}
                   </p>
+                  {slot.pick ? (
+                    <p className="mt-3 truncate border-t border-cyan-200/10 pt-2 text-[9px] font-black uppercase tracking-[0.14em] text-cyan-100/90">
+                      Picked by <span className="text-white">{pickerName}</span>
+                    </p>
+                  ) : null}
                 </div>
               );
             })}
