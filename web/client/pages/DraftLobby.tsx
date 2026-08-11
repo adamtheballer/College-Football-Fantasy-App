@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { Navigate, useParams, useNavigate } from "react-router-dom";
 import { AlertTriangle, CalendarClock, CheckCircle2, Clock, Copy, Link2, Lock, RefreshCw, Users, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ import {
   leagueLocalDateTimeToUtc,
   toLeagueDateTimeLocalValue,
 } from "@/lib/draftSchedule";
+import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 
 const getErrorMessage = (error: unknown) => {
   if (error instanceof ApiError) return error.message;
@@ -169,6 +170,13 @@ export default function DraftLobby() {
         </Card>
       </div>
     );
+  }
+
+  // A completed draft owns the post-draft league workspace. This direct-route
+  // guard also covers stale lobby bookmarks and browser history, so members
+  // cannot be sent back to a draft countdown after rosters were finalized.
+  if (isLeaguePostDraft({ draftStatus: league.draft?.status, leagueStatus: league.status })) {
+    return <Navigate to={`/league/${league.id}/roster`} replace />;
   }
 
   const draftRoomPath = `/league/${league.id}/draft`;

@@ -1209,6 +1209,21 @@ test.describe("critical browser workflows", () => {
     await page.route("**/stats/teams?**", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [] }) });
     });
+    await page.route("**/leagues/1/roster?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          league_id: 1,
+          week: 1,
+          owned_team: { id: 11, name: "Codex Team", owner_user_id: 42, record: null },
+          team_rosters: [],
+          slots: [],
+          roster_slot_limits: { QB: 1, IR: 1 },
+          ir_slots: 1,
+        }),
+      });
+    });
 
     await page.goto("/league/1/draft");
     const completionDialog = page.getByRole("dialog", { name: /Draft Complete/i });
@@ -1223,6 +1238,13 @@ test.describe("critical browser workflows", () => {
     await expect(completionDialog).toBeVisible();
     await completionDialog.getByRole("button", { name: "View Your Roster" }).click();
     await expect(page).toHaveURL(/\/league\/1\/roster$/);
+
+    // A completed league must never reopen the pre-draft lobby through a
+    // stale card link, browser history, or a copied lobby URL.
+    await page.goto("/league/1/lobby");
+    await expect(page).toHaveURL(/\/league\/1\/roster$/);
+    await expect(page.getByText("Loading draft lobby...", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /^Draft$/i })).toHaveCount(0);
   });
 
   test("league matchup page renders projected teams and honest empty state", async ({ page }) => {
