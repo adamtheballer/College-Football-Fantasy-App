@@ -5,6 +5,7 @@ import {
   formatDraftCountdown,
   getDraftCountdownParts,
   hasDraftStarted,
+  isTerminalDraftStatus,
 } from "./draftStatus";
 
 describe("draftStatus", () => {
@@ -57,5 +58,15 @@ describe("draftStatus", () => {
         now,
       })
     ).toBe(false);
+  });
+
+  it("treats only explicit completed statuses as a finished draft", () => {
+    expect(isTerminalDraftStatus("completed")).toBe(true);
+    expect(isTerminalDraftStatus("complete")).toBe(true);
+    expect(isTerminalDraftStatus("scheduled")).toBe(false);
+    expect(isTerminalDraftStatus("pre_draft")).toBe(false);
+    expect(isTerminalDraftStatus("on_clock")).toBe(false);
+    expect(isTerminalDraftStatus("transition")).toBe(false);
+    expect(isTerminalDraftStatus(null)).toBe(false);
   });
 });

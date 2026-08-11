@@ -1085,6 +1085,9 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText(/Arch Manning/i).first()).toBeVisible();
     await expect(page.getByText(/Other Team/i).first()).toBeVisible();
     const queuedRow = page.getByTestId("draft-player-row").filter({ hasText: "Quinn Ewers" });
+    await expect(page.getByTestId("draft-player-row").filter({ hasText: "Arch Manning" })).toHaveCount(0);
+    await expect(queuedRow).toHaveText(/^2/);
+    await expect(page.getByText(/^Draft Complete$/i)).toHaveCount(0);
     await expect(queuedRow.getByRole("button", { name: /^Draft Quinn Ewers$/i })).toHaveCount(0);
     await queuedRow.getByRole("button", { name: /^Queue Quinn Ewers$/i }).click();
     await expect(queuedRow.getByRole("button", { name: /Remove Quinn Ewers from queue/i })).toBeVisible();

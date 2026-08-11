@@ -104,18 +104,18 @@ test.describe("real two-manager draft lifecycle", () => {
 
       await commissioner.goto(`/league/${leagueId}/draft`);
       await expect(commissioner.getByRole("button", { name: /^Start Draft$/i })).toBeVisible();
-      await commissioner.getByRole("button", { name: /^Start Draft$/i }).click();
-      await expect.poll(async () => {
-        const room = await realApi<{ status: string }>(commissioner, `/leagues/${leagueId}/draft-room`);
-        return room.body.status;
-      }).toBe("pre_draft");
-      await expect(commissioner.getByText("Starting Soon", { exact: true })).toBeVisible();
-
       await manager.goto(`/league/${leagueId}/draft`);
-      await expect(manager.getByText("Starting Soon", { exact: true })).toBeVisible({ timeout: 15_000 });
       await expect(manager).not.toHaveURL(/\/login$/);
 
-      await expect(commissioner.getByText("Pick Timer")).toBeVisible({ timeout: 100_000 });
+      await commissioner.bringToFront();
+      await commissioner.getByRole("button", { name: /^Start Draft$/i }).click();
+      await expect.poll(async () => {
+        const room = await realApi<{ status: string; current_pick: number; current_pick_deadline: string | null }>(commissioner, `/leagues/${leagueId}/draft-room`);
+        return room.body;
+      }).toMatchObject({ status: "on_clock", current_pick: 1 });
+
+      await expect(commissioner.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
+      await expect(manager.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
 
       await expect.poll(async () => {
         const room = await realApi<{ picks: Array<{ auto_pick: boolean }> }>(commissioner, `/leagues/${leagueId}/draft-room`);

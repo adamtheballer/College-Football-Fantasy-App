@@ -128,14 +128,12 @@ def create_league(
     return league
 
 
-def advance_pick_transition(db_session, league_id: int) -> None:
+def assert_next_pick_is_live(db_session, league_id: int) -> None:
     draft = db_session.query(Draft).filter(Draft.league_id == league_id).one()
-    assert draft.status == "transition"
-    assert draft.transition_ends_at is not None
-    process_expired_draft_picks_once(
-        db_session,
-        now=draft.transition_ends_at + timedelta(seconds=1),
-    )
+    assert draft.status == "on_clock"
+    assert draft.transition_ends_at is None
+    assert draft.current_pick_started_at is not None
+    assert draft.current_pick_deadline is not None
 
 
 def activate_draft_for_direct_pick_test(db_session, league_id: int) -> None:
@@ -297,7 +295,7 @@ def test_manual_draft_pick_rejects_legacy_provider_player(client, db_session):
     assert response.json()["detail"] == "player is not in this season's approved draft pool"
 
 
-def test_commissioner_starts_pre_draft_then_worker_opens_first_pick(client, db_session):
+def test_commissioner_starts_first_pick_immediately_with_configured_timer(client, db_session):
     commissioner_token = create_user_and_token(client, "draft-lifecycle-commissioner")
     league = create_league(
         client,
@@ -320,11 +318,13 @@ def test_commissioner_starts_pre_draft_then_worker_opens_first_pick(client, db_s
         headers=auth_headers(commissioner_token),
     )
     assert start_response.status_code == 200
-    pre_draft = start_response.json()
-    assert pre_draft["status"] == "pre_draft"
-    assert pre_draft["can_make_pick"] is False
-    assert pre_draft["draft_starts_at"] is not None
-    assert pre_draft["current_pick_deadline"] is None
+    started = start_response.json()
+    assert started["status"] == "on_clock"
+    assert started["current_pick"] == 1
+    assert started["current_team_id"] is not None
+    assert started["draft_starts_at"] == started["pre_draft_starts_at"]
+    assert started["current_pick_started_at"] is not None
+    assert started["current_pick_deadline"] is not None
 
     duplicate_start = client.post(
         f"/leagues/{league['id']}/draft/start",
@@ -333,21 +333,11 @@ def test_commissioner_starts_pre_draft_then_worker_opens_first_pick(client, db_s
     assert duplicate_start.status_code == 409
     assert duplicate_start.json()["detail"] == "draft has already been started"
 
-    early_pick = client.post(
-        f"/leagues/{league['id']}/draft-picks",
-        json={"player_id": player_id, "pick_number": 1, "draft_version": pre_draft["draft_version"]},
-        headers=auth_headers(commissioner_token),
-    )
-    assert early_pick.status_code == 409
-    assert early_pick.json()["detail"] == "draft is not accepting picks"
-
     db_session.expire_all()
     draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
-    assert draft.draft_starts_at is not None
-    assert process_expired_draft_picks_once(
-        db_session,
-        now=draft.draft_starts_at + timedelta(seconds=1),
-    ) == {"auto_picked": 0, "skipped": 1}
+    assert draft.status == "on_clock"
+    assert draft.current_pick_number == 1
+    assert draft.current_pick_deadline is not None
 
     commissioner_room = client.get(
         f"/leagues/{league['id']}/draft-room",
@@ -361,6 +351,57 @@ def test_commissioner_starts_pre_draft_then_worker_opens_first_pick(client, db_s
     assert commissioner_room["current_pick"] == member_room["current_pick"] == 1
     assert commissioner_room["can_make_pick"] is not member_room["can_make_pick"]
     assert commissioner_room["current_pick_deadline"] is not None
+
+
+def test_commissioner_recovers_legacy_pre_draft_without_reshuffling_the_order(client, db_session):
+    commissioner_token = create_user_and_token(client, "legacy-pre-draft-commissioner")
+    league = create_league(
+        client,
+        commissioner_token,
+        max_teams=2,
+        fill_league=False,
+        activate_for_direct_pick_tests=False,
+    )
+    join_league(client, league["id"], "legacy-pre-draft-member")
+
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    teams = (
+        db_session.query(Team)
+        .filter(Team.league_id == league["id"])
+        .order_by(Team.name.asc())
+        .all()
+    )
+    for position, team in enumerate(teams, start=1):
+        team.draft_position = position
+    draft.status = "pre_draft"
+    draft.current_pick_number = 1
+    draft.draft_starts_at = datetime.now(timezone.utc) + timedelta(seconds=45)
+    draft.current_pick_started_at = None
+    draft.current_pick_deadline = None
+    db_session.commit()
+
+    response = client.post(
+        f"/leagues/{league['id']}/draft/start",
+        headers=auth_headers(commissioner_token),
+    )
+
+    assert response.status_code == 200
+    recovered = response.json()
+    assert recovered["status"] == "on_clock"
+    assert recovered["current_pick"] == 1
+    assert recovered["current_team_id"] == teams[0].id
+    assert recovered["current_pick_started_at"] is not None
+    assert recovered["current_pick_deadline"] is not None
+
+    db_session.expire_all()
+    preserved_positions = [
+        team.draft_position
+        for team in db_session.query(Team)
+        .filter(Team.league_id == league["id"])
+        .order_by(Team.name.asc())
+        .all()
+    ]
+    assert preserved_positions == [1, 2]
 
 
 def test_two_managers_complete_the_full_server_authoritative_draft_lifecycle(client, db_session):
@@ -379,16 +420,11 @@ def test_two_managers_complete_the_full_server_authoritative_draft_lifecycle(cli
 
     start_response = client.post(f"/leagues/{league['id']}/draft/start", headers=auth_headers(commissioner_token))
     assert start_response.status_code == 200
-    pre_draft = start_response.json()
-    assert pre_draft["status"] == "pre_draft"
-    assert pre_draft["can_make_pick"] is False
-    assert (
-        datetime.fromisoformat(pre_draft["draft_starts_at"])
-        - datetime.fromisoformat(pre_draft["pre_draft_starts_at"])
-    ) == timedelta(seconds=60)
-
-    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
-    process_expired_draft_picks_once(db_session, now=draft.draft_starts_at + timedelta(seconds=1))
+    started = start_response.json()
+    assert started["status"] == "on_clock"
+    assert started["current_pick"] == 1
+    assert started["draft_starts_at"] == started["pre_draft_starts_at"]
+    assert started["current_pick_deadline"] is not None
 
     commissioner_room = client.get(
         f"/leagues/{league['id']}/draft-room",
@@ -415,11 +451,7 @@ def test_two_managers_complete_the_full_server_authoritative_draft_lifecycle(cli
         headers=auth_headers(first_picker_token),
     )
     assert first_pick.status_code == 201
-    assert first_pick.json()["status"] == "transition"
-
-    db_session.expire_all()
-    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
-    process_expired_draft_picks_once(db_session, now=draft.transition_ends_at + timedelta(seconds=1))
+    assert first_pick.json()["status"] == "on_clock"
     commissioner_turn = client.get(
         f"/leagues/{league['id']}/draft-room",
         headers=auth_headers(commissioner_token),
@@ -507,8 +539,6 @@ def test_cpu_seats_pick_individually_after_their_server_delay(client, db_session
     assert start_response.status_code == 200
     assert [team["is_cpu"] for team in start_response.json()["teams"]] == [False, True, True, True]
 
-    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
-    process_expired_draft_picks_once(db_session, now=draft.draft_starts_at + timedelta(seconds=1))
     commissioner_room = client.get(
         f"/leagues/{league['id']}/draft-room",
         headers=auth_headers(commissioner_token),
@@ -526,8 +556,6 @@ def test_cpu_seats_pick_individually_after_their_server_delay(client, db_session
 
     db_session.expire_all()
     draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
-    process_expired_draft_picks_once(db_session, now=draft.transition_ends_at + timedelta(seconds=1))
-    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
     assert draft.status == "on_clock"
     assert draft.current_pick_number == 2
     assert process_expired_draft_picks_once(
@@ -542,27 +570,32 @@ def test_cpu_seats_pick_individually_after_their_server_delay(client, db_session
     ) == {"auto_picked": 1, "skipped": 0}
     db_session.expire_all()
     draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
-    assert draft.status == "transition"
-    assert draft.current_pick_number == 2
-    assert db_session.query(DraftPick).filter(DraftPick.draft_id == draft.id).count() == 2
-
-    process_expired_draft_picks_once(db_session, now=draft.transition_ends_at + timedelta(seconds=1))
-    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
     assert draft.status == "on_clock"
     assert draft.current_pick_number == 3
+    assert db_session.query(DraftPick).filter(DraftPick.draft_id == draft.id).count() == 2
+
     assert process_expired_draft_picks_once(
         db_session,
         now=draft.current_pick_started_at + timedelta(seconds=2),
     ) == {"auto_picked": 1, "skipped": 0}
     db_session.expire_all()
     draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
-    assert draft.status == "transition"
+    assert draft.status == "on_clock"
+    assert draft.current_pick_number == 4
+
+    assert process_expired_draft_picks_once(
+        db_session,
+        now=draft.current_pick_started_at + timedelta(seconds=2),
+    ) == {"auto_picked": 0, "skipped": 1}
+    db_session.expire_all()
+    draft = db_session.query(Draft).filter(Draft.league_id == league["id"]).one()
+    assert draft.status == "on_clock"
     assert [pick.player_id for pick in db_session.query(DraftPick).filter(DraftPick.draft_id == draft.id).order_by(DraftPick.overall_pick)] == [
         player.id for player in cpu_players
     ]
 
 
-def test_pick_transition_advances_only_after_worker_window(client, db_session):
+def test_pick_advances_next_manager_immediately(client, db_session):
     token = create_user_and_token(client, "draft-transition-owner")
     league = create_league(client, token, max_teams=2, fill_league=False)
     member_token = join_league(client, league["id"], "draft-transition-member")
@@ -581,23 +614,23 @@ def test_pick_transition_advances_only_after_worker_window(client, db_session):
         headers=auth_headers(token),
     )
     assert first_pick.status_code == 201
-    transition = first_pick.json()
-    assert transition["status"] == "transition"
-    assert transition["can_make_pick"] is False
+    next_pick = first_pick.json()
+    assert next_pick["status"] == "on_clock"
+    assert next_pick["current_pick"] == 2
+    assert next_pick["current_pick_deadline"] is not None
+    assert next_pick["can_make_pick"] is False
 
-    premature_pick = client.post(
+    immediate_pick = client.post(
         f"/leagues/{league['id']}/draft-picks",
-        json={"player_id": second_player_id, "pick_number": 2, "draft_version": transition["draft_version"]},
+        json={"player_id": second_player_id, "pick_number": 2, "draft_version": next_pick["draft_version"]},
         headers=auth_headers(member_token),
     )
-    assert premature_pick.status_code == 409
-    assert premature_pick.json()["detail"] == "draft is not accepting picks"
+    assert immediate_pick.status_code == 201
 
-    advance_pick_transition(db_session, league["id"])
     member_room = client.get(f"/leagues/{league['id']}/draft-room", headers=auth_headers(member_token)).json()
-    assert member_room["status"] == "on_clock"
+    assert member_room["status"] == "completed"
     assert member_room["current_pick"] == 2
-    assert member_room["can_make_pick"] is True
+    assert member_room["can_make_pick"] is False
 
 
 def test_two_user_real_draft_stays_in_sync_and_creates_rosters(client, db_session):
@@ -648,11 +681,11 @@ def test_two_user_real_draft_stays_in_sync_and_creates_rosters(client, db_sessio
     )
     assert owner_pick_response.status_code == 201
     after_owner_pick = owner_pick_response.json()
-    assert after_owner_pick["status"] == "transition"
+    assert after_owner_pick["status"] == "on_clock"
     assert len(after_owner_pick["picks"]) == 1
     assert after_owner_pick["picks"][0]["player_id"] == first_qb_id
 
-    advance_pick_transition(db_session, league["id"])
+    assert_next_pick_is_live(db_session, league["id"])
 
     member_updated_response = client.get(
         f"/leagues/{league['id']}/draft-room",
@@ -747,7 +780,9 @@ def test_member_can_trigger_expired_real_draft_auto_pick(client, db_session):
     assert len(updated_room["picks"]) == 1
     assert updated_room["picks"][0]["player_id"] == top_qb.id
     assert updated_room["picks"][0]["made_by_user_id"] is None
-    assert updated_room["status"] == "transition"
+    assert updated_room["status"] == "on_clock"
+    assert updated_room["current_pick"] == 2
+    assert updated_room["current_pick_deadline"] is not None
 
     db_session.expire_all()
     assert db_session.query(DraftPick).filter(DraftPick.player_id == top_qb.id).count() == 1
@@ -816,7 +851,7 @@ def test_duplicate_draft_pick_returns_409_and_does_not_create_extra_rows(client,
         json=draft_pick_payload(db_session, league["id"], player_id),
         headers=auth_headers(token),
     )
-    advance_pick_transition(db_session, league["id"])
+    assert_next_pick_is_live(db_session, league["id"])
     second_response = client.post(
         f"/leagues/{league['id']}/draft-picks",
         json=draft_pick_payload(db_session, league["id"], player_id),
@@ -1156,7 +1191,7 @@ def test_matchup_endpoint_returns_current_opponent_and_win_probability(client, d
         json=draft_pick_payload(db_session, league["id"], first_player_id),
         headers=auth_headers(owner_token),
     ).status_code == 201
-    advance_pick_transition(db_session, league["id"])
+    assert_next_pick_is_live(db_session, league["id"])
     assert client.post(
         f"/leagues/{league['id']}/draft-picks",
         json=draft_pick_payload(db_session, league["id"], second_player_id),
