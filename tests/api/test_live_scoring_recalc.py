@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime, timedelta, timezone
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
@@ -120,7 +121,8 @@ def test_stat_correction_changes_scores_without_incrementing(client, db_session)
     assert home_score.total_points == 68.0
 
 
-def test_scoring_run_records_success_and_failure(client, db_session):
+def test_scoring_run_records_success_and_failure(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "scoring_mode", "enabled")
     league, *_ = create_scoring_fixture(db_session)
     summary = run_league_scoring_recalculation(db_session, league.id, 2026, 1)
 
@@ -135,6 +137,7 @@ def test_scoring_run_records_success_and_failure(client, db_session):
 
 
 def test_failed_scoring_run_rolls_back_partial_recalculation(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "scoring_mode", "enabled")
     league, *_ = create_scoring_fixture(db_session)
 
     def fail_after_player_scores(*_args, **_kwargs):
