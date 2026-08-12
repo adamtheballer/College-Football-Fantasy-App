@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.domain.scoring_engine import (
     calculate_player_fantasy_points,
     is_starting_slot,
@@ -31,6 +32,23 @@ from collegefootballfantasy_api.app.services.player_lock_service import as_utc, 
 
 FINAL_MATCHUP_STATUSES = {"final", "stat_corrected"}
 DELAYED_SCORE_STATUSES = {"delayed", "unavailable", "stale"}
+
+
+class LegacyScoringMutationDisabledError(RuntimeError):
+    """Raised when a deprecated mutable scoring writer is not authorized.
+
+    Live scoring is intentionally fail-closed outside explicit enabled mode.
+    Shadow mode derives immutable evidence through the live-scoring pipeline;
+    it must never mutate the public score, matchup, or standings tables.
+    """
+
+
+def require_legacy_scoring_mutation_authority() -> None:
+    """Allow legacy public score writes only after an explicit production enablement."""
+    if not settings.scoring_enabled:
+        raise LegacyScoringMutationDisabledError(
+            "legacy mutable scoring is disabled; use immutable shadow scoring evidence until SCORING_MODE=enabled"
+        )
 
 
 @dataclass(frozen=True)
@@ -494,6 +512,7 @@ def run_league_scoring_recalculation(
     week: int,
     provider: str = "manual",
 ) -> ScoringSummary:
+    require_legacy_scoring_mutation_authority()
     run = ScoringRun(
         league_id=league_id,
         season=season,

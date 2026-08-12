@@ -493,22 +493,52 @@ def process_one_scoring_work_item(db: Session, *, worker_id: str) -> ScoringWork
     if item is None:
         return None
     try:
-        if item.task_type != "score_revision":
+        if item.task_type == "score_revision":
+            revision_id = item.payload_json.get("revision_id")
+            league_id = item.payload_json.get("league_id")
+            if not isinstance(revision_id, int) or not isinstance(league_id, int):
+                raise LiveScoringContractError("score_revision requires integer revision_id and league_id")
+            revision = db.get(PlayerGameStatRevision, revision_id)
+            if revision is None:
+                raise LiveScoringContractError("score_revision references a missing stat revision")
+            league_settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league_id).one_or_none()
+            calculate_snapshot(
+                db,
+                league_id=league_id,
+                revision=revision,
+                scoring_rules=league_settings.scoring_json if league_settings else {},
+            )
+            # Build a separate immutable projection after the score snapshot is
+            # durable.  The task is idempotent per correction revision and
+            # never changes legacy public score/matchup/standing rows.
+            enqueue_work(
+                db,
+                task_type="rebuild_shadow_read_model",
+                idempotency_key=f"shadow-read-model:{league_id}:{revision.season}:{revision.week}:{revision.id}",
+                payload={"league_id": league_id, "season": revision.season, "week": revision.week},
+            )
+        elif item.task_type == "rebuild_shadow_read_model":
+            league_id = item.payload_json.get("league_id")
+            season = item.payload_json.get("season")
+            week = item.payload_json.get("week")
+            if not all(isinstance(value, int) for value in (league_id, season, week)):
+                raise LiveScoringContractError(
+                    "rebuild_shadow_read_model requires integer league_id, season, and week"
+                )
+            # Local import prevents a service-level circular dependency while
+            # keeping the worker's only effect confined to immutable shadow
+            # evidence.
+            from collegefootballfantasy_api.app.services.live_scoring_read_model_service import (
+                build_shadow_read_model,
+                persist_shadow_read_model,
+            )
+
+            persist_shadow_read_model(
+                db,
+                build_shadow_read_model(db, league_id=league_id, season=season, week=week),
+            )
+        else:
             raise LiveScoringContractError(f"unsupported scoring work item: {item.task_type}")
-        revision_id = item.payload_json.get("revision_id")
-        league_id = item.payload_json.get("league_id")
-        if not isinstance(revision_id, int) or not isinstance(league_id, int):
-            raise LiveScoringContractError("score_revision requires integer revision_id and league_id")
-        revision = db.get(PlayerGameStatRevision, revision_id)
-        if revision is None:
-            raise LiveScoringContractError("score_revision references a missing stat revision")
-        league_settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league_id).one_or_none()
-        calculate_snapshot(
-            db,
-            league_id=league_id,
-            revision=revision,
-            scoring_rules=league_settings.scoring_json if league_settings else {},
-        )
         complete_work_item(db, item, worker_id=worker_id)
         return item
     except Exception as exc:

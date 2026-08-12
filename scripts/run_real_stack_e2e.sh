@@ -87,7 +87,7 @@ runtime_contract='{
   email_enabled
 }'
 if ! jq -e --arg sha "$CFF_GIT_SHA" \
-  '.git_sha == $sha and .alembic_revision == "0091_live_scoring_hardening" and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' \
+  '.git_sha == $sha and .alembic_revision == "0092_shadow_scoring_read_models" and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' \
   <<<"$runtime_payload" >/dev/null; then
   echo "Real-stack runtime contract mismatch (safe fields only):" >&2
   jq "$runtime_contract" <<<"$runtime_payload" >&2

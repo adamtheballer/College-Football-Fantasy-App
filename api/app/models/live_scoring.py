@@ -120,6 +120,38 @@ class ScoringCalculationSnapshot(Base):
     calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class ShadowScoringReadModel(Base):
+    """Immutable, shadow-only projection of one league scoring window.
+
+    This table is deliberately separate from the mutable public score,
+    matchup, and standing read models.  A source hash identifies the exact
+    lineup locks and scoring snapshots used to derive the payload, so an
+    operator can compare a correction or replay without overwriting evidence.
+    """
+
+    __tablename__ = "shadow_scoring_read_models"
+    __table_args__ = (
+        UniqueConstraint(
+            "league_id",
+            "season",
+            "week",
+            "source_sha256",
+            name="uq_shadow_scoring_read_model_source",
+        ),
+        Index("ix_shadow_scoring_read_models_league_week", "league_id", "season", "week"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    league_id: Mapped[int] = mapped_column(ForeignKey("leagues.id", ondelete="CASCADE"), nullable=False)
+    season: Mapped[int] = mapped_column(Integer, nullable=False)
+    week: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    calculation_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False)
+    payload_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class LeagueScoringSnapshot(Base):
     """Immutable league-season scoring policy used for every calculated score."""
 
