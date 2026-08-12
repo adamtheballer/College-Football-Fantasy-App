@@ -7,9 +7,12 @@ from collegefootballfantasy_api.app.domain.scoring_rules import scoring_profile_
 
 OFFENSE_ALIASES = {
     "pass_yards": ["pass_yards", "PassingYards", "passing_yards", "PassYards", "PassingYardage"],
+    "pass_completions": ["pass_completions", "PassingCompletions", "passing_completions", "PassCompletions"],
+    "pass_attempts": ["pass_attempts", "PassingAttempts", "passing_attempts", "PassAttempts"],
     "pass_tds": ["pass_tds", "PassingTouchdowns", "PassingTD", "passing_tds", "PassTD"],
     "interceptions": ["interceptions", "passing_interceptions", "PassingInterceptions", "Interceptions"],
     "rush_yards": ["rush_yards", "RushingYards", "rushing_yards", "RushYards"],
+    "rush_attempts": ["rush_attempts", "RushingAttempts", "rushing_attempts", "RushAttempts"],
     "rush_tds": ["rush_tds", "RushingTouchdowns", "RushingTD", "rushing_tds", "RushTD"],
     "receptions": ["receptions", "Receptions", "ReceivingReceptions", "Rec"],
     "rec_yards": ["rec_yards", "ReceivingYards", "receiving_yards", "ReceivingYardage"],

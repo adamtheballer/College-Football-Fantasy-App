@@ -6,6 +6,12 @@ from collegefootballfantasy_api.app.api.deps import require_admin_user
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.scoring_admin_audit import ScoringAdminAudit
 from collegefootballfantasy_api.app.models.scoring_run import ScoringRun
+from collegefootballfantasy_api.app.models.live_scoring import (
+    PlayerGameStatRevision,
+    ProviderGamePollState,
+    ProviderPollingHealth,
+    ProviderRawEvent,
+)
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbeat
 from collegefootballfantasy_api.app.schemas.admin_scoring import (
@@ -31,6 +37,10 @@ from collegefootballfantasy_api.app.services.admin_scoring_service import (
     set_week_status,
 )
 from collegefootballfantasy_api.app.services.scoring_service import LegacyScoringMutationDisabledError
+from collegefootballfantasy_api.app.services.live_scoring_service import (
+    LiveScoringContractError,
+    queue_manual_espn_poll,
+)
 
 router = APIRouter()
 
@@ -90,6 +100,91 @@ def get_provider_health(
     current_user: User = Depends(require_admin_user),
 ) -> ProviderHealthResponse:
     return provider_health(db)
+
+
+@router.get("/espn-live/status")
+def get_espn_live_shadow_status(
+    season: int = Query(..., ge=2020),
+    week: int = Query(..., ge=1, le=20),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_user),
+) -> dict:
+    """Operator-only health/readiness view; raw provider payloads stay private."""
+    states = (
+        db.query(ProviderGamePollState)
+        .filter(
+            ProviderGamePollState.provider == "espn",
+            ProviderGamePollState.season == season,
+            ProviderGamePollState.week == week,
+        )
+        .order_by(ProviderGamePollState.provider_game_id.asc())
+        .all()
+    )
+    health = db.query(ProviderPollingHealth).filter(ProviderPollingHealth.provider == "espn").one_or_none()
+    raw_events = (
+        db.query(func.count(ProviderRawEvent.id))
+        .filter(ProviderRawEvent.provider == "espn", ProviderRawEvent.season == season, ProviderRawEvent.week == week)
+        .scalar()
+        or 0
+    )
+    revisions = (
+        db.query(func.count(PlayerGameStatRevision.id))
+        .filter(PlayerGameStatRevision.provider == "espn", PlayerGameStatRevision.season == season, PlayerGameStatRevision.week == week)
+        .scalar()
+        or 0
+    )
+    return {
+        "mode": "shadow_only",
+        "season": season,
+        "week": week,
+        "poll_states": [
+            {
+                "game_id": state.game_id,
+                "provider_game_id": state.provider_game_id,
+                "lifecycle_state": state.lifecycle_state,
+                "next_poll_at": state.next_poll_at,
+                "last_success_at": state.last_success_at,
+                "rate_limited_until": state.rate_limited_until,
+                "failure_count": state.failure_count,
+                "last_error_category": state.last_error_category,
+                "operator_status": state.operator_status,
+            }
+            for state in states
+        ],
+        "raw_event_count": raw_events,
+        "stat_revision_count": revisions,
+        "provider_health": None
+        if health is None
+        else {
+            "circuit_state": health.circuit_state,
+            "blocked_until": health.blocked_until,
+            "consecutive_failures": health.consecutive_failures,
+            "last_http_status": health.last_http_status,
+            "last_error_category": health.last_error_category,
+            "last_success_at": health.last_success_at,
+        },
+    }
+
+
+@router.post("/espn-live/poll/queue")
+def queue_espn_live_shadow_poll(
+    season: int = Query(..., ge=2020),
+    week: int = Query(..., ge=1, le=20),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_user),
+) -> dict:
+    """Ask the worker to retry existing active/final ESPN game rows.
+
+    This does not contact ESPN in the request thread, create game mappings, or
+    publish scores. A 30-second cooldown prevents a manual-click retry loop.
+    """
+    try:
+        queued = queue_manual_espn_poll(db, season=season, week=week)
+        db.commit()
+    except LiveScoringContractError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return {"mode": "shadow_only", "season": season, "week": week, "queued": queued}
 
 
 @router.post("/rerun", response_model=AdminActionResponse)

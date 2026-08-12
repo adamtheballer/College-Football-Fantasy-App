@@ -63,6 +63,52 @@ class ProviderRawEvent(Base):
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class ProviderGamePollState(TimestampMixin, Base):
+    """Durable per-game polling state; one ESPN request is shared globally."""
+
+    __tablename__ = "provider_game_poll_states"
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_game_id", name="uq_provider_game_poll_state"),
+        Index("ix_provider_game_poll_states_due", "provider", "next_poll_at"),
+        Index("ix_provider_game_poll_states_game", "game_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    provider_game_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    game_id: Mapped[int] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
+    season: Mapped[int] = mapped_column(Integer, nullable=False)
+    week: Mapped[int] = mapped_column(Integer, nullable=False)
+    lifecycle_state: Mapped[str] = mapped_column(String(30), nullable=False, default="scheduled")
+    final_fetch_stage: Mapped[str] = mapped_column(String(30), nullable=False, default="normal")
+    next_poll_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_scoreboard_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_polled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rate_limited_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failure_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error_category: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    last_error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    operator_status: Mapped[str] = mapped_column(String(30), nullable=False, default="healthy")
+
+
+class ProviderPollingHealth(TimestampMixin, Base):
+    """Provider-wide circuit-breaker evidence, not a hidden retry loop."""
+
+    __tablename__ = "provider_polling_health"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    circuit_state: Mapped[str] = mapped_column(String(30), nullable=False, default="closed")
+    consecutive_failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    blocked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_error_category: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    last_error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_failure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class PlayerGameStatRevision(Base):
     __tablename__ = "player_game_stat_revisions"
     __table_args__ = (

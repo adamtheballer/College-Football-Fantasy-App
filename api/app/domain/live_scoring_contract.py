@@ -80,6 +80,12 @@ def validate_lifecycle_transition(current: str | None, proposed: str) -> None:
     aliases = {"live": IN_PROGRESS, "final": FINAL_VERIFIED}
     normalized_current = aliases.get(current or "", current)
     normalized_proposed = aliases.get(proposed, proposed)
+    # ESPN summary responses are cumulative snapshots.  A game can therefore
+    # remain in the same provider lifecycle while a later payload corrects a
+    # player's current totals.  Those responses must create a new immutable
+    # revision rather than being rejected as an impossible transition.
+    if normalized_current == normalized_proposed:
+        return
     if normalized_current is not None and normalized_proposed not in VALID_LIFECYCLE_TRANSITIONS.get(normalized_current, set()):
         raise LiveScoringContractError(f"invalid game lifecycle transition: {current} -> {proposed}")
 
