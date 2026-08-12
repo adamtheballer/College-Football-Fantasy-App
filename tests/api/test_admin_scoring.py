@@ -8,6 +8,7 @@ from collegefootballfantasy_api.app.models.provider_sync_state import ProviderSy
 from collegefootballfantasy_api.app.models.scoring_admin_audit import ScoringAdminAudit
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.user import User
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.services.scoring_service import recalculate_league_week_scores
 from tests.api.scoring_helpers import create_scoring_fixture
 
@@ -83,7 +84,8 @@ def test_non_admin_cannot_access_admin_scoring_routes(client):
         assert response.json()["detail"] == "admin only"
 
 
-def test_admin_can_view_provider_health_and_failed_runs(client, db_session):
+def test_admin_can_view_provider_health_and_failed_runs(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "scoring_mode", "enabled")
     token, _user_id = create_user_and_token(client, "health", admin=True)
     db_session.add(
         ProviderSyncState(
@@ -118,7 +120,8 @@ def test_admin_can_view_provider_health_and_failed_runs(client, db_session):
     assert failed_audit.reason == "force a failed run"
 
 
-def test_admin_preview_and_apply_stat_correction_recalculates_and_audits(client, db_session):
+def test_admin_preview_and_apply_stat_correction_recalculates_and_audits(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "scoring_mode", "enabled")
     token, admin_user_id = create_user_and_token(client, "correction", admin=True)
     league, home, _away, players, _matchup = create_scoring_fixture(db_session)
     recalculate_league_week_scores(db_session, league.id, 2026, 1)
@@ -161,7 +164,8 @@ def test_admin_preview_and_apply_stat_correction_recalculates_and_audits(client,
     assert history_response.json()[0]["id"] == audit.id
 
 
-def test_stat_correction_can_flip_a_finalized_matchup_and_standings(client, db_session):
+def test_stat_correction_can_flip_a_finalized_matchup_and_standings(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "scoring_mode", "enabled")
     token, _admin_user_id = create_user_and_token(client, "correction-flip", admin=True)
     league, home, away, players, matchup = create_scoring_fixture(db_session)
 
@@ -198,7 +202,8 @@ def test_stat_correction_can_flip_a_finalized_matchup_and_standings(client, db_s
     assert (corrected_away.wins, corrected_away.losses) == (1, 0)
 
 
-def test_admin_can_reconcile_finalize_and_reopen_week(client, db_session):
+def test_admin_can_reconcile_finalize_and_reopen_week(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "scoring_mode", "enabled")
     token, _admin_user_id = create_user_and_token(client, "week", admin=True)
     league, _home, _away, _players, matchup = create_scoring_fixture(db_session)
 
@@ -230,3 +235,56 @@ def test_admin_can_reconcile_finalize_and_reopen_week(client, db_session):
     assert refreshed_matchup.status == "live"
     actions = {row.action for row in db_session.query(ScoringAdminAudit).all()}
     assert {"reconcile_league_week", "final_week", "live_week"}.issubset(actions)
+
+
+def test_admin_mutable_scoring_routes_fail_closed_when_scoring_is_disabled(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "scoring_mode", "disabled")
+    token, _admin_user_id = create_user_and_token(client, "disabled", admin=True)
+    league, _home, _away, players, matchup = create_scoring_fixture(db_session)
+    db_session.commit()
+
+    baseline_status = matchup.status
+    baseline_stats = dict(
+        db_session.query(PlayerStat)
+        .filter_by(player_id=players["qb"].id, season=2026, week=1)
+        .one()
+        .stats
+    )
+
+    responses = [
+        client.post(
+            "/admin/scoring/rerun",
+            json={"league_id": league.id, "season": 2026, "week": 1, "reason": "must stay shadow-only"},
+            headers=auth_headers(token),
+        ),
+        client.post(
+            "/admin/scoring/corrections/apply",
+            json={
+                "player_id": players["qb"].id,
+                "season": 2026,
+                "week": 1,
+                "stats": {"PassingYards": 999},
+                "reason": "must stay shadow-only",
+            },
+            headers=auth_headers(token),
+        ),
+        client.post(
+            "/admin/scoring/weeks/finalize",
+            json={"league_id": league.id, "season": 2026, "week": 1, "reason": "must stay shadow-only"},
+            headers=auth_headers(token),
+        ),
+    ]
+
+    for response in responses:
+        assert response.status_code == 409
+        assert "legacy mutable scoring is disabled" in response.json()["detail"]
+
+    db_session.expire_all()
+    assert db_session.get(Matchup, matchup.id).status == baseline_status
+    assert (
+        db_session.query(PlayerStat)
+        .filter_by(player_id=players["qb"].id, season=2026, week=1)
+        .one()
+        .stats
+        == baseline_stats
+    )

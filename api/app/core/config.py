@@ -52,7 +52,10 @@ class Settings(BaseSettings):
     # Public beta can run all non-scoring workflows without a live provider.
     # Keep this explicit rather than inferring it from whether a key happened
     # to be configured, so a later credential change cannot start polling.
-    scoring_mode: Literal["enabled", "disabled"] = "enabled"
+    # A deployment must opt in to public score promotion.  ``shadow`` accepts
+    # reviewed work into immutable calculation snapshots but never updates
+    # public matchup/standing read models.
+    scoring_mode: Literal["enabled", "shadow", "disabled"] = "disabled"
     scoring_provider: str = "sportsdata"
     scoring_allow_unofficial_providers: bool = False
     scoring_worker_interval_live_seconds: int = 60
@@ -210,6 +213,10 @@ class Settings(BaseSettings):
     @property
     def scoring_enabled(self) -> bool:
         return self.scoring_mode == "enabled"
+
+    @property
+    def scoring_shadow_enabled(self) -> bool:
+        return self.scoring_mode == "shadow"
 
     @property
     def scoring_worker_expected(self) -> bool:

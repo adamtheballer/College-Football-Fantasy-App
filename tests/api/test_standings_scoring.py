@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from conftest import TestingSessionLocal
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.standing import Standing
@@ -45,7 +46,8 @@ def signup_verified_user(client, suffix: str) -> tuple[int, str]:
     return user_id, response.json()["access_token"]
 
 
-def test_recalculate_endpoint_requires_commissioner(client, db_session):
+def test_recalculate_endpoint_requires_commissioner(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "scoring_mode", "enabled")
     commissioner_id, commissioner_token = signup_verified_user(client, "commissioner")
     manager_id, manager_token = signup_verified_user(client, "manager")
     league, _home, _away, _players, _matchup = create_scoring_fixture(db_session)

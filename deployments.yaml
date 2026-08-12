@@ -156,7 +156,10 @@ environments:
       scoring_processor:
         enabled: false
         command: PYTHONPATH=. uv run python scripts/run_scoring_worker.py --season ${SCORING_SEASON} --week ${SCORING_WEEK} --mode live
-        note: Omitted for public beta. Enable only with SCORING_MODE=enabled and an approved provider credential.
+        note: >-
+          Omitted for public beta. This processor consumes only verified,
+          durable scoring work items; it never polls a provider. Enable only
+          after shadow reconciliation and an approved provider adapter.
       lifecycle_processor:
         enabled: true
         command: PYTHONPATH=. uv run python scripts/run_lifecycle_worker.py

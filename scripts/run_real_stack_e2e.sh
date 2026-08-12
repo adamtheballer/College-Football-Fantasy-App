@@ -78,7 +78,21 @@ done
 ready_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/ready")"
 runtime_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/runtime")"
 jq -e '.status == "ready"' <<<"$ready_payload" >/dev/null
-jq -e --arg sha "$CFF_GIT_SHA" '.git_sha == $sha and .alembic_revision == "0090_expand_league_icon_url" and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' <<<"$runtime_payload" >/dev/null
+runtime_contract='{
+  git_sha,
+  alembic_revision,
+  scoring_mode,
+  sportsdata_enabled,
+  provider_polling_expected,
+  email_enabled
+}'
+if ! jq -e --arg sha "$CFF_GIT_SHA" \
+  '.git_sha == $sha and .alembic_revision == "0092_shadow_scoring_read_models" and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' \
+  <<<"$runtime_payload" >/dev/null; then
+  echo "Real-stack runtime contract mismatch (safe fields only):" >&2
+  jq "$runtime_contract" <<<"$runtime_payload" >&2
+  exit 1
+fi
 curl --fail --show-error --silent --head "${web_origin}" >/dev/null
 
 # This command runs only after Compose created a fresh disposable database.

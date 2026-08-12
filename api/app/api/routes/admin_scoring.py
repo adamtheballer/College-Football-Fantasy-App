@@ -30,8 +30,13 @@ from collegefootballfantasy_api.app.services.admin_scoring_service import (
     rerun_scoring,
     set_week_status,
 )
+from collegefootballfantasy_api.app.services.scoring_service import LegacyScoringMutationDisabledError
 
 router = APIRouter()
+
+
+def _raise_scoring_mutation_error(exc: LegacyScoringMutationDisabledError) -> None:
+    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 @router.get("/workers")
@@ -99,6 +104,8 @@ def rerun_scoring_endpoint(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LegacyScoringMutationDisabledError as exc:
+        _raise_scoring_mutation_error(exc)
 
 
 @router.post("/corrections/preview", response_model=CorrectionPreviewResponse)
@@ -123,6 +130,8 @@ def apply_correction_endpoint(
         return apply_stat_correction(db, payload, current_user)
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LegacyScoringMutationDisabledError as exc:
+        _raise_scoring_mutation_error(exc)
 
 
 @router.get("/corrections", response_model=list[AdminScoringAuditRead])
@@ -161,6 +170,8 @@ def reconcile_player_week_endpoint(
         )
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LegacyScoringMutationDisabledError as exc:
+        _raise_scoring_mutation_error(exc)
 
 
 @router.post("/reconcile/league-week", response_model=AdminActionResponse)
@@ -180,6 +191,8 @@ def reconcile_league_week_endpoint(
         )
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LegacyScoringMutationDisabledError as exc:
+        _raise_scoring_mutation_error(exc)
 
 
 @router.post("/weeks/finalize", response_model=AdminActionResponse)
@@ -200,6 +213,8 @@ def finalize_week_endpoint(
         )
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LegacyScoringMutationDisabledError as exc:
+        _raise_scoring_mutation_error(exc)
 
 
 @router.post("/weeks/reopen", response_model=AdminActionResponse)
@@ -220,3 +235,5 @@ def reopen_week_endpoint(
         )
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LegacyScoringMutationDisabledError as exc:
+        _raise_scoring_mutation_error(exc)
