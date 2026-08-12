@@ -28,6 +28,7 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     league_member,
     league_settings,
     lineup_week_snapshot,
+    live_scoring,
     matchup,
     mock_draft,
     mock_draft_pick,
