@@ -285,6 +285,7 @@ def test_production_allows_scoring_disabled_without_sportsdata_credentials():
     required = production_required_settings()
     required.pop("sportsdata_api_key")
     required["sportsdata_enabled"] = False
+    required["scoring_mode"] = "disabled"
 
     settings = make_settings(
         environment="production",
@@ -292,7 +293,6 @@ def test_production_allows_scoring_disabled_without_sportsdata_credentials():
         cors_origins="https://app.example.com",
         cors_origin_regex=None,
         refresh_cookie_secure=True,
-        scoring_mode="disabled",
         **required,
     )
 
@@ -302,6 +302,9 @@ def test_production_allows_scoring_disabled_without_sportsdata_credentials():
 
 
 def test_production_rejects_provider_enablement_when_scoring_is_disabled():
+    required = production_required_settings()
+    required["scoring_mode"] = "disabled"
+
     with pytest.raises(ValidationError, match="SPORTSDATA_ENABLED must be false"):
         make_settings(
             environment="production",
@@ -309,8 +312,7 @@ def test_production_rejects_provider_enablement_when_scoring_is_disabled():
             cors_origins="https://app.example.com",
             cors_origin_regex=None,
             refresh_cookie_secure=True,
-            scoring_mode="disabled",
-            **production_required_settings(),
+            **required,
         )
 
 
