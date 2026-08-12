@@ -24,8 +24,8 @@ def upgrade() -> None:
         sa.Column("verification_status", sa.String(length=30), nullable=False, server_default="unverified"),
         sa.Column("verified_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("source_metadata", sa.JSON(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.UniqueConstraint("provider", "provider_game_id", name="uq_provider_game_identity"),
         sa.UniqueConstraint("game_id", "provider", name="uq_game_provider_identity"),
     )
@@ -108,7 +108,7 @@ def upgrade() -> None:
         sa.Column("max_attempts", sa.Integer(), nullable=False, server_default="3"), sa.Column("lease_owner", sa.String(length=120), nullable=True),
         sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True), sa.Column("next_attempt_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_error_category", sa.String(length=80), nullable=True), sa.Column("last_error_message", sa.Text(), nullable=True),
-        sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True), sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()), sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+        sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True), sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()), sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.UniqueConstraint("idempotency_key", name="uq_scoring_work_item_idempotency"),
     )
     op.create_index("ix_scoring_work_items_ready", "scoring_work_items", ["status", "next_attempt_at"])
