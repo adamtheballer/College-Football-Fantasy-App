@@ -30,6 +30,7 @@ from collegefootballfantasy_api.app.services.live_scoring_service import (
     ensure_relevant_espn_poll_states,
     ingest_espn_game_summary,
     record_espn_poll_failure,
+    scoreboard_refresh_due,
 )
 from tests.api.test_admin_scoring import auth_headers, create_user_and_token
 from tests.api.scoring_helpers import create_scoring_fixture
@@ -244,6 +245,22 @@ def test_polling_circuit_breaker_prevents_aggressive_retries(client, db_session)
     record_espn_poll_failure(db_session, state_id=state.id, category="PROVIDER_BLOCKED", message="blocked", status_code=403)
     assert state.next_poll_at is None
     assert state.operator_status == "provider_blocked"
+
+
+def test_scoreboard_refreshes_every_four_minutes_during_a_live_window(client, db_session, monkeypatch):
+    _league, _qb, _game = _espn_identity_ready(db_session)
+    ensure_relevant_espn_poll_states(db_session, season=2026, week=1)
+    state = db_session.query(ProviderGamePollState).one()
+    now = datetime(2026, 8, 29, 18, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(settings, "espn_live_scoring_scoreboard_interval_seconds", 240)
+
+    state.last_scoreboard_at = now - timedelta(seconds=239)
+    db_session.commit()
+    assert scoreboard_refresh_due(db_session, season=2026, week=1, now=now) is False
+
+    state.last_scoreboard_at = now - timedelta(seconds=240)
+    db_session.commit()
+    assert scoreboard_refresh_due(db_session, season=2026, week=1, now=now) is True
 
 
 class _PollingAdapter:

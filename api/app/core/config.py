@@ -73,8 +73,12 @@ class Settings(BaseSettings):
     espn_live_scoring_enabled: bool = False
     espn_live_scoring_base_url: str = "https://site.api.espn.com/apis/site/v2/sports/football/college-football"
     espn_live_scoring_timeout_seconds: int = 10
-    espn_live_scoring_scoreboard_interval_seconds: int = 600
-    espn_live_scoring_active_poll_interval_seconds: int = 180
+    # During an operator-scheduled live game window (Friday through Sunday as
+    # applicable), ESPN scoreboard and detail snapshots refresh at most once
+    # every four minutes.  The feature remains shadow-only until separately
+    # promoted, so this default cannot change public beta scores on its own.
+    espn_live_scoring_scoreboard_interval_seconds: int = 240
+    espn_live_scoring_active_poll_interval_seconds: int = 240
     espn_live_scoring_worker_interval_seconds: int = 30
     espn_live_scoring_postgame_first_delay_seconds: int = 600
     espn_live_scoring_postgame_second_delay_seconds: int = 7200

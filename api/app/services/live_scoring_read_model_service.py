@@ -24,14 +24,18 @@ from collegefootballfantasy_api.app.domain.live_scoring_contract import (
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.live_scoring import (
     PlayerGameStatRevision,
+    ProviderRawEvent,
     ScoringCalculationSnapshot,
     ShadowScoringReadModel,
 )
 from collegefootballfantasy_api.app.models.matchup import Matchup
+from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
+from collegefootballfantasy_api.app.services.live_projection_service import live_projected_points
+from collegefootballfantasy_api.app.services.matchup_probability import calculate_matchup_win_probability
 from collegefootballfantasy_api.app.services.live_scoring_service import canonical_json, sha256, utcnow
 
 
-SHADOW_READ_MODEL_VERSION = "shadow_read_model_v1"
+SHADOW_READ_MODEL_VERSION = "shadow_read_model_v2"
 
 
 class ShadowReadModelError(ValueError):
@@ -75,8 +79,9 @@ def _latest_shadow_scores(
     one based on insertion time.
     """
     rows = (
-        db.query(ScoringCalculationSnapshot, PlayerGameStatRevision)
+        db.query(ScoringCalculationSnapshot, PlayerGameStatRevision, ProviderRawEvent)
         .join(PlayerGameStatRevision, PlayerGameStatRevision.id == ScoringCalculationSnapshot.stat_revision_id)
+        .join(ProviderRawEvent, ProviderRawEvent.id == PlayerGameStatRevision.raw_event_id)
         .filter(
             ScoringCalculationSnapshot.league_id == league_id,
             ScoringCalculationSnapshot.season == season,
@@ -95,9 +100,9 @@ def _latest_shadow_scores(
         .all()
     )
 
-    by_player_game: dict[tuple[int, int], list[tuple[ScoringCalculationSnapshot, PlayerGameStatRevision]]] = {}
-    for snapshot, revision in rows:
-        by_player_game.setdefault((revision.player_id, revision.game_id), []).append((snapshot, revision))
+    by_player_game: dict[tuple[int, int], list[tuple[ScoringCalculationSnapshot, PlayerGameStatRevision, ProviderRawEvent]]] = {}
+    for snapshot, revision, raw_event in rows:
+        by_player_game.setdefault((revision.player_id, revision.game_id), []).append((snapshot, revision, raw_event))
 
     selected: dict[int, dict[str, Any]] = {}
     blockers: list[dict[str, Any]] = []
@@ -105,9 +110,9 @@ def _latest_shadow_scores(
     for (player_id, game_id), candidates in sorted(by_player_game.items()):
         if player_id in conflicted_player_ids:
             continue
-        highest_revision = max(revision.revision_number for _snapshot, revision in candidates)
-        newest = [(snapshot, revision) for snapshot, revision in candidates if revision.revision_number == highest_revision]
-        policy_hashes = {snapshot.scoring_policy_hash for snapshot, _revision in newest}
+        highest_revision = max(revision.revision_number for _snapshot, revision, _event in candidates)
+        newest = [(snapshot, revision, event) for snapshot, revision, event in candidates if revision.revision_number == highest_revision]
+        policy_hashes = {snapshot.scoring_policy_hash for snapshot, _revision, _event in newest}
         if len(policy_hashes) != 1:
             blockers.append(
                 {
@@ -120,7 +125,7 @@ def _latest_shadow_scores(
             continue
         # Immutable snapshot IDs only break ties for duplicate evidence with the
         # same exact policy; the calculated points must still agree.
-        scores = {snapshot.score for snapshot, _revision in newest}
+        scores = {snapshot.score for snapshot, _revision, _event in newest}
         if len(scores) != 1:
             blockers.append(
                 {
@@ -131,7 +136,7 @@ def _latest_shadow_scores(
                 }
             )
             continue
-        snapshot, revision = newest[0]
+        snapshot, revision, raw_event = newest[0]
         current = selected.get(player_id)
         if current is not None:
             blockers.append(
@@ -154,6 +159,7 @@ def _latest_shadow_scores(
             "score": snapshot.score,
             "scoring_policy_hash": snapshot.scoring_policy_hash,
             "scorer_version": snapshot.scorer_version,
+            "provider_payload": raw_event.payload_json,
         }
     return selected, blockers
 
@@ -196,6 +202,17 @@ def build_shadow_read_model(
     blocked_player_ids = {
         blocker["player_id"] for blocker in source_blockers if isinstance(blocker.get("player_id"), int)
     }
+    player_ids = {lineup.player_id for lineup in lineups}
+    published_projections = {
+        row.player_id: row
+        for row in db.scalars(
+            current_published_projections_query(
+                season=season,
+                week=week,
+                player_ids=player_ids,
+            )
+        ).all()
+    }
 
     team_ids = {lineup.team_id for lineup in lineups}
     for matchup in matchups:
@@ -205,6 +222,9 @@ def build_shadow_read_model(
             "team_id": team_id,
             "starter_points": 0.0,
             "bench_points": 0.0,
+            "starter_live_projection": 0.0,
+            "bench_live_projection": 0.0,
+            "starter_pre_game_projection": 0.0,
             "lineup": [],
             "missing_player_ids": [],
             "lifecycle_states": set(),
@@ -214,38 +234,66 @@ def build_shadow_read_model(
     }
 
     source_lineage: list[dict[str, Any]] = []
+    projection_lineage: list[dict[str, Any]] = []
     for lineup in lineups:
         team = teams[lineup.team_id]
         scoring = scores_by_player.get(lineup.player_id)
-        unavailable = scoring is None or lineup.player_id in blocked_player_ids
+        projection = published_projections.get(lineup.player_id)
+        pre_game_projection = float(projection.fantasy_points) if projection is not None else None
+        if projection is not None:
+            projection_lineage.append(
+                {
+                    "player_id": lineup.player_id,
+                    "projection_id": projection.id,
+                    "projection_version": projection.projection_version,
+                    "fantasy_points": pre_game_projection,
+                    "updated_at": projection.updated_at.isoformat(),
+                }
+            )
+        unavailable = lineup.player_id in blocked_player_ids or (scoring is None and pre_game_projection is None)
+        actual_points = None if scoring is None else float(scoring["score"])
+        live_projection, projection_source, game_progress = live_projected_points(
+            pre_game_projection=pre_game_projection,
+            actual_points=actual_points,
+            lifecycle_state=None if scoring is None else scoring["lifecycle_state"],
+            provider_payload=None if scoring is None else scoring["provider_payload"],
+        )
         line: dict[str, Any] = {
             "player_id": lineup.player_id,
             "slot": lineup.slot,
             "is_starter": lineup.is_starter,
             "game_start_at": lineup.game_start_at.isoformat() if lineup.game_start_at else None,
             "locked_at": lineup.locked_at.isoformat() if lineup.locked_at else None,
-            "score": None if unavailable else scoring["score"],
+            "score": None if unavailable else actual_points,
+            "pre_game_projection_points": pre_game_projection,
+            "live_projection_points": None if unavailable else round(live_projection, 2) if live_projection is not None else None,
+            "projection_source": projection_source,
+            "game_progress": round(game_progress, 4),
             "availability": "unavailable" if unavailable else "available",
         }
         if unavailable:
             team["missing_player_ids"].append(lineup.player_id)
             team["ambiguous"] = team["ambiguous"] or lineup.player_id in blocked_player_ids
         else:
-            team["lifecycle_states"].add(scoring["lifecycle_state"])
+            if scoring is not None:
+                team["lifecycle_states"].add(scoring["lifecycle_state"])
             if lineup.is_starter:
-                team["starter_points"] += scoring["score"]
+                team["starter_points"] += actual_points or 0.0
+                team["starter_pre_game_projection"] += pre_game_projection or 0.0
+                team["starter_live_projection"] += live_projection or 0.0
             else:
-                team["bench_points"] += scoring["score"]
+                team["bench_points"] += actual_points or 0.0
+                team["bench_live_projection"] += live_projection or 0.0
             line.update(
                 {
-                    "game_id": scoring["game_id"],
-                    "stat_revision_id": scoring["stat_revision_id"],
-                    "revision_number": scoring["revision_number"],
-                    "lifecycle_state": scoring["lifecycle_state"],
+                    "game_id": None if scoring is None else scoring["game_id"],
+                    "stat_revision_id": None if scoring is None else scoring["stat_revision_id"],
+                    "revision_number": None if scoring is None else scoring["revision_number"],
+                    "lifecycle_state": None if scoring is None else scoring["lifecycle_state"],
                 }
             )
-            source_lineage.append(
-                {
+            if scoring is not None:
+                source_lineage.append({
                     "player_id": lineup.player_id,
                     "game_id": scoring["game_id"],
                     "stat_revision_id": scoring["stat_revision_id"],
@@ -254,8 +302,8 @@ def build_shadow_read_model(
                     "score": scoring["score"],
                     "scoring_policy_hash": scoring["scoring_policy_hash"],
                     "scorer_version": scoring["scorer_version"],
-                }
-            )
+                    "pre_game_projection_points": pre_game_projection,
+                })
         team["lineup"].append(line)
 
     team_payloads: list[dict[str, Any]] = []
@@ -273,6 +321,9 @@ def build_shadow_read_model(
                 "team_id": team_id,
                 "starter_points": round(team["starter_points"], 2),
                 "bench_points": round(team["bench_points"], 2),
+                "starter_pre_game_projection": round(team["starter_pre_game_projection"], 2),
+                "starter_live_projection": round(team["starter_live_projection"], 2),
+                "bench_live_projection": round(team["bench_live_projection"], 2),
                 "status": status,
                 "missing_player_ids": sorted(team["missing_player_ids"]),
                 "lineup": team["lineup"],
@@ -286,6 +337,16 @@ def build_shadow_read_model(
         away = teams_by_id[matchup.away_team_id]
         statuses = {home["status"], away["status"]}
         status = "final" if statuses == {"final"} else "unavailable" if "unavailable" in statuses else "provisional"
+        probability = None
+        if "unavailable" not in statuses:
+            calculated_probability = calculate_matchup_win_probability(
+                home["starter_live_projection"], away["starter_live_projection"]
+            )
+            if calculated_probability is not None:
+                probability = {
+                    "home": calculated_probability[0],
+                    "away": calculated_probability[1],
+                }
         matchup_payloads.append(
             {
                 "matchup_id": matchup.id,
@@ -293,6 +354,9 @@ def build_shadow_read_model(
                 "away_team_id": matchup.away_team_id,
                 "home_starter_points": home["starter_points"],
                 "away_starter_points": away["starter_points"],
+                "home_live_projection": home["starter_live_projection"],
+                "away_live_projection": away["starter_live_projection"],
+                "win_probability": probability,
                 "status": status,
             }
         )
@@ -314,6 +378,7 @@ def build_shadow_read_model(
             for line in lineups
         ],
         "source_lineage": sorted(source_lineage, key=canonical_json),
+        "published_projection_inputs": sorted(projection_lineage, key=canonical_json),
         "source_blockers": sorted(source_blockers, key=canonical_json),
         "matchups": [
             {"matchup_id": row.id, "home_team_id": row.home_team_id, "away_team_id": row.away_team_id}
