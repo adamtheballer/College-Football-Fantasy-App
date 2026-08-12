@@ -18,6 +18,7 @@ from collegefootballfantasy_api.app.models.live_scoring import (
     ScoringCorrectionLedger,
     ScoringDeadLetter,
     ScoringWorkItem,
+    ShadowScoringReadModel,
 )
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.services.live_scoring_service import (
@@ -209,6 +210,11 @@ def test_queue_processor_creates_a_shadow_snapshot_without_provider_network(clie
     assert processed is not None and processed.status == "succeeded"
     snapshot = db_session.query(ScoringCalculationSnapshot).one()
     assert snapshot.publish_state == "shadow"
+    # The next durable task creates an immutable league read model.  It is
+    # deliberately distinct from any public scoring table.
+    projected = process_one_scoring_work_item(db_session, worker_id="worker-a")
+    assert projected is not None and projected.status == "succeeded"
+    assert db_session.query(ShadowScoringReadModel).count() == 1
 
 
 def test_scoring_policy_snapshot_is_immutable_per_league_and_season(client, db_session, monkeypatch):
