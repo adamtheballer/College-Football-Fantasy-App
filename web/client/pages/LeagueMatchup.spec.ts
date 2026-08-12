@@ -13,8 +13,12 @@ vi.mock("react-router-dom", () => ({
 }));
 
 vi.mock("@/components/league/LeagueTabs", () => ({ LeagueTabs: () => null }));
-vi.mock("@/components/league/SideBySideMatchup", () => ({ SideBySideMatchup: () => null }));
-vi.mock("@/components/league/WeekSelector", () => ({ WeekSelector: () => null }));
+vi.mock("@/components/league/SideBySideMatchup", () => ({
+  SideBySideMatchup: () => null,
+}));
+vi.mock("@/components/league/WeekSelector", () => ({
+  WeekSelector: () => null,
+}));
 vi.mock("@/components/league/WinChanceMeter", () => ({
   WinChanceMeter: () => null,
   WinChanceBar: () => null,
@@ -31,8 +35,22 @@ vi.mock("@/hooks/use-leagues", () => ({
       matchup_id: 1,
       week: 1,
       status: "projected",
-      my_team: { fantasy_team_id: 10, fantasy_team_name: "My Team", record: "0-0-0", projected_total: 111.2, win_probability: 54, roster: [] },
-      opponent_team: { fantasy_team_id: 11, fantasy_team_name: "My Opponent", record: "0-0-0", projected_total: 106.4, win_probability: 46, roster: [] },
+      my_team: {
+        fantasy_team_id: 10,
+        fantasy_team_name: "My Team",
+        record: "0-0-0",
+        projected_total: 111.2,
+        win_probability: 54,
+        roster: [],
+      },
+      opponent_team: {
+        fantasy_team_id: 11,
+        fantasy_team_name: "My Opponent",
+        record: "0-0-0",
+        projected_total: 106.4,
+        win_probability: 46,
+        roster: [],
+      },
     },
     isLoading: false,
     isError: false,
@@ -41,8 +59,24 @@ vi.mock("@/hooks/use-leagues", () => ({
   useLeagueScoreboard: () => ({
     data: {
       data: [
-        { matchup_id: 1, week: 1, status: "projected", home_team_name: "My Team", away_team_name: "My Opponent", home_score: 111.2, away_score: 106.4 },
-        { matchup_id: 2, week: 1, status: "projected", home_team_name: "League Mate One", away_team_name: "League Mate Two", home_score: 103.1, away_score: 100.8 },
+        {
+          matchup_id: 1,
+          week: 1,
+          status: "projected",
+          home_team_name: "My Team",
+          away_team_name: "My Opponent",
+          home_score: 111.2,
+          away_score: 106.4,
+        },
+        {
+          matchup_id: 2,
+          week: 1,
+          status: "projected",
+          home_team_name: "League Mate One",
+          away_team_name: "League Mate Two",
+          home_score: 103.1,
+          away_score: 100.8,
+        },
       ],
     },
     isLoading: false,
@@ -100,13 +134,17 @@ describe("league matchup scoreboard", () => {
     render(createElement(LeagueMatchup));
 
     expect(screen.getByText("Week 1 Matchup")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "My Team vs My Opponent" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "My Team vs My Opponent" }),
+    ).toBeTruthy();
     expect(screen.getByText("Preweek baseline")).toBeTruthy();
     expect(screen.getByText("111.2")).toBeTruthy();
     expect(screen.getByText("106.4")).toBeTruthy();
     expect(screen.getAllByText("54.0%")).toHaveLength(1);
     expect(screen.getAllByText("46.0%")).toHaveLength(1);
-    expect(screen.getByText("Win chance from weekly lineup totals")).toBeTruthy();
+    expect(
+      screen.getByText("Win chance from weekly lineup totals"),
+    ).toBeTruthy();
   });
 
   it("lets a member load another same-league matchup through the canonical detail query", () => {
@@ -114,13 +152,20 @@ describe("league matchup scoreboard", () => {
 
     const selector = screen.getByRole("combobox", { name: "League matchup" });
     expect(selector).toBeTruthy();
-    expect(screen.getByRole("option", { name: "My Team vs My Opponent" })).toBeTruthy();
-    expect(screen.getByRole("option", { name: "League Mate One vs League Mate Two" })).toBeTruthy();
+    expect(
+      screen.getByRole("option", { name: "My Team vs My Opponent" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("option", {
+        name: "League Mate One vs League Mate Two",
+      }),
+    ).toBeTruthy();
 
     fireEvent.change(selector, { target: { value: "2" } });
 
     expect(routerMocks.setSearchParams).toHaveBeenCalledTimes(1);
-    const nextParams = routerMocks.setSearchParams.mock.calls[0][0] as URLSearchParams;
+    const nextParams = routerMocks.setSearchParams.mock
+      .calls[0][0] as URLSearchParams;
     expect(nextParams.toString()).toBe("week=1&matchup=2");
   });
 });

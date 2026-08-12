@@ -4,9 +4,11 @@ import { formatDateTime, formatTradeAssets } from "./LeagueSettings";
 
 describe("league settings trade history helpers", () => {
   it("renders complete trade asset details and preserves an empty-side fallback", () => {
-    expect(formatTradeAssets([{ name: "Arch Manning", position: "QB", school: "Texas" }])).toEqual([
-      "Arch Manning · QB · Texas",
-    ]);
+    expect(
+      formatTradeAssets([
+        { name: "Arch Manning", position: "QB", school: "Texas" },
+      ]),
+    ).toEqual(["Arch Manning · QB · Texas"]);
     expect(formatTradeAssets([])).toEqual(["No players listed"]);
   });
 

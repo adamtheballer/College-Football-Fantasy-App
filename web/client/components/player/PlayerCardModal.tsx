@@ -1,20 +1,46 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, AlertTriangle, BarChart3, CalendarDays, History, Info, Loader2 } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  CalendarDays,
+  History,
+  Info,
+  Loader2,
+} from "lucide-react";
 
-import { useLeaguePlayerHistory, usePlayerGameLog, usePlayerTradeValues, usePlayerTrajectory, type PlayerCardResponse } from "@/hooks/use-players";
+import {
+  useLeaguePlayerHistory,
+  usePlayerGameLog,
+  usePlayerTradeValues,
+  usePlayerTrajectory,
+  type PlayerCardResponse,
+} from "@/hooks/use-players";
 import {
   getHistoricalStatColumnsForPosition,
   historicalStatValuesForSeason,
   historicalStatsTablePosition,
 } from "@/lib/historicalStatColumns";
-import { buildProjectedStats, formatStat, statRowsForPosition, statValue } from "@/lib/playerProjectionStats";
+import {
+  buildProjectedStats,
+  formatStat,
+  statRowsForPosition,
+  statValue,
+} from "@/lib/playerProjectionStats";
 import { cn } from "@/lib/utils";
 import type { PlayerStats } from "@/types/player";
 
 import { PlayerCardHeader, resolvePlayerCardStatus } from "./PlayerCardHeader";
 import { PlayerTrajectoryChart } from "./PlayerTrajectoryChart";
 
-type PlayerCardTab = "summary" | "stats" | "game-log" | "alerts" | "projections" | "history" | "value";
+type PlayerCardTab =
+  | "summary"
+  | "stats"
+  | "game-log"
+  | "alerts"
+  | "projections"
+  | "history"
+  | "value";
 
 export type PlayerCardModalPlayer = {
   id: number;
@@ -36,13 +62,19 @@ export type PlayerCardAction = {
   onClick: () => void;
 };
 
-type HistoricalSeason = NonNullable<PlayerCardResponse["historical_stats"]>["seasons"][number];
+type HistoricalSeason = NonNullable<
+  PlayerCardResponse["historical_stats"]
+>["seasons"][number];
 type HistoricalStatTableRow = {
   category: string;
   label: string;
   value: number | string | null;
 };
-const tabConfig: Array<{ id: PlayerCardTab; label: string; icon: typeof Info }> = [
+const tabConfig: Array<{
+  id: PlayerCardTab;
+  label: string;
+  icon: typeof Info;
+}> = [
   { id: "summary", label: "Summary", icon: Info },
   { id: "stats", label: "Stats", icon: BarChart3 },
   { id: "game-log", label: "Game Log", icon: CalendarDays },
@@ -132,7 +164,8 @@ const defaultPalette = {
 
 export const formatPlayerCardValue = (value: unknown, fallback = "—") => {
   if (value === null || value === undefined || value === "") return fallback;
-  if (typeof value === "number") return Number.isFinite(value) ? value.toLocaleString() : fallback;
+  if (typeof value === "number")
+    return Number.isFinite(value) ? value.toLocaleString() : fallback;
   return String(value);
 };
 
@@ -141,8 +174,12 @@ export const resolvePlayerCardCfb27Rating = (
   contextualRating?: number | null,
 ) => card?.player.cfb27_overall ?? contextualRating ?? null;
 
-export const draftHistorySummary = (event: { event_type: string; metadata?: Record<string, unknown> | null }) => {
-  if (event.event_type !== "DRAFTED" && event.event_type !== "AUTO_DRAFTED") return null;
+export const draftHistorySummary = (event: {
+  event_type: string;
+  metadata?: Record<string, unknown> | null;
+}) => {
+  if (event.event_type !== "DRAFTED" && event.event_type !== "AUTO_DRAFTED")
+    return null;
   const metadata = event.metadata ?? {};
   const round = metadata.round ?? metadata.round_number;
   const pick = metadata.pick_in_round ?? metadata.round_pick;
@@ -158,7 +195,10 @@ export const draftHistorySummary = (event: { event_type: string; metadata?: Reco
 export const getPlayerCardPalette = (position?: string | null) =>
   positionPalettes[(position ?? "").toUpperCase()] ?? defaultPalette;
 
-const getStatValue = (stats: Record<string, unknown> | null | undefined, keys: readonly string[]) => {
+const getStatValue = (
+  stats: Record<string, unknown> | null | undefined,
+  keys: readonly string[],
+) => {
   if (!stats) return null;
   for (const key of keys) {
     const value = stats[key];
@@ -167,12 +207,16 @@ const getStatValue = (stats: Record<string, unknown> | null | undefined, keys: r
   return null;
 };
 
-const gameLogStatValue = (stats: Record<string, unknown> | null | undefined, keys: readonly string[]) =>
-  getStatValue(stats, keys);
+const gameLogStatValue = (
+  stats: Record<string, unknown> | null | undefined,
+  keys: readonly string[],
+) => getStatValue(stats, keys);
 
 type GameLogColumn = readonly [label: string, keys: readonly string[]];
 
-export const gameLogColumnsForPosition = (position: string): readonly GameLogColumn[] => {
+export const gameLogColumnsForPosition = (
+  position: string,
+): readonly GameLogColumn[] => {
   switch (position.toUpperCase()) {
     case "QB":
       return [
@@ -220,9 +264,23 @@ export const gameLogColumnsForPosition = (position: string): readonly GameLogCol
       return [
         ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
         ["FGM", ["field_goals_made", "fieldGoalsMade", "FieldGoalsMade"]],
-        ["FGA", ["field_goals_attempted", "fieldGoalsAttempted", "FieldGoalsAttempted"]],
+        [
+          "FGA",
+          [
+            "field_goals_attempted",
+            "fieldGoalsAttempted",
+            "FieldGoalsAttempted",
+          ],
+        ],
         ["XPM", ["extra_points_made", "extraPointsMade", "ExtraPointsMade"]],
-        ["XPA", ["extra_points_attempted", "extraPointsAttempted", "ExtraPointsAttempted"]],
+        [
+          "XPA",
+          [
+            "extra_points_attempted",
+            "extraPointsAttempted",
+            "ExtraPointsAttempted",
+          ],
+        ],
       ] as const;
     default:
       return [
@@ -236,7 +294,10 @@ export const gameLogColumnsForPosition = (position: string): readonly GameLogCol
   }
 };
 
-export const gameLogOpponentLabel = (row: { location: string; opponent_name?: string | null }) => {
+export const gameLogOpponentLabel = (row: {
+  location: string;
+  opponent_name?: string | null;
+}) => {
   if (row.location === "bye") return "BYE";
   if (!row.opponent_name) return "TBD";
   if (row.location === "away") return `at ${row.opponent_name}`;
@@ -249,29 +310,43 @@ export const formatGameLogDate = (value?: string | null) => {
   const date = new Date(`${value}T12:00:00Z`);
   return Number.isNaN(date.getTime())
     ? "Date TBD"
-    : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date);
+    : new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        timeZone: "UTC",
+      }).format(date);
 };
 
 export const resolvePlayerCardProjectionStats = (
   player: PlayerCardModalPlayer,
-  card?: PlayerCardResponse | null
+  card?: PlayerCardResponse | null,
 ) => {
-  const sheetProjectionStats = player.sheetProjectionStats ?? card?.player.sheet_projection_stats ?? undefined;
+  const sheetProjectionStats =
+    player.sheetProjectionStats ??
+    card?.player.sheet_projection_stats ??
+    undefined;
   const projectedPoints =
     player.projectedPoints ??
     player.projection?.fpts ??
     card?.player.sheet_projected_season_points ??
-    statValue(sheetProjectionStats, ["fpts", "fantasy_points", "projected_points", "projectedFantasyPoints"]) ??
+    statValue(sheetProjectionStats, [
+      "fpts",
+      "fantasy_points",
+      "projected_points",
+      "projectedFantasyPoints",
+    ]) ??
     0;
   const projection = player.projection ?? { fpts: projectedPoints };
 
-  if (!player.projection && !sheetProjectionStats && !card?.player.sheet_projected_season_points) return null;
+  if (
+    !player.projection &&
+    !sheetProjectionStats &&
+    !card?.player.sheet_projected_season_points
+  )
+    return null;
 
-  return buildProjectedStats(
-    projection,
-    projectedPoints,
-    sheetProjectionStats
-  );
+  return buildProjectedStats(projection, projectedPoints, sheetProjectionStats);
 };
 
 /**
@@ -284,32 +359,44 @@ export const resolvePlayerCardCurrentValueRating = (
   tradeValue?: number | null,
   card?: PlayerCardResponse | null,
 ) => {
-  if (typeof tradeValue === "number" && Number.isFinite(tradeValue)) return tradeValue;
+  if (typeof tradeValue === "number" && Number.isFinite(tradeValue))
+    return tradeValue;
   const cardValue = card?.player.current_value_rating;
-  return typeof cardValue === "number" && Number.isFinite(cardValue) ? cardValue : null;
+  return typeof cardValue === "number" && Number.isFinite(cardValue)
+    ? cardValue
+    : null;
 };
 
-export const buildHistoricalStatsTableRows = (season: HistoricalSeason | null): HistoricalStatTableRow[] =>
+export const buildHistoricalStatsTableRows = (
+  season: HistoricalSeason | null,
+): HistoricalStatTableRow[] =>
   season?.categories.flatMap((category) =>
     category.stats.map((stat) => ({
       category: category.label,
       label: stat.label,
       value: stat.value,
-    }))
+    })),
   ) ?? [];
 
 export const buildHistoricalSeasonSummaryColumns = (
   seasons: HistoricalSeason[],
   currentPosition?: string | null,
 ): string[] => {
-  const present = new Set(seasons.flatMap((season) => [...historicalStatValuesForSeason(season).keys()]));
+  const present = new Set(
+    seasons.flatMap((season) => [
+      ...historicalStatValuesForSeason(season).keys(),
+    ]),
+  );
   return getHistoricalStatColumnsForPosition(
     historicalStatsTablePosition(seasons, currentPosition),
     present,
   );
 };
 
-export const historicalSeasonSummaryValue = (season: HistoricalSeason, label: string) => {
+export const historicalSeasonSummaryValue = (
+  season: HistoricalSeason,
+  label: string,
+) => {
   return historicalStatValuesForSeason(season).get(label) ?? null;
 };
 
@@ -351,11 +438,24 @@ export function PlayerCardModal({
 }) {
   const [activeTab, setActiveTab] = useState<PlayerCardTab>("summary");
   const historicalStatsScrollRef = useRef<HTMLDivElement>(null);
-  const hasLeagueContext = typeof leagueId === "number" && Number.isFinite(leagueId) && leagueId > 0;
-  const position = (card?.about.position ?? player.position ?? "").toUpperCase();
+  const hasLeagueContext =
+    typeof leagueId === "number" && Number.isFinite(leagueId) && leagueId > 0;
+  const position = (
+    card?.about.position ??
+    player.position ??
+    ""
+  ).toUpperCase();
   const playerStatus = resolvePlayerCardStatus(card, player.status);
-  const gameLogQuery = usePlayerGameLog(player.id, 2026, activeTab === "game-log");
-  const historyQuery = useLeaguePlayerHistory(leagueId ?? undefined, player.id, activeTab === "history" && hasLeagueContext);
+  const gameLogQuery = usePlayerGameLog(
+    player.id,
+    2026,
+    activeTab === "game-log",
+  );
+  const historyQuery = useLeaguePlayerHistory(
+    leagueId ?? undefined,
+    player.id,
+    activeTab === "history" && hasLeagueContext,
+  );
   const valueQuery = usePlayerTradeValues(player.id, 2026);
   const trajectoryQuery = usePlayerTrajectory(
     player.id,
@@ -366,9 +466,18 @@ export function PlayerCardModal({
   const palette = getPlayerCardPalette(position);
   const historicalStats = card?.historical_stats;
   const historicalSeasons = historicalStats?.seasons ?? [];
-  const historicalTablePosition = historicalStatsTablePosition(historicalSeasons, position);
-  const historicalSummaryColumns = buildHistoricalSeasonSummaryColumns(historicalSeasons, historicalTablePosition);
-  const projectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
+  const historicalTablePosition = historicalStatsTablePosition(
+    historicalSeasons,
+    position,
+  );
+  const historicalSummaryColumns = buildHistoricalSeasonSummaryColumns(
+    historicalSeasons,
+    historicalTablePosition,
+  );
+  const projectionStats = useMemo(
+    () => resolvePlayerCardProjectionStats(player, card),
+    [player, card],
+  );
   const currentValueRating = resolvePlayerCardCurrentValueRating(
     valueQuery.data?.current?.current_value_rating,
     card,
@@ -377,7 +486,8 @@ export function PlayerCardModal({
   const cardActions = [...(action ? [action] : []), ...actions];
 
   useEffect(() => {
-    if (historicalStatsScrollRef.current) historicalStatsScrollRef.current.scrollLeft = 0;
+    if (historicalStatsScrollRef.current)
+      historicalStatsScrollRef.current.scrollLeft = 0;
   }, [player.id, historicalTablePosition]);
   const projectionHighlights = [
     ["Fantasy", projectionStats?.fpts ?? player.projectedPoints],
@@ -385,11 +495,15 @@ export function PlayerCardModal({
     ["Ceiling", projectionStats?.ceiling],
     [
       "Boom",
-      typeof projectionStats?.boomProb === "number" ? `${Math.round(projectionStats.boomProb * 100)}%` : null,
+      typeof projectionStats?.boomProb === "number"
+        ? `${Math.round(projectionStats.boomProb * 100)}%`
+        : null,
     ],
     [
       "Bust",
-      typeof projectionStats?.bustProb === "number" ? `${Math.round(projectionStats.bustProb * 100)}%` : null,
+      typeof projectionStats?.bustProb === "number"
+        ? `${Math.round(projectionStats.bustProb * 100)}%`
+        : null,
     ],
     ["Opponent", player.opponent],
   ] as Array<[string, unknown]>;
@@ -399,8 +513,14 @@ export function PlayerCardModal({
   const projectionRows = statRowsForPosition(position || player.position || "");
   const projectionDetailRows = projectionStats
     ? projectionRows
-        .map((row) => [row.label, statValue(projectionStats, row.projectionKeys)] as const)
-    .filter(([, value]) => value !== null)
+        .map(
+          (row) =>
+            [
+              row.label,
+              statValue(projectionStats, row.projectionKeys),
+            ] as const,
+        )
+        .filter(([, value]) => value !== null)
     : [];
   useEffect(() => {
     setActiveTab("summary");
@@ -417,7 +537,7 @@ export function PlayerCardModal({
       <article
         className={cn(
           "relative flex h-[82dvh] max-h-[82dvh] w-full max-w-5xl flex-col overflow-hidden rounded-[1.75rem] border border-white/12 bg-[#0b0d10] text-white shadow-[0_28px_80px_rgba(2,6,23,0.62)] sm:h-auto sm:max-h-[92vh] sm:rounded-xl",
-          palette.glow
+          palette.glow,
         )}
         onClick={(event) => event.stopPropagation()}
       >
@@ -444,7 +564,7 @@ export function PlayerCardModal({
                   "relative inline-flex shrink-0 items-center gap-1.5 px-2 py-2.5 text-[9px] font-bold uppercase tracking-[0.06em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent sm:gap-2 sm:px-1 sm:text-[10px] sm:font-black sm:tracking-[0.12em]",
                   active
                     ? "text-white after:bg-cfb-brand"
-                    : "text-white/55 hover:text-white"
+                    : "text-white/55 hover:text-white",
                 )}
               >
                 <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -461,8 +581,12 @@ export function PlayerCardModal({
             </div>
           ) : error ? (
             <div className="flex min-h-56 flex-col items-center justify-center gap-4 rounded-3xl border border-amber-300/20 bg-amber-400/10 p-6 text-center">
-              <p className="text-sm font-black text-amber-50">Player details are unavailable right now.</p>
-              <p className="text-xs font-bold leading-5 text-amber-100/75">The player card stayed open. Please try again.</p>
+              <p className="text-sm font-black text-amber-50">
+                Player details are unavailable right now.
+              </p>
+              <p className="text-xs font-bold leading-5 text-amber-100/75">
+                The player card stayed open. Please try again.
+              </p>
               {onRetry ? (
                 <button
                   type="button"
@@ -476,7 +600,14 @@ export function PlayerCardModal({
           ) : activeTab === "summary" ? (
             <div className="w-full">
               <section className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 sm:rounded-3xl sm:p-5">
-                <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Bio</p>
+                <p
+                  className={cn(
+                    "text-[10px] font-black uppercase tracking-[0.22em]",
+                    palette.accent,
+                  )}
+                >
+                  Bio
+                </p>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
                   {[
                     ["Height", card?.about.height],
@@ -486,9 +617,16 @@ export function PlayerCardModal({
                     ["School", card?.about.team ?? player.school],
                     ["Status", playerStatus],
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-xl border border-white/10 bg-black/20 p-2.5 sm:rounded-2xl sm:p-3">
-                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
-                      <p className="mt-1 text-sm font-black text-white sm:mt-2">{formatPlayerCardValue(value)}</p>
+                    <div
+                      key={label}
+                      className="rounded-xl border border-white/10 bg-black/20 p-2.5 sm:rounded-2xl sm:p-3"
+                    >
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">
+                        {label}
+                      </p>
+                      <p className="mt-1 text-sm font-black text-white sm:mt-2">
+                        {formatPlayerCardValue(value)}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -517,11 +655,17 @@ export function PlayerCardModal({
             <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>
+                  <p
+                    className={cn(
+                      "text-[10px] font-black uppercase tracking-[0.22em]",
+                      palette.accent,
+                    )}
+                  >
                     Historical Season Stats
                   </p>
                   <p className="mt-2 text-sm font-bold leading-6 text-white/55">
-                    Verified season totals, with one row for each year this player has recorded stats.
+                    Verified season totals, with one row for each year this
+                    player has recorded stats.
                   </p>
                 </div>
                 <p className="w-fit rounded-full border border-white/15 bg-white/[0.05] px-3 py-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/55">
@@ -530,27 +674,65 @@ export function PlayerCardModal({
               </div>
 
               {historicalSeasons.length ? (
-                <div ref={historicalStatsScrollRef} className="mt-5 overflow-x-auto overscroll-x-contain touch-pan-x rounded-3xl border border-white/10 bg-black/20" aria-label="Historical stats table; scroll horizontally for all columns">
+                <div
+                  ref={historicalStatsScrollRef}
+                  className="mt-5 overflow-x-auto overscroll-x-contain touch-pan-x rounded-3xl border border-white/10 bg-black/20"
+                  aria-label="Historical stats table; scroll horizontally for all columns"
+                >
                   <table className="min-w-[1050px] w-max border-collapse text-left">
                     <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
                       <tr>
-                        <th className="min-w-[5.5rem] whitespace-nowrap px-4 py-4">Year</th>
-                        <th className="min-w-36 whitespace-nowrap px-4 py-4">Team</th>
-                        <th className="min-w-[4.5rem] whitespace-nowrap px-4 py-4">Pos</th>
+                        <th className="min-w-[5.5rem] whitespace-nowrap px-4 py-4">
+                          Year
+                        </th>
+                        <th className="min-w-36 whitespace-nowrap px-4 py-4">
+                          Team
+                        </th>
+                        <th className="min-w-[4.5rem] whitespace-nowrap px-4 py-4">
+                          Pos
+                        </th>
                         {historicalSummaryColumns.map((label) => (
-                          <th key={label} className="whitespace-nowrap px-4 py-4 text-right">{label}</th>
+                          <th
+                            key={label}
+                            className="whitespace-nowrap px-4 py-4 text-right"
+                          >
+                            {label}
+                          </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
                       {historicalSeasons.map((season) => (
-                        <tr key={`${season.season}-${season.team_name ?? "team"}-${season.season_type}`} className="text-sm font-bold text-white/75 transition hover:bg-white/[0.035]">
-                          <td className="whitespace-nowrap px-4 py-5 text-xl font-black tabular-nums text-white">{season.season}</td>
-                          <td className="min-w-36 px-4 py-5"><p className="font-black text-white">{season.team_name ?? card?.about.team ?? player.school}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.14em] text-white/45">{season.season_type}</p></td>
-                          <td className="px-4 py-5"><span className="rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-white/70">{season.position ?? position ?? "—"}</span></td>
+                        <tr
+                          key={`${season.season}-${season.team_name ?? "team"}-${season.season_type}`}
+                          className="text-sm font-bold text-white/75 transition hover:bg-white/[0.035]"
+                        >
+                          <td className="whitespace-nowrap px-4 py-5 text-xl font-black tabular-nums text-white">
+                            {season.season}
+                          </td>
+                          <td className="min-w-36 px-4 py-5">
+                            <p className="font-black text-white">
+                              {season.team_name ??
+                                card?.about.team ??
+                                player.school}
+                            </p>
+                            <p className="mt-1 text-[9px] font-black uppercase tracking-[0.14em] text-white/45">
+                              {season.season_type}
+                            </p>
+                          </td>
+                          <td className="px-4 py-5">
+                            <span className="rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-white/70">
+                              {season.position ?? position ?? "—"}
+                            </span>
+                          </td>
                           {historicalSummaryColumns.map((label) => (
-                            <td key={label} className="px-4 py-5 text-right font-black tabular-nums text-white">
-                              {formatPlayerCardValue(historicalSeasonSummaryValue(season, label))}
+                            <td
+                              key={label}
+                              className="px-4 py-5 text-right font-black tabular-nums text-white"
+                            >
+                              {formatPlayerCardValue(
+                                historicalSeasonSummaryValue(season, label),
+                              )}
                             </td>
                           ))}
                         </tr>
@@ -569,9 +751,20 @@ export function PlayerCardModal({
             <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>2026 Game Log</p>
+                  <p
+                    className={cn(
+                      "text-[10px] font-black uppercase tracking-[0.22em]",
+                      palette.accent,
+                    )}
+                  >
+                    2026 Game Log
+                  </p>
                   <p className="mt-2 text-sm font-bold leading-6 text-white/55">
-                    {gameLogQuery.data?.team_name ?? card?.about.team ?? player.school} schedule. Completed game stats appear here after they are verified.
+                    {gameLogQuery.data?.team_name ??
+                      card?.about.team ??
+                      player.school}{" "}
+                    schedule. Completed game stats appear here after they are
+                    verified.
                   </p>
                 </div>
                 <p className="rounded-full border border-white/15 bg-white/[0.05] px-3 py-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/55">
@@ -584,102 +777,185 @@ export function PlayerCardModal({
                 </div>
               ) : gameLogQuery.isError ? (
                 <p className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm font-bold leading-6 text-amber-100">
-                  The Game Log is unavailable right now. Please try again shortly.
+                  The Game Log is unavailable right now. Please try again
+                  shortly.
                 </p>
               ) : gameLogQuery.data?.games.length ? (
                 <>
-                <div className="mt-5 hidden overflow-x-auto rounded-2xl border border-white/10 bg-black/20 md:block">
-                  <table className="min-w-max border-collapse text-left">
-                    <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
-                      <tr>
-                        <th className="min-w-[4.5rem] whitespace-nowrap px-4 py-3">Week</th>
-                        <th className="min-w-[15rem] whitespace-nowrap px-4 py-3">Opponent</th>
-                        <th className="min-w-[8rem] whitespace-nowrap px-4 py-3">Location</th>
-                        <th className="min-w-[5.5rem] whitespace-nowrap px-4 py-3">Result</th>
-                        {gameLogColumnsForPosition(position).map(([label]) => (
-                          <th key={label} className="whitespace-nowrap px-4 py-3 text-right">{label}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/10">
-                      {gameLogQuery.data.games.map((row) => {
-                        const stats = row.stats?.stats;
-                        return (
-                          <tr key={row.schedule_id} className="text-sm font-bold text-white/75">
-                            <td className="px-4 py-4 font-black tabular-nums text-white">{row.week}</td>
-                            <td className="px-4 py-4">
-                              <p className="font-black text-white">{gameLogOpponentLabel(row)}</p>
-                              <p className="mt-1 text-[10px] font-bold text-white/40">{formatGameLogDate(row.date)}</p>
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-white/55">{row.location_label}</td>
-                            <td className="whitespace-nowrap px-4 py-4 text-xs font-black tabular-nums text-white/70">{row.result ?? "—"}</td>
-                            {gameLogColumnsForPosition(position).map(([label, keys]) => {
-                              const value = row.location === "bye" ? null : gameLogStatValue(stats, keys);
-                              return (
-                                <td key={label} className="whitespace-nowrap px-4 py-4 text-right font-black tabular-nums text-white">
-                                  {formatPlayerCardValue(value)}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="mt-5 space-y-3 md:hidden">
-                  {gameLogQuery.data.games.map((row) => {
-                    const stats = row.stats?.stats;
-                    return (
-                      <article key={row.schedule_id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/45">Week {row.week}</p>
-                            <p className="mt-1 font-black text-white">{gameLogOpponentLabel(row)}</p>
-                            <p className="mt-1 text-xs font-bold text-white/45">{formatGameLogDate(row.date)} • {row.location_label}</p>
+                  <div className="mt-5 hidden overflow-x-auto rounded-2xl border border-white/10 bg-black/20 md:block">
+                    <table className="min-w-max border-collapse text-left">
+                      <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
+                        <tr>
+                          <th className="min-w-[4.5rem] whitespace-nowrap px-4 py-3">
+                            Week
+                          </th>
+                          <th className="min-w-[15rem] whitespace-nowrap px-4 py-3">
+                            Opponent
+                          </th>
+                          <th className="min-w-[8rem] whitespace-nowrap px-4 py-3">
+                            Location
+                          </th>
+                          <th className="min-w-[5.5rem] whitespace-nowrap px-4 py-3">
+                            Result
+                          </th>
+                          {gameLogColumnsForPosition(position).map(
+                            ([label]) => (
+                              <th
+                                key={label}
+                                className="whitespace-nowrap px-4 py-3 text-right"
+                              >
+                                {label}
+                              </th>
+                            ),
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
+                        {gameLogQuery.data.games.map((row) => {
+                          const stats = row.stats?.stats;
+                          return (
+                            <tr
+                              key={row.schedule_id}
+                              className="text-sm font-bold text-white/75"
+                            >
+                              <td className="px-4 py-4 font-black tabular-nums text-white">
+                                {row.week}
+                              </td>
+                              <td className="px-4 py-4">
+                                <p className="font-black text-white">
+                                  {gameLogOpponentLabel(row)}
+                                </p>
+                                <p className="mt-1 text-[10px] font-bold text-white/40">
+                                  {formatGameLogDate(row.date)}
+                                </p>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
+                                {row.location_label}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-4 text-xs font-black tabular-nums text-white/70">
+                                {row.result ?? "—"}
+                              </td>
+                              {gameLogColumnsForPosition(position).map(
+                                ([label, keys]) => {
+                                  const value =
+                                    row.location === "bye"
+                                      ? null
+                                      : gameLogStatValue(stats, keys);
+                                  return (
+                                    <td
+                                      key={label}
+                                      className="whitespace-nowrap px-4 py-4 text-right font-black tabular-nums text-white"
+                                    >
+                                      {formatPlayerCardValue(value)}
+                                    </td>
+                                  );
+                                },
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-5 space-y-3 md:hidden">
+                    {gameLogQuery.data.games.map((row) => {
+                      const stats = row.stats?.stats;
+                      return (
+                        <article
+                          key={row.schedule_id}
+                          className="rounded-2xl border border-white/10 bg-black/20 p-4"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/45">
+                                Week {row.week}
+                              </p>
+                              <p className="mt-1 font-black text-white">
+                                {gameLogOpponentLabel(row)}
+                              </p>
+                              <p className="mt-1 text-xs font-bold text-white/45">
+                                {formatGameLogDate(row.date)} •{" "}
+                                {row.location_label}
+                              </p>
+                            </div>
+                            <p className="text-right text-xs font-black tabular-nums text-white/70">
+                              {row.result ?? "—"}
+                            </p>
                           </div>
-                          <p className="text-right text-xs font-black tabular-nums text-white/70">{row.result ?? "—"}</p>
-                        </div>
-                        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
-                          {gameLogColumnsForPosition(position).map(([label, keys]) => {
-                            const value = row.location === "bye" ? null : gameLogStatValue(stats, keys);
-                            return (
-                              <div key={label} className="flex items-center justify-between gap-3 text-xs">
-                                <span className="font-black uppercase tracking-[0.12em] text-white/45">{label}</span>
-                                <span className="font-black tabular-nums text-white">{formatPlayerCardValue(value)}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
+                          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+                            {gameLogColumnsForPosition(position).map(
+                              ([label, keys]) => {
+                                const value =
+                                  row.location === "bye"
+                                    ? null
+                                    : gameLogStatValue(stats, keys);
+                                return (
+                                  <div
+                                    key={label}
+                                    className="flex items-center justify-between gap-3 text-xs"
+                                  >
+                                    <span className="font-black uppercase tracking-[0.12em] text-white/45">
+                                      {label}
+                                    </span>
+                                    <span className="font-black tabular-nums text-white">
+                                      {formatPlayerCardValue(value)}
+                                    </span>
+                                  </div>
+                                );
+                              },
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
                 </>
               ) : (
                 <p className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
-                  {gameLogQuery.data?.message ?? "No 2026 schedule has been imported for this player's team yet."}
+                  {gameLogQuery.data?.message ??
+                    "No 2026 schedule has been imported for this player's team yet."}
                 </p>
               )}
             </section>
           ) : activeTab === "alerts" ? (
             <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
-              <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>News / Injury Alerts</p>
+              <p
+                className={cn(
+                  "text-[10px] font-black uppercase tracking-[0.22em]",
+                  palette.accent,
+                )}
+              >
+                News / Injury Alerts
+              </p>
               {card?.injuries.length ? (
                 <div className="mt-5 space-y-3">
                   {card.injuries.map((injury) => (
-                    <div key={injury.id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div
+                      key={injury.id}
+                      className="rounded-2xl border border-white/10 bg-black/20 p-4"
+                    >
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-base font-black text-white">{injury.status}</p>
+                        <p className="text-base font-black text-white">
+                          {injury.status}
+                        </p>
                         <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
                           {injury.season} W{injury.week}
                         </p>
                       </div>
                       <p className="mt-2 text-sm font-bold leading-6 text-white/70">
-                        {[injury.injury, injury.practice_level, injury.return_timeline].filter(Boolean).join(" • ") ||
-                          "No injury detail provided."}
+                        {[
+                          injury.injury,
+                          injury.practice_level,
+                          injury.return_timeline,
+                        ]
+                          .filter(Boolean)
+                          .join(" • ") || "No injury detail provided."}
                       </p>
-                      {injury.notes ? <p className="mt-2 text-xs leading-5 text-white/50">{injury.notes}</p> : null}
+                      {injury.notes ? (
+                        <p className="mt-2 text-xs leading-5 text-white/50">
+                          {injury.notes}
+                        </p>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -691,22 +967,40 @@ export function PlayerCardModal({
             </section>
           ) : activeTab === "projections" ? (
             <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
-              <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Fantasy Projection</p>
+              <p
+                className={cn(
+                  "text-[10px] font-black uppercase tracking-[0.22em]",
+                  palette.accent,
+                )}
+              >
+                Fantasy Projection
+              </p>
               <div className="mt-5">
                 {trajectoryQuery.isLoading ? (
                   <div className="flex min-h-56 items-center justify-center gap-3 rounded-3xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Building season trajectory
+                    <Loader2 className="h-4 w-4 animate-spin" /> Building season
+                    trajectory
                   </div>
                 ) : trajectoryQuery.data?.projection.length ? (
                   <>
-                    {typeof trajectoryQuery.data.preseason_projection_points === "number" ? (
+                    {typeof trajectoryQuery.data.preseason_projection_points ===
+                    "number" ? (
                       <p className="mb-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm font-bold text-white/65">
-                        Preseason season projection: <span className="font-black text-white">{trajectoryQuery.data.preseason_projection_points.toFixed(1)} pts</span>
+                        Preseason season projection:{" "}
+                        <span className="font-black text-white">
+                          {trajectoryQuery.data.preseason_projection_points.toFixed(
+                            1,
+                          )}{" "}
+                          pts
+                        </span>
                       </p>
                     ) : null}
                     <PlayerTrajectoryChart
                       ariaLabel={`${player.name} projected fantasy points by week`}
-                      points={trajectoryQuery.data.projection.map((point) => ({ ...point, value: point.points }))}
+                      points={trajectoryQuery.data.projection.map((point) => ({
+                        ...point,
+                        value: point.points,
+                      }))}
                       yLabel="Points"
                       yMax={30}
                       valueFormatter={(value) => `${value.toFixed(1)} pts`}
@@ -715,14 +1009,33 @@ export function PlayerCardModal({
                   </>
                 ) : trajectoryQuery.data ? (
                   <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-sm font-bold leading-6 text-white/60">
-                    {typeof trajectoryQuery.data.preseason_projection_points === "number" ? (
-                      <p>Preseason season projection: <span className="font-black text-white">{trajectoryQuery.data.preseason_projection_points.toFixed(1)} pts</span></p>
+                    {typeof trajectoryQuery.data.preseason_projection_points ===
+                    "number" ? (
+                      <p>
+                        Preseason season projection:{" "}
+                        <span className="font-black text-white">
+                          {trajectoryQuery.data.preseason_projection_points.toFixed(
+                            1,
+                          )}{" "}
+                          pts
+                        </span>
+                      </p>
                     ) : null}
-                    <p className={typeof trajectoryQuery.data.preseason_projection_points === "number" ? "mt-2" : undefined}>Weekly projections have not been published yet.</p>
+                    <p
+                      className={
+                        typeof trajectoryQuery.data
+                          .preseason_projection_points === "number"
+                          ? "mt-2"
+                          : undefined
+                      }
+                    >
+                      Weekly projections have not been published yet.
+                    </p>
                   </div>
                 ) : (
                   <p className="rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4 text-sm font-bold text-rose-100">
-                    Season projection trajectory is unavailable right now. Please try again shortly.
+                    Season projection trajectory is unavailable right now.
+                    Please try again shortly.
                   </p>
                 )}
               </div>
@@ -731,10 +1044,17 @@ export function PlayerCardModal({
                   {visibleProjectionHighlights.length ? (
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                       {visibleProjectionHighlights.map(([label, value]) => (
-                        <div key={label} className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
+                        <div
+                          key={label}
+                          className="rounded-2xl border border-white/10 bg-black/20 p-3"
+                        >
+                          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">
+                            {label}
+                          </p>
                           <p className="mt-2 truncate text-xl font-black tabular-nums text-white">
-                            {typeof value === "number" ? formatStat(value) : formatPlayerCardValue(value)}
+                            {typeof value === "number"
+                              ? formatStat(value)
+                              : formatPlayerCardValue(value)}
                           </p>
                         </div>
                       ))}
@@ -743,15 +1063,24 @@ export function PlayerCardModal({
                   {projectionDetailRows.length ? (
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                       {projectionDetailRows.map(([label, value]) => (
-                        <div key={label} className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
-                          <p className="mt-2 text-xl font-black tabular-nums text-white">{formatStat(value)}</p>
+                        <div
+                          key={label}
+                          className="rounded-2xl border border-white/10 bg-black/20 p-3"
+                        >
+                          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">
+                            {label}
+                          </p>
+                          <p className="mt-2 text-xl font-black tabular-nums text-white">
+                            {formatStat(value)}
+                          </p>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <p className="rounded-2xl border border-cyan-300/15 bg-cyan-300/10 p-4 text-sm font-bold leading-6 text-cyan-100">
-                      Weekly projection is available from the matchup model. Position stat splits are shown when the projection feed supplies them.
+                      Weekly projection is available from the matchup model.
+                      Position stat splits are shown when the projection feed
+                      supplies them.
                     </p>
                   )}
                 </div>
@@ -763,42 +1092,115 @@ export function PlayerCardModal({
             </section>
           ) : activeTab === "history" ? (
             <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
-              <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>League History</p>
+              <p
+                className={cn(
+                  "text-[10px] font-black uppercase tracking-[0.22em]",
+                  palette.accent,
+                )}
+              >
+                League History
+              </p>
               {!hasLeagueContext ? (
                 <p className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
-                  Open this player card from a league to view this player&apos;s draft, roster, trade, and waiver history.
+                  Open this player card from a league to view this player&apos;s
+                  draft, roster, trade, and waiver history.
                 </p>
               ) : historyQuery.isLoading ? (
-                <div className="mt-5 flex min-h-40 items-center justify-center gap-3 rounded-2xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55"><Loader2 className="h-4 w-4 animate-spin" /> Loading league history</div>
+                <div className="mt-5 flex min-h-40 items-center justify-center gap-3 rounded-2xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading league
+                  history
+                </div>
               ) : historyQuery.isError ? (
-                <p className="mt-5 rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4 text-sm font-bold text-rose-100">League history is unavailable right now. Please try again shortly.</p>
+                <p className="mt-5 rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4 text-sm font-bold text-rose-100">
+                  League history is unavailable right now. Please try again
+                  shortly.
+                </p>
               ) : historyQuery.data ? (
                 <div className="mt-5 space-y-3">
                   <div className="rounded-2xl border border-cyan-200/20 bg-cyan-200/10 p-4">
-                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-100/70">Current status</p>
-                    <p className="mt-1 text-lg font-black text-white">{historyQuery.data.current_status.status.replace(/_/g, " ")}{historyQuery.data.current_status.fantasy_team_name ? ` by ${historyQuery.data.current_status.fantasy_team_name}` : ""}</p>
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-100/70">
+                      Current status
+                    </p>
+                    <p className="mt-1 text-lg font-black text-white">
+                      {historyQuery.data.current_status.status.replace(
+                        /_/g,
+                        " ",
+                      )}
+                      {historyQuery.data.current_status.fantasy_team_name
+                        ? ` by ${historyQuery.data.current_status.fantasy_team_name}`
+                        : ""}
+                    </p>
                   </div>
-                  {historyQuery.data.events.length ? historyQuery.data.events.map((event) => (
-                    <article key={event.id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-black text-white">{event.event_type.replace(/_/g, " ")}</p><p className="mt-1 text-xs font-bold text-white/55">{event.from_team?.name ? `${event.from_team.name} → ` : ""}{event.to_team?.name ?? event.fantasy_team?.name ?? "League transaction"}</p></div><p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">{new Date(event.occurred_at).toLocaleString()}</p></div>
-                      <p className="mt-2 text-xs font-bold text-white/55">{draftHistorySummary(event) ? `${draftHistorySummary(event)} • ` : ""}{event.position} • {event.school}{event.manager?.name ? ` • ${event.manager.name}` : ""}{typeof event.player_value_at_event === "number" ? ` • Value ${event.player_value_at_event.toFixed(1)}` : ""}</p>
-                    </article>
-                  )) : <p className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">No league history yet. This player has not been drafted, added, traded, or rostered in this league.</p>}
+                  {historyQuery.data.events.length ? (
+                    historyQuery.data.events.map((event) => (
+                      <article
+                        key={event.id}
+                        className="rounded-2xl border border-white/10 bg-black/20 p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="font-black text-white">
+                              {event.event_type.replace(/_/g, " ")}
+                            </p>
+                            <p className="mt-1 text-xs font-bold text-white/55">
+                              {event.from_team?.name
+                                ? `${event.from_team.name} → `
+                                : ""}
+                              {event.to_team?.name ??
+                                event.fantasy_team?.name ??
+                                "League transaction"}
+                            </p>
+                          </div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
+                            {new Date(event.occurred_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <p className="mt-2 text-xs font-bold text-white/55">
+                          {draftHistorySummary(event)
+                            ? `${draftHistorySummary(event)} • `
+                            : ""}
+                          {event.position} • {event.school}
+                          {event.manager?.name
+                            ? ` • ${event.manager.name}`
+                            : ""}
+                          {typeof event.player_value_at_event === "number"
+                            ? ` • Value ${event.player_value_at_event.toFixed(1)}`
+                            : ""}
+                        </p>
+                      </article>
+                    ))
+                  ) : (
+                    <p className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
+                      No league history yet. This player has not been drafted,
+                      added, traded, or rostered in this league.
+                    </p>
+                  )}
                 </div>
               ) : null}
             </section>
           ) : (
             <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
-              <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Trade Value</p>
+              <p
+                className={cn(
+                  "text-[10px] font-black uppercase tracking-[0.22em]",
+                  palette.accent,
+                )}
+              >
+                Trade Value
+              </p>
               <div className="mt-5">
                 {trajectoryQuery.isLoading ? (
                   <div className="flex min-h-56 items-center justify-center gap-3 rounded-3xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Building value trajectory
+                    <Loader2 className="h-4 w-4 animate-spin" /> Building value
+                    trajectory
                   </div>
                 ) : trajectoryQuery.data ? (
                   <PlayerTrajectoryChart
                     ariaLabel={`${player.name} trade value by week`}
-                    points={trajectoryQuery.data.value.map((point) => ({ ...point, value: point.value }))}
+                    points={trajectoryQuery.data.value.map((point) => ({
+                      ...point,
+                      value: point.value,
+                    }))}
                     yLabel="Value"
                     yMax={100}
                     valueFormatter={(value) => value.toFixed(0)}
@@ -806,11 +1208,19 @@ export function PlayerCardModal({
                   />
                 ) : (
                   <p className="rounded-2xl border border-rose-300/20 bg-rose-300/10 p-4 text-sm font-bold text-rose-100">
-                    Season value trajectory is unavailable right now. Please try again shortly.
+                    Season value trajectory is unavailable right now. Please try
+                    again shortly.
                   </p>
                 )}
               </div>
-              {!trajectoryQuery.isLoading && trajectoryQuery.data && !trajectoryQuery.data.value.some((point) => point.week > 0) ? <p className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">Player value history will appear as weekly snapshots are published.</p> : null}
+              {!trajectoryQuery.isLoading &&
+              trajectoryQuery.data &&
+              !trajectoryQuery.data.value.some((point) => point.week > 0) ? (
+                <p className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
+                  Player value history will appear as weekly snapshots are
+                  published.
+                </p>
+              ) : null}
             </section>
           )}
         </div>

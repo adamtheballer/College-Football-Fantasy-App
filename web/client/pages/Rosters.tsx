@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ClipboardList, Trophy, ArrowRight, Users, ShieldAlert } from "lucide-react";
+import {
+  ClipboardList,
+  Trophy,
+  ArrowRight,
+  Users,
+  ShieldAlert,
+} from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,13 +17,25 @@ import { ApiError } from "@/lib/api";
 import type { RosterEntry } from "@/types/roster";
 import type { Team } from "@/types/team";
 
-const SLOT_ORDER = ["QB", "RB", "WR", "TE", "K", "FLEX", "SUPERFLEX", "BENCH", "IR"];
+const SLOT_ORDER = [
+  "QB",
+  "RB",
+  "WR",
+  "TE",
+  "K",
+  "FLEX",
+  "SUPERFLEX",
+  "BENCH",
+  "IR",
+];
 
 const formatApiError = (error: unknown, fallback: string) => {
   if (error instanceof ApiError) {
     if (error.status === 401) return "Sign in again to load roster data.";
-    if (error.status === 403) return "You do not have access to this roster view.";
-    if (error.status === 404) return "The selected roster view could not be found.";
+    if (error.status === 403)
+      return "You do not have access to this roster view.";
+    if (error.status === 404)
+      return "The selected roster view could not be found.";
     return error.message || fallback;
   }
 
@@ -182,7 +200,7 @@ const LeagueSelectorCard = ({
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-3">
               <h3 className="text-3xl font-black italic uppercase tracking-tight text-foreground">
-              {name}
+                {name}
               </h3>
               <span
                 className={`rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.24em] ${
@@ -229,8 +247,11 @@ export default function Rosters() {
   const [selectedLeagueId, setSelectedLeagueId] = useState<number | null>(null);
   const activeLeagueRef = useRef<HTMLDivElement | null>(null);
   const selectedLeague = useMemo(
-    () => leagueRows.find((league) => league.id === selectedLeagueId) ?? leagueRows[0] ?? null,
-    [leagueRows, selectedLeagueId]
+    () =>
+      leagueRows.find((league) => league.id === selectedLeagueId) ??
+      leagueRows[0] ??
+      null,
+    [leagueRows, selectedLeagueId],
   );
   const {
     data: teamsPayload,
@@ -249,7 +270,10 @@ export default function Rosters() {
       if (current && leagueRows.some((league) => league.id === current)) {
         return current;
       }
-      if (activeLeagueId && leagueRows.some((league) => league.id === activeLeagueId)) {
+      if (
+        activeLeagueId &&
+        leagueRows.some((league) => league.id === activeLeagueId)
+      ) {
         return activeLeagueId;
       }
       return leagueRows[0].id;
@@ -285,7 +309,8 @@ export default function Rosters() {
           Rosters
         </h1>
         <p className="text-muted-foreground text-xl font-medium max-w-2xl leading-relaxed">
-          Browse live league teams and roster entries from backend contracts. Synthetic roster fillers have been removed.
+          Browse live league teams and roster entries from backend contracts.
+          Synthetic roster fillers have been removed.
         </p>
       </div>
 
@@ -307,9 +332,12 @@ export default function Rosters() {
             <ClipboardList className="w-12 h-12" />
           </div>
           <div className="space-y-4">
-            <h2 className="text-3xl font-black italic uppercase text-foreground">No leagues joined yet</h2>
+            <h2 className="text-3xl font-black italic uppercase text-foreground">
+              No leagues joined yet
+            </h2>
             <p className="text-muted-foreground max-w-sm mx-auto uppercase tracking-widest text-[10px] font-bold leading-loose">
-              Create or join a league first, then open the league hub to access supported roster information.
+              Create or join a league first, then open the league hub to access
+              supported roster information.
             </p>
           </div>
           <Link to="/leagues" className="block">
@@ -338,62 +366,67 @@ export default function Rosters() {
           {selectedLeague && (
             <div ref={activeLeagueRef}>
               <Card className="bg-card/40 backdrop-blur-md border border-white/5 rounded-[3rem] overflow-hidden">
-              <CardContent className="p-10 space-y-6">
-                <div className="flex flex-wrap items-start justify-between gap-6">
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">
-                      Active League
-                    </p>
-                    <h2 className="text-4xl font-black italic uppercase tracking-tight text-foreground">
-                      {selectedLeague.name}
-                    </h2>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                      {selectedLeague.members.length}/{selectedLeague.max_teams} managers joined
-                    </p>
+                <CardContent className="p-10 space-y-6">
+                  <div className="flex flex-wrap items-start justify-between gap-6">
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">
+                        Active League
+                      </p>
+                      <h2 className="text-4xl font-black italic uppercase tracking-tight text-foreground">
+                        {selectedLeague.name}
+                      </h2>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                        {selectedLeague.members.length}/
+                        {selectedLeague.max_teams} managers joined
+                      </p>
+                    </div>
+                    <Button
+                      asChild
+                      type="button"
+                      className="h-12 rounded-2xl bg-primary px-6 text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground"
+                    >
+                      <Link to={`/league/${selectedLeague.id}`}>
+                        Open League Hub
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
                   </div>
-                  <Button
-                    asChild
-                    type="button"
-                    className="h-12 rounded-2xl bg-primary px-6 text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground"
-                  >
-                    <Link to={`/league/${selectedLeague.id}`}>
-                      Open League Hub
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
 
-                {teamsLoading ? (
-                  <div className="rounded-[2rem] border border-white/10 bg-white/[0.03] px-6 py-12 text-center">
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
-                      Loading teams...
-                    </p>
-                  </div>
-                ) : teamsError ? (
-                  <div className="rounded-[2rem] border border-red-400/20 bg-red-500/5 px-6 py-12 text-center space-y-3">
-                    <ShieldAlert className="mx-auto h-8 w-8 text-red-300" />
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-red-300">
-                      {formatApiError(teamsErrorDetail, "Unable to load team rosters for this league.")}
-                    </p>
-                  </div>
-                ) : (teamsPayload?.data.length ?? 0) === 0 ? (
-                  <div className="rounded-[2rem] border border-dashed border-white/10 bg-white/[0.03] px-6 py-12 text-center space-y-4">
-                    <Users className="mx-auto h-10 w-10 text-muted-foreground/40" />
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
-                      No teams created in this league yet
-                    </p>
-                    <p className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground/50">
-                      Team assignment and full owned-team hydration will land with the canonical league workspace contract.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {teamsPayload?.data.map((team) => (
-                      <TeamRosterCard key={team.id} team={team} />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
+                  {teamsLoading ? (
+                    <div className="rounded-[2rem] border border-white/10 bg-white/[0.03] px-6 py-12 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+                        Loading teams...
+                      </p>
+                    </div>
+                  ) : teamsError ? (
+                    <div className="rounded-[2rem] border border-red-400/20 bg-red-500/5 px-6 py-12 text-center space-y-3">
+                      <ShieldAlert className="mx-auto h-8 w-8 text-red-300" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-red-300">
+                        {formatApiError(
+                          teamsErrorDetail,
+                          "Unable to load team rosters for this league.",
+                        )}
+                      </p>
+                    </div>
+                  ) : (teamsPayload?.data.length ?? 0) === 0 ? (
+                    <div className="rounded-[2rem] border border-dashed border-white/10 bg-white/[0.03] px-6 py-12 text-center space-y-4">
+                      <Users className="mx-auto h-10 w-10 text-muted-foreground/40" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+                        No teams created in this league yet
+                      </p>
+                      <p className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground/50">
+                        Team assignment and full owned-team hydration will land
+                        with the canonical league workspace contract.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {teamsPayload?.data.map((team) => (
+                        <TeamRosterCard key={team.id} team={team} />
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
               </Card>
             </div>
           )}

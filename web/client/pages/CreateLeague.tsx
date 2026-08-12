@@ -17,7 +17,13 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { PlaybookDecor } from "@/components/fantasy/PlaybookDecor";
 import { cn } from "@/lib/utils";
@@ -35,12 +41,14 @@ const waiverOptions = [
   {
     label: "FAAB",
     value: "faab",
-    description: "Managers submit hidden bids from a season-long budget. The highest valid bid wins.",
+    description:
+      "Managers submit hidden bids from a season-long budget. The highest valid bid wins.",
   },
   {
     label: "Waiver Priority",
     value: "priority",
-    description: "Claims process in waiver order. A successful claim moves the team to the back.",
+    description:
+      "Claims process in waiver order. A successful claim moves the team to the back.",
   },
 ];
 const tradeReviewOptions = [
@@ -85,8 +93,10 @@ const standardBetaScoring = {
   xp: 1,
 };
 
-const standardRosterSummary = "QB 1 · RB 2 · WR 2 · TE 1 · FLEX 1 · K 1 · Bench 5 · IR 1";
-const standardBetaScoringSummary = "Standard PPR · 3-point field goals · 1-point extra points";
+const standardRosterSummary =
+  "QB 1 · RB 2 · WR 2 · TE 1 · FLEX 1 · K 1 · Bench 5 · IR 1";
+const standardBetaScoringSummary =
+  "Standard PPR · 3-point field goals · 1-point extra points";
 const managedWaiverSchedule = {
   waiver_period_hours: 24,
   waiver_processing_weekday: 1,
@@ -109,8 +119,8 @@ const getDefaultDraftTime = () => "19:00";
 const isDraftTimeSafelyInFuture = (draftDateTime: Date | null) =>
   Boolean(
     draftDateTime &&
-      Number.isFinite(draftDateTime.getTime()) &&
-      draftDateTime.getTime() > Date.now() + MIN_DRAFT_LEAD_TIME_MS
+    Number.isFinite(draftDateTime.getTime()) &&
+    draftDateTime.getTime() > Date.now() + MIN_DRAFT_LEAD_TIME_MS,
   );
 
 const fieldLabelClass =
@@ -130,7 +140,10 @@ const secondaryButtonClass =
 
 function CreateLeagueBackdrop() {
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+    >
       <div className="absolute inset-x-0 top-0 h-[34rem] bg-[radial-gradient(circle_at_14%_10%,rgba(34,211,238,0.2),transparent_27%),radial-gradient(circle_at_78%_18%,rgba(59,130,246,0.22),transparent_26%),linear-gradient(180deg,#10274A_0%,#091426_58%,#070A12_100%)]" />
       <div className="absolute -left-20 top-32 h-3 w-[30rem] rotate-[-17deg] rounded-full bg-[#67E8F9]/25 blur-[1px]" />
       <div className="absolute right-[-8rem] top-44 h-3 w-[32rem] rotate-[20deg] rounded-full bg-[#FBBF24]/30 blur-[1px]" />
@@ -144,9 +157,18 @@ function CreateLeagueBackdrop() {
 function CreateLeagueHero({ currentStep }: { currentStep: number }) {
   return (
     <header className="relative overflow-hidden rounded-[28px] border border-[#60A5FA]/25 bg-[#0C1830]/90 px-6 py-7 shadow-[0_20px_60px_rgba(2,8,23,0.32)] sm:px-8 md:px-10 md:py-9">
-      <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(116deg,transparent_0%,transparent_46%,rgba(59,130,246,0.16)_46%,transparent_47%,transparent_62%,rgba(251,191,36,0.12)_62%,transparent_63%)]" />
-      <div aria-hidden="true" className="absolute -right-8 top-8 h-2 w-48 rotate-[-18deg] rounded-full bg-[#67E8F9]/50" />
-      <div aria-hidden="true" className="absolute -right-10 top-14 h-2 w-36 rotate-[-18deg] rounded-full bg-[#F43F8E]/55" />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(116deg,transparent_0%,transparent_46%,rgba(59,130,246,0.16)_46%,transparent_47%,transparent_62%,rgba(251,191,36,0.12)_62%,transparent_63%)]"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute -right-8 top-8 h-2 w-48 rotate-[-18deg] rounded-full bg-[#67E8F9]/50"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute -right-10 top-14 h-2 w-36 rotate-[-18deg] rounded-full bg-[#F43F8E]/55"
+      />
       <PlaybookDecor className="opacity-55" />
 
       <div className="relative z-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end">
@@ -163,7 +185,8 @@ function CreateLeagueHero({ currentStep }: { currentStep: number }) {
             Build your <span className="text-[#67E8F9]">league.</span>
           </h1>
           <p className="mt-5 max-w-2xl text-sm leading-6 text-[#B8C7DF] sm:text-base">
-            Set the rules, schedule the draft, and send your managers an invite-ready league hub.
+            Set the rules, schedule the draft, and send your managers an
+            invite-ready league hub.
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
             <span className="rounded-full border border-[#67E8F9]/25 bg-[#67E8F9]/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[#CFFAFE]">
@@ -178,15 +201,21 @@ function CreateLeagueHero({ currentStep }: { currentStep: number }) {
         <div className="grid grid-cols-2 gap-3 rounded-[22px] border border-white/[0.1] bg-[#081325]/75 p-3 backdrop-blur-sm">
           <div className="rounded-[16px] border border-[#67E8F9]/20 bg-[#67E8F9]/10 p-4">
             <p className={fieldLabelClass}>Current phase</p>
-            <p className="mt-2 text-lg font-bold text-[#F8FAFC]">{steps[currentStep]}</p>
+            <p className="mt-2 text-lg font-bold text-[#F8FAFC]">
+              {steps[currentStep]}
+            </p>
           </div>
           <div className="rounded-[16px] border border-[#FCD34D]/20 bg-[#FCD34D]/10 p-4">
             <p className={fieldLabelClass}>Setup</p>
-            <p className="mt-2 text-lg font-bold text-[#F8FAFC]">{currentStep + 1}/4</p>
+            <p className="mt-2 text-lg font-bold text-[#F8FAFC]">
+              {currentStep + 1}/4
+            </p>
           </div>
           <div className="col-span-2 flex items-center gap-3 rounded-[16px] border border-white/[0.08] bg-[#111E34]/85 px-4 py-3">
             <ShieldCheck className="h-5 w-5 shrink-0 text-[#86EFAC]" />
-            <p className="text-xs font-semibold leading-5 text-[#CBD5E1]">Your settings become the source of truth for the whole league.</p>
+            <p className="text-xs font-semibold leading-5 text-[#CBD5E1]">
+              Your settings become the source of truth for the whole league.
+            </p>
           </div>
         </div>
       </div>
@@ -207,9 +236,16 @@ function LeagueCreationLoadingOverlay() {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] border border-[#67E8F9]/30 bg-[#67E8F9]/10">
             <Loader2 className="h-7 w-7 animate-spin text-[#67E8F9]" />
           </div>
-          <p className="mt-5 text-xs font-bold uppercase tracking-[0.2em] text-[#7DD3FC]">League setup</p>
-          <h2 className="mt-2 font-display text-3xl font-black italic uppercase tracking-[-0.04em] text-[#F8FAFC]">Building your league</h2>
-          <p className="mt-3 text-sm leading-6 text-[#B8C7DF]">Saving your rules, draft schedule, and private invite details. Keep this page open.</p>
+          <p className="mt-5 text-xs font-bold uppercase tracking-[0.2em] text-[#7DD3FC]">
+            League setup
+          </p>
+          <h2 className="mt-2 font-display text-3xl font-black italic uppercase tracking-[-0.04em] text-[#F8FAFC]">
+            Building your league
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-[#B8C7DF]">
+            Saving your rules, draft schedule, and private invite details. Keep
+            this page open.
+          </p>
         </div>
       </div>
     </div>
@@ -273,16 +309,34 @@ function Stepper({ currentStep }: { currentStep: number }) {
   );
 }
 
-function SectionHeader({ title, description }: { title: string; description?: string }) {
+function SectionHeader({
+  title,
+  description,
+}: {
+  title: string;
+  description?: string;
+}) {
   return (
     <div className="space-y-2">
-      <h2 className="text-2xl font-bold tracking-tight text-[#F8FAFC]">{title}</h2>
-      {description && <p className="max-w-2xl text-sm leading-6 text-[#94A3B8]">{description}</p>}
+      <h2 className="text-2xl font-bold tracking-tight text-[#F8FAFC]">
+        {title}
+      </h2>
+      {description && (
+        <p className="max-w-2xl text-sm leading-6 text-[#94A3B8]">
+          {description}
+        </p>
+      )}
     </div>
   );
 }
 
-function ReviewItem({ label, value }: { label: string; value: React.ReactNode }) {
+function ReviewItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
   return (
     <div className="rounded-[14px] border border-white/[0.08] bg-[#161E2E] p-4">
       <p className={fieldLabelClass}>{label}</p>
@@ -305,10 +359,13 @@ class CreateLeagueErrorBoundary extends Component<
     message: "",
   };
 
-  static getDerivedStateFromError(error: Error): CreateLeagueErrorBoundaryState {
+  static getDerivedStateFromError(
+    error: Error,
+  ): CreateLeagueErrorBoundaryState {
     return {
       hasError: true,
-      message: error.message || "The create league page hit an unexpected error.",
+      message:
+        error.message || "The create league page hit an unexpected error.",
     };
   }
 
@@ -321,10 +378,15 @@ class CreateLeagueErrorBoundary extends Component<
       <div className="min-h-full bg-[#070A12] px-6 py-10 text-[#F8FAFC] md:px-10">
         <div className="mx-auto max-w-2xl">
           <div className={cn(cardClass, "p-8 text-center md:p-10")}>
-            <p className="text-sm font-semibold text-[#60A5FA]">Create League</p>
-            <h1 className="mt-3 text-3xl font-extrabold tracking-[-0.03em]">Something broke on this step</h1>
+            <p className="text-sm font-semibold text-[#60A5FA]">
+              Create League
+            </p>
+            <h1 className="mt-3 text-3xl font-extrabold tracking-[-0.03em]">
+              Something broke on this step
+            </h1>
             <p className="mt-3 text-sm leading-6 text-[#94A3B8]">
-              The page recovered instead of going blank. Go back to the leagues page, then reopen Create League.
+              The page recovered instead of going blank. Go back to the leagues
+              page, then reopen Create League.
             </p>
             <p className="mt-4 rounded-[12px] border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-3 text-left text-xs font-semibold text-[#FCA5A5]">
               {this.state.message}
@@ -367,8 +429,11 @@ function CreateLeagueForm() {
   const [success, setSuccess] = useState<LeagueCreateResponse | null>(null);
   const [betaScoringAcknowledged, setBetaScoringAcknowledged] = useState(false);
 
-  const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
-  const timezone = timezoneOptions.some((option) => option.value === detectedTimezone)
+  const detectedTimezone =
+    Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
+  const timezone = timezoneOptions.some(
+    (option) => option.value === detectedTimezone,
+  )
     ? detectedTimezone
     : "America/New_York";
   const currentYear = new Date().getFullYear();
@@ -418,7 +483,10 @@ function CreateLeagueForm() {
     return true;
   }, [basics.name, basics.max_teams, draftDateTime, step]);
 
-  const nextStepLabel = step < steps.length - 1 ? `Continue to ${steps[step + 1]}` : "Create League";
+  const nextStepLabel =
+    step < steps.length - 1
+      ? `Continue to ${steps[step + 1]}`
+      : "Create League";
 
   const updateLeagueSize = (rawValue: number) => {
     setBasics((prev) => ({ ...prev, max_teams: rawValue }));
@@ -437,12 +505,16 @@ function CreateLeagueForm() {
 
   const handleCreate = async () => {
     if (!isLoggedIn || !getStoredAccessToken()) {
-      setError("Your sign-in session expired. Sign in again before creating a league.");
+      setError(
+        "Your sign-in session expired. Sign in again before creating a league.",
+      );
       navigate("/login", { replace: true, state: { from: "/leagues/create" } });
       return;
     }
     if (!draftDateTime || Number.isNaN(draftDateTime.getTime())) {
-      setError("Choose a valid draft date and time before creating the league.");
+      setError(
+        "Choose a valid draft date and time before creating the league.",
+      );
       return;
     }
     if (!isDraftTimeSafelyInFuture(draftDateTime)) {
@@ -450,7 +522,9 @@ function CreateLeagueForm() {
       return;
     }
     if (!betaScoringAcknowledged) {
-      setError("Acknowledge the standard beta rules before creating the league.");
+      setError(
+        "Acknowledge the standard beta rules before creating the league.",
+      );
       return;
     }
 
@@ -487,8 +561,14 @@ function CreateLeagueForm() {
         },
       };
       const response = await apiPost<LeagueCreateResponse>("/leagues", payload);
-      if (!response?.league?.id || !response.invite_code || !response.invite_link) {
-        throw new Error("League was created, but the API returned an incomplete invite response.");
+      if (
+        !response?.league?.id ||
+        !response.invite_code ||
+        !response.invite_link
+      ) {
+        throw new Error(
+          "League was created, but the API returned an incomplete invite response.",
+        );
       }
       queryClient.invalidateQueries({ queryKey: ["leagues"] });
       queryClient.setQueryData(["league", response.league.id], response.league);
@@ -505,18 +585,33 @@ function CreateLeagueForm() {
       <div className="relative isolate min-h-full overflow-hidden bg-[#070A12] px-6 py-10 text-[#F8FAFC] md:px-10">
         <CreateLeagueBackdrop />
         <div className="relative z-10 mx-auto max-w-2xl">
-          <div className={cn(cardClass, "relative overflow-hidden border-[#60A5FA]/20 p-8 text-center md:p-10")}>
+          <div
+            className={cn(
+              cardClass,
+              "relative overflow-hidden border-[#60A5FA]/20 p-8 text-center md:p-10",
+            )}
+          >
             <PlaybookDecor className="opacity-45" />
             <div className="relative z-10">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[16px] border border-[#67E8F9]/30 bg-[#67E8F9]/10">
                 <ShieldCheck className="h-6 w-6 text-[#67E8F9]" />
               </div>
-            <p className="text-sm font-semibold text-[#60A5FA]">College Football Fantasy</p>
-            <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.03em]">Sign in required</h1>
-            <p className="mt-3 text-sm text-[#94A3B8]">You need an account before creating a league.</p>
-            <Button type="button" onClick={() => navigate("/login")} className={cn(primaryButtonClass, "mt-8")}>
-              Go to Login
-            </Button>
+              <p className="text-sm font-semibold text-[#60A5FA]">
+                College Football Fantasy
+              </p>
+              <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.03em]">
+                Sign in required
+              </h1>
+              <p className="mt-3 text-sm text-[#94A3B8]">
+                You need an account before creating a league.
+              </p>
+              <Button
+                type="button"
+                onClick={() => navigate("/login")}
+                className={cn(primaryButtonClass, "mt-8")}
+              >
+                Go to Login
+              </Button>
             </div>
           </div>
         </div>
@@ -529,72 +624,90 @@ function CreateLeagueForm() {
       <div className="relative isolate min-h-full overflow-hidden bg-[#070A12] px-6 py-8 text-[#F8FAFC] md:px-10">
         <CreateLeagueBackdrop />
         <div className="relative z-10 mx-auto max-w-[1180px]">
-          <div className={cn(cardClass, "relative overflow-hidden border-[#60A5FA]/20 p-6 md:p-10")}>
+          <div
+            className={cn(
+              cardClass,
+              "relative overflow-hidden border-[#60A5FA]/20 p-6 md:p-10",
+            )}
+          >
             <PlaybookDecor className="opacity-30" />
             <div className="relative z-10">
-            <div className="flex flex-col gap-3 border-b border-white/[0.08] pb-8">
-              <div className="flex h-12 w-12 items-center justify-center rounded-[16px] border border-[#67E8F9]/30 bg-[#67E8F9]/10">
-                <Sparkles className="h-6 w-6 text-[#67E8F9]" />
+              <div className="flex flex-col gap-3 border-b border-white/[0.08] pb-8">
+                <div className="flex h-12 w-12 items-center justify-center rounded-[16px] border border-[#67E8F9]/30 bg-[#67E8F9]/10">
+                  <Sparkles className="h-6 w-6 text-[#67E8F9]" />
+                </div>
+                <p className="text-sm font-semibold text-[#60A5FA]">
+                  League created
+                </p>
+                <h1 className="font-display text-4xl font-black italic uppercase tracking-[-0.04em] md:text-5xl">
+                  Invite managers
+                </h1>
+                <p className="max-w-2xl text-sm leading-6 text-[#94A3B8]">
+                  Share the invite code or link. Managers can preview the league
+                  before joining.
+                </p>
               </div>
-              <p className="text-sm font-semibold text-[#60A5FA]">League created</p>
-              <h1 className="font-display text-4xl font-black italic uppercase tracking-[-0.04em] md:text-5xl">Invite managers</h1>
-              <p className="max-w-2xl text-sm leading-6 text-[#94A3B8]">
-                Share the invite code or link. Managers can preview the league before joining.
-              </p>
-            </div>
 
-            <div className="grid grid-cols-1 gap-5 py-8 md:grid-cols-2">
-              <div className="rounded-[16px] border border-white/[0.08] bg-[#161E2E] p-5">
-                <p className={fieldLabelClass}>Invite code</p>
-                <div className="mt-3 flex items-center justify-between gap-4">
-                  <span className="text-2xl font-bold tracking-[0.08em] text-[#60A5FA]">{success.invite_code}</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={cn(secondaryButtonClass, "h-10 px-4")}
-                    onClick={() => navigator.clipboard.writeText(success.invite_code)}
-                  >
-                    <Copy className="h-4 w-4" />
-                    Copy
-                  </Button>
+              <div className="grid grid-cols-1 gap-5 py-8 md:grid-cols-2">
+                <div className="rounded-[16px] border border-white/[0.08] bg-[#161E2E] p-5">
+                  <p className={fieldLabelClass}>Invite code</p>
+                  <div className="mt-3 flex items-center justify-between gap-4">
+                    <span className="text-2xl font-bold tracking-[0.08em] text-[#60A5FA]">
+                      {success.invite_code}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={cn(secondaryButtonClass, "h-10 px-4")}
+                      onClick={() =>
+                        navigator.clipboard.writeText(success.invite_code)
+                      }
+                    >
+                      <Copy className="h-4 w-4" />
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-[16px] border border-white/[0.08] bg-[#161E2E] p-5">
+                  <p className={fieldLabelClass}>Invite link</p>
+                  <div className="mt-3 flex items-center justify-between gap-4">
+                    <span className="truncate text-sm font-medium text-[#CBD5E1]">
+                      {success.invite_link}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={cn(secondaryButtonClass, "h-10 px-4")}
+                      onClick={() =>
+                        navigator.clipboard.writeText(success.invite_link)
+                      }
+                    >
+                      <Copy className="h-4 w-4" />
+                      Copy
+                    </Button>
+                  </div>
                 </div>
               </div>
 
-              <div className="rounded-[16px] border border-white/[0.08] bg-[#161E2E] p-5">
-                <p className={fieldLabelClass}>Invite link</p>
-                <div className="mt-3 flex items-center justify-between gap-4">
-                  <span className="truncate text-sm font-medium text-[#CBD5E1]">{success.invite_link}</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={cn(secondaryButtonClass, "h-10 px-4")}
-                    onClick={() => navigator.clipboard.writeText(success.invite_link)}
-                  >
-                    <Copy className="h-4 w-4" />
-                    Copy
-                  </Button>
-                </div>
+              <div className="flex flex-col-reverse gap-3 border-t border-white/[0.08] pt-6 sm:flex-row sm:items-center sm:justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={secondaryButtonClass}
+                  onClick={() => navigate("/leagues")}
+                >
+                  Back to Leagues
+                </Button>
+                <Button
+                  type="button"
+                  className={primaryButtonClass}
+                  onClick={() => navigate(`/league/${success.league.id}`)}
+                >
+                  Open League Hub
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
-            </div>
-
-            <div className="flex flex-col-reverse gap-3 border-t border-white/[0.08] pt-6 sm:flex-row sm:items-center sm:justify-between">
-              <Button
-                type="button"
-                variant="outline"
-                className={secondaryButtonClass}
-                onClick={() => navigate("/leagues")}
-              >
-                Back to Leagues
-              </Button>
-              <Button
-                type="button"
-                className={primaryButtonClass}
-                onClick={() => navigate(`/league/${success.league.id}`)}
-              >
-                Open League Hub
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
             </div>
           </div>
         </div>
@@ -603,7 +716,10 @@ function CreateLeagueForm() {
   }
 
   return (
-    <div className="relative isolate min-h-full overflow-hidden bg-[#070A12] px-5 py-6 text-[#F8FAFC] sm:px-8 md:px-10" data-create-step={step}>
+    <div
+      className="relative isolate min-h-full overflow-hidden bg-[#070A12] px-5 py-6 text-[#F8FAFC] sm:px-8 md:px-10"
+      data-create-step={step}
+    >
       <CreateLeagueBackdrop />
       <div className="relative z-10 mx-auto max-w-[1180px] space-y-7">
         <CreateLeagueHero currentStep={step} />
@@ -616,8 +732,16 @@ function CreateLeagueForm() {
           </div>
         )}
 
-        <section className={cn(cardClass, "relative overflow-hidden border-[#60A5FA]/15")}>
-          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#67E8F9] via-[#FCD34D] to-[#F43F8E]" />
+        <section
+          className={cn(
+            cardClass,
+            "relative overflow-hidden border-[#60A5FA]/15",
+          )}
+        >
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#67E8F9] via-[#FCD34D] to-[#F43F8E]"
+          />
           <PlaybookDecor className="opacity-20" />
           <div className="relative z-10 p-5 md:p-8 lg:p-10">
             {step === 0 && (
@@ -631,7 +755,9 @@ function CreateLeagueForm() {
                   <Field label="League name">
                     <Input
                       value={basics.name}
-                      onChange={(e) => setBasics((prev) => ({ ...prev, name: e.target.value }))}
+                      onChange={(e) =>
+                        setBasics((prev) => ({ ...prev, name: e.target.value }))
+                      }
                       className={inputClass}
                     />
                   </Field>
@@ -645,18 +771,27 @@ function CreateLeagueForm() {
                       </SelectTrigger>
                       <SelectContent className={selectContentClass}>
                         {leagueSizes.map((size) => (
-                          <SelectItem key={size} value={String(size)} className="text-sm font-medium">
+                          <SelectItem
+                            key={size}
+                            value={String(size)}
+                            className="text-sm font-medium"
+                          >
                             {size} Teams
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field label="Private league" helper="Only invited managers can join this league.">
+                  <Field
+                    label="Private league"
+                    helper="Only invited managers can join this league."
+                  >
                     <div className="flex h-12 items-center gap-3 rounded-[10px] border border-white/[0.08] bg-[#161E2E] px-4">
                       <Switch
                         checked={basics.is_private}
-                        onCheckedChange={(value) => setBasics((prev) => ({ ...prev, is_private: value }))}
+                        onCheckedChange={(value) =>
+                          setBasics((prev) => ({ ...prev, is_private: value }))
+                        }
                         className="data-[state=checked]:bg-[#60A5FA] data-[state=unchecked]:bg-[#334155] focus-visible:ring-[#60A5FA]/30"
                       />
                       <span className="text-sm font-semibold text-[#F8FAFC]">
@@ -664,10 +799,18 @@ function CreateLeagueForm() {
                       </span>
                     </div>
                   </Field>
-                  <Field label="Description (optional)" className="md:col-span-2">
+                  <Field
+                    label="Description (optional)"
+                    className="md:col-span-2"
+                  >
                     <Input
                       value={basics.description}
-                      onChange={(e) => setBasics((prev) => ({ ...prev, description: e.target.value }))}
+                      onChange={(e) =>
+                        setBasics((prev) => ({
+                          ...prev,
+                          description: e.target.value,
+                        }))
+                      }
                       className={inputClass}
                     />
                   </Field>
@@ -678,7 +821,12 @@ function CreateLeagueForm() {
                   >
                     <Input
                       value={basics.icon_url}
-                      onChange={(e) => setBasics((prev) => ({ ...prev, icon_url: e.target.value }))}
+                      onChange={(e) =>
+                        setBasics((prev) => ({
+                          ...prev,
+                          icon_url: e.target.value,
+                        }))
+                      }
                       className={inputClass}
                     />
                   </Field>
@@ -697,7 +845,12 @@ function CreateLeagueForm() {
                   <Field label="Playoff teams">
                     <Select
                       value={String(settings.playoff_teams)}
-                      onValueChange={(value) => setSettings((prev) => ({ ...prev, playoff_teams: Number(value) }))}
+                      onValueChange={(value) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          playoff_teams: Number(value),
+                        }))
+                      }
                     >
                       <SelectTrigger className={selectTriggerClass}>
                         <SelectValue />
@@ -706,24 +859,34 @@ function CreateLeagueForm() {
                         {playoffOptions
                           .filter((option) => option <= basics.max_teams)
                           .map((option) => (
-                          <SelectItem key={option} value={String(option)} className="text-sm font-medium">
-                            {option} Teams
-                          </SelectItem>
-                        ))}
+                            <SelectItem
+                              key={option}
+                              value={String(option)}
+                              className="text-sm font-medium"
+                            >
+                              {option} Teams
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </Field>
                   <Field label="Waiver system">
                     <Select
                       value={settings.waiver_type}
-                      onValueChange={(value) => setSettings((prev) => ({ ...prev, waiver_type: value }))}
+                      onValueChange={(value) =>
+                        setSettings((prev) => ({ ...prev, waiver_type: value }))
+                      }
                     >
                       <SelectTrigger className={selectTriggerClass}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className={selectContentClass}>
                         {waiverOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value} className="text-sm font-medium">
+                          <SelectItem
+                            key={option.value}
+                            value={option.value}
+                            className="text-sm font-medium"
+                          >
                             {option.label}
                           </SelectItem>
                         ))}
@@ -733,14 +896,23 @@ function CreateLeagueForm() {
                   <Field label="Trade review">
                     <Select
                       value={settings.trade_review_type}
-                      onValueChange={(value) => setSettings((prev) => ({ ...prev, trade_review_type: value }))}
+                      onValueChange={(value) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          trade_review_type: value,
+                        }))
+                      }
                     >
                       <SelectTrigger className={selectTriggerClass}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className={selectContentClass}>
                         {tradeReviewOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value} className="text-sm font-medium">
+                          <SelectItem
+                            key={option.value}
+                            value={option.value}
+                            className="text-sm font-medium"
+                          >
                             {option.label}
                           </SelectItem>
                         ))}
@@ -763,7 +935,12 @@ function CreateLeagueForm() {
                     <Input
                       type="date"
                       value={draft.draft_date}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, draft_date: e.target.value }))}
+                      onChange={(e) =>
+                        setDraft((prev) => ({
+                          ...prev,
+                          draft_date: e.target.value,
+                        }))
+                      }
                       className={inputClass}
                     />
                   </Field>
@@ -771,21 +948,32 @@ function CreateLeagueForm() {
                     <Input
                       type="time"
                       value={draft.draft_time}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, draft_time: e.target.value }))}
+                      onChange={(e) =>
+                        setDraft((prev) => ({
+                          ...prev,
+                          draft_time: e.target.value,
+                        }))
+                      }
                       className={inputClass}
                     />
                   </Field>
                   <Field label="Time zone">
                     <Select
                       value={draft.timezone}
-                      onValueChange={(value) => setDraft((prev) => ({ ...prev, timezone: value }))}
+                      onValueChange={(value) =>
+                        setDraft((prev) => ({ ...prev, timezone: value }))
+                      }
                     >
                       <SelectTrigger className={selectTriggerClass}>
                         <SelectValue placeholder="Select time zone" />
                       </SelectTrigger>
                       <SelectContent className={selectContentClass}>
                         {timezoneOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value} className="text-sm font-medium">
+                          <SelectItem
+                            key={option.value}
+                            value={option.value}
+                            className="text-sm font-medium"
+                          >
                             {option.label}
                           </SelectItem>
                         ))}
@@ -798,13 +986,18 @@ function CreateLeagueForm() {
                   <Field label="Draft type">
                     <Select
                       value={draft.draft_type}
-                      onValueChange={(value) => setDraft((prev) => ({ ...prev, draft_type: value }))}
+                      onValueChange={(value) =>
+                        setDraft((prev) => ({ ...prev, draft_type: value }))
+                      }
                     >
                       <SelectTrigger className={selectTriggerClass}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className={selectContentClass}>
-                        <SelectItem value="snake" className="text-sm font-medium">
+                        <SelectItem
+                          value="snake"
+                          className="text-sm font-medium"
+                        >
                           Snake Draft
                         </SelectItem>
                       </SelectContent>
@@ -814,17 +1007,26 @@ function CreateLeagueForm() {
                     <Select
                       value={draft.draft_order_mode}
                       onValueChange={(value: "random" | "custom") =>
-                        setDraft((prev) => ({ ...prev, draft_order_mode: value }))
+                        setDraft((prev) => ({
+                          ...prev,
+                          draft_order_mode: value,
+                        }))
                       }
                     >
                       <SelectTrigger className={selectTriggerClass}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className={selectContentClass}>
-                        <SelectItem value="random" className="text-sm font-medium">
+                        <SelectItem
+                          value="random"
+                          className="text-sm font-medium"
+                        >
                           Random at draft start
                         </SelectItem>
-                        <SelectItem value="custom" className="text-sm font-medium">
+                        <SelectItem
+                          value="custom"
+                          className="text-sm font-medium"
+                        >
                           Commissioner sets order
                         </SelectItem>
                       </SelectContent>
@@ -839,7 +1041,12 @@ function CreateLeagueForm() {
                     <Input
                       type="number"
                       value={draft.pick_timer_seconds}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, pick_timer_seconds: Number(e.target.value) }))}
+                      onChange={(e) =>
+                        setDraft((prev) => ({
+                          ...prev,
+                          pick_timer_seconds: Number(e.target.value),
+                        }))
+                      }
                       className={inputClass}
                     />
                   </Field>
@@ -864,22 +1071,34 @@ function CreateLeagueForm() {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <ReviewItem label="League name" value={basics.name} />
                   <ReviewItem label="Teams" value={basics.max_teams} />
-                  <ReviewItem label="Draft" value={formatDraftDateTime(draftDateTime)} />
+                  <ReviewItem
+                    label="Draft"
+                    value={formatDraftDateTime(draftDateTime)}
+                  />
                   <ReviewItem label="Commissioner" value="You" />
                   <ReviewItem label="Roster" value={standardRosterSummary} />
-                  <ReviewItem label="Scoring" value={standardBetaScoringSummary} />
+                  <ReviewItem
+                    label="Scoring"
+                    value={standardBetaScoringSummary}
+                  />
                 </div>
                 <div className="rounded-[16px] border border-amber-300/20 bg-amber-300/10 p-5">
                   <p className="text-sm font-bold text-amber-100">
-                    Beta notice: Standard scoring and roster rules are applied to every league and cannot be changed after creation.
+                    Beta notice: Standard scoring and roster rules are applied
+                    to every league and cannot be changed after creation.
                   </p>
                   <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm font-semibold leading-6 text-slate-100">
                     <Checkbox
                       checked={betaScoringAcknowledged}
-                      onCheckedChange={(checked) => setBetaScoringAcknowledged(checked === true)}
+                      onCheckedChange={(checked) =>
+                        setBetaScoringAcknowledged(checked === true)
+                      }
                       aria-label="I understand that standard scoring and roster rules cannot be changed during the beta."
                     />
-                    <span>I understand that standard scoring and roster rules cannot be changed during the beta.</span>
+                    <span>
+                      I understand that standard scoring and roster rules cannot
+                      be changed during the beta.
+                    </span>
                   </label>
                 </div>
               </div>
@@ -913,7 +1132,11 @@ function CreateLeagueForm() {
                 onClick={handleCreate}
                 disabled={loading || !betaScoringAcknowledged}
               >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
                 Create League
               </Button>
             )}

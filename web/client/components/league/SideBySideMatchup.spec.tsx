@@ -13,7 +13,12 @@ import { SideBySideMatchup } from "./SideBySideMatchup";
 
 afterEach(cleanup);
 
-const makePlayer = (id: number, name: string, slot: string, projection: number): LeagueRosterPlayer => ({
+const makePlayer = (
+  id: number,
+  name: string,
+  slot: string,
+  projection: number,
+): LeagueRosterPlayer => ({
   id,
   fantasy_team_id: id < 10 ? 1 : 2,
   fantasy_team_name: id < 10 ? "Adam's Team" : "Guy's Team",
@@ -33,7 +38,10 @@ const myTeam: LeagueMatchupTeam = {
   fantasy_team_name: "Adam's Team",
   record: "0-0-0",
   projected_total: 119.5,
-  roster: [makePlayer(1, "Long Name Quarterback", "QB", 24.1), makePlayer(2, "Bench Running Back", "BENCH", 9.3)],
+  roster: [
+    makePlayer(1, "Long Name Quarterback", "QB", 24.1),
+    makePlayer(2, "Bench Running Back", "BENCH", 9.3),
+  ],
 };
 
 const opponentTeam: LeagueMatchupTeam = {
@@ -41,15 +49,24 @@ const opponentTeam: LeagueMatchupTeam = {
   fantasy_team_name: "Guy's Team",
   record: "0-0-0",
   projected_total: 115.2,
-  roster: [makePlayer(10, "Opponent Quarterback", "QB", 22.7), makePlayer(11, "Opponent Bench", "BENCH", 8.8)],
+  roster: [
+    makePlayer(10, "Opponent Quarterback", "QB", 22.7),
+    makePlayer(11, "Opponent Bench", "BENCH", 8.8),
+  ],
 };
 
 describe("SideBySideMatchup", () => {
   it("renders a compact mobile starting lineup with both teams, slot, and weekly projections in each row", () => {
-    const { container } = render(<SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} />);
+    const { container } = render(
+      <SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} />,
+    );
 
     expect(screen.getByTestId("mobile-starting-lineup")).toBeTruthy();
-    expect(screen.getByTestId("mobile-starting-lineup").querySelectorAll("[data-mobile-matchup-row]")).toHaveLength(1);
+    expect(
+      screen
+        .getByTestId("mobile-starting-lineup")
+        .querySelectorAll("[data-mobile-matchup-row]"),
+    ).toHaveLength(1);
     expect(screen.getByText("Long Name Quarterback")).toBeTruthy();
     expect(screen.getByText("Opponent Quarterback")).toBeTruthy();
     expect(screen.getByText("QB")).toBeTruthy();
@@ -58,7 +75,9 @@ describe("SideBySideMatchup", () => {
   });
 
   it("keeps bench rows collapsed until a user chooses to inspect them", () => {
-    const { container } = render(<SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} />);
+    const { container } = render(
+      <SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} />,
+    );
 
     expect(screen.getByText("Bench depth")).toBeTruthy();
     expect(screen.getByTestId("mobile-bench-lineup")).toBeTruthy();

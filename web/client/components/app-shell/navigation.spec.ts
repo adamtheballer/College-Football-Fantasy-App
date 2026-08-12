@@ -42,11 +42,17 @@ describe("app shell navigation helpers", () => {
       "SETTINGS",
       "SIGN IN",
     ]);
-    expect(getMobileNavItems(items).map((item) => item.name)).not.toContain("HOME");
+    expect(getMobileNavItems(items).map((item) => item.name)).not.toContain(
+      "HOME",
+    );
   });
 
   it("includes admin scoring only for admin users", () => {
-    expect(getShellNavItems(user, true).some((item) => item.name === "ADMIN SCORING")).toBe(false);
+    expect(
+      getShellNavItems(user, true).some(
+        (item) => item.name === "ADMIN SCORING",
+      ),
+    ).toBe(false);
     expect(
       getShellNavItems({ ...user, isAdmin: true }, true).some(
         (item) => item.name === "ADMIN SCORING",
@@ -71,20 +77,29 @@ describe("app shell navigation helpers", () => {
 
   it("keeps Saturday Pick 6 out of permanent authenticated desktop navigation", () => {
     expect(getShellNavItems(user, true)).not.toContainEqual(
-      expect.objectContaining({ name: "SATURDAY PICK 6", path: "/saturday-pick-6" }),
+      expect.objectContaining({
+        name: "SATURDAY PICK 6",
+        path: "/saturday-pick-6",
+      }),
     );
   });
 
   it("surfaces an unread badge for the chats sidebar item", () => {
-    const chats = getShellNavItems(user, true, 12).find((item) => item.name === "CHATS");
-    const cappedChats = getShellNavItems(user, true, 120).find((item) => item.name === "CHATS");
+    const chats = getShellNavItems(user, true, 12).find(
+      (item) => item.name === "CHATS",
+    );
+    const cappedChats = getShellNavItems(user, true, 120).find(
+      (item) => item.name === "CHATS",
+    );
 
     expect(chats?.badge).toBe("12");
     expect(cappedChats?.badge).toBe("99+");
   });
 
   it("keeps mobile navigation focused on the primary destinations", () => {
-    const mobileItems = getMobileNavItems(getShellNavItems(user, true, 1, true));
+    const mobileItems = getMobileNavItems(
+      getShellNavItems(user, true, 1, true),
+    );
     const mobile = mobileItems.map((item) => item.name);
 
     expect(mobile).toEqual(["HOME", "LEAGUES", "CHATS", "MOCK DRAFT"]);

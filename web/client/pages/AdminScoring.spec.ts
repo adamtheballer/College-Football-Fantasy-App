@@ -47,7 +47,9 @@ describe("AdminScoring helpers", () => {
   it("validates admin numeric and stats inputs", () => {
     expect(numberOrUndefined("42")).toBe(42);
     expect(numberOrUndefined("")).toBeUndefined();
-    expect(parseJsonObject('{"PassingYards":300}')).toEqual({ PassingYards: 300 });
+    expect(parseJsonObject('{"PassingYards":300}')).toEqual({
+      PassingYards: 300,
+    });
     expect(() => parseJsonObject("[]")).toThrow("Stats must be a JSON object.");
   });
 });

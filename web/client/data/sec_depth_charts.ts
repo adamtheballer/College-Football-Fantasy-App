@@ -17,7 +17,11 @@ export type TeamDepthChart = {
   };
 };
 
-const NOT_SURE: DepthPlayer = { depth: 0, name: "not sure", classYear: "not sure" };
+const NOT_SURE: DepthPlayer = {
+  depth: 0,
+  name: "not sure",
+  classYear: "not sure",
+};
 
 export const secDepthCharts: TeamDepthChart[] = [
   {
@@ -25,7 +29,12 @@ export const secDepthCharts: TeamDepthChart[] = [
     conference: "SEC",
     positions: {
       QB: [
-        { depth: 1, name: "Austin Mack", classYear: "Junior", firstYearStarter: true },
+        {
+          depth: 1,
+          name: "Austin Mack",
+          classYear: "Junior",
+          firstYearStarter: true,
+        },
         { depth: 2, name: "Keelon Russell", classYear: "Freshman" },
       ],
       RB: [
@@ -54,7 +63,12 @@ export const secDepthCharts: TeamDepthChart[] = [
     conference: "SEC",
     positions: {
       QB: [
-        { depth: 1, name: "KJ Jackson", classYear: "Sophomore", firstYearStarter: true },
+        {
+          depth: 1,
+          name: "KJ Jackson",
+          classYear: "Sophomore",
+          firstYearStarter: true,
+        },
         { depth: 2, name: "AJ Hill", classYear: "Freshman" },
       ],
       RB: [
@@ -83,7 +97,12 @@ export const secDepthCharts: TeamDepthChart[] = [
     conference: "SEC",
     positions: {
       QB: [
-        { depth: 1, name: "Byrum Brown", classYear: "Senior", firstYearStarter: true },
+        {
+          depth: 1,
+          name: "Byrum Brown",
+          classYear: "Senior",
+          firstYearStarter: true,
+        },
         { depth: 2, name: "Tristan Ti'a", classYear: "Freshman" },
       ],
       RB: [
@@ -98,7 +117,12 @@ export const secDepthCharts: TeamDepthChart[] = [
         { depth: 4, name: "Jeremiah Koger", classYear: "Sophomore" },
       ],
       TE: [
-        { depth: 1, name: "Jake Johnson", classYear: "Senior", firstYearStarter: true },
+        {
+          depth: 1,
+          name: "Jake Johnson",
+          classYear: "Senior",
+          firstYearStarter: true,
+        },
         { depth: 2, name: "Jonathan Echols", classYear: "Sophomore" },
       ],
       K: [
@@ -112,7 +136,12 @@ export const secDepthCharts: TeamDepthChart[] = [
     conference: "SEC",
     positions: {
       QB: [
-        { depth: 1, name: "Aaron Philo", classYear: "Sophomore", firstYearStarter: true },
+        {
+          depth: 1,
+          name: "Aaron Philo",
+          classYear: "Sophomore",
+          firstYearStarter: true,
+        },
         { depth: 2, name: "Tramell Jones Jr.", classYear: "Freshman" },
       ],
       RB: [
@@ -124,7 +153,12 @@ export const secDepthCharts: TeamDepthChart[] = [
         { depth: 1, name: "Dallas Wilson", classYear: "Freshman" },
         { depth: 2, name: "Eric Singleton Jr.", classYear: "Senior" },
         { depth: 3, name: "Vernell Brown III", classYear: "Sophomore" },
-        { depth: 4, name: "Micah Mays Jr.", classYear: "Junior", firstYearStarter: true },
+        {
+          depth: 4,
+          name: "Micah Mays Jr.",
+          classYear: "Junior",
+          firstYearStarter: true,
+        },
       ],
       TE: [
         { depth: 1, name: "Luke Harpring", classYear: "Sophomore" },
@@ -170,7 +204,12 @@ export const secDepthCharts: TeamDepthChart[] = [
     conference: "SEC",
     positions: {
       QB: [
-        { depth: 1, name: "Kenny Minchey", classYear: "Junior", firstYearStarter: true },
+        {
+          depth: 1,
+          name: "Kenny Minchey",
+          classYear: "Junior",
+          firstYearStarter: true,
+        },
         { depth: 2, name: "Matt Ponatoski", classYear: "Freshman" },
       ],
       RB: [
@@ -180,7 +219,12 @@ export const secDepthCharts: TeamDepthChart[] = [
       ],
       WR: [
         { depth: 1, name: "DJ Miller", classYear: "Sophomore" },
-        { depth: 2, name: "Nic Anderson", classYear: "Senior", firstYearStarter: true },
+        {
+          depth: 2,
+          name: "Nic Anderson",
+          classYear: "Senior",
+          firstYearStarter: true,
+        },
         { depth: 3, name: "Kenny Darby", classYear: "Freshman" },
         { depth: 4, name: "Shane Carr", classYear: "Junior" },
       ],
@@ -199,7 +243,12 @@ export const secDepthCharts: TeamDepthChart[] = [
     conference: "SEC",
     positions: {
       QB: [
-        { depth: 1, name: "Sam Leavitt", classYear: "Junior", firstYearStarter: true },
+        {
+          depth: 1,
+          name: "Sam Leavitt",
+          classYear: "Junior",
+          firstYearStarter: true,
+        },
         { depth: 2, name: "Husan Longstreet", classYear: "Freshman" },
       ],
       RB: [
@@ -208,9 +257,24 @@ export const secDepthCharts: TeamDepthChart[] = [
         { depth: 3, name: "Dilin Jones", classYear: "Sophomore" },
       ],
       WR: [
-        { depth: 1, name: "Eugene Wilson III", classYear: "Junior", firstYearStarter: true },
-        { depth: 2, name: "Jayce Brown", classYear: "Senior", firstYearStarter: true },
-        { depth: 3, name: "Winston Watkins", classYear: "Sophomore", firstYearStarter: true },
+        {
+          depth: 1,
+          name: "Eugene Wilson III",
+          classYear: "Junior",
+          firstYearStarter: true,
+        },
+        {
+          depth: 2,
+          name: "Jayce Brown",
+          classYear: "Senior",
+          firstYearStarter: true,
+        },
+        {
+          depth: 3,
+          name: "Winston Watkins",
+          classYear: "Sophomore",
+          firstYearStarter: true,
+        },
         { depth: 4, name: "Jackson Harris", classYear: "Junior" },
       ],
       TE: [
@@ -228,7 +292,12 @@ export const secDepthCharts: TeamDepthChart[] = [
     conference: "SEC",
     positions: {
       QB: [
-        { depth: 1, name: "Kamario Taylor", classYear: "Sophomore", firstYearStarter: true },
+        {
+          depth: 1,
+          name: "Kamario Taylor",
+          classYear: "Sophomore",
+          firstYearStarter: true,
+        },
         { depth: 2, name: "AJ Swann", classYear: "Senior" },
       ],
       RB: [
@@ -257,7 +326,12 @@ export const secDepthCharts: TeamDepthChart[] = [
     conference: "SEC",
     positions: {
       QB: [
-        { depth: 1, name: "Austin Simmons", classYear: "Junior", firstYearStarter: true },
+        {
+          depth: 1,
+          name: "Austin Simmons",
+          classYear: "Junior",
+          firstYearStarter: true,
+        },
         { depth: 2, name: "Nick Evers", classYear: "Senior" },
       ],
       RB: [
@@ -373,7 +447,12 @@ export const secDepthCharts: TeamDepthChart[] = [
     conference: "SEC",
     positions: {
       QB: [
-        { depth: 1, name: "George MacIntyre", classYear: "Freshman", firstYearStarter: true },
+        {
+          depth: 1,
+          name: "George MacIntyre",
+          classYear: "Freshman",
+          firstYearStarter: true,
+        },
         { depth: 2, name: "Faizon Brandon", classYear: "Freshman" },
       ],
       RB: [
@@ -406,7 +485,12 @@ export const secDepthCharts: TeamDepthChart[] = [
         { depth: 2, name: "Brady Hart", classYear: "Freshman" },
       ],
       RB: [
-        { depth: 1, name: "Rueben Owens II", classYear: "Junior", firstYearStarter: true },
+        {
+          depth: 1,
+          name: "Rueben Owens II",
+          classYear: "Junior",
+          firstYearStarter: true,
+        },
         { depth: 2, name: "Jamarion Morrow", classYear: "Sophomore" },
         { depth: 3, name: "KJ Edwards", classYear: "Freshman" },
       ],
@@ -417,7 +501,12 @@ export const secDepthCharts: TeamDepthChart[] = [
         { depth: 4, name: "TK Norman", classYear: "Sophomore" },
       ],
       TE: [
-        { depth: 1, name: "Houston Thomas", classYear: "Senior", firstYearStarter: true },
+        {
+          depth: 1,
+          name: "Houston Thomas",
+          classYear: "Senior",
+          firstYearStarter: true,
+        },
         { depth: 2, name: "Richie Anderson III", classYear: "Junior" },
       ],
       K: [
@@ -440,7 +529,12 @@ export const secDepthCharts: TeamDepthChart[] = [
         { depth: 3, name: "James Simon", classYear: "Freshman" },
       ],
       WR: [
-        { depth: 1, name: "Cam Coleman", classYear: "Junior", firstYearStarter: true },
+        {
+          depth: 1,
+          name: "Cam Coleman",
+          classYear: "Junior",
+          firstYearStarter: true,
+        },
         { depth: 2, name: "Ryan Wingo", classYear: "Junior" },
         { depth: 3, name: "Emmett Mosley V", classYear: "Junior" },
         { depth: 4, name: "Sterling Berkhalter", classYear: "Senior" },
@@ -460,7 +554,12 @@ export const secDepthCharts: TeamDepthChart[] = [
     conference: "SEC",
     positions: {
       QB: [
-        { depth: 1, name: "Jared Curtis", classYear: "Freshman", firstYearStarter: true },
+        {
+          depth: 1,
+          name: "Jared Curtis",
+          classYear: "Freshman",
+          firstYearStarter: true,
+        },
         { depth: 2, name: "Blaze Berlowitz", classYear: "Junior" },
       ],
       RB: [

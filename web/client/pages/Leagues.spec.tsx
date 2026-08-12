@@ -35,11 +35,18 @@ afterEach(() => {
 
 describe("LeagueCard", () => {
   it("renders the saved league image inside the trophy tile", () => {
-    render(<LeagueCard {...props} iconUrl="https://images.example.com/saturday-league.png" />);
-
-    expect(screen.getByRole("img", { name: "Saturday League league logo" }).getAttribute("src")).toBe(
-      "https://images.example.com/saturday-league.png"
+    render(
+      <LeagueCard
+        {...props}
+        iconUrl="https://images.example.com/saturday-league.png"
+      />,
     );
+
+    expect(
+      screen
+        .getByRole("img", { name: "Saturday League league logo" })
+        .getAttribute("src"),
+    ).toBe("https://images.example.com/saturday-league.png");
     expect(screen.queryByLabelText("Default league trophy")).toBeNull();
   });
 
@@ -47,8 +54,15 @@ describe("LeagueCard", () => {
     const { rerender } = render(<LeagueCard {...props} iconUrl={null} />);
     expect(screen.getByLabelText("Default league trophy")).toBeTruthy();
 
-    rerender(<LeagueCard {...props} iconUrl="https://images.example.com/missing.png" />);
-    fireEvent.error(screen.getByRole("img", { name: "Saturday League league logo" }));
+    rerender(
+      <LeagueCard
+        {...props}
+        iconUrl="https://images.example.com/missing.png"
+      />,
+    );
+    fireEvent.error(
+      screen.getByRole("img", { name: "Saturday League league logo" }),
+    );
     expect(screen.getByLabelText("Default league trophy")).toBeTruthy();
   });
 
@@ -59,7 +73,7 @@ describe("LeagueCard", () => {
         status="post_draft"
         draftStatus="completed"
         iconUrl={null}
-      />
+      />,
     );
 
     const openHubButton = screen
@@ -68,8 +82,12 @@ describe("LeagueCard", () => {
     expect(openHubButton).toBeTruthy();
     fireEvent.click(openHubButton!);
     expect(props.onOpen).toHaveBeenCalledWith(1);
-    expect(screen.queryByRole("button", { name: /Join Draft Room/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Draft Room Locked/i })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Join Draft Room/i }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Draft Room Locked/i }),
+    ).toBeNull();
   });
 
   it("shows the signed-in manager's record, opponent, and canonical win chance", () => {

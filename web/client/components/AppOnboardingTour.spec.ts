@@ -14,7 +14,9 @@ describe("first-sign-in onboarding", () => {
     };
 
     expect(TOUR_STEPS.map((step) => step.target)).toEqual(
-      getShellNavItems(regularNewUser, true, 0, true).map((item) => `#${navDomId(item.name)}`),
+      getShellNavItems(regularNewUser, true, 0, true).map(
+        (item) => `#${navDomId(item.name)}`,
+      ),
     );
   });
 

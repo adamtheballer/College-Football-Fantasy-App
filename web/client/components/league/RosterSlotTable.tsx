@@ -3,8 +3,14 @@ import { useNavigate } from "react-router-dom";
 
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { usePlayerCard } from "@/hooks/use-players";
-import { useDropRosterPlayer, useUpdateLineup } from "@/hooks/use-roster-actions";
-import { getEligibleSlotsForPosition, normalizePosition } from "@/lib/rosterLegality";
+import {
+  useDropRosterPlayer,
+  useUpdateLineup,
+} from "@/hooks/use-roster-actions";
+import {
+  getEligibleSlotsForPosition,
+  normalizePosition,
+} from "@/lib/rosterLegality";
 import { formatProjectionDisplay } from "@/lib/projection-display";
 import type { LeagueRosterPlayer } from "@/types/league";
 import { cn } from "@/lib/utils";
@@ -18,7 +24,17 @@ import {
 } from "@/components/ui/dialog";
 
 const slotRank = (slot?: string | null) => {
-  const order = ["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "BENCH", "IR"];
+  const order = [
+    "QB",
+    "RB",
+    "WR",
+    "TE",
+    "FLEX",
+    "SUPERFLEX",
+    "K",
+    "BENCH",
+    "IR",
+  ];
   const index = order.indexOf((slot || "BENCH").toUpperCase());
   return index === -1 ? order.length : index;
 };
@@ -26,12 +42,21 @@ const slotRank = (slot?: string | null) => {
 const slotType = (player: LeagueRosterPlayer) =>
   (player.slot ?? player.roster_slot ?? "BENCH").toUpperCase();
 
-const slotLabel = (player: LeagueRosterPlayer) => player.display_label ?? slotType(player);
+const slotLabel = (player: LeagueRosterPlayer) =>
+  player.display_label ?? slotType(player);
 
 const positionLabel = (player: LeagueRosterPlayer) =>
   (player.position ?? player.player_position ?? "—").toUpperCase();
 
-const schoolAcronyms = new Set(["BYU", "LSU", "SMU", "TCU", "UCF", "UCLA", "USC"]);
+const schoolAcronyms = new Set([
+  "BYU",
+  "LSU",
+  "SMU",
+  "TCU",
+  "UCF",
+  "UCLA",
+  "USC",
+]);
 
 const displaySchoolName = (school?: string | null) => {
   const value = school?.trim();
@@ -39,23 +64,25 @@ const displaySchoolName = (school?: string | null) => {
   return value
     .split(/(\s+)/)
     .map((part) => {
-      if (!part.trim() || schoolAcronyms.has(part) || /[&()]/.test(part)) return part;
+      if (!part.trim() || schoolAcronyms.has(part) || /[&()]/.test(part))
+        return part;
       return `${part.slice(0, 1)}${part.slice(1).toLowerCase()}`;
     })
     .join("");
 };
 
 const weeklyProjectionLabel = (player: LeagueRosterPlayer) => {
-  const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
+  const projection =
+    player.projected_points ?? player.weekly_projected_fantasy_points;
   return formatProjectionDisplay(projection, player.projection_status);
 };
 
 const isRealRosterPlayer = (player: LeagueRosterPlayer) =>
   Boolean(
     player.player_id !== null &&
-      player.player_id !== undefined &&
-      !player.is_placeholder &&
-      !/\bpreview\b/i.test(player.player_name ?? ""),
+    player.player_id !== undefined &&
+    !player.is_placeholder &&
+    !/\bpreview\b/i.test(player.player_name ?? ""),
   );
 
 const positionStyles: Record<
@@ -148,12 +175,25 @@ type OwnedRosterActions = {
 
 const isUnavailableForSwap = (player: LeagueRosterPlayer) => {
   const status = (player.status ?? "").toUpperCase();
-  return Boolean(player.is_locked || player.is_ir || ["OUT", "IR", "INJURED", "PUP"].includes(status));
+  return Boolean(
+    player.is_locked ||
+    player.is_ir ||
+    ["OUT", "IR", "INJURED", "PUP"].includes(status),
+  );
 };
 
-const playerCanFillSlot = (player: LeagueRosterPlayer, slot: string, superflexEnabled: boolean) => {
+const playerCanFillSlot = (
+  player: LeagueRosterPlayer,
+  slot: string,
+  superflexEnabled: boolean,
+) => {
   const position = normalizePosition(player.position ?? player.player_position);
-  return Boolean(position && getEligibleSlotsForPosition(position, superflexEnabled).includes(slot as never));
+  return Boolean(
+    position &&
+    getEligibleSlotsForPosition(position, superflexEnabled).includes(
+      slot as never,
+    ),
+  );
 };
 
 export function RosterSlotTable({
@@ -174,27 +214,40 @@ export function RosterSlotTable({
   ownedRosterActions?: OwnedRosterActions;
 }) {
   const navigate = useNavigate();
-  const [selectedPlayer, setSelectedPlayer] = useState<LeagueRosterPlayer | null>(null);
+  const [selectedPlayer, setSelectedPlayer] =
+    useState<LeagueRosterPlayer | null>(null);
   const [swapPlayer, setSwapPlayer] = useState<LeagueRosterPlayer | null>(null);
   const [swapError, setSwapError] = useState<string | null>(null);
   const isBenchTone = tone === "bench";
   const sorted = [...players].sort((left, right) => {
-    const slotDelta = slotRank(left.roster_slot || left.slot) - slotRank(right.roster_slot || right.slot);
+    const slotDelta =
+      slotRank(left.roster_slot || left.slot) -
+      slotRank(right.roster_slot || right.slot);
     if (slotDelta !== 0) return slotDelta;
     return (left.slot_index ?? 0) - (right.slot_index ?? 0);
   });
 
-  const selectedPosition = selectedPlayer ? positionLabel(selectedPlayer) : null;
+  const selectedPosition = selectedPlayer
+    ? positionLabel(selectedPlayer)
+    : null;
   const selectedProjection =
-    selectedPlayer?.projected_points ?? selectedPlayer?.weekly_projected_fantasy_points;
+    selectedPlayer?.projected_points ??
+    selectedPlayer?.weekly_projected_fantasy_points;
   const selectedPlayerCardQuery = usePlayerCard(
     selectedPlayer?.player_id,
-    Boolean(selectedPlayer?.player_id)
+    Boolean(selectedPlayer?.player_id),
   );
   const ownedTeamId = ownedRosterActions?.teamId;
-  const numericLeagueId = typeof leagueId === "number" ? leagueId : Number(leagueId);
-  const updateLineupMutation = useUpdateLineup(ownedTeamId, Number.isFinite(numericLeagueId) ? numericLeagueId : undefined);
-  const dropPlayerMutation = useDropRosterPlayer(ownedTeamId, Number.isFinite(numericLeagueId) ? numericLeagueId : undefined);
+  const numericLeagueId =
+    typeof leagueId === "number" ? leagueId : Number(leagueId);
+  const updateLineupMutation = useUpdateLineup(
+    ownedTeamId,
+    Number.isFinite(numericLeagueId) ? numericLeagueId : undefined,
+  );
+  const dropPlayerMutation = useDropRosterPlayer(
+    ownedTeamId,
+    Number.isFinite(numericLeagueId) ? numericLeagueId : undefined,
+  );
   const tableColumns = showPositionColumn
     ? "md:grid-cols-[0.55fr_1.45fr_0.75fr_0.45fr_0.55fr_0.5fr]"
     : "md:grid-cols-[0.55fr_1.6fr_0.9fr_0.65fr_0.5fr]";
@@ -208,23 +261,48 @@ export function RosterSlotTable({
     if (!swapPlayer || !ownedRosterActions) return [];
     const selectedSlot = slotType(swapPlayer);
     return ownedRosterActions.roster.filter((candidate) => {
-      if (candidate.id === swapPlayer.id || !isRealRosterPlayer(candidate) || isUnavailableForSwap(candidate)) return false;
+      if (
+        candidate.id === swapPlayer.id ||
+        !isRealRosterPlayer(candidate) ||
+        isUnavailableForSwap(candidate)
+      )
+        return false;
       const candidateSlot = slotType(candidate);
       return (
         candidateSlot !== selectedSlot &&
-        playerCanFillSlot(candidate, selectedSlot, ownedRosterActions.superflexEnabled) &&
-        playerCanFillSlot(swapPlayer, candidateSlot, ownedRosterActions.superflexEnabled)
+        playerCanFillSlot(
+          candidate,
+          selectedSlot,
+          ownedRosterActions.superflexEnabled,
+        ) &&
+        playerCanFillSlot(
+          swapPlayer,
+          candidateSlot,
+          ownedRosterActions.superflexEnabled,
+        )
       );
     });
   }, [ownedRosterActions, swapPlayer]);
   const beginSwap = () => {
-    if (!selectedPlayer || !ownedRosterActions || isUnavailableForSwap(selectedPlayer)) return;
+    if (
+      !selectedPlayer ||
+      !ownedRosterActions ||
+      isUnavailableForSwap(selectedPlayer)
+    )
+      return;
     setSwapError(null);
     setSwapPlayer(selectedPlayer);
     setSelectedPlayer(null);
   };
   const confirmSwap = async (candidate: LeagueRosterPlayer) => {
-    if (!swapPlayer || !swapPlayer.id || !candidate.id || !swapPlayer.slot_index || !candidate.slot_index) return;
+    if (
+      !swapPlayer ||
+      !swapPlayer.id ||
+      !candidate.id ||
+      !swapPlayer.slot_index ||
+      !candidate.slot_index
+    )
+      return;
     setSwapError(null);
     try {
       await updateLineupMutation.mutateAsync([
@@ -241,17 +319,32 @@ export function RosterSlotTable({
       ]);
       setSwapPlayer(null);
     } catch (error) {
-      setSwapError(error instanceof Error ? error.message : "Unable to swap players.");
+      setSwapError(
+        error instanceof Error ? error.message : "Unable to swap players.",
+      );
     }
   };
   const dropSelectedPlayer = async () => {
-    if (!selectedPlayer || !selectedPlayer.id || !ownedRosterActions || isUnavailableForSwap(selectedPlayer)) return;
-    if (!window.confirm(`Drop ${selectedPlayer.player_name}? You can add them again if they are available.`)) return;
+    if (
+      !selectedPlayer ||
+      !selectedPlayer.id ||
+      !ownedRosterActions ||
+      isUnavailableForSwap(selectedPlayer)
+    )
+      return;
+    if (
+      !window.confirm(
+        `Drop ${selectedPlayer.player_name}? You can add them again if they are available.`,
+      )
+    )
+      return;
     try {
       await dropPlayerMutation.mutateAsync(selectedPlayer.id);
       setSelectedPlayer(null);
     } catch (error) {
-      setSwapError(error instanceof Error ? error.message : "Unable to drop player.");
+      setSwapError(
+        error instanceof Error ? error.message : "Unable to drop player.",
+      );
     }
   };
 
@@ -261,19 +354,21 @@ export function RosterSlotTable({
         "overflow-hidden rounded-[1.5rem] border",
         isBenchTone
           ? "border-slate-300/15 bg-[linear-gradient(135deg,rgba(5,10,18,0.98),rgba(13,18,28,0.94)_52%,rgba(8,13,24,0.98))] shadow-[0_18px_54px_rgba(2,6,23,0.42)]"
-          : "border-sky-300/15 bg-[linear-gradient(135deg,rgba(8,18,32,0.98),rgba(13,23,39,0.94)_48%,rgba(15,23,42,0.98))] shadow-[0_22px_70px_rgba(14,165,233,0.08)]"
+          : "border-sky-300/15 bg-[linear-gradient(135deg,rgba(8,18,32,0.98),rgba(13,23,39,0.94)_48%,rgba(15,23,42,0.98))] shadow-[0_22px_70px_rgba(14,165,233,0.08)]",
       )}
     >
       <div
         className={cn(
           "border-b px-5 py-4",
-          isBenchTone ? "border-white/10 bg-white/[0.025]" : "border-sky-300/10 bg-sky-300/[0.03]"
+          isBenchTone
+            ? "border-white/10 bg-white/[0.025]"
+            : "border-sky-300/10 bg-sky-300/[0.03]",
         )}
       >
         <h2
           className={cn(
             "text-[11px] font-black uppercase tracking-[0.22em]",
-            isBenchTone ? "text-slate-300" : "text-sky-300"
+            isBenchTone ? "text-slate-300" : "text-sky-300",
           )}
         >
           {title}
@@ -283,14 +378,19 @@ export function RosterSlotTable({
         <p
           className={cn(
             "border-t border-dashed px-5 py-6 text-sm text-slate-400",
-            isBenchTone ? "border-white/10" : "border-sky-300/10"
+            isBenchTone ? "border-white/10" : "border-sky-300/10",
           )}
         >
           {emptyText}
         </p>
       ) : (
         <div className="divide-y divide-white/10">
-          <div className={cn("hidden gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 md:grid", tableColumns)}>
+          <div
+            className={cn(
+              "hidden gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 md:grid",
+              tableColumns,
+            )}
+          >
             <span>Slot</span>
             <span>Player</span>
             <span>School</span>
@@ -301,13 +401,20 @@ export function RosterSlotTable({
           {sorted.map((player) => {
             const position = positionLabel(player);
             const isRealPlayer = isRealRosterPlayer(player);
-            const style = getPositionStyle(isRealPlayer ? position : slotType(player));
+            const style = getPositionStyle(
+              isRealPlayer ? position : slotType(player),
+            );
             const projection = isRealPlayer
-              ? player.projected_points ?? player.weekly_projected_fantasy_points ?? null
+              ? (player.projected_points ??
+                player.weekly_projected_fantasy_points ??
+                null)
               : 0;
             return (
               <button
-                key={player.slot_id ?? `${player.team_id ?? player.fantasy_team_id}-${slotType(player)}-${player.slot_index ?? 0}`}
+                key={
+                  player.slot_id ??
+                  `${player.team_id ?? player.fantasy_team_id}-${slotType(player)}-${player.slot_index ?? 0}`
+                }
                 type="button"
                 data-roster-mobile-row
                 onClick={() => {
@@ -319,44 +426,84 @@ export function RosterSlotTable({
                 className={cn(
                   "grid min-h-[76px] w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-3 text-left text-sm text-cfb-text-secondary transition focus:outline-none focus-visible:bg-cfb-brand/[0.08] focus-visible:ring-2 focus-visible:ring-cfb-brand/50 md:min-h-0 md:gap-3 md:px-5 md:py-4",
                   tableColumns,
-                  isRealPlayer ? style.row : "cursor-not-allowed opacity-75"
+                  isRealPlayer ? style.row : "cursor-not-allowed opacity-75",
                 )}
               >
                 <span className="flex items-center gap-2">
                   <span
                     className={cn(
                       "inline-flex min-w-[3.4rem] shrink-0 justify-center whitespace-nowrap rounded-full border px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] md:min-w-[3.25rem] md:px-3 md:py-1 md:tracking-[0.14em]",
-                      style.pill
+                      style.pill,
                     )}
                   >
                     {slotLabel(player)}
                   </span>
-                  <span className={cn("hidden h-2.5 w-2.5 rounded-full md:block", style.dot)} />
+                  <span
+                    className={cn(
+                      "hidden h-2.5 w-2.5 rounded-full md:block",
+                      style.dot,
+                    )}
+                  />
                 </span>
                 <span className="flex min-w-0 flex-col gap-1">
-                  <span className="truncate font-black text-cfb-text-primary">{isRealPlayer ? player.player_name : "N/A"}</span>
+                  <span className="truncate font-black text-cfb-text-primary">
+                    {isRealPlayer ? player.player_name : "N/A"}
+                  </span>
                   <span
                     className={cn(
                       "hidden w-fit shrink-0 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] md:inline-flex",
-                      style.pill
+                      style.pill,
                     )}
                   >
                     {position}
                   </span>
                   <span className="truncate text-[10px] font-bold text-cfb-text-muted md:hidden">
                     {isRealPlayer
-                      ? [displaySchoolName(player.school ?? player.player_school), player.opponent ? `vs ${player.opponent}` : "Opponent TBD"].filter(Boolean).join(" · ")
+                      ? [
+                          displaySchoolName(
+                            player.school ?? player.player_school,
+                          ),
+                          player.opponent
+                            ? `vs ${player.opponent}`
+                            : "Opponent TBD",
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")
                       : "Open roster slot"}
                   </span>
                 </span>
-                <span className="hidden text-cfb-text-muted md:block">{isRealPlayer ? displaySchoolName(player.school ?? player.player_school) || "—" : "—"}</span>
+                <span className="hidden text-cfb-text-muted md:block">
+                  {isRealPlayer
+                    ? displaySchoolName(
+                        player.school ?? player.player_school,
+                      ) || "—"
+                    : "—"}
+                </span>
                 {showPositionColumn ? (
-                  <span className={cn("hidden font-black md:block", style.text)}>{position}</span>
+                  <span
+                    className={cn("hidden font-black md:block", style.text)}
+                  >
+                    {position}
+                  </span>
                 ) : null}
-                <span className="hidden text-cfb-text-muted md:block">{isRealPlayer ? player.opponent ?? "TBD" : "—"}</span>
-                <span className={cn("flex flex-col items-end text-right font-black tabular-nums", style.text)}>
-                  <span className="text-[8px] uppercase tracking-[0.12em] text-cfb-text-muted md:hidden">Proj</span>
-                  <span>{formatProjectionDisplay(projection, player.projection_status)}</span>
+                <span className="hidden text-cfb-text-muted md:block">
+                  {isRealPlayer ? (player.opponent ?? "TBD") : "—"}
+                </span>
+                <span
+                  className={cn(
+                    "flex flex-col items-end text-right font-black tabular-nums",
+                    style.text,
+                  )}
+                >
+                  <span className="text-[8px] uppercase tracking-[0.12em] text-cfb-text-muted md:hidden">
+                    Proj
+                  </span>
+                  <span>
+                    {formatProjectionDisplay(
+                      projection,
+                      player.projection_status,
+                    )}
+                  </span>
                 </span>
               </button>
             );
@@ -377,13 +524,18 @@ export function RosterSlotTable({
             ownedRosterActions && !isUnavailableForSwap(selectedPlayer)
               ? [
                   { label: "Swap Player", onClick: beginSwap },
-                  { label: "Drop Player", onClick: () => void dropSelectedPlayer() },
+                  {
+                    label: "Drop Player",
+                    onClick: () => void dropSelectedPlayer(),
+                  },
                 ]
               : []
           }
           card={selectedPlayerCardQuery.data}
           error={selectedPlayerCardQuery.isError}
-          leagueId={Number.isFinite(numericLeagueId) ? numericLeagueId : undefined}
+          leagueId={
+            Number.isFinite(numericLeagueId) ? numericLeagueId : undefined
+          }
           loading={selectedPlayerCardQuery.isLoading}
           onClose={() => setSelectedPlayer(null)}
           onRetry={() => void selectedPlayerCardQuery.refetch()}
@@ -408,15 +560,22 @@ export function RosterSlotTable({
           title="Roster Player Card"
         />
       ) : null}
-      <Dialog open={Boolean(swapPlayer)} onOpenChange={(open) => !open && setSwapPlayer(null)}>
+      <Dialog
+        open={Boolean(swapPlayer)}
+        onOpenChange={(open) => !open && setSwapPlayer(null)}
+      >
         <DialogContent
           className="max-w-2xl border-white/10 bg-slate-950 text-slate-50"
           overlayClassName="bg-slate-950/45 backdrop-blur-[2px]"
         >
           <DialogHeader>
-            <DialogTitle className="pr-8 text-2xl font-black italic">Swap {swapPlayer?.player_name}</DialogTitle>
+            <DialogTitle className="pr-8 text-2xl font-black italic">
+              Swap {swapPlayer?.player_name}
+            </DialogTitle>
             <DialogDescription className="text-slate-300">
-              Choose an unlocked, healthy teammate eligible for {swapPlayer ? slotLabel(swapPlayer) : "this slot"}. Both lineup slots update together.
+              Choose an unlocked, healthy teammate eligible for{" "}
+              {swapPlayer ? slotLabel(swapPlayer) : "this slot"}. Both lineup
+              slots update together.
             </DialogDescription>
           </DialogHeader>
           {swapCandidates.length ? (
@@ -430,12 +589,18 @@ export function RosterSlotTable({
                   className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/[0.045] p-4 text-left transition hover:border-cyan-200/40 hover:bg-cyan-200/10 disabled:opacity-60"
                 >
                   <span>
-                    <span className="block font-black text-white">{candidate.player_name}</span>
+                    <span className="block font-black text-white">
+                      {candidate.player_name}
+                    </span>
                     <span className="mt-1 block text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
-                      {positionLabel(candidate)} • {displaySchoolName(candidate.school ?? candidate.player_school)}
+                      {positionLabel(candidate)} •{" "}
+                      {displaySchoolName(
+                        candidate.school ?? candidate.player_school,
+                      )}
                     </span>
                     <span className="mt-2 block text-[10px] font-black uppercase tracking-[0.14em] text-cyan-100/70">
-                      Opp {candidate.opponent ?? "TBD"} • Proj {weeklyProjectionLabel(candidate)}
+                      Opp {candidate.opponent ?? "TBD"} • Proj{" "}
+                      {weeklyProjectionLabel(candidate)}
                     </span>
                   </span>
                   <span className="rounded-full border border-white/15 px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-white/70">
@@ -449,9 +614,15 @@ export function RosterSlotTable({
               No eligible, unlocked teammates can make this swap.
             </p>
           )}
-          {swapError ? <p className="text-sm font-bold text-red-300">{swapError}</p> : null}
+          {swapError ? (
+            <p className="text-sm font-bold text-red-300">{swapError}</p>
+          ) : null}
           <DialogFooter>
-            <button type="button" onClick={() => setSwapPlayer(null)} className="rounded-xl border border-white/15 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-white/75">
+            <button
+              type="button"
+              onClick={() => setSwapPlayer(null)}
+              className="rounded-xl border border-white/15 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-white/75"
+            >
               Cancel
             </button>
           </DialogFooter>

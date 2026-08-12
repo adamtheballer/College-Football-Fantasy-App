@@ -15,7 +15,7 @@ describe("formatDraftProjection", () => {
     expect(
       formatDraftProjection({
         fallbackSeasonProjection: 314,
-      })
+      }),
     ).toBe("314.0");
   });
 

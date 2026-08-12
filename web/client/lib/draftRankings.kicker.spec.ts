@@ -18,7 +18,7 @@ describe("kicker draft-board placement", () => {
       getEarliestKickerDraftRank({
         leagueSize: 4,
         rosterSlots: standardRosterSlots,
-      })
+      }),
     ).toBe(100);
   });
 
@@ -27,7 +27,7 @@ describe("kicker draft-board placement", () => {
       getEarliestKickerDraftRank({
         leagueSize: 12,
         rosterSlots: standardRosterSlots,
-      })
+      }),
     ).toBe(132);
   });
 });

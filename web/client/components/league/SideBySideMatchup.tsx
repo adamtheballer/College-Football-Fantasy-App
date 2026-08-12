@@ -17,7 +17,17 @@ const startersFor = (team: LeagueMatchupTeam | null) =>
 const reservesFor = (team: LeagueMatchupTeam | null) =>
   (team?.roster ?? []).filter(isReservePlayer);
 
-const slotOrder = ["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "BENCH", "IR"];
+const slotOrder = [
+  "QB",
+  "RB",
+  "WR",
+  "TE",
+  "FLEX",
+  "SUPERFLEX",
+  "K",
+  "BENCH",
+  "IR",
+];
 
 const sortBySlot = (players: LeagueRosterPlayer[]) =>
   [...players].sort((left, right) => {
@@ -30,7 +40,9 @@ const sortBySlot = (players: LeagueRosterPlayer[]) =>
   });
 
 const compactSlot = (player?: LeagueRosterPlayer) =>
-  player ? (player.display_label ?? rosterSlot(player) ?? "—").toUpperCase() : "—";
+  player
+    ? (player.display_label ?? rosterSlot(player) ?? "—").toUpperCase()
+    : "—";
 
 const compactProjection = (player?: LeagueRosterPlayer) =>
   formatProjectionDisplay(
@@ -45,18 +57,33 @@ const compactPlayerMeta = (player?: LeagueRosterPlayer) => {
   return `${school} · ${opponent}`;
 };
 
-function CompactMatchupPlayer({ player, align }: { player?: LeagueRosterPlayer; align: "left" | "right" }) {
+function CompactMatchupPlayer({
+  player,
+  align,
+}: {
+  player?: LeagueRosterPlayer;
+  align: "left" | "right";
+}) {
   const hasPlayer = Boolean(player?.player_id && player.player_name);
   return (
-    <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
-      <p className={`truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
+    <div
+      className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}
+    >
+      <p
+        className={`truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}
+      >
         {hasPlayer ? player?.player_name : "Open slot"}
       </p>
       <p className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
         {compactPlayerMeta(player)}
       </p>
-      <p className={`mt-1 text-[11px] font-black tabular-nums ${align === "right" ? "text-cfb-pink" : "text-cfb-brand"}`}>
-        {compactProjection(player)} <span className="text-[8px] uppercase tracking-[0.08em] text-cfb-text-muted">proj</span>
+      <p
+        className={`mt-1 text-[11px] font-black tabular-nums ${align === "right" ? "text-cfb-pink" : "text-cfb-brand"}`}
+      >
+        {compactProjection(player)}{" "}
+        <span className="text-[8px] uppercase tracking-[0.08em] text-cfb-text-muted">
+          proj
+        </span>
       </p>
     </div>
   );
@@ -76,10 +103,17 @@ function CompactMobileLineup({
   const rowCount = Math.max(myPlayers.length, opponentPlayers.length);
 
   return (
-    <section data-testid={testId} className="overflow-hidden rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised/95 shadow-[0_16px_38px_rgba(2,6,23,0.26)] md:hidden">
+    <section
+      data-testid={testId}
+      className="overflow-hidden rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised/95 shadow-[0_16px_38px_rgba(2,6,23,0.26)] md:hidden"
+    >
       <div className="flex items-center justify-between border-b border-cfb-border-subtle bg-cfb-surface/70 px-4 py-3">
-        <h2 className="text-[11px] font-black uppercase tracking-[0.17em] text-cfb-brand">{title}</h2>
-        <span className="text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Weekly proj</span>
+        <h2 className="text-[11px] font-black uppercase tracking-[0.17em] text-cfb-brand">
+          {title}
+        </h2>
+        <span className="text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">
+          Weekly proj
+        </span>
       </div>
       <div className="divide-y divide-cfb-border-subtle/80">
         {Array.from({ length: rowCount }, (_, index) => {
@@ -123,9 +157,7 @@ export function SideBySideMatchup({
     <div className="space-y-4 sm:space-y-6">
       <section className="space-y-3">
         <div>
-          <p className="cfb-micro-label text-cfb-brand">
-            Starting Matchup
-          </p>
+          <p className="cfb-micro-label text-cfb-brand">Starting Matchup</p>
         </div>
         <CompactMobileLineup
           title="Starting lineup"
@@ -154,7 +186,9 @@ export function SideBySideMatchup({
       <details className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised/95 p-0 md:hidden">
         <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between px-4 text-[11px] font-black uppercase tracking-[0.16em] text-cfb-text-secondary [&::-webkit-details-marker]:hidden">
           Bench depth
-          <span className="text-[9px] text-cfb-text-muted">{myReserves.length} / {opponentReserves.length}</span>
+          <span className="text-[9px] text-cfb-text-muted">
+            {myReserves.length} / {opponentReserves.length}
+          </span>
         </summary>
         <div className="border-t border-cfb-border-subtle p-3">
           <CompactMobileLineup
@@ -166,12 +200,14 @@ export function SideBySideMatchup({
         </div>
       </details>
 
-      <SurfaceCard variant="default" padding="compact" className="hidden space-y-3 md:block">
+      <SurfaceCard
+        variant="default"
+        padding="compact"
+        className="hidden space-y-3 md:block"
+      >
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="cfb-micro-label text-cfb-text-muted">
-              Bench Depth
-            </p>
+            <p className="cfb-micro-label text-cfb-text-muted">Bench Depth</p>
           </div>
         </div>
         <div className="grid gap-5 xl:grid-cols-2">

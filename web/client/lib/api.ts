@@ -9,9 +9,14 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || resolveDefaultApiBase();
 
 const isLocalApiBase = () => {
   try {
-    const origin = typeof window === "undefined" ? "http://127.0.0.1" : window.location.origin;
+    const origin =
+      typeof window === "undefined"
+        ? "http://127.0.0.1"
+        : window.location.origin;
     const hostname = new URL(API_BASE, origin).hostname;
-    return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1";
+    return (
+      hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1"
+    );
   } catch {
     return false;
   }
@@ -39,10 +44,14 @@ export class ApiError extends Error {
   }
 }
 
-export const buildApiUrl = (path: string, params?: Record<string, string | number | boolean | undefined>) => {
+export const buildApiUrl = (
+  path: string,
+  params?: Record<string, string | number | boolean | undefined>,
+) => {
   const base = API_BASE.replace(/\/+$/, "");
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
-  const origin = typeof window === "undefined" ? "http://127.0.0.1" : window.location.origin;
+  const origin =
+    typeof window === "undefined" ? "http://127.0.0.1" : window.location.origin;
   const url = new URL(`${base}${cleanPath}`, origin);
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
@@ -94,7 +103,7 @@ export const getStoredAccessTokenExpiresAt = (): string | null =>
 
 export const storeAccessTokenSession = (
   accessToken: string,
-  accessTokenExpiresAt: string
+  accessTokenExpiresAt: string,
 ) => {
   safeStorageSet(ACCESS_TOKEN_STORAGE_KEY, accessToken);
   safeStorageSet(ACCESS_TOKEN_EXPIRES_AT_STORAGE_KEY, accessTokenExpiresAt);
@@ -148,7 +157,10 @@ const refreshAccessToken = async (): Promise<RefreshResult> => {
       if (!payload.access_token || !payload.access_token_expires_at) {
         return "transient_failure";
       }
-      storeAccessTokenSession(payload.access_token, payload.access_token_expires_at);
+      storeAccessTokenSession(
+        payload.access_token,
+        payload.access_token_expires_at,
+      );
       return "refreshed";
     } catch {
       return "transient_failure";
@@ -211,7 +223,9 @@ const buildError = async (res: Response) => {
   }
 
   if (detail && typeof detail === "object" && "detail" in detail) {
-    const validationMessage = formatValidationDetail((detail as { detail?: unknown }).detail);
+    const validationMessage = formatValidationDetail(
+      (detail as { detail?: unknown }).detail,
+    );
     if (validationMessage) {
       return new ApiError(res.status, validationMessage, detail);
     }
@@ -221,7 +235,11 @@ const buildError = async (res: Response) => {
     return new ApiError(res.status, detail, detail);
   }
 
-  return new ApiError(res.status, `API ${res.status}: ${res.statusText}`, detail);
+  return new ApiError(
+    res.status,
+    `API ${res.status}: ${res.statusText}`,
+    detail,
+  );
 };
 
 const parseJson = async <T>(res: Response): Promise<T> => {
@@ -244,11 +262,14 @@ const createRequestSignal = (externalSignal?: AbortSignal) => {
   const controller = new AbortController();
   let timedOut = false;
 
-  const abortFromExternalSignal = () => controller.abort(externalSignal?.reason);
+  const abortFromExternalSignal = () =>
+    controller.abort(externalSignal?.reason);
   if (externalSignal?.aborted) {
     abortFromExternalSignal();
   } else {
-    externalSignal?.addEventListener("abort", abortFromExternalSignal, { once: true });
+    externalSignal?.addEventListener("abort", abortFromExternalSignal, {
+      once: true,
+    });
   }
 
   const timeout = setTimeout(() => {
@@ -295,22 +316,20 @@ const apiRequest = async <T>({
       throw new ApiError(
         0,
         `The service took too long to respond. ${apiUnavailableMessage()}`,
-        { apiBase: API_BASE, timeoutMs: API_REQUEST_TIMEOUT_MS }
+        { apiBase: API_BASE, timeoutMs: API_REQUEST_TIMEOUT_MS },
       );
     }
     if (error instanceof DOMException && error.name === "AbortError") {
       throw error;
     }
-    throw new ApiError(
-      0,
-      apiUnavailableMessage(),
-      { cause: error instanceof Error ? error.message : String(error), apiBase: API_BASE }
-    );
+    throw new ApiError(0, apiUnavailableMessage(), {
+      cause: error instanceof Error ? error.message : String(error),
+      apiBase: API_BASE,
+    });
   } finally {
     requestSignal.dispose();
   }
-  const canRefreshForPath =
-    !path.startsWith("/auth/") || path === "/auth/me";
+  const canRefreshForPath = !path.startsWith("/auth/") || path === "/auth/me";
   if (res.status === 401 && retryOn401 && canRefreshForPath) {
     const refreshResult = await refreshAccessToken();
     if (refreshResult === "refreshed") {
@@ -327,7 +346,7 @@ const apiRequest = async <T>({
       throw new ApiError(
         0,
         `Unable to refresh your sign-in session at ${API_BASE}. Check your connection and try again; you have not been signed out.`,
-        { apiBase: API_BASE, refresh: "transient_failure" }
+        { apiBase: API_BASE, refresh: "transient_failure" },
       );
     }
   }
@@ -340,7 +359,7 @@ const apiRequest = async <T>({
 export const apiGet = async <T>(
   path: string,
   params?: Record<string, string | number | boolean | undefined>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<T> => {
   return apiRequest<T>({ method: "GET", path, params, signal });
 };
@@ -349,13 +368,14 @@ export const apiGet = async <T>(
 export const getLeaguePlayerHistory = async <T>(
   leagueId: number,
   playerId: number,
-  params?: { limit?: number; offset?: number }
-): Promise<T> => apiGet<T>(`/leagues/${leagueId}/players/${playerId}/history`, params);
+  params?: { limit?: number; offset?: number },
+): Promise<T> =>
+  apiGet<T>(`/leagues/${leagueId}/players/${playerId}/history`, params);
 
 export const apiPost = async <T>(
   path: string,
   body: unknown,
-  params?: Record<string, string | number | boolean | undefined>
+  params?: Record<string, string | number | boolean | undefined>,
 ): Promise<T> => {
   return apiRequest<T>({ method: "POST", path, body, params });
 };
@@ -363,7 +383,7 @@ export const apiPost = async <T>(
 export const apiPut = async <T>(
   path: string,
   body: unknown,
-  params?: Record<string, string | number | boolean | undefined>
+  params?: Record<string, string | number | boolean | undefined>,
 ): Promise<T> => {
   return apiRequest<T>({ method: "PUT", path, body, params });
 };
@@ -371,14 +391,14 @@ export const apiPut = async <T>(
 export const apiPatch = async <T>(
   path: string,
   body: unknown,
-  params?: Record<string, string | number | boolean | undefined>
+  params?: Record<string, string | number | boolean | undefined>,
 ): Promise<T> => {
   return apiRequest<T>({ method: "PATCH", path, body, params });
 };
 
 export const apiDelete = async <T>(
   path: string,
-  params?: Record<string, string | number | boolean | undefined>
+  params?: Record<string, string | number | boolean | undefined>,
 ): Promise<T> => {
   return apiRequest<T>({ method: "DELETE", path, params });
 };

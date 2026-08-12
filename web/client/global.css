@@ -161,9 +161,21 @@
   body {
     @apply bg-background text-foreground;
     background:
-      radial-gradient(circle at 7% 4%, rgba(251, 191, 36, 0.10), transparent 28%),
-      radial-gradient(circle at 92% 6%, rgba(59, 130, 246, 0.13), transparent 30%),
-      radial-gradient(circle at 88% 90%, rgba(251, 191, 36, 0.08), transparent 28%),
+      radial-gradient(
+        circle at 7% 4%,
+        rgba(251, 191, 36, 0.1),
+        transparent 28%
+      ),
+      radial-gradient(
+        circle at 92% 6%,
+        rgba(59, 130, 246, 0.13),
+        transparent 30%
+      ),
+      radial-gradient(
+        circle at 88% 90%,
+        rgba(251, 191, 36, 0.08),
+        transparent 28%
+      ),
       linear-gradient(135deg, hsl(var(--background)), #06152a 48%, #020713);
   }
 
@@ -201,9 +213,22 @@
   .cfb-panel {
     @apply rounded-2xl border border-cfb-border-subtle text-card-foreground backdrop-blur-md shadow-[0_18px_42px_rgba(2,6,23,0.34)];
     background:
-      radial-gradient(circle at 12% 0%, hsl(var(--accent-cyan) / 0.06), transparent 34%),
-      linear-gradient(135deg, hsl(var(--background-surface) / 0.88), hsl(var(--brand-primary) / 0.045) 48%, hsl(var(--accent-pink) / 0.035)),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
+      radial-gradient(
+        circle at 12% 0%,
+        hsl(var(--accent-cyan) / 0.06),
+        transparent 34%
+      ),
+      linear-gradient(
+        135deg,
+        hsl(var(--background-surface) / 0.88),
+        hsl(var(--brand-primary) / 0.045) 48%,
+        hsl(var(--accent-pink) / 0.035)
+      ),
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.035),
+        rgba(255, 255, 255, 0.012)
+      );
     box-shadow:
       0 18px 42px rgba(2, 6, 23, 0.34),
       0 0 30px hsl(var(--brand-primary) / 0.055),
@@ -213,10 +238,27 @@
   .cfb-panel-strong {
     @apply rounded-3xl border border-cfb-border-subtle text-card-foreground backdrop-blur-xl shadow-[0_24px_64px_rgba(2,6,23,0.42)];
     background:
-      radial-gradient(circle at 8% 0%, hsl(var(--accent-cyan) / 0.10), transparent 34%),
-      radial-gradient(circle at 92% 12%, hsl(var(--accent-gold) / 0.07), transparent 30%),
-      radial-gradient(circle at 55% 100%, hsl(var(--accent-pink) / 0.055), transparent 34%),
-      linear-gradient(135deg, hsl(var(--background-surface) / 0.90), hsl(var(--brand-primary) / 0.07), hsl(var(--accent-pink) / 0.045));
+      radial-gradient(
+        circle at 8% 0%,
+        hsl(var(--accent-cyan) / 0.1),
+        transparent 34%
+      ),
+      radial-gradient(
+        circle at 92% 12%,
+        hsl(var(--accent-gold) / 0.07),
+        transparent 30%
+      ),
+      radial-gradient(
+        circle at 55% 100%,
+        hsl(var(--accent-pink) / 0.055),
+        transparent 34%
+      ),
+      linear-gradient(
+        135deg,
+        hsl(var(--background-surface) / 0.9),
+        hsl(var(--brand-primary) / 0.07),
+        hsl(var(--accent-pink) / 0.045)
+      );
     box-shadow:
       0 24px 64px rgba(2, 6, 23, 0.42),
       0 0 42px hsl(var(--brand-primary) / 0.08),
@@ -256,9 +298,19 @@
 
   .cfb-yard-lines {
     background-image:
-      linear-gradient(to right, hsl(var(--border-subtle) / 0.20) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--border-subtle) / 0.12) 1px, transparent 1px);
-    background-size: 72px 72px, 72px 72px;
+      linear-gradient(
+        to right,
+        hsl(var(--border-subtle) / 0.2) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        hsl(var(--border-subtle) / 0.12) 1px,
+        transparent 1px
+      );
+    background-size:
+      72px 72px,
+      72px 72px;
   }
 
   .cfb-playbook-pattern {
@@ -270,20 +322,56 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    opacity: 0.10;
+    opacity: 0.1;
     background:
-      linear-gradient(115deg, transparent 0 5%, hsl(var(--accent-pink) / 0.22) 5.2% 5.9%, transparent 6.2% 100%),
-      linear-gradient(155deg, transparent 0 72%, hsl(var(--accent-gold) / 0.18) 72.2% 72.9%, transparent 73.2% 100%),
-      radial-gradient(circle at 88% 16%, transparent 0 5px, hsl(var(--accent-cyan) / 0.28) 5px 6px, transparent 6.5px);
-    mask-image: linear-gradient(135deg, transparent, black 24%, black 76%, transparent);
+      linear-gradient(
+        115deg,
+        transparent 0 5%,
+        hsl(var(--accent-pink) / 0.22) 5.2% 5.9%,
+        transparent 6.2% 100%
+      ),
+      linear-gradient(
+        155deg,
+        transparent 0 72%,
+        hsl(var(--accent-gold) / 0.18) 72.2% 72.9%,
+        transparent 73.2% 100%
+      ),
+      radial-gradient(
+        circle at 88% 16%,
+        transparent 0 5px,
+        hsl(var(--accent-cyan) / 0.28) 5px 6px,
+        transparent 6.5px
+      );
+    mask-image: linear-gradient(
+      135deg,
+      transparent,
+      black 24%,
+      black 76%,
+      transparent
+    );
   }
 
   .cfb-school-grid {
     background-image:
-      linear-gradient(to right, hsl(var(--accent-cyan) / 0.045) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--accent-cyan) / 0.04) 1px, transparent 1px),
-      repeating-linear-gradient(135deg, transparent 0 26px, hsl(var(--accent-gold) / 0.035) 27px 28px);
-    background-size: 34px 34px, 34px 34px, 120px 120px;
+      linear-gradient(
+        to right,
+        hsl(var(--accent-cyan) / 0.045) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        hsl(var(--accent-cyan) / 0.04) 1px,
+        transparent 1px
+      ),
+      repeating-linear-gradient(
+        135deg,
+        transparent 0 26px,
+        hsl(var(--accent-gold) / 0.035) 27px 28px
+      );
+    background-size:
+      34px 34px,
+      34px 34px,
+      120px 120px;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -298,7 +386,11 @@
   }
 
   .cfb-tour-active-target {
-    background: linear-gradient(to right, hsl(var(--primary)), rgb(59 130 246)) !important;
+    background: linear-gradient(
+      to right,
+      hsl(var(--primary)),
+      rgb(59 130 246)
+    ) !important;
     color: hsl(var(--primary-foreground)) !important;
     box-shadow: 0 0 20px rgba(59, 130, 246, 0.35) !important;
     border-color: transparent !important;
@@ -309,18 +401,25 @@
     color: hsl(var(--primary-foreground)) !important;
   }
 
-  .cfb-tour-open [data-nav-item="true"][data-nav-active="true"]:not(.cfb-tour-active-target) {
+  .cfb-tour-open
+    [data-nav-item="true"][data-nav-active="true"]:not(
+      .cfb-tour-active-target
+    ) {
     background: transparent !important;
     color: hsl(var(--muted-foreground)) !important;
     box-shadow: none !important;
     border-color: transparent !important;
   }
 
-  .cfb-tour-open [data-nav-item="true"][data-nav-active="true"]:not(.cfb-tour-active-target) .nav-active-overlay {
+  .cfb-tour-open
+    [data-nav-item="true"][data-nav-active="true"]:not(.cfb-tour-active-target)
+    .nav-active-overlay {
     display: none !important;
   }
 
-  .cfb-tour-open [data-nav-item="true"][data-nav-active="true"]:not(.cfb-tour-active-target) svg {
+  .cfb-tour-open
+    [data-nav-item="true"][data-nav-active="true"]:not(.cfb-tour-active-target)
+    svg {
     color: hsl(var(--primary)) !important;
   }
 }

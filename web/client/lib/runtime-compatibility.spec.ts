@@ -10,7 +10,9 @@ import {
   type RuntimeIdentity,
 } from "./runtime-compatibility";
 
-const runtime = (overrides: Partial<RuntimeIdentity> = {}): RuntimeIdentity => ({
+const runtime = (
+  overrides: Partial<RuntimeIdentity> = {},
+): RuntimeIdentity => ({
   git_sha: "release-sha",
   git_branch: "main",
   runtime_id: "beta-release-sha",
@@ -45,21 +47,25 @@ describe("publishRuntimeDebugIdentity", () => {
 
 describe("runtime compatibility", () => {
   it("allows only generated Vercel preview hosts to tolerate a frontend bundle skew", () => {
-    expect(isVercelPreviewHostname("college-football-app-git-pr-37.vercel.app")).toBe(true);
+    expect(
+      isVercelPreviewHostname("college-football-app-git-pr-37.vercel.app"),
+    ).toBe(true);
     expect(isVercelPreviewHostname("vercel.app")).toBe(false);
-    expect(isVercelPreviewHostname("www.collegefantasyfootball.org")).toBe(false);
+    expect(isVercelPreviewHostname("www.collegefantasyfootball.org")).toBe(
+      false,
+    );
 
     expect(
       runtimeCompatibilityError(runtime(), {
         hostname: "college-football-app-git-pr-37.vercel.app",
         frontendGitSha: "preview-sha",
-      })
+      }),
     ).toBeNull();
     expect(
       runtimeDeploymentSkew(runtime(), {
         hostname: "college-football-app-git-pr-37.vercel.app",
         frontendGitSha: "preview-sha",
-      })
+      }),
     ).toMatch(/Vercel preview bundle/i);
   });
 
@@ -68,16 +74,19 @@ describe("runtime compatibility", () => {
       runtimeCompatibilityError(runtime(), {
         hostname: "www.collegefantasyfootball.org",
         frontendGitSha: "preview-sha",
-      })
+      }),
     ).toMatch(/page bundle does not match/i);
   });
 
   it("never waives API, web-runtime, or worker identity mismatches in previews", () => {
     expect(
-      runtimeCompatibilityError(runtime({ worker_git_sha: "different-worker" }), {
-        hostname: "college-football-app-git-pr-37.vercel.app",
-        frontendGitSha: "preview-sha",
-      })
+      runtimeCompatibilityError(
+        runtime({ worker_git_sha: "different-worker" }),
+        {
+          hostname: "college-football-app-git-pr-37.vercel.app",
+          frontendGitSha: "preview-sha",
+        },
+      ),
     ).toMatch(/API, web, and worker build identities do not match/i);
   });
 });

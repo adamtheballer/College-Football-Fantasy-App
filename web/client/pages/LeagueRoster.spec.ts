@@ -1,13 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import { ApiError } from "@/lib/api";
-import { formatLineupLockMessage, formatRosterLoadError, getLeagueRosterTeams } from "./LeagueRoster";
+import {
+  formatLineupLockMessage,
+  formatRosterLoadError,
+  getLeagueRosterTeams,
+} from "./LeagueRoster";
 
 describe("formatRosterLoadError", () => {
   it("keeps the backend detail instead of rendering an empty roster", () => {
-    expect(formatRosterLoadError(new ApiError(503, "Roster service is unavailable."), "Fallback")).toBe(
-      "Roster service is unavailable."
-    );
+    expect(
+      formatRosterLoadError(
+        new ApiError(503, "Roster service is unavailable."),
+        "Fallback",
+      ),
+    ).toBe("Roster service is unavailable.");
   });
 
   it("uses a safe fallback for unknown errors", () => {
@@ -42,10 +49,26 @@ describe("formatRosterLoadError", () => {
         week: 1,
         data: [],
         team_rosters: [
-          { team: { id: 1, name: "My Team", owner_user_id: 42, record: "0-0-0" }, roster: [] },
-          { team: { id: 2, name: "Rival Team", owner_user_id: 43, record: "0-0-0" }, roster: [] },
+          {
+            team: {
+              id: 1,
+              name: "My Team",
+              owner_user_id: 42,
+              record: "0-0-0",
+            },
+            roster: [],
+          },
+          {
+            team: {
+              id: 2,
+              name: "Rival Team",
+              owner_user_id: 43,
+              record: "0-0-0",
+            },
+            roster: [],
+          },
         ],
-      })
+      }),
     ).toHaveLength(2);
   });
 });

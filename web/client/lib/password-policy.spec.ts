@@ -18,8 +18,18 @@ describe("password policy", () => {
   });
 
   it("requires matching replacement passwords and a current password", () => {
-    expect(validatePasswordChange("", "StrongPass123!", "StrongPass123!")).toContain("Complete");
-    expect(validatePasswordChange("OldPass123!", "StrongPass123!", "DifferentPass123!")).toContain("match");
-    expect(validatePasswordChange("OldPass123!", "StrongPass123!", "StrongPass123!")).toBeNull();
+    expect(
+      validatePasswordChange("", "StrongPass123!", "StrongPass123!"),
+    ).toContain("Complete");
+    expect(
+      validatePasswordChange(
+        "OldPass123!",
+        "StrongPass123!",
+        "DifferentPass123!",
+      ),
+    ).toContain("match");
+    expect(
+      validatePasswordChange("OldPass123!", "StrongPass123!", "StrongPass123!"),
+    ).toBeNull();
   });
 });

@@ -29,11 +29,18 @@ export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
           className={cn("absolute left-0 top-0 h-full w-1", toneClasses.accent)}
         />
         <div className={cn("cfb-micro-label", toneClasses.label)}>{label}</div>
-        <div className={cn("mt-2 font-display text-4xl font-black tracking-[-0.05em]", toneClasses.value)}>
+        <div
+          className={cn(
+            "mt-2 font-display text-4xl font-black tracking-[-0.05em]",
+            toneClasses.value,
+          )}
+        >
           {value}
         </div>
         {helper ? (
-          <div className="mt-2 text-sm font-medium text-cfb-text-secondary">{helper}</div>
+          <div className="mt-2 text-sm font-medium text-cfb-text-secondary">
+            {helper}
+          </div>
         ) : null}
       </div>
     );

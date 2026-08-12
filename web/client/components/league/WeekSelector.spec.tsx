@@ -25,6 +25,8 @@ describe("WeekSelector", () => {
   it("disables the previous arrow at week one", () => {
     render(<WeekSelector week={1} selectedWeek={1} onChange={vi.fn()} />);
 
-    expect(screen.getByRole("button", { name: "Previous week" })).toHaveProperty("disabled", true);
+    expect(
+      screen.getByRole("button", { name: "Previous week" }),
+    ).toHaveProperty("disabled", true);
   });
 });

@@ -57,7 +57,13 @@ export const loadRouteModuleWithRecovery = async <T>(
     }
     return module;
   } catch (error) {
-    if (!isStaleRouteImportError(error) || !storage || !reload || !reloadKey || storage.getItem(reloadKey)) {
+    if (
+      !isStaleRouteImportError(error) ||
+      !storage ||
+      !reload ||
+      !reloadKey ||
+      storage.getItem(reloadKey)
+    ) {
       throw error;
     }
 

@@ -51,16 +51,22 @@ declare global {
   }
 }
 
-export const isVercelPreviewHostname = (hostname: string | undefined): boolean => {
+export const isVercelPreviewHostname = (
+  hostname: string | undefined,
+): boolean => {
   const normalized = hostname?.trim().toLowerCase() ?? "";
-  return normalized.length > ".vercel.app".length && normalized.endsWith(".vercel.app");
+  return (
+    normalized.length > ".vercel.app".length &&
+    normalized.endsWith(".vercel.app")
+  );
 };
 
 export const runtimeDeploymentSkew = (
   runtime: RuntimeIdentity,
-  { hostname, frontendGitSha = WEB_BUILD_SHA }: CompatibilityOptions = {}
+  { hostname, frontendGitSha = WEB_BUILD_SHA }: CompatibilityOptions = {},
 ): string | null => {
-  if (frontendGitSha === "unknown" || frontendGitSha === runtime.git_sha) return null;
+  if (frontendGitSha === "unknown" || frontendGitSha === runtime.git_sha)
+    return null;
   return isVercelPreviewHostname(hostname)
     ? "A Vercel preview bundle is using an aligned runtime from a different release."
     : "The page bundle does not match the running API release.";
@@ -68,9 +74,13 @@ export const runtimeDeploymentSkew = (
 
 export const runtimeCompatibilityError = (
   runtime: RuntimeIdentity,
-  { hostname, frontendGitSha = WEB_BUILD_SHA }: CompatibilityOptions = {}
+  { hostname, frontendGitSha = WEB_BUILD_SHA }: CompatibilityOptions = {},
 ): string | null => {
-  const required = [runtime.git_sha, runtime.web_git_sha, runtime.worker_git_sha];
+  const required = [
+    runtime.git_sha,
+    runtime.web_git_sha,
+    runtime.worker_git_sha,
+  ];
   if (required.some((value) => !value || value === "unknown")) {
     return "The release runtime did not provide complete build identity information.";
   }
@@ -79,7 +89,10 @@ export const runtimeCompatibilityError = (
   }
   // Only Vercel's generated preview hosts can visual-QA a bundle against an
   // otherwise aligned runtime. Production custom domains stay fail-closed.
-  if (!isVercelPreviewHostname(hostname) && runtimeDeploymentSkew(runtime, { hostname, frontendGitSha })) {
+  if (
+    !isVercelPreviewHostname(hostname) &&
+    runtimeDeploymentSkew(runtime, { hostname, frontendGitSha })
+  ) {
     return "The page bundle does not match the running API release.";
   }
   return null;
@@ -88,7 +101,10 @@ export const runtimeCompatibilityError = (
 // This contains only the public runtime fields already returned by
 // /health/runtime; it deliberately omits credentials, cookies, and URLs with
 // secret material. The existing fail-closed release gate remains in place.
-export const publishRuntimeDebugIdentity = (runtime: RuntimeIdentity, deploymentSkew: string | null) => {
+export const publishRuntimeDebugIdentity = (
+  runtime: RuntimeIdentity,
+  deploymentSkew: string | null,
+) => {
   if (typeof window === "undefined") return;
   window.__CFF_RUNTIME__ = Object.freeze({
     git_sha: runtime.git_sha,

@@ -6,8 +6,15 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { setPendingGuide } from "@/lib/onboarding";
 import { ApiError, apiUnavailableMessage } from "@/lib/api";
-import { PASSWORD_POLICY_MESSAGE, passwordMeetsPolicy, passwordPolicyChecks } from "@/lib/password-policy";
-import { clearBetaAccessReservation, getBetaAccessReservation } from "@/lib/beta-access";
+import {
+  PASSWORD_POLICY_MESSAGE,
+  passwordMeetsPolicy,
+  passwordPolicyChecks,
+} from "@/lib/password-policy";
+import {
+  clearBetaAccessReservation,
+  getBetaAccessReservation,
+} from "@/lib/beta-access";
 import {
   Trophy,
   Mail,
@@ -49,7 +56,10 @@ export default function Signup() {
   if (isBootstrapping || isLoggedIn) {
     return (
       <main className="mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-xl items-center justify-center px-4 py-8">
-        <p className="cfb-micro-label text-center text-cfb-text-secondary" role="status">
+        <p
+          className="cfb-micro-label text-center text-cfb-text-secondary"
+          role="status"
+        >
           Restoring your signed-in session…
         </p>
       </main>
@@ -65,7 +75,12 @@ export default function Signup() {
     }
     setIsLoading(true);
     try {
-      const nextUser = await signup(firstName, email, password, reservation?.token);
+      const nextUser = await signup(
+        firstName,
+        email,
+        password,
+        reservation?.token,
+      );
       clearBetaAccessReservation();
       setPendingGuide(nextUser.id);
       navigate("/", { replace: true });
@@ -115,27 +130,58 @@ export default function Signup() {
               </span>
             </h1>
             <p className="max-w-xl text-xs font-bold uppercase tracking-[0.16em] text-slate-200/70 xl:text-sm">
-              Draft boards, live scoring, available-player tracking, and league bragging rights in one electric college football command center.
+              Draft boards, live scoring, available-player tracking, and league
+              bragging rights in one electric college football command center.
             </p>
           </div>
 
           <div className="grid max-w-2xl grid-cols-3 gap-3 [@media(max-height:760px)]:hidden">
             {[
-              { label: "Live Drafts", value: "90s", icon: Radio, tone: "from-cyan-400/25 to-blue-500/15 text-cyan-100" },
-              { label: "Managers", value: "12", icon: Users, tone: "from-emerald-400/25 to-teal-500/15 text-emerald-100" },
-              { label: "Power Plays", value: "24/7", icon: Star, tone: "from-amber-300/25 to-orange-500/15 text-amber-100" },
+              {
+                label: "Live Drafts",
+                value: "90s",
+                icon: Radio,
+                tone: "from-cyan-400/25 to-blue-500/15 text-cyan-100",
+              },
+              {
+                label: "Managers",
+                value: "12",
+                icon: Users,
+                tone: "from-emerald-400/25 to-teal-500/15 text-emerald-100",
+              },
+              {
+                label: "Power Plays",
+                value: "24/7",
+                icon: Star,
+                tone: "from-amber-300/25 to-orange-500/15 text-amber-100",
+              },
             ].map((item) => (
-              <div key={item.label} className={`rounded-2xl border border-white/10 bg-gradient-to-br ${item.tone} p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]`}>
+              <div
+                key={item.label}
+                className={`rounded-2xl border border-white/10 bg-gradient-to-br ${item.tone} p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]`}
+              >
                 <item.icon className="mb-4 h-5 w-5" />
-                <p className="text-2xl font-black italic leading-none text-white">{item.value}</p>
-                <p className="mt-2 text-[9px] font-black uppercase tracking-[0.18em] opacity-75">{item.label}</p>
+                <p className="text-2xl font-black italic leading-none text-white">
+                  {item.value}
+                </p>
+                <p className="mt-2 text-[9px] font-black uppercase tracking-[0.18em] opacity-75">
+                  {item.label}
+                </p>
               </div>
             ))}
           </div>
 
           <div className="flex max-w-xl flex-wrap gap-3 [@media(max-height:760px)]:hidden">
-            {["CFB rankings", "Rivalry week", "Available players", "Draft room"].map((label) => (
-              <span key={label} className="rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/75">
+            {[
+              "CFB rankings",
+              "Rivalry week",
+              "Available players",
+              "Draft room",
+            ].map((label) => (
+              <span
+                key={label}
+                className="rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/75"
+              >
                 {label}
               </span>
             ))}
@@ -151,7 +197,9 @@ export default function Signup() {
             >
               <Trophy className="h-6 w-6 text-slate-950" />
             </Link>
-            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan-100/80">College Football Fantasy</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan-100/80">
+              College Football Fantasy
+            </p>
           </div>
 
           <Card className="relative max-h-full overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/72 shadow-[0_28px_80px_rgba(0,0,0,0.42)] backdrop-blur-2xl">
@@ -174,10 +222,15 @@ export default function Signup() {
                 </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-3 [@media(max-height:760px)]:space-y-2.5">
+              <form
+                onSubmit={handleSubmit}
+                className="space-y-3 [@media(max-height:760px)]:space-y-2.5"
+              >
                 <div className="space-y-3 [@media(max-height:760px)]:space-y-2">
                   <div className="space-y-1.5">
-                    <label className="ml-3 text-[10px] font-black uppercase tracking-widest text-cyan-100/70">First Name</label>
+                    <label className="ml-3 text-[10px] font-black uppercase tracking-widest text-cyan-100/70">
+                      First Name
+                    </label>
                     <div className="group relative">
                       <User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-100/45 transition-colors group-focus-within:text-cyan-200" />
                       <Input
@@ -191,7 +244,9 @@ export default function Signup() {
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="ml-3 text-[10px] font-black uppercase tracking-widest text-cyan-100/70">Email Address</label>
+                    <label className="ml-3 text-[10px] font-black uppercase tracking-widest text-cyan-100/70">
+                      Email Address
+                    </label>
                     <div className="group relative">
                       <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-100/45 transition-colors group-focus-within:text-cyan-200" />
                       <Input
@@ -207,7 +262,9 @@ export default function Signup() {
                   </div>
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between px-3">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-cyan-100/70">Password</label>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-cyan-100/70">
+                        Password
+                      </label>
                       <Link
                         to="/login"
                         className="text-[9px] font-black uppercase tracking-widest text-amber-200/80 transition-colors hover:text-amber-100"
@@ -228,7 +285,9 @@ export default function Signup() {
                       />
                       <button
                         type="button"
-                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
                         aria-pressed={showPassword}
                         onClick={() => setShowPassword((value) => !value)}
                         className="absolute right-4 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-cyan-100/60 transition hover:bg-white/10 hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70"
@@ -243,7 +302,10 @@ export default function Signup() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 rounded-2xl border border-cyan-200/10 bg-white/[0.06] p-3 [@media(max-height:760px)]:hidden" aria-live="polite">
+                <div
+                  className="grid grid-cols-2 gap-2 rounded-2xl border border-cyan-200/10 bg-white/[0.06] p-3 [@media(max-height:760px)]:hidden"
+                  aria-live="polite"
+                >
                   {passwordChecks.map((check) => (
                     <div
                       key={check.label}
@@ -287,18 +349,29 @@ export default function Signup() {
               <div className="space-y-4 [@media(max-height:760px)]:hidden">
                 <div className="relative flex items-center justify-center">
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/20 to-white/10" />
-                  <span className="px-4 text-[9px] font-black uppercase tracking-widest text-slate-300/50">Or continue with</span>
+                  <span className="px-4 text-[9px] font-black uppercase tracking-widest text-slate-300/50">
+                    Or continue with
+                  </span>
                   <div className="h-px flex-1 bg-gradient-to-l from-transparent via-white/20 to-white/10" />
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
-                  <Button variant="outline" className="h-12 rounded-2xl border-white/10 bg-white/10 text-white hover:border-cyan-200/35 hover:bg-cyan-300/15">
+                  <Button
+                    variant="outline"
+                    className="h-12 rounded-2xl border-white/10 bg-white/10 text-white hover:border-cyan-200/35 hover:bg-cyan-300/15"
+                  >
                     <Chrome className="h-5 w-5" />
                   </Button>
-                  <Button variant="outline" className="h-12 rounded-2xl border-white/10 bg-white/10 text-white hover:border-amber-200/35 hover:bg-amber-300/15">
+                  <Button
+                    variant="outline"
+                    className="h-12 rounded-2xl border-white/10 bg-white/10 text-white hover:border-amber-200/35 hover:bg-amber-300/15"
+                  >
                     <Apple className="h-5 w-5" />
                   </Button>
-                  <Button variant="outline" className="h-12 rounded-2xl border-white/10 bg-white/10 text-white hover:border-rose-200/35 hover:bg-rose-300/15">
+                  <Button
+                    variant="outline"
+                    className="h-12 rounded-2xl border-white/10 bg-white/10 text-white hover:border-rose-200/35 hover:bg-rose-300/15"
+                  >
                     <Github className="h-5 w-5" />
                   </Button>
                 </div>
@@ -307,7 +380,13 @@ export default function Signup() {
 
             <div className="relative border-t border-white/10 bg-white/[0.06] px-7 py-4 text-center [@media(max-height:760px)]:hidden">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-300/70">
-                Already have an account? <Link to="/login" className="ml-1 font-black text-amber-200 hover:text-amber-100">Sign In</Link>
+                Already have an account?{" "}
+                <Link
+                  to="/login"
+                  className="ml-1 font-black text-amber-200 hover:text-amber-100"
+                >
+                  Sign In
+                </Link>
               </p>
             </div>
           </Card>
@@ -315,11 +394,15 @@ export default function Signup() {
           <div className="mt-4 flex items-center justify-center gap-5 text-slate-200/55 [@media(max-height:760px)]:hidden">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-200" />
-              <span className="text-[8px] font-black uppercase tracking-widest">Secure SSL</span>
+              <span className="text-[8px] font-black uppercase tracking-widest">
+                Secure SSL
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <Zap className="h-3.5 w-3.5 text-amber-200" />
-              <span className="text-[8px] font-black uppercase tracking-widest">Live Scoring</span>
+              <span className="text-[8px] font-black uppercase tracking-widest">
+                Live Scoring
+              </span>
             </div>
           </div>
         </div>

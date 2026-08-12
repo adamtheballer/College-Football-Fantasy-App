@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,7 +30,10 @@ vi.mock("@/hooks/use-leagues", () => ({
 }));
 
 vi.mock("@/hooks/use-active-league", () => ({
-  useActiveLeagueId: () => ({ activeLeagueId: 1, setActiveLeagueId: state.setActiveLeagueId }),
+  useActiveLeagueId: () => ({
+    activeLeagueId: 1,
+    setActiveLeagueId: state.setActiveLeagueId,
+  }),
 }));
 
 vi.mock("@/components/RuntimeCompatibilityGate", () => ({
@@ -41,17 +50,45 @@ vi.mock("@/components/support/SupportContactCard", () => ({
 
 vi.mock("@/components/ui/select", async () => {
   const React = await import("react");
-  const Context = React.createContext<{ onValueChange?: (value: string) => void }>({});
+  const Context = React.createContext<{
+    onValueChange?: (value: string) => void;
+  }>({});
   return {
-    Select: ({ onValueChange, children }: { onValueChange?: (value: string) => void; children: React.ReactNode }) => (
+    Select: ({
+      onValueChange,
+      children,
+    }: {
+      onValueChange?: (value: string) => void;
+      children: React.ReactNode;
+    }) => (
       <Context.Provider value={{ onValueChange }}>{children}</Context.Provider>
     ),
-    SelectTrigger: ({ children, className }: { children: React.ReactNode; className?: string }) => <div className={className}>{children}</div>,
-    SelectValue: ({ placeholder }: { placeholder?: string }) => <span>{placeholder}</span>,
-    SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => {
+    SelectTrigger: ({
+      children,
+      className,
+    }: {
+      children: React.ReactNode;
+      className?: string;
+    }) => <div className={className}>{children}</div>,
+    SelectValue: ({ placeholder }: { placeholder?: string }) => (
+      <span>{placeholder}</span>
+    ),
+    SelectContent: ({ children }: { children: React.ReactNode }) => (
+      <div>{children}</div>
+    ),
+    SelectItem: ({
+      value,
+      children,
+    }: {
+      value: string;
+      children: React.ReactNode;
+    }) => {
       const { onValueChange } = React.useContext(Context);
-      return <button type="button" onClick={() => onValueChange?.(value)}>{children}</button>;
+      return (
+        <button type="button" onClick={() => onValueChange?.(value)}>
+          {children}
+        </button>
+      );
     },
   };
 });
@@ -68,7 +105,11 @@ describe("Settings beta preferences", () => {
   });
 
   it("removes unsupported notification and third-party theme controls", () => {
-    render(<MemoryRouter><Settings /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <Settings />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText("App Preferences")).toBeTruthy();
     expect(screen.queryByText(/push notifications/i)).toBeNull();
@@ -77,16 +118,28 @@ describe("Settings beta preferences", () => {
   });
 
   it("saves the manager name through the self-only profile update flow", async () => {
-    render(<MemoryRouter><Settings /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <Settings />
+      </MemoryRouter>,
+    );
 
-    fireEvent.change(screen.getByLabelText("Manager Name"), { target: { value: "Updated Adam" } });
+    fireEvent.change(screen.getByLabelText("Manager Name"), {
+      target: { value: "Updated Adam" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
-    await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith("Updated Adam"));
+    await waitFor(() =>
+      expect(state.updateProfile).toHaveBeenCalledWith("Updated Adam"),
+    );
   });
 
   it("records an explicit replay request before returning to Home", () => {
-    render(<MemoryRouter initialEntries={["/settings"]}><Settings /></MemoryRouter>);
+    render(
+      <MemoryRouter initialEntries={["/settings"]}>
+        <Settings />
+      </MemoryRouter>,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /start guide again/i }));
 

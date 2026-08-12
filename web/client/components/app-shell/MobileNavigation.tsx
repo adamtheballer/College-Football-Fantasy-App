@@ -20,12 +20,19 @@ type MobileNavigationProps = {
   onSignOut: () => void;
 };
 
-export function MobileNavigation({ items, allItems, pathname, onSignOut }: MobileNavigationProps) {
+export function MobileNavigation({
+  items,
+  allItems,
+  pathname,
+  onSignOut,
+}: MobileNavigationProps) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const drawerItems = allItems.filter((item) => item.kind !== "danger");
   const signOutItem = allItems.find((item) => item.kind === "danger");
   const isMoreActive = drawerItems.some(
-    (item) => item.path === pathname && !items.some((mobileItem) => mobileItem.name === item.name),
+    (item) =>
+      item.path === pathname &&
+      !items.some((mobileItem) => mobileItem.name === item.name),
   );
 
   return (
@@ -46,7 +53,11 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
               <Link
                 key={item.name}
                 to={item.path}
-                aria-label={item.badge ? `${item.name}: ${item.badge} unread chat messages` : item.name}
+                aria-label={
+                  item.badge
+                    ? `${item.name}: ${item.badge} unread chat messages`
+                    : item.name
+                }
                 className={cn(
                   "relative flex min-h-[54px] min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-0.5 text-[10px] font-bold uppercase tracking-[0.03em] leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent",
                   isActive
@@ -66,7 +77,9 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
                     </span>
                   ) : null}
                 </span>
-                <span className="max-w-full whitespace-nowrap">{item.name.replace("MOCK ", "")}</span>
+                <span className="max-w-full whitespace-nowrap">
+                  {item.name.replace("MOCK ", "")}
+                </span>
               </Link>
             );
           })}
@@ -120,7 +133,10 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
                         : "border-transparent text-cfb-text-secondary hover:border-cfb-border-subtle hover:bg-cfb-surface-hover/70 hover:text-cfb-text-primary",
                     )}
                   >
-                    <Icon className="h-4 w-4 shrink-0 text-cfb-brand" aria-hidden="true" />
+                    <Icon
+                      className="h-4 w-4 shrink-0 text-cfb-brand"
+                      aria-hidden="true"
+                    />
                     <span className="min-w-0 flex-1">{item.name}</span>
                     {item.badge ? (
                       <span className="inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[9px] font-black tracking-normal text-white">

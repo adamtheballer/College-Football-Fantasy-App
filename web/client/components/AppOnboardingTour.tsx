@@ -102,10 +102,15 @@ const resetSidebarNavToTop = () => {
   }
 };
 
-export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTourProps) {
+export function AppOnboardingTour({
+  isOpen,
+  userId,
+  onClose,
+}: AppOnboardingTourProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null);
+  const [tooltipPosition, setTooltipPosition] =
+    useState<TooltipPosition | null>(null);
   const primaryButtonRef = useRef<HTMLButtonElement | null>(null);
   const activeTargetRef = useRef<HTMLElement | null>(null);
 
@@ -189,12 +194,22 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
         const elementBottom = elementTop + element.offsetHeight;
         const margin = 16;
 
-        if (elementTop < containerTop + margin || elementBottom > containerBottom - margin) {
-          const targetTop = Math.max(0, elementTop - sidebarNav.clientHeight * 0.25);
+        if (
+          elementTop < containerTop + margin ||
+          elementBottom > containerBottom - margin
+        ) {
+          const targetTop = Math.max(
+            0,
+            elementTop - sidebarNav.clientHeight * 0.25,
+          );
           sidebarNav.scrollTo({ top: targetTop, left: 0, behavior: "smooth" });
         }
       } else {
-        element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        element.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+          inline: "nearest",
+        });
       }
       if (!element.hasAttribute("tabindex")) {
         element.setAttribute("tabindex", "-1");
@@ -207,9 +222,13 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
       const width = Math.min(360, window.innerWidth - 32);
       const preferredLeft = rect.right + 20;
       const roomRight = window.innerWidth - rect.right;
-      const left = roomRight > width + 24
-        ? preferredLeft
-        : Math.max(16, Math.min(rect.left - width - 20, window.innerWidth - width - 16));
+      const left =
+        roomRight > width + 24
+          ? preferredLeft
+          : Math.max(
+              16,
+              Math.min(rect.left - width - 20, window.innerWidth - width - 16),
+            );
       const top = Math.max(16, Math.min(rect.top, window.innerHeight - 220));
 
       setTooltipPosition({ top, left, width });
@@ -242,27 +261,46 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
   };
 
   return (
-    <div className="fixed inset-0 z-[1200]" role="dialog" aria-modal="true" aria-live="polite">
+    <div
+      className="fixed inset-0 z-[1200]"
+      role="dialog"
+      aria-modal="true"
+      aria-live="polite"
+    >
       <div className="absolute inset-0 bg-slate-950/28 backdrop-blur-[0.5px]" />
 
       {targetRect && (
         <>
-          <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
+          <svg
+            className="pointer-events-none absolute inset-0 h-full w-full"
+            aria-hidden="true"
+          >
             <defs>
               <mask id="app-tour-mask">
                 <rect width="100%" height="100%" fill="white" />
                 <rect
                   x={Math.max(0, targetRect.left - PADDING)}
                   y={Math.max(0, targetRect.top - PADDING)}
-                  width={Math.min(window.innerWidth, targetRect.width + PADDING * 2)}
-                  height={Math.min(window.innerHeight, targetRect.height + PADDING * 2)}
+                  width={Math.min(
+                    window.innerWidth,
+                    targetRect.width + PADDING * 2,
+                  )}
+                  height={Math.min(
+                    window.innerHeight,
+                    targetRect.height + PADDING * 2,
+                  )}
                   rx="20"
                   ry="20"
                   fill="black"
                 />
               </mask>
             </defs>
-            <rect width="100%" height="100%" fill="rgba(2,6,23,0.30)" mask="url(#app-tour-mask)" />
+            <rect
+              width="100%"
+              height="100%"
+              fill="rgba(2,6,23,0.30)"
+              mask="url(#app-tour-mask)"
+            />
           </svg>
           <div
             aria-hidden="true"
@@ -281,7 +319,11 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
         className="fixed z-[1210] rounded-[28px] border border-white/10 bg-[#08121d]/92 p-6 shadow-[0_30px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl"
         style={
           tooltipPosition
-            ? { top: tooltipPosition.top, left: tooltipPosition.left, width: tooltipPosition.width }
+            ? {
+                top: tooltipPosition.top,
+                left: tooltipPosition.left,
+                width: tooltipPosition.width,
+              }
             : {
                 width: Math.min(420, window.innerWidth - 32),
                 left: "50%",

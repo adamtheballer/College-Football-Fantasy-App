@@ -33,10 +33,15 @@ export function FloatingQuickActions() {
         styleClass: "from-emerald-500/90 to-teal-500/90",
       },
     ],
-    [navigate]
+    [navigate],
   );
 
-  const hiddenRoutes = ["/login", "/signup", "/leagues/create", "/leagues/join"];
+  const hiddenRoutes = [
+    "/login",
+    "/signup",
+    "/leagues/create",
+    "/leagues/join",
+  ];
   if (!isLoggedIn || hiddenRoutes.includes(location.pathname)) {
     return null;
   }
@@ -46,7 +51,9 @@ export function FloatingQuickActions() {
       <div
         className={cn(
           "flex flex-col items-end gap-3 transition-all duration-300",
-          open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 translate-y-2 pointer-events-none"
+          open
+            ? "opacity-100 translate-y-0 pointer-events-auto"
+            : "opacity-0 translate-y-2 pointer-events-none",
         )}
       >
         {actions.map((action) => (
@@ -59,7 +66,7 @@ export function FloatingQuickActions() {
             className={cn(
               "h-12 px-5 rounded-2xl border border-white/15 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-2xl",
               "pointer-events-auto bg-gradient-to-r hover:scale-105 transition-transform flex items-center gap-2",
-              action.styleClass
+              action.styleClass,
             )}
           >
             <action.icon className="w-4 h-4" />
@@ -74,10 +81,15 @@ export function FloatingQuickActions() {
         className={cn(
           "pointer-events-auto h-14 w-14 rounded-2xl border border-white/20 shadow-[0_20px_40px_rgba(0,0,0,0.35)]",
           "bg-gradient-to-r from-primary to-blue-500 text-white flex items-center justify-center",
-          "hover:scale-105 transition-transform"
+          "hover:scale-105 transition-transform",
         )}
       >
-        <Plus className={cn("w-5 h-5 transition-transform", open ? "rotate-45" : "rotate-0")} />
+        <Plus
+          className={cn(
+            "w-5 h-5 transition-transform",
+            open ? "rotate-45" : "rotate-0",
+          )}
+        />
       </button>
     </div>
   );

@@ -12,13 +12,24 @@ export function formatProjectionDisplay(
   const normalizedStatus = status?.toUpperCase();
   if (normalizedStatus === "BYE") return "BYE";
   if (normalizedStatus === "OUT") return "OUT";
-  if (normalizedStatus === "UNAVAILABLE" || value === null || value === undefined) return "—";
-  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "—";
+  if (
+    normalizedStatus === "UNAVAILABLE" ||
+    value === null ||
+    value === undefined
+  )
+    return "—";
+  return typeof value === "number" && Number.isFinite(value)
+    ? value.toFixed(1)
+    : "—";
 }
 
 export function isNumericProjection(
   value: number | null | undefined,
   status?: ProjectionDisplayStatus,
 ) {
-  return status?.toUpperCase() !== "BYE" && typeof value === "number" && Number.isFinite(value);
+  return (
+    status?.toUpperCase() !== "BYE" &&
+    typeof value === "number" &&
+    Number.isFinite(value)
+  );
 }

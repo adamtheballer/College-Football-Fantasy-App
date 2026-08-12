@@ -4,38 +4,56 @@ import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
 import { WeekSelector } from "@/components/league/WeekSelector";
-import { WinChanceBar, WinChanceMeter } from "@/components/league/WinChanceMeter";
+import {
+  WinChanceBar,
+  WinChanceMeter,
+} from "@/components/league/WinChanceMeter";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
-import { useLeagueDetail, useLeagueMatchupTab, useLeagueScoreboard } from "@/hooks/use-leagues";
+import {
+  useLeagueDetail,
+  useLeagueMatchupTab,
+  useLeagueScoreboard,
+} from "@/hooks/use-leagues";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
-import type { LeagueMatchupTabResponse, LeagueMatchupTeam } from "@/types/league";
+import type {
+  LeagueMatchupTabResponse,
+  LeagueMatchupTeam,
+} from "@/types/league";
 
 export function formatMatchupStatus(status: string | null | undefined) {
   const normalized = (status || "projected").toLowerCase();
   if (normalized === "live") return "Live";
   if (normalized === "final") return "Final";
-  if (normalized === "stat_corrected" || normalized === "corrected") return "Corrected";
+  if (normalized === "stat_corrected" || normalized === "corrected")
+    return "Corrected";
   if (normalized === "delayed") return "Delayed";
   if (normalized === "unavailable") return "Unavailable";
   return "Projected";
 }
 
-export function matchupStatusVariant(status: string | null | undefined): StatusBadgeVariant {
+export function matchupStatusVariant(
+  status: string | null | undefined,
+): StatusBadgeVariant {
   const normalized = (status || "projected").toLowerCase();
   if (normalized === "live") return "live";
   if (normalized === "final") return "final";
-  if (normalized === "stat_corrected" || normalized === "corrected") return "corrected";
+  if (normalized === "stat_corrected" || normalized === "corrected")
+    return "corrected";
   if (normalized === "delayed") return "delayed";
   if (normalized === "unavailable") return "unavailable";
   return "projected";
 }
 
 export function formatMatchupPoints(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "—";
+  return typeof value === "number" && Number.isFinite(value)
+    ? value.toFixed(1)
+    : "—";
 }
 
-export function shouldShowMatchupScorePanels(status: string | null | undefined) {
+export function shouldShowMatchupScorePanels(
+  status: string | null | undefined,
+) {
   return ["Live", "Final", "Corrected"].includes(formatMatchupStatus(status));
 }
 
@@ -43,7 +61,10 @@ function teamTotal(team: LeagueMatchupTeam | null) {
   return team?.projected_total ?? team?.projected_points ?? null;
 }
 
-function leadingTeam(myTeam: LeagueMatchupTeam | null, opponentTeam: LeagueMatchupTeam | null) {
+function leadingTeam(
+  myTeam: LeagueMatchupTeam | null,
+  opponentTeam: LeagueMatchupTeam | null,
+) {
   const myProbability = myTeam?.win_probability;
   const opponentProbability = opponentTeam?.win_probability;
   if (
@@ -56,8 +77,8 @@ function leadingTeam(myTeam: LeagueMatchupTeam | null, opponentTeam: LeagueMatch
   }
   if (myProbability === opponentProbability) return "Even matchup";
   return myProbability > opponentProbability
-    ? myTeam?.fantasy_team_name ?? "Your Team"
-    : opponentTeam?.fantasy_team_name ?? "Opponent";
+    ? (myTeam?.fantasy_team_name ?? "Your Team")
+    : (opponentTeam?.fantasy_team_name ?? "Opponent");
 }
 
 function teamInitials(name: string | null | undefined) {
@@ -90,11 +111,16 @@ function displayedProbabilityPair(
 
 function freshnessText(data: LeagueMatchupTabResponse | undefined) {
   const label = formatMatchupStatus(data?.status);
-  if (label === "Live") return "Live scoring refreshes automatically while games are active.";
-  if (label === "Corrected") return "Scores include a stat correction and should be treated as corrected.";
-  if (label === "Final") return "This matchup is final unless a controlled correction is applied.";
-  if (label === "Delayed") return "Provider data is delayed. Do not treat the score as fully current.";
-  if (label === "Unavailable") return "Provider data is unavailable. Existing scores should not be replaced by false zeroes.";
+  if (label === "Live")
+    return "Live scoring refreshes automatically while games are active.";
+  if (label === "Corrected")
+    return "Scores include a stat correction and should be treated as corrected.";
+  if (label === "Final")
+    return "This matchup is final unless a controlled correction is applied.";
+  if (label === "Delayed")
+    return "Provider data is delayed. Do not treat the score as fully current.";
+  if (label === "Unavailable")
+    return "Provider data is unavailable. Existing scores should not be replaced by false zeroes.";
   return "Projected matchup values are shown until live scoring begins.";
 }
 
@@ -114,11 +140,17 @@ function MatchupTeamSummary({
   status: string;
 }) {
   const isBrand = accent === "brand";
-  const pointsLabel = shouldShowMatchupScorePanels(status) ? "Points" : "Projected";
+  const pointsLabel = shouldShowMatchupScorePanels(status)
+    ? "Points"
+    : "Projected";
 
   return (
-    <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
-      <div className={`flex items-center gap-2.5 ${align === "right" ? "justify-end" : "justify-start"}`}>
+    <div
+      className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}
+    >
+      <div
+        className={`flex items-center gap-2.5 ${align === "right" ? "justify-end" : "justify-start"}`}
+      >
         <div
           aria-hidden="true"
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-sm font-black tracking-tight shadow-[0_0_24px_rgba(58,144,255,0.16)] sm:h-12 sm:w-12 sm:text-base ${
@@ -129,17 +161,27 @@ function MatchupTeamSummary({
         >
           {teamInitials(team?.fantasy_team_name)}
         </div>
-        <p className="hidden cfb-micro-label text-cfb-text-muted sm:block">{label}</p>
+        <p className="hidden cfb-micro-label text-cfb-text-muted sm:block">
+          {label}
+        </p>
       </div>
-      <p className="mt-2 truncate text-[9px] font-black uppercase tracking-[0.1em] text-cfb-text-muted sm:hidden">{compactLabel}</p>
+      <p className="mt-2 truncate text-[9px] font-black uppercase tracking-[0.1em] text-cfb-text-muted sm:hidden">
+        {compactLabel}
+      </p>
       <p className="mt-1 truncate text-xs font-black text-cfb-text-primary sm:mt-2 sm:text-base">
         {team?.fantasy_team_name ?? "Team TBD"}
       </p>
-      <p className="mt-0.5 text-[10px] font-bold text-cfb-text-muted sm:text-xs">{team?.record ?? "0-0-0"}</p>
-      <p className={`mt-1 font-display text-2xl font-black tracking-[-0.06em] sm:mt-2 sm:text-4xl ${isBrand ? "text-cfb-brand" : "text-cfb-pink"}`}>
+      <p className="mt-0.5 text-[10px] font-bold text-cfb-text-muted sm:text-xs">
+        {team?.record ?? "0-0-0"}
+      </p>
+      <p
+        className={`mt-1 font-display text-2xl font-black tracking-[-0.06em] sm:mt-2 sm:text-4xl ${isBrand ? "text-cfb-brand" : "text-cfb-pink"}`}
+      >
         {formatMatchupPoints(teamTotal(team))}
       </p>
-      <p className={`mt-0.5 text-[9px] font-black uppercase tracking-[0.15em] ${isBrand ? "text-cfb-brand" : "text-cfb-pink"}`}>
+      <p
+        className={`mt-0.5 text-[9px] font-black uppercase tracking-[0.15em] ${isBrand ? "text-cfb-brand" : "text-cfb-pink"}`}
+      >
         {pointsLabel}
       </p>
     </div>
@@ -159,14 +201,20 @@ function CompactMatchupScoreboard({
   displayWeek: number;
   isViewingOwnMatchup: boolean;
 }) {
-  const winChance = displayedProbabilityPair(myTeam?.win_probability, opponentTeam?.win_probability);
-  const myTeamIsLeading = Boolean(winChance && winChance.my >= winChance.opponent);
+  const winChance = displayedProbabilityPair(
+    myTeam?.win_probability,
+    opponentTeam?.win_probability,
+  );
+  const myTeamIsLeading = Boolean(
+    winChance && winChance.my >= winChance.opponent,
+  );
   const statusLabel = formatMatchupStatus(data.status);
 
   return (
     <section className="relative overflow-hidden rounded-[1.65rem] border border-cfb-border-strong bg-[linear-gradient(135deg,hsl(var(--background-surface-raised)/0.98),hsl(var(--background-surface)/0.94))] p-4 shadow-[0_22px_60px_rgba(2,6,23,0.34)] sm:p-6">
       <h2 className="sr-only">
-        {myTeam?.fantasy_team_name ?? "Your team"} vs {opponentTeam?.fantasy_team_name ?? "Opponent"}
+        {myTeam?.fantasy_team_name ?? "Your team"} vs{" "}
+        {opponentTeam?.fantasy_team_name ?? "Opponent"}
       </h2>
       <div className="pointer-events-none absolute inset-x-[22%] top-0 h-px bg-gradient-to-r from-transparent via-cfb-brand/60 to-transparent" />
       <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-cfb-pink/10 blur-3xl" />
@@ -174,9 +222,13 @@ function CompactMatchupScoreboard({
 
       <div className="relative flex items-center justify-between gap-3">
         <div>
-          <p className="cfb-micro-label text-cfb-text-secondary">Week {displayWeek} Matchup</p>
+          <p className="cfb-micro-label text-cfb-text-secondary">
+            Week {displayWeek} Matchup
+          </p>
           <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb-text-muted">
-            {statusLabel === "Projected" ? "Preweek baseline" : `${statusLabel} scoring`}
+            {statusLabel === "Projected"
+              ? "Preweek baseline"
+              : `${statusLabel} scoring`}
           </p>
         </div>
         <span className="rounded-full border border-cfb-border-subtle bg-cfb-canvas/70 px-3 py-1 text-[10px] font-black uppercase tracking-[0.15em] text-cfb-text-secondary">
@@ -195,13 +247,19 @@ function CompactMatchupScoreboard({
         />
 
         <div className="flex min-w-[112px] flex-col items-center gap-2 text-center">
-          <span className="text-[9px] font-black uppercase tracking-[0.13em] text-cfb-text-muted">Win chance</span>
+          <span className="text-[9px] font-black uppercase tracking-[0.13em] text-cfb-text-muted">
+            Win chance
+          </span>
           <div className="flex items-center gap-1.5 whitespace-nowrap text-[10px] font-black tabular-nums sm:text-xs">
-            <span className={myTeamIsLeading ? "text-emerald-300" : "text-red-300"}>
+            <span
+              className={myTeamIsLeading ? "text-emerald-300" : "text-red-300"}
+            >
               {winChance ? `${winChance.my.toFixed(1)}%` : "—"}
             </span>
             <span className="text-cfb-text-muted">VS</span>
-            <span className={myTeamIsLeading ? "text-red-300" : "text-emerald-300"}>
+            <span
+              className={myTeamIsLeading ? "text-red-300" : "text-emerald-300"}
+            >
               {winChance ? `${winChance.opponent.toFixed(1)}%` : "—"}
             </span>
           </div>
@@ -225,7 +283,11 @@ function CompactMatchupScoreboard({
 
       <div className="relative mt-5 flex items-center justify-between gap-3 border-t border-cfb-border-subtle pt-3 text-[10px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
         <span>Week {displayWeek}</span>
-        <span className="text-right">{winChance ? "Win chance from weekly lineup totals" : "Win chance unavailable"}</span>
+        <span className="text-right">
+          {winChance
+            ? "Win chance from weekly lineup totals"
+            : "Win chance unavailable"}
+        </span>
       </div>
 
       <div className="relative mt-4 hidden grid-cols-[1fr_auto] items-center gap-4 border-t border-cfb-border-subtle pt-4 sm:grid">
@@ -236,7 +298,9 @@ function CompactMatchupScoreboard({
           opponentProjectedTotal={null}
         />
         <div className="rounded-xl border border-cfb-border-subtle bg-cfb-canvas/70 px-4 py-3 text-right">
-          <p className="cfb-micro-label text-cfb-text-muted">Projected Leader</p>
+          <p className="cfb-micro-label text-cfb-text-muted">
+            Projected Leader
+          </p>
           <p className="mt-1 text-sm font-black text-cfb-text-primary">
             {leadingTeam(myTeam, opponentTeam)}
           </p>
@@ -251,20 +315,31 @@ export default function LeagueMatchup() {
   const parsedLeagueId = Number(leagueId);
   const [searchParams, setSearchParams] = useSearchParams();
   const weekParam = Number(searchParams.get("week"));
-  const selectedWeek = Number.isInteger(weekParam) && weekParam > 0 ? weekParam : 1;
+  const selectedWeek =
+    Number.isInteger(weekParam) && weekParam > 0 ? weekParam : 1;
   const matchupParam = Number(searchParams.get("matchup"));
-  const selectedMatchupId = Number.isInteger(matchupParam) && matchupParam > 0 ? matchupParam : undefined;
+  const selectedMatchupId =
+    Number.isInteger(matchupParam) && matchupParam > 0
+      ? matchupParam
+      : undefined;
   const leagueQuery = useLeagueDetail(parsedLeagueId);
   const postDraft = isLeaguePostDraft({
     draftStatus: leagueQuery.data?.draft?.status,
     leagueStatus: leagueQuery.data?.status,
   });
-  const matchupQuery = useLeagueMatchupTab(parsedLeagueId, selectedWeek, selectedMatchupId, postDraft);
+  const matchupQuery = useLeagueMatchupTab(
+    parsedLeagueId,
+    selectedWeek,
+    selectedMatchupId,
+    postDraft,
+  );
   const data = matchupQuery.data;
   const myTeam = data?.my_team ?? data?.user_team ?? null;
   const opponentTeam = data?.opponent_team ?? null;
   const displayWeek = data?.week ?? selectedWeek;
-  const hasScheduledMatchup = Boolean(data?.matchup_id && myTeam && opponentTeam);
+  const hasScheduledMatchup = Boolean(
+    data?.matchup_id && myTeam && opponentTeam,
+  );
   const scoreboardQuery = useLeagueScoreboard(
     parsedLeagueId,
     displayWeek,
@@ -273,7 +348,8 @@ export default function LeagueMatchup() {
   const scheduledMatchups = scoreboardQuery.data?.data ?? [];
   const selectedMatchupValue = selectedMatchupId ?? data?.matchup_id ?? "";
   const isViewingOwnMatchup = Boolean(
-    data?.my_team?.fantasy_team_id && data?.user_team?.fantasy_team_id === data.my_team.fantasy_team_id,
+    data?.my_team?.fantasy_team_id &&
+    data?.user_team?.fantasy_team_id === data.my_team.fantasy_team_id,
   );
 
   const updateSelection = (week: number, matchupId?: number) => {
@@ -319,10 +395,12 @@ export default function LeagueMatchup() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="cfb-micro-label text-cfb-brand">League Matchup</p>
-            <h1 className="cfb-display-title mt-1 text-3xl sm:mt-2 sm:text-5xl">Matchup</h1>
+            <h1 className="cfb-display-title mt-1 text-3xl sm:mt-2 sm:text-5xl">
+              Matchup
+            </h1>
             <p className="mt-2 hidden max-w-2xl text-sm font-medium leading-6 text-cfb-text-secondary sm:block">
-              Week {displayWeek} scoring view with honest projected, live, final, corrected,
-              delayed, and unavailable states.
+              Week {displayWeek} scoring view with honest projected, live,
+              final, corrected, delayed, and unavailable states.
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -332,13 +410,21 @@ export default function LeagueMatchup() {
               onChange={(week) => updateSelection(week)}
             />
             <label className="flex min-w-[260px] flex-col gap-2 text-left">
-              <span className="cfb-micro-label text-cfb-text-muted">League matchup</span>
+              <span className="cfb-micro-label text-cfb-text-muted">
+                League matchup
+              </span>
               <select
                 aria-label="League matchup"
                 className="h-11 rounded-xl border border-cfb-border-subtle bg-cfb-surface px-3 text-sm font-bold text-cfb-text-primary outline-none transition focus:border-cfb-brand focus:ring-2 focus:ring-cfb-brand/20"
                 value={selectedMatchupValue}
-                disabled={scoreboardQuery.isLoading || scoreboardQuery.isError || !scheduledMatchups.length}
-                onChange={(event) => updateSelection(displayWeek, Number(event.target.value))}
+                disabled={
+                  scoreboardQuery.isLoading ||
+                  scoreboardQuery.isError ||
+                  !scheduledMatchups.length
+                }
+                onChange={(event) =>
+                  updateSelection(displayWeek, Number(event.target.value))
+                }
               >
                 {scheduledMatchups.map((matchup) => (
                   <option key={matchup.matchup_id} value={matchup.matchup_id}>
@@ -388,7 +474,9 @@ export default function LeagueMatchup() {
             />
 
             <div className="flex flex-col gap-3 rounded-2xl border border-cfb-border-subtle bg-cfb-surface/65 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm font-medium leading-6 text-cfb-text-secondary">{freshnessText(data)}</p>
+              <p className="text-sm font-medium leading-6 text-cfb-text-secondary">
+                {freshnessText(data)}
+              </p>
               <div className="flex shrink-0 items-center gap-2 text-xs font-black text-cfb-text-primary">
                 <Clock className="h-4 w-4 text-cfb-gold" aria-hidden="true" />
                 {leadingTeam(myTeam, opponentTeam)}
@@ -406,7 +494,11 @@ export default function LeagueMatchup() {
             <Trophy className="h-5 w-5 text-cfb-gold" aria-hidden="true" />
             <p className="cfb-micro-label text-cfb-brand">Lineup Comparison</p>
           </div>
-          <SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={parsedLeagueId} />
+          <SideBySideMatchup
+            myTeam={myTeam}
+            opponentTeam={opponentTeam}
+            leagueId={parsedLeagueId}
+          />
         </>
       )}
     </main>

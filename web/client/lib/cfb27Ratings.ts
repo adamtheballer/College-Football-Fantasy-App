@@ -345,7 +345,7 @@ const ratingRows = [
   [323, "Benjamin Hall", "NORTH CAROLINA", "RB", 81],
   [324, "Kaleb Jackson", "NORTH CAROLINA", "RB", 81],
   [325, "Jelani Thurman", "NORTH CAROLINA", "TE", 81],
-  [326, "Jayden \"Duke\" Scott", "NC STATE", "RB", 81],
+  [326, 'Jayden "Duke" Scott', "NC STATE", "RB", 81],
   [327, "Keenan Jackson", "NC STATE", "WR", 81],
   [328, "Cataurus Hicks", "PITTSBURGH", "WR", 81],
   [329, "Randy Pittman Jr.", "SMU", "TE", 81],
@@ -456,7 +456,7 @@ const ratingRows = [
   [434, "Jayvan Boggs", "FLORIDA STATE", "WR", 79],
   [435, "Gavin Harris", "GEORGIA TECH", "TE", 79],
   [436, "Teddy Hoffmann", "NC STATE", "WR", 79],
-  [437, "Joshisa \"Jojo\" Trader", "NC STATE", "WR", 79],
+  [437, 'Joshisa "Jojo" Trader', "NC STATE", "WR", 79],
   [438, "Jalen Cooper", "SMU", "WR", 79],
   [439, "Ju'Juan Johnson", "SYRACUSE", "RB", 79],
   [440, "Zamondre Merriweather", "SYRACUSE", "WR", 79],
@@ -820,7 +820,7 @@ const ratingRows = [
   [798, "Luke Dehnicke", "NORTHWESTERN", "TE", 69],
   [799, "Evans Chuba", "PURDUE", "QB", 69],
   [800, "Logan Blake", "RUTGERS", "TE", 69],
-  [801, "Keylen \"Brodie\" Adams", "VIRGINIA TECH", "WR", 69],
+  [801, 'Keylen "Brodie" Adams', "VIRGINIA TECH", "WR", 69],
   [802, "Tyler Powell", "ARIZONA", "TE", 69],
   [803, "Max Shikenjanski", "MINNESOTA", "QB", 68],
   [804, "Grayson Brousseau", "UCF", "TE", 68],
@@ -836,19 +836,21 @@ const ratingRows = [
   [814, "Nate Bennett", "BAYLOR", "QB", 62],
 ] as const;
 
-export const CFB27_RATINGS: Cfb27Rating[] = ratingRows.map(([rank, name, school, pos, ovr]) => ({
-  rank,
-  name,
-  school,
-  pos,
-  ovr,
-}));
+export const CFB27_RATINGS: Cfb27Rating[] = ratingRows.map(
+  ([rank, name, school, pos, ovr]) => ({
+    rank,
+    name,
+    school,
+    pos,
+    ovr,
+  }),
+);
 
 const ratingByExactKey = new Map(
   CFB27_RATINGS.map((rating) => [
     `${normalizeText(rating.name)}|${normalizeText(rating.school)}|${rating.pos}`,
     rating,
-  ])
+  ]),
 );
 
 const ratingsByNamePosition = CFB27_RATINGS.reduce((map, rating) => {
@@ -868,17 +870,21 @@ export const findCfb27Rating = ({
 }) => {
   const normalizedPos = pos.toUpperCase();
   const exact = ratingByExactKey.get(
-    `${normalizeText(name)}|${normalizeText(school)}|${normalizedPos}`
+    `${normalizeText(name)}|${normalizeText(school)}|${normalizedPos}`,
   );
   if (exact) return exact;
 
-  const nameMatches = ratingsByNamePosition.get(`${normalizeText(name)}|${normalizedPos}`);
+  const nameMatches = ratingsByNamePosition.get(
+    `${normalizeText(name)}|${normalizedPos}`,
+  );
   return nameMatches?.length === 1 ? nameMatches[0] : null;
 };
 
 export const getCfb27PositionPercentile = (rating: Cfb27Rating | null) => {
   if (!rating) return 0.5;
-  const samePosition = CFB27_RATINGS.filter((entry) => entry.pos === rating.pos);
+  const samePosition = CFB27_RATINGS.filter(
+    (entry) => entry.pos === rating.pos,
+  );
   const ovrs = samePosition.map((entry) => entry.ovr);
   const min = Math.min(...ovrs);
   const max = Math.max(...ovrs);

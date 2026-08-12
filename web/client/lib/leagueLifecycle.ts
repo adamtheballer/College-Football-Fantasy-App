@@ -19,7 +19,10 @@ export const isLeaguePostDraft = ({
 }) => {
   const normalizedDraftStatus = normalizeLifecycleStatus(draftStatus);
   const normalizedLeagueStatus = normalizeLifecycleStatus(leagueStatus);
-  return DRAFT_COMPLETE_STATUSES.has(normalizedDraftStatus) || DRAFT_COMPLETE_STATUSES.has(normalizedLeagueStatus);
+  return (
+    DRAFT_COMPLETE_STATUSES.has(normalizedDraftStatus) ||
+    DRAFT_COMPLETE_STATUSES.has(normalizedLeagueStatus)
+  );
 };
 
 export const shouldRestrictLeagueToDraft = ({
@@ -47,6 +50,7 @@ export const shouldShowLeagueDraftRoomAction = ({
     normalizedDraftStatus === "scheduled" ||
     normalizedDraftStatus === "draft_scheduled" ||
     normalizedLeagueStatus === "draft_scheduled";
-  const draftLive = normalizedDraftStatus === "live" || normalizedDraftStatus === "draft_live";
+  const draftLive =
+    normalizedDraftStatus === "live" || normalizedDraftStatus === "draft_live";
   return draftLive || draftScheduled || Boolean(draftDateTime);
 };

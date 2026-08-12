@@ -3,7 +3,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "./dialog";
 
 afterEach(cleanup);
 
@@ -13,7 +18,9 @@ describe("DialogContent mobile containment", () => {
       <Dialog open>
         <DialogContent>
           <DialogTitle>Review trade offer</DialogTitle>
-          <DialogDescription>Long offers must remain readable on a phone.</DialogDescription>
+          <DialogDescription>
+            Long offers must remain readable on a phone.
+          </DialogDescription>
           <div className="h-[120dvh]">Long trade details</div>
         </DialogContent>
       </Dialog>,

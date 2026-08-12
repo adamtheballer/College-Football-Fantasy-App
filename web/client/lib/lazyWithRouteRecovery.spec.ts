@@ -2,7 +2,10 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { isStaleRouteImportError, loadRouteModuleWithRecovery } from "./lazyWithRouteRecovery";
+import {
+  isStaleRouteImportError,
+  loadRouteModuleWithRecovery,
+} from "./lazyWithRouteRecovery";
 
 const createStorage = () => {
   const entries = new Map<string, string>();
@@ -15,9 +18,17 @@ const createStorage = () => {
 
 describe("lazy route recovery", () => {
   it("recognizes only stale Vite dynamic-import failures", () => {
-    expect(isStaleRouteImportError(new TypeError("Failed to fetch dynamically imported module"))).toBe(true);
-    expect(isStaleRouteImportError(new Error("Importing a module script failed."))).toBe(true);
-    expect(isStaleRouteImportError(new Error("league request failed"))).toBe(false);
+    expect(
+      isStaleRouteImportError(
+        new TypeError("Failed to fetch dynamically imported module"),
+      ),
+    ).toBe(true);
+    expect(
+      isStaleRouteImportError(new Error("Importing a module script failed.")),
+    ).toBe(true);
+    expect(isStaleRouteImportError(new Error("league request failed"))).toBe(
+      false,
+    );
   });
 
   it("clears an earlier reload marker after a route imports successfully", async () => {
@@ -25,7 +36,10 @@ describe("lazy route recovery", () => {
     storage.setItem("join", "attempted");
 
     await expect(
-      loadRouteModuleWithRecovery(async () => ({ page: "join" }), { storage, reloadKey: "join" }),
+      loadRouteModuleWithRecovery(async () => ({ page: "join" }), {
+        storage,
+        reloadKey: "join",
+      }),
     ).resolves.toEqual({ page: "join" });
 
     expect(storage.removeItem).toHaveBeenCalledWith("join");
@@ -34,13 +48,23 @@ describe("lazy route recovery", () => {
   it("reloads exactly once for a stale route chunk", async () => {
     const storage = createStorage();
     const reload = vi.fn();
-    const staleChunk = new TypeError("Failed to fetch dynamically imported module");
+    const staleChunk = new TypeError(
+      "Failed to fetch dynamically imported module",
+    );
 
     await expect(
-      loadRouteModuleWithRecovery(async () => Promise.reject(staleChunk), { storage, reload, reloadKey: "join" }),
+      loadRouteModuleWithRecovery(async () => Promise.reject(staleChunk), {
+        storage,
+        reload,
+        reloadKey: "join",
+      }),
     ).rejects.toThrow(staleChunk);
     await expect(
-      loadRouteModuleWithRecovery(async () => Promise.reject(staleChunk), { storage, reload, reloadKey: "join" }),
+      loadRouteModuleWithRecovery(async () => Promise.reject(staleChunk), {
+        storage,
+        reload,
+        reloadKey: "join",
+      }),
     ).rejects.toThrow(staleChunk);
 
     expect(reload).toHaveBeenCalledTimes(1);
@@ -52,11 +76,14 @@ describe("lazy route recovery", () => {
     const reload = vi.fn();
 
     await expect(
-      loadRouteModuleWithRecovery(async () => Promise.reject(new Error("league request failed")), {
-        storage,
-        reload,
-        reloadKey: "join",
-      }),
+      loadRouteModuleWithRecovery(
+        async () => Promise.reject(new Error("league request failed")),
+        {
+          storage,
+          reload,
+          reloadKey: "join",
+        },
+      ),
     ).rejects.toThrow("league request failed");
 
     expect(reload).not.toHaveBeenCalled();

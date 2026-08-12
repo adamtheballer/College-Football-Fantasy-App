@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const realStack = process.env.REAL_STACK_E2E === "1" || process.env.E2E_REAL_STACK === "1";
+const realStack =
+  process.env.REAL_STACK_E2E === "1" || process.env.E2E_REAL_STACK === "1";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -16,12 +17,15 @@ export default defineConfig({
     baseURL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:4173",
     trace: "on-first-retry",
   },
-  webServer: realStack ? undefined : {
-    command: "VITE_BETA_ACCESS_ENABLED=true npm run dev:vite -- --host 127.0.0.1 --port 4173 --strictPort",
-    url: "http://127.0.0.1:4173",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: realStack
+    ? undefined
+    : {
+        command:
+          "VITE_BETA_ACCESS_ENABLED=true npm run dev:vite -- --host 127.0.0.1 --port 4173 --strictPort",
+        url: "http://127.0.0.1:4173",
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+      },
   projects: [
     {
       name: "chromium",

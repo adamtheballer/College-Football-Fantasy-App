@@ -32,7 +32,9 @@ const mockPlayer = {
   updated_at: "2026-07-11T00:00:00Z",
 };
 
-const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]) => {
+const seedAuthenticatedSession = async (
+  page: Parameters<typeof test>[0]["page"],
+) => {
   await page.addInitScript((payload) => {
     window.localStorage.setItem(
       "cfb_user",
@@ -40,11 +42,17 @@ const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]
         id: payload.user.id,
         firstName: payload.user.first_name,
         email: payload.user.email,
-      })
+      }),
     );
     window.localStorage.setItem("cfb_access_token", payload.access_token);
-    window.localStorage.setItem("cfb_access_token_expires_at", payload.access_token_expires_at);
-    window.localStorage.setItem(`cfb_completed_guide_${payload.user.id}`, "true");
+    window.localStorage.setItem(
+      "cfb_access_token_expires_at",
+      payload.access_token_expires_at,
+    );
+    window.localStorage.setItem(
+      `cfb_completed_guide_${payload.user.id}`,
+      "true",
+    );
   }, mockAuthPayload);
 
   await page.route("**/auth/me", async (route) => {
@@ -76,13 +84,17 @@ const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]
 };
 
 test.describe("player card modal", () => {
-  test("opens centered with canonical bio details and no provider profile control", async ({ page }, testInfo) => {
+  test("opens centered with canonical bio details and no provider profile control", async ({
+    page,
+  }, testInfo) => {
     await seedAuthenticatedSession(page);
     await page.route("**/stats/teams**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ data: [{ team: "Ohio State", conference: "Big Ten" }] }),
+        body: JSON.stringify({
+          data: [{ team: "Ohio State", conference: "Big Ten" }],
+        }),
       });
     });
     await page.route("**/players**", async (route) => {
@@ -147,7 +159,11 @@ test.describe("player card modal", () => {
                     {
                       key: "receiving",
                       label: "Receiving",
-                      stats: [{ label: "Receptions", value: 82 }, { label: "Yards", value: 1305 }, { label: "TD", value: 12 }],
+                      stats: [
+                        { label: "Receptions", value: 82 },
+                        { label: "Yards", value: 1305 },
+                        { label: "TD", value: 12 },
+                      ],
                     },
                   ],
                   freshness: { provider: "verified_import", is_final: true },
@@ -174,7 +190,12 @@ test.describe("player card modal", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ data: [mockPlayer], total: 1, limit: 200, offset: 0 }),
+        body: JSON.stringify({
+          data: [mockPlayer],
+          total: 1,
+          limit: 200,
+          offset: 0,
+        }),
       });
     });
     await page.route("**/projections/1**", async (route) => {
@@ -203,16 +224,27 @@ test.describe("player card modal", () => {
       });
     });
     await page.route("**/stats/injuries**", async (route) => {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [] }) });
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: [] }),
+      });
     });
 
     await page.goto("/draft/mock/single-player?new=1&teams=4&timer=60");
     await expect(page.getByText("Jeremiah Smith").first()).toBeVisible();
 
-    await page.getByRole("button", { name: /Jeremiah Smith/i }).first().click();
-    const dialog = page.getByRole("dialog", { name: /Jeremiah Smith player card/i });
+    await page
+      .getByRole("button", { name: /Jeremiah Smith/i })
+      .first()
+      .click();
+    const dialog = page.getByRole("dialog", {
+      name: /Jeremiah Smith player card/i,
+    });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByText("ESPN PROFILE", { exact: true })).toHaveCount(0);
+    await expect(dialog.getByText("ESPN PROFILE", { exact: true })).toHaveCount(
+      0,
+    );
     await expect(dialog.getByText("6'3\"")).toBeVisible();
     await expect(dialog.getByText("215 lbs")).toBeVisible();
     await expect(dialog.getByText("Columbus, Ohio")).toBeVisible();
@@ -223,14 +255,18 @@ test.describe("player card modal", () => {
     expect(viewport).not.toBeNull();
     if (box && viewport) {
       const dialogCenter = box.x + box.width / 2;
-      expect(Math.abs(dialogCenter - viewport.width / 2)).toBeLessThan(viewport.width * 0.12);
+      expect(Math.abs(dialogCenter - viewport.width / 2)).toBeLessThan(
+        viewport.width * 0.12,
+      );
     }
 
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(dialog.getByText("Bio", { exact: true })).toBeVisible();
     await expect(dialog.getByTestId("player-card-metric-rail")).toBeVisible();
     await expect(dialog.getByText("Height", { exact: true })).toBeVisible();
-    await expect(dialog.getByText("Status", { exact: true }).last()).toBeVisible();
+    await expect(
+      dialog.getByText("Status", { exact: true }).last(),
+    ).toBeVisible();
 
     const mobileArticle = dialog.locator("article");
     const mobileBox = await mobileArticle.boundingBox();
@@ -244,22 +280,47 @@ test.describe("player card modal", () => {
       expect(mobileBox.width).toBeLessThanOrEqual(390);
     }
     if (process.env.PLAYWRIGHT_CAPTURE_SCREENSHOTS === "1") {
-      await page.screenshot({ path: testInfo.outputPath("player-card-mobile-390x844.png"), fullPage: true });
+      await page.screenshot({
+        path: testInfo.outputPath("player-card-mobile-390x844.png"),
+        fullPage: true,
+      });
     }
 
     await dialog.getByRole("button", { name: "Stats" }).click();
-    await expect(dialog.getByText("Historical Season Stats", { exact: true })).toBeVisible();
-    await expect(dialog.getByRole("columnheader", { name: "Fantasy Points" })).toHaveCount(0);
-    await expect(dialog.getByRole("columnheader", { name: "Rec Yds" })).toBeVisible();
-    await expect(dialog.getByLabel("Historical stats table; scroll horizontally for all columns")).toBeVisible();
+    await expect(
+      dialog.getByText("Historical Season Stats", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("columnheader", { name: "Fantasy Points" }),
+    ).toHaveCount(0);
+    await expect(
+      dialog.getByRole("columnheader", { name: "Rec Yds" }),
+    ).toBeVisible();
+    await expect(
+      dialog.getByLabel(
+        "Historical stats table; scroll horizontally for all columns",
+      ),
+    ).toBeVisible();
     expect(await dialog.getByRole("columnheader").allTextContents()).toEqual([
-      "Year", "Team", "Pos", "Receptions", "Rec Yds", "Rec TD", "Rush Yds", "Rush TD", "Games", "Pass Yds",
+      "Year",
+      "Team",
+      "Pos",
+      "Receptions",
+      "Rec Yds",
+      "Rec TD",
+      "Rush Yds",
+      "Rush TD",
+      "Games",
+      "Pass Yds",
     ]);
 
     await page.getByRole("button", { name: /Close player card/i }).click();
     await expect(dialog).toBeHidden();
 
-    await page.getByRole("button", { name: /Jeremiah Smith/i }).first().click();
+    await page
+      .getByRole("button", { name: /Jeremiah Smith/i })
+      .first()
+      .click();
     await expect(dialog).toBeVisible();
     await page.getByRole("button", { name: "Close player card" }).click();
     await expect(dialog).toBeHidden();

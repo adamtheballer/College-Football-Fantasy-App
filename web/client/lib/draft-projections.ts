@@ -11,7 +11,11 @@ export function formatDraftProjection({
   fallbackSeasonProjection?: number | null;
 }): string {
   for (const annualProjection of [seasonProjection, fallbackSeasonProjection]) {
-    if (typeof annualProjection === "number" && Number.isFinite(annualProjection) && annualProjection > 0) {
+    if (
+      typeof annualProjection === "number" &&
+      Number.isFinite(annualProjection) &&
+      annualProjection > 0
+    ) {
       return annualProjection.toFixed(1);
     }
   }

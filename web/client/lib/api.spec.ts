@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { apiGet, apiPut, buildApiUrl, clearAccessTokenSession, storeAccessTokenSession } from "./api";
+import {
+  apiGet,
+  apiPut,
+  buildApiUrl,
+  clearAccessTokenSession,
+  storeAccessTokenSession,
+} from "./api";
 
 const originalFetch = globalThis.fetch;
 
@@ -30,11 +36,15 @@ describe("api client", () => {
 
     expect(removeItem).toHaveBeenCalledWith("cfb_access_token");
     expect(removeItem).toHaveBeenCalledWith("cfb_access_token_expires_at");
-    expect(dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "cfb-auth-changed" }));
+    expect(dispatchEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "cfb-auth-changed" }),
+    );
   });
 
   it("wraps browser network failures in an actionable ApiError", async () => {
-    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    globalThis.fetch = vi
+      .fn()
+      .mockRejectedValue(new TypeError("Failed to fetch"));
 
     await expect(apiGet("/health")).rejects.toMatchObject({
       name: "ApiError",
@@ -64,8 +74,8 @@ describe("api client", () => {
           status: 422,
           statusText: "Unprocessable Entity",
           headers: { "Content-Type": "application/json" },
-        }
-      )
+        },
+      ),
     );
 
     await expect(apiGet("/leagues")).rejects.toMatchObject({
@@ -81,10 +91,12 @@ describe("api client", () => {
       new Response(JSON.stringify({ id: 14, selected_pick_player_id: 9 }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      })
+      }),
     );
 
-    await expect(apiPut("/saturday-pick-6/14/entry", { selected_pick_player_id: 9 })).resolves.toMatchObject({
+    await expect(
+      apiPut("/saturday-pick-6/14/entry", { selected_pick_player_id: 9 }),
+    ).resolves.toMatchObject({
       id: 14,
       selected_pick_player_id: 9,
     });
@@ -93,8 +105,10 @@ describe("api client", () => {
       expect.objectContaining({
         method: "PUT",
         body: JSON.stringify({ selected_pick_player_id: 9 }),
-        headers: expect.objectContaining({ "Content-Type": "application/json" }),
-      })
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+        }),
+      }),
     );
   });
 
@@ -102,7 +116,11 @@ describe("api client", () => {
     const storage = new Map<string, string>();
     vi.stubGlobal("window", {
       dispatchEvent: vi.fn(),
-      location: { hostname: "localhost", protocol: "http:", origin: "http://localhost" },
+      location: {
+        hostname: "localhost",
+        protocol: "http:",
+        origin: "http://localhost",
+      },
     });
     vi.stubGlobal("localStorage", {
       getItem: vi.fn((key: string) => storage.get(key) ?? null),
@@ -118,7 +136,7 @@ describe("api client", () => {
           status: 401,
           statusText: "Unauthorized",
           headers: { "Content-Type": "application/json" },
-        })
+        }),
       )
       .mockResolvedValueOnce(
         new Response(
@@ -130,8 +148,8 @@ describe("api client", () => {
             status: 200,
             statusText: "OK",
             headers: { "Content-Type": "application/json" },
-          }
-        )
+          },
+        ),
       )
       .mockResolvedValueOnce(
         new Response(
@@ -145,8 +163,8 @@ describe("api client", () => {
             status: 200,
             statusText: "OK",
             headers: { "Content-Type": "application/json" },
-          }
-        )
+          },
+        ),
       );
 
     await expect(apiGet("/auth/me")).resolves.toMatchObject({
@@ -159,20 +177,24 @@ describe("api client", () => {
       1,
       expect.stringContaining("/auth/me"),
       expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: "Bearer expired-token" }),
-      })
+        headers: expect.objectContaining({
+          Authorization: "Bearer expired-token",
+        }),
+      }),
     );
     expect(globalThis.fetch).toHaveBeenNthCalledWith(
       2,
       expect.stringContaining("/auth/refresh"),
-      expect.objectContaining({ credentials: "include", method: "POST" })
+      expect.objectContaining({ credentials: "include", method: "POST" }),
     );
     expect(globalThis.fetch).toHaveBeenNthCalledWith(
       3,
       expect.stringContaining("/auth/me"),
       expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: "Bearer fresh-token" }),
-      })
+        headers: expect.objectContaining({
+          Authorization: "Bearer fresh-token",
+        }),
+      }),
     );
   });
 
@@ -182,7 +204,11 @@ describe("api client", () => {
     const removeItem = vi.fn((key: string) => storage.delete(key));
     vi.stubGlobal("window", {
       dispatchEvent,
-      location: { hostname: "localhost", protocol: "http:", origin: "http://localhost" },
+      location: {
+        hostname: "localhost",
+        protocol: "http:",
+        origin: "http://localhost",
+      },
     });
     vi.stubGlobal("localStorage", {
       getItem: vi.fn((key: string) => storage.get(key) ?? null),
@@ -198,7 +224,7 @@ describe("api client", () => {
           status: 401,
           statusText: "Unauthorized",
           headers: { "Content-Type": "application/json" },
-        })
+        }),
       )
       .mockRejectedValueOnce(new TypeError("Failed to fetch"));
 
@@ -209,9 +235,13 @@ describe("api client", () => {
     });
 
     expect(storage.get("cfb_access_token")).toBe("expired-token");
-    expect(storage.get("cfb_access_token_expires_at")).toBe("2026-07-14T18:00:00Z");
+    expect(storage.get("cfb_access_token_expires_at")).toBe(
+      "2026-07-14T18:00:00Z",
+    );
     expect(removeItem).not.toHaveBeenCalledWith("cfb_access_token");
-    expect(dispatchEvent).not.toHaveBeenCalledWith(expect.objectContaining({ type: "cfb-auth-changed" }));
+    expect(dispatchEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "cfb-auth-changed" }),
+    );
   });
 
   it("clears the stored session when refresh is rejected as invalid", async () => {
@@ -220,7 +250,11 @@ describe("api client", () => {
     const removeItem = vi.fn((key: string) => storage.delete(key));
     vi.stubGlobal("window", {
       dispatchEvent,
-      location: { hostname: "localhost", protocol: "http:", origin: "http://localhost" },
+      location: {
+        hostname: "localhost",
+        protocol: "http:",
+        origin: "http://localhost",
+      },
     });
     vi.stubGlobal("localStorage", {
       getItem: vi.fn((key: string) => storage.get(key) ?? null),
@@ -236,14 +270,14 @@ describe("api client", () => {
           status: 401,
           statusText: "Unauthorized",
           headers: { "Content-Type": "application/json" },
-        })
+        }),
       )
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ detail: "invalid refresh token" }), {
           status: 401,
           statusText: "Unauthorized",
           headers: { "Content-Type": "application/json" },
-        })
+        }),
       );
 
     await expect(apiGet("/auth/me")).rejects.toMatchObject({
@@ -254,6 +288,8 @@ describe("api client", () => {
     expect(storage.get("cfb_access_token")).toBeUndefined();
     expect(storage.get("cfb_access_token_expires_at")).toBeUndefined();
     expect(removeItem).toHaveBeenCalledWith("cfb_access_token");
-    expect(dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "cfb-auth-changed" }));
+    expect(dispatchEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "cfb-auth-changed" }),
+    );
   });
 });

@@ -4,7 +4,10 @@ import { CircleOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export interface EmptyStateProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
+export interface EmptyStateProps extends Omit<
+  React.HTMLAttributes<HTMLDivElement>,
+  "title"
+> {
   title: React.ReactNode;
   description?: React.ReactNode;
   actionLabel?: string;
@@ -13,7 +16,10 @@ export interface EmptyStateProps extends Omit<React.HTMLAttributes<HTMLDivElemen
 }
 
 export const EmptyState = React.forwardRef<HTMLDivElement, EmptyStateProps>(
-  ({ className, title, description, actionLabel, onAction, icon, ...props }, ref) => (
+  (
+    { className, title, description, actionLabel, onAction, icon, ...props },
+    ref,
+  ) => (
     <div
       ref={ref}
       className={cn(

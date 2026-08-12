@@ -13,6 +13,7 @@ import { ApiError } from "@/lib/api";
 import RuntimeCompatibilityGate from "@/components/RuntimeCompatibilityGate";
 import { lazyWithRouteRecovery } from "@/lib/lazyWithRouteRecovery";
 import Layout from "./components/Layout";
+import { Analytics } from "@vercel/analytics/react";
 
 const Index = lazyWithRouteRecovery(() => import("./pages/Index"));
 const NotFound = lazyWithRouteRecovery(() => import("./pages/NotFound"));
@@ -20,26 +21,48 @@ const Leagues = lazyWithRouteRecovery(() => import("./pages/Leagues"));
 const Settings = lazyWithRouteRecovery(() => import("./pages/Settings"));
 const ReportBug = lazyWithRouteRecovery(() => import("./pages/ReportBug"));
 const Login = lazyWithRouteRecovery(() => import("./pages/Login"));
-const ResetPassword = lazyWithRouteRecovery(() => import("./pages/ResetPassword"));
-const CreateLeague = lazyWithRouteRecovery(() => import("./pages/CreateLeague"));
+const ResetPassword = lazyWithRouteRecovery(
+  () => import("./pages/ResetPassword"),
+);
+const CreateLeague = lazyWithRouteRecovery(
+  () => import("./pages/CreateLeague"),
+);
 const JoinLeague = lazyWithRouteRecovery(() => import("./pages/JoinLeague"));
-const LeagueMatchup = lazyWithRouteRecovery(() => import("./pages/LeagueMatchup"));
-const LeagueRoster = lazyWithRouteRecovery(() => import("./pages/LeagueRoster"));
-const LeagueSettings = lazyWithRouteRecovery(() => import("./pages/LeagueSettings"));
-const LeagueWaivers = lazyWithRouteRecovery(() => import("./pages/LeagueWaivers"));
-const LeagueWatchlist = lazyWithRouteRecovery(() => import("./pages/LeagueWatchlist"));
+const LeagueMatchup = lazyWithRouteRecovery(
+  () => import("./pages/LeagueMatchup"),
+);
+const LeagueRoster = lazyWithRouteRecovery(
+  () => import("./pages/LeagueRoster"),
+);
+const LeagueSettings = lazyWithRouteRecovery(
+  () => import("./pages/LeagueSettings"),
+);
+const LeagueWaivers = lazyWithRouteRecovery(
+  () => import("./pages/LeagueWaivers"),
+);
+const LeagueWatchlist = lazyWithRouteRecovery(
+  () => import("./pages/LeagueWatchlist"),
+);
 const DraftHome = lazyWithRouteRecovery(() => import("./pages/DraftHome"));
 const DraftLobby = lazyWithRouteRecovery(() => import("./pages/DraftLobby"));
 const Draft = lazyWithRouteRecovery(() => import("./pages/Draft"));
-const SinglePlayerMockDraftRoom = lazyWithRouteRecovery(() => import("./pages/SinglePlayerMockDraftRoom"));
+const SinglePlayerMockDraftRoom = lazyWithRouteRecovery(
+  () => import("./pages/SinglePlayerMockDraftRoom"),
+);
 const Rosters = lazyWithRouteRecovery(() => import("./pages/Rosters"));
 const Alerts = lazyWithRouteRecovery(() => import("./pages/Alerts"));
 const Chats = lazyWithRouteRecovery(() => import("./pages/Chats"));
-const InjuryCenter = lazyWithRouteRecovery(() => import("./pages/InjuryCenter"));
+const InjuryCenter = lazyWithRouteRecovery(
+  () => import("./pages/InjuryCenter"),
+);
 const Trade = lazyWithRouteRecovery(() => import("./pages/Trade"));
-const AdminScoring = lazyWithRouteRecovery(() => import("./pages/AdminScoring"));
+const AdminScoring = lazyWithRouteRecovery(
+  () => import("./pages/AdminScoring"),
+);
 const ComingSoon = lazyWithRouteRecovery(() => import("./pages/ComingSoon"));
-const SaturdayPick6 = lazyWithRouteRecovery(() => import("./pages/SaturdayPick6"));
+const SaturdayPick6 = lazyWithRouteRecovery(
+  () => import("./pages/SaturdayPick6"),
+);
 
 const NON_RETRYABLE_STATUSES = new Set([401, 403, 404]);
 
@@ -72,150 +95,247 @@ const RouteFallback = () => (
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <RuntimeCompatibilityGate>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <AppErrorBoundary>
-          <BrowserRouter>
-            <Layout>
-              <Suspense fallback={<RouteFallback />}>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/leagues" element={<Leagues />} />
-                <Route
-                  path="/leagues/create"
-                  element={
-                    <ProtectedRoute>
-                      <CreateLeague />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/leagues/join"
-                  element={
-                    <ProtectedRoute>
-                      <JoinLeague />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/join/:inviteCode"
-                  element={
-                    <ProtectedRoute>
-                      <JoinLeague />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/draft"
-                  element={
-                    <ProtectedRoute>
-                      <DraftHome />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/draft/mock/single-player"
-                  element={
-                    <ProtectedRoute>
-                      <SinglePlayerMockDraftRoom />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/league/:leagueId"
-                  element={
-                    <ProtectedRoute>
-                      <LeagueRoster />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/league/:leagueId/roster"
-                  element={
-                    <ProtectedRoute>
-                      <LeagueRoster />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/league/:leagueId/matchup"
-                  element={
-                    <ProtectedRoute>
-                      <LeagueMatchup />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/league/:leagueId/waivers"
-                  element={
-                    <ProtectedRoute>
-                      <LeagueWaivers />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/league/:leagueId/watchlist"
-                  element={
-                    <ProtectedRoute>
-                      <LeagueWatchlist />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/league/:leagueId/settings"
-                  element={
-                    <ProtectedRoute>
-                      <LeagueSettings />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/league/:leagueId/lobby"
-                  element={
-                    <ProtectedRoute>
-                      <DraftLobby />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/league/:leagueId/draft"
-                  element={
-                    <ProtectedRoute>
-                      <Draft />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/report-bug" element={<ReportBug />} />
-                <Route path="/rosters" element={<ProtectedRoute><Rosters /></ProtectedRoute>} />
-                <Route path="/chats" element={<ProtectedRoute><Chats /></ProtectedRoute>} />
-                <Route path="/waivers" element={<ProtectedRoute><Navigate to="/leagues" replace /></ProtectedRoute>} />
-                <Route path="/watchlists" element={<ProtectedRoute><Navigate to="/leagues" replace /></ProtectedRoute>} />
-                <Route path="/injury-center" element={<ProtectedRoute><InjuryCenter /></ProtectedRoute>} />
-                <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
-                <Route path="/trade" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
-                <Route path="/trade/:leagueId/:playerId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
-                <Route path="/leagues/:leagueId/trades/:tradeId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
-                <Route path="/coming-soon" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
-                <Route path="/saturday-pick-6" element={<ProtectedRoute><SaturdayPick6 /></ProtectedRoute>} />
-                <Route path="/admin/scoring" element={<ProtectedRoute><AdminScoring /></ProtectedRoute>} />
-                <Route path="/stats" element={<Navigate to="/leagues" replace />} />
-                <Route path="/stats/players" element={<Navigate to="/leagues" replace />} />
-                <Route path="/login" element={<Login />} />
-                {/* Kept for shared legacy links; codes now grant optional Pro credit. */}
-                <Route path="/beta-access" element={<Navigate to="/login?flow=pro" replace />} />
-                <Route path="/signup" element={<Navigate to="/login?flow=signup" replace />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-              </Suspense>
-            </Layout>
-          </BrowserRouter>
-        </AppErrorBoundary>
-      </TooltipProvider>
-    </AuthProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <Analytics />
+          <AppErrorBoundary>
+            <BrowserRouter>
+              <Layout>
+                <Suspense fallback={<RouteFallback />}>
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/leagues" element={<Leagues />} />
+                    <Route
+                      path="/leagues/create"
+                      element={
+                        <ProtectedRoute>
+                          <CreateLeague />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/leagues/join"
+                      element={
+                        <ProtectedRoute>
+                          <JoinLeague />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/join/:inviteCode"
+                      element={
+                        <ProtectedRoute>
+                          <JoinLeague />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/draft"
+                      element={
+                        <ProtectedRoute>
+                          <DraftHome />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/draft/mock/single-player"
+                      element={
+                        <ProtectedRoute>
+                          <SinglePlayerMockDraftRoom />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/league/:leagueId"
+                      element={
+                        <ProtectedRoute>
+                          <LeagueRoster />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/league/:leagueId/roster"
+                      element={
+                        <ProtectedRoute>
+                          <LeagueRoster />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/league/:leagueId/matchup"
+                      element={
+                        <ProtectedRoute>
+                          <LeagueMatchup />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/league/:leagueId/waivers"
+                      element={
+                        <ProtectedRoute>
+                          <LeagueWaivers />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/league/:leagueId/watchlist"
+                      element={
+                        <ProtectedRoute>
+                          <LeagueWatchlist />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/league/:leagueId/settings"
+                      element={
+                        <ProtectedRoute>
+                          <LeagueSettings />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/league/:leagueId/lobby"
+                      element={
+                        <ProtectedRoute>
+                          <DraftLobby />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/league/:leagueId/draft"
+                      element={
+                        <ProtectedRoute>
+                          <Draft />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="/report-bug" element={<ReportBug />} />
+                    <Route
+                      path="/rosters"
+                      element={
+                        <ProtectedRoute>
+                          <Rosters />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/chats"
+                      element={
+                        <ProtectedRoute>
+                          <Chats />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/waivers"
+                      element={
+                        <ProtectedRoute>
+                          <Navigate to="/leagues" replace />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/watchlists"
+                      element={
+                        <ProtectedRoute>
+                          <Navigate to="/leagues" replace />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/injury-center"
+                      element={
+                        <ProtectedRoute>
+                          <InjuryCenter />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/alerts"
+                      element={
+                        <ProtectedRoute>
+                          <Alerts />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/trade"
+                      element={
+                        <ProtectedRoute>
+                          <Trade />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/trade/:leagueId/:playerId"
+                      element={
+                        <ProtectedRoute>
+                          <Trade />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/leagues/:leagueId/trades/:tradeId"
+                      element={
+                        <ProtectedRoute>
+                          <Trade />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/coming-soon"
+                      element={
+                        <ProtectedRoute>
+                          <ComingSoon />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/saturday-pick-6"
+                      element={
+                        <ProtectedRoute>
+                          <SaturdayPick6 />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/admin/scoring"
+                      element={
+                        <ProtectedRoute>
+                          <AdminScoring />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/stats"
+                      element={<Navigate to="/leagues" replace />}
+                    />
+                    <Route
+                      path="/stats/players"
+                      element={<Navigate to="/leagues" replace />}
+                    />
+                    <Route path="/login" element={<Login />} />
+                    {/* Kept for shared legacy links; codes now grant optional Pro credit. */}
+                    <Route
+                      path="/beta-access"
+                      element={<Navigate to="/login?flow=pro" replace />}
+                    />
+                    <Route
+                      path="/signup"
+                      element={<Navigate to="/login?flow=signup" replace />}
+                    />
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Suspense>
+              </Layout>
+            </BrowserRouter>
+          </AppErrorBoundary>
+        </TooltipProvider>
+      </AuthProvider>
     </RuntimeCompatibilityGate>
   </QueryClientProvider>
 );

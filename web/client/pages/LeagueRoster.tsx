@@ -5,12 +5,22 @@ import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
 import { WeekSelector } from "@/components/league/WeekSelector";
 import { ErrorState } from "@/components/states/ErrorState";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useLeagueDetail, useLeagueRosterTab } from "@/hooks/use-leagues";
 import { ApiError } from "@/lib/api";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import { isNumericProjection } from "@/lib/projection-display";
-import type { LeagueRosterPlayer, LeagueRosterTabResponse, LeagueRosterTeam } from "@/types/league";
+import type {
+  LeagueRosterPlayer,
+  LeagueRosterTabResponse,
+  LeagueRosterTeam,
+} from "@/types/league";
 
 const starterSlot = (slot?: string | null) => {
   const normalized = (slot || "").toUpperCase();
@@ -20,9 +30,9 @@ const starterSlot = (slot?: string | null) => {
 const isRealRosterPlayer = (player: LeagueRosterPlayer) =>
   Boolean(
     player.player_id !== null &&
-      player.player_id !== undefined &&
-      !player.is_placeholder &&
-      !/\bpreview\b/i.test(player.player_name ?? ""),
+    player.player_id !== undefined &&
+    !player.is_placeholder &&
+    !/\bpreview\b/i.test(player.player_name ?? ""),
   );
 
 export const formatRosterLoadError = (error: unknown, fallback: string) => {
@@ -39,19 +49,25 @@ export const formatLineupLockMessage = (player: LeagueRosterPlayer) => {
   return `Locked at kickoff (${gameStart.toLocaleString()})`;
 };
 
-export const getLeagueRosterTeams = (rosterData?: LeagueRosterTabResponse): LeagueRosterTeam[] => {
+export const getLeagueRosterTeams = (
+  rosterData?: LeagueRosterTabResponse,
+): LeagueRosterTeam[] => {
   if (rosterData?.team_rosters?.length) return rosterData.team_rosters;
 
-  const ownedTeamId = rosterData?.owned_team?.id ?? rosterData?.fantasy_team_id ?? null;
+  const ownedTeamId =
+    rosterData?.owned_team?.id ?? rosterData?.fantasy_team_id ?? null;
   if (!rosterData?.owned_team && !ownedTeamId) return [];
 
   return [
     {
       team: {
-          id: ownedTeamId ?? -100,
-          name: rosterData?.owned_team?.name ?? rosterData?.fantasy_team_name ?? "Your Team",
-          owner_user_id: rosterData?.owned_team?.owner_user_id ?? null,
-          record: null,
+        id: ownedTeamId ?? -100,
+        name:
+          rosterData?.owned_team?.name ??
+          rosterData?.fantasy_team_name ??
+          "Your Team",
+        owner_user_id: rosterData?.owned_team?.owner_user_id ?? null,
+        record: null,
       },
       roster: rosterData?.slots ?? rosterData?.roster ?? rosterData?.data ?? [],
     },
@@ -68,63 +84,98 @@ export default function LeagueRoster() {
     draftStatus: leagueQuery.data?.draft?.status,
     leagueStatus: leagueQuery.data?.status,
   });
-  const rosterQuery = useLeagueRosterTab(parsedLeagueId, selectedWeek ?? undefined, postDraft);
+  const rosterQuery = useLeagueRosterTab(
+    parsedLeagueId,
+    selectedWeek ?? undefined,
+    postDraft,
+  );
   const rosterData = rosterQuery.data;
-  const ownedTeamId = rosterData?.owned_team?.id ?? rosterData?.fantasy_team_id ?? null;
-  const ownedRoster = rosterData?.slots ?? rosterData?.roster ?? rosterData?.data ?? [];
-  const teamRosters = useMemo(() => getLeagueRosterTeams(rosterData), [rosterData]);
+  const ownedTeamId =
+    rosterData?.owned_team?.id ?? rosterData?.fantasy_team_id ?? null;
+  const ownedRoster =
+    rosterData?.slots ?? rosterData?.roster ?? rosterData?.data ?? [];
+  const teamRosters = useMemo(
+    () => getLeagueRosterTeams(rosterData),
+    [rosterData],
+  );
   useEffect(() => {
     const defaultTeamId = ownedTeamId ?? teamRosters[0]?.team.id ?? null;
-    if (selectedTeamId === null || !teamRosters.some((teamRoster) => teamRoster.team.id === selectedTeamId)) {
+    if (
+      selectedTeamId === null ||
+      !teamRosters.some((teamRoster) => teamRoster.team.id === selectedTeamId)
+    ) {
       setSelectedTeamId(defaultTeamId);
     }
   }, [ownedTeamId, selectedTeamId, teamRosters]);
-  const selectedTeamRoster = teamRosters.find((teamRoster) => teamRoster.team.id === selectedTeamId) ?? teamRosters[0];
+  const selectedTeamRoster =
+    teamRosters.find((teamRoster) => teamRoster.team.id === selectedTeamId) ??
+    teamRosters[0];
   const fetchedRoster = selectedTeamRoster?.roster ?? ownedRoster;
-  const previewTeamName = selectedTeamRoster?.team.name ?? rosterData?.owned_team?.name ?? rosterData?.fantasy_team_name ?? "Your Team";
+  const previewTeamName =
+    selectedTeamRoster?.team.name ??
+    rosterData?.owned_team?.name ??
+    rosterData?.fantasy_team_name ??
+    "Your Team";
   const previewTeamId = selectedTeamRoster?.team.id ?? ownedTeamId ?? -100;
-  const viewingOwnedTeam = Boolean(ownedTeamId && previewTeamId === ownedTeamId);
-  const realRoster = useMemo(() => fetchedRoster.filter(isRealRosterPlayer), [fetchedRoster]);
+  const viewingOwnedTeam = Boolean(
+    ownedTeamId && previewTeamId === ownedTeamId,
+  );
+  const realRoster = useMemo(
+    () => fetchedRoster.filter(isRealRosterPlayer),
+    [fetchedRoster],
+  );
   const hasRosterSlots = fetchedRoster.length > 0;
-  const isEmptyRoster = !rosterQuery.isLoading && !rosterQuery.isError && !hasRosterSlots;
+  const isEmptyRoster =
+    !rosterQuery.isLoading && !rosterQuery.isError && !hasRosterSlots;
   const roster = fetchedRoster;
   const starters = useMemo(
-    () => roster.filter((player) => starterSlot(player.slot ?? player.roster_slot)),
-    [roster]
+    () =>
+      roster.filter((player) => starterSlot(player.slot ?? player.roster_slot)),
+    [roster],
   );
   const bench = useMemo(
-    () => roster.filter((player) => (player.slot ?? player.roster_slot ?? "").toUpperCase() === "BENCH"),
-    [roster]
+    () =>
+      roster.filter(
+        (player) =>
+          (player.slot ?? player.roster_slot ?? "").toUpperCase() === "BENCH",
+      ),
+    [roster],
   );
   const ir = useMemo(
-    () => roster.filter((player) => (player.slot ?? player.roster_slot ?? "").toUpperCase() === "IR"),
-    [roster]
+    () =>
+      roster.filter(
+        (player) =>
+          (player.slot ?? player.roster_slot ?? "").toUpperCase() === "IR",
+      ),
+    [roster],
   );
   const starterTotal = hasRosterSlots
-    ? starters.reduce(
-        (total, player) => {
-          const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
-          return isNumericProjection(projection, player.projection_status) ? total + projection : total;
-        },
-        0
-      )
+    ? starters.reduce((total, player) => {
+        const projection =
+          player.projected_points ?? player.weekly_projected_fantasy_points;
+        return isNumericProjection(projection, player.projection_status)
+          ? total + projection
+          : total;
+      }, 0)
     : null;
-  const ownedRosterActions = viewingOwnedTeam && typeof previewTeamId === "number" && previewTeamId > 0
-    ? {
-        teamId: previewTeamId,
-        roster: realRoster,
-        superflexEnabled: Number(rosterData?.roster_slot_limits?.SUPERFLEX ?? 0) > 0,
-      }
-    : undefined;
+  const ownedRosterActions =
+    viewingOwnedTeam && typeof previewTeamId === "number" && previewTeamId > 0
+      ? {
+          teamId: previewTeamId,
+          roster: realRoster,
+          superflexEnabled:
+            Number(rosterData?.roster_slot_limits?.SUPERFLEX ?? 0) > 0,
+        }
+      : undefined;
 
   const benchTotal = hasRosterSlots
-    ? bench.reduce(
-        (total, player) => {
-          const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
-          return isNumericProjection(projection, player.projection_status) ? total + projection : total;
-        },
-        0
-      )
+    ? bench.reduce((total, player) => {
+        const projection =
+          player.projected_points ?? player.weekly_projected_fantasy_points;
+        return isNumericProjection(projection, player.projection_status)
+          ? total + projection
+          : total;
+      }, 0)
     : null;
 
   if (leagueQuery.isLoading) {
@@ -142,7 +193,10 @@ export default function LeagueRoster() {
       <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
         <ErrorState
           title="Unable to load league"
-          message={formatRosterLoadError(leagueQuery.error, "The league could not be loaded. Please try again.")}
+          message={formatRosterLoadError(
+            leagueQuery.error,
+            "The league could not be loaded. Please try again.",
+          )}
           retryLabel="Retry"
           onRetry={() => void leagueQuery.refetch()}
         />
@@ -159,7 +213,10 @@ export default function LeagueRoster() {
       <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
         <ErrorState
           title="Unable to load roster"
-          message={formatRosterLoadError(rosterQuery.error, "The roster could not be loaded. Please try again.")}
+          message={formatRosterLoadError(
+            rosterQuery.error,
+            "The roster could not be loaded. Please try again.",
+          )}
           retryLabel="Retry"
           onRetry={() => void rosterQuery.refetch()}
         />
@@ -176,23 +233,37 @@ export default function LeagueRoster() {
         </p>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-black italic text-slate-50 sm:text-4xl">Roster</h1>
+            <h1 className="text-3xl font-black italic text-slate-50 sm:text-4xl">
+              Roster
+            </h1>
             <p className="mt-1 hidden text-sm text-slate-400 sm:block">
-              Manage your lineup or inspect every league team&apos;s current roster.
+              Manage your lineup or inspect every league team&apos;s current
+              roster.
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             {teamRosters.length > 1 ? (
               <div className="min-w-[240px]">
-                <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">View team roster</p>
-                <Select value={selectedTeamId === null ? undefined : String(selectedTeamId)} onValueChange={(value) => setSelectedTeamId(Number(value))}>
+                <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  View team roster
+                </p>
+                <Select
+                  value={
+                    selectedTeamId === null ? undefined : String(selectedTeamId)
+                  }
+                  onValueChange={(value) => setSelectedTeamId(Number(value))}
+                >
                   <SelectTrigger className="h-11 rounded-xl border-sky-300/25 bg-slate-950/45 text-sm font-black text-slate-100">
                     <SelectValue placeholder="Choose a team" />
                   </SelectTrigger>
                   <SelectContent className="border-sky-300/20 bg-slate-950 text-slate-100">
                     {teamRosters.map((teamRoster) => (
-                      <SelectItem key={teamRoster.team.id} value={String(teamRoster.team.id)}>
-                        {teamRoster.team.name}{teamRoster.team.id === ownedTeamId ? " (You)" : ""}
+                      <SelectItem
+                        key={teamRoster.team.id}
+                        value={String(teamRoster.team.id)}
+                      >
+                        {teamRoster.team.name}
+                        {teamRoster.team.id === ownedTeamId ? " (You)" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -216,7 +287,8 @@ export default function LeagueRoster() {
       {isEmptyRoster ? (
         <section className="cfb-playbook-pattern rounded-[1.25rem] border border-cfb-brand/30 bg-cfb-brand/[0.09] px-5 py-4 shadow-[0_0_36px_hsl(var(--brand-primary)/0.12)]">
           <p className="relative text-sm font-bold text-blue-50">
-            No players on this roster yet. Complete the draft to populate your roster.
+            No players on this roster yet. Complete the draft to populate your
+            roster.
           </p>
         </section>
       ) : null}
@@ -226,7 +298,10 @@ export default function LeagueRoster() {
           {viewingOwnedTeam ? "Managing your roster" : "Viewing league roster"}
         </p>
         <p className="mt-1 text-sm font-bold text-slate-200">
-          {previewTeamName}{selectedTeamRoster?.team.record ? ` · ${selectedTeamRoster.team.record}` : ""}
+          {previewTeamName}
+          {selectedTeamRoster?.team.record
+            ? ` · ${selectedTeamRoster.team.record}`
+            : ""}
           {!viewingOwnedTeam ? " · Read-only" : ""}
         </p>
       </section>
@@ -236,27 +311,47 @@ export default function LeagueRoster() {
           <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-slate-400 sm:text-[10px] sm:tracking-[0.2em]">
             Starter Proj
           </p>
-          <p className="mt-1 text-xl font-black tabular-nums text-sky-100 sm:text-3xl">{starterTotal === null ? "N/A" : starterTotal.toFixed(1)}</p>
+          <p className="mt-1 text-xl font-black tabular-nums text-sky-100 sm:text-3xl">
+            {starterTotal === null ? "N/A" : starterTotal.toFixed(1)}
+          </p>
         </div>
         <div className="rounded-[1.1rem] border border-cfb-border-subtle bg-cfb-surface-raised/90 p-3 sm:rounded-[1.35rem] sm:p-5">
           <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-slate-500 sm:text-[10px] sm:tracking-[0.2em]">
             Bench Depth
           </p>
-          <p className="mt-1 text-xl font-black tabular-nums text-slate-100 sm:text-3xl">{benchTotal === null ? "N/A" : benchTotal.toFixed(1)}</p>
+          <p className="mt-1 text-xl font-black tabular-nums text-slate-100 sm:text-3xl">
+            {benchTotal === null ? "N/A" : benchTotal.toFixed(1)}
+          </p>
         </div>
         <div className="rounded-[1.1rem] border border-cfb-border-subtle bg-cfb-surface-raised/90 p-3 sm:rounded-[1.35rem] sm:p-5">
           <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-slate-500 sm:text-[10px] sm:tracking-[0.2em]">
             Week
           </p>
-          <p className="mt-1 text-xl font-black tabular-nums text-slate-100 sm:text-3xl">{selectedWeek ?? rosterData?.week ?? 1}</p>
+          <p className="mt-1 text-xl font-black tabular-nums text-slate-100 sm:text-3xl">
+            {selectedWeek ?? rosterData?.week ?? 1}
+          </p>
           {rosterData?.message ? (
-            <p className="mt-2 text-xs font-semibold text-slate-400">{rosterData.message}</p>
+            <p className="mt-2 text-xs font-semibold text-slate-400">
+              {rosterData.message}
+            </p>
           ) : null}
         </div>
       </section>
 
-      <RosterSlotTable title="Starters" players={starters} emptyText="No starters set yet." leagueId={parsedLeagueId} ownedRosterActions={ownedRosterActions} />
-      <RosterSlotTable title="Bench" players={bench} emptyText="Bench is empty." leagueId={parsedLeagueId} ownedRosterActions={ownedRosterActions} />
+      <RosterSlotTable
+        title="Starters"
+        players={starters}
+        emptyText="No starters set yet."
+        leagueId={parsedLeagueId}
+        ownedRosterActions={ownedRosterActions}
+      />
+      <RosterSlotTable
+        title="Bench"
+        players={bench}
+        emptyText="Bench is empty."
+        leagueId={parsedLeagueId}
+        ownedRosterActions={ownedRosterActions}
+      />
       <RosterSlotTable
         title={`IR (${rosterData?.ir_slots ?? 0})`}
         players={ir}

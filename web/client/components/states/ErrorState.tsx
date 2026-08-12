@@ -4,7 +4,10 @@ import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export interface ErrorStateProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
+export interface ErrorStateProps extends Omit<
+  React.HTMLAttributes<HTMLDivElement>,
+  "title"
+> {
   title?: React.ReactNode;
   message: React.ReactNode;
   retryLabel?: string;
@@ -12,7 +15,17 @@ export interface ErrorStateProps extends Omit<React.HTMLAttributes<HTMLDivElemen
 }
 
 export const ErrorState = React.forwardRef<HTMLDivElement, ErrorStateProps>(
-  ({ className, title = "Unable to load this view", message, retryLabel, onRetry, ...props }, ref) => (
+  (
+    {
+      className,
+      title = "Unable to load this view",
+      message,
+      retryLabel,
+      onRetry,
+      ...props
+    },
+    ref,
+  ) => (
     <div
       ref={ref}
       role="alert"
@@ -30,7 +43,13 @@ export const ErrorState = React.forwardRef<HTMLDivElement, ErrorStateProps>(
           <h2 className="font-black text-red-100">{title}</h2>
           <p className="mt-1 text-sm font-medium text-red-100/80">{message}</p>
           {retryLabel && onRetry ? (
-            <Button type="button" variant="outline" size="sm" className="mt-4" onClick={onRetry}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={onRetry}
+            >
               {retryLabel}
             </Button>
           ) : null}

@@ -5,7 +5,13 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { PlayerTrajectoryChart } from "./PlayerTrajectoryChart";
 
-const renderChart = (points: Array<{ week: number; value: number | null; source: "preseason" | "current" | "published" | "actual" | "bye" }>) =>
+const renderChart = (
+  points: Array<{
+    week: number;
+    value: number | null;
+    source: "preseason" | "current" | "published" | "actual" | "bye";
+  }>,
+) =>
   render(
     <PlayerTrajectoryChart
       ariaLabel="Projection trajectory"
@@ -23,13 +29,25 @@ describe("PlayerTrajectoryChart", () => {
   it("renders a canonical weekly preweek baseline without inventing a preseason point", () => {
     renderChart([{ week: 1, value: 18.4, source: "published" }]);
 
-    expect(screen.getByText("Preweek baseline — actual fantasy points publish after each game")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Preweek baseline — actual fantasy points publish after each game",
+      ),
+    ).toBeTruthy();
     expect(screen.getByText("Preweek")).toBeTruthy();
     expect(screen.getByText("Preweek baseline")).toBeTruthy();
     expect(screen.getByText("Actual fantasy points")).toBeTruthy();
     expect(screen.getByText("W13")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("path[stroke='#5ee7ff']")).toHaveLength(0);
-    expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("circle[fill='#ffffff']")).toHaveLength(1);
+    expect(
+      screen
+        .getByRole("img", { name: "Projection trajectory" })
+        .querySelectorAll("path[stroke='#5ee7ff']"),
+    ).toHaveLength(0);
+    expect(
+      screen
+        .getByRole("img", { name: "Projection trajectory" })
+        .querySelectorAll("circle[fill='#ffffff']"),
+    ).toHaveLength(1);
   });
 
   it("connects only consecutive published weekly records", () => {
@@ -38,8 +56,16 @@ describe("PlayerTrajectoryChart", () => {
       { week: 2, value: 18.4, source: "published" },
     ]);
 
-    expect(screen.getByText("Preweek baseline — actual fantasy points publish after each game")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("path[stroke='#5ee7ff']")).toHaveLength(1);
+    expect(
+      screen.getByText(
+        "Preweek baseline — actual fantasy points publish after each game",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("img", { name: "Projection trajectory" })
+        .querySelectorAll("path[stroke='#5ee7ff']"),
+    ).toHaveLength(1);
   });
 
   it("uses blue only for actual fantasy-point totals", () => {
@@ -47,7 +73,9 @@ describe("PlayerTrajectoryChart", () => {
 
     const chart = screen.getByRole("img", { name: "Projection trajectory" });
     expect(chart.querySelectorAll("circle[fill='#2f80ff']")).toHaveLength(1);
-    expect(chart.querySelector("title")?.textContent).toContain("actual fantasy points");
+    expect(chart.querySelector("title")?.textContent).toContain(
+      "actual fantasy points",
+    );
   });
 
   it("keeps the value-history legend separate from the weekly points semantics", () => {
@@ -62,7 +90,9 @@ describe("PlayerTrajectoryChart", () => {
       />,
     );
 
-    expect(screen.getByText("Preseason baseline — weekly snapshots begin at Week 1")).toBeTruthy();
+    expect(
+      screen.getByText("Preseason baseline — weekly snapshots begin at Week 1"),
+    ).toBeTruthy();
     expect(screen.getByText("Published weekly snapshot")).toBeTruthy();
     expect(screen.queryByText("Actual fantasy points")).toBeNull();
   });
@@ -71,6 +101,10 @@ describe("PlayerTrajectoryChart", () => {
     renderChart([{ week: 2, value: null, source: "bye" }]);
 
     expect(screen.getByText("BYE")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("circle")).toHaveLength(0);
+    expect(
+      screen
+        .getByRole("img", { name: "Projection trajectory" })
+        .querySelectorAll("circle"),
+    ).toHaveLength(0);
   });
 });

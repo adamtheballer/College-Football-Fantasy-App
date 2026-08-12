@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,7 +17,10 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  const actual =
+    await vi.importActual<typeof import("react-router-dom")>(
+      "react-router-dom",
+    );
   return {
     ...actual,
     useNavigate: () => vi.fn(),
@@ -52,7 +61,9 @@ const deferred = <T,>() => {
 };
 
 const renderPage = () => {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
@@ -73,7 +84,9 @@ describe("JoinLeague preview", () => {
   it("keeps the newest preview when an older request fails later", async () => {
     const firstRequest = deferred<typeof preview>();
     const secondRequest = deferred<typeof preview>();
-    state.apiPost.mockImplementationOnce(() => firstRequest.promise).mockImplementationOnce(() => secondRequest.promise);
+    state.apiPost
+      .mockImplementationOnce(() => firstRequest.promise)
+      .mockImplementationOnce(() => secondRequest.promise);
     state.inviteCode = "FIRSTINVITE";
 
     const view = renderPage();
@@ -81,7 +94,11 @@ describe("JoinLeague preview", () => {
 
     state.inviteCode = "SECONDINVITE";
     view.rerender(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
         <MemoryRouter>
           <JoinLeague />
         </MemoryRouter>
@@ -90,7 +107,9 @@ describe("JoinLeague preview", () => {
     await waitFor(() => expect(state.apiPost).toHaveBeenCalledTimes(2));
 
     secondRequest.resolve(preview);
-    await waitFor(() => expect(screen.getByText("League Preview")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText("League Preview")).toBeTruthy(),
+    );
 
     firstRequest.reject(new Error("Internal Server Error"));
     await Promise.resolve();
@@ -103,11 +122,17 @@ describe("JoinLeague preview", () => {
     state.apiPost.mockRejectedValueOnce(new Error("Internal Server Error"));
     renderPage();
 
-    fireEvent.change(screen.getByPlaceholderText("ENTER INVITE CODE"), { target: { value: "INVITECODE" } });
+    fireEvent.change(screen.getByPlaceholderText("ENTER INVITE CODE"), {
+      target: { value: "INVITECODE" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Preview League" }));
 
     await waitFor(() => {
-      expect(screen.getByText("We could not load this invite just now. Please try again.")).toBeTruthy();
+      expect(
+        screen.getByText(
+          "We could not load this invite just now. Please try again.",
+        ),
+      ).toBeTruthy();
     });
     expect(screen.queryByText("Internal Server Error")).toBeNull();
   });

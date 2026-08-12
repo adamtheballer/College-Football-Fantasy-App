@@ -18,22 +18,43 @@ import {
   visiblePlayerCardAboutMessage,
   visiblePlayerCardTabs,
 } from "./PlayerCardModal";
-import { CURRENT_VALUE_RATING_LABEL, formatCurrentValueRating } from "./PlayerCardHeader";
+import {
+  CURRENT_VALUE_RATING_LABEL,
+  formatCurrentValueRating,
+} from "./PlayerCardHeader";
 
 describe("PlayerCardModal helpers", () => {
   it("always shows the History tab, with league context controlling its contents", () => {
     expect(visiblePlayerCardTabs(false).map((tab) => tab.label)).toEqual([
-      "Summary", "Stats", "Game Log", "Alerts", "Projections", "History", "Value",
+      "Summary",
+      "Stats",
+      "Game Log",
+      "Alerts",
+      "Projections",
+      "History",
+      "Value",
     ]);
     expect(visiblePlayerCardTabs(true).map((tab) => tab.label)).toEqual([
-      "Summary", "Stats", "Game Log", "Alerts", "Projections", "History", "Value",
+      "Summary",
+      "Stats",
+      "Game Log",
+      "Alerts",
+      "Projections",
+      "History",
+      "Value",
     ]);
   });
   it("uses position-specific Game Log columns and full school names", () => {
     expect(gameLogColumnsForPosition("TE").map(([label]) => label)).toEqual([
-      "FPTS", "REC", "TAR", "REC YDS", "REC TD",
+      "FPTS",
+      "REC",
+      "TAR",
+      "REC YDS",
+      "REC TD",
     ]);
-    expect(gameLogOpponentLabel({ location: "away", opponent_name: "Ohio State" })).toBe("at Ohio State");
+    expect(
+      gameLogOpponentLabel({ location: "away", opponent_name: "Ohio State" }),
+    ).toBe("at Ohio State");
     expect(formatGameLogDate("2026-09-05")).toBe("Sep 5, 2026");
   });
   it("formats empty player-card fields with an em dash fallback", () => {
@@ -54,7 +75,12 @@ describe("PlayerCardModal helpers", () => {
   });
 
   it("uses the same loaded CFB 27 rating for every player-card rating display", () => {
-    expect(resolvePlayerCardCfb27Rating({ player: { cfb27_overall: 90 } } as never, 73)).toBe(90);
+    expect(
+      resolvePlayerCardCfb27Rating(
+        { player: { cfb27_overall: 90 } } as never,
+        73,
+      ),
+    ).toBe(90);
     expect(resolvePlayerCardCfb27Rating(null, 73)).toBe(73);
     expect(resolvePlayerCardCfb27Rating(null, null)).toBeNull();
   });
@@ -73,13 +99,20 @@ describe("PlayerCardModal helpers", () => {
 
     expect(resolvePlayerCardCurrentValueRating(undefined, archCard)).toBe(91);
     expect(resolvePlayerCardCurrentValueRating(91, archCard)).toBe(91);
-    expect(resolvePlayerCardCurrentValueRating(null, { player: { raw_cfb27_rating: null, current_value_rating: null } } as never)).toBeNull();
+    expect(
+      resolvePlayerCardCurrentValueRating(null, {
+        player: { raw_cfb27_rating: null, current_value_rating: null },
+      } as never),
+    ).toBeNull();
   });
 
   it("shows a drafted player's round, pick, and overall selection in league history", () => {
-    expect(draftHistorySummary({ event_type: "AUTO_DRAFTED", metadata: { round: 4, pick_in_round: 4, overall_pick: 16 } })).toBe(
-      "Round 4 • Pick 4 • Overall 16"
-    );
+    expect(
+      draftHistorySummary({
+        event_type: "AUTO_DRAFTED",
+        metadata: { round: 4, pick_in_round: 4, overall_pick: 16 },
+      }),
+    ).toBe("Round 4 • Pick 4 • Overall 16");
   });
 
   it("uses a position-specific palette when available and a default otherwise", () => {
@@ -88,11 +121,21 @@ describe("PlayerCardModal helpers", () => {
   });
 
   it("suppresses provider-ID placeholder messages but keeps meaningful notes", () => {
-    expect(visiblePlayerCardAboutMessage("No ESPN player ID is set for this player.")).toBeNull();
-    expect(visiblePlayerCardAboutMessage("No trusted ESPN player match is linked to this player.")).toBeNull();
-    expect(visiblePlayerCardAboutMessage("Imported provider stats are still refreshing.")).toBe(
-      "Imported provider stats are still refreshing."
-    );
+    expect(
+      visiblePlayerCardAboutMessage(
+        "No ESPN player ID is set for this player.",
+      ),
+    ).toBeNull();
+    expect(
+      visiblePlayerCardAboutMessage(
+        "No trusted ESPN player match is linked to this player.",
+      ),
+    ).toBeNull();
+    expect(
+      visiblePlayerCardAboutMessage(
+        "Imported provider stats are still refreshing.",
+      ),
+    ).toBe("Imported provider stats are still refreshing.");
   });
 
   it("uses sheet projection stats from the loaded card when the selected row has none", () => {
@@ -121,7 +164,7 @@ describe("PlayerCardModal helpers", () => {
         injuries: [],
         season_stats: [],
         historical_stats: null,
-      }
+      },
     );
 
     expect(statValue(projectedStats, ["receptions"])).toBe(63);
@@ -189,7 +232,10 @@ describe("PlayerCardModal helpers", () => {
       {
         season: 2025,
         season_type: "regular",
-        summary: [{ label: "Fantasy Pts", value: 212.3 }, { label: "Rush Yds", value: 1047 }],
+        summary: [
+          { label: "Fantasy Pts", value: 212.3 },
+          { label: "Rush Yds", value: 1047 },
+        ],
         categories: [],
         freshness: { provider: "verified_import", is_final: true },
         scoring_context: {},
@@ -197,16 +243,26 @@ describe("PlayerCardModal helpers", () => {
       {
         season: 2024,
         season_type: "regular",
-        summary: [{ label: "Fantasy Pts", value: 164.1 }, { label: "Rec Yds", value: 812 }],
+        summary: [
+          { label: "Fantasy Pts", value: 164.1 },
+          { label: "Rec Yds", value: 812 },
+        ],
         categories: [],
         freshness: { provider: "verified_import", is_final: true },
         scoring_context: {},
       },
     ] as never;
 
-    expect(buildHistoricalSeasonSummaryColumns(seasons)).toEqual(["Rush Yds", "Rec Yds"]);
-    expect(buildHistoricalSeasonSummaryColumns(seasons)).not.toContain("Fantasy Points");
-    expect(buildHistoricalSeasonSummaryColumns(seasons)).not.toContain("Fantasy Pts");
+    expect(buildHistoricalSeasonSummaryColumns(seasons)).toEqual([
+      "Rush Yds",
+      "Rec Yds",
+    ]);
+    expect(buildHistoricalSeasonSummaryColumns(seasons)).not.toContain(
+      "Fantasy Points",
+    );
+    expect(buildHistoricalSeasonSummaryColumns(seasons)).not.toContain(
+      "Fantasy Pts",
+    );
     expect(historicalSeasonSummaryValue(seasons[1], "Rec Yds")).toBe(812);
     expect(historicalSeasonSummaryValue(seasons[1], "Rush Yds")).toBeNull();
   });

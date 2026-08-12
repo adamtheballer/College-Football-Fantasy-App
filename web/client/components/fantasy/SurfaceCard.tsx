@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils";
 import { surfaceCardVariants } from "./designSystem";
 
 export interface SurfaceCardProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends
+    React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof surfaceCardVariants> {}
 
 export const SurfaceCard = React.forwardRef<HTMLDivElement, SurfaceCardProps>(

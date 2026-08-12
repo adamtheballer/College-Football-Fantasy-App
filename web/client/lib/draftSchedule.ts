@@ -8,7 +8,10 @@ type LeagueDateTimeParts = {
 
 const LOCAL_DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
 
-const partsForLeagueTimezone = (date: Date, timeZone: string): LeagueDateTimeParts => {
+const partsForLeagueTimezone = (
+  date: Date,
+  timeZone: string,
+): LeagueDateTimeParts => {
   const parts = new Intl.DateTimeFormat("en-CA", {
     calendar: "iso8601",
     timeZone,
@@ -31,7 +34,13 @@ const partsForLeagueTimezone = (date: Date, timeZone: string): LeagueDateTimePar
   };
 };
 
-const toLocalInput = ({ year, month, day, hour, minute }: LeagueDateTimeParts) =>
+const toLocalInput = ({
+  year,
+  month,
+  day,
+  hour,
+  minute,
+}: LeagueDateTimeParts) =>
   `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-${day
     .toString()
     .padStart(2, "0")}T${hour.toString().padStart(2, "0")}:${minute
@@ -56,7 +65,10 @@ const parseLocalInput = (value: string): LeagueDateTimeParts | null => {
 };
 
 /** Formats a canonical UTC timestamp for a date/time picker in the league timezone. */
-export const toLeagueDateTimeLocalValue = (value: string | Date | null | undefined, timeZone: string) => {
+export const toLeagueDateTimeLocalValue = (
+  value: string | Date | null | undefined,
+  timeZone: string,
+) => {
   if (!value) return "";
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -81,28 +93,49 @@ export const leagueLocalDateTimeToUtc = (
   try {
     // A timezone can differ from UTC by at most 14 hours. Search by minute because a
     // datetime-local input has minute precision, and reject the repeated DST hour.
-    const targetAsUtc = Date.UTC(target.year, target.month - 1, target.day, target.hour, target.minute);
+    const targetAsUtc = Date.UTC(
+      target.year,
+      target.month - 1,
+      target.day,
+      target.hour,
+      target.minute,
+    );
     const matches: Date[] = [];
     const windowMs = 16 * 60 * 60 * 1000;
-    for (let timestamp = targetAsUtc - windowMs; timestamp <= targetAsUtc + windowMs; timestamp += 60_000) {
+    for (
+      let timestamp = targetAsUtc - windowMs;
+      timestamp <= targetAsUtc + windowMs;
+      timestamp += 60_000
+    ) {
       const candidate = new Date(timestamp);
       if (toLocalInput(partsForLeagueTimezone(candidate, timeZone)) === value) {
         matches.push(candidate);
         if (matches.length > 1) {
-          return { error: "That local time occurs twice because of daylight saving time. Choose another time." };
+          return {
+            error:
+              "That local time occurs twice because of daylight saving time. Choose another time.",
+          };
         }
       }
     }
     if (matches.length !== 1) {
-      return { error: "That local time does not exist because of daylight saving time. Choose another time." };
+      return {
+        error:
+          "That local time does not exist because of daylight saving time. Choose another time.",
+      };
     }
     return { iso: matches[0].toISOString() };
   } catch {
-    return { error: "The league timezone is invalid. Refresh the page and try again." };
+    return {
+      error: "The league timezone is invalid. Refresh the page and try again.",
+    };
   }
 };
 
-export const formatLeagueDraftDateTime = (value: string | Date | null | undefined, timeZone: string) => {
+export const formatLeagueDraftDateTime = (
+  value: string | Date | null | undefined,
+  timeZone: string,
+) => {
   if (!value) return "Unavailable";
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "Unavailable";

@@ -14,7 +14,11 @@ describe("TopBar", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: "Early Access CFB Fantasy Beta" }).getAttribute("href")).toBe("/");
+    expect(
+      screen
+        .getByRole("link", { name: "Early Access CFB Fantasy Beta" })
+        .getAttribute("href"),
+    ).toBe("/");
     expect(screen.getByText("Early Access")).toBeTruthy();
     expect(screen.getByText("Beta")).toBeTruthy();
   });

@@ -6,10 +6,15 @@ const e2eCode = "EARLY-CI1234";
 const e2ePassword = "RealE2ePass123!";
 
 test.describe("real seeded stack", () => {
-  test.skip(!realStackEnabled, "Run this test through npm run test:e2e:real against the isolated Compose stack.");
+  test.skip(
+    !realStackEnabled,
+    "Run this test through npm run test:e2e:real against the isolated Compose stack.",
+  );
   test.setTimeout(90_000);
 
-  test("allows open signup and optionally redeems an Early Access Pro code, then preserves the returning session", async ({ page }) => {
+  test("allows open signup and optionally redeems an Early Access Pro code, then preserves the returning session", async ({
+    page,
+  }) => {
     const apiResponses: Array<{ url: string; status: number }> = [];
     page.on("response", (response) => {
       const pathname = new URL(response.url()).pathname.replace(/^\/api/, "");
@@ -20,18 +25,29 @@ test.describe("real seeded stack", () => {
 
     await page.goto("/signup");
     await expect(page).toHaveURL(/\/login\?flow=signup$/);
-    await expect(page.getByRole("heading", { name: /Create account/i })).toBeVisible();
-    await expect(page.locator("#signup-email")).not.toHaveAttribute("readonly", "");
+    await expect(
+      page.getByRole("heading", { name: /Create account/i }),
+    ).toBeVisible();
+    await expect(page.locator("#signup-email")).not.toHaveAttribute(
+      "readonly",
+      "",
+    );
     await page.locator("#signup-email").fill(e2eEmail);
     await page.locator("#signup-name").fill("Real E2E Manager");
     await page.locator("#signup-password").fill(e2ePassword);
     await page.getByRole("button", { name: /Create (beta )?account/i }).click();
-    await expect(page.getByRole("dialog", { name: /Account created/i })).toBeVisible();
+    await expect(
+      page.getByRole("dialog", { name: /Account created/i }),
+    ).toBeVisible();
     await page.getByRole("button", { name: /Continue to dashboard/i }).click();
     await page.waitForURL("**/");
-    await expect(page.getByRole("heading", { name: /Good to see you, Real E2E/i })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /Good to see you, Real E2E/i }),
+    ).toBeVisible();
     await expect
-      .poll(() => page.evaluate(() => window.localStorage.getItem("cfb_access_token")))
+      .poll(() =>
+        page.evaluate(() => window.localStorage.getItem("cfb_access_token")),
+      )
       .not.toBeNull();
 
     const endGuide = page.getByRole("button", { name: /End Guide/i });
@@ -45,11 +61,18 @@ test.describe("real seeded stack", () => {
     await page.goto("/leagues");
     await expect(page).toHaveURL(/\/leagues$/);
 
-    expect(apiResponses.some((response) => response.url.includes("/auth/signup") && response.status === 201)).toBe(true);
+    expect(
+      apiResponses.some(
+        (response) =>
+          response.url.includes("/auth/signup") && response.status === 201,
+      ),
+    ).toBe(true);
 
     await page.locator("button:has(#nav-sign-out)").click();
     await expect
-      .poll(() => page.evaluate(() => window.localStorage.getItem("cfb_access_token")))
+      .poll(() =>
+        page.evaluate(() => window.localStorage.getItem("cfb_access_token")),
+      )
       .toBeNull();
     await page.goto("/login");
     await expect(page.getByRole("heading", { name: /Sign in/i })).toBeVisible();
@@ -62,13 +85,17 @@ test.describe("real seeded stack", () => {
     await expect(page).toHaveURL(/\/leagues$/);
     await page.locator("button:has(#nav-sign-out)").click();
     await expect
-      .poll(() => page.evaluate(() => window.localStorage.getItem("cfb_access_token")))
+      .poll(() =>
+        page.evaluate(() => window.localStorage.getItem("cfb_access_token")),
+      )
       .toBeNull();
     await page.goto("/login?flow=pro");
     await page.locator("#beta-email").fill(e2eEmail);
     await page.locator("#beta-code").fill("WRONG1");
     await page.getByRole("button", { name: /Claim free Pro year/i }).click();
-    await expect(page.getByRole("alert")).toContainText(/do not match|no longer available/i);
+    await expect(page.getByRole("alert")).toContainText(
+      /do not match|no longer available/i,
+    );
 
     await page.locator("#beta-code").fill(e2eCode);
     await page.getByRole("button", { name: /Claim free Pro year/i }).click();
@@ -84,6 +111,8 @@ test.describe("real seeded stack", () => {
     await page.locator("#beta-email").fill(e2eEmail);
     await page.locator("#beta-code").fill(e2eCode);
     await page.getByRole("button", { name: /Claim free Pro year/i }).click();
-    await expect(page.getByRole("alert")).toContainText(/do not match|no longer available/i);
+    await expect(page.getByRole("alert")).toContainText(
+      /do not match|no longer available/i,
+    );
   });
 });
