@@ -34,6 +34,9 @@ def production_required_settings() -> dict[str, object]:
         "privacy_policy_url": "https://app.example.com/privacy",
         "terms_url": "https://app.example.com/terms",
         "provider_disclosure_url": "https://app.example.com/provider-disclosure",
+        # These tests exercise production providers.  Live-scoring hardening
+        # now correctly rejects provider enablement while scoring is disabled.
+        "scoring_mode": "enabled",
         "sportsdata_enabled": True,
         "sportsdata_api_key": "sportsdata-production-key",
     }
