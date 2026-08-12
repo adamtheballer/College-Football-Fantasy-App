@@ -11,7 +11,9 @@ const readStoredLeagueId = (): number | null => {
 };
 
 export function useActiveLeagueId() {
-  const [activeLeagueId, setActiveLeagueIdState] = useState<number | null>(() => readStoredLeagueId());
+  const [activeLeagueId, setActiveLeagueIdState] = useState<number | null>(() =>
+    readStoredLeagueId(),
+  );
 
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {

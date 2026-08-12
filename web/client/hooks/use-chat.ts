@@ -16,7 +16,16 @@ const isValidLeagueId = (leagueId?: number) =>
   typeof leagueId === "number" && Number.isInteger(leagueId) && leagueId > 0;
 
 export const chatMessagesQueryKey = (leagueId?: number, threadId?: number) =>
-  ["chat", "league", leagueId, "thread", threadId, "messages", "latest", "none"] as const;
+  [
+    "chat",
+    "league",
+    leagueId,
+    "thread",
+    threadId,
+    "messages",
+    "latest",
+    "none",
+  ] as const;
 
 export const chatThreadsQueryKey = (leagueId?: number) =>
   ["chat", "league", leagueId, "threads"] as const;
@@ -25,7 +34,11 @@ const isDocumentVisible = () =>
   typeof document === "undefined" || document.visibilityState === "visible";
 
 const shouldRetryChatQuery = (failureCount: number, error: unknown) => {
-  if (error instanceof ApiError && (error.status === 401 || error.status === 403)) return false;
+  if (
+    error instanceof ApiError &&
+    (error.status === 401 || error.status === 403)
+  )
+    return false;
   return failureCount < 3;
 };
 
@@ -48,17 +61,33 @@ export function useChatMessages(
   enabled = true,
 ) {
   return useQuery({
-    queryKey: ["chat", "league", leagueId, "thread", threadId, "messages", beforeMessageId ?? "latest", afterMessageId ?? "none"],
-    enabled: enabled && isValidLeagueId(leagueId) && typeof threadId === "number" && threadId > 0,
+    queryKey: [
+      "chat",
+      "league",
+      leagueId,
+      "thread",
+      threadId,
+      "messages",
+      beforeMessageId ?? "latest",
+      afterMessageId ?? "none",
+    ],
+    enabled:
+      enabled &&
+      isValidLeagueId(leagueId) &&
+      typeof threadId === "number" &&
+      threadId > 0,
     staleTime: 3_000,
     refetchInterval: false,
     refetchOnWindowFocus: false,
     queryFn: () =>
-      apiGet<ChatMessagePageResponse>(`/leagues/${leagueId}/chats/${threadId}/messages`, {
-        before_message_id: beforeMessageId,
-        after_message_id: afterMessageId,
-        limit: 50,
-      }),
+      apiGet<ChatMessagePageResponse>(
+        `/leagues/${leagueId}/chats/${threadId}/messages`,
+        {
+          before_message_id: beforeMessageId,
+          after_message_id: afterMessageId,
+          limit: 50,
+        },
+      ),
   });
 }
 
@@ -70,33 +99,63 @@ export function useChatMessageUpdates(
 ) {
   const queryClient = useQueryClient();
   const query = useQuery({
-    queryKey: ["chat", "league", leagueId, "thread", threadId, "message-updates", afterMessageId],
-    enabled: enabled && isValidLeagueId(leagueId) && typeof threadId === "number" && threadId > 0,
+    queryKey: [
+      "chat",
+      "league",
+      leagueId,
+      "thread",
+      threadId,
+      "message-updates",
+      afterMessageId,
+    ],
+    enabled:
+      enabled &&
+      isValidLeagueId(leagueId) &&
+      typeof threadId === "number" &&
+      threadId > 0,
     staleTime: 0,
-    refetchInterval: () => isDocumentVisible() ? 5_000 : false,
+    refetchInterval: () => (isDocumentVisible() ? 5_000 : false),
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     retry: shouldRetryChatQuery,
     queryFn: () =>
-      apiGet<ChatMessagePageResponse>(`/leagues/${leagueId}/chats/${threadId}/messages`, {
-        after_message_id: afterMessageId,
-        limit: 100,
-      }),
+      apiGet<ChatMessagePageResponse>(
+        `/leagues/${leagueId}/chats/${threadId}/messages`,
+        {
+          after_message_id: afterMessageId,
+          limit: 100,
+        },
+      ),
   });
 
   useEffect(() => {
     if (!query.data?.data.length) return;
     const messagesKey = chatMessagesQueryKey(leagueId, threadId);
-    queryClient.setQueryData<ChatMessagePageResponse>(messagesKey, (current) => {
-      const page = current ?? { data: [], next_before_message_id: null, next_after_message_id: null };
-      const byMessageId = new Map(page.data.map((message) => [message.id, message]));
-      query.data.data.forEach((message) => byMessageId.set(message.id, message));
-      return {
-        ...page,
-        data: [...byMessageId.values()].sort((left, right) => left.id - right.id),
-      };
+    queryClient.setQueryData<ChatMessagePageResponse>(
+      messagesKey,
+      (current) => {
+        const page = current ?? {
+          data: [],
+          next_before_message_id: null,
+          next_after_message_id: null,
+        };
+        const byMessageId = new Map(
+          page.data.map((message) => [message.id, message]),
+        );
+        query.data.data.forEach((message) =>
+          byMessageId.set(message.id, message),
+        );
+        return {
+          ...page,
+          data: [...byMessageId.values()].sort(
+            (left, right) => left.id - right.id,
+          ),
+        };
+      },
+    );
+    queryClient.invalidateQueries({
+      queryKey: ["chat", "league", leagueId, "threads"],
     });
-    queryClient.invalidateQueries({ queryKey: ["chat", "league", leagueId, "threads"] });
     queryClient.invalidateQueries({ queryKey: ["chat", "unread-summary"] });
   }, [leagueId, query.data, queryClient, threadId]);
 
@@ -107,12 +166,20 @@ export function useSendChatMessage(leagueId?: number, threadId?: number) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: (payload: { body: string; client_message_id: string; reply_to_message_id?: number }) =>
-      apiPost<ChatMessage>(`/leagues/${leagueId}/chats/${threadId}/messages`, payload),
+    mutationFn: (payload: {
+      body: string;
+      client_message_id: string;
+      reply_to_message_id?: number;
+    }) =>
+      apiPost<ChatMessage>(
+        `/leagues/${leagueId}/chats/${threadId}/messages`,
+        payload,
+      ),
     onMutate: async (payload) => {
       const messagesKey = chatMessagesQueryKey(leagueId, threadId);
       await queryClient.cancelQueries({ queryKey: messagesKey });
-      const previousMessages = queryClient.getQueryData<ChatMessagePageResponse>(messagesKey);
+      const previousMessages =
+        queryClient.getQueryData<ChatMessagePageResponse>(messagesKey);
       const optimisticMessage: ChatMessage = {
         id: -Date.now(),
         thread_id: threadId ?? 0,
@@ -132,40 +199,79 @@ export function useSendChatMessage(leagueId?: number, threadId?: number) {
         reply_to_message: null,
         delivery_status: "sending",
       };
-      queryClient.setQueryData<ChatMessagePageResponse>(messagesKey, (current) => {
-        const page = current ?? { data: [], next_before_message_id: null, next_after_message_id: null };
-        const alreadyPresent = page.data.some((message) => message.client_message_id === payload.client_message_id);
-        return {
-          ...page,
-          data: alreadyPresent
-            ? page.data.map((message) => message.client_message_id === payload.client_message_id ? optimisticMessage : message)
-            : [...page.data, optimisticMessage],
-        };
-      });
+      queryClient.setQueryData<ChatMessagePageResponse>(
+        messagesKey,
+        (current) => {
+          const page = current ?? {
+            data: [],
+            next_before_message_id: null,
+            next_after_message_id: null,
+          };
+          const alreadyPresent = page.data.some(
+            (message) =>
+              message.client_message_id === payload.client_message_id,
+          );
+          return {
+            ...page,
+            data: alreadyPresent
+              ? page.data.map((message) =>
+                  message.client_message_id === payload.client_message_id
+                    ? optimisticMessage
+                    : message,
+                )
+              : [...page.data, optimisticMessage],
+          };
+        },
+      );
       return { previousMessages };
     },
     onError: (_error, payload) => {
       const messagesKey = chatMessagesQueryKey(leagueId, threadId);
-      queryClient.setQueryData<ChatMessagePageResponse>(messagesKey, (current) => current ? {
-        ...current,
-        data: current.data.map((message) => message.client_message_id === payload.client_message_id
-          ? { ...message, delivery_status: "failed" }
-          : message),
-      } : current);
+      queryClient.setQueryData<ChatMessagePageResponse>(
+        messagesKey,
+        (current) =>
+          current
+            ? {
+                ...current,
+                data: current.data.map((message) =>
+                  message.client_message_id === payload.client_message_id
+                    ? { ...message, delivery_status: "failed" }
+                    : message,
+                ),
+              }
+            : current,
+      );
     },
     onSuccess: (message) => {
       const messagesKey = chatMessagesQueryKey(leagueId, threadId);
-      queryClient.setQueryData<ChatMessagePageResponse>(messagesKey, (current) => current ? {
-        ...current,
-        data: current.data.some((item) => item.client_message_id === message.client_message_id)
-          ? current.data.map((item) => item.client_message_id === message.client_message_id ? message : item)
-          : [...current.data, message],
-      } : current);
-      queryClient.invalidateQueries({ queryKey: ["chat", "league", leagueId, "threads"] });
+      queryClient.setQueryData<ChatMessagePageResponse>(
+        messagesKey,
+        (current) =>
+          current
+            ? {
+                ...current,
+                data: current.data.some(
+                  (item) =>
+                    item.client_message_id === message.client_message_id,
+                )
+                  ? current.data.map((item) =>
+                      item.client_message_id === message.client_message_id
+                        ? message
+                        : item,
+                    )
+                  : [...current.data, message],
+              }
+            : current,
+      );
+      queryClient.invalidateQueries({
+        queryKey: ["chat", "league", leagueId, "threads"],
+      });
       queryClient.invalidateQueries({ queryKey: ["chat", "unread-summary"] });
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["chat", "league", leagueId, "thread", threadId, "messages"] });
+      queryClient.invalidateQueries({
+        queryKey: ["chat", "league", leagueId, "thread", threadId, "messages"],
+      });
     },
   });
 }
@@ -184,9 +290,13 @@ export function useMarkChatThreadRead(leagueId?: number, threadId?: number) {
         queryClient.cancelQueries({ queryKey: threadQueryKey }),
         queryClient.cancelQueries({ queryKey: summaryQueryKey }),
       ]);
-      const previousThreads = queryClient.getQueryData<ChatThreadListResponse>(threadQueryKey);
-      const previousSummary = queryClient.getQueryData<ChatUnreadSummaryResponse>(summaryQueryKey);
-      const threadUnread = previousThreads?.data.find((thread) => thread.id === threadId)?.unread_count ?? 0;
+      const previousThreads =
+        queryClient.getQueryData<ChatThreadListResponse>(threadQueryKey);
+      const previousSummary =
+        queryClient.getQueryData<ChatUnreadSummaryResponse>(summaryQueryKey);
+      const threadUnread =
+        previousThreads?.data.find((thread) => thread.id === threadId)
+          ?.unread_count ?? 0;
 
       if (previousThreads && typeof threadId === "number") {
         queryClient.setQueryData<ChatThreadListResponse>(threadQueryKey, {
@@ -199,12 +309,21 @@ export function useMarkChatThreadRead(leagueId?: number, threadId?: number) {
       if (previousSummary && typeof leagueId === "number" && threadUnread > 0) {
         const nextLeagueUnread = Math.max(
           0,
-          (previousSummary.leagues.find((league) => league.league_id === leagueId)?.unread ?? 0) - threadUnread,
+          (previousSummary.leagues.find(
+            (league) => league.league_id === leagueId,
+          )?.unread ?? 0) - threadUnread,
         );
         queryClient.setQueryData<ChatUnreadSummaryResponse>(summaryQueryKey, {
-          total_unread: Math.max(0, previousSummary.total_unread - threadUnread),
+          total_unread: Math.max(
+            0,
+            previousSummary.total_unread - threadUnread,
+          ),
           leagues: previousSummary.leagues
-            .map((league) => league.league_id === leagueId ? { ...league, unread: nextLeagueUnread } : league)
+            .map((league) =>
+              league.league_id === leagueId
+                ? { ...league, unread: nextLeagueUnread }
+                : league,
+            )
             .filter((league) => league.unread > 0),
         });
       }
@@ -213,11 +332,15 @@ export function useMarkChatThreadRead(leagueId?: number, threadId?: number) {
     onError: (_error, _lastReadMessageId, context) => {
       const threadQueryKey = ["chat", "league", leagueId, "threads"] as const;
       const summaryQueryKey = ["chat", "unread-summary"] as const;
-      if (context?.previousThreads) queryClient.setQueryData(threadQueryKey, context.previousThreads);
-      if (context?.previousSummary) queryClient.setQueryData(summaryQueryKey, context.previousSummary);
+      if (context?.previousThreads)
+        queryClient.setQueryData(threadQueryKey, context.previousThreads);
+      if (context?.previousSummary)
+        queryClient.setQueryData(summaryQueryKey, context.previousSummary);
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["chat", "league", leagueId, "threads"] });
+      queryClient.invalidateQueries({
+        queryKey: ["chat", "league", leagueId, "threads"],
+      });
       queryClient.invalidateQueries({ queryKey: ["chat", "unread-summary"] });
     },
   });
@@ -226,13 +349,27 @@ export function useMarkChatThreadRead(leagueId?: number, threadId?: number) {
 export function useCreateDirectChatThread(leagueId?: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (recipientUserId: number) => apiPost<ChatThread>(`/leagues/${leagueId}/chats/direct`, { recipient_user_id: recipientUserId }),
+    mutationFn: (recipientUserId: number) =>
+      apiPost<ChatThread>(`/leagues/${leagueId}/chats/direct`, {
+        recipient_user_id: recipientUserId,
+      }),
     onSuccess: (thread) => {
       const threadsKey = chatThreadsQueryKey(leagueId);
-      queryClient.setQueryData<ChatThreadListResponse>(threadsKey, (current) => {
-        if (!current || current.data.some((existing) => existing.id === thread.id)) return current;
-        return { ...current, data: [...current.data, thread], total: current.total + 1 };
-      });
+      queryClient.setQueryData<ChatThreadListResponse>(
+        threadsKey,
+        (current) => {
+          if (
+            !current ||
+            current.data.some((existing) => existing.id === thread.id)
+          )
+            return current;
+          return {
+            ...current,
+            data: [...current.data, thread],
+            total: current.total + 1,
+          };
+        },
+      );
       queryClient.invalidateQueries({ queryKey: threadsKey });
     },
   });
@@ -243,7 +380,8 @@ export function useChatUnreadSummary(enabled = true, chatsPageOpen = false) {
     queryKey: ["chat", "unread-summary"],
     enabled,
     staleTime: 5_000,
-    refetchInterval: () => isDocumentVisible() ? (chatsPageOpen ? 5_000 : 10_000) : false,
+    refetchInterval: () =>
+      isDocumentVisible() ? (chatsPageOpen ? 5_000 : 10_000) : false,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     placeholderData: (previousData) => previousData,

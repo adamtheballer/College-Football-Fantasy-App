@@ -17,11 +17,21 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/use-auth", () => ({
-  useAuth: () => ({ user: { id: 1, firstName: "Avery", email: "avery@example.com", isAdmin: false } }),
+  useAuth: () => ({
+    user: {
+      id: 1,
+      firstName: "Avery",
+      email: "avery@example.com",
+      isAdmin: false,
+    },
+  }),
 }));
 
 vi.mock("@/hooks/use-active-league", () => ({
-  useActiveLeagueId: () => ({ activeLeagueId: state.activeLeagueId, setActiveLeagueId: state.setActiveLeagueId }),
+  useActiveLeagueId: () => ({
+    activeLeagueId: state.activeLeagueId,
+    setActiveLeagueId: state.setActiveLeagueId,
+  }),
 }));
 
 vi.mock("@/hooks/use-leagues", () => ({
@@ -36,17 +46,43 @@ vi.mock("@/hooks/use-leagues", () => ({
 
 vi.mock("@/components/ui/select", async () => {
   const React = await import("react");
-  const SelectContext = React.createContext<{ onValueChange?: (value: string) => void } | null>(null);
+  const SelectContext = React.createContext<{
+    onValueChange?: (value: string) => void;
+  } | null>(null);
   return {
-    Select: ({ onValueChange, children }: { onValueChange?: (value: string) => void; children: React.ReactNode }) => (
-      <SelectContext.Provider value={{ onValueChange }}>{children}</SelectContext.Provider>
+    Select: ({
+      onValueChange,
+      children,
+    }: {
+      onValueChange?: (value: string) => void;
+      children: React.ReactNode;
+    }) => (
+      <SelectContext.Provider value={{ onValueChange }}>
+        {children}
+      </SelectContext.Provider>
     ),
-    SelectTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    SelectValue: ({ placeholder }: { placeholder?: string }) => <span>{placeholder}</span>,
-    SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => {
+    SelectTrigger: ({ children }: { children: React.ReactNode }) => (
+      <div>{children}</div>
+    ),
+    SelectValue: ({ placeholder }: { placeholder?: string }) => (
+      <span>{placeholder}</span>
+    ),
+    SelectContent: ({ children }: { children: React.ReactNode }) => (
+      <div>{children}</div>
+    ),
+    SelectItem: ({
+      value,
+      children,
+    }: {
+      value: string;
+      children: React.ReactNode;
+    }) => {
       const context = React.useContext(SelectContext);
-      return <button type="button" onClick={() => context?.onValueChange?.(value)}>{children}</button>;
+      return (
+        <button type="button" onClick={() => context?.onValueChange?.(value)}>
+          {children}
+        </button>
+      );
     },
   };
 });
@@ -63,8 +99,18 @@ const leagueThread = (leagueId: number): ChatThread => ({
   created_at: "2026-08-01T12:00:00Z",
   updated_at: "2026-08-01T12:00:00Z",
   participants: [
-    { user_id: 1, joined_at: "2026-08-01T12:00:00Z", display_name: "Avery", fantasy_team_name: "Avery Aces" },
-    { user_id: 2, joined_at: "2026-08-01T12:00:00Z", display_name: "Blake", fantasy_team_name: "Blake Bears" },
+    {
+      user_id: 1,
+      joined_at: "2026-08-01T12:00:00Z",
+      display_name: "Avery",
+      fantasy_team_name: "Avery Aces",
+    },
+    {
+      user_id: 2,
+      joined_at: "2026-08-01T12:00:00Z",
+      display_name: "Blake",
+      fantasy_team_name: "Blake Bears",
+    },
   ],
   other_participant: null,
   last_message_preview: "Welcome",
@@ -85,7 +131,11 @@ const directThread = (leagueId: number): ChatThread => ({
   unread_count: 2,
 });
 
-const chatMessage = (threadId: number, body: string, options: Partial<ChatMessage> = {}): ChatMessage => ({
+const chatMessage = (
+  threadId: number,
+  body: string,
+  options: Partial<ChatMessage> = {},
+): ChatMessage => ({
   id: threadId * 10 + 1,
   thread_id: threadId,
   league_id: Math.floor(threadId / 100),
@@ -108,9 +158,8 @@ const chatMessage = (threadId: number, body: string, options: Partial<ChatMessag
 vi.mock("@/hooks/use-chat", () => ({
   useLeagueChatThreads: (leagueId?: number) => ({
     data: {
-      data: leagueId === 2
-        ? [leagueThread(2)]
-        : [leagueThread(1), directThread(1)],
+      data:
+        leagueId === 2 ? [leagueThread(2)] : [leagueThread(1), directThread(1)],
     },
     isLoading: false,
     isFetching: false,
@@ -118,13 +167,20 @@ vi.mock("@/hooks/use-chat", () => ({
   }),
   useChatMessages: (leagueId?: number, threadId?: number) => ({
     data: {
-      data: leagueId === 2
-        ? [chatMessage(threadId ?? 200, "League two only")]
-        : state.failedMessage
-          ? [chatMessage(threadId ?? 100, "Failed message", { delivery_status: "failed", client_message_id: "failed-1", sender_user_id: 1 })]
-          : threadId === 101
-            ? [chatMessage(101, "Private note")]
-          : [chatMessage(100, "League one only")],
+      data:
+        leagueId === 2
+          ? [chatMessage(threadId ?? 200, "League two only")]
+          : state.failedMessage
+            ? [
+                chatMessage(threadId ?? 100, "Failed message", {
+                  delivery_status: "failed",
+                  client_message_id: "failed-1",
+                  sender_user_id: 1,
+                }),
+              ]
+            : threadId === 101
+              ? [chatMessage(101, "Private note")]
+              : [chatMessage(100, "League one only")],
       next_before_message_id: null,
       next_after_message_id: null,
     },
@@ -132,12 +188,24 @@ vi.mock("@/hooks/use-chat", () => ({
     isError: false,
   }),
   useChatMessageUpdates: () => ({ isFetching: false }),
-  useSendChatMessage: () => ({ mutate: state.sendMutate, isPending: false, isError: false }),
+  useSendChatMessage: () => ({
+    mutate: state.sendMutate,
+    isPending: false,
+    isError: false,
+  }),
   useMarkChatThreadRead: () => ({ mutate: state.readMutate, isPending: false }),
-  useCreateDirectChatThread: () => ({ mutate: state.directMutate, isPending: false, isError: false }),
+  useCreateDirectChatThread: () => ({
+    mutate: state.directMutate,
+    isPending: false,
+    isError: false,
+  }),
 }));
 
-import Chats, { isPrivateTradeMessage, PrivateTradeOfferCard, TradeFinalizedCard } from "./Chats";
+import Chats, {
+  isPrivateTradeMessage,
+  PrivateTradeOfferCard,
+  TradeFinalizedCard,
+} from "./Chats";
 
 afterEach(() => {
   cleanup();
@@ -176,15 +244,21 @@ describe("Chats", () => {
     render(<Chats />);
 
     fireEvent.click(screen.getByRole("button", { name: /new message/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Blake.*Blake Bears/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Blake.*Blake Bears/i }),
+    );
     expect(state.directMutate).toHaveBeenCalledWith(2, expect.any(Object));
 
-    fireEvent.change(screen.getByPlaceholderText("Message your league…"), { target: { value: "Good luck" } });
+    fireEvent.change(screen.getByPlaceholderText("Message your league…"), {
+      target: { value: "Good luck" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
-    expect(state.sendMutate).toHaveBeenCalledWith(expect.objectContaining({
-      body: "Good luck",
-      client_message_id: expect.any(String),
-    }));
+    expect(state.sendMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: "Good luck",
+        client_message_id: expect.any(String),
+      }),
+    );
   });
 
   it("shows retry for a failed optimistic message", () => {
@@ -193,10 +267,12 @@ describe("Chats", () => {
 
     expect(screen.getByText("Failed to send")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /retry/i }));
-    expect(state.sendMutate).toHaveBeenCalledWith(expect.objectContaining({
-      body: "Failed message",
-      client_message_id: "failed-1",
-    }));
+    expect(state.sendMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: "Failed message",
+        client_message_id: "failed-1",
+      }),
+    );
     state.failedMessage = false;
   });
 });
@@ -210,26 +286,61 @@ describe("TradeFinalizedCard", () => {
         trade_id: 18,
         proposing_team: { name: "Saturday Stars" },
         receiving_team: { name: "Campus Kings" },
-        proposing_team_sends: [{ player_id: 9, name: "Jeremiah Smith", position: "WR", school: "Ohio State" }],
-        receiving_team_sends: [{ player_id: 10, name: "Ahmad Hardy", position: "RB", school: "Missouri" }],
+        proposing_team_sends: [
+          {
+            player_id: 9,
+            name: "Jeremiah Smith",
+            position: "WR",
+            school: "Ohio State",
+          },
+        ],
+        receiving_team_sends: [
+          {
+            player_id: 10,
+            name: "Ahmad Hardy",
+            position: "RB",
+            school: "Missouri",
+          },
+        ],
         processing_status: "pending_transfer",
         players_process_at: "2026-09-07T04:00:00Z",
       },
     };
-    const { rerender } = render(<MemoryRouter><TradeFinalizedCard message={message} /></MemoryRouter>);
+    const { rerender } = render(
+      <MemoryRouter>
+        <TradeFinalizedCard message={message} />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText("Trade Finalized")).toBeTruthy();
     expect(screen.getByText(/Jeremiah Smith/)).toBeTruthy();
     expect(screen.getByText(/Ahmad Hardy/)).toBeTruthy();
     expect(screen.getByText(/Roster transfer pending/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: "View trade" }).getAttribute("href")).toBe("/leagues/4/trades/18?returnTo=%2Fchats%3FleagueId%3D4");
+    expect(
+      screen.getByRole("link", { name: "View trade" }).getAttribute("href"),
+    ).toBe("/leagues/4/trades/18?returnTo=%2Fchats%3FleagueId%3D4");
 
-    rerender(<MemoryRouter><TradeFinalizedCard message={{ ...message, metadata: { ...message.metadata, processing_status: "processed" } }} /></MemoryRouter>);
+    rerender(
+      <MemoryRouter>
+        <TradeFinalizedCard
+          message={{
+            ...message,
+            metadata: { ...message.metadata, processing_status: "processed" },
+          }}
+        />
+      </MemoryRouter>,
+    );
     expect(screen.getByText("Roster transfer complete")).toBeTruthy();
   });
 
   it("does not render a trade link when a malformed system message cannot identify one offer", () => {
-    render(<MemoryRouter><TradeFinalizedCard message={{ league_id: 4, body: null, metadata: { trade_id: "18" } }} /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <TradeFinalizedCard
+          message={{ league_id: 4, body: null, metadata: { trade_id: "18" } }}
+        />
+      </MemoryRouter>,
+    );
 
     expect(screen.queryByRole("link", { name: "View trade" })).toBeNull();
   });
@@ -245,8 +356,22 @@ describe("PrivateTradeOfferCard", () => {
       league: { id: 4, name: "Saturday Stars" },
       proposing_team: { id: 8, name: "Avery Aces", owner_user_id: 1 },
       receiving_team: { id: 9, name: "Blake Bears", owner_user_id: 2 },
-      proposing_team_sends: [{ player_id: 9, name: "Jeremiah Smith", position: "WR", school: "Ohio State" }],
-      receiving_team_sends: [{ player_id: 10, name: "Ahmad Hardy", position: "RB", school: "Missouri" }],
+      proposing_team_sends: [
+        {
+          player_id: 9,
+          name: "Jeremiah Smith",
+          position: "WR",
+          school: "Ohio State",
+        },
+      ],
+      receiving_team_sends: [
+        {
+          player_id: 10,
+          name: "Ahmad Hardy",
+          position: "RB",
+          school: "Missouri",
+        },
+      ],
       trade_status: "proposed",
       created_at: "2026-08-10T12:00:00Z",
       expires_at: "2026-08-17T12:00:00Z",
@@ -254,13 +379,25 @@ describe("PrivateTradeOfferCard", () => {
   };
 
   it("identifies structured private trade messages without treating unrelated system text as a card", () => {
-    expect(isPrivateTradeMessage({ message_type: "system", metadata: message.metadata } as Pick<ChatMessage, "message_type" | "metadata">)).toBe(true);
-    expect(isPrivateTradeMessage({ message_type: "system", metadata: {} } as Pick<ChatMessage, "message_type" | "metadata">)).toBe(false);
+    expect(
+      isPrivateTradeMessage({
+        message_type: "system",
+        metadata: message.metadata,
+      } as Pick<ChatMessage, "message_type" | "metadata">),
+    ).toBe(true);
+    expect(
+      isPrivateTradeMessage({ message_type: "system", metadata: {} } as Pick<
+        ChatMessage,
+        "message_type" | "metadata"
+      >),
+    ).toBe(false);
   });
 
   it("shows a review action only to the receiving manager and keeps both player groups explicit", () => {
     const { rerender } = render(
-      <MemoryRouter><PrivateTradeOfferCard message={message} currentUserId={2} /></MemoryRouter>,
+      <MemoryRouter>
+        <PrivateTradeOfferCard message={message} currentUserId={2} />
+      </MemoryRouter>,
     );
 
     expect(screen.getByText("Trade offer pending")).toBeTruthy();
@@ -268,9 +405,15 @@ describe("PrivateTradeOfferCard", () => {
     expect(screen.getByText("Blake Bears sends")).toBeTruthy();
     expect(screen.getByText(/Jeremiah Smith/)).toBeTruthy();
     expect(screen.getByText(/Ahmad Hardy/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Review trade" }).getAttribute("href")).toBe("/leagues/4/trades/18?returnTo=%2Fchats%3FleagueId%3D4");
+    expect(
+      screen.getByRole("link", { name: "Review trade" }).getAttribute("href"),
+    ).toBe("/leagues/4/trades/18?returnTo=%2Fchats%3FleagueId%3D4");
 
-    rerender(<MemoryRouter><PrivateTradeOfferCard message={message} currentUserId={1} /></MemoryRouter>);
+    rerender(
+      <MemoryRouter>
+        <PrivateTradeOfferCard message={message} currentUserId={1} />
+      </MemoryRouter>,
+    );
     expect(screen.getByRole("link", { name: "View trade" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Review trade" })).toBeNull();
   });
@@ -282,7 +425,15 @@ describe("PrivateTradeOfferCard", () => {
     ["expired", "Trade expired"],
   ])("renders %s as %s", (tradeStatus, label) => {
     render(
-      <MemoryRouter><PrivateTradeOfferCard message={{ ...message, metadata: { ...message.metadata, trade_status: tradeStatus } }} currentUserId={1} /></MemoryRouter>,
+      <MemoryRouter>
+        <PrivateTradeOfferCard
+          message={{
+            ...message,
+            metadata: { ...message.metadata, trade_status: tradeStatus },
+          }}
+          currentUserId={1}
+        />
+      </MemoryRouter>,
     );
 
     expect(screen.getByText(label)).toBeTruthy();

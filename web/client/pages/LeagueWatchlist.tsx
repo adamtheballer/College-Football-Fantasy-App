@@ -6,7 +6,10 @@ import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { useLeagueDetail } from "@/hooks/use-leagues";
-import { useToggleWatchlistPlayer, useWatchlists } from "@/hooks/use-watchlists";
+import {
+  useToggleWatchlistPlayer,
+  useWatchlists,
+} from "@/hooks/use-watchlists";
 import { ApiError } from "@/lib/api";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import type { Player } from "@/types/player";
@@ -38,7 +41,9 @@ export default function LeagueWatchlist() {
   });
   const watchlistsQuery = useWatchlists(
     parsedLeagueId,
-    postDraft && typeof parsedLeagueId === "number" && !Number.isNaN(parsedLeagueId)
+    postDraft &&
+      typeof parsedLeagueId === "number" &&
+      !Number.isNaN(parsedLeagueId),
   );
   const toggleWatchlistPlayer = useToggleWatchlistPlayer();
   const watchlists = watchlistsQuery.data?.data ?? [];
@@ -50,7 +55,10 @@ export default function LeagueWatchlist() {
         : "Unable to load your saved watchlist.";
 
   const watchedPlayers = useMemo(() => {
-    const playerById = new Map<number, { player: Player; watchlistId: number }>();
+    const playerById = new Map<
+      number,
+      { player: Player; watchlistId: number }
+    >();
     for (const list of watchlists) {
       for (const player of list.players) {
         if (!playerById.has(player.id)) {
@@ -59,7 +67,7 @@ export default function LeagueWatchlist() {
       }
     }
     return Array.from(playerById.values()).sort((first, second) =>
-      first.player.name.localeCompare(second.player.name)
+      first.player.name.localeCompare(second.player.name),
     );
   }, [watchlists]);
 
@@ -99,14 +107,21 @@ export default function LeagueWatchlist() {
         </p>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-4xl font-black italic text-slate-50">Watchlist</h1>
+            <h1 className="text-4xl font-black italic text-slate-50">
+              Watchlist
+            </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              Your saved league-specific available-player targets. Players stay available only if they are not rostered in this league.
+              Your saved league-specific available-player targets. Players stay
+              available only if they are not rostered in this league.
             </p>
           </div>
           <div className="rounded-[1.25rem] border border-sky-300/20 bg-sky-400/10 p-4 shadow-[0_0_34px_rgba(56,189,248,0.12)]">
-            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Watched</p>
-            <p className="mt-1 text-2xl font-black text-sky-100">{watchedPlayers.length}</p>
+            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+              Watched
+            </p>
+            <p className="mt-1 text-2xl font-black text-sky-100">
+              {watchedPlayers.length}
+            </p>
           </div>
         </div>
         <LeagueTabs
@@ -142,8 +157,12 @@ export default function LeagueWatchlist() {
         ) : watchedPlayers.length === 0 ? (
           <div className="px-5 py-12 text-center">
             <Search className="mx-auto h-10 w-10 text-sky-300/70" />
-            <p className="mt-4 text-sm font-bold text-slate-300">No watched players yet.</p>
-            <p className="mt-2 text-xs font-semibold text-slate-500">Open a player card and press Watch to save a target here.</p>
+            <p className="mt-4 text-sm font-bold text-slate-300">
+              No watched players yet.
+            </p>
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              Open a player card and press Watch to save a target here.
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-sky-300/10">
@@ -155,14 +174,20 @@ export default function LeagueWatchlist() {
                   className="grid gap-4 px-5 py-4 text-sm text-slate-200 transition-all duration-200 hover:bg-sky-300/[0.045] md:grid-cols-[minmax(0,1fr)_180px_130px_80px]"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-base font-black text-slate-50">{player.name}</p>
+                    <p className="truncate text-base font-black text-slate-50">
+                      {player.name}
+                    </p>
                     <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
                       Watchlist target
                     </p>
                   </div>
-                  <div className="flex items-center text-sm font-bold text-slate-400">{player.school ?? "-"}</div>
+                  <div className="flex items-center text-sm font-bold text-slate-400">
+                    {player.school ?? "-"}
+                  </div>
                   <div className="flex items-center">
-                    <span className={`rounded-2xl border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] ${positionTone(position)}`}>
+                    <span
+                      className={`rounded-2xl border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] ${positionTone(position)}`}
+                    >
                       {position}
                     </span>
                   </div>

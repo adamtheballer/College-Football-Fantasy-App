@@ -34,7 +34,10 @@ export function TopBar({ isLoggedIn, user }: TopBarProps) {
               </span>
               <div className="hidden h-1 w-1 rounded-full bg-cfb-border-strong sm:block" />
               <span className="text-xs font-bold tracking-[0.04em] text-cfb-text-primary sm:font-black sm:uppercase sm:tracking-[0.12em]">
-                Welcome <span className="text-cfb-brand">{user?.firstName ?? "Manager"}</span>
+                Welcome{" "}
+                <span className="text-cfb-brand">
+                  {user?.firstName ?? "Manager"}
+                </span>
               </span>
             </div>
           ) : (

@@ -18,7 +18,8 @@ export const isTerminalDraftStatus = (status?: string | null) => {
 
 export const getDraftTimeMs = (draftDateTime?: string | Date | null) => {
   if (!draftDateTime) return null;
-  const value = draftDateTime instanceof Date ? draftDateTime : new Date(draftDateTime);
+  const value =
+    draftDateTime instanceof Date ? draftDateTime : new Date(draftDateTime);
   const time = value.getTime();
   return Number.isFinite(time) ? time : null;
 };

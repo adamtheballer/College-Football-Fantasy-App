@@ -13,7 +13,10 @@ export interface StatusBadgeProps extends React.HTMLAttributes<HTMLSpanElement> 
 }
 
 export const StatusBadge = React.forwardRef<HTMLSpanElement, StatusBadgeProps>(
-  ({ className, children, variant = "neutral", showDot = true, ...props }, ref) => (
+  (
+    { className, children, variant = "neutral", showDot = true, ...props },
+    ref,
+  ) => (
     <span
       ref={ref}
       className={cn(
@@ -23,7 +26,12 @@ export const StatusBadge = React.forwardRef<HTMLSpanElement, StatusBadgeProps>(
       )}
       {...props}
     >
-      {showDot ? <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" /> : null}
+      {showDot ? (
+        <span
+          aria-hidden="true"
+          className="h-1.5 w-1.5 rounded-full bg-current"
+        />
+      ) : null}
       {children ?? statusBadgeLabels[variant]}
     </span>
   ),

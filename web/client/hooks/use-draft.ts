@@ -11,7 +11,12 @@ export function useDraftRoom(leagueId?: number, enabled = true) {
     refetchInterval: (query) => {
       const room = query.state.data as DraftRoom | undefined;
       const status = room?.status?.toLowerCase();
-      if (status === "pre_draft" || status === "on_clock" || status === "transition") return 1_000;
+      if (
+        status === "pre_draft" ||
+        status === "on_clock" ||
+        status === "transition"
+      )
+        return 1_000;
       if (status === "scheduled") return 15_000;
       return false;
     },
@@ -44,16 +49,24 @@ export function useDraftPick(leagueId?: number) {
     },
     onSuccess: (payload) => {
       queryClient.setQueryData(["league", leagueId, "draft-room"], payload);
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "teams"] });
+      queryClient.invalidateQueries({
+        queryKey: ["league", leagueId, "workspace"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["league", leagueId, "teams"],
+      });
       queryClient.invalidateQueries({ queryKey: ["draft-player-pool"] });
       queryClient.invalidateQueries({ queryKey: ["players"] });
       if (payload.user_team_id) {
-        queryClient.invalidateQueries({ queryKey: ["team", payload.user_team_id, "roster"] });
+        queryClient.invalidateQueries({
+          queryKey: ["team", payload.user_team_id, "roster"],
+        });
       }
     },
     onError: () => {
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "draft-room"] });
+      queryClient.invalidateQueries({
+        queryKey: ["league", leagueId, "draft-room"],
+      });
       queryClient.invalidateQueries({ queryKey: ["draft-player-pool"] });
       queryClient.invalidateQueries({ queryKey: ["players"] });
     },
@@ -72,11 +85,17 @@ export function useStartDraft(leagueId?: number) {
     },
     onSuccess: (payload) => {
       queryClient.setQueryData(["league", leagueId, "draft-room"], payload);
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "teams"] });
+      queryClient.invalidateQueries({
+        queryKey: ["league", leagueId, "workspace"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["league", leagueId, "teams"],
+      });
     },
     onError: () => {
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "draft-room"] });
+      queryClient.invalidateQueries({
+        queryKey: ["league", leagueId, "draft-room"],
+      });
     },
   });
 }

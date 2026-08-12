@@ -1,12 +1,18 @@
 function validProbability(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value) && value >= 5 && value <= 95;
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 5 &&
+    value <= 95
+  );
 }
 
 function formatDisplayedProbabilityPair(left: number, right: number) {
   // Round one side only, then derive its complement. This prevents a pair of
   // independently rounded values from visibly totaling 99.9% or 100.1%.
   const displayedLeft = Math.round((left + Number.EPSILON) * 10) / 10;
-  const displayedRight = Math.round((100 - displayedLeft + Number.EPSILON) * 10) / 10;
+  const displayedRight =
+    Math.round((100 - displayedLeft + Number.EPSILON) * 10) / 10;
   return { left: displayedLeft, right: displayedRight };
 }
 
@@ -86,7 +92,8 @@ export function WinChanceMeter({
       ? myProjectedTotal.toFixed(1)
       : "—";
   const formattedOpponentProjection =
-    typeof opponentProjectedTotal === "number" && Number.isFinite(opponentProjectedTotal)
+    typeof opponentProjectedTotal === "number" &&
+    Number.isFinite(opponentProjectedTotal)
       ? opponentProjectedTotal.toFixed(1)
       : "—";
   const hasProjectedTotals =
@@ -99,7 +106,9 @@ export function WinChanceMeter({
         <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-3 text-[10px] font-black uppercase tracking-[0.18em] text-cfb-text-muted">
           <div className="text-left">
             <p>My Projection</p>
-            <p className="mt-1 text-base font-black tracking-normal text-cfb-brand">{formattedMyProjection}</p>
+            <p className="mt-1 text-base font-black tracking-normal text-cfb-brand">
+              {formattedMyProjection}
+            </p>
           </div>
           <div className="text-center">
             <p>Win Chance</p>
@@ -111,7 +120,9 @@ export function WinChanceMeter({
           </div>
           <div className="text-right">
             <p>Their Projection</p>
-            <p className="mt-1 text-base font-black tracking-normal text-cfb-pink">{formattedOpponentProjection}</p>
+            <p className="mt-1 text-base font-black tracking-normal text-cfb-pink">
+              {formattedOpponentProjection}
+            </p>
           </div>
         </div>
       ) : (
@@ -125,9 +136,14 @@ export function WinChanceMeter({
         </div>
       )}
       {hasWinChance ? (
-        <WinChanceBar myPercent={leftProbability} opponentPercent={rightProbability} />
+        <WinChanceBar
+          myPercent={leftProbability}
+          opponentPercent={rightProbability}
+        />
       ) : (
-        <p className="text-center text-xs font-bold text-cfb-text-muted">Win chance unavailable</p>
+        <p className="text-center text-xs font-bold text-cfb-text-muted">
+          Win chance unavailable
+        </p>
       )}
     </div>
   );

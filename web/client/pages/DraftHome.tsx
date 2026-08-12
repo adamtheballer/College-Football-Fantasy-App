@@ -1,6 +1,13 @@
 import { type ReactNode, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bot, ClipboardList, Clock3, ShieldCheck, Trophy, Users } from "lucide-react";
+import {
+  Bot,
+  ClipboardList,
+  Clock3,
+  ShieldCheck,
+  Trophy,
+  Users,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,7 +42,7 @@ const OptionButton = ({
       "hover:-translate-y-0.5 hover:border-cfb-brand/45 hover:bg-cfb-brand/10 hover:shadow-[0_0_26px_hsl(var(--brand-primary)/0.16)]",
       active
         ? "border-cfb-brand/70 bg-cfb-brand/20 text-blue-50 shadow-[0_0_34px_hsl(var(--brand-primary)/0.22)]"
-        : "border-cfb-border-subtle bg-cfb-surface/70 text-cfb-text-secondary"
+        : "border-cfb-border-subtle bg-cfb-surface/70 text-cfb-text-secondary",
     )}
   >
     {children}
@@ -48,8 +55,9 @@ export default function DraftHome() {
   const [pickTimer, setPickTimer] = useState(30);
 
   const mockDraftUrl = useMemo(
-    () => `/draft/mock/single-player?new=1&teams=${leagueSize}&timer=${pickTimer}`,
-    [leagueSize, pickTimer]
+    () =>
+      `/draft/mock/single-player?new=1&teams=${leagueSize}&timer=${pickTimer}`,
+    [leagueSize, pickTimer],
   );
 
   const realDrafts = leagues.filter(
@@ -57,7 +65,9 @@ export default function DraftHome() {
       league.status === "draft_live" ||
       league.status === "draft_pre_draft" ||
       league.status === "draft_scheduled" ||
-      ["pre_draft", "on_clock", "transition", "live", "scheduled"].includes(league.draft?.status ?? "")
+      ["pre_draft", "on_clock", "transition", "live", "scheduled"].includes(
+        league.draft?.status ?? "",
+      ),
   );
 
   return (
@@ -67,14 +77,11 @@ export default function DraftHome() {
 
       <header className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-3">
-          <p className="cfb-micro-label text-cfb-brand">
-            Draft Center
-          </p>
-          <h1 className="cfb-display-title text-5xl md:text-7xl">
-            Draft
-          </h1>
+          <p className="cfb-micro-label text-cfb-brand">Draft Center</p>
+          <h1 className="cfb-display-title text-5xl md:text-7xl">Draft</h1>
           <p className="max-w-3xl text-base font-semibold leading-7 text-cfb-text-secondary">
-            Practice in a local-only single-player mock, preview league drafts, and enter the real draft room only when a league draft is ready.
+            Practice in a local-only single-player mock, preview league drafts,
+            and enter the real draft room only when a league draft is ready.
           </p>
         </div>
         <Button
@@ -96,10 +103,16 @@ export default function DraftHome() {
                 <Trophy className="h-5 w-5" />
               </div>
               <div>
-                <p className="cfb-micro-label text-cfb-brand">Mock Draft Setup</p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-cfb-text-primary">Tune the room before you enter</h2>
+                <p className="cfb-micro-label text-cfb-brand">
+                  Mock Draft Setup
+                </p>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-cfb-text-primary">
+                  Tune the room before you enter
+                </h2>
                 <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-cfb-text-secondary">
-                  These settings apply to the next new single-player mock. Mock drafts run in this browser only and are not saved to the backend.
+                  These settings apply to the next new single-player mock. Mock
+                  drafts run in this browser only and are not saved to the
+                  backend.
                 </p>
               </div>
             </div>
@@ -108,11 +121,17 @@ export default function DraftHome() {
               <section className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface/70 p-5">
                 <div className="mb-4 flex items-center gap-3">
                   <Users className="h-4 w-4 text-cyan-200" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-300">League Size</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-300">
+                    League Size
+                  </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
                   {LEAGUE_SIZE_OPTIONS.map((option) => (
-                    <OptionButton key={option} active={leagueSize === option} onClick={() => setLeagueSize(option)}>
+                    <OptionButton
+                      key={option}
+                      active={leagueSize === option}
+                      onClick={() => setLeagueSize(option)}
+                    >
                       {option} Teams
                     </OptionButton>
                   ))}
@@ -122,11 +141,17 @@ export default function DraftHome() {
               <section className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface/70 p-5">
                 <div className="mb-4 flex items-center gap-3">
                   <Clock3 className="h-4 w-4 text-cyan-200" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-300">Pick Time Limit</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-300">
+                    Pick Time Limit
+                  </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
                   {TIMER_OPTIONS.map((option) => (
-                    <OptionButton key={option} active={pickTimer === option} onClick={() => setPickTimer(option)}>
+                    <OptionButton
+                      key={option}
+                      active={pickTimer === option}
+                      onClick={() => setPickTimer(option)}
+                    >
                       {option}s
                     </OptionButton>
                   ))}
@@ -136,9 +161,12 @@ export default function DraftHome() {
               <section className="rounded-[1.5rem] border border-cfb-brand/25 bg-cfb-brand/[0.07] p-5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200">Roster-Fill Rounds</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200">
+                      Roster-Fill Rounds
+                    </p>
                     <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-slate-300">
-                      Rounds are locked to the roster size: QB, 2 RB, 2 WR, TE, FLEX, K, and 5 bench spots.
+                      Rounds are locked to the roster size: QB, 2 RB, 2 WR, TE,
+                      FLEX, K, and 5 bench spots.
                     </p>
                   </div>
                   <div className="rounded-2xl border border-cyan-200/35 bg-slate-950/45 px-5 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-cyan-50">
@@ -158,10 +186,16 @@ export default function DraftHome() {
                 Current Mock Rules
               </p>
               <div className="grid gap-3 text-sm font-bold uppercase tracking-[0.14em] text-slate-200/74">
-                <p>{leagueSize} teams • snake order • {MOCK_ROUNDS} roster-fill rounds</p>
+                <p>
+                  {leagueSize} teams • snake order • {MOCK_ROUNDS} roster-fill
+                  rounds
+                </p>
                 <p>{pickTimer}s user pick timer</p>
                 <p>Bot picks advance automatically after about two seconds</p>
-                <p>No real rosters, league status, trades, or standings are touched</p>
+                <p>
+                  No real rosters, league status, trades, or standings are
+                  touched
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -185,7 +219,8 @@ export default function DraftHome() {
               </div>
               {realDrafts.length === 0 ? (
                 <p className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-sm font-bold text-muted-foreground">
-                  No scheduled or live real drafts. Join or create a league first.
+                  No scheduled or live real drafts. Join or create a league
+                  first.
                 </p>
               ) : (
                 <div className="space-y-3">
@@ -195,7 +230,9 @@ export default function DraftHome() {
                       to={`/league/${league.id}/draft`}
                       className="block rounded-2xl border border-white/10 bg-white/[0.055] p-5 transition hover:-translate-y-0.5 hover:border-cyan-200/40 hover:bg-cyan-300/10 hover:shadow-[0_0_26px_rgba(56,189,248,0.12)]"
                     >
-                      <p className="text-lg font-black tracking-tight text-foreground">{league.name}</p>
+                      <p className="text-lg font-black tracking-tight text-foreground">
+                        {league.name}
+                      </p>
                       <p className="mt-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
                         {formatDraftTime(league.draft?.draft_datetime_utc)}
                       </p>

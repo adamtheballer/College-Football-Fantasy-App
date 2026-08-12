@@ -11,14 +11,21 @@ describe("PlayerCardHeader injury status", () => {
   it("renders the reviewed injury designation instead of generic Active availability", () => {
     render(
       <PlayerCardHeader
-        card={{
-          current_injury_status: "OUT_FOR_SEASON",
-          about: { status: "Active", source: "local" },
-          player: { id: 1, name: "Injured Player", position: "RB", school: "Georgia" },
-          injuries: [],
-          season_stats: [],
-          historical_stats: null,
-        } as never}
+        card={
+          {
+            current_injury_status: "OUT_FOR_SEASON",
+            about: { status: "Active", source: "local" },
+            player: {
+              id: 1,
+              name: "Injured Player",
+              position: "RB",
+              school: "Georgia",
+            },
+            injuries: [],
+            season_stats: [],
+            historical_stats: null,
+          } as never
+        }
         currentValue={88}
         onClose={vi.fn()}
         palette={{
@@ -29,7 +36,13 @@ describe("PlayerCardHeader injury status", () => {
           pill: "bg-slate-800",
           silhouette: "from-slate-700 to-slate-800",
         }}
-        player={{ id: 1, name: "Injured Player", position: "RB", school: "Georgia", status: "Active" }}
+        player={{
+          id: 1,
+          name: "Injured Player",
+          position: "RB",
+          school: "Georgia",
+          status: "Active",
+        }}
         position="RB"
         title="Player Card"
       />,

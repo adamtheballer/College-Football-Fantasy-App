@@ -63,24 +63,37 @@ export function useSaturdayPickContest(enabled = true) {
     staleTime: 5_000,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status && ["OPEN", "LOCKED", "SCORING", "PROVISIONAL"].includes(status) ? 5_000 : false;
+      return status &&
+        ["OPEN", "LOCKED", "SCORING", "PROVISIONAL"].includes(status)
+        ? 5_000
+        : false;
     },
-    queryFn: () => apiGet<SaturdayPickContest>("/saturday-pick-6/current", {
-      season: SATURDAY_PICK_6_SEASON,
-      week: SATURDAY_PICK_6_WEEK,
-    }),
+    queryFn: () =>
+      apiGet<SaturdayPickContest>("/saturday-pick-6/current", {
+        season: SATURDAY_PICK_6_SEASON,
+        week: SATURDAY_PICK_6_WEEK,
+      }),
   });
 }
 
 export function useSaveSaturdayPick() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ contestId, selectedPickPlayerId }: { contestId: number; selectedPickPlayerId: number }) =>
-      apiPut<NonNullable<SaturdayPickContest["entry"]>>(`/saturday-pick-6/${contestId}/entry`, { selected_pick_player_id: selectedPickPlayerId }),
+    mutationFn: ({
+      contestId,
+      selectedPickPlayerId,
+    }: {
+      contestId: number;
+      selectedPickPlayerId: number;
+    }) =>
+      apiPut<NonNullable<SaturdayPickContest["entry"]>>(
+        `/saturday-pick-6/${contestId}/entry`,
+        { selected_pick_player_id: selectedPickPlayerId },
+      ),
     onSuccess: (entry) => {
       queryClient.setQueriesData<SaturdayPickContest>(
         { queryKey: ["saturday-pick-6"] },
-        (contest) => contest ? { ...contest, entry } : contest
+        (contest) => (contest ? { ...contest, entry } : contest),
       );
       void queryClient.invalidateQueries({ queryKey: ["saturday-pick-6"] });
     },

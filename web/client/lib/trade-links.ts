@@ -22,12 +22,15 @@ export const tradeOfferPath = (
  * a malformed notification payload from redirecting somebody outside the
  * product or into the trade builder.
  */
-export const resolveTradeOfferReturnPath = (returnTo: string | null): string => {
+export const resolveTradeOfferReturnPath = (
+  returnTo: string | null,
+): string => {
   if (!returnTo) return "/leagues";
 
   try {
     const parsed = new URL(returnTo, "https://cfbfantasy.local");
-    return parsed.origin === "https://cfbfantasy.local" && ["/alerts", "/chats"].includes(parsed.pathname)
+    return parsed.origin === "https://cfbfantasy.local" &&
+      ["/alerts", "/chats"].includes(parsed.pathname)
       ? `${parsed.pathname}${parsed.search}`
       : "/leagues";
   } catch {

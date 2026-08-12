@@ -1,7 +1,9 @@
 import { chromium } from "@playwright/test";
 
-const apiBase = process.env.DRAFT_VERIFY_API_BASE_URL ?? "http://127.0.0.1:8000";
-const webBase = process.env.DRAFT_VERIFY_WEB_BASE_URL ?? "http://127.0.0.1:8080";
+const apiBase =
+  process.env.DRAFT_VERIFY_API_BASE_URL ?? "http://127.0.0.1:8000";
+const webBase =
+  process.env.DRAFT_VERIFY_WEB_BASE_URL ?? "http://127.0.0.1:8080";
 const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const password = "LiveDraftPass123!";
 
@@ -16,7 +18,9 @@ const requestJson = async (path, { token, method = "GET", body } = {}) => {
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(`${method} ${path} failed (${response.status}): ${JSON.stringify(payload)}`);
+    throw new Error(
+      `${method} ${path} failed (${response.status}): ${JSON.stringify(payload)}`,
+    );
   }
   return payload;
 };
@@ -76,7 +80,7 @@ const browserSession = async (browser, auth) => {
           firstName: user.first_name,
           email: user.email,
           isAdmin: user.is_admin,
-        })
+        }),
       );
       localStorage.setItem(`cfb_completed_guide_${user.id}`, "true");
     },
@@ -84,7 +88,7 @@ const browserSession = async (browser, auth) => {
       accessToken: auth.access_token,
       accessTokenExpiresAt: auth.access_token_expires_at,
       user: auth.user,
-    }
+    },
   );
   return { context, page: await context.newPage() };
 };
@@ -92,9 +96,10 @@ const browserSession = async (browser, auth) => {
 const waitForOnClock = (page, teamName) =>
   page.waitForFunction(
     (expectedTeamName) =>
-      document.body.innerText.toUpperCase().includes("ON CLOCK") && document.body.innerText.includes(expectedTeamName),
+      document.body.innerText.toUpperCase().includes("ON CLOCK") &&
+      document.body.innerText.includes(expectedTeamName),
     teamName,
-    { timeout: 85_000 }
+    { timeout: 85_000 },
   );
 
 const draftFirstAvailablePlayer = async (page) => {
@@ -107,15 +112,22 @@ const main = async () => {
   const manager = await signup("Manager");
   const created = await createLeague(commissioner.access_token);
   const leagueId = created.league.id;
-  await requestJson(`/leagues/${leagueId}/join`, { token: manager.access_token, method: "POST" });
+  await requestJson(`/leagues/${leagueId}/join`, {
+    token: manager.access_token,
+    method: "POST",
+  });
 
   const browser = await chromium.launch({ headless: true });
   const commissionerSession = await browserSession(browser, commissioner);
   const managerSession = await browserSession(browser, manager);
   try {
     await Promise.all([
-      commissionerSession.page.goto(`${webBase}/league/${leagueId}/draft`, { waitUntil: "networkidle" }),
-      managerSession.page.goto(`${webBase}/league/${leagueId}/draft`, { waitUntil: "networkidle" }),
+      commissionerSession.page.goto(`${webBase}/league/${leagueId}/draft`, {
+        waitUntil: "networkidle",
+      }),
+      managerSession.page.goto(`${webBase}/league/${leagueId}/draft`, {
+        waitUntil: "networkidle",
+      }),
     ]);
 
     await requestJson(`/leagues/${leagueId}/draft/start`, {
@@ -124,11 +136,17 @@ const main = async () => {
       body: {},
     });
     await Promise.all([
-      commissionerSession.page.getByText("Draft Starts In", { exact: true }).waitFor(),
-      managerSession.page.getByText("Draft Starts In", { exact: true }).waitFor(),
+      commissionerSession.page
+        .getByText("Draft Starts In", { exact: true })
+        .waitFor(),
+      managerSession.page
+        .getByText("Draft Starts In", { exact: true })
+        .waitFor(),
     ]);
 
-    const initialRoom = await requestJson(`/leagues/${leagueId}/draft-room`, { token: commissioner.access_token });
+    const initialRoom = await requestJson(`/leagues/${leagueId}/draft-room`, {
+      token: commissioner.access_token,
+    });
     const firstTeam = initialRoom.teams[0];
     const secondTeam = initialRoom.teams[1];
     await waitForOnClock(commissionerSession.page, firstTeam.name);
@@ -136,18 +154,43 @@ const main = async () => {
     await waitForOnClock(managerSession.page, secondTeam.name);
     await draftFirstAvailablePlayer(managerSession.page);
 
-    await managerSession.page.getByText("Draft Complete", { exact: true }).waitFor({ timeout: 20_000 });
-    const completedRoom = await requestJson(`/leagues/${leagueId}/draft-room`, { token: commissioner.access_token });
-    if (completedRoom.status !== "completed" || completedRoom.picks.length !== 2) {
-      throw new Error(`Draft did not complete correctly: ${JSON.stringify(completedRoom)}`);
+    await managerSession.page
+      .getByText("Draft Complete", { exact: true })
+      .waitFor({ timeout: 20_000 });
+    const completedRoom = await requestJson(`/leagues/${leagueId}/draft-room`, {
+      token: commissioner.access_token,
+    });
+    if (
+      completedRoom.status !== "completed" ||
+      completedRoom.picks.length !== 2
+    ) {
+      throw new Error(
+        `Draft did not complete correctly: ${JSON.stringify(completedRoom)}`,
+      );
     }
     const rosters = await Promise.all(
-      completedRoom.teams.map((team) => requestJson(`/teams/${team.id}/roster`, { token: team.id === firstTeam.id ? commissioner.access_token : manager.access_token }))
+      completedRoom.teams.map((team) =>
+        requestJson(`/teams/${team.id}/roster`, {
+          token:
+            team.id === firstTeam.id
+              ? commissioner.access_token
+              : manager.access_token,
+        }),
+      ),
     );
     if (rosters.some((roster) => roster.total !== 1)) {
-      throw new Error(`Final rosters were not persisted: ${JSON.stringify(rosters)}`);
+      throw new Error(
+        `Final rosters were not persisted: ${JSON.stringify(rosters)}`,
+      );
     }
-    console.log(JSON.stringify({ leagueId, status: completedRoom.status, picks: completedRoom.picks.length, rosterTotals: rosters.map((roster) => roster.total) }));
+    console.log(
+      JSON.stringify({
+        leagueId,
+        status: completedRoom.status,
+        picks: completedRoom.picks.length,
+        rosterTotals: rosters.map((roster) => roster.total),
+      }),
+    );
   } finally {
     await commissionerSession.context.close();
     await managerSession.context.close();

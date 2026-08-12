@@ -27,7 +27,10 @@ import {
   resolveInitialSinglePlayerMockDraftState,
 } from "./singlePlayerMockDraft";
 import type { DraftPlayer } from "./draftRankings";
-import type { MockDraftPick, SinglePlayerMockDraftState } from "./singlePlayerMockDraft";
+import type {
+  MockDraftPick,
+  SinglePlayerMockDraftState,
+} from "./singlePlayerMockDraft";
 
 const player = (id: number, pos = "RB"): DraftPlayer => ({
   id,
@@ -58,26 +61,37 @@ const player = (id: number, pos = "RB"): DraftPlayer => ({
 });
 
 const board = Array.from({ length: 180 }, (_, index) =>
-  player(index + 1, ["QB", "RB", "WR", "TE", "K"][index % 5])
+  player(index + 1, ["QB", "RB", "WR", "TE", "K"][index % 5]),
 );
 
 const selectRosterBalancedPlayer = (
   state: SinglePlayerMockDraftState,
-  draftBoard: DraftPlayer[]
+  draftBoard: DraftPlayer[],
 ) => {
   const available = getDraftablePlayersForTeam(draftBoard, state);
-  const roster = state.picks.filter((pick) => pick.teamId === MOCK_USER_TEAM_ID);
+  const roster = state.picks.filter(
+    (pick) => pick.teamId === MOCK_USER_TEAM_ID,
+  );
   const starterTargets: Record<string, number> = { QB: 1, RB: 2, WR: 2, TE: 1 };
 
   for (const [position, target] of Object.entries(starterTargets)) {
-    const current = roster.filter((pick) => pick.assignedSlot === position).length;
+    const current = roster.filter(
+      (pick) => pick.assignedSlot === position,
+    ).length;
     if (current < target) {
-      return available.find((candidate) => candidate.pos === position) ?? available[0];
+      return (
+        available.find((candidate) => candidate.pos === position) ??
+        available[0]
+      );
     }
   }
 
   if (!roster.some((pick) => pick.assignedSlot === "FLEX")) {
-    return available.find((candidate) => ["RB", "WR", "TE"].includes(candidate.pos)) ?? available[0];
+    return (
+      available.find((candidate) =>
+        ["RB", "WR", "TE"].includes(candidate.pos),
+      ) ?? available[0]
+    );
   }
 
   return available[0];
@@ -88,7 +102,7 @@ const pick = (
   position: string,
   teamId: number,
   assignedSlot: string,
-  overallPick = id
+  overallPick = id,
 ): MockDraftPick => ({
   overallPick,
   round: 1,
@@ -109,7 +123,7 @@ const pick = (
 
 const fillTeamExceptK = (
   state: SinglePlayerMockDraftState,
-  teamId: number
+  teamId: number,
 ): SinglePlayerMockDraftState => ({
   ...state,
   picks: [
@@ -140,9 +154,16 @@ describe("single-player mock draft engine", () => {
   });
 
   it("assigns every valid user draft slot through the random mock factory", () => {
-    const settings = { leagueSize: 10, rounds: MOCK_ROUNDS, pickTimerSeconds: 30 };
-    const assignedTeamIds = Array.from({ length: settings.leagueSize }, (_, slot) =>
-      createRandomSinglePlayerMockDraft(1_000, settings, () => slot).userTeamId
+    const settings = {
+      leagueSize: 10,
+      rounds: MOCK_ROUNDS,
+      pickTimerSeconds: 30,
+    };
+    const assignedTeamIds = Array.from(
+      { length: settings.leagueSize },
+      (_, slot) =>
+        createRandomSinglePlayerMockDraft(1_000, settings, () => slot)
+          .userTeamId,
     );
 
     expect(assignedTeamIds).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
@@ -157,8 +178,12 @@ describe("single-player mock draft engine", () => {
 
     expect(state.userTeamId).toBe(10);
     expect(state.teams).toHaveLength(10);
-    expect(state.teams.filter((team) => team.managerType === "user")).toHaveLength(1);
-    expect(state.teams.filter((team) => team.managerType === "bot")).toHaveLength(9);
+    expect(
+      state.teams.filter((team) => team.managerType === "user"),
+    ).toHaveLength(1);
+    expect(
+      state.teams.filter((team) => team.managerType === "bot"),
+    ).toHaveLength(9);
     expect(new Set(state.teams.map((team) => team.id)).size).toBe(10);
   });
 
@@ -168,7 +193,10 @@ describe("single-player mock draft engine", () => {
       { leagueSize: 10, rounds: MOCK_ROUNDS, pickTimerSeconds: 30 },
       () => 7,
     );
-    const resolved = resolveInitialSinglePlayerMockDraftState({ storedState: stored, now: 5_000 });
+    const resolved = resolveInitialSinglePlayerMockDraftState({
+      storedState: stored,
+      now: 5_000,
+    });
 
     expect(resolved.state).toBe(stored);
     expect(resolved.state.userTeamId).toBe(8);
@@ -176,7 +204,11 @@ describe("single-player mock draft engine", () => {
   });
 
   it("allows a new mock draft to draw the same position again", () => {
-    const settings = { leagueSize: 10, rounds: MOCK_ROUNDS, pickTimerSeconds: 30 };
+    const settings = {
+      leagueSize: 10,
+      rounds: MOCK_ROUNDS,
+      pickTimerSeconds: 30,
+    };
     const first = createRandomSinglePlayerMockDraft(1_000, settings, () => 4);
     const second = createRandomSinglePlayerMockDraft(2_000, settings, () => 4);
 
@@ -197,7 +229,11 @@ describe("single-player mock draft engine", () => {
   });
 
   it("passes a seeded 10,000-draft fairness simulation without duplicate slots", () => {
-    const settings = { leagueSize: 10, rounds: MOCK_ROUNDS, pickTimerSeconds: 30 };
+    const settings = {
+      leagueSize: 10,
+      rounds: MOCK_ROUNDS,
+      pickTimerSeconds: 30,
+    };
     const counts = Array.from({ length: settings.leagueSize }, () => 0);
     let seed = 0x5eed1234;
     const nextSeededSlot = (teamCount: number) => {
@@ -206,11 +242,17 @@ describe("single-player mock draft engine", () => {
     };
 
     for (let index = 0; index < 10_000; index += 1) {
-      const state = createRandomSinglePlayerMockDraft(1_000 + index, settings, nextSeededSlot);
+      const state = createRandomSinglePlayerMockDraft(
+        1_000 + index,
+        settings,
+        nextSeededSlot,
+      );
       counts[state.userTeamId - 1] += 1;
       expect(state.teams).toHaveLength(10);
       expect(new Set(state.teams.map((team) => team.id)).size).toBe(10);
-      expect(state.teams.filter((team) => team.managerType === "user")).toHaveLength(1);
+      expect(
+        state.teams.filter((team) => team.managerType === "user"),
+      ).toHaveLength(1);
     }
 
     // 1,000 expected assignments per slot; a ±15% deterministic tolerance
@@ -284,7 +326,11 @@ describe("single-player mock draft engine", () => {
       picks: [legacyIanPick],
     };
 
-    const reconciled = reconcileSinglePlayerMockDraftState(state, [canonicalIan], 2_000);
+    const reconciled = reconcileSinglePlayerMockDraftState(
+      state,
+      [canonicalIan],
+      2_000,
+    );
 
     expect(reconciled.wasReset).toBe(false);
     expect(reconciled.didChange).toBe(true);
@@ -315,7 +361,11 @@ describe("single-player mock draft engine", () => {
       picks: [invalidEaston],
     };
 
-    const reconciled = reconcileSinglePlayerMockDraftState(state, [approvedIan], 2_000);
+    const reconciled = reconcileSinglePlayerMockDraftState(
+      state,
+      [approvedIan],
+      2_000,
+    );
 
     expect(reconciled.wasReset).toBe(true);
     expect(reconciled.didChange).toBe(true);
@@ -335,7 +385,7 @@ describe("single-player mock draft engine", () => {
     const live = advanceSinglePlayerMockDraft(
       initial,
       board,
-      start + MOCK_INTERMISSION_SECONDS * 1000
+      start + MOCK_INTERMISSION_SECONDS * 1000,
     );
     expect(live.status).toBe("live");
     expect(live.picks).toHaveLength(0);
@@ -344,7 +394,9 @@ describe("single-player mock draft engine", () => {
     const afterBot = advanceSinglePlayerMockDraft(
       live,
       board,
-      start + MOCK_INTERMISSION_SECONDS * 1000 + MOCK_BOT_PICK_DELAY_SECONDS * 1000
+      start +
+        MOCK_INTERMISSION_SECONDS * 1000 +
+        MOCK_BOT_PICK_DELAY_SECONDS * 1000,
     );
     expect(afterBot.picks).toHaveLength(1);
     expect(afterBot.picks[0].pickedBy).toBe("bot");
@@ -355,23 +407,28 @@ describe("single-player mock draft engine", () => {
 
   it("bot auto-picks the lowest true board rank even when input order is scrambled", () => {
     const start = 1_000;
-    const scrambledBoard = [player(12), player(3), player(1), player(8), player(2)].map(
-      (row) =>
-        row.id === 12
-          ? { ...row, masterDraftRank: 99, draftRank: 99 }
-          : row
+    const scrambledBoard = [
+      player(12),
+      player(3),
+      player(1),
+      player(8),
+      player(2),
+    ].map((row) =>
+      row.id === 12 ? { ...row, masterDraftRank: 99, draftRank: 99 } : row,
     );
     const initial = createSinglePlayerMockDraft(start);
     const live = advanceSinglePlayerMockDraft(
       initial,
       scrambledBoard,
-      start + MOCK_INTERMISSION_SECONDS * 1000
+      start + MOCK_INTERMISSION_SECONDS * 1000,
     );
 
     const afterBot = advanceSinglePlayerMockDraft(
       live,
       scrambledBoard,
-      start + MOCK_INTERMISSION_SECONDS * 1000 + MOCK_BOT_PICK_DELAY_SECONDS * 1000
+      start +
+        MOCK_INTERMISSION_SECONDS * 1000 +
+        MOCK_BOT_PICK_DELAY_SECONDS * 1000,
     );
 
     expect(afterBot.picks).toHaveLength(1);
@@ -394,7 +451,7 @@ describe("single-player mock draft engine", () => {
     const advanced = advanceSinglePlayerMockDraft(
       state,
       candidates,
-      start + MOCK_BOT_PICK_DELAY_SECONDS * 1000
+      start + MOCK_BOT_PICK_DELAY_SECONDS * 1000,
     );
 
     expect(advanced.picks).toHaveLength(2);
@@ -415,7 +472,7 @@ describe("single-player mock draft engine", () => {
     const advanced = advanceSinglePlayerMockDraft(
       state,
       candidates,
-      start + MOCK_BOT_PICK_DELAY_SECONDS * 1000
+      start + MOCK_BOT_PICK_DELAY_SECONDS * 1000,
     );
 
     expect(advanced.picks).toHaveLength(1);
@@ -445,7 +502,7 @@ describe("single-player mock draft engine", () => {
     const advanced = advanceSinglePlayerMockDraft(
       state,
       candidates,
-      start + MOCK_BOT_PICK_DELAY_SECONDS * 1000
+      start + MOCK_BOT_PICK_DELAY_SECONDS * 1000,
     );
 
     expect(advanced.picks).toHaveLength(8);
@@ -467,7 +524,7 @@ describe("single-player mock draft engine", () => {
     const advanced = advanceSinglePlayerMockDraft(
       state,
       candidates,
-      start + MOCK_BOT_PICK_DELAY_SECONDS * 1000
+      start + MOCK_BOT_PICK_DELAY_SECONDS * 1000,
     );
 
     expect(advanced.picks).toHaveLength(2);
@@ -480,12 +537,14 @@ describe("single-player mock draft engine", () => {
     const live = advanceSinglePlayerMockDraft(
       state,
       board,
-      start + MOCK_INTERMISSION_SECONDS * 1000
+      start + MOCK_INTERMISSION_SECONDS * 1000,
     );
     const afterBot = advanceSinglePlayerMockDraft(
       live,
       board,
-      start + MOCK_INTERMISSION_SECONDS * 1000 + MOCK_BOT_PICK_DELAY_SECONDS * 1000
+      start +
+        MOCK_INTERMISSION_SECONDS * 1000 +
+        MOCK_BOT_PICK_DELAY_SECONDS * 1000,
     );
 
     const available = getAvailablePlayers(board, afterBot);
@@ -500,8 +559,16 @@ describe("single-player mock draft engine", () => {
   it("excludes duplicate player identities after any copy is drafted", () => {
     const start = 1_000;
     const duplicateBoard = [
-      { ...player(1, "QB"), name: "LaNorris Sellers", school: "South Carolina" },
-      { ...player(2, "QB"), name: "Lanorris Sellers", school: "South Carolina" },
+      {
+        ...player(1, "QB"),
+        name: "LaNorris Sellers",
+        school: "South Carolina",
+      },
+      {
+        ...player(2, "QB"),
+        name: "Lanorris Sellers",
+        school: "South Carolina",
+      },
       { ...player(3, "RB"), name: "Ahmad Hardy", school: "Missouri" },
     ];
     const state = {
@@ -523,7 +590,7 @@ describe("single-player mock draft engine", () => {
 
     expect(available.map((row) => row.name)).not.toContain("Lanorris Sellers");
     expect(() => makeUserMockPick(state, duplicateBoard, 2, start)).toThrow(
-      "That player has already been drafted."
+      "That player has already been drafted.",
     );
   });
 
@@ -534,7 +601,7 @@ describe("single-player mock draft engine", () => {
         cardOffsetLeft: 400,
         cardWidth: 180,
         containerWidth: 600,
-      })
+      }),
     ).toBe(0);
 
     expect(
@@ -543,7 +610,7 @@ describe("single-player mock draft engine", () => {
         cardOffsetLeft: 720,
         cardWidth: 180,
         containerWidth: 600,
-      })
+      }),
     ).toBe(510);
   });
 
@@ -559,7 +626,9 @@ describe("single-player mock draft engine", () => {
     expect(isPickTimerDanger(live, 11)).toBe(false);
     expect(isPickTimerDanger(live, 10)).toBe(true);
     expect(isPickTimerDanger(live, 1)).toBe(true);
-    expect(isPickTimerDanger({ ...live, status: "intermission" }, 5)).toBe(false);
+    expect(isPickTimerDanger({ ...live, status: "intermission" }, 5)).toBe(
+      false,
+    );
     expect(isPickTimerDanger({ ...live, status: "complete" }, 5)).toBe(false);
   });
 
@@ -569,10 +638,12 @@ describe("single-player mock draft engine", () => {
     const live = advanceSinglePlayerMockDraft(
       initial,
       board,
-      start + MOCK_INTERMISSION_SECONDS * 1000
+      start + MOCK_INTERMISSION_SECONDS * 1000,
     );
 
-    expect(() => makeUserMockPick(live, board, 1, start)).toThrow("It is not your turn.");
+    expect(() => makeUserMockPick(live, board, 1, start)).toThrow(
+      "It is not your turn.",
+    );
 
     let state = live;
     let now = start + MOCK_INTERMISSION_SECONDS * 1000;
@@ -597,7 +668,7 @@ describe("single-player mock draft engine", () => {
             draftRank: player.draftRank + MOCK_TOTAL_PICKS,
             masterDraftRank: player.masterDraftRank + MOCK_TOTAL_PICKS,
           }
-        : player
+        : player,
     );
     let state = createSinglePlayerMockDraft(start);
     let now = start + MOCK_INTERMISSION_SECONDS * 1000;
@@ -614,9 +685,17 @@ describe("single-player mock draft engine", () => {
       }
     }
     expect(state.picks).toHaveLength(MOCK_TOTAL_PICKS);
-    expect(new Set(state.picks.map((pick) => pick.playerId)).size).toBe(MOCK_TOTAL_PICKS);
-    expect(buildMockRoster(state).every((slot) => Boolean(slot.player))).toBe(true);
-    expect(buildMockRoster(state).some((slot) => slot.label === "K" && slot.player?.position === "K")).toBe(true);
+    expect(new Set(state.picks.map((pick) => pick.playerId)).size).toBe(
+      MOCK_TOTAL_PICKS,
+    );
+    expect(buildMockRoster(state).every((slot) => Boolean(slot.player))).toBe(
+      true,
+    );
+    expect(
+      buildMockRoster(state).some(
+        (slot) => slot.label === "K" && slot.player?.position === "K",
+      ),
+    ).toBe(true);
   });
 
   it("can build roster views for any selected mock team", () => {
@@ -631,9 +710,15 @@ describe("single-player mock draft engine", () => {
     const userRoster = buildMockRoster(state, MOCK_USER_TEAM_ID);
     const botRoster = buildMockRoster(state, 1);
 
-    expect(userRoster.find((slot) => slot.label === "QB")?.player?.playerName).toBe("QB Pick 201");
-    expect(botRoster.find((slot) => slot.label === "RB 1")?.player?.playerName).toBe("RB Pick 202");
-    expect(botRoster.find((slot) => slot.label === "QB")?.player).toBeUndefined();
+    expect(
+      userRoster.find((slot) => slot.label === "QB")?.player?.playerName,
+    ).toBe("QB Pick 201");
+    expect(
+      botRoster.find((slot) => slot.label === "RB 1")?.player?.playerName,
+    ).toBe("RB Pick 202");
+    expect(
+      botRoster.find((slot) => slot.label === "QB")?.player,
+    ).toBeUndefined();
   });
 
   it("only exposes kickers and rejects illegal user picks when the on-clock roster only has K open", () => {
@@ -654,10 +739,14 @@ describe("single-player mock draft engine", () => {
       player(104, "K"),
     ];
 
-    expect(getLegalMockPositionsForTeam(state, MOCK_USER_TEAM_ID)).toEqual(["K"]);
-    expect(getDraftablePlayersForTeam(kOnlyBoard, state).map((row) => row.pos)).toEqual(["K"]);
+    expect(getLegalMockPositionsForTeam(state, MOCK_USER_TEAM_ID)).toEqual([
+      "K",
+    ]);
+    expect(
+      getDraftablePlayersForTeam(kOnlyBoard, state).map((row) => row.pos),
+    ).toEqual(["K"]);
     expect(() => makeUserMockPick(state, kOnlyBoard, 100, start)).toThrow(
-      "You cannot draft this player because your roster has no open slot for this position."
+      "You cannot draft this player because your roster has no open slot for this position.",
     );
 
     const afterKicker = makeUserMockPick(state, kOnlyBoard, 104, start);
@@ -687,7 +776,7 @@ describe("single-player mock draft engine", () => {
     const afterBot = advanceSinglePlayerMockDraft(
       state,
       kOnlyBoard,
-      start + MOCK_BOT_PICK_DELAY_SECONDS * 1000
+      start + MOCK_BOT_PICK_DELAY_SECONDS * 1000,
     );
     const lastPick = afterBot.picks[afterBot.picks.length - 1];
     expect(lastPick.position).toBe("K");

@@ -72,7 +72,8 @@ const statusSortOrder: Record<string, number> = {
   N_A: 11,
 };
 
-const statusLabel = (value: string) => (value === "N_A" ? "N/A" : value.split("_").join(" "));
+const statusLabel = (value: string) =>
+  value === "N_A" ? "N/A" : value.split("_").join(" ");
 
 export const buildInjuryPlayerCard = (injury: InjuryItem) => ({
   id: injury.id,
@@ -87,7 +88,10 @@ export default function InjuryCenter() {
   const [conferenceFilter, setConferenceFilter] = useState("ALL");
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [injuries, setInjuries] = useState<InjuryItem[]>([]);
-  const playerCardQuery = usePlayerCard(selectedPlayerId, selectedPlayerId !== null);
+  const playerCardQuery = usePlayerCard(
+    selectedPlayerId,
+    selectedPlayerId !== null,
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -100,7 +104,7 @@ export default function InjuryCenter() {
     apiGet<{ data: any[] }>(
       "/injuries",
       { season, week, conference: conferenceParam },
-      controller.signal
+      controller.signal,
     )
       .then((payload) => {
         const mapped = payload.data.map((row) => ({
@@ -127,10 +131,11 @@ export default function InjuryCenter() {
 
   const filtered = useMemo(() => {
     return injuries
-      .filter((row) =>
-        row.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        row.team.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        row.pos.toLowerCase().includes(searchQuery.toLowerCase())
+      .filter(
+        (row) =>
+          row.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          row.team.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          row.pos.toLowerCase().includes(searchQuery.toLowerCase()),
       )
       .sort((a, b) => {
         if (a.conference !== b.conference) {
@@ -164,7 +169,8 @@ export default function InjuryCenter() {
   const openPlayer = (playerId: number) => {
     setSelectedPlayerId(playerId);
   };
-  const selectedInjury = injuries.find((injury) => injury.id === selectedPlayerId) ?? null;
+  const selectedInjury =
+    injuries.find((injury) => injury.id === selectedPlayerId) ?? null;
 
   return (
     <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-1000">
@@ -238,7 +244,9 @@ export default function InjuryCenter() {
               >
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
-                    <h3 className="text-[14px] font-black italic uppercase text-foreground">{row.name}</h3>
+                    <h3 className="text-[14px] font-black italic uppercase text-foreground">
+                      {row.name}
+                    </h3>
                     <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">
                       {row.team} • {row.conference} • {row.pos}
                     </span>
@@ -253,7 +261,7 @@ export default function InjuryCenter() {
                   <span
                     className={cn(
                       "px-4 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-widest",
-                      statusStyles[row.status]
+                      statusStyles[row.status],
                     )}
                   >
                     {statusLabel(row.status)}

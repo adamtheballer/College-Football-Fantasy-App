@@ -1,5 +1,8 @@
 import * as React from "react";
-import { Legend, type Props as LegendProps } from "recharts/es6/component/Legend";
+import {
+  Legend,
+  type Props as LegendProps,
+} from "recharts/es6/component/Legend";
 import { ResponsiveContainer } from "recharts/es6/component/ResponsiveContainer";
 import { Tooltip } from "recharts/es6/component/Tooltip";
 
@@ -38,9 +41,7 @@ const ChartContainer = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & {
     config: ChartConfig;
-    children: React.ComponentProps<
-      typeof ResponsiveContainer
-    >["children"];
+    children: React.ComponentProps<typeof ResponsiveContainer>["children"];
   }
 >(({ id, className, children, config, ...props }, ref) => {
   const uniqueId = React.useId();
@@ -58,9 +59,7 @@ const ChartContainer = React.forwardRef<
         {...props}
       >
         <ChartStyle id={chartId} config={config} />
-        <ResponsiveContainer>
-          {children}
-        </ResponsiveContainer>
+        <ResponsiveContainer>{children}</ResponsiveContainer>
       </div>
     </ChartContext.Provider>
   );

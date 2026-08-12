@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,7 +27,9 @@ vi.mock("@/lib/api", () => ({
 import CreateLeague from "./CreateLeague";
 
 const renderPage = () => {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
@@ -45,7 +53,9 @@ describe("CreateLeague beta defaults", () => {
 
   it("shows only playoffs, waiver system, and trade review on the settings step", () => {
     renderPage();
-    fireEvent.click(screen.getByRole("button", { name: "Continue to Settings" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Continue to Settings" }),
+    );
 
     expect(screen.getByText("Playoff teams")).toBeTruthy();
     expect(screen.getByText("Waiver system")).toBeTruthy();
@@ -57,7 +67,9 @@ describe("CreateLeague beta defaults", () => {
 
   it("submits the standard beta roster and managed processing schedule", async () => {
     renderPage();
-    fireEvent.click(screen.getByRole("button", { name: "Continue to Settings" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Continue to Settings" }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Continue to Draft" }));
     fireEvent.click(screen.getByRole("button", { name: "Continue to Review" }));
     fireEvent.click(screen.getByRole("checkbox"));

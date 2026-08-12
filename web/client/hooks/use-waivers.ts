@@ -17,12 +17,19 @@ type FreeAgentAddPayload = {
   drop_roster_entry_id?: number;
 };
 
-const invalidateWaiverQueries = (queryClient: ReturnType<typeof useQueryClient>, leagueId: number) => {
+const invalidateWaiverQueries = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  leagueId: number,
+) => {
   queryClient.invalidateQueries({ queryKey: ["league", leagueId, "waivers"] });
   queryClient.invalidateQueries({ queryKey: ["league", leagueId, "roster"] });
-  queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
+  queryClient.invalidateQueries({
+    queryKey: ["league", leagueId, "workspace"],
+  });
   queryClient.invalidateQueries({ queryKey: ["league", leagueId, "matchup"] });
-  queryClient.invalidateQueries({ queryKey: ["league", leagueId, "transactions"] });
+  queryClient.invalidateQueries({
+    queryKey: ["league", leagueId, "transactions"],
+  });
   queryClient.invalidateQueries({ queryKey: ["players"] });
 };
 
@@ -33,10 +40,14 @@ export function useSubmitWaiverClaim(leagueId?: number) {
       if (typeof leagueId !== "number" || Number.isNaN(leagueId)) {
         throw new ApiError(400, "Invalid league ID.");
       }
-      return apiPost<LeagueWaiverClaim>(`/leagues/${leagueId}/waivers/claims`, payload);
+      return apiPost<LeagueWaiverClaim>(
+        `/leagues/${leagueId}/waivers/claims`,
+        payload,
+      );
     },
     onSuccess: () => {
-      if (typeof leagueId === "number") invalidateWaiverQueries(queryClient, leagueId);
+      if (typeof leagueId === "number")
+        invalidateWaiverQueries(queryClient, leagueId);
     },
   });
 }
@@ -44,14 +55,24 @@ export function useSubmitWaiverClaim(leagueId?: number) {
 export function useAddFreeAgent(leagueId?: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ playerId, payload }: { playerId: number; payload: FreeAgentAddPayload }) => {
+    mutationFn: ({
+      playerId,
+      payload,
+    }: {
+      playerId: number;
+      payload: FreeAgentAddPayload;
+    }) => {
       if (typeof leagueId !== "number" || Number.isNaN(leagueId)) {
         throw new ApiError(400, "Invalid league ID.");
       }
-      return apiPost(`/leagues/${leagueId}/waivers/free-agents/${playerId}/add`, payload);
+      return apiPost(
+        `/leagues/${leagueId}/waivers/free-agents/${playerId}/add`,
+        payload,
+      );
     },
     onSuccess: () => {
-      if (typeof leagueId === "number") invalidateWaiverQueries(queryClient, leagueId);
+      if (typeof leagueId === "number")
+        invalidateWaiverQueries(queryClient, leagueId);
     },
   });
 }
@@ -63,10 +84,14 @@ export function useCancelWaiverClaim(leagueId?: number) {
       if (typeof leagueId !== "number" || Number.isNaN(leagueId)) {
         throw new ApiError(400, "Invalid league ID.");
       }
-      return apiPost<LeagueWaiverClaim>(`/leagues/${leagueId}/waivers/claims/${claimId}/cancel`, { reason });
+      return apiPost<LeagueWaiverClaim>(
+        `/leagues/${leagueId}/waivers/claims/${claimId}/cancel`,
+        { reason },
+      );
     },
     onSuccess: () => {
-      if (typeof leagueId === "number") invalidateWaiverQueries(queryClient, leagueId);
+      if (typeof leagueId === "number")
+        invalidateWaiverQueries(queryClient, leagueId);
     },
   });
 }
@@ -74,14 +99,24 @@ export function useCancelWaiverClaim(leagueId?: number) {
 export function useEditWaiverClaim(leagueId?: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ claimId, payload }: { claimId: number; payload: WaiverClaimPayload }) => {
+    mutationFn: ({
+      claimId,
+      payload,
+    }: {
+      claimId: number;
+      payload: WaiverClaimPayload;
+    }) => {
       if (typeof leagueId !== "number" || Number.isNaN(leagueId)) {
         throw new ApiError(400, "Invalid league ID.");
       }
-      return apiPatch<LeagueWaiverClaim>(`/leagues/${leagueId}/waivers/claims/${claimId}`, payload);
+      return apiPatch<LeagueWaiverClaim>(
+        `/leagues/${leagueId}/waivers/claims/${claimId}`,
+        payload,
+      );
     },
     onSuccess: () => {
-      if (typeof leagueId === "number") invalidateWaiverQueries(queryClient, leagueId);
+      if (typeof leagueId === "number")
+        invalidateWaiverQueries(queryClient, leagueId);
     },
   });
 }
@@ -93,10 +128,14 @@ export function useReorderWaiverClaims(leagueId?: number) {
       if (typeof leagueId !== "number" || Number.isNaN(leagueId)) {
         throw new ApiError(400, "Invalid league ID.");
       }
-      return apiPost<LeagueWaiverClaim[]>(`/leagues/${leagueId}/waivers/claims/reorder`, { claim_ids: claimIds });
+      return apiPost<LeagueWaiverClaim[]>(
+        `/leagues/${leagueId}/waivers/claims/reorder`,
+        { claim_ids: claimIds },
+      );
     },
     onSuccess: () => {
-      if (typeof leagueId === "number") invalidateWaiverQueries(queryClient, leagueId);
+      if (typeof leagueId === "number")
+        invalidateWaiverQueries(queryClient, leagueId);
     },
   });
 }

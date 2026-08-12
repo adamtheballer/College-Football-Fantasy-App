@@ -43,10 +43,13 @@ export default function Alerts() {
 
   const leaguesById = useMemo(
     () => new Map(leagueRows.map((league) => [league.id, league.name])),
-    [leagueRows]
+    [leagueRows],
   );
 
-  const resolveAlertPath = (alertType: string, payload: Record<string, unknown> | null) => {
+  const resolveAlertPath = (
+    alertType: string,
+    payload: Record<string, unknown> | null,
+  ) => {
     const rawPath = payload?.deep_link ?? payload?.path;
     if (typeof rawPath === "string" && rawPath.trim()) {
       return rawPath;
@@ -88,7 +91,11 @@ export default function Alerts() {
       return;
     }
     const controller = new AbortController();
-    apiGet<{ data: any[] }>("/notifications/alerts", { limit: 50 }, controller.signal)
+    apiGet<{ data: any[] }>(
+      "/notifications/alerts",
+      { limit: 50 },
+      controller.signal,
+    )
       .then((payload) => {
         if (!payload?.data?.length) {
           setAlerts([]);
@@ -99,8 +106,11 @@ export default function Alerts() {
           type: row.alert_type,
           title: row.title,
           body: row.body,
-          timestamp: row.sent_at ? new Date(row.sent_at).toLocaleString() : "Just now",
-          payload: row.payload && typeof row.payload === "object" ? row.payload : null,
+          timestamp: row.sent_at
+            ? new Date(row.sent_at).toLocaleString()
+            : "Just now",
+          payload:
+            row.payload && typeof row.payload === "object" ? row.payload : null,
         }));
         setAlerts(mapped);
       })
@@ -143,19 +153,30 @@ export default function Alerts() {
                 onClick={() => openAlertDestination(alert)}
                 className="flex w-full items-center gap-6 px-10 py-6 text-left hover:bg-white/[0.04] transition-all"
               >
-                <div className={cn("w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center", typeColors[alert.type])}>
+                <div
+                  className={cn(
+                    "w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center",
+                    typeColors[alert.type],
+                  )}
+                >
                   <Icon className="w-5 h-5" />
                 </div>
                 <div className="flex-1 space-y-1">
-                  <h3 className="text-[12px] font-black uppercase tracking-widest text-foreground">{alert.title}</h3>
-                  <p className="text-[11px] font-medium text-muted-foreground/70">{alert.body}</p>
+                  <h3 className="text-[12px] font-black uppercase tracking-widest text-foreground">
+                    {alert.title}
+                  </h3>
+                  <p className="text-[11px] font-medium text-muted-foreground/70">
+                    {alert.body}
+                  </p>
                   {leagueLabel ? (
                     <p className="text-[9px] font-black uppercase tracking-[0.22em] text-primary/80">
                       {leagueLabel}
                     </p>
                   ) : null}
                 </div>
-                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">{alert.timestamp}</span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">
+                  {alert.timestamp}
+                </span>
               </button>
             );
           })}

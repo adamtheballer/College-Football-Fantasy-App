@@ -10,7 +10,11 @@ type DesktopSidebarProps = {
   onSignOut: () => void;
 };
 
-export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarProps) {
+export function DesktopSidebar({
+  items,
+  pathname,
+  onSignOut,
+}: DesktopSidebarProps) {
   return (
     <aside className="relative z-10 hidden h-screen w-72 shrink-0 overflow-hidden border-r border-cfb-border-subtle bg-cfb-sidebar shadow-[inset_-1px_0_0_hsl(var(--border-subtle)/0.9),18px_0_70px_rgba(2,6,23,0.28)] lg:sticky lg:top-0 lg:flex lg:flex-col">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_9%,hsl(var(--brand-primary)/0.16),transparent_34%),radial-gradient(circle_at_88%_76%,hsl(var(--accent-pink)/0.07),transparent_36%),linear-gradient(180deg,hsl(var(--background-surface-raised)/0.34),transparent_52%)]" />
@@ -58,9 +62,9 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
                     ? "text-red-200/50 group-hover:text-red-100"
                     : isAuth
                       ? "text-cfb-brand/70 group-hover:text-cfb-brand"
-                    : isActive
-                      ? "text-cfb-brand"
-                      : "text-cfb-text-muted group-hover:text-cfb-text-primary",
+                      : isActive
+                        ? "text-cfb-brand"
+                        : "text-cfb-text-muted group-hover:text-cfb-text-primary",
                 )}
               />
               <span>{item.name}</span>
@@ -84,7 +88,12 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
 
           if (isSignOut) {
             return (
-              <button key={item.name} type="button" onClick={onSignOut} className="w-full">
+              <button
+                key={item.name}
+                type="button"
+                onClick={onSignOut}
+                className="w-full"
+              >
                 {content}
               </button>
             );

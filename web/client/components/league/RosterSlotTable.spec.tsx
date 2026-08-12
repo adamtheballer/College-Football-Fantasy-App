@@ -63,7 +63,9 @@ const projectedReceiver: LeagueRosterPlayer = {
 
 describe("RosterSlotTable", () => {
   it("renders an empty configured slot instead of removing its roster row", () => {
-    render(<RosterSlotTable title="Starters" players={[emptyQuarterbackSlot]} />);
+    render(
+      <RosterSlotTable title="Starters" players={[emptyQuarterbackSlot]} />,
+    );
 
     expect(screen.getByText("QB")).toBeTruthy();
     expect(screen.getByText("N/A")).toBeTruthy();
@@ -72,10 +74,16 @@ describe("RosterSlotTable", () => {
   });
 
   it("keeps mobile roster data in one compact row with a weekly projection", () => {
-    const { container } = render(<RosterSlotTable title="Starters" players={[projectedReceiver]} />);
+    const { container } = render(
+      <RosterSlotTable title="Starters" players={[projectedReceiver]} />,
+    );
 
-    expect(container.querySelectorAll("[data-roster-mobile-row]")).toHaveLength(1);
-    expect(screen.getByText("A Very Long Receiver Name That Must Stay Compact")).toBeTruthy();
+    expect(container.querySelectorAll("[data-roster-mobile-row]")).toHaveLength(
+      1,
+    );
+    expect(
+      screen.getByText("A Very Long Receiver Name That Must Stay Compact"),
+    ).toBeTruthy();
     expect(screen.getByText("Ohio State · vs Michigan")).toBeTruthy();
     expect(screen.getByText("18.4")).toBeTruthy();
   });

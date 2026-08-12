@@ -44,8 +44,12 @@ describe("AppShell scroll ownership", () => {
       hideDecor: false,
     });
 
-    expect(container.firstElementChild?.getAttribute("style")).toContain("rgb(2, 6, 17)");
-    expect(container.firstElementChild?.getAttribute("style")).toContain("rgb(7, 27, 53)");
+    expect(container.firstElementChild?.getAttribute("style")).toContain(
+      "rgb(2, 6, 17)",
+    );
+    expect(container.firstElementChild?.getAttribute("style")).toContain(
+      "rgb(7, 27, 53)",
+    );
 
     const effects = container.querySelector("[data-bg-effects='true']");
     expect(effects).not.toBeNull();

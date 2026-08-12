@@ -35,7 +35,14 @@ export interface ChatMessage {
   thread_id: number;
   league_id: number;
   sender_user_id: number | null;
-  message_type: "user" | "system" | "trade_finalized" | "trade_processed" | "waiver" | "draft" | "commissioner";
+  message_type:
+    | "user"
+    | "system"
+    | "trade_finalized"
+    | "trade_processed"
+    | "waiver"
+    | "draft"
+    | "commissioner";
   body: string | null;
   metadata: Record<string, unknown>;
   client_message_id: string | null;

@@ -73,16 +73,20 @@ export type StatCardTone = keyof typeof statCardToneClasses;
 
 export const statusBadgeClasses = {
   live: "border-score-live/35 bg-score-live/[0.12] text-emerald-100",
-  projected: "border-score-projected/35 bg-score-projected/[0.12] text-blue-100",
+  projected:
+    "border-score-projected/35 bg-score-projected/[0.12] text-blue-100",
   final: "border-score-final/35 bg-score-final/[0.12] text-slate-100",
-  corrected: "border-score-corrected/35 bg-score-corrected/[0.12] text-violet-100",
+  corrected:
+    "border-score-corrected/35 bg-score-corrected/[0.12] text-violet-100",
   delayed: "border-score-delayed/40 bg-score-delayed/[0.14] text-yellow-100",
-  unavailable: "border-score-unavailable/35 bg-score-unavailable/[0.12] text-slate-300",
+  unavailable:
+    "border-score-unavailable/35 bg-score-unavailable/[0.12] text-slate-300",
   locked: "border-score-locked/40 bg-score-locked/[0.14] text-orange-100",
   success: "border-cfb-success/35 bg-cfb-success/[0.12] text-emerald-100",
   warning: "border-cfb-warning/40 bg-cfb-warning/[0.14] text-yellow-100",
   danger: "border-cfb-danger/40 bg-cfb-danger/[0.14] text-red-100",
-  neutral: "border-cfb-border-subtle bg-cfb-surface-raised/75 text-cfb-text-secondary",
+  neutral:
+    "border-cfb-border-subtle bg-cfb-surface-raised/75 text-cfb-text-secondary",
 } as const;
 
 export type StatusBadgeVariant = keyof typeof statusBadgeClasses;
@@ -109,13 +113,16 @@ export const positionBadgeClasses = {
   K: "border-cyan-300/45 bg-cyan-500/[0.14] text-cyan-100",
   FLEX: "border-pink-300/45 bg-pink-500/[0.14] text-pink-100",
   DST: "border-slate-300/45 bg-slate-500/[0.14] text-slate-100",
-  DEFAULT: "border-cfb-border-subtle bg-cfb-surface-raised/75 text-cfb-text-secondary",
+  DEFAULT:
+    "border-cfb-border-subtle bg-cfb-surface-raised/75 text-cfb-text-secondary",
 } as const;
 
 export type PositionBadgeKey = keyof typeof positionBadgeClasses;
 
 export function getPositionBadgeClass(position?: string | null) {
-  const normalized = String(position ?? "").trim().toUpperCase();
+  const normalized = String(position ?? "")
+    .trim()
+    .toUpperCase();
   if (normalized in positionBadgeClasses) {
     return positionBadgeClasses[normalized as PositionBadgeKey];
   }

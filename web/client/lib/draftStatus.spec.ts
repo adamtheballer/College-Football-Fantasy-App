@@ -40,7 +40,7 @@ describe("draftStatus", () => {
         memberCount: 4,
         maxTeams: 4,
         now,
-      })
+      }),
     ).toBe(true);
     expect(
       canJoinDraftRoom({
@@ -48,7 +48,7 @@ describe("draftStatus", () => {
         memberCount: 3,
         maxTeams: 4,
         now,
-      })
+      }),
     ).toBe(false);
     expect(
       canJoinDraftRoom({
@@ -56,7 +56,7 @@ describe("draftStatus", () => {
         memberCount: 4,
         maxTeams: 4,
         now,
-      })
+      }),
     ).toBe(false);
   });
 

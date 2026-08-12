@@ -39,7 +39,8 @@ export function useLeagues(limit = 20, enabled = true) {
       const payload = await apiGet<LeagueListResponse>("/leagues", { limit });
       return payload.data.sort(
         (left, right) =>
-          new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime()
+          new Date(right.updated_at).getTime() -
+          new Date(left.updated_at).getTime(),
       );
     },
   });
@@ -67,9 +68,15 @@ export function useRescheduleDraft(leagueId?: number) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["league", leagueId] }),
         queryClient.invalidateQueries({ queryKey: ["leagues"] }),
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] }),
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "settings-view"] }),
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "draft-room"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "workspace"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "settings-view"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "draft-room"],
+        }),
         queryClient.invalidateQueries({ queryKey: ["draft-room", leagueId] }),
       ]);
     },
@@ -89,18 +96,29 @@ export function useUpdateDraftOrder(leagueId?: number) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["league", leagueId] }),
         queryClient.invalidateQueries({ queryKey: ["leagues"] }),
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "draft-room"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "draft-room"],
+        }),
       ]);
     },
   });
 }
 
-const invalidateLeagueQueries = (queryClient: ReturnType<typeof useQueryClient>, leagueId: number) => {
+const invalidateLeagueQueries = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  leagueId: number,
+) => {
   queryClient.invalidateQueries({ queryKey: ["league", leagueId] });
   queryClient.invalidateQueries({ queryKey: ["leagues"] });
-  queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
-  queryClient.invalidateQueries({ queryKey: ["league", leagueId, "settings-view"] });
-  queryClient.invalidateQueries({ queryKey: ["league", leagueId, "draft-room"] });
+  queryClient.invalidateQueries({
+    queryKey: ["league", leagueId, "workspace"],
+  });
+  queryClient.invalidateQueries({
+    queryKey: ["league", leagueId, "settings-view"],
+  });
+  queryClient.invalidateQueries({
+    queryKey: ["league", leagueId, "draft-room"],
+  });
 };
 
 export function useRotateLeagueInvite(leagueId?: number) {
@@ -110,10 +128,14 @@ export function useRotateLeagueInvite(leagueId?: number) {
       if (typeof leagueId !== "number" || Number.isNaN(leagueId)) {
         throw new ApiError(400, "Invalid league ID.");
       }
-      return apiPost<LeagueCreateResponse>(`/leagues/${leagueId}/invite/rotate`, {});
+      return apiPost<LeagueCreateResponse>(
+        `/leagues/${leagueId}/invite/rotate`,
+        {},
+      );
     },
     onSuccess: () => {
-      if (typeof leagueId === "number") invalidateLeagueQueries(queryClient, leagueId);
+      if (typeof leagueId === "number")
+        invalidateLeagueQueries(queryClient, leagueId);
     },
   });
 }
@@ -128,7 +150,8 @@ export function useRevokeLeagueInvite(leagueId?: number) {
       return apiPost<LeagueDetail>(`/leagues/${leagueId}/invite/revoke`, {});
     },
     onSuccess: () => {
-      if (typeof leagueId === "number") invalidateLeagueQueries(queryClient, leagueId);
+      if (typeof leagueId === "number")
+        invalidateLeagueQueries(queryClient, leagueId);
     },
   });
 }
@@ -151,7 +174,7 @@ export function useLeagueWorkspace(leagueId?: number, enabled = true) {
 export function useLeagueRosterTab(
   leagueId?: number,
   week?: number,
-  enabled = true
+  enabled = true,
 ) {
   return useQuery({
     queryKey: ["league", leagueId, "roster", week ?? "auto"],
@@ -174,10 +197,16 @@ export function useLeagueMatchupTab(
   leagueId?: number,
   week?: number,
   matchupId?: number,
-  enabled = true
+  enabled = true,
 ) {
   return useQuery({
-    queryKey: ["league", leagueId, "matchup", week ?? "auto", matchupId ?? "mine"],
+    queryKey: [
+      "league",
+      leagueId,
+      "matchup",
+      week ?? "auto",
+      matchupId ?? "mine",
+    ],
     enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
     staleTime: 30_000,
     retry: (failureCount, error) => {
@@ -212,7 +241,8 @@ export function useLeagueSettingsTab(leagueId?: number, enabled = true) {
       }
       return failureCount < 2;
     },
-    queryFn: () => apiGet<LeagueSettingsTabResponse>(`/leagues/${leagueId}/settings-view`),
+    queryFn: () =>
+      apiGet<LeagueSettingsTabResponse>(`/leagues/${leagueId}/settings-view`),
   });
 }
 
@@ -220,7 +250,7 @@ export function useLeagueWaiverTab(
   leagueId?: number,
   limit = 1000,
   offset = 0,
-  enabled = true
+  enabled = true,
 ) {
   return useQuery({
     queryKey: ["league", leagueId, "waivers", limit, offset],
@@ -243,7 +273,7 @@ export function useLeagueWaiverTab(
 export function useLeagueScoreboard(
   leagueId?: number,
   week?: number,
-  enabled = true
+  enabled = true,
 ) {
   return useQuery({
     queryKey: ["league", leagueId, "scoreboard", week ?? "default"],
@@ -273,15 +303,12 @@ export function useLeaguePowerRankings(leagueId?: number, enabled = true) {
       }
       return failureCount < 2;
     },
-    queryFn: () => apiGet<LeaguePowerRankingResponse>(`/leagues/${leagueId}/power-rankings`),
+    queryFn: () =>
+      apiGet<LeaguePowerRankingResponse>(`/leagues/${leagueId}/power-rankings`),
   });
 }
 
-export function useLeagueNews(
-  leagueId?: number,
-  limit = 25,
-  enabled = true
-) {
+export function useLeagueNews(leagueId?: number, limit = 25, enabled = true) {
   return useQuery({
     queryKey: ["league", leagueId, "news", limit],
     enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),

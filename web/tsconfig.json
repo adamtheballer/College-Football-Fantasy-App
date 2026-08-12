@@ -32,9 +32,7 @@
       "@/*": ["./client/*"]
     }
   },
-  "include": [
-    "client/**/*"
-  ],
+  "include": ["client/**/*"],
   "exclude": [
     "client/**/*.spec.ts",
     "client/**/*.spec.tsx",

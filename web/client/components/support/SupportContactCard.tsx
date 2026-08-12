@@ -10,7 +10,9 @@ import { useRuntimeCapabilities } from "@/components/RuntimeCompatibilityGate";
  */
 export function SupportContactCard() {
   const { support_email: supportEmail } = useRuntimeCapabilities();
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">(
+    "idle",
+  );
 
   if (!supportEmail) return null;
 
@@ -29,9 +31,12 @@ export function SupportContactCard() {
 
   return (
     <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Email Support</p>
+      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
+        Email Support
+      </p>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Email us with the page, what happened, and the steps that led to the issue.
+        Email us with the page, what happened, and the steps that led to the
+        issue.
       </p>
       <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <a
@@ -48,7 +53,11 @@ export function SupportContactCard() {
           aria-live="polite"
         >
           <Copy className="mr-2 h-3.5 w-3.5" />
-          {copyState === "copied" ? "Copied" : copyState === "error" ? "Copy Failed" : "Copy Email"}
+          {copyState === "copied"
+            ? "Copied"
+            : copyState === "error"
+              ? "Copy Failed"
+              : "Copy Email"}
         </Button>
       </div>
       <a

@@ -84,7 +84,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
 
     if (location.pathname !== "/") {
-      navigate("/", { replace: true, state: { replayGuide: replayGuideRequested } });
+      navigate("/", {
+        replace: true,
+        state: { replayGuide: replayGuideRequested },
+      });
       return;
     }
 

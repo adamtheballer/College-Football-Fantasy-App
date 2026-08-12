@@ -1,10 +1,27 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Navigate, useParams, useNavigate } from "react-router-dom";
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock, Copy, Link2, Lock, RefreshCw, Users, Zap } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  Clock,
+  Copy,
+  Link2,
+  Lock,
+  RefreshCw,
+  Users,
+  Zap,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -49,7 +66,12 @@ export default function DraftLobby() {
   const { user } = useAuth();
   const parsedLeagueId =
     leagueId && !Number.isNaN(Number(leagueId)) ? Number(leagueId) : undefined;
-  const { data: league, error, isLoading, refetch: refetchLeague } = useLeagueDetail(parsedLeagueId);
+  const {
+    data: league,
+    error,
+    isLoading,
+    refetch: refetchLeague,
+  } = useLeagueDetail(parsedLeagueId);
   const rescheduleDraft = useRescheduleDraft(parsedLeagueId);
   const updateDraftOrder = useUpdateDraftOrder(parsedLeagueId);
   const rotateInvite = useRotateLeagueInvite(parsedLeagueId);
@@ -59,23 +81,38 @@ export default function DraftLobby() {
   const [draftDate, setDraftDate] = useState("");
   const [draftClockTime, setDraftClockTime] = useState("");
   const [rescheduleError, setRescheduleError] = useState<string | null>(null);
-  const [rescheduleSuccess, setRescheduleSuccess] = useState<string | null>(null);
-  const [draftOrderMode, setDraftOrderMode] = useState<"random" | "custom">("random");
-  const [draftOrderBySlot, setDraftOrderBySlot] = useState<Record<number, number | null>>({});
+  const [rescheduleSuccess, setRescheduleSuccess] = useState<string | null>(
+    null,
+  );
+  const [draftOrderMode, setDraftOrderMode] = useState<"random" | "custom">(
+    "random",
+  );
+  const [draftOrderBySlot, setDraftOrderBySlot] = useState<
+    Record<number, number | null>
+  >({});
   const [draftOrderError, setDraftOrderError] = useState<string | null>(null);
-  const [draftOrderSuccess, setDraftOrderSuccess] = useState<string | null>(null);
+  const [draftOrderSuccess, setDraftOrderSuccess] = useState<string | null>(
+    null,
+  );
   const [dismissedPoolWarning, setDismissedPoolWarning] = useState(false);
-  const [copiedInviteField, setCopiedInviteField] = useState<"code" | "link" | null>(null);
-  const [inviteActionError, setInviteActionError] = useState<string | null>(null);
+  const [copiedInviteField, setCopiedInviteField] = useState<
+    "code" | "link" | null
+  >(null);
+  const [inviteActionError, setInviteActionError] = useState<string | null>(
+    null,
+  );
   const playerPoolQuery = useDraftPlayerPool({
     limit: 100,
     offset: 0,
     pages: 1,
     sort: "draft_rank",
-    enabled: typeof parsedLeagueId === "number" && Number.isFinite(parsedLeagueId),
+    enabled:
+      typeof parsedLeagueId === "number" && Number.isFinite(parsedLeagueId),
   });
 
-  const draftTime = league?.draft?.draft_datetime_utc ? new Date(league.draft.draft_datetime_utc) : null;
+  const draftTime = league?.draft?.draft_datetime_utc
+    ? new Date(league.draft.draft_datetime_utc)
+    : null;
 
   useEffect(() => {
     const localValue = toLeagueDateTimeLocalValue(
@@ -91,7 +128,8 @@ export default function DraftLobby() {
     const order = league?.draft_order;
     if (!order) return;
     const next: Record<number, number | null> = {};
-    for (let position = 1; position <= order.max_teams; position += 1) next[position] = null;
+    for (let position = 1; position <= order.max_teams; position += 1)
+      next[position] = null;
     for (const entry of order.entries) {
       if (entry.draft_position) next[entry.draft_position] = entry.team_id;
     }
@@ -118,24 +156,32 @@ export default function DraftLobby() {
     return formatDraftCountdown(draftTime, now);
   }, [draftTime, now]);
 
-  const countdownParts = useMemo(() => getDraftCountdownParts(draftTime, now), [draftTime, now]);
+  const countdownParts = useMemo(
+    () => getDraftCountdownParts(draftTime, now),
+    [draftTime, now],
+  );
 
   const canEnterDraft = useMemo(() => {
     return hasDraftStarted(draftTime, now);
   }, [draftTime, now]);
 
   const isFull = league ? league.members.length >= league.max_teams : false;
-  const missingManagers = league ? Math.max(0, league.max_teams - league.members.length) : 0;
-  const isCommissioner = Boolean(league && user?.id === league.commissioner_user_id);
+  const missingManagers = league
+    ? Math.max(0, league.max_teams - league.members.length)
+    : 0;
+  const isCommissioner = Boolean(
+    league && user?.id === league.commissioner_user_id,
+  );
   const canReschedule = Boolean(
     isCommissioner &&
-      league?.draft?.status === "scheduled" &&
-      ["pre_draft", "scheduled"].includes(league.status),
+    league?.draft?.status === "scheduled" &&
+    ["pre_draft", "scheduled"].includes(league.status),
   );
   const canEditDraftOrder = canReschedule;
   const expectedPlayerCount = CFB27_RATINGS.length;
   const loadedPlayerCount = playerPoolQuery.data?.total ?? 0;
-  const playerPoolComplete = !playerPoolQuery.isLoading && loadedPlayerCount >= expectedPlayerCount;
+  const playerPoolComplete =
+    !playerPoolQuery.isLoading && loadedPlayerCount >= expectedPlayerCount;
   const showPlayerPoolWarning =
     !playerPoolQuery.isLoading &&
     !playerPoolComplete &&
@@ -146,7 +192,9 @@ export default function DraftLobby() {
     return (
       <div className="max-w-3xl mx-auto py-20 text-center">
         <Card className="bg-card/40 border-border/60 rounded-[2.5rem] p-12">
-          <h1 className="text-3xl font-black uppercase text-red-400">Invalid league ID.</h1>
+          <h1 className="text-3xl font-black uppercase text-red-400">
+            Invalid league ID.
+          </h1>
         </Card>
       </div>
     );
@@ -156,7 +204,9 @@ export default function DraftLobby() {
     return (
       <div className="max-w-3xl mx-auto py-20 text-center">
         <Card className="bg-card/40 border-border/60 rounded-[2.5rem] p-12">
-          <h1 className="text-3xl font-black uppercase text-red-400">Unable to load league.</h1>
+          <h1 className="text-3xl font-black uppercase text-red-400">
+            Unable to load league.
+          </h1>
         </Card>
       </div>
     );
@@ -166,7 +216,9 @@ export default function DraftLobby() {
     return (
       <div className="max-w-3xl mx-auto py-20 text-center">
         <Card className="bg-card/40 border-border/60 rounded-[2.5rem] p-12">
-          <p className="text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground">Loading draft lobby...</p>
+          <p className="text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground">
+            Loading draft lobby...
+          </p>
         </Card>
       </div>
     );
@@ -175,7 +227,12 @@ export default function DraftLobby() {
   // A completed draft owns the post-draft league workspace. This direct-route
   // guard also covers stale lobby bookmarks and browser history, so members
   // cannot be sent back to a draft countdown after rosters were finalized.
-  if (isLeaguePostDraft({ draftStatus: league.draft?.status, leagueStatus: league.status })) {
+  if (
+    isLeaguePostDraft({
+      draftStatus: league.draft?.status,
+      leagueStatus: league.status,
+    })
+  ) {
     return <Navigate to={`/league/${league.id}/roster`} replace />;
   }
 
@@ -212,7 +269,9 @@ export default function DraftLobby() {
         status: "scheduled",
       });
       setShowReschedule(false);
-      setRescheduleSuccess("Draft time updated. All league members will see the new countdown.");
+      setRescheduleSuccess(
+        "Draft time updated. All league members will see the new countdown.",
+      );
     } catch (error) {
       setRescheduleError(getErrorMessage(error));
     }
@@ -224,9 +283,15 @@ export default function DraftLobby() {
     setDraftOrderSuccess(null);
     const entries = Object.entries(draftOrderBySlot)
       .filter(([, teamId]) => typeof teamId === "number")
-      .map(([position, teamId]) => ({ team_id: teamId as number, draft_position: Number(position) }));
+      .map(([position, teamId]) => ({
+        team_id: teamId as number,
+        draft_position: Number(position),
+      }));
     try {
-      await updateDraftOrder.mutateAsync({ draft_order_mode: draftOrderMode, entries });
+      await updateDraftOrder.mutateAsync({
+        draft_order_mode: draftOrderMode,
+        entries,
+      });
       setDraftOrderSuccess(
         draftOrderMode === "custom"
           ? "Draft order saved. Fill every slot before starting the draft."
@@ -238,7 +303,9 @@ export default function DraftLobby() {
   };
 
   const activeInviteCode = isCommissioner ? league.invite_code : null;
-  const activeInviteLink = activeInviteCode ? `${window.location.origin}/join/${activeInviteCode}` : null;
+  const activeInviteLink = activeInviteCode
+    ? `${window.location.origin}/join/${activeInviteCode}`
+    : null;
 
   const copyInviteValue = async (field: "code" | "link", value: string) => {
     try {
@@ -246,7 +313,9 @@ export default function DraftLobby() {
       setCopiedInviteField(field);
       window.setTimeout(() => setCopiedInviteField(null), 2_000);
     } catch {
-      setInviteActionError("Unable to copy the invite. Select the code or link and copy it manually.");
+      setInviteActionError(
+        "Unable to copy the invite. Select the code or link and copy it manually.",
+      );
     }
   };
 
@@ -270,16 +339,20 @@ export default function DraftLobby() {
 
   return (
     <div className="max-w-5xl mx-auto py-12 space-y-10">
-      <Dialog open={showPlayerPoolWarning} onOpenChange={(open) => setDismissedPoolWarning(!open)}>
+      <Dialog
+        open={showPlayerPoolWarning}
+        onOpenChange={(open) => setDismissedPoolWarning(!open)}
+      >
         <DialogContent className="max-w-xl border-amber-300/20 bg-[#101928]">
           <DialogHeader>
             <DialogTitle className="pr-8 text-2xl font-black uppercase italic text-amber-100">
               Draft player pool is not ready
             </DialogTitle>
             <DialogDescription className="text-sm font-semibold leading-6 text-slate-300">
-              This draft has {loadedPlayerCount} backend players available, but the CFB27 draft
-              board expects at least {expectedPlayerCount}. Reschedule the draft so the player
-              sync can finish before managers enter the room.
+              This draft has {loadedPlayerCount} backend players available, but
+              the CFB27 draft board expects at least {expectedPlayerCount}.
+              Reschedule the draft so the player sync can finish before managers
+              enter the room.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -334,9 +407,14 @@ export default function DraftLobby() {
             }}
           >
             <div className="rounded-2xl border border-white/10 bg-black/15 p-4 text-sm">
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Current schedule</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
+                Current schedule
+              </p>
               <p className="mt-2 font-black text-slate-50">
-                {formatLeagueDraftDateTime(draftTime, league.draft?.timezone || "UTC")}
+                {formatLeagueDraftDateTime(
+                  draftTime,
+                  league.draft?.timezone || "UTC",
+                )}
               </p>
               <p className="mt-1 text-xs font-semibold text-sky-200">
                 {getLeagueTimezoneLabel(league.draft?.timezone || "UTC")}
@@ -344,7 +422,9 @@ export default function DraftLobby() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-2" htmlFor="draft-reschedule-date">
-                <span className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">New date</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+                  New date
+                </span>
                 <Input
                   id="draft-reschedule-date"
                   type="date"
@@ -355,7 +435,9 @@ export default function DraftLobby() {
                 />
               </label>
               <label className="grid gap-2" htmlFor="draft-reschedule-time">
-                <span className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">New time</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+                  New time
+                </span>
                 <Input
                   id="draft-reschedule-time"
                   type="time"
@@ -367,9 +449,15 @@ export default function DraftLobby() {
               </label>
             </div>
             <p className="text-xs font-semibold text-slate-400">
-              Times are saved in {getLeagueTimezoneLabel(league.draft?.timezone || "UTC")} and stored securely in UTC.
+              Times are saved in{" "}
+              {getLeagueTimezoneLabel(league.draft?.timezone || "UTC")} and
+              stored securely in UTC.
             </p>
-            {rescheduleError ? <p role="alert" className="text-sm font-bold text-red-300">{rescheduleError}</p> : null}
+            {rescheduleError ? (
+              <p role="alert" className="text-sm font-bold text-red-300">
+                {rescheduleError}
+              </p>
+            ) : null}
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <Button
                 type="button"
@@ -385,7 +473,9 @@ export default function DraftLobby() {
                 className="h-11 rounded-2xl bg-primary px-5 text-[10px] font-black uppercase tracking-[0.18em] text-primary-foreground"
                 disabled={rescheduleDraft.isPending}
               >
-                {rescheduleDraft.isPending ? "Saving..." : "Save New Draft Time"}
+                {rescheduleDraft.isPending
+                  ? "Saving..."
+                  : "Save New Draft Time"}
               </Button>
             </div>
           </form>
@@ -393,7 +483,9 @@ export default function DraftLobby() {
       </Dialog>
 
       <div className="space-y-3">
-        <h1 className="text-6xl font-black italic uppercase text-foreground">{league.name}</h1>
+        <h1 className="text-6xl font-black italic uppercase text-foreground">
+          {league.name}
+        </h1>
         <p className="text-sm font-medium text-muted-foreground uppercase tracking-[0.2em]">
           Draft Lobby • {league.members.length}/{league.max_teams} members
         </p>
@@ -401,7 +493,9 @@ export default function DraftLobby() {
 
       <Card className="bg-card/40 border-border/60 rounded-[2.5rem]">
         <CardHeader className="flex flex-col gap-4 px-10 pt-10 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">Draft Countdown</CardTitle>
+          <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">
+            Draft Countdown
+          </CardTitle>
           {canReschedule ? (
             <Button
               type="button"
@@ -423,36 +517,75 @@ export default function DraftLobby() {
             <div className="flex items-center gap-4 px-6 py-4 rounded-2xl bg-white/5 border border-white/10 md:col-span-2">
               <Clock className="w-6 h-6 text-primary" />
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Starts In</p>
-                <p className="whitespace-nowrap text-[clamp(1.35rem,6vw,2rem)] font-black tabular-nums text-foreground">{countdown}</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+                  Starts In
+                </p>
+                <p className="whitespace-nowrap text-[clamp(1.35rem,6vw,2rem)] font-black tabular-nums text-foreground">
+                  {countdown}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-4 px-6 py-4 rounded-2xl bg-white/5 border border-white/10">
               <Users className="w-6 h-6 text-primary" />
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Draft Type</p>
-                <p className="text-2xl font-black text-foreground uppercase">{league.draft?.draft_type || "Snake"}</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+                  Draft Type
+                </p>
+                <p className="text-2xl font-black text-foreground uppercase">
+                  {league.draft?.draft_type || "Snake"}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-4 px-6 py-4 rounded-2xl bg-white/5 border border-white/10">
               <Zap className="w-6 h-6 text-primary" />
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">Pick Timer</p>
-                <p className="text-2xl font-black text-foreground">{league.draft?.pick_timer_seconds || 90}s</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+                  Pick Timer
+                </p>
+                <p className="text-2xl font-black text-foreground">
+                  {league.draft?.pick_timer_seconds || 90}s
+                </p>
               </div>
             </div>
           </div>
           {countdownParts && countdownParts.totalMs > 0 ? (
-            <div data-testid="draft-countdown-units" className="grid grid-cols-4 gap-2 sm:gap-3">
+            <div
+              data-testid="draft-countdown-units"
+              className="grid grid-cols-4 gap-2 sm:gap-3"
+            >
               {[
-                { label: "Days", compactLabel: "DAYS", value: countdownParts.days },
-                { label: "Hours", compactLabel: "HRS", value: countdownParts.hours },
-                { label: "Minutes", compactLabel: "MIN", value: countdownParts.minutes },
-                { label: "Seconds", compactLabel: "SEC", value: countdownParts.seconds },
+                {
+                  label: "Days",
+                  compactLabel: "DAYS",
+                  value: countdownParts.days,
+                },
+                {
+                  label: "Hours",
+                  compactLabel: "HRS",
+                  value: countdownParts.hours,
+                },
+                {
+                  label: "Minutes",
+                  compactLabel: "MIN",
+                  value: countdownParts.minutes,
+                },
+                {
+                  label: "Seconds",
+                  compactLabel: "SEC",
+                  value: countdownParts.seconds,
+                },
               ].map(({ label, compactLabel, value }) => (
-                <div key={label} className="min-w-0 rounded-2xl border border-white/10 bg-black/15 px-2 py-3 text-center sm:p-4">
-                  <p className="whitespace-nowrap text-[clamp(1.55rem,8.5vw,1.875rem)] font-black leading-none tabular-nums text-slate-50">{value}</p>
-                  <p aria-label={label} className="mt-2 whitespace-nowrap text-[8px] font-black uppercase tracking-[0.08em] text-slate-500 sm:text-[9px] sm:tracking-[0.18em]">
+                <div
+                  key={label}
+                  className="min-w-0 rounded-2xl border border-white/10 bg-black/15 px-2 py-3 text-center sm:p-4"
+                >
+                  <p className="whitespace-nowrap text-[clamp(1.55rem,8.5vw,1.875rem)] font-black leading-none tabular-nums text-slate-50">
+                    {value}
+                  </p>
+                  <p
+                    aria-label={label}
+                    className="mt-2 whitespace-nowrap text-[8px] font-black uppercase tracking-[0.08em] text-slate-500 sm:text-[9px] sm:tracking-[0.18em]"
+                  >
                     <span className="sm:hidden">{compactLabel}</span>
                     <span className="hidden sm:inline">{label}</span>
                   </p>
@@ -462,17 +595,37 @@ export default function DraftLobby() {
           ) : null}
 
           <div className="space-y-2 text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground">
-            <p>Draft Order: {league.draft_order?.draft_order_mode === "custom" ? "Commissioner set" : "Random at start"}</p>
-            <p>Timezone: {getLeagueTimezoneLabel(league.draft?.timezone || "UTC")}</p>
-            <p>Draft Time: {formatLeagueDraftDateTime(draftTime, league.draft?.timezone || "UTC")}</p>
+            <p>
+              Draft Order:{" "}
+              {league.draft_order?.draft_order_mode === "custom"
+                ? "Commissioner set"
+                : "Random at start"}
+            </p>
+            <p>
+              Timezone:{" "}
+              {getLeagueTimezoneLabel(league.draft?.timezone || "UTC")}
+            </p>
+            <p>
+              Draft Time:{" "}
+              {formatLeagueDraftDateTime(
+                draftTime,
+                league.draft?.timezone || "UTC",
+              )}
+            </p>
           </div>
-          {rescheduleSuccess ? <p role="status" className="text-sm font-bold text-emerald-300">{rescheduleSuccess}</p> : null}
+          {rescheduleSuccess ? (
+            <p role="status" className="text-sm font-bold text-emerald-300">
+              {rescheduleSuccess}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 
       <Card className="bg-card/40 border-border/60 rounded-[2.5rem]">
         <CardHeader className="px-10 pt-10">
-          <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">Draft Order</CardTitle>
+          <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">
+            Draft Order
+          </CardTitle>
           <p className="text-sm font-medium text-muted-foreground">
             {league.draft_order?.draft_order_mode === "custom"
               ? "The commissioner can build this order as managers join. Empty slots are allowed now, but every slot must be filled before the draft starts."
@@ -489,7 +642,14 @@ export default function DraftLobby() {
                   className="h-auto min-h-16 justify-start rounded-2xl px-5 py-4 text-left"
                   onClick={() => setDraftOrderMode("random")}
                 >
-                  <span><span className="block text-xs font-black uppercase tracking-[0.18em]">Random order</span><span className="mt-1 block text-xs font-medium normal-case">Generated once at draft start.</span></span>
+                  <span>
+                    <span className="block text-xs font-black uppercase tracking-[0.18em]">
+                      Random order
+                    </span>
+                    <span className="mt-1 block text-xs font-medium normal-case">
+                      Generated once at draft start.
+                    </span>
+                  </span>
                 </Button>
                 <Button
                   type="button"
@@ -497,28 +657,53 @@ export default function DraftLobby() {
                   className="h-auto min-h-16 justify-start rounded-2xl px-5 py-4 text-left"
                   onClick={() => setDraftOrderMode("custom")}
                 >
-                  <span><span className="block text-xs font-black uppercase tracking-[0.18em]">Custom order</span><span className="mt-1 block text-xs font-medium normal-case">Assign joined managers as they arrive.</span></span>
+                  <span>
+                    <span className="block text-xs font-black uppercase tracking-[0.18em]">
+                      Custom order
+                    </span>
+                    <span className="mt-1 block text-xs font-medium normal-case">
+                      Assign joined managers as they arrive.
+                    </span>
+                  </span>
                 </Button>
               </div>
 
               {draftOrderMode === "custom" && league.draft_order ? (
                 <div className="grid gap-3 md:grid-cols-2">
-                  {Array.from({ length: league.draft_order.max_teams }, (_, index) => index + 1).map((slot) => {
+                  {Array.from(
+                    { length: league.draft_order.max_teams },
+                    (_, index) => index + 1,
+                  ).map((slot) => {
                     const selectedTeamId = draftOrderBySlot[slot];
                     const usedTeamIds = new Set(
                       Object.entries(draftOrderBySlot)
-                        .filter(([position, teamId]) => Number(position) !== slot && typeof teamId === "number")
+                        .filter(
+                          ([position, teamId]) =>
+                            Number(position) !== slot &&
+                            typeof teamId === "number",
+                        )
                         .map(([, teamId]) => teamId as number),
                     );
                     return (
-                      <label key={slot} className="rounded-2xl border border-white/10 bg-black/15 p-4">
-                        <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Pick {slot}</span>
+                      <label
+                        key={slot}
+                        className="rounded-2xl border border-white/10 bg-black/15 p-4"
+                      >
+                        <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
+                          Pick {slot}
+                        </span>
                         <Select
-                          value={selectedTeamId ? String(selectedTeamId) : `unassigned-${slot}`}
+                          value={
+                            selectedTeamId
+                              ? String(selectedTeamId)
+                              : `unassigned-${slot}`
+                          }
                           onValueChange={(value) => {
                             setDraftOrderBySlot((current) => ({
                               ...current,
-                              [slot]: value.startsWith("unassigned-") ? null : Number(value),
+                              [slot]: value.startsWith("unassigned-")
+                                ? null
+                                : Number(value),
                             }));
                           }}
                         >
@@ -526,11 +711,20 @@ export default function DraftLobby() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value={`unassigned-${slot}`}>Open slot</SelectItem>
+                            <SelectItem value={`unassigned-${slot}`}>
+                              Open slot
+                            </SelectItem>
                             {league.draft_order.entries
-                              .filter((entry) => entry.team_id === selectedTeamId || !usedTeamIds.has(entry.team_id))
+                              .filter(
+                                (entry) =>
+                                  entry.team_id === selectedTeamId ||
+                                  !usedTeamIds.has(entry.team_id),
+                              )
                               .map((entry) => (
-                                <SelectItem key={entry.team_id} value={String(entry.team_id)}>
+                                <SelectItem
+                                  key={entry.team_id}
+                                  value={String(entry.team_id)}
+                                >
                                   {entry.owner_name || entry.team_name}
                                 </SelectItem>
                               ))}
@@ -542,8 +736,16 @@ export default function DraftLobby() {
                 </div>
               ) : null}
 
-              {draftOrderError ? <p role="alert" className="text-sm font-bold text-red-300">{draftOrderError}</p> : null}
-              {draftOrderSuccess ? <p role="status" className="text-sm font-bold text-emerald-300">{draftOrderSuccess}</p> : null}
+              {draftOrderError ? (
+                <p role="alert" className="text-sm font-bold text-red-300">
+                  {draftOrderError}
+                </p>
+              ) : null}
+              {draftOrderSuccess ? (
+                <p role="status" className="text-sm font-bold text-emerald-300">
+                  {draftOrderSuccess}
+                </p>
+              ) : null}
               <Button
                 type="button"
                 className="h-11 rounded-2xl px-5 text-[10px] font-black uppercase tracking-[0.18em]"
@@ -558,8 +760,15 @@ export default function DraftLobby() {
               {league.draft_order?.entries.some((entry) => entry.draft_position)
                 ? league.draft_order.entries
                     .filter((entry) => entry.draft_position)
-                    .sort((left, right) => (left.draft_position || 0) - (right.draft_position || 0))
-                    .map((entry) => `Pick ${entry.draft_position}: ${entry.owner_name || entry.team_name}`)
+                    .sort(
+                      (left, right) =>
+                        (left.draft_position || 0) -
+                        (right.draft_position || 0),
+                    )
+                    .map(
+                      (entry) =>
+                        `Pick ${entry.draft_position}: ${entry.owner_name || entry.team_name}`,
+                    )
                     .join(" · ")
                 : "Draft order has not been assigned yet."}
             </div>
@@ -570,27 +779,51 @@ export default function DraftLobby() {
       {isCommissioner ? (
         <Card className="border-amber-300/20 bg-amber-300/[0.06] rounded-[2.5rem]">
           <CardHeader className="px-10 pt-10">
-            <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">Invite Recovery</CardTitle>
+            <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">
+              Invite Recovery
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 px-10 pb-10">
             {activeInviteCode && activeInviteLink ? (
               <>
                 <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
                   <div className="min-w-0">
-                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Invite Code</p>
-                    <p className="mt-1 break-all font-mono text-lg font-black text-slate-50">{activeInviteCode}</p>
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">
+                      Invite Code
+                    </p>
+                    <p className="mt-1 break-all font-mono text-lg font-black text-slate-50">
+                      {activeInviteCode}
+                    </p>
                   </div>
-                  <Button type="button" variant="outline" className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.16em]" onClick={() => void copyInviteValue("code", activeInviteCode)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.16em]"
+                    onClick={() =>
+                      void copyInviteValue("code", activeInviteCode)
+                    }
+                  >
                     <Copy className="mr-2 h-4 w-4" />
                     {copiedInviteField === "code" ? "Copied" : "Copy Code"}
                   </Button>
                 </div>
                 <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
                   <div className="min-w-0">
-                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Invite Link</p>
-                    <p className="mt-1 break-all font-mono text-xs font-bold text-slate-300">{activeInviteLink}</p>
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">
+                      Invite Link
+                    </p>
+                    <p className="mt-1 break-all font-mono text-xs font-bold text-slate-300">
+                      {activeInviteLink}
+                    </p>
                   </div>
-                  <Button type="button" variant="outline" className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.16em]" onClick={() => void copyInviteValue("link", activeInviteLink)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.16em]"
+                    onClick={() =>
+                      void copyInviteValue("link", activeInviteLink)
+                    }
+                  >
                     <Link2 className="mr-2 h-4 w-4" />
                     {copiedInviteField === "link" ? "Copied" : "Copy Link"}
                   </Button>
@@ -598,21 +831,42 @@ export default function DraftLobby() {
               </>
             ) : (
               <p className="rounded-2xl border border-white/10 bg-black/15 p-4 text-sm font-semibold leading-6 text-slate-300">
-                This league does not have an active invite. Generate a new secure invite when you are ready to add a manager.
+                This league does not have an active invite. Generate a new
+                secure invite when you are ready to add a manager.
               </p>
             )}
             <div className="flex flex-wrap gap-3">
-              <Button type="button" variant="outline" className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.16em]" onClick={() => void handleRotateInvite()} disabled={rotateInvite.isPending}>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.16em]"
+                onClick={() => void handleRotateInvite()}
+                disabled={rotateInvite.isPending}
+              >
                 <RefreshCw className="mr-2 h-4 w-4" />
-                {rotateInvite.isPending ? "Generating..." : activeInviteCode ? "Rotate Invite" : "Generate Invite"}
+                {rotateInvite.isPending
+                  ? "Generating..."
+                  : activeInviteCode
+                    ? "Rotate Invite"
+                    : "Generate Invite"}
               </Button>
               {activeInviteCode ? (
-                <Button type="button" variant="outline" className="h-11 rounded-xl border-red-300/25 text-[10px] font-black uppercase tracking-[0.16em] text-red-200 hover:bg-red-400/10" onClick={() => void handleRevokeInvite()} disabled={revokeInvite.isPending}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 rounded-xl border-red-300/25 text-[10px] font-black uppercase tracking-[0.16em] text-red-200 hover:bg-red-400/10"
+                  onClick={() => void handleRevokeInvite()}
+                  disabled={revokeInvite.isPending}
+                >
                   {revokeInvite.isPending ? "Revoking..." : "Revoke Invite"}
                 </Button>
               ) : null}
             </div>
-            {inviteActionError ? <p className="text-[11px] font-bold text-red-300">{inviteActionError}</p> : null}
+            {inviteActionError ? (
+              <p className="text-[11px] font-bold text-red-300">
+                {inviteActionError}
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
@@ -639,14 +893,16 @@ export default function DraftLobby() {
                 Draft Room
               </p>
               <h2 className="mt-1 text-2xl font-black uppercase italic text-slate-50">
-                {draftIsReadyToCommence ? "Ready to join" : "Locked until draft kickoff"}
+                {draftIsReadyToCommence
+                  ? "Ready to join"
+                  : "Locked until draft kickoff"}
               </h2>
               <p className="mt-2 text-sm font-semibold leading-6 text-slate-400">
                 {!isFull
                   ? `${missingManagers} more ${missingManagers === 1 ? "manager needs" : "managers need"} to join before the room unlocks.`
                   : canEnterDraft
-                      ? "The scheduled time has arrived. League members can enter the draft room."
-                      : "Managers can view this lobby now. The join button unlocks when the scheduled draft time arrives."}
+                    ? "The scheduled time has arrived. League members can enter the draft room."
+                    : "Managers can view this lobby now. The join button unlocks when the scheduled draft time arrives."}
               </p>
             </div>
           </div>
@@ -662,7 +918,9 @@ export default function DraftLobby() {
 
       <Card className="bg-card/40 border-border/60 rounded-[2.5rem]">
         <CardHeader className="px-10 pt-10">
-          <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">Participants</CardTitle>
+          <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">
+            Participants
+          </CardTitle>
         </CardHeader>
         <CardContent className="px-10 pb-10 space-y-4">
           {!isFull && (
@@ -675,8 +933,13 @@ export default function DraftLobby() {
                       Draft locked until league is full
                     </p>
                     <p className="text-sm font-bold leading-6 text-amber-50/90">
-                      {league.members.length}/{league.max_teams} managers have joined. The draft cannot commence
-                      until {missingManagers} more {missingManagers === 1 ? "manager joins" : "managers join"}.
+                      {league.members.length}/{league.max_teams} managers have
+                      joined. The draft cannot commence until {missingManagers}{" "}
+                      more{" "}
+                      {missingManagers === 1
+                        ? "manager joins"
+                        : "managers join"}
+                      .
                     </p>
                   </div>
                 </div>
@@ -684,9 +947,16 @@ export default function DraftLobby() {
             </div>
           )}
           {league.members.map((member) => (
-            <div key={member.id} className="flex items-center justify-between px-6 py-4 rounded-2xl bg-white/5 border border-white/10">
-              <span className="text-sm font-black uppercase tracking-[0.2em] text-foreground">User {member.user_id}</span>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{member.role}</span>
+            <div
+              key={member.id}
+              className="flex items-center justify-between px-6 py-4 rounded-2xl bg-white/5 border border-white/10"
+            >
+              <span className="text-sm font-black uppercase tracking-[0.2em] text-foreground">
+                User {member.user_id}
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                {member.role}
+              </span>
             </div>
           ))}
         </CardContent>
@@ -694,7 +964,8 @@ export default function DraftLobby() {
 
       {(!isFull || !canEnterDraft) && (
         <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground/70">
-          Draft room access stays locked until the league is full and the scheduled draft time has arrived.
+          Draft room access stays locked until the league is full and the
+          scheduled draft time has arrived.
         </p>
       )}
 

@@ -25,7 +25,7 @@ const makePlayer = (
   id: number,
   pos: string,
   fpts: number,
-  options: Partial<Player> = {}
+  options: Partial<Player> = {},
 ): Player => ({
   id,
   name: `${pos} Player ${id}`,
@@ -58,15 +58,41 @@ const makePlayer = (
 describe("buildDraftBoard", () => {
   it("keeps RB/WR/TE/K projections monotonic by pre-draft board rank", () => {
     const players: Player[] = [
-      ...Array.from({ length: 30 }, (_, index) => makePlayer(index + 1, "RB", 220 - index)),
-      makePlayer(1001, "RB", 500, { name: "Late High Projection RB", adp: 300, posRank: 40 }),
-      ...Array.from({ length: 30 }, (_, index) => makePlayer(2000 + index, "WR", 210 - index)),
-      makePlayer(3001, "WR", 480, { name: "Late High Projection WR", adp: 320, posRank: 45 }),
-      ...Array.from({ length: 30 }, (_, index) => makePlayer(4000 + index, "TE", 180 - index)),
-      makePlayer(5001, "TE", 450, { name: "Late High Projection TE", adp: 350, posRank: 45 }),
-      ...Array.from({ length: 20 }, (_, index) => makePlayer(6000 + index, "QB", 260 - index)),
-      ...Array.from({ length: 20 }, (_, index) => makePlayer(7000 + index, "K", 100 - index)),
-      makePlayer(8001, "K", 180, { name: "Late High Projection K", adp: 300, posRank: 25 }),
+      ...Array.from({ length: 30 }, (_, index) =>
+        makePlayer(index + 1, "RB", 220 - index),
+      ),
+      makePlayer(1001, "RB", 500, {
+        name: "Late High Projection RB",
+        adp: 300,
+        posRank: 40,
+      }),
+      ...Array.from({ length: 30 }, (_, index) =>
+        makePlayer(2000 + index, "WR", 210 - index),
+      ),
+      makePlayer(3001, "WR", 480, {
+        name: "Late High Projection WR",
+        adp: 320,
+        posRank: 45,
+      }),
+      ...Array.from({ length: 30 }, (_, index) =>
+        makePlayer(4000 + index, "TE", 180 - index),
+      ),
+      makePlayer(5001, "TE", 450, {
+        name: "Late High Projection TE",
+        adp: 350,
+        posRank: 45,
+      }),
+      ...Array.from({ length: 20 }, (_, index) =>
+        makePlayer(6000 + index, "QB", 260 - index),
+      ),
+      ...Array.from({ length: 20 }, (_, index) =>
+        makePlayer(7000 + index, "K", 100 - index),
+      ),
+      makePlayer(8001, "K", 180, {
+        name: "Late High Projection K",
+        adp: 300,
+        posRank: 25,
+      }),
     ];
 
     const board = buildDraftBoard(players, config);
@@ -77,7 +103,7 @@ describe("buildDraftBoard", () => {
         .sort((left, right) => left.draftRank - right.draftRank);
       for (let index = 1; index < positionPlayers.length; index += 1) {
         expect(positionPlayers[index].projectedPoints).toBeLessThanOrEqual(
-          positionPlayers[index - 1].projectedPoints
+          positionPlayers[index - 1].projectedPoints,
         );
       }
     }
@@ -86,19 +112,39 @@ describe("buildDraftBoard", () => {
   it("keeps explicit source ranks as metadata while rendering dense master ranks", () => {
     const players: Player[] = [
       makePlayer(1, "RB", 100, { name: "Set Rank One", rank: 1, adp: 1 }),
-      makePlayer(2, "QB", 500, { name: "Set Rank One Hundred", rank: 100, adp: 100 }),
-      makePlayer(3, "TE", 450, { name: "Set Rank Two Eighty Seven", rank: 287, adp: 287 }),
+      makePlayer(2, "QB", 500, {
+        name: "Set Rank One Hundred",
+        rank: 100,
+        adp: 100,
+      }),
+      makePlayer(3, "TE", 450, {
+        name: "Set Rank Two Eighty Seven",
+        rank: 287,
+        adp: 287,
+      }),
     ];
 
     const board = buildDraftBoard(players, config);
     const playersByName = new Map(board.map((player) => [player.name, player]));
 
     expect(playersByName.get("Set Rank One")?.sourceBoardRank).toBe(1);
-    expect(playersByName.get("Set Rank One Hundred")?.sourceBoardRank).toBe(100);
-    expect(playersByName.get("Set Rank Two Eighty Seven")?.sourceBoardRank).toBe(287);
+    expect(playersByName.get("Set Rank One Hundred")?.sourceBoardRank).toBe(
+      100,
+    );
+    expect(
+      playersByName.get("Set Rank Two Eighty Seven")?.sourceBoardRank,
+    ).toBe(287);
 
-    expect([...board].sort((left, right) => left.masterDraftRank - right.masterDraftRank).map((player) => player.masterDraftRank)).toEqual([1, 2, 3]);
-    expect([...board].sort((left, right) => left.draftRank - right.draftRank).map((player) => player.draftRank)).toEqual([1, 2, 3]);
+    expect(
+      [...board]
+        .sort((left, right) => left.masterDraftRank - right.masterDraftRank)
+        .map((player) => player.masterDraftRank),
+    ).toEqual([1, 2, 3]);
+    expect(
+      [...board]
+        .sort((left, right) => left.draftRank - right.draftRank)
+        .map((player) => player.draftRank),
+    ).toEqual([1, 2, 3]);
   });
 
   it("removes duplicate player identities from the master draft board", () => {
@@ -122,7 +168,8 @@ describe("buildDraftBoard", () => {
 
     const board = buildDraftBoard(players, config);
     const sellersRows = board.filter(
-      (player) => player.name.toLowerCase().replace(/[^a-z]/g, "") === "lanorrissellers"
+      (player) =>
+        player.name.toLowerCase().replace(/[^a-z]/g, "") === "lanorrissellers",
     );
 
     expect(sellersRows).toHaveLength(1);
@@ -148,17 +195,20 @@ describe("buildDraftBoard", () => {
           adp: 2,
         }),
       ],
-      config
+      config,
     );
 
     expect(board.map((player) => player.name)).toContain("Jeremiah Smith");
-    expect(board.map((player) => player.name)).toContain("Unmapped Quarterback");
+    expect(board.map((player) => player.name)).toContain(
+      "Unmapped Quarterback",
+    );
   });
 
   it("applies position tuning: WR up slightly, QB down slightly, TE down multiple rounds", () => {
     const players: Player[] = Array.from({ length: 60 }, (_, index) => {
       const rank = index + 1;
-      const pos = rank === 10 ? "QB" : rank === 12 ? "WR" : rank === 14 ? "TE" : "RB";
+      const pos =
+        rank === 10 ? "QB" : rank === 12 ? "WR" : rank === 14 ? "TE" : "RB";
       return makePlayer(rank, pos, 300 - rank, {
         name: `Rank ${rank}`,
         rank,
@@ -184,14 +234,14 @@ describe("buildDraftBoard", () => {
           name: `Quarterback ${index + 1}`,
           rank: index + 1,
           adp: index + 1,
-        })
+        }),
       ),
       ...Array.from({ length: 80 }, (_, index) =>
         makePlayer(100 + index, index % 2 === 0 ? "RB" : "WR", 330 - index, {
           name: `Skill Player ${index + 1}`,
           rank: 29 + index,
           adp: 29 + index,
-        })
+        }),
       ),
     ];
 
@@ -203,25 +253,32 @@ describe("buildDraftBoard", () => {
     // 12 starter-QB slots plus a small two-QB backup buffer, never an entire
     // block of QB depth that hides RB/WR choices in rounds 4–6.
     expect(earlyQuarterbacks).toHaveLength(14);
-    expect(
-      earlyQuarterbacks.map((player) => player.projectedPoints)
-    ).toEqual([...earlyQuarterbacks.map((player) => player.projectedPoints)].sort((a, b) => b - a));
+    expect(earlyQuarterbacks.map((player) => player.projectedPoints)).toEqual(
+      [...earlyQuarterbacks.map((player) => player.projectedPoints)].sort(
+        (a, b) => b - a,
+      ),
+    );
   });
 
   it("keeps even elite kickers in the late-round portion of the board", () => {
     const players: Player[] = [
-      makePlayer(1, "K", 210, { name: "Elite Kicker", rank: 1, adp: 1, posRank: 1 }),
+      makePlayer(1, "K", 210, {
+        name: "Elite Kicker",
+        rank: 1,
+        adp: 1,
+        posRank: 1,
+      }),
       ...Array.from({ length: 160 }, (_, index) =>
         makePlayer(index + 2, index % 2 === 0 ? "RB" : "WR", 300 - index, {
           name: `Skill Player ${index + 1}`,
           rank: index + 2,
           adp: index + 2,
-        })
+        }),
       ),
     ];
 
     const eliteKicker = buildDraftBoard(players, config).find(
-      (player) => player.name === "Elite Kicker"
+      (player) => player.name === "Elite Kicker",
     );
 
     expect(eliteKicker?.masterDraftRank).toBeGreaterThanOrEqual(132);
@@ -233,18 +290,23 @@ describe("buildDraftBoard", () => {
       leagueSize: 8,
     };
     const players: Player[] = [
-      makePlayer(1, "K", 210, { name: "Elite Kicker", rank: 1, adp: 1, posRank: 1 }),
+      makePlayer(1, "K", 210, {
+        name: "Elite Kicker",
+        rank: 1,
+        adp: 1,
+        posRank: 1,
+      }),
       ...Array.from({ length: 120 }, (_, index) =>
         makePlayer(index + 2, index % 2 === 0 ? "RB" : "WR", 300 - index, {
           name: `Skill Player ${index + 1}`,
           rank: index + 2,
           adp: index + 2,
-        })
+        }),
       ),
     ];
 
     const eliteKicker = buildDraftBoard(players, eightTeamConfig).find(
-      (player) => player.name === "Elite Kicker"
+      (player) => player.name === "Elite Kicker",
     );
 
     // The universal kicker floor prevents a small league from surfacing a
@@ -257,16 +319,24 @@ describe("buildDraftBoard", () => {
     const players: Player[] = [
       makePlayer(1, "RB", 320, { name: "Elite RB", rank: 1, adp: 1 }),
       makePlayer(2, "QB", 310, { name: "Starting QB", rank: 2, adp: 2 }),
-      makePlayer(3, "QB", 3.3, { name: "Deuce Knight Type Backup", rank: 3, adp: 3 }),
+      makePlayer(3, "QB", 3.3, {
+        name: "Deuce Knight Type Backup",
+        rank: 3,
+        adp: 3,
+      }),
       makePlayer(4, "WR", 290, { name: "Elite WR", rank: 4, adp: 4 }),
       makePlayer(5, "TE", 260, { name: "Elite TE", rank: 5, adp: 5 }),
-      makePlayer(6, "QB", 16.6, { name: "Beau Allen Type Backup", rank: 6, adp: 6 }),
+      makePlayer(6, "QB", 16.6, {
+        name: "Beau Allen Type Backup",
+        rank: 6,
+        adp: 6,
+      }),
       ...Array.from({ length: 18 }, (_, index) =>
         makePlayer(100 + index, index % 2 === 0 ? "RB" : "WR", 240 - index, {
           name: `Draftable Skill ${index + 1}`,
           rank: 20 + index,
           adp: 20 + index,
-        })
+        }),
       ),
     ];
 
@@ -278,11 +348,14 @@ describe("buildDraftBoard", () => {
 
     expect(deuceType?.sourceBoardRank).toBe(3);
     expect(beauType?.sourceBoardRank).toBe(6);
-    expect(lastRanks).toEqual(["Beau Allen Type Backup", "Deuce Knight Type Backup"]);
+    expect(lastRanks).toEqual([
+      "Beau Allen Type Backup",
+      "Deuce Knight Type Backup",
+    ]);
     expect(deuceType?.masterDraftRank).toBe(board.length);
     expect(beauType?.masterDraftRank).toBe(board.length - 1);
     expect(byName.get("Starting QB")?.masterDraftRank).toBeLessThan(
-      beauType?.masterDraftRank ?? 0
+      beauType?.masterDraftRank ?? 0,
     );
   });
 
@@ -292,11 +365,16 @@ describe("buildDraftBoard", () => {
       makePlayer(2, "QB", 325, { name: "Top QB", rank: 2, adp: 2 }),
       ...Array.from({ length: 34 }, (_, index) => {
         const rank = index + 3;
-        return makePlayer(200 + index, index % 2 === 0 ? "RB" : "WR", 260 - index, {
-          name: `Normal Draftable ${rank}`,
-          rank,
-          adp: rank,
-        });
+        return makePlayer(
+          200 + index,
+          index % 2 === 0 ? "RB" : "WR",
+          260 - index,
+          {
+            name: `Normal Draftable ${rank}`,
+            rank,
+            adp: rank,
+          },
+        );
       }),
       makePlayer(999, "QB", 316, {
         name: "LaNorris Sellers Type Starter",
@@ -320,21 +398,43 @@ describe("buildDraftBoard", () => {
     expect(sellersType?.projectedPoints).toBe(316);
     expect(sellersType?.masterDraftRank).toBeLessThanOrEqual(30);
     expect(backup?.masterDraftRank).toBe(board.length);
-    expect(sellersType?.masterDraftRank).toBeLessThan(backup?.masterDraftRank ?? 0);
+    expect(sellersType?.masterDraftRank).toBeLessThan(
+      backup?.masterDraftRank ?? 0,
+    );
   });
 
   it("never ranks a lower-projected quarterback above a higher-projected quarterback", () => {
     const players: Player[] = [
-      makePlayer(1, "QB", 260, { name: "Lower Projection Early QB", rank: 1, adp: 1, posRank: 1 }),
-      makePlayer(2, "QB", 320, { name: "Higher Projection Later QB", rank: 40, adp: 40, posRank: 8 }),
-      makePlayer(3, "QB", 300, { name: "Middle Projection QB", rank: 4, adp: 4, posRank: 2 }),
-      makePlayer(4, "QB", 35, { name: "Backup QB", rank: 2, adp: 2, posRank: 3 }),
+      makePlayer(1, "QB", 260, {
+        name: "Lower Projection Early QB",
+        rank: 1,
+        adp: 1,
+        posRank: 1,
+      }),
+      makePlayer(2, "QB", 320, {
+        name: "Higher Projection Later QB",
+        rank: 40,
+        adp: 40,
+        posRank: 8,
+      }),
+      makePlayer(3, "QB", 300, {
+        name: "Middle Projection QB",
+        rank: 4,
+        adp: 4,
+        posRank: 2,
+      }),
+      makePlayer(4, "QB", 35, {
+        name: "Backup QB",
+        rank: 2,
+        adp: 2,
+        posRank: 3,
+      }),
       ...Array.from({ length: 36 }, (_, index) =>
         makePlayer(100 + index, index % 2 === 0 ? "RB" : "WR", 280 - index, {
           name: `Skill Player ${index + 1}`,
           rank: 5 + index,
           adp: 5 + index,
-        })
+        }),
       ),
     ];
 
@@ -345,13 +445,15 @@ describe("buildDraftBoard", () => {
 
     for (let index = 1; index < quarterbacks.length; index += 1) {
       expect(quarterbacks[index].projectedPoints).toBeLessThanOrEqual(
-        quarterbacks[index - 1].projectedPoints
+        quarterbacks[index - 1].projectedPoints,
       );
     }
 
     const byName = new Map(board.map((player) => [player.name, player]));
-    expect(byName.get("Higher Projection Later QB")?.masterDraftRank).toBeLessThan(
-      byName.get("Lower Projection Early QB")?.masterDraftRank ?? 0
+    expect(
+      byName.get("Higher Projection Later QB")?.masterDraftRank,
+    ).toBeLessThan(
+      byName.get("Lower Projection Early QB")?.masterDraftRank ?? 0,
     );
     expect(byName.get("Backup QB")?.masterDraftRank).toBe(board.length);
   });
@@ -366,7 +468,7 @@ describe("buildDraftBoard", () => {
           sheetProjectedSeasonPoints: 347.4,
         }),
       ],
-      config
+      config,
     );
 
     expect(board[0].draftRank).toBe(1);
@@ -383,10 +485,17 @@ describe("buildDraftBoard", () => {
           adp: 30,
           hasWeeklyProjection: true,
           sheetProjectedSeasonPoints: 265,
-          sheetProjectionStats: { fpts: 265, rush_yards: 1300, rush_tds: 12, receptions: 28, rec_yards: 230, rec_tds: 2 },
+          sheetProjectionStats: {
+            fpts: 265,
+            rush_yards: 1300,
+            rush_tds: 12,
+            receptions: 28,
+            rec_yards: 230,
+            rec_tds: 2,
+          },
         }),
       ],
-      config
+      config,
     );
 
     expect(board[0].projectedPoints).toBe(265);
@@ -394,8 +503,14 @@ describe("buildDraftBoard", () => {
 
   it("does not rank a weekly snapshot when no approved season projection exists", () => {
     const board = buildDraftBoard(
-      [makePlayer(1, "RB", 12.5, { sheetProjectedSeasonPoints: undefined, sheetProjectionStats: undefined, hasWeeklyProjection: true })],
-      config
+      [
+        makePlayer(1, "RB", 12.5, {
+          sheetProjectedSeasonPoints: undefined,
+          sheetProjectionStats: undefined,
+          hasWeeklyProjection: true,
+        }),
+      ],
+      config,
     );
 
     expect(board[0].projectedPoints).toBe(0);
@@ -423,10 +538,10 @@ describe("buildDraftBoard", () => {
             name: `Control Player ${index + 1}`,
             rank: 30 + index,
             adp: 30 + index,
-          })
+          }),
         ),
       ],
-      config
+      config,
     );
 
     const byName = new Map(board.map((player) => [player.name, player]));
@@ -435,18 +550,27 @@ describe("buildDraftBoard", () => {
 
     expect(highRated?.cfb27Overall).toBe(99);
     expect(lowerRated?.cfb27Overall).toBe(86);
-    expect(highRated?.finalDraftScore ?? 0).toBeGreaterThan(lowerRated?.finalDraftScore ?? 0);
-    expect(highRated?.masterDraftRank ?? 0).toBeLessThan(lowerRated?.masterDraftRank ?? 0);
+    expect(highRated?.finalDraftScore ?? 0).toBeGreaterThan(
+      lowerRated?.finalDraftScore ?? 0,
+    );
+    expect(highRated?.masterDraftRank ?? 0).toBeLessThan(
+      lowerRated?.masterDraftRank ?? 0,
+    );
   });
 
   it("keeps high-rated CFB27 players that arrive beyond the old first 500 fetched rows", () => {
     const players: Player[] = [
       ...Array.from({ length: 520 }, (_, index) =>
-        makePlayer(index + 1, index % 2 === 0 ? "RB" : "WR", 250 - index * 0.1, {
-          name: `Paged Player ${index + 1}`,
-          rank: index + 1,
-          adp: index + 1,
-        })
+        makePlayer(
+          index + 1,
+          index % 2 === 0 ? "RB" : "WR",
+          250 - index * 0.1,
+          {
+            name: `Paged Player ${index + 1}`,
+            rank: index + 1,
+            adp: index + 1,
+          },
+        ),
       ),
       makePlayer(9001, "WR", 285, {
         name: "Jeremiah Smith",
@@ -461,7 +585,9 @@ describe("buildDraftBoard", () => {
     const board = buildDraftBoard(players, config);
     const jeremiah = board.find((player) => player.name === "Jeremiah Smith");
 
-    expect(players.findIndex((player) => player.name === "Jeremiah Smith")).toBeGreaterThan(500);
+    expect(
+      players.findIndex((player) => player.name === "Jeremiah Smith"),
+    ).toBeGreaterThan(500);
     expect(jeremiah).toBeDefined();
     expect(jeremiah?.cfb27Overall).toBe(99);
     expect(jeremiah?.projectedPoints).toBe(285);

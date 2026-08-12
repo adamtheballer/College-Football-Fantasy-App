@@ -17,9 +17,14 @@ type PasswordChangeFormProps = {
   onSuccess: () => void;
 };
 
-const credentialFailureMessage = "Unable to reset password with the provided credentials.";
+const credentialFailureMessage =
+  "Unable to reset password with the provided credentials.";
 
-export function PasswordChangeForm({ mode, onCancel, onSuccess }: PasswordChangeFormProps) {
+export function PasswordChangeForm({
+  mode,
+  onCancel,
+  onSuccess,
+}: PasswordChangeFormProps) {
   const { changePassword, resetPasswordWithCurrentPassword } = useAuth();
   const [email, setEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -30,7 +35,8 @@ export function PasswordChangeForm({ mode, onCancel, onSuccess }: PasswordChange
   const [error, setError] = useState<string | null>(null);
 
   const validationError = useMemo(
-    () => validatePasswordChange(currentPassword, newPassword, confirmNewPassword),
+    () =>
+      validatePasswordChange(currentPassword, newPassword, confirmNewPassword),
     [confirmNewPassword, currentPassword, newPassword],
   );
   const canSubmit =
@@ -55,7 +61,12 @@ export function PasswordChangeForm({ mode, onCancel, onSuccess }: PasswordChange
       if (mode === "authenticated") {
         await changePassword(currentPassword, newPassword, confirmNewPassword);
       } else {
-        await resetPasswordWithCurrentPassword(email, currentPassword, newPassword, confirmNewPassword);
+        await resetPasswordWithCurrentPassword(
+          email,
+          currentPassword,
+          newPassword,
+          confirmNewPassword,
+        );
       }
       clearPasswords();
       onSuccess();
@@ -63,10 +74,18 @@ export function PasswordChangeForm({ mode, onCancel, onSuccess }: PasswordChange
       clearPasswords();
       if (requestError instanceof ApiError && requestError.status === 400) {
         setError(credentialFailureMessage);
-      } else if (requestError instanceof ApiError && requestError.status === 422) {
+      } else if (
+        requestError instanceof ApiError &&
+        requestError.status === 422
+      ) {
         setError(requestError.message);
-      } else if (requestError instanceof ApiError && requestError.status === 429) {
-        setError("Too many password reset attempts. Wait a few minutes and try again.");
+      } else if (
+        requestError instanceof ApiError &&
+        requestError.status === 429
+      ) {
+        setError(
+          "Too many password reset attempts. Wait a few minutes and try again.",
+        );
       } else {
         setError("Unable to reset password right now. Try again later.");
       }
@@ -82,9 +101,14 @@ export function PasswordChangeForm({ mode, onCancel, onSuccess }: PasswordChange
     <form onSubmit={handleSubmit} className="space-y-5">
       {mode === "reset" ? (
         <label className="grid gap-2">
-          <span className="text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Email address</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">
+            Email address
+          </span>
           <span className="group relative block">
-            <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" aria-hidden="true" />
+            <Mail
+              className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted"
+              aria-hidden="true"
+            />
             <Input
               type="email"
               autoComplete="email"
@@ -98,19 +122,36 @@ export function PasswordChangeForm({ mode, onCancel, onSuccess }: PasswordChange
       ) : null}
 
       {[
-        ["Current password", currentPassword, setCurrentPassword, "current-password"],
+        [
+          "Current password",
+          currentPassword,
+          setCurrentPassword,
+          "current-password",
+        ],
         ["New password", newPassword, setNewPassword, "new-password"],
-        ["Confirm new password", confirmNewPassword, setConfirmNewPassword, "new-password"],
+        [
+          "Confirm new password",
+          confirmNewPassword,
+          setConfirmNewPassword,
+          "new-password",
+        ],
       ].map(([label, value, setValue, autoComplete]) => (
         <label key={label as string} className="grid gap-2">
-          <span className="text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">{label as string}</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">
+            {label as string}
+          </span>
           <span className="group relative block">
-            <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" aria-hidden="true" />
+            <Lock
+              className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted"
+              aria-hidden="true"
+            />
             <Input
               type={passwordType}
               autoComplete={autoComplete as string}
               value={value as string}
-              onChange={(event) => (setValue as (nextValue: string) => void)(event.target.value)}
+              onChange={(event) =>
+                (setValue as (nextValue: string) => void)(event.target.value)
+              }
               className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-11 pr-12"
               required
             />
@@ -120,14 +161,23 @@ export function PasswordChangeForm({ mode, onCancel, onSuccess }: PasswordChange
               onClick={() => setShowPasswords((visible) => !visible)}
               className="absolute right-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-cfb-text-muted hover:bg-white/10 hover:text-cfb-text-primary"
             >
-              {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showPasswords ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
             </button>
           </span>
         </label>
       ))}
 
-      <div className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface/55 p-4" aria-live="polite">
-        <p className="text-xs font-semibold text-cfb-text-secondary">{PASSWORD_POLICY_MESSAGE}</p>
+      <div
+        className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface/55 p-4"
+        aria-live="polite"
+      >
+        <p className="text-xs font-semibold text-cfb-text-secondary">
+          {PASSWORD_POLICY_MESSAGE}
+        </p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {policyChecks.map((check) => (
             <span
@@ -138,16 +188,35 @@ export function PasswordChangeForm({ mode, onCancel, onSuccess }: PasswordChange
             </span>
           ))}
         </div>
-        {newPassword && confirmNewPassword && newPassword !== confirmNewPassword ? (
-          <p className="mt-3 text-xs font-bold text-cfb-danger">New passwords do not match.</p>
+        {newPassword &&
+        confirmNewPassword &&
+        newPassword !== confirmNewPassword ? (
+          <p className="mt-3 text-xs font-bold text-cfb-danger">
+            New passwords do not match.
+          </p>
         ) : null}
       </div>
 
-      {error ? <p role="alert" className="rounded-2xl border border-cfb-danger/35 bg-cfb-danger/[0.14] px-4 py-3 text-sm font-bold text-red-100">{error}</p> : null}
+      {error ? (
+        <p
+          role="alert"
+          className="rounded-2xl border border-cfb-danger/35 bg-cfb-danger/[0.14] px-4 py-3 text-sm font-bold text-red-100"
+        >
+          {error}
+        </p>
+      ) : null}
 
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        {onCancel ? <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button> : null}
-        <Button type="submit" disabled={!canSubmit} className="bg-gradient-to-r from-cfb-cyan to-cfb-brand text-slate-950">
+        {onCancel ? (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+        ) : null}
+        <Button
+          type="submit"
+          disabled={!canSubmit}
+          className="bg-gradient-to-r from-cfb-cyan to-cfb-brand text-slate-950"
+        >
           {isSubmitting ? "Resetting password..." : "Reset Password"}
         </Button>
       </div>

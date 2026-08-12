@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRightLeft, Check, ChevronRight, Search, ShieldAlert, Users } from "lucide-react";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
+import {
+  ArrowLeft,
+  ArrowRightLeft,
+  Check,
+  ChevronRight,
+  Search,
+  ShieldAlert,
+  Users,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -148,15 +161,17 @@ export const toTradeRows = (entries: RosterEntry[] | undefined): TradeRow[] => {
       const player = entry.player;
       const position = player?.position?.toUpperCase() ?? "";
       if (!player || !OFFENSE_POSITIONS.has(position)) return [];
-      return [{
-        rosterEntryId: entry.id,
-        playerId: player.id,
-        teamId: entry.team_id,
-        name: player.name,
-        position,
-        school: player.school ?? "",
-        slot: (entry.slot || "BENCH").toUpperCase(),
-      }];
+      return [
+        {
+          rosterEntryId: entry.id,
+          playerId: player.id,
+          teamId: entry.team_id,
+          name: player.name,
+          position,
+          school: player.school ?? "",
+          slot: (entry.slot || "BENCH").toUpperCase(),
+        },
+      ];
     })
     .sort((a, b) => {
       const starterA = a.slot !== "BENCH" ? 0 : 1;
@@ -166,11 +181,17 @@ export const toTradeRows = (entries: RosterEntry[] | undefined): TradeRow[] => {
     });
 };
 
-const toTradeRowsFromLeagueRoster = (entries: LeagueRosterPlayer[] | undefined): TradeRow[] => {
+const toTradeRowsFromLeagueRoster = (
+  entries: LeagueRosterPlayer[] | undefined,
+): TradeRow[] => {
   if (!entries?.length) return [];
   return entries
     .filter((entry) => {
-      const position = (entry.player_position ?? entry.position ?? "").toUpperCase();
+      const position = (
+        entry.player_position ??
+        entry.position ??
+        ""
+      ).toUpperCase();
       return (
         entry.player_id !== null &&
         entry.player_id !== undefined &&
@@ -187,7 +208,8 @@ const toTradeRowsFromLeagueRoster = (entries: LeagueRosterPlayer[] | undefined):
       position: (entry.player_position ?? entry.position ?? "").toUpperCase(),
       school: entry.player_school ?? entry.school ?? "",
       slot: (entry.roster_slot ?? entry.slot ?? "BENCH").toUpperCase(),
-      projectedPoints: entry.projected_points ?? entry.weekly_projected_fantasy_points ?? 0,
+      projectedPoints:
+        entry.projected_points ?? entry.weekly_projected_fantasy_points ?? 0,
     }))
     .filter((entry) => entry.teamId > 0)
     .sort((a, b) => {
@@ -198,10 +220,13 @@ const toTradeRowsFromLeagueRoster = (entries: LeagueRosterPlayer[] | undefined):
     });
 };
 
-const mergeProjectedValues = (rows: TradeRow[], fallbackRows: TradeRow[]): TradeRow[] => {
+const mergeProjectedValues = (
+  rows: TradeRow[],
+  fallbackRows: TradeRow[],
+): TradeRow[] => {
   if (!rows.length || !fallbackRows.length) return rows;
   const fallbackByTeamPlayer = new Map(
-    fallbackRows.map((row) => [`${row.teamId}:${row.playerId}`, row])
+    fallbackRows.map((row) => [`${row.teamId}:${row.playerId}`, row]),
   );
   return rows.map((row) => {
     const fallback = fallbackByTeamPlayer.get(`${row.teamId}:${row.playerId}`);
@@ -219,7 +244,7 @@ export const tradeSelectionSignature = (
   leagueId: number | undefined,
   opponentTeamId: number | null,
   giveIds: number[],
-  receiveIds: number[]
+  receiveIds: number[],
 ) =>
   JSON.stringify({
     leagueId: leagueId ?? null,
@@ -232,15 +257,16 @@ export const canSendTradeOffer = (
   analysis: TradeAnalyzeResult | null,
   analysisSignature: string | null,
   currentSignature: string,
-  isSending: boolean
-) => Boolean(
-  analysis &&
+  isSending: boolean,
+) =>
+  Boolean(
+    analysis &&
     analysis.receive_value !== null &&
     analysis.give_value !== null &&
     analysis.delta !== null &&
     analysisSignature === currentSignature &&
     !isSending,
-);
+  );
 
 const formatTradeStatus = (status: string) =>
   status
@@ -248,7 +274,9 @@ const formatTradeStatus = (status: string) =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 
-const toTradeRosterSlots = (slots: Record<string, number> | undefined): Record<string, number> => {
+const toTradeRosterSlots = (
+  slots: Record<string, number> | undefined,
+): Record<string, number> => {
   if (!slots) {
     return { QB: 1, RB: 2, WR: 2, TE: 1, K: 1, BE: 4, IR: 1 };
   }
@@ -299,7 +327,12 @@ const TradeList = ({
                 {subtitle}
               </p>
             </div>
-            <span className={cn("w-fit shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em]", accentClasses)}>
+            <span
+              className={cn(
+                "w-fit shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em]",
+                accentClasses,
+              )}
+            >
               {isGiving ? "You send" : "You receive"}
             </span>
           </div>
@@ -325,7 +358,12 @@ const TradeList = ({
               {subtitle}
             </p>
           </div>
-          <span className={cn("w-fit shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em]", accentClasses)}>
+          <span
+            className={cn(
+              "w-fit shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em]",
+              accentClasses,
+            )}
+          >
             {selectedIds.size} chosen
           </span>
         </div>
@@ -343,7 +381,7 @@ const TradeList = ({
                 "group w-full rounded-2xl border px-4 py-3 text-left transition-all duration-200",
                 selected
                   ? selectionClasses
-                  : "border-white/10 bg-white/[0.03] hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.055]"
+                  : "border-white/10 bg-white/[0.03] hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.055]",
               )}
             >
               <div className="flex items-center justify-between gap-4">
@@ -357,14 +395,19 @@ const TradeList = ({
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {selected ? (
-                    <span className={cn("grid h-7 w-7 place-items-center rounded-full border", accentClasses)}>
+                    <span
+                      className={cn(
+                        "grid h-7 w-7 place-items-center rounded-full border",
+                        accentClasses,
+                      )}
+                    >
                       <Check className="h-3.5 w-3.5" />
                     </span>
                   ) : null}
                   <span
                     className={cn(
                       "rounded-xl border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]",
-                      POS_STYLES[row.position] ?? POS_STYLES.QB
+                      POS_STYLES[row.position] ?? POS_STYLES.QB,
                     )}
                   >
                     {row.position}
@@ -380,7 +423,11 @@ const TradeList = ({
 };
 
 export default function Trade() {
-  const { leagueId: leagueIdParam, playerId: playerIdParam, tradeId: tradeIdParam } = useParams();
+  const {
+    leagueId: leagueIdParam,
+    playerId: playerIdParam,
+    tradeId: tradeIdParam,
+  } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -389,9 +436,13 @@ export default function Trade() {
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
 
   const parsedLeagueId =
-    leagueIdParam && /^\d+$/.test(leagueIdParam) ? Number(leagueIdParam) : undefined;
+    leagueIdParam && /^\d+$/.test(leagueIdParam)
+      ? Number(leagueIdParam)
+      : undefined;
   const requestedTradeId =
-    tradeIdParam && /^\d+$/.test(tradeIdParam) ? Number(tradeIdParam) : undefined;
+    tradeIdParam && /^\d+$/.test(tradeIdParam)
+      ? Number(tradeIdParam)
+      : undefined;
   const isTradeOfferRoute = tradeIdParam !== undefined;
   const fallbackLeagueId = activeLeagueId ?? leagues[0]?.id;
   const leagueId = parsedLeagueId ?? fallbackLeagueId;
@@ -399,20 +450,24 @@ export default function Trade() {
   const { data: league } = useLeagueDetail(leagueId, Boolean(leagueId));
   const { data: workspace } = useLeagueWorkspace(leagueId, Boolean(leagueId));
   const { data: teamsPayload } = useLeagueTeams(leagueId, Boolean(leagueId));
-  const { data: settingsView } = useLeagueSettingsTab(leagueId, Boolean(leagueId));
+  const { data: settingsView } = useLeagueSettingsTab(
+    leagueId,
+    Boolean(leagueId),
+  );
 
   const teams = teamsPayload?.data ?? [];
   const ownedTeamId =
     workspace?.owned_team?.id ??
-    teams.find((team) => team.owner_user_id && team.owner_user_id === user?.id)?.id ??
+    teams.find((team) => team.owner_user_id && team.owner_user_id === user?.id)
+      ?.id ??
     null;
   const opponentTeams = useMemo(
     () => teams.filter((team) => team.id !== ownedTeamId),
-    [ownedTeamId, teams]
+    [ownedTeamId, teams],
   );
   const allLeagueRosterRows = useMemo(
     () => toTradeRowsFromLeagueRoster(settingsView?.rosters),
-    [settingsView?.rosters]
+    [settingsView?.rosters],
   );
   const fallbackRowsByTeam = useMemo(() => {
     const rowsByTeam = new Map<number, TradeRow[]>();
@@ -427,21 +482,29 @@ export default function Trade() {
   const [receiveIds, setReceiveIds] = useState<number[]>([]);
   const [playerSearch, setPlayerSearch] = useState("");
   const [analysis, setAnalysis] = useState<TradeAnalyzeResult | null>(null);
-  const [analysisSignature, setAnalysisSignature] = useState<string | null>(null);
+  const [analysisSignature, setAnalysisSignature] = useState<string | null>(
+    null,
+  );
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isAnalysisReviewOpen, setIsAnalysisReviewOpen] = useState(false);
   const [tradeMessage, setTradeMessage] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [counteringOfferId, setCounteringOfferId] = useState<number | null>(null);
-  const pendingTradeRequest = useRef<{ signature: string; id: string } | null>(null);
+  const [counteringOfferId, setCounteringOfferId] = useState<number | null>(
+    null,
+  );
+  const pendingTradeRequest = useRef<{ signature: string; id: string } | null>(
+    null,
+  );
   const targetTeamIdParam = searchParams.get("teamId");
   const targetTeamId =
     targetTeamIdParam && /^\d+$/.test(targetTeamIdParam)
       ? Number(targetTeamIdParam)
       : null;
-  const focusedOfferReturnPath = resolveTradeOfferReturnPath(searchParams.get("returnTo"));
+  const focusedOfferReturnPath = resolveTradeOfferReturnPath(
+    searchParams.get("returnTo"),
+  );
 
   useEffect(() => {
     if (!leagueId) return;
@@ -456,7 +519,8 @@ export default function Trade() {
       return;
     }
     setOpponentTeamId((current) => {
-      if (current && opponentTeams.some((team) => team.id === current)) return current;
+      if (current && opponentTeams.some((team) => team.id === current))
+        return current;
       return opponentTeams[0].id;
     });
   }, [opponentTeams]);
@@ -479,11 +543,16 @@ export default function Trade() {
     isError: theirRosterError,
   } = useTeamRoster(opponentTeamId ?? undefined, Boolean(opponentTeamId));
 
-  const myRows = useMemo(() => toTradeRows(myRosterPayload?.data), [myRosterPayload?.data]);
+  const myRows = useMemo(
+    () => toTradeRows(myRosterPayload?.data),
+    [myRosterPayload?.data],
+  );
   const theirRows = useMemo(() => {
     const directRows = toTradeRows(theirRosterPayload?.data);
     const fallbackRows = fallbackRowsByTeam.get(opponentTeamId ?? -1) ?? [];
-    return directRows.length ? mergeProjectedValues(directRows, fallbackRows) : fallbackRows;
+    return directRows.length
+      ? mergeProjectedValues(directRows, fallbackRows)
+      : fallbackRows;
   }, [fallbackRowsByTeam, opponentTeamId, theirRosterPayload?.data]);
   const resolvedMyRows = useMemo(() => {
     const fallbackRows = fallbackRowsByTeam.get(ownedTeamId ?? -1) ?? [];
@@ -493,32 +562,42 @@ export default function Trade() {
   const giveSet = useMemo(() => new Set(giveIds), [giveIds]);
   const receiveSet = useMemo(() => new Set(receiveIds), [receiveIds]);
   const currentTradeSignature = useMemo(
-    () => tradeSelectionSignature(leagueId, opponentTeamId, giveIds, receiveIds),
-    [giveIds, leagueId, opponentTeamId, receiveIds]
+    () =>
+      tradeSelectionSignature(leagueId, opponentTeamId, giveIds, receiveIds),
+    [giveIds, leagueId, opponentTeamId, receiveIds],
   );
   const tradeSubmitSignature = useMemo(
-    () => JSON.stringify({
-      selection: currentTradeSignature,
-      counterTradeId: counteringOfferId,
-      message: tradeMessage.trim(),
-    }),
-    [counteringOfferId, currentTradeSignature, tradeMessage]
+    () =>
+      JSON.stringify({
+        selection: currentTradeSignature,
+        counterTradeId: counteringOfferId,
+        message: tradeMessage.trim(),
+      }),
+    [counteringOfferId, currentTradeSignature, tradeMessage],
   );
   const selectedGiveRows = useMemo(
     () => resolvedMyRows.filter((row) => giveSet.has(row.playerId)),
-    [giveSet, resolvedMyRows]
+    [giveSet, resolvedMyRows],
   );
   const selectedReceiveRows = useMemo(
     () => theirRows.filter((row) => receiveSet.has(row.playerId)),
-    [receiveSet, theirRows]
+    [receiveSet, theirRows],
   );
   const liveGiveValue = useMemo(
-    () => selectedGiveRows.reduce((sum, row) => sum + (row.projectedPoints ?? 0), 0),
-    [selectedGiveRows]
+    () =>
+      selectedGiveRows.reduce(
+        (sum, row) => sum + (row.projectedPoints ?? 0),
+        0,
+      ),
+    [selectedGiveRows],
   );
   const liveReceiveValue = useMemo(
-    () => selectedReceiveRows.reduce((sum, row) => sum + (row.projectedPoints ?? 0), 0),
-    [selectedReceiveRows]
+    () =>
+      selectedReceiveRows.reduce(
+        (sum, row) => sum + (row.projectedPoints ?? 0),
+        0,
+      ),
+    [selectedReceiveRows],
   );
   const liveDelta = liveReceiveValue - liveGiveValue;
   const partnerPlayerResults = useMemo(() => {
@@ -528,17 +607,21 @@ export default function Trade() {
       .filter((row) => row.teamId !== ownedTeamId)
       .filter((row) =>
         [row.name, row.school, row.position, row.teamName ?? ""].some((value) =>
-          value.toLowerCase().includes(query)
-        )
+          value.toLowerCase().includes(query),
+        ),
       )
       .slice(0, 8);
   }, [allLeagueRosterRows, ownedTeamId, playerSearch]);
 
   useEffect(() => {
     const parsedPlayerId =
-      playerIdParam && /^\d+$/.test(playerIdParam) ? Number(playerIdParam) : null;
+      playerIdParam && /^\d+$/.test(playerIdParam)
+        ? Number(playerIdParam)
+        : null;
     if (!parsedPlayerId) return;
-    const leagueRosterTarget = allLeagueRosterRows.find((row) => row.playerId === parsedPlayerId);
+    const leagueRosterTarget = allLeagueRosterRows.find(
+      (row) => row.playerId === parsedPlayerId,
+    );
     if (
       leagueRosterTarget &&
       leagueRosterTarget.teamId !== ownedTeamId &&
@@ -546,28 +629,48 @@ export default function Trade() {
     ) {
       setOpponentTeamId(leagueRosterTarget.teamId);
       setReceiveIds((current) =>
-        current.includes(parsedPlayerId) ? current : [...current, parsedPlayerId]
+        current.includes(parsedPlayerId)
+          ? current
+          : [...current, parsedPlayerId],
       );
       return;
     }
-    if (targetTeamId && targetTeamId === ownedTeamId && resolvedMyRows.some((row) => row.playerId === parsedPlayerId)) {
+    if (
+      targetTeamId &&
+      targetTeamId === ownedTeamId &&
+      resolvedMyRows.some((row) => row.playerId === parsedPlayerId)
+    ) {
       setGiveIds((current) =>
-        current.includes(parsedPlayerId) ? current : [...current, parsedPlayerId]
+        current.includes(parsedPlayerId)
+          ? current
+          : [...current, parsedPlayerId],
       );
       return;
     }
     if (theirRows.some((row) => row.playerId === parsedPlayerId)) {
       setReceiveIds((current) =>
-        current.includes(parsedPlayerId) ? current : [...current, parsedPlayerId]
+        current.includes(parsedPlayerId)
+          ? current
+          : [...current, parsedPlayerId],
       );
       return;
     }
     if (resolvedMyRows.some((row) => row.playerId === parsedPlayerId)) {
       setGiveIds((current) =>
-        current.includes(parsedPlayerId) ? current : [...current, parsedPlayerId]
+        current.includes(parsedPlayerId)
+          ? current
+          : [...current, parsedPlayerId],
       );
     }
-  }, [allLeagueRosterRows, opponentTeams, resolvedMyRows, ownedTeamId, playerIdParam, targetTeamId, theirRows]);
+  }, [
+    allLeagueRosterRows,
+    opponentTeams,
+    resolvedMyRows,
+    ownedTeamId,
+    playerIdParam,
+    targetTeamId,
+    theirRows,
+  ]);
 
   useEffect(() => {
     setAnalysis(null);
@@ -580,13 +683,15 @@ export default function Trade() {
   const offersQuery = useQuery({
     queryKey: ["league", leagueId, "trade-offers"],
     enabled: Boolean(leagueId),
-    queryFn: () => apiGet<TradeOfferListResponse>(`/leagues/${leagueId}/trades`),
+    queryFn: () =>
+      apiGet<TradeOfferListResponse>(`/leagues/${leagueId}/trades`),
   });
 
   const focusedOfferQuery = useQuery({
     queryKey: ["league", leagueId, "trade-offer", requestedTradeId],
     enabled: Boolean(isTradeOfferRoute && leagueId && requestedTradeId),
-    queryFn: () => apiGet<TradeOffer>(`/leagues/${leagueId}/trades/${requestedTradeId}`),
+    queryFn: () =>
+      apiGet<TradeOffer>(`/leagues/${leagueId}/trades/${requestedTradeId}`),
   });
 
   const focusedOffer = isTradeOfferPayload(focusedOfferQuery.data)
@@ -597,23 +702,40 @@ export default function Trade() {
     !requestedTradeId ||
     Boolean(focusedOfferQuery.data && !focusedOffer);
 
-  const closeFocusedOffer = () => navigate(focusedOfferReturnPath, { replace: true });
+  const closeFocusedOffer = () =>
+    navigate(focusedOfferReturnPath, { replace: true });
 
   const createOfferMutation = useMutation({
-    mutationFn: ({ counterTradeId, clientRequestId }: { counterTradeId: number | null; clientRequestId: string }) =>
+    mutationFn: ({
+      counterTradeId,
+      clientRequestId,
+    }: {
+      counterTradeId: number | null;
+      clientRequestId: string;
+    }) =>
       apiPost<TradeOffer>(
-        counterTradeId ? `/leagues/${leagueId}/trades/${counterTradeId}/counter` : `/leagues/${leagueId}/trades`,
+        counterTradeId
+          ? `/leagues/${leagueId}/trades/${counterTradeId}/counter`
+          : `/leagues/${leagueId}/trades`,
         {
           proposing_team_id: ownedTeamId,
           receiving_team_id: opponentTeamId,
-          give_items: selectedGiveRows.map((row) => ({ team_id: row.teamId, player_id: row.playerId })),
-          receive_items: selectedReceiveRows.map((row) => ({ team_id: row.teamId, player_id: row.playerId })),
+          give_items: selectedGiveRows.map((row) => ({
+            team_id: row.teamId,
+            player_id: row.playerId,
+          })),
+          receive_items: selectedReceiveRows.map((row) => ({
+            team_id: row.teamId,
+            player_id: row.playerId,
+          })),
           message: tradeMessage.trim() || null,
           client_request_id: clientRequestId,
-        }
+        },
       ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "trade-offers"] });
+      queryClient.invalidateQueries({
+        queryKey: ["league", leagueId, "trade-offers"],
+      });
       queryClient.invalidateQueries({ queryKey: ["notifications", "alerts"] });
       setGiveIds([]);
       setReceiveIds([]);
@@ -623,19 +745,39 @@ export default function Trade() {
       setIsAnalysisReviewOpen(false);
       setSendError(null);
     },
-    onError: (error) => setSendError(formatTradeError(error, "Unable to send trade offer.")),
+    onError: (error) =>
+      setSendError(formatTradeError(error, "Unable to send trade offer.")),
   });
 
   const tradeActionMutation = useMutation({
-    mutationFn: ({ tradeId, action }: { tradeId: number; action: "accept" | "reject" | "cancel" | "commissioner/approve" | "commissioner/veto" }) =>
-      apiPost<TradeOffer>(`/leagues/${leagueId}/trades/${tradeId}/${action}`, {}),
+    mutationFn: ({
+      tradeId,
+      action,
+    }: {
+      tradeId: number;
+      action:
+        | "accept"
+        | "reject"
+        | "cancel"
+        | "commissioner/approve"
+        | "commissioner/veto";
+    }) =>
+      apiPost<TradeOffer>(
+        `/leagues/${leagueId}/trades/${tradeId}/${action}`,
+        {},
+      ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "trade-offers"] });
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
+      queryClient.invalidateQueries({
+        queryKey: ["league", leagueId, "trade-offers"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["league", leagueId, "workspace"],
+      });
       queryClient.invalidateQueries({ queryKey: ["notifications", "alerts"] });
       setActionError(null);
     },
-    onError: (error) => setActionError(formatTradeError(error, "Unable to update trade offer.")),
+    onError: (error) =>
+      setActionError(formatTradeError(error, "Unable to update trade offer.")),
   });
 
   const opponentTeam = teams.find((team) => team.id === opponentTeamId) ?? null;
@@ -649,7 +791,9 @@ export default function Trade() {
 
   const selectTradeTargetPlayer = (row: TradeRow) => {
     setOpponentTeamId(row.teamId);
-    setReceiveIds((current) => (current.includes(row.playerId) ? current : [...current, row.playerId]));
+    setReceiveIds((current) =>
+      current.includes(row.playerId) ? current : [...current, row.playerId],
+    );
     setPlayerSearch("");
   };
 
@@ -657,7 +801,7 @@ export default function Trade() {
     setGiveIds((current) =>
       current.includes(playerId)
         ? current.filter((id) => id !== playerId)
-        : [...current, playerId]
+        : [...current, playerId],
     );
   };
 
@@ -665,7 +809,7 @@ export default function Trade() {
     setReceiveIds((current) =>
       current.includes(playerId)
         ? current.filter((id) => id !== playerId)
-        : [...current, playerId]
+        : [...current, playerId],
     );
   };
 
@@ -685,7 +829,10 @@ export default function Trade() {
     setIsAnalyzing(true);
     setAnalysisError(null);
     try {
-      const result = await apiPost<TradeAnalyzeResult>("/trade/analyze", payload);
+      const result = await apiPost<TradeAnalyzeResult>(
+        "/trade/analyze",
+        payload,
+      );
       setAnalysis(result);
       setAnalysisSignature(currentTradeSignature);
       setIsAnalysisReviewOpen(true);
@@ -698,10 +845,22 @@ export default function Trade() {
     }
   };
 
-  const analysisIsCurrent = Boolean(analysis && analysisSignature === currentTradeSignature);
+  const analysisIsCurrent = Boolean(
+    analysis && analysisSignature === currentTradeSignature,
+  );
   const sendEnabled =
-    canSendTradeOffer(analysis, analysisSignature, currentTradeSignature, createOfferMutation.isPending) &&
-    Boolean(ownedTeamId && opponentTeamId && selectedGiveRows.length && selectedReceiveRows.length);
+    canSendTradeOffer(
+      analysis,
+      analysisSignature,
+      currentTradeSignature,
+      createOfferMutation.isPending,
+    ) &&
+    Boolean(
+      ownedTeamId &&
+      opponentTeamId &&
+      selectedGiveRows.length &&
+      selectedReceiveRows.length,
+    );
 
   const handleSendTrade = () => {
     if (!sendEnabled) {
@@ -709,19 +868,29 @@ export default function Trade() {
       return;
     }
     setSendError(null);
-    const request = pendingTradeRequest.current?.signature === tradeSubmitSignature
-      ? pendingTradeRequest.current
-      : { signature: tradeSubmitSignature, id: createClientTradeRequestId() };
+    const request =
+      pendingTradeRequest.current?.signature === tradeSubmitSignature
+        ? pendingTradeRequest.current
+        : { signature: tradeSubmitSignature, id: createClientTradeRequestId() };
     pendingTradeRequest.current = request;
-    createOfferMutation.mutate({ counterTradeId: counteringOfferId, clientRequestId: request.id });
+    createOfferMutation.mutate({
+      counterTradeId: counteringOfferId,
+      clientRequestId: request.id,
+    });
   };
 
   const beginCounterOffer = (offer: TradeOffer) => {
     const originalGiveIds = offer.items
-      .filter((item) => item.team_id === offer.proposing_team_id && item.player_id !== null)
+      .filter(
+        (item) =>
+          item.team_id === offer.proposing_team_id && item.player_id !== null,
+      )
       .map((item) => item.player_id as number);
     const originalReceiveIds = offer.items
-      .filter((item) => item.team_id === offer.receiving_team_id && item.player_id !== null)
+      .filter(
+        (item) =>
+          item.team_id === offer.receiving_team_id && item.player_id !== null,
+      )
       .map((item) => item.player_id as number);
     setOpponentTeamId(offer.proposing_team_id);
     setGiveIds(originalReceiveIds);
@@ -791,7 +960,9 @@ export default function Trade() {
       <Card className="overflow-visible rounded-[2rem] border border-white/10 bg-card/40">
         <CardHeader className="border-b border-white/10 bg-white/[0.02]">
           <CardTitle className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-foreground">
-            <span className="grid h-7 w-7 place-items-center rounded-full border border-sky-300/30 bg-sky-300/10 text-[10px] text-sky-100">1</span>
+            <span className="grid h-7 w-7 place-items-center rounded-full border border-sky-300/30 bg-sky-300/10 text-[10px] text-sky-100">
+              1
+            </span>
             Choose the matchup
           </CardTitle>
           <p className="pt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
@@ -804,7 +975,8 @@ export default function Trade() {
               Your Team
             </p>
             <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-black uppercase tracking-[0.14em] text-foreground">
-              {ownedTeam?.name ?? (ownedTeamId ? "Your Team" : "No team found for this league")}
+              {ownedTeam?.name ??
+                (ownedTeamId ? "Your Team" : "No team found for this league")}
             </div>
           </div>
           <div className="space-y-2">
@@ -849,15 +1021,21 @@ export default function Trade() {
                       className="flex w-full items-center justify-between gap-4 rounded-xl px-3 py-3 text-left transition hover:bg-sky-300/10"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-black text-foreground">{row.name}</p>
+                        <p className="truncate text-sm font-black text-foreground">
+                          {row.name}
+                        </p>
                         <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-                          {row.school} • {row.teamName ?? teams.find((team) => team.id === row.teamId)?.name ?? "Manager"}
+                          {row.school} •{" "}
+                          {row.teamName ??
+                            teams.find((team) => team.id === row.teamId)
+                              ?.name ??
+                            "Manager"}
                         </p>
                       </div>
                       <span
                         className={cn(
                           "shrink-0 rounded-xl border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]",
-                          POS_STYLES[row.position] ?? POS_STYLES.QB
+                          POS_STYLES[row.position] ?? POS_STYLES.QB,
                         )}
                       >
                         {row.position}
@@ -874,7 +1052,9 @@ export default function Trade() {
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_4.5rem_minmax(0,1fr)] xl:items-stretch">
         <TradeList
           title="Players You Give"
-          subtitle={myRosterLoading ? "Loading roster..." : "Select one or more players"}
+          subtitle={
+            myRosterLoading ? "Loading roster..." : "Select one or more players"
+          }
           direction="give"
           rows={resolvedMyRows}
           selectedIds={giveSet}
@@ -887,7 +1067,11 @@ export default function Trade() {
         </div>
         <TradeList
           title={`Players You Receive${opponentTeam ? ` (${opponentTeam.name})` : ""}`}
-          subtitle={theirRosterLoading ? "Loading roster..." : "Select one or more players"}
+          subtitle={
+            theirRosterLoading
+              ? "Loading roster..."
+              : "Select one or more players"
+          }
           direction="receive"
           rows={theirRows}
           selectedIds={receiveSet}
@@ -899,7 +1083,10 @@ export default function Trade() {
         <Card className="rounded-[2rem] border border-red-400/30 bg-red-500/10">
           <CardContent className="flex items-center gap-3 p-6 text-sm text-red-200">
             <ShieldAlert className="h-5 w-5" />
-            {formatTradeError(myRosterError || theirRosterError, "Unable to load one or more rosters. Please retry or switch leagues.")}
+            {formatTradeError(
+              myRosterError || theirRosterError,
+              "Unable to load one or more rosters. Please retry or switch leagues.",
+            )}
           </CardContent>
         </Card>
       )}
@@ -908,7 +1095,9 @@ export default function Trade() {
         <CardHeader className="flex flex-row items-center justify-between border-b border-white/10 bg-white/[0.02]">
           <div>
             <CardTitle className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-foreground">
-              <span className="grid h-7 w-7 place-items-center rounded-full border border-sky-300/30 bg-sky-300/10 text-sky-100">2</span>
+              <span className="grid h-7 w-7 place-items-center rounded-full border border-sky-300/30 bg-sky-300/10 text-sky-100">
+                2
+              </span>
               Trade snapshot
             </CardTitle>
             <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
@@ -917,17 +1106,33 @@ export default function Trade() {
           </div>
           <Button
             className="h-10 rounded-xl bg-gradient-to-r from-sky-300 to-blue-500 px-4 text-[10px] font-black uppercase tracking-[0.18em] text-slate-950 shadow-[0_10px_30px_rgba(59,130,246,0.25)] hover:from-sky-200 hover:to-blue-400"
-            disabled={isAnalyzing || !giveIds.length || !receiveIds.length || !league || !workspace}
-            onClick={() => (analysisIsCurrent ? setIsAnalysisReviewOpen(true) : handleAnalyze())}
+            disabled={
+              isAnalyzing ||
+              !giveIds.length ||
+              !receiveIds.length ||
+              !league ||
+              !workspace
+            }
+            onClick={() =>
+              analysisIsCurrent
+                ? setIsAnalysisReviewOpen(true)
+                : handleAnalyze()
+            }
           >
-            {isAnalyzing ? "Analyzing..." : analysisIsCurrent ? "Review Analysis" : "Analyze Trade"}
+            {isAnalyzing
+              ? "Analyzing..."
+              : analysisIsCurrent
+                ? "Review Analysis"
+                : "Analyze Trade"}
             {!isAnalyzing && <ChevronRight className="ml-2 h-4 w-4" />}
           </Button>
         </CardHeader>
         <CardContent className="space-y-6 p-6">
           <div className="grid gap-4 lg:grid-cols-[1fr_auto_1fr] lg:items-stretch">
             <div className="rounded-2xl border border-rose-300/20 bg-rose-500/[0.075] p-5">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-100">You send</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-100">
+                You send
+              </p>
               <p className="mt-3 text-4xl font-black italic tabular-nums text-foreground">
                 {liveGiveValue.toFixed(1)}
               </p>
@@ -941,28 +1146,41 @@ export default function Trade() {
               </div>
             </div>
             <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/[0.075] p-5">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">You receive</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">
+                You receive
+              </p>
               <p className="mt-3 text-4xl font-black italic tabular-nums text-foreground">
                 {liveReceiveValue.toFixed(1)}
               </p>
               <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/65">
-                {receiveIds.length} asset{receiveIds.length === 1 ? "" : "s"} selected
+                {receiveIds.length} asset{receiveIds.length === 1 ? "" : "s"}{" "}
+                selected
               </p>
             </div>
           </div>
 
           <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/10 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Live projection edge</p>
-              <p className="mt-1 text-xs font-semibold text-muted-foreground">A quick comparison only — the formal review uses the trade analyzer.</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                Live projection edge
+              </p>
+              <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                A quick comparison only — the formal review uses the trade
+                analyzer.
+              </p>
             </div>
             <p
               className={cn(
                 "text-3xl font-black italic tabular-nums",
-                liveDelta > 0 ? "text-emerald-300" : liveDelta < 0 ? "text-rose-300" : "text-foreground"
+                liveDelta > 0
+                  ? "text-emerald-300"
+                  : liveDelta < 0
+                    ? "text-rose-300"
+                    : "text-foreground",
               )}
             >
-              {liveDelta >= 0 ? "+" : ""}{liveDelta.toFixed(1)}
+              {liveDelta >= 0 ? "+" : ""}
+              {liveDelta.toFixed(1)}
             </p>
           </div>
 
@@ -981,14 +1199,16 @@ export default function Trade() {
           ) : (
             <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                Select players from both sides, then run analysis to see value differential.
+                Select players from both sides, then run analysis to see value
+                differential.
               </p>
             </div>
           )}
           <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-2">
               <p className="text-xs font-bold text-muted-foreground">
-                Run analysis after every selection change. Sending is locked until the current offer has a fresh analysis.
+                Run analysis after every selection change. Sending is locked
+                until the current offer has a fresh analysis.
               </p>
               <textarea
                 value={tradeMessage}
@@ -1006,46 +1226,76 @@ export default function Trade() {
         </CardContent>
       </Card>
 
-      <Dialog open={isAnalysisReviewOpen} onOpenChange={setIsAnalysisReviewOpen}>
+      <Dialog
+        open={isAnalysisReviewOpen}
+        onOpenChange={setIsAnalysisReviewOpen}
+      >
         <DialogContent className="max-w-2xl border-cfb-brand/30 bg-[#081321] text-foreground">
           <DialogHeader>
             <DialogTitle className="pr-10 text-2xl font-black uppercase italic tracking-tight sm:text-3xl">
               Review Trade Offer
             </DialogTitle>
             <DialogDescription className="text-sm font-semibold leading-6 text-muted-foreground">
-              Review the selected players and the current trade outlook before sending the offer.
+              Review the selected players and the current trade outlook before
+              sending the offer.
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-2xl border border-red-300/20 bg-red-500/10 p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-100">You send</p>
-              <p className="mt-2 text-2xl font-black tabular-nums">{analysis?.give_value?.toFixed(2) ?? "N/A"}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-100">
+                You send
+              </p>
+              <p className="mt-2 text-2xl font-black tabular-nums">
+                {analysis?.give_value?.toFixed(2) ?? "N/A"}
+              </p>
               <p className="mt-3 text-xs font-semibold leading-5 text-muted-foreground">
-                {selectedGiveRows.map((row) => row.name).join(", ") || "No players selected"}
+                {selectedGiveRows.map((row) => row.name).join(", ") ||
+                  "No players selected"}
               </p>
             </div>
             <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/10 p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">You receive</p>
-              <p className="mt-2 text-2xl font-black tabular-nums">{analysis?.receive_value?.toFixed(2) ?? "N/A"}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">
+                You receive
+              </p>
+              <p className="mt-2 text-2xl font-black tabular-nums">
+                {analysis?.receive_value?.toFixed(2) ?? "N/A"}
+              </p>
               <p className="mt-3 text-xs font-semibold leading-5 text-muted-foreground">
-                {selectedReceiveRows.map((row) => row.name).join(", ") || "No players selected"}
+                {selectedReceiveRows.map((row) => row.name).join(", ") ||
+                  "No players selected"}
               </p>
             </div>
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Trade verdict</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+              Trade verdict
+            </p>
             <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-              <p className="text-2xl font-black text-primary">{analysis?.verdict ?? "Analysis unavailable"}</p>
-              <p className={cn("text-xl font-black tabular-nums", (analysis?.delta ?? 0) >= 0 ? "text-emerald-300" : "text-red-300")}>
-                {analysis?.delta === null || analysis?.delta === undefined ? "N/A" : `${analysis.delta >= 0 ? "+" : ""}${analysis.delta.toFixed(2)}`}
+              <p className="text-2xl font-black text-primary">
+                {analysis?.verdict ?? "Analysis unavailable"}
+              </p>
+              <p
+                className={cn(
+                  "text-xl font-black tabular-nums",
+                  (analysis?.delta ?? 0) >= 0
+                    ? "text-emerald-300"
+                    : "text-red-300",
+                )}
+              >
+                {analysis?.delta === null || analysis?.delta === undefined
+                  ? "N/A"
+                  : `${analysis.delta >= 0 ? "+" : ""}${analysis.delta.toFixed(2)}`}
               </p>
             </div>
           </div>
 
           <DialogFooter className="gap-3 sm:gap-3">
-            <Button variant="outline" onClick={() => setIsAnalysisReviewOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsAnalysisReviewOpen(false)}
+            >
               Keep Editing
             </Button>
             <Button disabled={!sendEnabled} onClick={handleSendTrade}>
@@ -1059,14 +1309,20 @@ export default function Trade() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isTradeOfferRoute} onOpenChange={(open) => { if (!open) closeFocusedOffer(); }}>
+      <Dialog
+        open={isTradeOfferRoute}
+        onOpenChange={(open) => {
+          if (!open) closeFocusedOffer();
+        }}
+      >
         <DialogContent className="max-w-4xl border-cfb-brand/30 bg-[#081321] text-foreground">
           <DialogHeader>
             <DialogTitle className="pr-8 text-3xl font-black uppercase italic tracking-tight">
               Review Trade Offer
             </DialogTitle>
             <DialogDescription className="text-sm font-semibold leading-6 text-muted-foreground">
-              Review the complete league trade without leaving the conversation that shared it.
+              Review the complete league trade without leaving the conversation
+              that shared it.
             </DialogDescription>
           </DialogHeader>
 
@@ -1077,64 +1333,127 @@ export default function Trade() {
           ) : null}
           {focusedOfferUnavailable ? (
             <div className="rounded-2xl border border-red-300/25 bg-red-500/10 p-5">
-              <p className="text-sm font-black text-red-100">This trade is unavailable.</p>
+              <p className="text-sm font-black text-red-100">
+                This trade is unavailable.
+              </p>
               <p className="mt-2 text-xs font-semibold leading-5 text-red-100/80">
-                The offer may have been removed, belong to another league, or the link is invalid. Your league was not changed.
+                The offer may have been removed, belong to another league, or
+                the link is invalid. Your league was not changed.
               </p>
             </div>
           ) : null}
-          {focusedOffer ? (() => {
-            const offer = focusedOffer;
-            const proposingTeam = teams.find((team) => team.id === offer.proposing_team_id);
-            const receivingTeam = teams.find((team) => team.id === offer.receiving_team_id);
-            const proposingSends = offer.items.filter((item) => item.team_id === offer.proposing_team_id);
-            const receivingSends = offer.items.filter((item) => item.team_id === offer.receiving_team_id);
-            return (
-              <div className="space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">League trade</p>
-                    <p className="mt-2 text-xl font-black text-foreground">
-                      {proposingTeam?.name ?? "Proposing Team"} <span className="px-1 text-primary">→</span> {receivingTeam?.name ?? "Receiving Team"}
-                    </p>
-                  </div>
-                  <span className="rounded-full border border-primary/35 bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-primary">
-                    {formatTradeStatus(offer.status)}
-                  </span>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-red-300/20 bg-red-500/10 p-5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-100">{proposingTeam?.name ?? "Proposing Team"} gives</p>
-                    <div className="mt-4 space-y-3">{proposingSends.length ? proposingSends.map((item) => (
-                      <div key={item.id} className="rounded-xl border border-white/10 bg-black/10 px-4 py-3">
-                        <p className="font-black text-foreground">{item.player_name ?? `Player ${item.player_id ?? ""}`}</p>
-                        <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{[item.player_position, item.player_school].filter(Boolean).join(" · ") || "League asset"}</p>
+          {focusedOffer
+            ? (() => {
+                const offer = focusedOffer;
+                const proposingTeam = teams.find(
+                  (team) => team.id === offer.proposing_team_id,
+                );
+                const receivingTeam = teams.find(
+                  (team) => team.id === offer.receiving_team_id,
+                );
+                const proposingSends = offer.items.filter(
+                  (item) => item.team_id === offer.proposing_team_id,
+                );
+                const receivingSends = offer.items.filter(
+                  (item) => item.team_id === offer.receiving_team_id,
+                );
+                return (
+                  <div className="space-y-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                          League trade
+                        </p>
+                        <p className="mt-2 text-xl font-black text-foreground">
+                          {proposingTeam?.name ?? "Proposing Team"}{" "}
+                          <span className="px-1 text-primary">→</span>{" "}
+                          {receivingTeam?.name ?? "Receiving Team"}
+                        </p>
                       </div>
-                    )) : <p className="text-sm font-bold text-muted-foreground">No players listed</p>}</div>
-                  </div>
-                  <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/10 p-5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">{receivingTeam?.name ?? "Receiving Team"} gives</p>
-                    <div className="mt-4 space-y-3">{receivingSends.length ? receivingSends.map((item) => (
-                      <div key={item.id} className="rounded-xl border border-white/10 bg-black/10 px-4 py-3">
-                        <p className="font-black text-foreground">{item.player_name ?? `Player ${item.player_id ?? ""}`}</p>
-                        <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{[item.player_position, item.player_school].filter(Boolean).join(" · ") || "League asset"}</p>
+                      <span className="rounded-full border border-primary/35 bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-primary">
+                        {formatTradeStatus(offer.status)}
+                      </span>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-red-300/20 bg-red-500/10 p-5">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-100">
+                          {proposingTeam?.name ?? "Proposing Team"} gives
+                        </p>
+                        <div className="mt-4 space-y-3">
+                          {proposingSends.length ? (
+                            proposingSends.map((item) => (
+                              <div
+                                key={item.id}
+                                className="rounded-xl border border-white/10 bg-black/10 px-4 py-3"
+                              >
+                                <p className="font-black text-foreground">
+                                  {item.player_name ??
+                                    `Player ${item.player_id ?? ""}`}
+                                </p>
+                                <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                                  {[item.player_position, item.player_school]
+                                    .filter(Boolean)
+                                    .join(" · ") || "League asset"}
+                                </p>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm font-bold text-muted-foreground">
+                              No players listed
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    )) : <p className="text-sm font-bold text-muted-foreground">No players listed</p>}</div>
+                      <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/10 p-5">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">
+                          {receivingTeam?.name ?? "Receiving Team"} gives
+                        </p>
+                        <div className="mt-4 space-y-3">
+                          {receivingSends.length ? (
+                            receivingSends.map((item) => (
+                              <div
+                                key={item.id}
+                                className="rounded-xl border border-white/10 bg-black/10 px-4 py-3"
+                              >
+                                <p className="font-black text-foreground">
+                                  {item.player_name ??
+                                    `Player ${item.player_id ?? ""}`}
+                                </p>
+                                <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                                  {[item.player_position, item.player_school]
+                                    .filter(Boolean)
+                                    .join(" · ") || "League asset"}
+                                </p>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm font-bold text-muted-foreground">
+                              No players listed
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {offer.message ? (
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
+                          Manager note
+                        </p>
+                        <p className="mt-2 text-sm font-semibold leading-6 text-muted-foreground">
+                          {offer.message}
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
-                </div>
-                {offer.message ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">Manager note</p>
-                    <p className="mt-2 text-sm font-semibold leading-6 text-muted-foreground">{offer.message}</p>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })() : null}
+                );
+              })()
+            : null}
 
           <DialogFooter className="sticky bottom-0 border-t border-white/10 bg-[#081321]/95 pt-3 backdrop-blur">
             <Button variant="outline" onClick={closeFocusedOffer}>
-              {focusedOfferReturnPath.startsWith("/chats") ? "Back to league chat" : "Close"}
+              {focusedOfferReturnPath.startsWith("/chats")
+                ? "Back to league chat"
+                : "Close"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1154,7 +1473,10 @@ export default function Trade() {
           ) : null}
           {offersQuery.isError ? (
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-300">
-              {formatTradeError(offersQuery.error, "Unable to load trade offers.")}
+              {formatTradeError(
+                offersQuery.error,
+                "Unable to load trade offers.",
+              )}
             </p>
           ) : null}
           {!offersQuery.isLoading && !offersQuery.data?.data.length ? (
@@ -1163,21 +1485,41 @@ export default function Trade() {
             </p>
           ) : null}
           {(offersQuery.data?.data ?? []).map((offer) => {
-            const proposingTeam = teams.find((team) => team.id === offer.proposing_team_id);
-            const receivingTeam = teams.find((team) => team.id === offer.receiving_team_id);
-            const giveItems = offer.items.filter((item) => item.team_id === offer.proposing_team_id);
-            const receiveItems = offer.items.filter((item) => item.team_id === offer.receiving_team_id);
-            const canAccept = offer.status === "proposed" && receivingTeam?.owner_user_id === user?.id;
-            const canCancel = ["proposed", "commissioner_review"].includes(offer.status) && proposingTeam?.owner_user_id === user?.id;
-            const canCounter = offer.status === "proposed" && receivingTeam?.owner_user_id === user?.id;
-            const canReview = offer.status === "commissioner_review" && league?.commissioner_user_id === user?.id;
+            const proposingTeam = teams.find(
+              (team) => team.id === offer.proposing_team_id,
+            );
+            const receivingTeam = teams.find(
+              (team) => team.id === offer.receiving_team_id,
+            );
+            const giveItems = offer.items.filter(
+              (item) => item.team_id === offer.proposing_team_id,
+            );
+            const receiveItems = offer.items.filter(
+              (item) => item.team_id === offer.receiving_team_id,
+            );
+            const canAccept =
+              offer.status === "proposed" &&
+              receivingTeam?.owner_user_id === user?.id;
+            const canCancel =
+              ["proposed", "commissioner_review"].includes(offer.status) &&
+              proposingTeam?.owner_user_id === user?.id;
+            const canCounter =
+              offer.status === "proposed" &&
+              receivingTeam?.owner_user_id === user?.id;
+            const canReview =
+              offer.status === "commissioner_review" &&
+              league?.commissioner_user_id === user?.id;
             return (
-              <div key={offer.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <div
+                key={offer.id}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+              >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="space-y-3">
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                        {proposingTeam?.name ?? "Proposing Team"} → {receivingTeam?.name ?? "Receiving Team"}
+                        {proposingTeam?.name ?? "Proposing Team"} →{" "}
+                        {receivingTeam?.name ?? "Receiving Team"}
                       </p>
                       <p className="mt-1 text-sm font-black uppercase tracking-[0.12em] text-foreground">
                         {formatTradeStatus(offer.status)}
@@ -1189,7 +1531,12 @@ export default function Trade() {
                           {proposingTeam?.name ?? "Team"} gives
                         </p>
                         <p className="mt-1 text-sm font-bold text-muted-foreground">
-                          {giveItems.map((item) => item.player_name ?? `Player ${item.player_id}`).join(", ")}
+                          {giveItems
+                            .map(
+                              (item) =>
+                                item.player_name ?? `Player ${item.player_id}`,
+                            )
+                            .join(", ")}
                         </p>
                       </div>
                       <div>
@@ -1197,13 +1544,20 @@ export default function Trade() {
                           {receivingTeam?.name ?? "Team"} gives
                         </p>
                         <p className="mt-1 text-sm font-bold text-muted-foreground">
-                          {receiveItems.map((item) => item.player_name ?? `Player ${item.player_id}`).join(", ")}
+                          {receiveItems
+                            .map(
+                              (item) =>
+                                item.player_name ?? `Player ${item.player_id}`,
+                            )
+                            .join(", ")}
                         </p>
                       </div>
                     </div>
-                    {offer.status === "accepted_pending" && offer.process_after ? (
+                    {offer.status === "accepted_pending" &&
+                    offer.process_after ? (
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-200">
-                        Processes after {new Date(offer.process_after).toLocaleString()}
+                        Processes after{" "}
+                        {new Date(offer.process_after).toLocaleString()}
                       </p>
                     ) : null}
                     {offer.failure_reason ? (
@@ -1223,7 +1577,12 @@ export default function Trade() {
                         <Button
                           className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
                           disabled={tradeActionMutation.isPending}
-                          onClick={() => tradeActionMutation.mutate({ tradeId: offer.id, action: "accept" })}
+                          onClick={() =>
+                            tradeActionMutation.mutate({
+                              tradeId: offer.id,
+                              action: "accept",
+                            })
+                          }
                         >
                           Accept
                         </Button>
@@ -1231,7 +1590,12 @@ export default function Trade() {
                           variant="outline"
                           className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
                           disabled={tradeActionMutation.isPending}
-                          onClick={() => tradeActionMutation.mutate({ tradeId: offer.id, action: "reject" })}
+                          onClick={() =>
+                            tradeActionMutation.mutate({
+                              tradeId: offer.id,
+                              action: "reject",
+                            })
+                          }
                         >
                           Decline
                         </Button>
@@ -1241,7 +1605,10 @@ export default function Trade() {
                       <Button
                         variant="outline"
                         className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
-                        disabled={tradeActionMutation.isPending || createOfferMutation.isPending}
+                        disabled={
+                          tradeActionMutation.isPending ||
+                          createOfferMutation.isPending
+                        }
                         onClick={() => beginCounterOffer(offer)}
                       >
                         Counter
@@ -1252,7 +1619,12 @@ export default function Trade() {
                         variant="outline"
                         className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
                         disabled={tradeActionMutation.isPending}
-                        onClick={() => tradeActionMutation.mutate({ tradeId: offer.id, action: "cancel" })}
+                        onClick={() =>
+                          tradeActionMutation.mutate({
+                            tradeId: offer.id,
+                            action: "cancel",
+                          })
+                        }
                       >
                         Unsend Offer
                       </Button>
@@ -1262,7 +1634,12 @@ export default function Trade() {
                         <Button
                           className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
                           disabled={tradeActionMutation.isPending}
-                          onClick={() => tradeActionMutation.mutate({ tradeId: offer.id, action: "commissioner/approve" })}
+                          onClick={() =>
+                            tradeActionMutation.mutate({
+                              tradeId: offer.id,
+                              action: "commissioner/approve",
+                            })
+                          }
                         >
                           Approve
                         </Button>
@@ -1270,7 +1647,12 @@ export default function Trade() {
                           variant="outline"
                           className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
                           disabled={tradeActionMutation.isPending}
-                          onClick={() => tradeActionMutation.mutate({ tradeId: offer.id, action: "commissioner/veto" })}
+                          onClick={() =>
+                            tradeActionMutation.mutate({
+                              tradeId: offer.id,
+                              action: "commissioner/veto",
+                            })
+                          }
                         >
                           Veto
                         </Button>
@@ -1282,7 +1664,9 @@ export default function Trade() {
             );
           })}
           {actionError ? (
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-red-300">{actionError}</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-red-300">
+              {actionError}
+            </p>
           ) : null}
         </CardContent>
       </Card>
@@ -1290,7 +1674,8 @@ export default function Trade() {
       <Card className="rounded-[2rem] border border-emerald-400/20 bg-emerald-500/10">
         <CardContent className="flex items-center gap-3 p-5 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-100">
           <Users className="h-4 w-4" />
-          Trade value is calculated from your league rosters and weekly projections.
+          Trade value is calculated from your league rosters and weekly
+          projections.
         </CardContent>
       </Card>
     </div>

@@ -24,7 +24,7 @@ describe("getDraftPlayerPoolPageOffsets", () => {
         offset: 0,
         pages: 5,
         total: 1200,
-      })
+      }),
     ).toEqual([0, 100, 200, 300, 400]);
   });
 
@@ -35,7 +35,7 @@ describe("getDraftPlayerPoolPageOffsets", () => {
         limit: getDraftPlayerPoolBackendLimit(200),
         offset: 0,
         total: 1200,
-      })
+      }),
     ).toEqual([0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100]);
   });
 
@@ -49,7 +49,7 @@ describe("getDraftPlayerPoolPageOffsets", () => {
         limit: backendLimit,
         offset: 0,
         total: 201,
-      })
+      }),
     ).toEqual([0, 100, 200]);
   });
 
@@ -61,7 +61,7 @@ describe("getDraftPlayerPoolPageOffsets", () => {
         maxPages: 3,
         offset: 0,
         total: 1200,
-      })
+      }),
     ).toEqual([0, 100, 200]);
   });
 });
@@ -71,13 +71,16 @@ describe("fetchDraftPlayerPoolPagesSequentially", () => {
     let inFlight = 0;
     let peakInFlight = 0;
 
-    const pages = await fetchDraftPlayerPoolPagesSequentially([100, 200, 300], async (offset) => {
-      inFlight += 1;
-      peakInFlight = Math.max(peakInFlight, inFlight);
-      await Promise.resolve();
-      inFlight -= 1;
-      return offset;
-    });
+    const pages = await fetchDraftPlayerPoolPagesSequentially(
+      [100, 200, 300],
+      async (offset) => {
+        inFlight += 1;
+        peakInFlight = Math.max(peakInFlight, inFlight);
+        await Promise.resolve();
+        inFlight -= 1;
+        return offset;
+      },
+    );
 
     expect(pages).toEqual([100, 200, 300]);
     expect(peakInFlight).toBe(1);
@@ -108,7 +111,7 @@ describe("normalizePlayer", () => {
           expected_rush_per_play: 3.5,
           expected_td_per_play: 0.04,
         },
-      }
+      },
     );
 
     expect(player.projection.fpts).toBe(24.6);

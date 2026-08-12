@@ -5,9 +5,13 @@ import path from "path";
 // Host development and the Docker stack use different API hostnames. The
 // supported browser contract is always same-origin `/api`; only this internal
 // Vite proxy target changes by environment.
-const apiProxyTarget = process.env.VITE_API_PROXY_TARGET ?? "http://127.0.0.1:8000";
+const apiProxyTarget =
+  process.env.VITE_API_PROXY_TARGET ?? "http://127.0.0.1:8000";
 const configuredDevPort = Number(process.env.WEB_PORT ?? "8080");
-const devServerPort = Number.isInteger(configuredDevPort) && configuredDevPort > 0 ? configuredDevPort : 8080;
+const devServerPort =
+  Number.isInteger(configuredDevPort) && configuredDevPort > 0
+    ? configuredDevPort
+    : 8080;
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -41,7 +45,12 @@ export default defineConfig(({ mode }) => ({
     },
   },
   test: {
-    include: ["client/**/*.spec.ts", "client/**/*.test.ts", "client/**/*.spec.tsx", "client/**/*.test.tsx"],
+    include: [
+      "client/**/*.spec.ts",
+      "client/**/*.test.ts",
+      "client/**/*.spec.tsx",
+      "client/**/*.test.tsx",
+    ],
     exclude: ["**/node_modules/**", "**/dist/**", "**/.worktrees/**"],
   },
 }));

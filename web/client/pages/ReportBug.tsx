@@ -12,7 +12,9 @@ export default function ReportBug() {
         <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-cfb-danger/30 bg-cfb-danger/10 text-red-100">
           <Bug className="h-5 w-5" aria-hidden="true" />
         </div>
-        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">Beta feedback</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">
+          Beta feedback
+        </p>
         <h1 className="mt-3 text-4xl font-black uppercase italic tracking-tight text-foreground sm:text-6xl">
           Report a Bug
         </h1>

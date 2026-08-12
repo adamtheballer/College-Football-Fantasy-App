@@ -1,7 +1,10 @@
-type SaturdayPickSponsor = {
-  name: string;
-  logo_url?: string | null;
-} | null | undefined;
+type SaturdayPickSponsor =
+  | {
+      name: string;
+      logo_url?: string | null;
+    }
+  | null
+  | undefined;
 
 export const saturdayPick6Sponsor = {
   name: "West Georgia Cornhole",

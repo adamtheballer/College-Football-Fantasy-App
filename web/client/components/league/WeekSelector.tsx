@@ -21,9 +21,16 @@ export function WeekSelector({
         onClick={() => onChange(Math.max(displayedWeek - 1, 1))}
         className="flex h-9 w-9 items-center justify-center rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 text-cfb-text-secondary transition hover:border-cfb-brand/30 hover:bg-cfb-brand/[0.08] hover:text-cfb-text-primary disabled:cursor-not-allowed disabled:opacity-45"
       >
-        <ChevronLeft aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={2.5} />
+        <ChevronLeft
+          aria-hidden="true"
+          className="h-3.5 w-3.5"
+          strokeWidth={2.5}
+        />
       </button>
-      <div data-testid="matchup-week-label" className="flex items-center justify-center rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 px-4 py-2 text-center text-[11px] font-black text-cfb-text-primary">
+      <div
+        data-testid="matchup-week-label"
+        className="flex items-center justify-center rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 px-4 py-2 text-center text-[11px] font-black text-cfb-text-primary"
+      >
         Week {displayedWeek}
       </div>
       <button
@@ -33,7 +40,11 @@ export function WeekSelector({
         onClick={() => onChange(displayedWeek + 1)}
         className="flex h-9 w-9 items-center justify-center rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 text-cfb-text-secondary transition hover:border-cfb-brand/30 hover:bg-cfb-brand/[0.08] hover:text-cfb-text-primary"
       >
-        <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={2.5} />
+        <ChevronRight
+          aria-hidden="true"
+          className="h-3.5 w-3.5"
+          strokeWidth={2.5}
+        />
       </button>
       <button
         type="button"

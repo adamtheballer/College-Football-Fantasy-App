@@ -1,6 +1,9 @@
 import * as React from "react";
 
-import { BackgroundEffects, collegiateCanvasBackground } from "@/components/BackgroundEffects";
+import {
+  BackgroundEffects,
+  collegiateCanvasBackground,
+} from "@/components/BackgroundEffects";
 import { FloatingQuickActions } from "@/components/FloatingQuickActions";
 import type { User } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";

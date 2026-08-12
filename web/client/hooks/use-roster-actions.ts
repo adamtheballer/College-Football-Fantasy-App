@@ -15,7 +15,8 @@ export function useLeagueTransactions(leagueId?: number, enabled = true) {
     queryKey: ["league", leagueId, "transactions"],
     enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
     staleTime: 15_000,
-    queryFn: () => apiGet<TransactionListResponse>(`/leagues/${leagueId}/transactions`),
+    queryFn: () =>
+      apiGet<TransactionListResponse>(`/leagues/${leagueId}/transactions`),
   });
 }
 
@@ -38,11 +39,21 @@ export function useAddDrop(teamId?: number, leagueId?: number) {
         queryClient.invalidateQueries({ queryKey: ["team", teamId, "roster"] });
       }
       if (typeof leagueId === "number") {
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "roster"] });
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "matchup"] });
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "scoreboard"] });
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "transactions"] });
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "roster"],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "workspace"],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "matchup"],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "scoreboard"],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "transactions"],
+        });
       }
     },
   });
@@ -51,7 +62,13 @@ export function useAddDrop(teamId?: number, leagueId?: number) {
 export function useUpdateLineup(teamId?: number, leagueId?: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (assignments: Array<{ roster_entry_id: number; slot: string; slot_index?: number }>) => {
+    mutationFn: (
+      assignments: Array<{
+        roster_entry_id: number;
+        slot: string;
+        slot_index?: number;
+      }>,
+    ) => {
       if (typeof teamId !== "number") {
         throw new Error("Missing team id for lineup update.");
       }
@@ -62,11 +79,21 @@ export function useUpdateLineup(teamId?: number, leagueId?: number) {
         queryClient.invalidateQueries({ queryKey: ["team", teamId, "roster"] });
       }
       if (typeof leagueId === "number") {
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "roster"] });
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "matchup"] });
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "scoreboard"] });
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "transactions"] });
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "roster"],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "workspace"],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "matchup"],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "scoreboard"],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "transactions"],
+        });
       }
     },
   });
@@ -87,11 +114,21 @@ export function useDropRosterPlayer(teamId?: number, leagueId?: number) {
         queryClient.invalidateQueries({ queryKey: ["team", teamId, "roster"] });
       }
       if (typeof leagueId === "number") {
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "roster"] });
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "workspace"] });
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "matchup"] });
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "scoreboard"] });
-        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "transactions"] });
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "roster"],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "workspace"],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "matchup"],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "scoreboard"],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["league", leagueId, "transactions"],
+        });
       }
     },
   });

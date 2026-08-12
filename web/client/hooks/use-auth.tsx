@@ -69,8 +69,17 @@ type SessionsPayload = {
 
 type AuthContextValue = {
   user: User | null;
-  login: (email: string, password: string, betaAccessReservation?: string) => Promise<User>;
-  signup: (firstName: string, email: string, password: string, betaAccessReservation?: string) => Promise<User>;
+  login: (
+    email: string,
+    password: string,
+    betaAccessReservation?: string,
+  ) => Promise<User>;
+  signup: (
+    firstName: string,
+    email: string,
+    password: string,
+    betaAccessReservation?: string,
+  ) => Promise<User>;
   updateProfile: (firstName: string) => Promise<User>;
   logout: () => void;
   resetPasswordWithCurrentPassword: (
@@ -79,7 +88,11 @@ type AuthContextValue = {
     newPassword: string,
     confirmNewPassword: string,
   ) => Promise<void>;
-  changePassword: (currentPassword: string, newPassword: string, confirmNewPassword: string) => Promise<void>;
+  changePassword: (
+    currentPassword: string,
+    newPassword: string,
+    confirmNewPassword: string,
+  ) => Promise<void>;
   listSessions: () => Promise<AuthSession[]>;
   revokeSession: (sessionId: number) => Promise<void>;
   logoutAll: () => Promise<void>;
@@ -144,7 +157,11 @@ const loadStoredUser = (): User | null => {
   }
 };
 
-const persistUser = (user: User, accessToken: string, accessTokenExpiresAt: string) => {
+const persistUser = (
+  user: User,
+  accessToken: string,
+  accessTokenExpiresAt: string,
+) => {
   safeStorageSet(USER_STORAGE_KEY, JSON.stringify(user));
   storeAccessTokenSession(accessToken, accessTokenExpiresAt);
 };
@@ -156,7 +173,8 @@ const mapUserPayload = (payload: AuthUserPayload): User => ({
   isAdmin: !!payload.is_admin,
 });
 
-const mapAuthPayload = (payload: AuthPayload): User => mapUserPayload(payload.user);
+const mapAuthPayload = (payload: AuthPayload): User =>
+  mapUserPayload(payload.user);
 
 const mapSessionPayload = (payload: AuthSessionPayload): AuthSession => ({
   id: payload.id,
@@ -196,7 +214,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch((error) => {
         if (cancelled) return;
-        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        if (
+          error instanceof ApiError &&
+          (error.status === 401 || error.status === 403)
+        ) {
           clearStoredAuth();
           setUser(null);
         }
@@ -225,37 +246,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login = useCallback(async (email: string, password: string, betaAccessReservation?: string) => {
-    const payload = await apiPost<AuthPayload>("/auth/login", {
-      email,
-      password,
-      beta_access_reservation: betaAccessReservation,
-    });
-    const nextUser = mapAuthPayload(payload);
-    persistUser(nextUser, payload.access_token, payload.access_token_expires_at);
-    queryClient.clear();
-    setUser(nextUser);
-    dispatchAuthChanged();
-    return nextUser;
-  }, [queryClient]);
+  const login = useCallback(
+    async (email: string, password: string, betaAccessReservation?: string) => {
+      const payload = await apiPost<AuthPayload>("/auth/login", {
+        email,
+        password,
+        beta_access_reservation: betaAccessReservation,
+      });
+      const nextUser = mapAuthPayload(payload);
+      persistUser(
+        nextUser,
+        payload.access_token,
+        payload.access_token_expires_at,
+      );
+      queryClient.clear();
+      setUser(nextUser);
+      dispatchAuthChanged();
+      return nextUser;
+    },
+    [queryClient],
+  );
 
-  const signup = useCallback(async (firstName: string, email: string, password: string, betaAccessReservation?: string) => {
-    const payload = await apiPost<AuthPayload>("/auth/signup", {
-      first_name: firstName,
-      email,
-      password,
-      beta_access_reservation: betaAccessReservation,
-    });
-    const nextUser = mapAuthPayload(payload);
-    persistUser(nextUser, payload.access_token, payload.access_token_expires_at);
-    queryClient.clear();
-    setUser(nextUser);
-    dispatchAuthChanged();
-    return nextUser;
-  }, [queryClient]);
+  const signup = useCallback(
+    async (
+      firstName: string,
+      email: string,
+      password: string,
+      betaAccessReservation?: string,
+    ) => {
+      const payload = await apiPost<AuthPayload>("/auth/signup", {
+        first_name: firstName,
+        email,
+        password,
+        beta_access_reservation: betaAccessReservation,
+      });
+      const nextUser = mapAuthPayload(payload);
+      persistUser(
+        nextUser,
+        payload.access_token,
+        payload.access_token_expires_at,
+      );
+      queryClient.clear();
+      setUser(nextUser);
+      dispatchAuthChanged();
+      return nextUser;
+    },
+    [queryClient],
+  );
 
   const updateProfile = useCallback(async (firstName: string) => {
-    const payload = await apiPatch<AuthUserPayload>("/auth/me", { first_name: firstName });
+    const payload = await apiPatch<AuthUserPayload>("/auth/me", {
+      first_name: firstName,
+    });
     const nextUser = mapUserPayload(payload);
     safeStorageSet(USER_STORAGE_KEY, JSON.stringify(nextUser));
     setUser(nextUser);
@@ -280,33 +322,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatchAuthChanged();
   }, [queryClient]);
 
-  const resetPasswordWithCurrentPassword = useCallback(async (
-    email: string,
-    currentPassword: string,
-    newPassword: string,
-    confirmNewPassword: string,
-  ) => {
-    await apiPost("/auth/reset-password-with-current-password", {
-      email,
-      current_password: currentPassword,
-      new_password: newPassword,
-      confirm_new_password: confirmNewPassword,
-    });
-    clearPasswordChangeAuth();
-  }, [clearPasswordChangeAuth]);
+  const resetPasswordWithCurrentPassword = useCallback(
+    async (
+      email: string,
+      currentPassword: string,
+      newPassword: string,
+      confirmNewPassword: string,
+    ) => {
+      await apiPost("/auth/reset-password-with-current-password", {
+        email,
+        current_password: currentPassword,
+        new_password: newPassword,
+        confirm_new_password: confirmNewPassword,
+      });
+      clearPasswordChangeAuth();
+    },
+    [clearPasswordChangeAuth],
+  );
 
-  const changePassword = useCallback(async (
-    currentPassword: string,
-    newPassword: string,
-    confirmNewPassword: string,
-  ) => {
-    await apiPost("/auth/change-password", {
-      current_password: currentPassword,
-      new_password: newPassword,
-      confirm_new_password: confirmNewPassword,
-    });
-    clearPasswordChangeAuth();
-  }, [clearPasswordChangeAuth]);
+  const changePassword = useCallback(
+    async (
+      currentPassword: string,
+      newPassword: string,
+      confirmNewPassword: string,
+    ) => {
+      await apiPost("/auth/change-password", {
+        current_password: currentPassword,
+        new_password: newPassword,
+        confirm_new_password: confirmNewPassword,
+      });
+      clearPasswordChangeAuth();
+    },
+    [clearPasswordChangeAuth],
+  );
 
   const listSessions = useCallback(async () => {
     const payload = await apiGet<SessionsPayload>("/auth/sessions");
@@ -352,7 +400,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signup,
       updateProfile,
       user,
-    ]
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

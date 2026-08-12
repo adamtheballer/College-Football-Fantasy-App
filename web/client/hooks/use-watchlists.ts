@@ -23,7 +23,9 @@ export function useCreateWatchlist() {
     onSuccess: (watchlist) => {
       queryClient.invalidateQueries({ queryKey: ["watchlists"] });
       if (watchlist.league_id) {
-        queryClient.invalidateQueries({ queryKey: ["watchlists", watchlist.league_id] });
+        queryClient.invalidateQueries({
+          queryKey: ["watchlists", watchlist.league_id],
+        });
       }
     },
   });
@@ -32,12 +34,19 @@ export function useCreateWatchlist() {
 export function useRenameWatchlist() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ watchlistId, name }: { watchlistId: number; name: string }) =>
-      apiPatch<Watchlist>(`/watchlists/${watchlistId}`, { name }),
+    mutationFn: ({
+      watchlistId,
+      name,
+    }: {
+      watchlistId: number;
+      name: string;
+    }) => apiPatch<Watchlist>(`/watchlists/${watchlistId}`, { name }),
     onSuccess: (watchlist) => {
       queryClient.invalidateQueries({ queryKey: ["watchlists"] });
       if (watchlist.league_id) {
-        queryClient.invalidateQueries({ queryKey: ["watchlists", watchlist.league_id] });
+        queryClient.invalidateQueries({
+          queryKey: ["watchlists", watchlist.league_id],
+        });
       }
     },
   });
@@ -56,14 +65,20 @@ export function useToggleWatchlistPlayer() {
       isSaved: boolean;
     }) => {
       if (isSaved) {
-        return apiDelete<Watchlist>(`/watchlists/${watchlistId}/players/${playerId}`);
+        return apiDelete<Watchlist>(
+          `/watchlists/${watchlistId}/players/${playerId}`,
+        );
       }
-      return apiPost<Watchlist>(`/watchlists/${watchlistId}/players`, { player_id: playerId });
+      return apiPost<Watchlist>(`/watchlists/${watchlistId}/players`, {
+        player_id: playerId,
+      });
     },
     onSuccess: (watchlist) => {
       queryClient.invalidateQueries({ queryKey: ["watchlists"] });
       if (watchlist.league_id) {
-        queryClient.invalidateQueries({ queryKey: ["watchlists", watchlist.league_id] });
+        queryClient.invalidateQueries({
+          queryKey: ["watchlists", watchlist.league_id],
+        });
       }
     },
   });

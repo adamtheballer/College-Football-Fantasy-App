@@ -29,8 +29,12 @@ const SettingsSection = ({ title, description, children, icon: Icon }: any) => (
           <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
         </div>
         <div className="min-w-0 space-y-1">
-          <CardTitle className="text-[10px] font-black uppercase tracking-[0.22em] text-primary sm:tracking-[0.3em]">{title}</CardTitle>
-          <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60 sm:text-[11px] sm:tracking-widest">{description}</p>
+          <CardTitle className="text-[10px] font-black uppercase tracking-[0.22em] text-primary sm:tracking-[0.3em]">
+            {title}
+          </CardTitle>
+          <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60 sm:text-[11px] sm:tracking-widest">
+            {description}
+          </p>
         </div>
       </div>
     </CardHeader>
@@ -52,11 +56,28 @@ const PolicyLinks = ({
   supportEmail?: string | null;
 }) => {
   const links = [
-    privacyPolicyUrl ? { href: privacyPolicyUrl, label: "Privacy Policy", external: true } : null,
+    privacyPolicyUrl
+      ? { href: privacyPolicyUrl, label: "Privacy Policy", external: true }
+      : null,
     termsUrl ? { href: termsUrl, label: "Terms", external: true } : null,
-    providerDisclosureUrl ? { href: providerDisclosureUrl, label: "Provider Disclosure", external: true } : null,
-    supportEmail ? { href: `mailto:${supportEmail}`, label: "Contact Support", external: false } : null,
-  ].filter((link): link is { href: string; label: string; external: boolean } => link !== null);
+    providerDisclosureUrl
+      ? {
+          href: providerDisclosureUrl,
+          label: "Provider Disclosure",
+          external: true,
+        }
+      : null,
+    supportEmail
+      ? {
+          href: `mailto:${supportEmail}`,
+          label: "Contact Support",
+          external: false,
+        }
+      : null,
+  ].filter(
+    (link): link is { href: string; label: string; external: boolean } =>
+      link !== null,
+  );
 
   if (!links.length) return null;
 
@@ -80,12 +101,16 @@ const PolicyLinks = ({
 const SettingItem = ({ label, description, children }: any) => (
   <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-10">
     <div className="min-w-0 space-y-1">
-      <Label className="text-sm font-black italic uppercase tracking-tight text-foreground">{label}</Label>
-      {description && <p className="text-[11px] font-medium leading-relaxed text-muted-foreground/60">{description}</p>}
+      <Label className="text-sm font-black italic uppercase tracking-tight text-foreground">
+        {label}
+      </Label>
+      {description && (
+        <p className="text-[11px] font-medium leading-relaxed text-muted-foreground/60">
+          {description}
+        </p>
+      )}
     </div>
-    <div className="w-full shrink-0 sm:w-auto">
-      {children}
-    </div>
+    <div className="w-full shrink-0 sm:w-auto">{children}</div>
   </div>
 );
 
@@ -100,7 +125,9 @@ export default function Settings() {
   } = useRuntimeCapabilities();
   const { data: leagues = [] } = useLeagues(50, Boolean(user));
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveState, setSaveState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
   const [managerName, setManagerName] = useState("");
   const [profileError, setProfileError] = useState<string | null>(null);
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
@@ -125,7 +152,11 @@ export default function Settings() {
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 1500);
     } catch (error) {
-      setProfileError(error instanceof Error ? error.message : "Unable to save your manager name.");
+      setProfileError(
+        error instanceof Error
+          ? error.message
+          : "Unable to save your manager name.",
+      );
       setSaveState("error");
     }
   };
@@ -142,7 +173,11 @@ export default function Settings() {
       await logoutAll();
       navigate("/login", { replace: true });
     } catch (error) {
-      setSecurityMessage(error instanceof Error ? error.message : "Unable to sign out of all devices.");
+      setSecurityMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to sign out of all devices.",
+      );
     }
   };
 
@@ -164,7 +199,8 @@ export default function Settings() {
             Settings
           </h1>
           <p className="max-w-2xl text-lg font-medium leading-relaxed text-muted-foreground sm:text-xl">
-            Review app information and sign in to manage your account and league preferences.
+            Review app information and sign in to manage your account and league
+            preferences.
           </p>
         </div>
 
@@ -179,24 +215,35 @@ export default function Settings() {
             </p>
             <Button
               className="h-12 rounded-2xl bg-primary px-7 text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground"
-              onClick={() => navigate("/login", { state: { from: "/settings" } })}
+              onClick={() =>
+                navigate("/login", { state: { from: "/settings" } })
+              }
             >
               Sign In To Manage Settings
             </Button>
           </div>
         </SettingsSection>
 
-        {privacyPolicyUrl || termsUrl || providerDisclosureUrl || supportEmail ? <section id="support" className="scroll-mt-8">
-          <SettingsSection
-            title="Support & Policies"
-            description="Helpful links and account resources"
-            icon={Shield}
-          >
-          <SupportContactCard />
-          <PolicyLinks privacyPolicyUrl={privacyPolicyUrl} termsUrl={termsUrl} providerDisclosureUrl={providerDisclosureUrl} supportEmail={supportEmail} />
-          </SettingsSection>
-        </section>
-        : null}
+        {privacyPolicyUrl ||
+        termsUrl ||
+        providerDisclosureUrl ||
+        supportEmail ? (
+          <section id="support" className="scroll-mt-8">
+            <SettingsSection
+              title="Support & Policies"
+              description="Helpful links and account resources"
+              icon={Shield}
+            >
+              <SupportContactCard />
+              <PolicyLinks
+                privacyPolicyUrl={privacyPolicyUrl}
+                termsUrl={termsUrl}
+                providerDisclosureUrl={providerDisclosureUrl}
+                supportEmail={supportEmail}
+              />
+            </SettingsSection>
+          </section>
+        ) : null}
       </div>
     );
   }
@@ -215,24 +262,31 @@ export default function Settings() {
             disabled={saveState === "saving"}
           >
             <Save className="w-4 h-4 mr-3" />
-            {saveState === "saving" ? "Saving..." : saveState === "saved" ? "Saved" : "Save Changes"}
+            {saveState === "saving"
+              ? "Saving..."
+              : saveState === "saved"
+                ? "Saved"
+                : "Save Changes"}
           </Button>
         </div>
         <p className="max-w-2xl text-base font-medium leading-relaxed text-muted-foreground sm:text-xl">
-          Update your manager profile and choose which league opens first across the app.
+          Update your manager profile and choose which league opens first across
+          the app.
         </p>
       </div>
 
       <div className="space-y-12">
         {/* PROFILE SECTION */}
-        <SettingsSection 
-          title="Account Profile" 
+        <SettingsSection
+          title="Account Profile"
           description="Your active manager identity"
           icon={User}
         >
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-10">
             <div className="space-y-4">
-              <Label className="text-[10px] font-black tracking-[0.2em] text-muted-foreground uppercase opacity-60">Manager Name</Label>
+              <Label className="text-[10px] font-black tracking-[0.2em] text-muted-foreground uppercase opacity-60">
+                Manager Name
+              </Label>
               <Input
                 aria-label="Manager Name"
                 value={managerName}
@@ -242,23 +296,29 @@ export default function Settings() {
               />
             </div>
             <div className="space-y-4">
-              <Label className="text-[10px] font-black tracking-[0.2em] text-muted-foreground uppercase opacity-60">Email Address</Label>
+              <Label className="text-[10px] font-black tracking-[0.2em] text-muted-foreground uppercase opacity-60">
+                Email Address
+              </Label>
               <p className="rounded-2xl border border-border bg-white/5 px-4 py-4 text-xs font-bold tracking-wider text-foreground">
                 {user.email}
               </p>
             </div>
           </div>
-          {profileError ? <p role="alert" className="text-sm font-semibold text-red-300">{profileError}</p> : null}
+          {profileError ? (
+            <p role="alert" className="text-sm font-semibold text-red-300">
+              {profileError}
+            </p>
+          ) : null}
         </SettingsSection>
 
         {/* PREFERENCES SECTION */}
-        <SettingsSection 
-          title="App Preferences" 
+        <SettingsSection
+          title="App Preferences"
           description="Customize your viewing experience"
           icon={Sliders}
         >
           <div className="space-y-8">
-            <SettingItem 
+            <SettingItem
               label="Default Active League"
               description="Choose which league opens first across roster/waiver/watchlist views"
             >
@@ -300,33 +360,55 @@ export default function Settings() {
         </SettingsSection>
 
         {/* SECURITY SECTION */}
-        <SettingsSection 
-          title="Security & Privacy" 
+        <SettingsSection
+          title="Security & Privacy"
           description="Keep your account safe and secure"
           icon={Shield}
         >
           <div className="space-y-8">
             <div className="rounded-3xl border border-primary/15 bg-primary/[0.04] p-6">
-              <h3 className="text-sm font-black uppercase tracking-[0.16em] text-foreground">Change Password</h3>
+              <h3 className="text-sm font-black uppercase tracking-[0.16em] text-foreground">
+                Change Password
+              </h3>
               <p className="mt-2 text-sm font-medium text-muted-foreground">
-                Enter your current password, then choose a new password. You will be signed out on every device.
+                Enter your current password, then choose a new password. You
+                will be signed out on every device.
               </p>
               <div className="mt-5">
                 <PasswordChangeForm
                   mode="authenticated"
-                  onSuccess={() => navigate("/login", { replace: true, state: { passwordResetSuccess: true } })}
+                  onSuccess={() =>
+                    navigate("/login", {
+                      replace: true,
+                      state: { passwordResetSuccess: true },
+                    })
+                  }
                 />
               </div>
             </div>
-            <PolicyLinks privacyPolicyUrl={privacyPolicyUrl} termsUrl={termsUrl} providerDisclosureUrl={providerDisclosureUrl} supportEmail={supportEmail} />
+            <PolicyLinks
+              privacyPolicyUrl={privacyPolicyUrl}
+              termsUrl={termsUrl}
+              providerDisclosureUrl={providerDisclosureUrl}
+              supportEmail={supportEmail}
+            />
 
             <div className="flex justify-center pt-8">
-               <Button type="button" variant="ghost" onClick={() => void handleLogoutAll()} className="text-muted-foreground hover:text-red-400 gap-3 text-[11px] font-black uppercase tracking-[0.2em]">
-                  <LogOut className="w-4 h-4" />
-                  Sign Out of All Devices
-               </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => void handleLogoutAll()}
+                className="text-muted-foreground hover:text-red-400 gap-3 text-[11px] font-black uppercase tracking-[0.2em]"
+              >
+                <LogOut className="w-4 h-4" />
+                Sign Out of All Devices
+              </Button>
             </div>
-            {securityMessage ? <p role="alert" className="text-sm font-semibold text-red-300">{securityMessage}</p> : null}
+            {securityMessage ? (
+              <p role="alert" className="text-sm font-semibold text-red-300">
+                {securityMessage}
+              </p>
+            ) : null}
           </div>
         </SettingsSection>
       </div>

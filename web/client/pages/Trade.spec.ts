@@ -6,15 +6,21 @@ import { formatTradeError, toTradeRows } from "./Trade";
 
 describe("formatTradeError", () => {
   it("shows a permission detail returned by a trade mutation", () => {
-    expect(formatTradeError(new ApiError(403, "Only the receiving manager can accept this trade."), "Fallback")).toBe(
-      "Only the receiving manager can accept this trade."
-    );
+    expect(
+      formatTradeError(
+        new ApiError(403, "Only the receiving manager can accept this trade."),
+        "Fallback",
+      ),
+    ).toBe("Only the receiving manager can accept this trade.");
   });
 
   it("shows a lifecycle-conflict detail returned by a trade mutation", () => {
-    expect(formatTradeError(new ApiError(409, "This trade is already cancelled."), "Fallback")).toBe(
-      "This trade is already cancelled."
-    );
+    expect(
+      formatTradeError(
+        new ApiError(409, "This trade is already cancelled."),
+        "Fallback",
+      ),
+    ).toBe("This trade is already cancelled.");
   });
 });
 
@@ -31,7 +37,12 @@ describe("toTradeRows", () => {
         id: 42,
         team_id: 9,
         slot: "RB",
-        player: { id: 7, name: "Healthy Runner", position: "RB", school: "Example University" },
+        player: {
+          id: 7,
+          name: "Healthy Runner",
+          position: "RB",
+          school: "Example University",
+        },
       },
     ] as unknown as RosterEntry[]);
 

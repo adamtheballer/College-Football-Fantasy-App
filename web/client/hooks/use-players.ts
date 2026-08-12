@@ -125,7 +125,12 @@ export type PlayerGameLogResponse = {
 export type LeaguePlayerHistoryResponse = {
   league_id: number;
   player_id: number;
-  current_status: { status: string; fantasy_team_id?: number | null; fantasy_team_name?: string | null; manager_name?: string | null };
+  current_status: {
+    status: string;
+    fantasy_team_id?: number | null;
+    fantasy_team_name?: string | null;
+    manager_name?: string | null;
+  };
   events: Array<{
     id: number;
     event_type: string;
@@ -152,20 +157,55 @@ export type LeaguePlayerHistoryResponse = {
 
 export type PlayerTradeValueResponse = {
   current: {
-    week: number; value: number; raw_cfb27_rating?: number | null; current_value_rating: number; tier: string; positional_value_rank?: number | null;
-    weekly_change?: number | null; confidence: number; policy_version: string; calculated_at?: string | null;
-    factor_breakdown?: Record<string, number> | null; explanations: Array<{ direction: string; reason: string; label: string; impact: number }>;
-    history?: Array<{ week: number; value: number; tier: string; calculated_at: string }>;
+    week: number;
+    value: number;
+    raw_cfb27_rating?: number | null;
+    current_value_rating: number;
+    tier: string;
+    positional_value_rank?: number | null;
+    weekly_change?: number | null;
+    confidence: number;
+    policy_version: string;
+    calculated_at?: string | null;
+    factor_breakdown?: Record<string, number> | null;
+    explanations: Array<{
+      direction: string;
+      reason: string;
+      label: string;
+      impact: number;
+    }>;
+    history?: Array<{
+      week: number;
+      value: number;
+      tier: string;
+      calculated_at: string;
+    }>;
   } | null;
-  history: Array<{ week: number; value: number; tier: string; calculated_at: string }>;
+  history: Array<{
+    week: number;
+    value: number;
+    tier: string;
+    calculated_at: string;
+  }>;
 };
 
 export type PlayerTrajectoryResponse = {
   player_id: number;
   season: number;
   league_id?: number | null;
-  projection: Array<{ week: number; points: number | null; source: "published" | "bye"; projection_status: string; projection_version?: string | null; published_at?: string | null }>;
-  value: Array<{ week: number; value: number; source: "preseason" | "published" }>;
+  projection: Array<{
+    week: number;
+    points: number | null;
+    source: "published" | "bye";
+    projection_status: string;
+    projection_version?: string | null;
+    published_at?: string | null;
+  }>;
+  value: Array<{
+    week: number;
+    value: number;
+    source: "preseason" | "published";
+  }>;
   preseason_projection_points?: number | null;
 };
 
@@ -176,24 +216,41 @@ export function useLeaguePlayerHistory(
 ) {
   return useQuery({
     queryKey: ["league-player-history", leagueId, playerId],
-    queryFn: () => getLeaguePlayerHistory<LeaguePlayerHistoryResponse>(leagueId as number, playerId as number),
+    queryFn: () =>
+      getLeaguePlayerHistory<LeaguePlayerHistoryResponse>(
+        leagueId as number,
+        playerId as number,
+      ),
     enabled: enabled && Number.isFinite(leagueId) && Number.isFinite(playerId),
     retry: false,
   });
 }
 
-export function usePlayerTradeValues(playerId?: number | null, season = 2026, enabled = true) {
+export function usePlayerTradeValues(
+  playerId?: number | null,
+  season = 2026,
+  enabled = true,
+) {
   return useQuery({
     queryKey: ["player-trade-values", playerId, season],
-    enabled: enabled && typeof playerId === "number" && Number.isFinite(playerId),
+    enabled:
+      enabled && typeof playerId === "number" && Number.isFinite(playerId),
     // Player-card and Value-tab cache entries must revalidate whenever a card
     // is opened, including after a preseason value reconciliation.
     staleTime: 0,
     refetchOnMount: "always",
     retry: false,
     queryFn: async () => {
-      const payload = await apiGet<PlayerTradeValueResponse>(`/players/${playerId}/trade-values`, { season });
-      return payload.current ? { ...payload, current: { ...payload.current, history: payload.history } } : payload;
+      const payload = await apiGet<PlayerTradeValueResponse>(
+        `/players/${playerId}/trade-values`,
+        { season },
+      );
+      return payload.current
+        ? {
+            ...payload,
+            current: { ...payload.current, history: payload.history },
+          }
+        : payload;
     },
   });
 }
@@ -206,13 +263,17 @@ export function usePlayerTrajectory(
 ) {
   return useQuery({
     queryKey: ["player-trajectory", playerId, season, leagueId ?? null],
-    enabled: enabled && typeof playerId === "number" && Number.isFinite(playerId),
+    enabled:
+      enabled && typeof playerId === "number" && Number.isFinite(playerId),
     staleTime: 60_000,
     retry: false,
-    queryFn: () => apiGet<PlayerTrajectoryResponse>(`/players/${playerId}/trajectory`, {
-      season,
-      ...(typeof leagueId === "number" && Number.isFinite(leagueId) ? { league_id: leagueId } : {}),
-    }),
+    queryFn: () =>
+      apiGet<PlayerTrajectoryResponse>(`/players/${playerId}/trajectory`, {
+        season,
+        ...(typeof leagueId === "number" && Number.isFinite(leagueId)
+          ? { league_id: leagueId }
+          : {}),
+      }),
   });
 }
 
@@ -256,7 +317,12 @@ export type PlayerCardResponse = {
   historical_stats?: {
     player_id: number;
     provider: string;
-    status: "available" | "not_available" | "disabled" | "no_provider_mapping" | "provider_unavailable";
+    status:
+      | "available"
+      | "not_available"
+      | "disabled"
+      | "no_provider_mapping"
+      | "provider_unavailable";
     message?: string | null;
     selected_season?: number | null;
     available_seasons: number[];
@@ -292,7 +358,13 @@ export type PlayerCardResponse = {
   } | null;
 };
 
-const VALID_STATUSES = new Set(["HEALTHY", "OUT", "QUESTIONABLE", "DOUBTFUL", "IR"]);
+const VALID_STATUSES = new Set([
+  "HEALTHY",
+  "OUT",
+  "QUESTIONABLE",
+  "DOUBTFUL",
+  "IR",
+]);
 
 const normalizeStatus = (value?: string | null): Player["status"] => {
   if (!value) return "HEALTHY";
@@ -304,7 +376,7 @@ const normalizeStatus = (value?: string | null): Player["status"] => {
 
 const mapProjection = (
   projection?: BackendProjectionRead,
-  fallbackFantasyPoints = 0
+  fallbackFantasyPoints = 0,
 ): Player["projection"] => ({
   fpts: projection?.fantasy_points ?? fallbackFantasyPoints,
   passingYards: projection?.pass_yards ?? 0,
@@ -334,7 +406,7 @@ export const normalizePlayer = (
     posRank?: number | null;
     status?: string;
     projection?: BackendProjectionRead;
-  }
+  },
 ): Player => ({
   id: player.id,
   name: player.name,
@@ -343,13 +415,21 @@ export const normalizePlayer = (
   imageUrl: player.image_url ?? undefined,
   playerClass: player.player_class ?? undefined,
   conf: context?.conference ?? "N/A",
-  rank: context?.rank ?? player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? 0,
+  rank:
+    context?.rank ??
+    player.board_rank ??
+    player.sheet_adp ??
+    player.cfb27_rank ??
+    0,
   boardRank: player.board_rank ?? player.sheet_adp ?? null,
   adp: context?.adp ?? player.sheet_adp ?? 0,
   posRank: context?.posRank ?? player.cfb27_position_rank ?? null,
   rostered: 0,
   status: normalizeStatus(context?.status),
-  projection: mapProjection(context?.projection, player.sheet_projected_season_points ?? 0),
+  projection: mapProjection(
+    context?.projection,
+    player.sheet_projected_season_points ?? 0,
+  ),
   hasWeeklyProjection: Boolean(context?.projection),
   history: [],
   analysis: "",
@@ -376,7 +456,7 @@ export function usePlayers(
     week?: number;
     limit?: number;
     offset?: number;
-  } = {}
+  } = {},
 ) {
   const {
     search,
@@ -425,45 +505,41 @@ export function usePlayers(
           week,
           limit: 2000,
           offset: 0,
-        }).catch(
-          (): BackendProjectionListResponse => ({
-            data: [],
-          })
-        ),
+        }).catch((): BackendProjectionListResponse => ({
+          data: [],
+        })),
         apiGet<BackendTeamSummaryResponse>("/stats/teams", {
           season,
           conference: "ALL",
-        }).catch(
-          (): BackendTeamSummaryResponse => ({
-            data: [],
-          })
-        ),
+        }).catch((): BackendTeamSummaryResponse => ({
+          data: [],
+        })),
         apiGet<BackendInjuryResponse>("/stats/injuries", {
           season,
           week,
           conference: "ALL",
-        }).catch(
-          (): BackendInjuryResponse => ({
-            data: [],
-          })
-        ),
+        }).catch((): BackendInjuryResponse => ({
+          data: [],
+        })),
       ]);
 
       const overallRankByPlayer = new Map<number, number>();
 
-      const sortedProjections = [...projections.data].sort((a, b) => b.fantasy_points - a.fantasy_points);
+      const sortedProjections = [...projections.data].sort(
+        (a, b) => b.fantasy_points - a.fantasy_points,
+      );
       sortedProjections.forEach((row, index) => {
         overallRankByPlayer.set(row.player_id, index + 1);
       });
       const projectionByPlayerId = new Map<number, BackendProjectionRead>(
-        projections.data.map((row) => [row.player_id, row])
+        projections.data.map((row) => [row.player_id, row]),
       );
 
       const conferenceEntries: Array<[string, string]> = teams.data.map(
-        (row): [string, string] => [row.team.toUpperCase(), row.conference]
+        (row): [string, string] => [row.team.toUpperCase(), row.conference],
       );
       const injuryEntries: Array<[number, string]> = injuries.data.map(
-        (row): [number, string] => [row.player_id, row.status]
+        (row): [number, string] => [row.player_id, row.status],
       );
       const conferenceBySchool = new Map<string, string>(conferenceEntries);
       const injuryByPlayerId = new Map<number, string>(injuryEntries);
@@ -472,13 +548,23 @@ export function usePlayers(
         ...payload,
         data: payload.data.map((player) =>
           normalizePlayer(player, {
-            conference: conferenceBySchool.get(player.school.toUpperCase()) ?? "N/A",
-            rank: player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? overallRankByPlayer.get(player.id) ?? 0,
-            adp: player.sheet_adp ?? player.board_rank ?? overallRankByPlayer.get(player.id) ?? 0,
+            conference:
+              conferenceBySchool.get(player.school.toUpperCase()) ?? "N/A",
+            rank:
+              player.board_rank ??
+              player.sheet_adp ??
+              player.cfb27_rank ??
+              overallRankByPlayer.get(player.id) ??
+              0,
+            adp:
+              player.sheet_adp ??
+              player.board_rank ??
+              overallRankByPlayer.get(player.id) ??
+              0,
             posRank: player.cfb27_position_rank ?? null,
             status: injuryByPlayerId.get(player.id),
             projection: projectionByPlayerId.get(player.id),
-          })
+          }),
         ),
       };
     },
@@ -501,7 +587,7 @@ export function useDraftPlayerPool(
     fetchAll?: boolean;
     maxPages?: number;
     enabled?: boolean;
-  } = {}
+  } = {},
 ) {
   const {
     search,
@@ -566,19 +652,15 @@ export function useDraftPlayerPool(
           week,
           limit: 2000,
           offset: 0,
-        }).catch(
-          (): BackendProjectionListResponse => ({
-            data: [],
-          })
-        ),
+        }).catch((): BackendProjectionListResponse => ({
+          data: [],
+        })),
         apiGet<BackendTeamSummaryResponse>("/stats/teams", {
           season,
           conference: "ALL",
-        }).catch(
-          (): BackendTeamSummaryResponse => ({
-            data: [],
-          })
-        ),
+        }).catch((): BackendTeamSummaryResponse => ({
+          data: [],
+        })),
       ]);
       const pageOffsets = getDraftPlayerPoolPageOffsets({
         fetchAll,
@@ -591,14 +673,22 @@ export function useDraftPlayerPool(
       const pageCount = pageOffsets.length;
       const remainingOffsets = pageOffsets.slice(1);
       const remainingPayloads = remainingOffsets.length
-        ? await fetchDraftPlayerPoolPagesSequentially(remainingOffsets, fetchPage)
+        ? await fetchDraftPlayerPoolPagesSequentially(
+            remainingOffsets,
+            fetchPage,
+          )
         : [];
-      const rows = [firstPayload, ...remainingPayloads].flatMap((payload) => payload.data);
+      const rows = [firstPayload, ...remainingPayloads].flatMap(
+        (payload) => payload.data,
+      );
       const conferenceBySchool = new Map(
-        teams.data.map((row): [string, string] => [row.team.toUpperCase(), row.conference])
+        teams.data.map((row): [string, string] => [
+          row.team.toUpperCase(),
+          row.conference,
+        ]),
       );
       const projectionByPlayerId = new Map<number, BackendProjectionRead>(
-        projections.data.map((row) => [row.player_id, row])
+        projections.data.map((row) => [row.player_id, row]),
       );
 
       return {
@@ -606,12 +696,14 @@ export function useDraftPlayerPool(
         limit: backendLimit * pageCount,
         data: rows.map((player) =>
           normalizePlayer(player, {
-            conference: conferenceBySchool.get(player.school.toUpperCase()) ?? "N/A",
-            rank: player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? 0,
+            conference:
+              conferenceBySchool.get(player.school.toUpperCase()) ?? "N/A",
+            rank:
+              player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? 0,
             adp: player.sheet_adp ?? player.board_rank ?? 0,
             posRank: player.cfb27_position_rank ?? null,
             projection: projectionByPlayerId.get(player.id),
-          })
+          }),
         ),
       };
     },
@@ -668,7 +760,10 @@ export function getDraftPlayerPoolPageOffsets({
     ? Math.min(safeMaxPages, Math.ceil(rowsAfterOffset / safeLimit))
     : requestedPages;
 
-  return Array.from({ length: pageCount }, (_, index) => safeOffset + safeLimit * index);
+  return Array.from(
+    { length: pageCount },
+    (_, index) => safeOffset + safeLimit * index,
+  );
 }
 
 export function usePlayerDetail(playerId?: number | null, enabled = true) {
@@ -681,37 +776,37 @@ export function usePlayerDetail(playerId?: number | null, enabled = true) {
     queryFn: async () => {
       const [payload, projection, teams, injuries] = await Promise.all([
         apiGet<BackendPlayerRead>(`/players/${playerId}`),
-        apiGet<BackendProjectionRead>(`/projections/${playerId}`, { season, week }).catch(() => undefined),
+        apiGet<BackendProjectionRead>(`/projections/${playerId}`, {
+          season,
+          week,
+        }).catch(() => undefined),
         apiGet<BackendTeamSummaryResponse>("/stats/teams", {
           season,
           conference: "ALL",
-        }).catch(
-          (): BackendTeamSummaryResponse => ({
-            data: [],
-          })
-        ),
+        }).catch((): BackendTeamSummaryResponse => ({
+          data: [],
+        })),
         apiGet<BackendInjuryResponse>("/stats/injuries", {
           season,
           week,
           conference: "ALL",
-        }).catch(
-          (): BackendInjuryResponse => ({
-            data: [],
-          })
-        ),
+        }).catch((): BackendInjuryResponse => ({
+          data: [],
+        })),
       ]);
 
       const conferenceEntries: Array<[string, string]> = teams.data.map(
-        (row): [string, string] => [row.team.toUpperCase(), row.conference]
+        (row): [string, string] => [row.team.toUpperCase(), row.conference],
       );
       const injuryEntries: Array<[number, string]> = injuries.data.map(
-        (row): [number, string] => [row.player_id, row.status]
+        (row): [number, string] => [row.player_id, row.status],
       );
       const conferenceBySchool = new Map<string, string>(conferenceEntries);
       const injuryByPlayerId = new Map<number, string>(injuryEntries);
 
       return normalizePlayer(payload, {
-        conference: conferenceBySchool.get(payload.school.toUpperCase()) ?? "N/A",
+        conference:
+          conferenceBySchool.get(payload.school.toUpperCase()) ?? "N/A",
         rank: 0,
         adp: 0,
         posRank: null,
@@ -730,26 +825,34 @@ export function usePlayerCard(playerId?: number | null, enabled = true) {
     enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
     staleTime: 5_000,
     refetchOnMount: "always",
-    queryFn: () => apiGet<PlayerCardResponse>(`/players/${playerId}/card`, {
-      injury_season: injurySeason,
-      injury_week: injuryWeek,
-    }),
+    queryFn: () =>
+      apiGet<PlayerCardResponse>(`/players/${playerId}/card`, {
+        injury_season: injurySeason,
+        injury_week: injuryWeek,
+      }),
   });
 }
 
-export function usePlayerGameLog(playerId?: number | null, season = 2026, enabled = true) {
+export function usePlayerGameLog(
+  playerId?: number | null,
+  season = 2026,
+  enabled = true,
+) {
   return useQuery({
     queryKey: ["player-game-log", playerId, season],
     enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
     staleTime: 60_000,
-    queryFn: () => apiGet<PlayerGameLogResponse>(`/players/${playerId}/game-log`, { season }),
+    queryFn: () =>
+      apiGet<PlayerGameLogResponse>(`/players/${playerId}/game-log`, {
+        season,
+      }),
   });
 }
 
 export function usePlayerSeasonStats(
   playerId?: number | null,
   season = 2025,
-  enabled = true
+  enabled = true,
 ) {
   return useQuery({
     queryKey: ["player-season-stats", playerId, season],

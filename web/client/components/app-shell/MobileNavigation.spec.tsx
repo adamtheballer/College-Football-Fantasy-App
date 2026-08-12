@@ -38,7 +38,9 @@ describe("MobileNavigation", () => {
   it("keeps four tap-friendly primary destinations visible and opens the full sidebar in More", () => {
     renderNavigation();
 
-    const navigation = screen.getByRole("navigation", { name: "Primary mobile navigation" });
+    const navigation = screen.getByRole("navigation", {
+      name: "Primary mobile navigation",
+    });
     expect(navigation).toBeTruthy();
     expect(navigation.className).toContain("relative");
     expect(navigation.className).toContain("shrink-0");
@@ -47,13 +49,19 @@ describe("MobileNavigation", () => {
     expect(screen.getByLabelText("LEAGUES")).toBeTruthy();
     expect(screen.getByLabelText("CHATS: 2 unread chat messages")).toBeTruthy();
     expect(screen.getByLabelText("MOCK DRAFT")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Open all navigation" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Open all navigation" }),
+    ).toBeTruthy();
     expect(screen.queryByText("INJURY CENTER")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open all navigation" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open all navigation" }),
+    );
 
     expect(screen.getByRole("dialog")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "All navigation" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "All navigation" }),
+    ).toBeTruthy();
     expect(screen.getByText("INJURY CENTER")).toBeTruthy();
     expect(screen.getByText("ALERTS")).toBeTruthy();
     expect(screen.getByText("REPORT BUG")).toBeTruthy();
@@ -65,7 +73,9 @@ describe("MobileNavigation", () => {
     const onSignOut = vi.fn();
     renderNavigation(onSignOut);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open all navigation" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open all navigation" }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "SIGN OUT" }));
 
     expect(onSignOut).toHaveBeenCalledTimes(1);
