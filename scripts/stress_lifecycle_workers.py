@@ -16,6 +16,7 @@ if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
 from collegefootballfantasy_api.app.db.session import SessionLocal
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league import League
@@ -671,6 +672,11 @@ def _assert_scoring_rollback() -> dict[str, int]:
         db.add(PlayerStat(player_id=player.id, season=2026, week=1, stats={"PassingYards": 250}))
         db.commit()
 
+        # This harness deliberately exercises the legacy mutable recalculation
+        # rollback path. Production stays fail-closed in disabled/shadow mode;
+        # the test-only process must opt in explicitly and restore its setting.
+        original_scoring_mode = settings.scoring_mode
+        settings.scoring_mode = "enabled"
         original_recalculate_team_scores = scoring_service.recalculate_team_week_scores
 
         def fail_after_player_scores(*_args: object, **_kwargs: object) -> int:
@@ -686,6 +692,7 @@ def _assert_scoring_rollback() -> dict[str, int]:
                 raise AssertionError("scoring rollback stress run unexpectedly succeeded")
         finally:
             scoring_service.recalculate_team_week_scores = original_recalculate_team_scores
+            settings.scoring_mode = original_scoring_mode
 
         failed_run = db.query(ScoringRun).filter_by(league_id=league.id, status="failed").one()
         assert failed_run.error_message and "intentional PostgreSQL scoring rollback" in failed_run.error_message
