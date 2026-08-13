@@ -412,16 +412,22 @@ export default function LeagueMatchup() {
             </div>
           ) : null}
           <div className="space-y-4">
-            {rivalryQuery.data?.is_rivalry_matchup ? (
+            {rivalryQuery.data?.is_rivalry_matchup || rivalryQuery.data?.is_championship ? (
               <section className="flex flex-col gap-3 rounded-2xl border border-cfb-gold/35 bg-[linear-gradient(120deg,rgba(79,57,14,0.38),rgba(15,29,48,0.92)_58%,rgba(11,53,58,0.42))] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cfb-gold/35 bg-cfb-gold/10 text-cfb-gold"><Swords className="h-5 w-5" aria-hidden="true" /></div>
                   <div>
                     <p className="cfb-micro-label text-cfb-gold">{rivalryQuery.data.is_championship ? "CFB Fantasy Bowl · Championship" : "Rivalry Week"}</p>
-                    <p className="mt-1 text-sm font-black text-cfb-text-primary">{rivalryQuery.data.user_team_name} vs {rivalryQuery.data.rival_team_name}</p>
+                    <p className="mt-1 text-sm font-black text-cfb-text-primary">
+                      {rivalryQuery.data.is_rivalry_matchup
+                        ? `${rivalryQuery.data.user_team_name} vs ${rivalryQuery.data.rival_team_name}`
+                        : `${rivalryQuery.data.user_team_name} · Championship matchup`}
+                    </p>
                   </div>
                 </div>
-                <p className="text-xs font-bold text-cfb-text-secondary">Series {rivalryQuery.data.series.wins}-{rivalryQuery.data.series.losses}{rivalryQuery.data.series.ties ? `-${rivalryQuery.data.series.ties}` : ""}{rivalryQuery.data.last_meeting ? ` · Last ${rivalryQuery.data.last_meeting.result} ${rivalryQuery.data.last_meeting.own_score.toFixed(1)}-${rivalryQuery.data.last_meeting.rival_score.toFixed(1)}` : ""}</p>
+                {rivalryQuery.data.is_rivalry_matchup ? (
+                  <p className="text-xs font-bold text-cfb-text-secondary">Series {rivalryQuery.data.series.wins}-{rivalryQuery.data.series.losses}{rivalryQuery.data.series.ties ? `-${rivalryQuery.data.series.ties}` : ""}{rivalryQuery.data.last_meeting ? ` · Last ${rivalryQuery.data.last_meeting.result} ${rivalryQuery.data.last_meeting.own_score.toFixed(1)}-${rivalryQuery.data.last_meeting.rival_score.toFixed(1)}` : ""}</p>
+                ) : null}
               </section>
             ) : null}
             <CompactMatchupScoreboard
