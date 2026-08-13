@@ -6,6 +6,8 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.services.career_profile import record_career_event
 from collegefootballfantasy_api.app.services.league_schedule import ensure_league_schedule
 from collegefootballfantasy_api.app.services.roster_legality import assign_best_roster_slot_for_team
 
@@ -86,5 +88,17 @@ def finalize_draft_rosters_and_matchups(db: Session, league: League) -> dict[str
         )
 
         initialize_waiver_state_after_official_draft(db, league)
+        for team in db.query(Team).filter(Team.league_id == league.id, Team.owner_user_id.is_not(None)).all():
+            record_career_event(
+                db,
+                user_id=team.owner_user_id,
+                event_type="OFFICIAL_DRAFT_COMPLETED",
+                source_key=f"career:official-draft:{draft.id}:team:{team.id}",
+                title=f"Completed the {league.name} draft",
+                league_id=league.id,
+                team_id=team.id,
+                draft_id=draft.id,
+                season=league.season_year,
+            )
 
     return {"rosters_backfilled": rosters_backfilled, "matchups_created": matchups_created}

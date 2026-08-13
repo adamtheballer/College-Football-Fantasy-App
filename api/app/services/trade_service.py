@@ -34,6 +34,7 @@ from collegefootballfantasy_api.app.services.chat_service import (
     create_trade_finalized_chat_message,
     mark_trade_finalized_chat_message_processed,
 )
+from collegefootballfantasy_api.app.services.career_profile import record_career_event
 from collegefootballfantasy_api.app.services.content_moderation import moderate_user_text
 from collegefootballfantasy_api.app.services.league_player_history import EVENT_TRADED, EVENT_TRADE_FAILED, append_league_player_event
 from collegefootballfantasy_api.app.services.player_trade_value import current_trade_value_snapshot
@@ -691,6 +692,22 @@ def _complete_accepted_trade(
     offer.failure_reason = None
     _add_review(db, offer, review_action, actor_user_id, review_reason)
     _notify_participants(db, offer, "TRADE_PROCESSED", "Trade Processed", "Accepted trade players have moved rosters.")
+    for team_id in (offer.proposing_team_id, offer.receiving_team_id):
+        team = db.get(Team, team_id)
+        if team is None or team.owner_user_id is None:
+            continue
+        record_career_event(
+            db,
+            user_id=team.owner_user_id,
+            event_type="TRADE_COMPLETED",
+            source_key=f"career:trade-completed:{offer.id}:team:{team.id}",
+            title=f"Completed a trade in {league.name}",
+            league_id=league.id,
+            team_id=team.id,
+            trade_id=offer.id,
+            season=league.season_year,
+            metadata={"counterparty_team_id": offer.receiving_team_id if team.id == offer.proposing_team_id else offer.proposing_team_id},
+        )
 
 
 def accept_trade_offer(db: Session, league: League, trade_id: int, current_user: User, payload: TradeActionRequest) -> TradeOfferRead:

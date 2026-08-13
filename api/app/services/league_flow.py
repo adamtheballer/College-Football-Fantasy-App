@@ -35,6 +35,7 @@ from collegefootballfantasy_api.app.services.notification_service import (
     cancel_scheduled_notifications,
     schedule_draft_notifications,
 )
+from collegefootballfantasy_api.app.services.career_profile import record_career_event
 
 FIXED_ROSTER_SLOTS = {
     "QB": 1,
@@ -339,21 +340,41 @@ def create_league(
         )
     )
 
-    db.add(
-        LeagueMember(
+    commissioner_membership = LeagueMember(
             league_id=league.id,
             user_id=current_user.id,
             role="commissioner",
-        )
     )
+    db.add(commissioner_membership)
 
-    db.add(
-        Team(
-            league_id=league.id,
-            name=f"{current_user.first_name}'s Team",
-            owner_name=current_user.first_name,
-            owner_user_id=current_user.id,
-        )
+    commissioner_team = Team(
+        league_id=league.id,
+        name=f"{current_user.first_name}'s Team",
+        owner_name=current_user.first_name,
+        owner_user_id=current_user.id,
+    )
+    db.add(commissioner_team)
+    db.flush()
+    record_career_event(
+        db,
+        user_id=current_user.id,
+        event_type="LEAGUE_CREATED",
+        source_key=f"career:league-created:{league.id}:user:{current_user.id}",
+        title=f"Created {league.name}",
+        league_id=league.id,
+        team_id=commissioner_team.id,
+        season=league.season_year,
+    )
+    record_career_event(
+        db,
+        user_id=current_user.id,
+        event_type="LEAGUE_JOINED",
+        source_key=f"career:league-member:{commissioner_membership.id}",
+        title=f"Joined {league.name}",
+        league_id=league.id,
+        team_id=commissioner_team.id,
+        season=league.season_year,
+        metadata={"role": commissioner_membership.role},
     )
 
     schedule_draft_notifications(db, league.id, current_user.id, payload.draft.draft_datetime_utc)
@@ -378,14 +399,25 @@ def join_league(db: Session, league: League, current_user: User) -> LeagueDetail
     if member_count >= league.max_teams:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="league is full")
 
-    db.add(LeagueMember(league_id=league.id, user_id=current_user.id, role="member"))
-    db.add(
-        Team(
-            league_id=league.id,
-            name=f"{current_user.first_name}'s Team",
-            owner_name=current_user.first_name,
-            owner_user_id=current_user.id,
-        )
+    membership = LeagueMember(league_id=league.id, user_id=current_user.id, role="member")
+    db.add(membership)
+    joined_team = Team(
+        league_id=league.id,
+        name=f"{current_user.first_name}'s Team",
+        owner_name=current_user.first_name,
+        owner_user_id=current_user.id,
+    )
+    db.add(joined_team)
+    db.flush()
+    record_career_event(
+        db,
+        user_id=current_user.id,
+        event_type="LEAGUE_JOINED",
+        source_key=f"career:league-member:{membership.id}",
+        title=f"Joined {league.name}",
+        league_id=league.id,
+        team_id=joined_team.id,
+        season=league.season_year,
     )
     draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
     if draft_row:

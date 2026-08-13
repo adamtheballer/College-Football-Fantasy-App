@@ -21,6 +21,7 @@ from collegefootballfantasy_api.app.schemas.draft_room import (
     DraftRoomRead,
 )
 from collegefootballfantasy_api.app.schemas.league import LeagueList
+from collegefootballfantasy_api.app.schemas.career import RivalryMatchupRead, RivalryRead, RivalryUpdate
 from collegefootballfantasy_api.app.schemas.league_player_history import LeaguePlayerHistoryRead
 from collegefootballfantasy_api.app.schemas.league_flow import (
     DraftOrderRead,
@@ -72,6 +73,11 @@ from collegefootballfantasy_api.app.services.league_roster_matchup import (
     build_settings_view,
 )
 from collegefootballfantasy_api.app.services.scoring_service import run_league_scoring_recalculation
+from collegefootballfantasy_api.app.services.league_rivalries import (
+    get_rivalry,
+    rivalry_matchup_context,
+    set_rivalry,
+)
 
 router = APIRouter()
 @router.post("", response_model=LeagueCreateResponse, status_code=status.HTTP_201_CREATED)
@@ -190,6 +196,44 @@ def get_league_matchup_tab_endpoint(
         selected_week=week,
         matchup_id=matchup_id,
     )
+
+
+@router.get("/{league_id}/rival", response_model=RivalryRead)
+def get_league_rival_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> RivalryRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return get_rivalry(db, league, current_user)
+
+
+@router.put("/{league_id}/rival", response_model=RivalryRead)
+def set_league_rival_endpoint(
+    league_id: int,
+    payload: RivalryUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> RivalryRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return set_rivalry(db, league, current_user, payload.rival_team_id)
+
+
+@router.get("/{league_id}/matchups/{matchup_id}/rivalry", response_model=RivalryMatchupRead)
+def get_matchup_rivalry_context_endpoint(
+    league_id: int,
+    matchup_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> RivalryMatchupRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    matchup = db.query(Matchup).filter(Matchup.id == matchup_id, Matchup.league_id == league.id).one_or_none()
+    if matchup is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="matchup not found in this league")
+    return rivalry_matchup_context(db, league, current_user, matchup)
 
 
 @router.get("/{league_id}/players/{player_id}/history", response_model=LeaguePlayerHistoryRead)
