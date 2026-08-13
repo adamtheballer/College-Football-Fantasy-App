@@ -30,6 +30,7 @@ from collegefootballfantasy_api.app.models.team_week_score import TeamWeekScore
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_starts_for_players
+from collegefootballfantasy_api.app.services.league_weeks import latest_fully_finalized_matchup_week
 from collegefootballfantasy_api.app.services.postseason_service import progress_postseason
 
 
@@ -561,6 +562,13 @@ def _upsert_standing(
 
 
 def recalculate_standings_for_week(db: Session, league_id: int, season: int, week: int) -> int:
+    league = db.get(League, league_id)
+    if league is None:
+        return 0
+    completed_week = latest_fully_finalized_matchup_week(db, league)
+    if completed_week is None:
+        return 0
+
     teams = db.query(Team).filter(Team.league_id == league_id).all()
     records = {
         team.id: {"wins": 0, "losses": 0, "ties": 0, "points_for": 0.0, "points_against": 0.0}
@@ -568,7 +576,7 @@ def recalculate_standings_for_week(db: Session, league_id: int, season: int, wee
     }
     final_matchups = (
         db.query(Matchup)
-        .filter(Matchup.league_id == league_id, Matchup.season == season, Matchup.week <= week)
+        .filter(Matchup.league_id == league_id, Matchup.season == season, Matchup.week <= completed_week)
         .all()
     )
     for matchup in final_matchups:
@@ -597,7 +605,7 @@ def recalculate_standings_for_week(db: Session, league_id: int, season: int, wee
             league_id,
             team_id,
             season,
-            week,
+            completed_week,
             int(record["wins"]),
             int(record["losses"]),
             int(record["ties"]),

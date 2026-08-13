@@ -78,5 +78,7 @@ def test_recalculate_endpoint_requires_commissioner(client, db_session, monkeypa
         "players_scored": 6,
         "teams_scored": 2,
         "matchups_updated": 1,
-        "standings_updated": 2,
+        # Score recomputation can run before games are final, but standings
+        # must remain unpublished until the complete matchup week is final.
+        "standings_updated": 0,
     }

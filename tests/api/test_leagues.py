@@ -831,7 +831,7 @@ def test_league_workspace_returns_real_matchup_and_standings(client, db_session)
             week=3,
             home_team_id=commissioner_team.id,
             away_team_id=member_team.id,
-            status="live",
+            status="final",
             home_score=118.4,
             away_score=111.2,
         )
