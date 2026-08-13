@@ -11,6 +11,7 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
+from collegefootballfantasy_api.app.models.live_scoring import ProviderGamePollState
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_waiver_availability import PlayerWaiverAvailability
@@ -28,6 +29,7 @@ from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjec
 from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueMatchupTabRead,
+    MatchupLiveRefreshRead,
     LeagueInviteSettingsRead,
     LeagueMemberRead,
     LeagueRosterTabRead,
@@ -65,6 +67,45 @@ DEFAULT_ROSTER_SLOTS = {
     "BENCH": 4,
     "IR": 1,
 }
+
+
+def _matchup_live_refresh(db: Session, *, season: int, week: int) -> MatchupLiveRefreshRead:
+    """Expose the shared provider schedule without polling or mutating from reads."""
+
+    cadence_seconds = max(int(app_settings.espn_live_scoring_active_poll_interval_seconds), 1)
+    if not app_settings.espn_live_scoring_enabled:
+        return MatchupLiveRefreshRead(
+            enabled=False,
+            cadence_seconds=cadence_seconds,
+            status="disabled",
+        )
+
+    active_states = (
+        db.query(ProviderGamePollState)
+        .filter(
+            ProviderGamePollState.provider == "espn",
+            ProviderGamePollState.season == season,
+            ProviderGamePollState.week == week,
+            ProviderGamePollState.lifecycle_state.in_(("live", "in_progress", "delayed")),
+        )
+        .all()
+    )
+    if not active_states:
+        return MatchupLiveRefreshRead(
+            enabled=True,
+            cadence_seconds=cadence_seconds,
+            status="not_live",
+        )
+
+    next_refreshes = [state.next_poll_at for state in active_states if state.next_poll_at]
+    successes = [state.last_success_at for state in active_states if state.last_success_at]
+    return MatchupLiveRefreshRead(
+        enabled=True,
+        cadence_seconds=cadence_seconds,
+        status="scheduled" if next_refreshes else "awaiting_schedule",
+        next_refresh_at=min(next_refreshes) if next_refreshes else None,
+        last_success_at=max(successes) if successes else None,
+    )
 
 
 def _slot_limits(db: Session, league: League) -> dict[str, int]:
@@ -417,6 +458,7 @@ def build_matchup_tab_view(
     matchup_id: int | None = None,
 ) -> LeagueMatchupTabRead:
     week = resolve_current_week(db, league, selected_week)
+    live_refresh = _matchup_live_refresh(db, season=league.season_year, week=week)
     viewer_team = _owned_team(db, league, user)
     if matchup_id is not None:
         matchup = (
@@ -460,6 +502,7 @@ def build_matchup_tab_view(
             my_roster=[],
             opponent_roster=[],
             message="No team found for your user in this league.",
+            live_refresh=live_refresh,
         )
 
     if not matchup:
@@ -487,6 +530,7 @@ def build_matchup_tab_view(
             my_roster=my_roster,
             opponent_roster=[],
             message="No matchup generated yet.",
+            live_refresh=live_refresh,
         )
 
     roster_by_team = _serialize_team_rosters(
@@ -547,6 +591,7 @@ def build_matchup_tab_view(
         opponent_roster=opponent_roster,
         projection_source="weekly_projections",
         message=None,
+        live_refresh=live_refresh,
     )
 
 

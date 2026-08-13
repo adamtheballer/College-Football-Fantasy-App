@@ -292,6 +292,14 @@ export interface LeagueMatchupTeam {
   roster: LeagueRosterPlayer[];
 }
 
+export interface LeagueMatchupLiveRefresh {
+  enabled: boolean;
+  cadence_seconds: number;
+  status: "disabled" | "not_live" | "scheduled" | "awaiting_schedule";
+  next_refresh_at?: string | null;
+  last_success_at?: string | null;
+}
+
 export interface LeagueMatchupTabResponse {
   league_id: number;
   season?: number;
@@ -305,6 +313,7 @@ export interface LeagueMatchupTabResponse {
   opponent_roster?: LeagueRosterPlayer[];
   projection_source?: string;
   message?: string | null;
+  live_refresh?: LeagueMatchupLiveRefresh | null;
 }
 
 export interface LeagueScheduleRow {

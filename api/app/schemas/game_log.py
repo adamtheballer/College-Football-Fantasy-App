@@ -31,6 +31,15 @@ class PlayerGameLogRowRead(BaseModel):
     stats: PlayerGameLogStatRead | None = None
 
 
+class PlayerGameLogSeasonSummaryRead(BaseModel):
+    """Verified standard-scoring total shown before the individual game rows."""
+
+    season: int
+    fantasy_points: float
+    finalized_games: int
+    source: str = "verified_player_stats"
+
+
 class PlayerGameLogRead(BaseModel):
     player_id: int
     player_name: str
@@ -38,4 +47,5 @@ class PlayerGameLogRead(BaseModel):
     team_name: str | None = None
     position: str
     games: list[PlayerGameLogRowRead]
+    season_summary: PlayerGameLogSeasonSummaryRead | None = None
     message: str | None = None

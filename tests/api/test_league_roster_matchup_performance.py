@@ -2,7 +2,11 @@ from sqlalchemy import event
 
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.user import User
-from collegefootballfantasy_api.app.services.league_roster_matchup import build_matchup_tab_view
+from collegefootballfantasy_api.app.core.config import settings as app_settings
+from collegefootballfantasy_api.app.services.league_roster_matchup import (
+    _matchup_live_refresh,
+    build_matchup_tab_view,
+)
 from tests.api.scoring_helpers import create_scoring_fixture
 
 
@@ -46,3 +50,14 @@ def test_matchup_tab_uses_a_bounded_number_of_selects(client, db_session):
     assert len(response.my_roster) == 8
     assert len(response.opponent_roster) == 8
     assert select_count <= 8
+
+
+def test_matchup_refresh_contract_is_disabled_without_alpha_live_scoring(db_session, monkeypatch):
+    monkeypatch.setattr(app_settings, "espn_live_scoring_enabled", False)
+    monkeypatch.setattr(app_settings, "espn_live_scoring_active_poll_interval_seconds", 240)
+
+    refresh = _matchup_live_refresh(db_session, season=2026, week=1)
+
+    assert refresh.enabled is False
+    assert refresh.status == "disabled"
+    assert refresh.cadence_seconds == 240

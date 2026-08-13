@@ -90,12 +90,14 @@ export const isHistoricalFantasyPointsColumn = (label: string) => FANTASY_POINT_
 export const historicalStatValuesForSeason = (season: HistoricalStatSeason) => {
   const values = new Map<string, number | string | null>();
   for (const stat of season.summary) {
-    if (!isHistoricalFantasyPointsColumn(stat.label)) values.set(stat.label, stat.value);
+    const label = isHistoricalFantasyPointsColumn(stat.label) ? "Fantasy Points" : stat.label;
+    values.set(label, stat.value);
   }
   for (const category of season.categories) {
     for (const stat of category.stats) {
-      const label = historicalStatColumnLabel(category, stat.label);
-      if (!isHistoricalFantasyPointsColumn(label) && !values.has(label)) values.set(label, stat.value);
+      const rawLabel = historicalStatColumnLabel(category, stat.label);
+      const label = isHistoricalFantasyPointsColumn(rawLabel) ? "Fantasy Points" : rawLabel;
+      if (!values.has(label)) values.set(label, stat.value);
     }
   }
   return values;
@@ -105,9 +107,11 @@ export const getHistoricalStatColumnsForPosition = (
   position: string | null | undefined,
   availableColumns: Iterable<string>,
 ) => {
-  const available = new Set([...availableColumns].filter((label) => !isHistoricalFantasyPointsColumn(label)));
+  const available = new Set(
+    [...availableColumns].map((label) => isHistoricalFantasyPointsColumn(label) ? "Fantasy Points" : label),
+  );
   const primary = POSITION_PRIMARY_COLUMNS[normalizeHistoricalFantasyPosition(position) ?? ""] ?? GENERIC_COLUMNS;
-  const ordered = [...new Set([...primary, ...SHARED_COLUMNS])]
+  const ordered = [...new Set(["Fantasy Points", ...primary, ...SHARED_COLUMNS])]
     .filter((label) => available.has(label));
   const remaining = [...available]
     .filter((label) => !ordered.includes(label))

@@ -18,6 +18,7 @@ from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.player import (
     PlayerCardAboutRead,
     PlayerCardInjuryRead,
+    PlayerCardPositionalRankRead,
     PlayerCardRead,
     PlayerCardStatRowRead,
     PlayerCreate,
@@ -39,6 +40,7 @@ from collegefootballfantasy_api.app.services.historical_stats import (
     resolve_espn_player_id,
 )
 from collegefootballfantasy_api.app.services.player_game_log import build_player_game_log
+from collegefootballfantasy_api.app.services.player_season_rank_service import get_latest_player_positional_rank
 from collegefootballfantasy_api.app.services.player_trade_value import get_player_trade_values
 from collegefootballfantasy_api.app.services.player_trajectory import build_player_trajectory
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
@@ -373,6 +375,11 @@ def get_player_card_endpoint(
             historical_stats.message = f"{historical_stats.message or 'ESPN historical stats unavailable.'} {exc}"
 
     card_player = _player_card_player_with_sheet_projection_fallback(db, player)
+    positional_rank = get_latest_player_positional_rank(
+        db,
+        player_id=player.id,
+        season=current_injury_season,
+    )
     return PlayerCardRead(
         player=card_player,
         about=_map_espn_about(player, card_player, profile_payload, profile_message, espn_player_id=espn_id),
@@ -403,6 +410,17 @@ def get_player_card_endpoint(
             )
             for row in stat_rows
         ],
+        positional_rank=(
+            PlayerCardPositionalRankRead(
+                season=positional_rank.season,
+                through_week=positional_rank.through_week,
+                position=positional_rank.position,
+                fantasy_points=positional_rank.fantasy_points,
+                position_rank=positional_rank.position_rank,
+            )
+            if positional_rank
+            else None
+        ),
         historical_stats=historical_stats,
     )
 

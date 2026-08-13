@@ -97,6 +97,12 @@ export type PlayerGameLogResponse = {
   team_name?: string | null;
   position: string;
   message?: string | null;
+  season_summary?: {
+    season: number;
+    fantasy_points: number;
+    finalized_games: number;
+    source: "verified_player_stats";
+  } | null;
   games: Array<{
     schedule_id: number;
     game_id?: number | null;
@@ -219,6 +225,13 @@ export function usePlayerTrajectory(
 export type PlayerCardResponse = {
   player: BackendPlayerRead;
   current_injury_status?: string | null;
+  positional_rank?: {
+    season: number;
+    through_week: number;
+    position: string;
+    fantasy_points: number;
+    position_rank: number;
+  } | null;
   about: {
     espn_player_id?: string | null;
     height?: string | null;

@@ -600,6 +600,16 @@ class MatchupTeamRead(BaseModel):
     roster: list[RosterTabEntryRead]
 
 
+class MatchupLiveRefreshRead(BaseModel):
+    """Read-only shared-refresh schedule for an active matchup."""
+
+    enabled: bool
+    cadence_seconds: int
+    status: str
+    next_refresh_at: datetime | None = None
+    last_success_at: datetime | None = None
+
+
 class LeagueMatchupTabRead(BaseModel):
     league_id: int
     season: int
@@ -613,6 +623,7 @@ class LeagueMatchupTabRead(BaseModel):
     projection_source: str = "weekly_projections"
     message: str | None = None
     user_team: MatchupTeamRead | None = None
+    live_refresh: MatchupLiveRefreshRead | None = None
 
 
 class LeagueWaiverPlayerRead(BaseModel):

@@ -1,6 +1,6 @@
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.team_environment import TeamEnvironment
-from collegefootballfantasy_api.app.services.projections.engine import build_weekly_projections
+from collegefootballfantasy_api.app.services.projections.engine import _projection_rating, build_weekly_projections
 
 
 def _player(player_id: int, position: str, *, overall: int, position_rank: int = 1) -> Player:
@@ -84,3 +84,36 @@ def test_preseason_baselines_replace_zero_volume_team_environment_rows() -> None
     )
 
     assert projections[0].fantasy_points > 10.0
+
+
+def test_week_two_uses_only_a_value_calculation_from_a_finalized_prior_week() -> None:
+    player = _player(1, "RB", overall=80)
+    player.raw_cfb27_rating = 80
+    player.current_value_rating = 99
+    player.value_calculation_week = 1
+
+    def projection_for(week: int) -> float:
+        return build_weekly_projections(
+            players=[player],
+            team_env_by_team={},
+            usage_by_player={},
+            defense_by_team={},
+            player_stats={},
+            injuries_by_player={},
+            opponent_by_team={},
+            season=2026,
+            week=week,
+        )[0].fantasy_points
+
+    # The Week 1 point is locked to the reviewed CFB27 preseason rating; the
+    # later-week point can use the value calculated after that verified week.
+    assert projection_for(2) > projection_for(1)
+
+
+def test_projection_rating_never_uses_a_future_value_calculation() -> None:
+    player = _player(1, "RB", overall=80)
+    player.raw_cfb27_rating = 80
+    player.current_value_rating = 99
+    player.value_calculation_week = 3
+
+    assert _projection_rating(player, week=2) == 80

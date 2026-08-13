@@ -204,6 +204,7 @@ def build_final_scoring_promotion_preview(
         blockers=tuple(blockers),
         dependent_recalculations={
             "player_card_game_log_and_history": dependent_state,
+            "season_positional_rank_snapshot": dependent_state,
             "next_week_projection_rebuild": dependent_state,
             "current_value_recalculation": dependent_state,
             "matchups_and_win_probability": dependent_state,

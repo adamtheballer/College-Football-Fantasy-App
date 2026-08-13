@@ -8,9 +8,11 @@ from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
+from collegefootballfantasy_api.app.scoring import calculate_fantasy_points, get_scoring_rules
 from collegefootballfantasy_api.app.schemas.game_log import (
     PlayerGameLogRead,
     PlayerGameLogRowRead,
+    PlayerGameLogSeasonSummaryRead,
     PlayerGameLogStatRead,
 )
 
@@ -59,27 +61,50 @@ def _location_label(schedule: TeamSchedule) -> str:
     return "Home"
 
 
-def _fantasy_points(stats: dict) -> float | None:
+def _fantasy_points(stats: dict, position: str) -> float | None:
     for key in ("fantasy_points", "fantasyPoints", "fpts", "FantasyPoints"):
         value = stats.get(key)
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             return float(value)
-    return None
+    return calculate_fantasy_points(stats, get_scoring_rules(), position=position) if stats else None
 
 
-def _stat_read(stat: PlayerGameStat | PlayerStat | None) -> PlayerGameLogStatRead | None:
+def _stat_read(stat: PlayerGameStat | PlayerStat | None, position: str) -> PlayerGameLogStatRead | None:
     if stat is None:
         return None
     return PlayerGameLogStatRead(
         source=stat.source,
         stats=stat.stats,
-        fantasy_points=_fantasy_points(stat.stats),
+        fantasy_points=_fantasy_points(stat.stats, position),
         updated_at=stat.updated_at,
     )
 
 
 def _team_schedule_table_exists(db: Session) -> bool:
     return inspect(db.get_bind()).has_table(TeamSchedule.__tablename__)
+
+
+def _season_summary(db: Session, player: Player, season: int) -> PlayerGameLogSeasonSummaryRead | None:
+    """Sum only verified weekly rows; no schedule or provider guesswork is involved."""
+
+    rows = (
+        db.query(PlayerStat)
+        .filter(
+            PlayerStat.player_id == player.id,
+            PlayerStat.season == season,
+            PlayerStat.week >= 1,
+            PlayerStat.verified.is_(True),
+        )
+        .order_by(PlayerStat.week.asc(), PlayerStat.id.asc())
+        .all()
+    )
+    if not rows:
+        return None
+    return PlayerGameLogSeasonSummaryRead(
+        season=season,
+        fantasy_points=round(sum(_fantasy_points(row.stats, player.position) or 0.0 for row in rows), 2),
+        finalized_games=len(rows),
+    )
 
 
 def _game_result(schedule: TeamSchedule, game: Game | None) -> str | None:
@@ -121,6 +146,7 @@ def _stat_status(schedule: TeamSchedule, game: Game | None, stat: PlayerGameStat
 
 
 def build_player_game_log(db: Session, player: Player, *, season: int) -> PlayerGameLogRead:
+    season_summary = _season_summary(db, player, season)
     if not _team_schedule_table_exists(db):
         return PlayerGameLogRead(
             player_id=player.id,
@@ -129,7 +155,8 @@ def build_player_game_log(db: Session, player: Player, *, season: int) -> Player
             team_name=player.school,
             position=player.position,
             games=[],
-            message="The 2026 team schedule is not available yet.",
+            season_summary=season_summary,
+            message=f"The {season} team schedule is not available yet.",
         )
     schedules = (
         db.query(TeamSchedule)
@@ -146,7 +173,8 @@ def build_player_game_log(db: Session, player: Player, *, season: int) -> Player
             team_name=player.school,
             position=player.position,
             games=[],
-            message="2026 schedule has not been imported for this player's team.",
+            season_summary=season_summary,
+            message=f"{season} schedule has not been imported for this player's team.",
         )
 
     game_ids = [schedule.game_id for schedule in player_schedules if schedule.game_id is not None]
@@ -175,7 +203,7 @@ def build_player_game_log(db: Session, player: Player, *, season: int) -> Player
         game = games_by_id.get(schedule.game_id) if schedule.game_id is not None else None
         game_stat = stats_by_game.get(schedule.game_id) if schedule.game_id is not None else None
         stat = game_stat or stats_by_week.get(schedule.week)
-        stat_read = _stat_read(stat)
+        stat_read = _stat_read(stat, player.position)
         rows.append(
             PlayerGameLogRowRead(
                 schedule_id=schedule.id,
@@ -203,4 +231,5 @@ def build_player_game_log(db: Session, player: Player, *, season: int) -> Player
         team_name=player.school,
         position=player.position,
         games=rows,
+        season_summary=season_summary,
     )

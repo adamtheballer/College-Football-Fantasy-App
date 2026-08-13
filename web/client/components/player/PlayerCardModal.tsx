@@ -167,8 +167,16 @@ const getStatValue = (stats: Record<string, unknown> | null | undefined, keys: r
   return null;
 };
 
-const gameLogStatValue = (stats: Record<string, unknown> | null | undefined, keys: readonly string[]) =>
-  getStatValue(stats, keys);
+const gameLogStatValue = (
+  stats: Record<string, unknown> | null | undefined,
+  keys: readonly string[],
+  fantasyPoints?: number | null,
+) => {
+  if (keys.some((key) => ["fantasy_points", "fantasyPoints", "fpts"].includes(key))) {
+    return fantasyPoints ?? getStatValue(stats, keys);
+  }
+  return getStatValue(stats, keys);
+};
 
 type GameLogColumn = readonly [label: string, keys: readonly string[]];
 
@@ -350,11 +358,18 @@ export function PlayerCardModal({
   title?: string;
 }) {
   const [activeTab, setActiveTab] = useState<PlayerCardTab>("summary");
+  const [gameLogSeason, setGameLogSeason] = useState(2026);
   const historicalStatsScrollRef = useRef<HTMLDivElement>(null);
   const hasLeagueContext = typeof leagueId === "number" && Number.isFinite(leagueId) && leagueId > 0;
   const position = (card?.about.position ?? player.position ?? "").toUpperCase();
   const playerStatus = resolvePlayerCardStatus(card, player.status);
-  const gameLogQuery = usePlayerGameLog(player.id, 2026, activeTab === "game-log");
+  const historicalStats = card?.historical_stats;
+  const historicalSeasons = historicalStats?.seasons ?? [];
+  const gameLogSeasons = useMemo(
+    () => Array.from(new Set([2026, ...historicalSeasons.map((season) => season.season)])).sort((left, right) => right - left),
+    [historicalSeasons],
+  );
+  const gameLogQuery = usePlayerGameLog(player.id, gameLogSeason, activeTab === "game-log");
   const historyQuery = useLeaguePlayerHistory(leagueId ?? undefined, player.id, activeTab === "history" && hasLeagueContext);
   const valueQuery = usePlayerTradeValues(player.id, 2026);
   const trajectoryQuery = usePlayerTrajectory(
@@ -364,8 +379,6 @@ export function PlayerCardModal({
     activeTab === "projections" || activeTab === "value",
   );
   const palette = getPlayerCardPalette(position);
-  const historicalStats = card?.historical_stats;
-  const historicalSeasons = historicalStats?.seasons ?? [];
   const historicalTablePosition = historicalStatsTablePosition(historicalSeasons, position);
   const historicalSummaryColumns = buildHistoricalSeasonSummaryColumns(historicalSeasons, historicalTablePosition);
   const projectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
@@ -379,6 +392,14 @@ export function PlayerCardModal({
   useEffect(() => {
     if (historicalStatsScrollRef.current) historicalStatsScrollRef.current.scrollLeft = 0;
   }, [player.id, historicalTablePosition]);
+
+  useEffect(() => {
+    setGameLogSeason(2026);
+  }, [player.id]);
+
+  useEffect(() => {
+    if (!gameLogSeasons.includes(gameLogSeason)) setGameLogSeason(gameLogSeasons[0] ?? 2026);
+  }, [gameLogSeason, gameLogSeasons]);
   const projectionHighlights = [
     ["Fantasy", projectionStats?.fpts ?? player.projectedPoints],
     ["Floor", projectionStats?.floor],
@@ -569,14 +590,30 @@ export function PlayerCardModal({
             <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>2026 Game Log</p>
+                  <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>{gameLogSeason} Game Log</p>
                   <p className="mt-2 text-sm font-bold leading-6 text-white/55">
                     {gameLogQuery.data?.team_name ?? card?.about.team ?? player.school} schedule. Completed game stats appear here after they are verified.
                   </p>
                 </div>
-                <p className="rounded-full border border-white/15 bg-white/[0.05] px-3 py-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/55">
-                  {position || "Player"}
-                </p>
+                <div className="flex items-center gap-2">
+                  {gameLogSeasons.length > 1 ? (
+                    <label className="sr-only" htmlFor="player-card-game-log-season">Game log season</label>
+                  ) : null}
+                  {gameLogSeasons.length > 1 ? (
+                    <select
+                      id="player-card-game-log-season"
+                      aria-label="Game log season"
+                      className="rounded-full border border-white/15 bg-slate-950 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-white outline-none"
+                      value={gameLogSeason}
+                      onChange={(event) => setGameLogSeason(Number(event.target.value))}
+                    >
+                      {gameLogSeasons.map((season) => <option key={season} value={season}>{season}</option>)}
+                    </select>
+                  ) : null}
+                  <p className="rounded-full border border-white/15 bg-white/[0.05] px-3 py-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/55">
+                    {position || "Player"}
+                  </p>
+                </div>
               </div>
               {gameLogQuery.isLoading ? (
                 <div className="mt-5 flex min-h-40 items-center justify-center gap-3 rounded-2xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">
@@ -586,7 +623,7 @@ export function PlayerCardModal({
                 <p className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm font-bold leading-6 text-amber-100">
                   The Game Log is unavailable right now. Please try again shortly.
                 </p>
-              ) : gameLogQuery.data?.games.length ? (
+              ) : gameLogQuery.data?.games.length || gameLogQuery.data?.season_summary ? (
                 <>
                 <div className="mt-5 hidden overflow-x-auto rounded-2xl border border-white/10 bg-black/20 md:block">
                   <table className="min-w-max border-collapse text-left">
@@ -602,6 +639,24 @@ export function PlayerCardModal({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
+                      {gameLogQuery.data.season_summary ? (
+                        <tr className="bg-cyan-300/[0.07] text-sm font-bold text-white/85">
+                          <td className="px-4 py-4 font-black text-cyan-100">Season</td>
+                          <td className="px-4 py-4">
+                            <p className="font-black text-white">{gameLogQuery.data.season} standard fantasy total</p>
+                            <p className="mt-1 text-[10px] font-bold text-white/45">
+                              {gameLogQuery.data.season_summary.finalized_games} verified final game{gameLogQuery.data.season_summary.finalized_games === 1 ? "" : "s"}
+                            </p>
+                          </td>
+                          <td className="px-4 py-4 text-xs font-black uppercase tracking-[0.16em] text-white/55">Verified</td>
+                          <td className="px-4 py-4 text-xs font-black text-white/55">—</td>
+                          {gameLogColumnsForPosition(position).map(([label]) => (
+                            <td key={label} className="px-4 py-4 text-right font-black tabular-nums text-white">
+                              {label === "FPTS" ? formatPlayerCardValue(gameLogQuery.data.season_summary?.fantasy_points) : "—"}
+                            </td>
+                          ))}
+                        </tr>
+                      ) : null}
                       {gameLogQuery.data.games.map((row) => {
                         const stats = row.stats?.stats;
                         return (
@@ -614,7 +669,7 @@ export function PlayerCardModal({
                             <td className="whitespace-nowrap px-4 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-white/55">{row.location_label}</td>
                             <td className="whitespace-nowrap px-4 py-4 text-xs font-black tabular-nums text-white/70">{row.result ?? "—"}</td>
                             {gameLogColumnsForPosition(position).map(([label, keys]) => {
-                              const value = row.location === "bye" ? null : gameLogStatValue(stats, keys);
+                              const value = row.location === "bye" ? null : gameLogStatValue(stats, keys, row.stats?.fantasy_points);
                               return (
                                 <td key={label} className="whitespace-nowrap px-4 py-4 text-right font-black tabular-nums text-white">
                                   {formatPlayerCardValue(value)}
@@ -628,6 +683,15 @@ export function PlayerCardModal({
                   </table>
                 </div>
                 <div className="mt-5 space-y-3 md:hidden">
+                  {gameLogQuery.data.season_summary ? (
+                    <article className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.07] p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100">{gameLogQuery.data.season} Season Total</p>
+                      <div className="mt-2 flex items-end justify-between gap-3">
+                        <p className="text-2xl font-black tabular-nums text-white">{formatPlayerCardValue(gameLogQuery.data.season_summary.fantasy_points)} FPTS</p>
+                        <p className="text-right text-[10px] font-bold leading-5 text-white/55">{gameLogQuery.data.season_summary.finalized_games} verified final game{gameLogQuery.data.season_summary.finalized_games === 1 ? "" : "s"}</p>
+                      </div>
+                    </article>
+                  ) : null}
                   {gameLogQuery.data.games.map((row) => {
                     const stats = row.stats?.stats;
                     return (
@@ -642,7 +706,7 @@ export function PlayerCardModal({
                         </div>
                         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
                           {gameLogColumnsForPosition(position).map(([label, keys]) => {
-                            const value = row.location === "bye" ? null : gameLogStatValue(stats, keys);
+                            const value = row.location === "bye" ? null : gameLogStatValue(stats, keys, row.stats?.fantasy_points);
                             return (
                               <div key={label} className="flex items-center justify-between gap-3 text-xs">
                                 <span className="font-black uppercase tracking-[0.12em] text-white/45">{label}</span>
@@ -658,7 +722,7 @@ export function PlayerCardModal({
                 </>
               ) : (
                 <p className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
-                  {gameLogQuery.data?.message ?? "No 2026 schedule has been imported for this player's team yet."}
+                  {gameLogQuery.data?.message ?? `No ${gameLogSeason} schedule has been imported for this player's team yet.`}
                 </p>
               )}
             </section>
