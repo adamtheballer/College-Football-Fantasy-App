@@ -36,12 +36,17 @@ from collegefootballfantasy_api.app.models.live_scoring import (
     ShadowScoringReadModel,
 )
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.services.live_scoring_service import (
+    certify_espn_game_final,
     ensure_relevant_espn_poll_states,
     ingest_espn_game_summary,
     process_one_scoring_work_item,
+)
+from collegefootballfantasy_api.app.services.live_scoring_promotion_preview import (
+    build_final_scoring_promotion_preview,
 )
 from tests.api.scoring_helpers import create_scoring_fixture
 
@@ -238,6 +243,7 @@ def test_week_9_2025_espn_replay_stays_shadow_only_and_handles_a_final_correctio
     db_session.commit()
 
     public_stat_count = db_session.query(PlayerStat).count()
+    public_game_stat_count = db_session.query(PlayerGameStat).count()
     original_matchup_status = matchup.status
     assert ensure_relevant_espn_poll_states(db_session, season=SEASON, week=WEEK) == 1
     state = db_session.query(ProviderGamePollState).one()
@@ -284,12 +290,6 @@ def test_week_9_2025_espn_replay_stays_shadow_only_and_handles_a_final_correctio
     assert correction["revisions"] == 1
     assert _process_all_scoring_work(db_session) == 2
 
-    assert _snapshot_score(db_session, player_id=players["qb"].id, revision_number=2) == pytest.approx(34.88)
-    assert _snapshot_score(db_session, player_id=players["rb"].id, revision_number=2) == pytest.approx(11.90)
-    assert _snapshot_score(db_session, player_id=players["wr"].id, revision_number=2) == pytest.approx(13.50)
-    assert _snapshot_score(db_session, player_id=players["bench"].id, revision_number=2) == pytest.approx(17.40)
-    assert _snapshot_score(db_session, player_id=players["qb"].id, revision_number=3) == pytest.approx(34.92)
-
     kicker_revision = (
         db_session.query(PlayerGameStatRevision)
         .filter(PlayerGameStatRevision.player_id == kicker.id)
@@ -300,11 +300,46 @@ def test_week_9_2025_espn_replay_stays_shadow_only_and_handles_a_final_correctio
     assert kicker_revision.status == "blocked_incomplete"
     assert db_session.query(ScoringCalculationSnapshot).filter_by(player_id=kicker.id).count() == 0
 
+    # A final certification is distinct from the raw final payload.  The
+    # promotion preview may use only the certified final state and remains
+    # pure: it must not write public player history or game-log rows.
+    certification = certify_espn_game_final(db_session, state_id=state.id)
+    assert certification == {"certified": True, "blockers": []}
+    promotion_preview = build_final_scoring_promotion_preview(db_session, season=SEASON, week=WEEK)
+    assert promotion_preview.status == "blocked"
+    assert promotion_preview.database_writes == 0
+    assert {plan.player_name: plan.fantasy_points for plan in promotion_preview.player_stat_plans} == {
+        "Marcel Reed": pytest.approx(34.92),
+        "Harlem Berry": pytest.approx(11.90),
+        "KC Concepcion": pytest.approx(13.50),
+        "Trey'Dez Green": pytest.approx(17.40),
+    }
+    assert {plan.player_stat_action for plan in promotion_preview.player_stat_plans} == {"CREATE"}
+    assert {plan.player_game_stat_action for plan in promotion_preview.player_stat_plans} == {"CREATE"}
+    assert promotion_preview.blockers == (
+        {
+            "kind": "INCOMPLETE_FINAL_STAT_REVISION",
+            "player_id": kicker.id,
+            "game_id": game.id,
+            "revision_id": kicker_revision.id,
+            "revision_status": "blocked_incomplete",
+            "completeness": "incomplete",
+        },
+    )
+    assert set(promotion_preview.dependent_recalculations.values()) == {"blocked_by_finalization_preview"}
+
+    assert _snapshot_score(db_session, player_id=players["qb"].id, revision_number=2) == pytest.approx(34.88)
+    assert _snapshot_score(db_session, player_id=players["rb"].id, revision_number=2) == pytest.approx(11.90)
+    assert _snapshot_score(db_session, player_id=players["wr"].id, revision_number=2) == pytest.approx(13.50)
+    assert _snapshot_score(db_session, player_id=players["bench"].id, revision_number=2) == pytest.approx(17.40)
+    assert _snapshot_score(db_session, player_id=players["qb"].id, revision_number=3) == pytest.approx(34.92)
+
     # The public beta score sources remain exactly as they were.  The replay
     # adds only append-only provider evidence and immutable shadow snapshots.
     # The per-league shadow read model is intentionally refreshed in place so
     # consumers have one current, non-public projection to read.
     assert db_session.query(PlayerStat).count() == public_stat_count
+    assert db_session.query(PlayerGameStat).count() == public_game_stat_count
     assert matchup.status == original_matchup_status
     assert db_session.query(ProviderRawEvent).count() == 3
     assert db_session.query(PlayerGameStatRevision).count() == 11
