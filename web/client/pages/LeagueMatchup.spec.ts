@@ -55,6 +55,7 @@ import {
   default as LeagueMatchup,
   formatMatchupPoints,
   formatMatchupStatus,
+  formatLiveRefreshCountdown,
   matchupStatusVariant,
   shouldShowMatchupScorePanels,
 } from "./LeagueMatchup";
@@ -92,6 +93,22 @@ describe("league matchup helpers", () => {
     expect(shouldShowMatchupScorePanels("live")).toBe(true);
     expect(shouldShowMatchupScorePanels("final")).toBe(true);
     expect(shouldShowMatchupScorePanels("stat_corrected")).toBe(true);
+  });
+
+  it("shows the shared four-minute live refresh cadence without claiming a provider poll when disabled", () => {
+    const now = Date.parse("2026-09-05T12:00:00Z");
+    expect(formatLiveRefreshCountdown({ enabled: false, cadence_seconds: 240, status: "disabled" }, now)).toBe(
+      "Live stat refresh is inactive.",
+    );
+    expect(formatLiveRefreshCountdown({ enabled: true, cadence_seconds: 240, status: "not_live" }, now)).toBe(
+      "Waiting for a live game to begin.",
+    );
+    expect(formatLiveRefreshCountdown({
+      enabled: true,
+      cadence_seconds: 240,
+      status: "scheduled",
+      next_refresh_at: "2026-09-05T12:04:00Z",
+    }, now)).toBe("Next stat refresh in 4:00");
   });
 });
 

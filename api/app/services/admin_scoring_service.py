@@ -26,6 +26,7 @@ from collegefootballfantasy_api.app.schemas.admin_scoring import (
     ScoringSummaryRead,
 )
 from collegefootballfantasy_api.app.services.scoring_service import (
+    require_legacy_scoring_mutation_authority,
     calculate_player_fantasy_points,
     normalize_player_stats,
     recalculate_league_week_scores,
@@ -139,6 +140,7 @@ def _audit(
 
 
 def apply_stat_correction(db: Session, payload: AdminCorrectionRequest, actor: User) -> AdminActionResponse:
+    require_legacy_scoring_mutation_authority()
     preview = preview_stat_correction(db, payload)
     before_state = preview.model_dump(mode="json")
     stat_row = _current_player_stat(db, payload.player_id, payload.season, payload.week)
@@ -229,6 +231,7 @@ def rerun_scoring(db: Session, payload: AdminRerunScoringRequest, actor: User) -
 
 
 def reconcile_league_week(db: Session, league_id: int, season: int, week: int, reason: str, actor: User) -> AdminActionResponse:
+    require_legacy_scoring_mutation_authority()
     league = db.get(League, league_id)
     if not league:
         raise LookupError("league not found")
@@ -255,6 +258,7 @@ def reconcile_league_week(db: Session, league_id: int, season: int, week: int, r
 
 
 def reconcile_player_week(db: Session, player_id: int, season: int, week: int, reason: str, actor: User, league_id: int | None = None) -> AdminActionResponse:
+    require_legacy_scoring_mutation_authority()
     if not db.get(Player, player_id):
         raise LookupError("player not found")
     affected = _affected_league_ids_for_player(db, player_id, season, week, league_id=league_id)
@@ -285,6 +289,7 @@ def reconcile_player_week(db: Session, player_id: int, season: int, week: int, r
 
 
 def set_week_status(db: Session, *, league_id: int, season: int, week: int, status: str, reason: str, actor: User) -> AdminActionResponse:
+    require_legacy_scoring_mutation_authority()
     matchups = db.query(Matchup).filter(Matchup.league_id == league_id, Matchup.season == season, Matchup.week == week).all()
     if not matchups:
         raise LookupError("matchups not found")

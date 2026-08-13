@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Clock, ShieldAlert, Trophy } from "lucide-react";
 import { Navigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -9,7 +10,7 @@ import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
 import { useLeagueDetail, useLeagueMatchupTab, useLeagueScoreboard } from "@/hooks/use-leagues";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
-import type { LeagueMatchupTabResponse, LeagueMatchupTeam } from "@/types/league";
+import type { LeagueMatchupLiveRefresh, LeagueMatchupTabResponse, LeagueMatchupTeam } from "@/types/league";
 
 export function formatMatchupStatus(status: string | null | undefined) {
   const normalized = (status || "projected").toLowerCase();
@@ -96,6 +97,20 @@ function freshnessText(data: LeagueMatchupTabResponse | undefined) {
   if (label === "Delayed") return "Provider data is delayed. Do not treat the score as fully current.";
   if (label === "Unavailable") return "Provider data is unavailable. Existing scores should not be replaced by false zeroes.";
   return "Projected matchup values are shown until live scoring begins.";
+}
+
+export function formatLiveRefreshCountdown(
+  refresh: LeagueMatchupLiveRefresh | null | undefined,
+  nowMs = Date.now(),
+) {
+  if (!refresh?.enabled) return "Live stat refresh is inactive.";
+  if (refresh.status === "not_live") return "Waiting for a live game to begin.";
+  if (refresh.status !== "scheduled" || !refresh.next_refresh_at) return "Live refresh schedule is preparing.";
+
+  const remainingSeconds = Math.max(0, Math.ceil((Date.parse(refresh.next_refresh_at) - nowMs) / 1000));
+  const minutes = Math.floor(remainingSeconds / 60);
+  const seconds = String(remainingSeconds % 60).padStart(2, "0");
+  return `Next stat refresh in ${minutes}:${seconds}`;
 }
 
 function MatchupTeamSummary({
@@ -261,6 +276,13 @@ export default function LeagueMatchup() {
   });
   const matchupQuery = useLeagueMatchupTab(parsedLeagueId, selectedWeek, selectedMatchupId, postDraft);
   const data = matchupQuery.data;
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!data?.live_refresh?.enabled) return undefined;
+    setNowMs(Date.now());
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [data?.live_refresh?.enabled, data?.live_refresh?.next_refresh_at]);
   const myTeam = data?.my_team ?? data?.user_team ?? null;
   const opponentTeam = data?.opponent_team ?? null;
   const displayWeek = data?.week ?? selectedWeek;
@@ -388,7 +410,12 @@ export default function LeagueMatchup() {
             />
 
             <div className="flex flex-col gap-3 rounded-2xl border border-cfb-border-subtle bg-cfb-surface/65 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm font-medium leading-6 text-cfb-text-secondary">{freshnessText(data)}</p>
+              <div>
+                <p className="text-sm font-medium leading-6 text-cfb-text-secondary">{freshnessText(data)}</p>
+                <p data-testid="live-refresh-countdown" className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
+                  {formatLiveRefreshCountdown(data?.live_refresh, nowMs)}
+                </p>
+              </div>
               <div className="flex shrink-0 items-center gap-2 text-xs font-black text-cfb-text-primary">
                 <Clock className="h-4 w-4 text-cfb-gold" aria-hidden="true" />
                 {leadingTeam(myTeam, opponentTeam)}

@@ -61,6 +61,12 @@ const projectedReceiver: LeagueRosterPlayer = {
   weekly_projected_fantasy_points: 18.4,
 };
 
+const completedReceiver: LeagueRosterPlayer = {
+  ...projectedReceiver,
+  final_fantasy_points: 22.7,
+  pre_game_projection_points: 18.4,
+};
+
 describe("RosterSlotTable", () => {
   it("renders an empty configured slot instead of removing its roster row", () => {
     render(<RosterSlotTable title="Starters" players={[emptyQuarterbackSlot]} />);
@@ -78,5 +84,12 @@ describe("RosterSlotTable", () => {
     expect(screen.getByText("A Very Long Receiver Name That Must Stay Compact")).toBeTruthy();
     expect(screen.getByText("Ohio State · vs Michigan")).toBeTruthy();
     expect(screen.getByText("18.4")).toBeTruthy();
+  });
+
+  it("shows a certified final above the locked pre-game projection", () => {
+    render(<RosterSlotTable title="Starters" players={[completedReceiver]} />);
+
+    expect(screen.getByText("22.7")).toBeTruthy();
+    expect(screen.getByText("Pre-game 18.4")).toBeTruthy();
   });
 });

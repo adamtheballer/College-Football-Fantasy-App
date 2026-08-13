@@ -5,12 +5,14 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from collegefootballfantasy_api.app.core.config import settings as app_settings
+from collegefootballfantasy_api.app.domain.live_scoring_contract import CORRECTED, FINAL_VERIFIED
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
+from collegefootballfantasy_api.app.models.live_scoring import ProviderGamePollState
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_waiver_availability import PlayerWaiverAvailability
@@ -28,6 +30,7 @@ from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjec
 from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueMatchupTabRead,
+    MatchupLiveRefreshRead,
     LeagueInviteSettingsRead,
     LeagueMemberRead,
     LeagueRosterTabRead,
@@ -65,6 +68,50 @@ DEFAULT_ROSTER_SLOTS = {
     "BENCH": 4,
     "IR": 1,
 }
+
+# A completed matchup row must only display a score after the live-scoring
+# workflow has certified it.  ``final`` remains here for legacy historical
+# rows that predate the explicit verification lifecycle.
+CERTIFIED_FINAL_SCORE_STATUSES = {"final", FINAL_VERIFIED, CORRECTED}
+
+
+def _matchup_live_refresh(db: Session, *, season: int, week: int) -> MatchupLiveRefreshRead:
+    """Expose the shared provider schedule without polling or mutating from reads."""
+
+    cadence_seconds = max(int(app_settings.espn_live_scoring_active_poll_interval_seconds), 1)
+    if not app_settings.espn_live_scoring_enabled:
+        return MatchupLiveRefreshRead(
+            enabled=False,
+            cadence_seconds=cadence_seconds,
+            status="disabled",
+        )
+
+    active_states = (
+        db.query(ProviderGamePollState)
+        .filter(
+            ProviderGamePollState.provider == "espn",
+            ProviderGamePollState.season == season,
+            ProviderGamePollState.week == week,
+            ProviderGamePollState.lifecycle_state.in_(("live", "in_progress", "delayed")),
+        )
+        .all()
+    )
+    if not active_states:
+        return MatchupLiveRefreshRead(
+            enabled=True,
+            cadence_seconds=cadence_seconds,
+            status="not_live",
+        )
+
+    next_refreshes = [state.next_poll_at for state in active_states if state.next_poll_at]
+    successes = [state.last_success_at for state in active_states if state.last_success_at]
+    return MatchupLiveRefreshRead(
+        enabled=True,
+        cadence_seconds=cadence_seconds,
+        status="scheduled" if next_refreshes else "awaiting_schedule",
+        next_refresh_at=min(next_refreshes) if next_refreshes else None,
+        last_success_at=max(successes) if successes else None,
+    )
 
 
 def _slot_limits(db: Session, league: League) -> dict[str, int]:
@@ -151,6 +198,32 @@ def _projection_map(
     return {row.player_id: row for row in rows}
 
 
+def _certified_final_score_map(
+    db: Session,
+    *,
+    league_id: int,
+    season: int,
+    week: int,
+    player_ids: set[int],
+) -> dict[int, float]:
+    """Return only scores whose game result is safe to show as complete."""
+
+    if not player_ids:
+        return {}
+    rows = (
+        db.query(PlayerWeekScore)
+        .filter(
+            PlayerWeekScore.league_id == league_id,
+            PlayerWeekScore.season == season,
+            PlayerWeekScore.week == week,
+            PlayerWeekScore.player_id.in_(player_ids),
+            PlayerWeekScore.status.in_(CERTIFIED_FINAL_SCORE_STATUSES),
+        )
+        .all()
+    )
+    return {row.player_id: float(row.fantasy_points) for row in rows}
+
+
 def _roster_rows(db: Session, team_id: int) -> list[RosterEntry]:
     return (
         db.query(RosterEntry)
@@ -185,6 +258,7 @@ def _serialize_roster_entry(
     opponent: str | None = None,
     game_start_at: datetime | None = None,
     is_locked: bool = False,
+    final_fantasy_points: float | None = None,
 ) -> RosterTabEntryRead:
     entry = roster_slot.entry
     projected = float(projection.fantasy_points) if projection and projection.fantasy_points is not None else None
@@ -217,6 +291,10 @@ def _serialize_roster_entry(
         bust_prob=float(projection.bust_prob or 0.0) if projection else 0.0,
         opponent=opponent,
         weekly_projected_fantasy_points=projected,
+        # The public projection query prioritizes the persisted LOCKED kickoff
+        # snapshot, preserving the pre-game value beneath a certified final.
+        pre_game_projection_points=projected if final_fantasy_points is not None else None,
+        final_fantasy_points=final_fantasy_points,
         projection_status=projection.projection_status if projection else "UNAVAILABLE",
         game_start_at=game_start_at,
         is_locked=is_locked,
@@ -236,6 +314,13 @@ def _serialize_team_roster(
         league.season_year,
         week,
         player_ids,
+    )
+    final_scores_by_player = _certified_final_score_map(
+        db,
+        league_id=league.id,
+        season=league.season_year,
+        week=week,
+        player_ids=player_ids,
     )
     player_schools = {
         entry.player_id: entry.player.school if entry.player else None
@@ -258,6 +343,7 @@ def _serialize_team_roster(
             projection_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             opponents.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             game_start_at=game_starts.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+            final_fantasy_points=final_scores_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             is_locked=(
                 roster_slot.entry is not None
                 and game_starts.get(roster_slot.entry.player_id) is not None
@@ -277,6 +363,13 @@ def _serialize_team_rosters(
     entries_by_team = _rosters_for_teams(db, set(teams))
     player_ids = {entry.player_id for entries in entries_by_team.values() for entry in entries}
     projection_by_player = _projection_map(db, league.season_year, week, player_ids)
+    final_scores_by_player = _certified_final_score_map(
+        db,
+        league_id=league.id,
+        season=league.season_year,
+        week=week,
+        player_ids=player_ids,
+    )
     player_schools = {
         entry.player_id: entry.player.school if entry.player else None
         for entries in entries_by_team.values()
@@ -300,6 +393,7 @@ def _serialize_team_rosters(
                 projection_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 opponents.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 game_start_at=game_starts.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+                final_fantasy_points=final_scores_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 is_locked=(
                     roster_slot.entry is not None
                     and game_starts.get(roster_slot.entry.player_id) is not None
@@ -417,6 +511,7 @@ def build_matchup_tab_view(
     matchup_id: int | None = None,
 ) -> LeagueMatchupTabRead:
     week = resolve_current_week(db, league, selected_week)
+    live_refresh = _matchup_live_refresh(db, season=league.season_year, week=week)
     viewer_team = _owned_team(db, league, user)
     if matchup_id is not None:
         matchup = (
@@ -460,6 +555,7 @@ def build_matchup_tab_view(
             my_roster=[],
             opponent_roster=[],
             message="No team found for your user in this league.",
+            live_refresh=live_refresh,
         )
 
     if not matchup:
@@ -487,6 +583,7 @@ def build_matchup_tab_view(
             my_roster=my_roster,
             opponent_roster=[],
             message="No matchup generated yet.",
+            live_refresh=live_refresh,
         )
 
     roster_by_team = _serialize_team_rosters(
@@ -547,6 +644,7 @@ def build_matchup_tab_view(
         opponent_roster=opponent_roster,
         projection_source="weekly_projections",
         message=None,
+        live_refresh=live_refresh,
     )
 
 

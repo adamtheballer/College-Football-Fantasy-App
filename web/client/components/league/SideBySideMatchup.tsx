@@ -38,6 +38,17 @@ const compactProjection = (player?: LeagueRosterPlayer) =>
     player?.projection_status,
   );
 
+const completedFantasyPoints = (player?: LeagueRosterPlayer) =>
+  typeof player?.final_fantasy_points === "number" && Number.isFinite(player.final_fantasy_points)
+    ? player.final_fantasy_points
+    : null;
+
+const preGameProjection = (player?: LeagueRosterPlayer) =>
+  formatProjectionDisplay(
+    player?.pre_game_projection_points ?? player?.projected_points ?? player?.weekly_projected_fantasy_points ?? null,
+    player?.projection_status,
+  );
+
 const compactPlayerMeta = (player?: LeagueRosterPlayer) => {
   if (!player?.player_id) return "Open slot";
   const school = player.school ?? player.player_school ?? "School TBD";
@@ -47,6 +58,7 @@ const compactPlayerMeta = (player?: LeagueRosterPlayer) => {
 
 function CompactMatchupPlayer({ player, align }: { player?: LeagueRosterPlayer; align: "left" | "right" }) {
   const hasPlayer = Boolean(player?.player_id && player.player_name);
+  const finalFantasyPoints = completedFantasyPoints(player);
   return (
     <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
       <p className={`truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
@@ -55,9 +67,18 @@ function CompactMatchupPlayer({ player, align }: { player?: LeagueRosterPlayer; 
       <p className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
         {compactPlayerMeta(player)}
       </p>
-      <p className={`mt-1 text-[11px] font-black tabular-nums ${align === "right" ? "text-cfb-pink" : "text-cfb-brand"}`}>
-        {compactProjection(player)} <span className="text-[8px] uppercase tracking-[0.08em] text-cfb-text-muted">proj</span>
-      </p>
+      {finalFantasyPoints !== null ? (
+        <div className="mt-1 tabular-nums">
+          <p className="text-[11px] font-black text-cfb-text-primary">
+            {finalFantasyPoints.toFixed(1)} <span className="text-[8px] uppercase tracking-[0.08em] text-cfb-text-muted">final</span>
+          </p>
+          <p className="mt-0.5 text-[9px] font-bold text-cfb-text-muted">Pre-game {preGameProjection(player)}</p>
+        </div>
+      ) : (
+        <p className={`mt-1 text-[11px] font-black tabular-nums ${align === "right" ? "text-cfb-pink" : "text-cfb-brand"}`}>
+          {compactProjection(player)} <span className="text-[8px] uppercase tracking-[0.08em] text-cfb-text-muted">proj</span>
+        </p>
+      )}
     </div>
   );
 }

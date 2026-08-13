@@ -1,12 +1,14 @@
 import pytest
 from datetime import datetime, timedelta, timezone
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.models.scoring_run import ScoringRun
 from collegefootballfantasy_api.app.models.team_week_score import TeamWeekScore
+from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.services import scoring_service
 from collegefootballfantasy_api.app.services.scoring_service import (
     create_or_refresh_lineup_snapshots,
@@ -86,6 +88,16 @@ def test_lineup_snapshot_refreshes_before_kickoff_then_freezes(client, db_sessio
             away_team="Opponent",
         )
     )
+    db_session.add(
+        WeeklyProjection(
+            player_id=players["qb"].id,
+            season=2026,
+            week=1,
+            projection_version="FINAL",
+            is_published=True,
+            fantasy_points=18.4,
+        )
+    )
     db_session.commit()
     monkeypatch.setattr(scoring_service, "_now", lambda: before_kickoff)
 
@@ -100,9 +112,28 @@ def test_lineup_snapshot_refreshes_before_kickoff_then_freezes(client, db_sessio
     monkeypatch.setattr(scoring_service, "_now", lambda: before_kickoff + timedelta(hours=3))
     create_or_refresh_lineup_snapshots(db_session, league.id, 2026, 1)
     assert snapshot.locked_at is not None
+    locked_projection = db_session.query(WeeklyProjection).filter_by(
+        player_id=players["qb"].id,
+        season=2026,
+        week=1,
+        projection_version="LOCKED",
+    ).one()
+    assert locked_projection.fantasy_points == 18.4
+    assert locked_projection.locked_at is not None
     qb_entry.slot = "QB"
     create_or_refresh_lineup_snapshots(db_session, league.id, 2026, 1)
     assert snapshot.slot == "BENCH"
+    assert (
+        db_session.query(WeeklyProjection)
+        .filter_by(
+            player_id=players["qb"].id,
+            season=2026,
+            week=1,
+            projection_version="LOCKED",
+        )
+        .count()
+        == 1
+    )
 
 
 def test_stat_correction_changes_scores_without_incrementing(client, db_session):
@@ -120,7 +151,8 @@ def test_stat_correction_changes_scores_without_incrementing(client, db_session)
     assert home_score.total_points == 68.0
 
 
-def test_scoring_run_records_success_and_failure(client, db_session):
+def test_scoring_run_records_success_and_failure(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "scoring_mode", "enabled")
     league, *_ = create_scoring_fixture(db_session)
     summary = run_league_scoring_recalculation(db_session, league.id, 2026, 1)
 
@@ -135,6 +167,7 @@ def test_scoring_run_records_success_and_failure(client, db_session):
 
 
 def test_failed_scoring_run_rolls_back_partial_recalculation(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "scoring_mode", "enabled")
     league, *_ = create_scoring_fixture(db_session)
 
     def fail_after_player_scores(*_args, **_kwargs):

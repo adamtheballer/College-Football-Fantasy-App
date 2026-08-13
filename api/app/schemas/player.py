@@ -92,10 +92,19 @@ class PlayerCardStatRowRead(BaseModel):
     updated_at: datetime
 
 
+class PlayerCardPositionalRankRead(BaseModel):
+    season: int
+    through_week: int
+    position: str
+    fantasy_points: float
+    position_rank: int
+
+
 class PlayerCardRead(BaseModel):
     player: PlayerRead
     about: PlayerCardAboutRead
     current_injury_status: str | None = None
     injuries: list[PlayerCardInjuryRead]
     season_stats: list[PlayerCardStatRowRead]
+    positional_rank: PlayerCardPositionalRankRead | None = None
     historical_stats: PlayerHistoricalStatsResponse | None = None

@@ -52,7 +52,10 @@ class Settings(BaseSettings):
     # Public beta can run all non-scoring workflows without a live provider.
     # Keep this explicit rather than inferring it from whether a key happened
     # to be configured, so a later credential change cannot start polling.
-    scoring_mode: Literal["enabled", "disabled"] = "enabled"
+    # A deployment must opt in to public score promotion.  ``shadow`` accepts
+    # reviewed work into immutable calculation snapshots but never updates
+    # public matchup/standing read models.
+    scoring_mode: Literal["enabled", "shadow", "disabled"] = "disabled"
     scoring_provider: str = "sportsdata"
     scoring_allow_unofficial_providers: bool = False
     scoring_worker_interval_live_seconds: int = 60
@@ -64,6 +67,24 @@ class Settings(BaseSettings):
     draft_cpu_pick_delay_seconds: int = 4
     scoring_dead_letter_after_failures: int = 3
     provider_unmatched_failure_threshold_percent: float = 10.0
+    # ESPN live ingestion is a separate, opt-in shadow capability.  It never
+    # promotes public scores; an operator must enable it explicitly in a
+    # shadow runtime after reviewing the provider mappings.
+    espn_live_scoring_enabled: bool = False
+    espn_live_scoring_base_url: str = "https://site.api.espn.com/apis/site/v2/sports/football/college-football"
+    espn_live_scoring_timeout_seconds: int = 10
+    # During an operator-scheduled live game window (Friday through Sunday as
+    # applicable), ESPN scoreboard and detail snapshots refresh at most once
+    # every four minutes.  The feature remains shadow-only until separately
+    # promoted, so this default cannot change public beta scores on its own.
+    espn_live_scoring_scoreboard_interval_seconds: int = 240
+    espn_live_scoring_active_poll_interval_seconds: int = 240
+    espn_live_scoring_worker_interval_seconds: int = 30
+    espn_live_scoring_postgame_first_delay_seconds: int = 600
+    espn_live_scoring_postgame_second_delay_seconds: int = 7200
+    espn_live_scoring_next_day_delay_seconds: int = 86400
+    espn_live_scoring_circuit_breaker_failures: int = 3
+    espn_live_scoring_circuit_breaker_cooldown_seconds: int = 900
     projection_provider: str = "sportsdataio"
     # Provider polling is opt-in. This keeps beta and other credential-free
     # runtimes fail-closed when a deployment omits SPORTSDATA_ENABLED; the
@@ -203,6 +224,22 @@ class Settings(BaseSettings):
             raise ValueError("BETA_ACCESS_RESERVATION_TTL_MINUTES must be between 1 and 60")
         return value
 
+    @field_validator(
+        "espn_live_scoring_timeout_seconds",
+        "espn_live_scoring_scoreboard_interval_seconds",
+        "espn_live_scoring_active_poll_interval_seconds",
+        "espn_live_scoring_postgame_first_delay_seconds",
+        "espn_live_scoring_postgame_second_delay_seconds",
+        "espn_live_scoring_next_day_delay_seconds",
+        "espn_live_scoring_circuit_breaker_failures",
+        "espn_live_scoring_circuit_breaker_cooldown_seconds",
+    )
+    @classmethod
+    def validate_positive_live_scoring_setting(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("ESPN live-scoring timing settings must be positive")
+        return value
+
     @property
     def is_production(self) -> bool:
         return self.environment.strip().lower() == "production"
@@ -212,12 +249,16 @@ class Settings(BaseSettings):
         return self.scoring_mode == "enabled"
 
     @property
+    def scoring_shadow_enabled(self) -> bool:
+        return self.scoring_mode == "shadow"
+
+    @property
     def scoring_worker_expected(self) -> bool:
         return self.scoring_enabled
 
     @property
     def provider_polling_expected(self) -> bool:
-        return self.scoring_enabled and self.sportsdata_enabled
+        return self.espn_live_scoring_enabled and self.scoring_shadow_enabled
 
     @property
     def allowed_cors_origins(self) -> list[str]:
@@ -249,6 +290,12 @@ class Settings(BaseSettings):
                 raise ValueError("BETA_ACCESS_RESERVATION_SECRET must be changed when Early Access Pro codes are enabled")
             if len(self.beta_access_code_hmac_secret) < 32 or len(self.beta_access_reservation_secret) < 32:
                 raise ValueError("Early Access Pro-code secrets must each contain at least 32 characters")
+
+        if self.espn_live_scoring_enabled and self.scoring_mode != "shadow":
+            raise ValueError("ESPN live scoring may run only with SCORING_MODE=shadow")
+
+        if self.espn_live_scoring_worker_interval_seconds < 30:
+            raise ValueError("ESPN_LIVE_SCORING_WORKER_INTERVAL_SECONDS must be at least 30")
 
         if not self.is_production:
             return self

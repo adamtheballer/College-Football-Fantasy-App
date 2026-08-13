@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.session import SessionLocal
-from collegefootballfantasy_api.app.models.scoring_run import ScoringRun
-from scripts.sync_live_scores import run_once
+from collegefootballfantasy_api.app.services.espn_live_polling_service import run_espn_shadow_poll_iteration
+from collegefootballfantasy_api.app.services.live_scoring_service import process_one_scoring_work_item
 from collegefootballfantasy_api.app.services.worker_health import record_worker_heartbeat
 
 logger = logging.getLogger("collegefootballfantasy_api.scoring_worker")
@@ -38,6 +38,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def schedule_for_mode(mode: str) -> WorkerSchedule:
+    # The worker checks durable due work every ~30 seconds while ESPN shadow
+    # polling is enabled. Per-game state still caps active ESPN calls at 180
+    # seconds, so this does not turn into a per-player/provider request loop.
+    if settings.espn_live_scoring_enabled:
+        return WorkerSchedule(mode=mode, interval_seconds=settings.espn_live_scoring_worker_interval_seconds)
     if mode == "postgame":
         return WorkerSchedule(mode=mode, interval_seconds=settings.scoring_worker_interval_postgame_seconds)
     if mode == "correction":
@@ -45,43 +50,54 @@ def schedule_for_mode(mode: str) -> WorkerSchedule:
     return WorkerSchedule(mode=mode, interval_seconds=settings.scoring_worker_interval_live_seconds)
 
 
-def record_worker_dead_letter(
-    *,
-    provider: str,
-    season: int,
-    week: int,
-    league_id: int | None,
-    mode: str,
-    error: Exception,
-) -> None:
-    with SessionLocal() as db:
-        db.add(
-            ScoringRun(
-                league_id=league_id,
-                season=season,
-                week=week,
-                provider=provider,
-                status="dead_letter",
-                started_at=datetime.now(timezone.utc),
-                completed_at=datetime.now(timezone.utc),
-                error_message=f"{mode} worker exhausted retries: {str(error)[:900]}",
-            )
-        )
-        db.commit()
-
-
 def run_iteration(args: argparse.Namespace) -> None:
-    if not settings.scoring_enabled:
+    if settings.scoring_mode not in {"enabled", "shadow"}:
         raise RuntimeError("Scoring worker cannot run while SCORING_MODE=disabled.")
-    live_args = argparse.Namespace(
-        season=args.season,
-        week=args.week,
-        league_id=args.league_id,
-        provider=args.provider,
-        watch=False,
-        interval_seconds=schedule_for_mode(args.mode).interval_seconds,
-    )
-    run_once(live_args)
+    worker_id = f"scoring-processor:{os.getpid()}"
+    espn_result = None
+    if settings.espn_live_scoring_enabled:
+        if not settings.scoring_shadow_enabled:
+            raise RuntimeError("ESPN live polling requires SCORING_MODE=shadow.")
+        # This helper commits its short claim transactions before each ESPN
+        # request, so no database lock or transaction spans provider I/O.
+        espn_result = run_espn_shadow_poll_iteration(
+            session_factory=SessionLocal,
+            season=args.season,
+            week=args.week,
+        )
+    with SessionLocal() as db:
+        try:
+            item = process_one_scoring_work_item(db, worker_id=worker_id)
+            db.commit()
+        except Exception:
+            # The work item is deliberately failed/dead-lettered inside the
+            # processor. Persist that durable state before the retry loop.
+            db.commit()
+            raise
+        record_worker_heartbeat(
+            db,
+            worker_name="scoring_processor",
+            success=True,
+            details={
+                "season": args.season,
+                "week": args.week,
+                "league_id": args.league_id,
+                "mode": args.mode,
+                "work_item_id": item.id if item else None,
+                "provider_polling": bool(settings.espn_live_scoring_enabled),
+                "espn": (
+                    {
+                        "states_created": espn_result.states_created,
+                        "scoreboard_games": espn_result.scoreboard_games,
+                        "detail_requests": espn_result.detail_requests,
+                        "detail_ingested": espn_result.detail_ingested,
+                        "failures": espn_result.failures,
+                    }
+                    if espn_result is not None
+                    else None
+                ),
+            },
+        )
 
 
 def run_with_retries(args: argparse.Namespace) -> None:
@@ -91,13 +107,6 @@ def run_with_retries(args: argparse.Namespace) -> None:
     for attempt in range(1, attempts + 1):
         try:
             run_iteration(args)
-            with SessionLocal() as db:
-                record_worker_heartbeat(
-                    db,
-                    worker_name="scoring_processor",
-                    success=True,
-                    details={"season": args.season, "week": args.week, "league_id": args.league_id, "mode": args.mode},
-                )
             return
         except Exception as exc:  # pragma: no cover - provider/DB failure mode depends on runtime
             last_error = exc
@@ -117,14 +126,6 @@ def run_with_retries(args: argparse.Namespace) -> None:
             if attempt < attempts:
                 time.sleep(base_sleep * (2 ** (attempt - 1)))
     if last_error is not None:
-        record_worker_dead_letter(
-            provider=args.provider,
-            season=args.season,
-            week=args.week,
-            league_id=args.league_id,
-            mode=args.mode,
-            error=last_error,
-        )
         with SessionLocal() as db:
             record_worker_heartbeat(
                 db,
@@ -136,7 +137,7 @@ def run_with_retries(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    if not settings.scoring_enabled:
+    if settings.scoring_mode not in {"enabled", "shadow"}:
         raise SystemExit("Scoring worker cannot start while SCORING_MODE=disabled.")
     args = parse_args()
     schedule = schedule_for_mode(args.mode)

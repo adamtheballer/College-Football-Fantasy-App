@@ -55,6 +55,7 @@ export function PlayerCardHeader({
   title: string;
 }) {
   const playerStatus = resolvePlayerCardStatus(card, player.status);
+  const positionalRank = card?.positional_rank;
   const metricCards = [
     {
       label: "Proj",
@@ -62,9 +63,11 @@ export function PlayerCardHeader({
       value: typeof player.projectedPoints === "number" ? player.projectedPoints.toFixed(1) : "—",
     },
     {
-      label: CURRENT_VALUE_RATING_LABEL,
-      mobileLabel: "Value",
-      value: formatCurrentValueRating(currentValue),
+      label: positionalRank ? "Positional Rank" : CURRENT_VALUE_RATING_LABEL,
+      mobileLabel: positionalRank ? "Rank" : "Value",
+      value: positionalRank
+        ? `${positionalRank.position} ${positionalRank.position_rank}`
+        : formatCurrentValueRating(currentValue),
     },
     { label: "Class", mobileLabel: "Class", value: card?.about.player_class ?? player.playerClass ?? "—" },
     { label: "Status", mobileLabel: "Status", value: playerStatus },

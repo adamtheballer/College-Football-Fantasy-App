@@ -12,6 +12,7 @@ if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
 from collegefootballfantasy_api.app.db.session import SessionLocal
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
@@ -238,6 +239,12 @@ def main() -> None:
     parser.add_argument("--league-id", type=int)
     parser.add_argument("--final", action="store_true")
     args = parser.parse_args()
+
+    if not settings.scoring_enabled:
+        raise SystemExit(
+            "Refusing legacy mutable score writes while SCORING_MODE is not enabled. "
+            "Use the immutable shadow-scoring pipeline for validation."
+        )
 
     rules = get_scoring_rules()
     session = SessionLocal()

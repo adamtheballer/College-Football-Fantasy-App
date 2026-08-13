@@ -442,7 +442,7 @@ def test_schedule_generation_rejects_legacy_odd_team_count(client, db_session):
         ensure_league_schedule(db_session, league_row)
 
 
-def test_schedule_generation_creates_and_backfills_a_fair_13_week_regular_season(client, db_session):
+def test_schedule_generation_creates_and_backfills_a_fair_10_week_regular_season(client, db_session):
     token = create_user_and_token(client, "schedule-fairness")
     league = create_league(client, token, name="Fair Schedule League", max_teams=4)
     league_row = db_session.get(League, league["id"])
@@ -460,7 +460,9 @@ def test_schedule_generation_creates_and_backfills_a_fair_13_week_regular_season
     team_ids = {team.id for team in teams}
     assert len(team_ids) == 4
 
-    assert ensure_league_schedule(db_session, league_row, regular_season_weeks=12) == 24
+    # The season reserves Weeks 11–13 for the playoff bracket. A partial
+    # regular-season schedule therefore backfills only through Week 10.
+    assert ensure_league_schedule(db_session, league_row, regular_season_weeks=9) == 18
     assert ensure_league_schedule(db_session, league_row) == 2
     db_session.flush()
 
@@ -829,7 +831,7 @@ def test_league_workspace_returns_real_matchup_and_standings(client, db_session)
             week=3,
             home_team_id=commissioner_team.id,
             away_team_id=member_team.id,
-            status="live",
+            status="final",
             home_score=118.4,
             away_score=111.2,
         )

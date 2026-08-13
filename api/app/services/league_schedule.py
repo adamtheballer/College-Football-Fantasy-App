@@ -3,9 +3,10 @@ from sqlalchemy.orm import Session
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.services.postseason_service import regular_season_end_week
 
 
-REGULAR_SEASON_WEEKS = 13
+REGULAR_SEASON_WEEKS = 10
 
 
 def generate_round_robin_weeks(team_ids: list[int], weeks: int) -> list[list[tuple[int, int]]]:
@@ -42,6 +43,8 @@ def ensure_league_schedule(
     # A draft finalization can stage matchups and invoke this again before the
     # transaction commits. Flush first so schedule generation stays idempotent.
     db.flush()
+    if regular_season_weeks == REGULAR_SEASON_WEEKS:
+        regular_season_weeks = regular_season_end_week(db, league)
     teams = (
         db.query(Team)
         .filter(Team.league_id == league.id)

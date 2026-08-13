@@ -67,6 +67,13 @@ class LeagueSettingsInput(BaseModel):
     kicker_enabled: bool
     defense_enabled: bool
 
+    @field_validator("playoff_teams")
+    @classmethod
+    def validate_playoff_teams(cls, value: int) -> int:
+        if value not in {2, 4, 6, 8}:
+            raise ValueError("playoff_teams must be one of 2, 4, 6, or 8")
+        return value
+
     @field_validator("waiver_period_hours")
     @classmethod
     def validate_waiver_period_hours(cls, value: int) -> int:
@@ -270,6 +277,13 @@ class LeagueSettingsUpdate(BaseModel):
     kicker_enabled: bool
     defense_enabled: bool
 
+    @field_validator("playoff_teams")
+    @classmethod
+    def validate_updated_playoff_teams(cls, value: int) -> int:
+        if value not in {2, 4, 6, 8}:
+            raise ValueError("playoff_teams must be one of 2, 4, 6, or 8")
+        return value
+
     @field_validator("waiver_period_hours")
     @classmethod
     def validate_waiver_period_hours(cls, value: int | None) -> int | None:
@@ -434,6 +448,7 @@ class LeagueWorkspaceStandingSummaryRead(BaseModel):
     losses: int | None = None
     ties: int | None = None
     points_for: float | None = None
+    points_against: float | None = None
     rank: int | None = None
 
 
@@ -560,6 +575,8 @@ class RosterTabEntryRead(BaseModel):
     bust_prob: float = 0.0
     opponent: str | None = None
     weekly_projected_fantasy_points: float | None = None
+    pre_game_projection_points: float | None = None
+    final_fantasy_points: float | None = None
     projection_status: str = "UNAVAILABLE"
     game_start_at: datetime | None = None
     is_locked: bool = False
@@ -600,6 +617,16 @@ class MatchupTeamRead(BaseModel):
     roster: list[RosterTabEntryRead]
 
 
+class MatchupLiveRefreshRead(BaseModel):
+    """Read-only shared-refresh schedule for an active matchup."""
+
+    enabled: bool
+    cadence_seconds: int
+    status: str
+    next_refresh_at: datetime | None = None
+    last_success_at: datetime | None = None
+
+
 class LeagueMatchupTabRead(BaseModel):
     league_id: int
     season: int
@@ -613,6 +640,7 @@ class LeagueMatchupTabRead(BaseModel):
     projection_source: str = "weekly_projections"
     message: str | None = None
     user_team: MatchupTeamRead | None = None
+    live_refresh: MatchupLiveRefreshRead | None = None
 
 
 class LeagueWaiverPlayerRead(BaseModel):

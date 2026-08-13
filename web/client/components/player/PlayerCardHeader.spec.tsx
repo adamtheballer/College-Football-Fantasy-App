@@ -39,4 +39,36 @@ describe("PlayerCardHeader injury status", () => {
     expect(screen.queryByText("Active")).toBeNull();
     expect(screen.getByText("Current Value Rating")).toBeTruthy();
   });
+
+  it("uses the certified positional rank after a verified week is published", () => {
+    render(
+      <PlayerCardHeader
+        card={{
+          positional_rank: { position: "RB", position_rank: 1, through_week: 1, fantasy_points: 26.4 },
+          about: { status: "Active", source: "local" },
+          player: { id: 1, name: "Ranked Player", position: "RB", school: "Georgia" },
+          injuries: [],
+          season_stats: [],
+          historical_stats: null,
+        } as never}
+        currentValue={88}
+        onClose={vi.fn()}
+        palette={{
+          headerBase: "bg-slate-900",
+          markerA: "rgba(255,255,255,0.1)",
+          markerB: "rgba(255,255,255,0.1)",
+          markerC: "rgba(255,255,255,0.1)",
+          pill: "bg-slate-800",
+          silhouette: "from-slate-700 to-slate-800",
+        }}
+        player={{ id: 1, name: "Ranked Player", position: "RB", school: "Georgia", status: "Active" }}
+        position="RB"
+        title="Player Card"
+      />,
+    );
+
+    expect(screen.getByText("Positional Rank")).toBeTruthy();
+    expect(screen.getByText("RB 1")).toBeTruthy();
+    expect(screen.queryByText("Current Value Rating")).toBeNull();
+  });
 });

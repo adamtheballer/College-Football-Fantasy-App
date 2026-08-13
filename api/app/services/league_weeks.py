@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.matchup import Matchup
 
@@ -12,6 +12,8 @@ CFB_WEEK_START_WEEKDAY = 3
 CFB_WEEK_END_WEEKDAY = 6
 TRADE_PROCESSING_WEEKDAYS = {0, 1, 2}
 MAX_CFB_REGULAR_SEASON_WEEK = 15
+FINAL_MATCHUP_STATUSES = {"final", "stat_corrected"}
+MATCHUP_RESULTS_HOLD = timedelta(hours=24)
 
 
 @dataclass(frozen=True)
@@ -107,36 +109,104 @@ def current_cfb_week_state(
     )
 
 
+def _league_timezone_name(db: Session, league: League) -> str:
+    """Use the league's draft timezone, falling back to the CFB schedule timezone."""
+    draft = db.query(Draft).filter(Draft.league_id == league.id).first()
+    return draft.timezone if draft and draft.timezone else "America/New_York"
+
+
+def _matchup_rows_by_week(db: Session, league: League) -> dict[int, list[Matchup]]:
+    rows = (
+        db.query(Matchup)
+        .filter(Matchup.league_id == league.id, Matchup.season == league.season_year)
+        .order_by(Matchup.week.asc(), Matchup.id.asc())
+        .all()
+    )
+    grouped: dict[int, list[Matchup]] = {}
+    for matchup in rows:
+        grouped.setdefault(int(matchup.week), []).append(matchup)
+    return grouped
+
+
+def _week_is_final(matchups: list[Matchup]) -> bool:
+    return bool(matchups) and all((matchup.status or "").lower() in FINAL_MATCHUP_STATUSES for matchup in matchups)
+
+
+def latest_fully_finalized_matchup_week(db: Session, league: League) -> int | None:
+    """Return the last consecutive fully final scheduled week.
+
+    Schedules imported midseason may start after Week 1. Missing weeks are not
+    scheduled weeks, so they must not prevent a later complete week from
+    finalizing; the first non-final scheduled week still blocks all later ones.
+    """
+    rows_by_week = _matchup_rows_by_week(db, league)
+    completed_week: int | None = None
+    for week in sorted(rows_by_week):
+        if not _week_is_final(rows_by_week[week]):
+            break
+        completed_week = week
+    return completed_week
+
+
+def _rollover_at(matchups: list[Matchup], timezone_name: str) -> datetime:
+    """Hold final results through Tuesday after the game weekend and for 24 hours.
+
+    CFB's normal slate can finish on Sunday or Monday. A later correction must
+    still remain visible for 24 hours, but it must not defer the next matchup
+    all the way to the following Tuesday.
+    """
+    league_tz = _timezone(timezone_name)
+    finalized_at = max(
+        (_as_utc(matchup.updated_at or matchup.created_at) for matchup in matchups),
+        default=datetime.now(timezone.utc),
+    )
+    local_finalized_at = finalized_at.astimezone(league_tz)
+    minimum_hold_ends_at = finalized_at + MATCHUP_RESULTS_HOLD
+    if local_finalized_at.weekday() > 1:
+        return minimum_hold_ends_at
+
+    days_until_tuesday = (1 - local_finalized_at.weekday()) % 7
+    tuesday_start = datetime.combine(
+        local_finalized_at.date() + timedelta(days=days_until_tuesday),
+        time.min,
+        tzinfo=league_tz,
+    ).astimezone(timezone.utc)
+    return max(minimum_hold_ends_at, tuesday_start)
+
+
 def resolve_current_week(
     db: Session,
     league: League,
     selected_week: int | None = None,
+    now: datetime | None = None,
 ) -> int:
     if selected_week is not None and selected_week > 0:
         return selected_week
 
-    live_week = (
-        db.query(func.min(Matchup.week))
-        .filter(
-            Matchup.league_id == league.id,
-            Matchup.season == league.season_year,
-            Matchup.status.in_(("live", "in_progress")),
-        )
-        .scalar()
-    )
-    if live_week is not None:
-        return int(live_week)
+    current = _as_utc(now or datetime.now(timezone.utc))
+    rows_by_week = _matchup_rows_by_week(db, league)
+    if not rows_by_week:
+        return calendar_cfb_week(league.season_year, current)
 
-    scheduled_week = (
-        db.query(func.min(Matchup.week))
-        .filter(
-            Matchup.league_id == league.id,
-            Matchup.season == league.season_year,
-            Matchup.status.in_(("scheduled", "projected")),
-        )
-        .scalar()
-    )
-    if scheduled_week is not None:
-        return int(scheduled_week)
+    # Never advance past an unfinished week. A league can have multiple
+    # matchups in a week, and all of them must be final before standings or
+    # the default workspace are allowed to move ahead.
+    completed_week = latest_fully_finalized_matchup_week(db, league)
+    if completed_week is not None:
+        completed_rows = rows_by_week[completed_week]
+        if current < _rollover_at(completed_rows, _league_timezone_name(db, league)):
+            return completed_week
 
-    return calendar_cfb_week(league.season_year)
+        next_week = next((week for week in sorted(rows_by_week) if week > completed_week), None)
+        if next_week is not None:
+            return next_week
+
+    calendar_week = calendar_cfb_week(league.season_year, current)
+    for week in sorted(rows_by_week):
+        if week <= calendar_week and not _week_is_final(rows_by_week[week]):
+            return week
+
+    # Before the first scheduled kickoff, or when an imported schedule is
+    # ahead of the calendar, show the nearest available matchup rather than
+    # incorrectly selecting the oldest projected row forever.
+    return min(rows_by_week)

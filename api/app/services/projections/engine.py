@@ -54,10 +54,29 @@ def _preseason_usage(player: Player) -> tuple[float, float]:
     return (0.0, 0.0)
 
 
-def _talent_multiplier(player: Player) -> float:
-    """Keep preseason output tied to the canonical CFB27 player pool without overreacting."""
+def _projection_rating(player: Player, week: int) -> float:
+    """Choose the canonical rating available *before* a given week's games.
 
-    overall = float(player.cfb27_overall or 80)
+    Week 1 must remain the reviewed CFB27 baseline.  Once a prior week has
+    been calculated, later projections may use the current-value calculation
+    (which itself incorporates verified production); they never use a value
+    calculation from the target week or a future week.
+    """
+
+    if (
+        week > 1
+        and player.value_calculation_week is not None
+        and player.value_calculation_week < week
+        and player.current_value_rating is not None
+    ):
+        return float(player.current_value_rating)
+    return float(player.raw_cfb27_rating or player.cfb27_overall or 80)
+
+
+def _talent_multiplier(player: Player, week: int) -> float:
+    """Keep projections tied to the approved rating available before kickoff."""
+
+    overall = _projection_rating(player, week)
     return max(0.85, min(1.15, 1.0 + (overall - 80.0) / 100.0))
 
 
@@ -120,7 +139,7 @@ def build_weekly_projections(
         fallback_rush_share, fallback_target_share = _preseason_usage(player)
         rush_share = usage.rush_share if usage else fallback_rush_share
         target_share = usage.target_share if usage else fallback_target_share
-        talent = _talent_multiplier(player)
+        talent = _talent_multiplier(player, week)
 
         injury = injuries_by_player.get(player.id)
         health = _health_multiplier(injury.status if injury else None)

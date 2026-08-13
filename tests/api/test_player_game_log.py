@@ -77,6 +77,40 @@ def test_player_game_log_returns_canonical_schedule_with_bye_and_verified_stats(
     assert body["games"][1]["stats"]["stats"]["passing_yards"] == 288
 
 
+def test_player_game_log_returns_a_verified_season_total_using_standard_scoring(client, db_session):
+    player = Player(name="Season Total Back", position="RB", school="Ohio State")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add_all(
+        [
+            TeamSchedule(
+                team_name="Ohio State", season=2026, week=1, opponent_name="Texas", location="home",
+                is_bye=False, neutral_site=False, conference_game=False, date_confirmed=True,
+            ),
+            PlayerStat(
+                player_id=player.id, season=2026, week=1, source="verified_boxscore", verified=True,
+                stats={"rush_yards": 100, "rush_tds": 1, "receiving_yards": 10},
+            ),
+            PlayerStat(
+                player_id=player.id, season=2026, week=2, source="verified_boxscore", verified=True,
+                stats={"rush_yards": 50, "receiving_yards": 50, "receptions": 4},
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(f"/players/{player.id}/game-log", params={"season": 2026})
+
+    assert response.status_code == 200
+    summary = response.json()["season_summary"]
+    assert summary == {
+        "season": 2026,
+        "fantasy_points": 31.0,
+        "finalized_games": 2,
+        "source": "verified_player_stats",
+    }
+
+
 def test_player_game_log_uses_explicit_school_alias_without_guessing(client, db_session):
     player = Player(name="Alias Receiver", position="WR", school="Cal")
     db_session.add(player)

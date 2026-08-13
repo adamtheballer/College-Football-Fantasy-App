@@ -1,8 +1,15 @@
 from sqlalchemy import event
 
 from collegefootballfantasy_api.app.models.standing import Standing
+from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.models.user import User
-from collegefootballfantasy_api.app.services.league_roster_matchup import build_matchup_tab_view
+from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+from collegefootballfantasy_api.app.core.config import settings as app_settings
+from collegefootballfantasy_api.app.services.league_roster_matchup import (
+    _matchup_live_refresh,
+    build_matchup_tab_view,
+    build_roster_tab_view,
+)
 from tests.api.scoring_helpers import create_scoring_fixture
 
 
@@ -45,4 +52,74 @@ def test_matchup_tab_uses_a_bounded_number_of_selects(client, db_session):
     assert response.opponent_team is not None
     assert len(response.my_roster) == 8
     assert len(response.opponent_roster) == 8
-    assert select_count <= 8
+    assert select_count <= 9
+
+
+def test_roster_and_matchup_show_only_certified_final_scores_with_locked_pregame_projection(client, db_session):
+    league, home, _away, players, _matchup = create_scoring_fixture(db_session)
+    user = User(
+        first_name="Final Score",
+        email="final-score@example.com",
+        password_hash="hash",
+        api_token="final-score-token",
+    )
+    db_session.add(user)
+    db_session.flush()
+    home.owner_user_id = user.id
+    db_session.add_all(
+        [
+            WeeklyProjection(
+                player_id=players["qb"].id,
+                season=2026,
+                week=1,
+                fantasy_points=20.1,
+            ),
+            WeeklyProjection(
+                player_id=players["rb"].id,
+                season=2026,
+                week=1,
+                fantasy_points=17.2,
+            ),
+            PlayerWeekScore(
+                league_id=league.id,
+                player_id=players["qb"].id,
+                season=2026,
+                week=1,
+                fantasy_points=24.5,
+                status="final_verified",
+            ),
+            PlayerWeekScore(
+                league_id=league.id,
+                player_id=players["rb"].id,
+                season=2026,
+                week=1,
+                fantasy_points=17.2,
+                status="live",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    roster = build_roster_tab_view(db_session, league, user, selected_week=1)
+    matchup = build_matchup_tab_view(db_session, league, user, selected_week=1)
+    qb_roster_row = next(row for row in roster.roster if row.player_id == players["qb"].id)
+    rb_roster_row = next(row for row in roster.roster if row.player_id == players["rb"].id)
+    qb_matchup_row = next(row for row in matchup.my_roster if row.player_id == players["qb"].id)
+
+    assert qb_roster_row.final_fantasy_points == 24.5
+    assert qb_roster_row.pre_game_projection_points == 20.1
+    assert qb_matchup_row.final_fantasy_points == 24.5
+    assert qb_matchup_row.pre_game_projection_points == 20.1
+    assert rb_roster_row.final_fantasy_points is None
+    assert rb_roster_row.pre_game_projection_points is None
+
+
+def test_matchup_refresh_contract_is_disabled_without_alpha_live_scoring(db_session, monkeypatch):
+    monkeypatch.setattr(app_settings, "espn_live_scoring_enabled", False)
+    monkeypatch.setattr(app_settings, "espn_live_scoring_active_poll_interval_seconds", 240)
+
+    refresh = _matchup_live_refresh(db_session, season=2026, week=1)
+
+    assert refresh.enabled is False
+    assert refresh.status == "disabled"
+    assert refresh.cadence_seconds == 240

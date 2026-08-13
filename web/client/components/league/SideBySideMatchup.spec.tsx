@@ -64,4 +64,22 @@ describe("SideBySideMatchup", () => {
     expect(screen.getByTestId("mobile-bench-lineup")).toBeTruthy();
     expect(container.querySelector("details")?.open).toBe(false);
   });
+
+  it("uses the final score with the locked pre-game projection after a game is certified", () => {
+    const completedMyTeam: LeagueMatchupTeam = {
+      ...myTeam,
+      roster: [
+        {
+          ...myTeam.roster[0],
+          final_fantasy_points: 25.6,
+          pre_game_projection_points: 24.1,
+        },
+      ],
+    };
+
+    render(<SideBySideMatchup myTeam={completedMyTeam} opponentTeam={opponentTeam} />);
+
+    expect(screen.getByText("25.6")).toBeTruthy();
+    expect(screen.getByText("Pre-game 24.1")).toBeTruthy();
+  });
 });

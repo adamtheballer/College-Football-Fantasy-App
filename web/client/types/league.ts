@@ -158,6 +158,7 @@ export interface LeagueWorkspaceStandingSummary {
   losses?: number;
   ties?: number;
   points_for?: number;
+  points_against?: number;
   rank?: number;
 }
 
@@ -248,6 +249,8 @@ export interface LeagueRosterPlayer {
   boom_prob?: number | null;
   bust_prob?: number | null;
   weekly_projected_fantasy_points: number | null;
+  pre_game_projection_points?: number | null;
+  final_fantasy_points?: number | null;
   projection_status?: string | null;
   game_start_at?: string | null;
   is_locked?: boolean;
@@ -292,6 +295,14 @@ export interface LeagueMatchupTeam {
   roster: LeagueRosterPlayer[];
 }
 
+export interface LeagueMatchupLiveRefresh {
+  enabled: boolean;
+  cadence_seconds: number;
+  status: "disabled" | "not_live" | "scheduled" | "awaiting_schedule";
+  next_refresh_at?: string | null;
+  last_success_at?: string | null;
+}
+
 export interface LeagueMatchupTabResponse {
   league_id: number;
   season?: number;
@@ -305,6 +316,7 @@ export interface LeagueMatchupTabResponse {
   opponent_roster?: LeagueRosterPlayer[];
   projection_source?: string;
   message?: string | null;
+  live_refresh?: LeagueMatchupLiveRefresh | null;
 }
 
 export interface LeagueScheduleRow {
