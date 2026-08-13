@@ -560,6 +560,8 @@ class RosterTabEntryRead(BaseModel):
     bust_prob: float = 0.0
     opponent: str | None = None
     weekly_projected_fantasy_points: float | None = None
+    pre_game_projection_points: float | None = None
+    final_fantasy_points: float | None = None
     projection_status: str = "UNAVAILABLE"
     game_start_at: datetime | None = None
     is_locked: bool = False

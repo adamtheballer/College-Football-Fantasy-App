@@ -27,6 +27,8 @@ from collegefootballfantasy_api.app.models.scoring_run import ScoringRun
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.team_week_score import TeamWeekScore
+from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_starts_for_players
 
 
@@ -72,6 +74,99 @@ def _league_settings(db: Session, league_id: int) -> LeagueSettings | None:
     return db.query(LeagueSettings).filter(LeagueSettings.league_id == league_id).first()
 
 
+_PROJECTION_SNAPSHOT_FIELDS = (
+    "is_published",
+    "pass_attempts",
+    "rush_attempts",
+    "targets",
+    "receptions",
+    "expected_plays",
+    "expected_rush_per_play",
+    "expected_td_per_play",
+    "pass_yards",
+    "rush_yards",
+    "rec_yards",
+    "pass_tds",
+    "rush_tds",
+    "rec_tds",
+    "interceptions",
+    "field_goals_made_0_to_39",
+    "field_goals_made_40_to_49",
+    "field_goals_made_0_to_49",
+    "field_goals_made_50_plus",
+    "extra_points_made",
+    "neutral_baseline",
+    "baseline_games_played",
+    "baseline_source",
+    "team_id",
+    "opponent_team_id",
+    "projection_status",
+    "availability_multiplier",
+    "usage_multiplier",
+    "offense_multiplier",
+    "opponent_defense_multiplier",
+    "confidence",
+    "fallback_reason",
+    "model_version",
+    "fantasy_points",
+    "floor",
+    "ceiling",
+    "boom_prob",
+    "bust_prob",
+    "qb_rating",
+)
+
+
+def _lock_pre_game_projection_snapshot(
+    db: Session,
+    *,
+    player_id: int,
+    season: int,
+    week: int,
+    locked_at: datetime,
+) -> None:
+    """Persist the projection visible at kickoff for completed-game displays.
+
+    Later weekly recalculations may change the current projection.  The LOCKED
+    version is therefore an immutable pre-game reference, never a live score
+    estimate, and is selected by the normal public projection read query.
+    """
+
+    existing = (
+        db.query(WeeklyProjection)
+        .filter(
+            WeeklyProjection.player_id == player_id,
+            WeeklyProjection.season == season,
+            WeeklyProjection.week == week,
+            WeeklyProjection.projection_version == "LOCKED",
+        )
+        .one_or_none()
+    )
+    if existing is not None:
+        return
+
+    source = db.scalar(
+        current_published_projections_query(
+            season=season,
+            week=week,
+            player_ids=(player_id,),
+        )
+    )
+    if source is None:
+        return
+
+    db.add(
+        WeeklyProjection(
+            player_id=player_id,
+            season=season,
+            week=week,
+            projection_version="LOCKED",
+            locked_at=as_utc(locked_at),
+            **{field: getattr(source, field) for field in _PROJECTION_SNAPSHOT_FIELDS},
+        )
+    )
+
+
 def create_or_refresh_lineup_snapshots(db: Session, league_id: int, season: int, week: int) -> int:
     existing = {
         (snapshot.team_id, snapshot.player_id): snapshot
@@ -98,6 +193,13 @@ def create_or_refresh_lineup_snapshots(db: Session, league_id: int, season: int,
         game_start_at = game_starts.get(entry.player_id)
         snapshot = existing.get((entry.team_id, entry.player_id))
         if snapshot and snapshot.locked_at is not None:
+            _lock_pre_game_projection_snapshot(
+                db,
+                player_id=entry.player_id,
+                season=season,
+                week=week,
+                locked_at=snapshot.locked_at,
+            )
             continue
         if snapshot is None:
             snapshot = LineupWeekSnapshot(
@@ -113,12 +215,27 @@ def create_or_refresh_lineup_snapshots(db: Session, league_id: int, season: int,
             )
             db.add(snapshot)
             created += 1
+            if snapshot.locked_at is not None:
+                _lock_pre_game_projection_snapshot(
+                    db,
+                    player_id=entry.player_id,
+                    season=season,
+                    week=week,
+                    locked_at=snapshot.locked_at,
+                )
             continue
         snapshot.slot = (entry.slot or "BENCH").upper()
         snapshot.is_starter = is_starting_slot(entry.slot or "")
         snapshot.game_start_at = game_start_at
         if game_start_at is not None and game_start_at <= as_utc(now):
             snapshot.locked_at = as_utc(now)
+            _lock_pre_game_projection_snapshot(
+                db,
+                player_id=entry.player_id,
+                season=season,
+                week=week,
+                locked_at=snapshot.locked_at,
+            )
 
     for key, snapshot in existing.items():
         if key not in current_keys and snapshot.locked_at is None:

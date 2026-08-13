@@ -50,6 +50,17 @@ const weeklyProjectionLabel = (player: LeagueRosterPlayer) => {
   return formatProjectionDisplay(projection, player.projection_status);
 };
 
+const completedFantasyPoints = (player: LeagueRosterPlayer) =>
+  typeof player.final_fantasy_points === "number" && Number.isFinite(player.final_fantasy_points)
+    ? player.final_fantasy_points
+    : null;
+
+const preGameProjectionLabel = (player: LeagueRosterPlayer) =>
+  formatProjectionDisplay(
+    player.pre_game_projection_points ?? player.projected_points ?? player.weekly_projected_fantasy_points,
+    player.projection_status,
+  );
+
 const isRealRosterPlayer = (player: LeagueRosterPlayer) =>
   Boolean(
     player.player_id !== null &&
@@ -305,6 +316,7 @@ export function RosterSlotTable({
             const projection = isRealPlayer
               ? player.projected_points ?? player.weekly_projected_fantasy_points ?? null
               : 0;
+            const finalFantasyPoints = isRealPlayer ? completedFantasyPoints(player) : null;
             return (
               <button
                 key={player.slot_id ?? `${player.team_id ?? player.fantasy_team_id}-${slotType(player)}-${player.slot_index ?? 0}`}
@@ -355,8 +367,20 @@ export function RosterSlotTable({
                 ) : null}
                 <span className="hidden text-cfb-text-muted md:block">{isRealPlayer ? player.opponent ?? "TBD" : "—"}</span>
                 <span className={cn("flex flex-col items-end text-right font-black tabular-nums", style.text)}>
-                  <span className="text-[8px] uppercase tracking-[0.12em] text-cfb-text-muted md:hidden">Proj</span>
-                  <span>{formatProjectionDisplay(projection, player.projection_status)}</span>
+                  {finalFantasyPoints !== null ? (
+                    <>
+                      <span className="text-[8px] uppercase tracking-[0.12em] text-cfb-text-muted md:hidden">Final</span>
+                      <span>{finalFantasyPoints.toFixed(1)}</span>
+                      <span className="mt-0.5 text-[9px] font-bold text-cfb-text-muted">
+                        Pre-game {preGameProjectionLabel(player)}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-[8px] uppercase tracking-[0.12em] text-cfb-text-muted md:hidden">Proj</span>
+                      <span>{formatProjectionDisplay(projection, player.projection_status)}</span>
+                    </>
+                  )}
                 </span>
               </button>
             );
