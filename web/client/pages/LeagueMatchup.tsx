@@ -1,4 +1,5 @@
-import { Clock, ShieldAlert, Trophy } from "lucide-react";
+import { Clock, ShieldAlert, Swords, Trophy } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Navigate, useParams, useSearchParams } from "react-router-dom";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
@@ -7,7 +8,7 @@ import { WeekSelector } from "@/components/league/WeekSelector";
 import { WinChanceBar, WinChanceMeter } from "@/components/league/WinChanceMeter";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
-import { useLeagueDetail, useLeagueMatchupTab, useLeagueScoreboard } from "@/hooks/use-leagues";
+import { useLeagueDetail, useLeagueMatchupTab, useLeagueScoreboard, useMatchupRivalry } from "@/hooks/use-leagues";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import type { LeagueMatchupTabResponse, LeagueMatchupTeam } from "@/types/league";
 
@@ -275,6 +276,26 @@ export default function LeagueMatchup() {
   const isViewingOwnMatchup = Boolean(
     data?.my_team?.fantasy_team_id && data?.user_team?.fantasy_team_id === data.my_team.fantasy_team_id,
   );
+  const rivalryQuery = useMatchupRivalry(parsedLeagueId, data?.matchup_id, postDraft && Boolean(data?.matchup_id));
+  const [showRivalryReveal, setShowRivalryReveal] = useState(false);
+
+  useEffect(() => {
+    const rivalry = rivalryQuery.data;
+    if (!rivalry?.is_rivalry_matchup || !data?.matchup_id) {
+      setShowRivalryReveal(false);
+      return;
+    }
+    const storageKey = `cff-rivalry-reveal:${parsedLeagueId}:${data.matchup_id}`;
+    try {
+      if (!window.localStorage.getItem(storageKey)) {
+        window.localStorage.setItem(storageKey, "seen");
+        setShowRivalryReveal(true);
+      }
+    } catch {
+      // Privacy-restricted browsers can still use the matchup without persistence.
+      setShowRivalryReveal(true);
+    }
+  }, [data?.matchup_id, parsedLeagueId, rivalryQuery.data]);
 
   const updateSelection = (week: number, matchupId?: number) => {
     const next = new URLSearchParams(searchParams);
@@ -378,7 +399,31 @@ export default function LeagueMatchup() {
         />
       ) : (
         <>
+          {showRivalryReveal && rivalryQuery.data?.is_rivalry_matchup ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="rivalry-reveal-title">
+              <section className="relative w-full max-w-md overflow-hidden rounded-3xl border border-cfb-gold/45 bg-[radial-gradient(circle_at_20%_0%,rgba(234,179,8,0.2),transparent_38%),linear-gradient(145deg,#172554,#0f172a_72%)] p-7 text-center shadow-[0_30px_100px_rgba(0,0,0,0.55)]">
+                <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-cfb-gold to-transparent" />
+                <Swords className="mx-auto h-10 w-10 text-cfb-gold" aria-hidden="true" />
+                <p className="mt-4 cfb-micro-label text-cfb-gold">{rivalryQuery.data.is_championship ? "CFB Fantasy Bowl" : "Rivalry Week"}</p>
+                <h2 id="rivalry-reveal-title" className="mt-2 text-3xl font-black text-cfb-text-primary">{rivalryQuery.data.user_team_name} vs {rivalryQuery.data.rival_team_name}</h2>
+                <p className="mt-3 text-sm leading-6 text-cfb-text-secondary">Series record: {rivalryQuery.data.series.wins}-{rivalryQuery.data.series.losses}{rivalryQuery.data.series.ties ? `-${rivalryQuery.data.series.ties}` : ""}. Rivalry status is for bragging rights only and never changes scoring or standings.</p>
+                <button type="button" onClick={() => setShowRivalryReveal(false)} className="mt-6 inline-flex min-h-11 items-center justify-center rounded-xl bg-cfb-gold px-5 text-xs font-black uppercase tracking-[0.14em] text-slate-950 transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-cfb-gold focus:ring-offset-2 focus:ring-offset-slate-950">View matchup</button>
+              </section>
+            </div>
+          ) : null}
           <div className="space-y-4">
+            {rivalryQuery.data?.is_rivalry_matchup ? (
+              <section className="flex flex-col gap-3 rounded-2xl border border-cfb-gold/35 bg-[linear-gradient(120deg,rgba(79,57,14,0.38),rgba(15,29,48,0.92)_58%,rgba(11,53,58,0.42))] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cfb-gold/35 bg-cfb-gold/10 text-cfb-gold"><Swords className="h-5 w-5" aria-hidden="true" /></div>
+                  <div>
+                    <p className="cfb-micro-label text-cfb-gold">{rivalryQuery.data.is_championship ? "CFB Fantasy Bowl · Championship" : "Rivalry Week"}</p>
+                    <p className="mt-1 text-sm font-black text-cfb-text-primary">{rivalryQuery.data.user_team_name} vs {rivalryQuery.data.rival_team_name}</p>
+                  </div>
+                </div>
+                <p className="text-xs font-bold text-cfb-text-secondary">Series {rivalryQuery.data.series.wins}-{rivalryQuery.data.series.losses}{rivalryQuery.data.series.ties ? `-${rivalryQuery.data.series.ties}` : ""}{rivalryQuery.data.last_meeting ? ` · Last ${rivalryQuery.data.last_meeting.result} ${rivalryQuery.data.last_meeting.own_score.toFixed(1)}-${rivalryQuery.data.last_meeting.rival_score.toFixed(1)}` : ""}</p>
+              </section>
+            ) : null}
             <CompactMatchupScoreboard
               data={data}
               myTeam={myTeam}

@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
+import { apiGet, apiPatch, apiPost, apiPut, ApiError } from "@/lib/api";
+import type {
+  CareerEventsResponse,
+  CareerLeague,
+  CareerProfile,
+  CareerTrophy,
+  LeagueRivalry,
+  RivalryMatchup,
+} from "@/types/career";
 import type {
   DraftInfo,
   DraftOrder,
@@ -42,6 +50,76 @@ export function useLeagues(limit = 20, enabled = true) {
           new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime()
       );
     },
+  });
+}
+
+export function useCareerProfile(enabled = true) {
+  return useQuery({
+    queryKey: ["career", "me"],
+    enabled,
+    staleTime: 30_000,
+    queryFn: () => apiGet<CareerProfile>("/users/me/career"),
+  });
+}
+
+export function useCareerEvents(enabled = true) {
+  return useQuery({
+    queryKey: ["career", "me", "events"],
+    enabled,
+    staleTime: 30_000,
+    queryFn: () => apiGet<CareerEventsResponse>("/users/me/career/history", { limit: 50 }),
+  });
+}
+
+export function useCareerLeagues(enabled = true) {
+  return useQuery({
+    queryKey: ["career", "me", "leagues"],
+    enabled,
+    staleTime: 30_000,
+    queryFn: async () => (await apiGet<{ data: CareerLeague[] }>("/users/me/career/leagues")).data,
+  });
+}
+
+export function useCareerTrophies(enabled = true) {
+  return useQuery({
+    queryKey: ["career", "me", "trophies"],
+    enabled,
+    staleTime: 30_000,
+    queryFn: async () => (await apiGet<{ data: CareerTrophy[] }>("/users/me/career/trophies")).data,
+  });
+}
+
+export function useLeagueRivalry(leagueId?: number, enabled = true) {
+  return useQuery({
+    queryKey: ["league", leagueId, "rivalry"],
+    enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
+    staleTime: 30_000,
+    queryFn: () => apiGet<LeagueRivalry>(`/leagues/${leagueId}/rival`),
+  });
+}
+
+export function useSetLeagueRivalry(leagueId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (rivalTeamId: number) => {
+      if (typeof leagueId !== "number" || Number.isNaN(leagueId)) throw new ApiError(400, "Invalid league ID.");
+      return apiPut<LeagueRivalry>(`/leagues/${leagueId}/rival`, { rival_team_id: rivalTeamId });
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["league", leagueId, "rivalry"] }),
+        queryClient.invalidateQueries({ queryKey: ["career", "me"] }),
+      ]);
+    },
+  });
+}
+
+export function useMatchupRivalry(leagueId?: number, matchupId?: number, enabled = true) {
+  return useQuery({
+    queryKey: ["league", leagueId, "matchup", matchupId, "rivalry"],
+    enabled: enabled && typeof leagueId === "number" && typeof matchupId === "number" && !Number.isNaN(leagueId) && !Number.isNaN(matchupId),
+    staleTime: 30_000,
+    queryFn: () => apiGet<RivalryMatchup>(`/leagues/${leagueId}/matchups/${matchupId}/rivalry`),
   });
 }
 

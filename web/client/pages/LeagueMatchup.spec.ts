@@ -49,6 +49,11 @@ vi.mock("@/hooks/use-leagues", () => ({
     isError: false,
     refetch: vi.fn(),
   }),
+  useMatchupRivalry: () => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+  }),
 }));
 
 import {

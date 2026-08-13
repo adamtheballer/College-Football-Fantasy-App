@@ -40,6 +40,7 @@ const Trade = lazyWithRouteRecovery(() => import("./pages/Trade"));
 const AdminScoring = lazyWithRouteRecovery(() => import("./pages/AdminScoring"));
 const ComingSoon = lazyWithRouteRecovery(() => import("./pages/ComingSoon"));
 const SaturdayPick6 = lazyWithRouteRecovery(() => import("./pages/SaturdayPick6"));
+const CareerProfile = lazyWithRouteRecovery(() => import("./pages/CareerProfile"));
 
 const NON_RETRYABLE_STATUSES = new Set([401, 403, 404]);
 
@@ -188,6 +189,7 @@ const App = () => (
                   }
                 />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/career" element={<ProtectedRoute><CareerProfile /></ProtectedRoute>} />
                 <Route path="/report-bug" element={<ReportBug />} />
                 <Route path="/rosters" element={<ProtectedRoute><Rosters /></ProtectedRoute>} />
                 <Route path="/chats" element={<ProtectedRoute><Chats /></ProtectedRoute>} />

@@ -16,6 +16,7 @@ def ensure_models_registered() -> None:
         beta_access,
         chat,
         cfb_standing_snapshot,
+        career,
         college_team,
         database_metadata,
         defense_rating,

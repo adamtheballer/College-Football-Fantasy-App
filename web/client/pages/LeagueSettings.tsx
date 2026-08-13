@@ -11,6 +11,7 @@ import {
   Medal,
   Settings2,
   ShieldCheck,
+  Swords,
   Trophy,
   Users,
 } from "lucide-react";
@@ -19,7 +20,7 @@ import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
 import { ErrorState } from "@/components/states";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useLeagueDetail, useLeagueSettingsTab } from "@/hooks/use-leagues";
+import { useLeagueDetail, useLeagueRivalry, useLeagueSettingsTab, useSetLeagueRivalry } from "@/hooks/use-leagues";
 import { getLeagueScheduleWeeks } from "@/lib/leagueSchedule";
 import { tradeOfferPath } from "@/lib/trade-links";
 import type { LeagueRosterPlayer, LeagueSettingsTabResponse } from "@/types/league";
@@ -136,6 +137,8 @@ export default function LeagueSettings() {
   const [copiedInviteField, setCopiedInviteField] = useState<"code" | "link" | null>(null);
   const leagueQuery = useLeagueDetail(parsedLeagueId);
   const settingsQuery = useLeagueSettingsTab(parsedLeagueId);
+  const rivalryQuery = useLeagueRivalry(parsedLeagueId);
+  const setRivalry = useSetLeagueRivalry(parsedLeagueId);
   const data = settingsQuery.data;
   const tradeHistory = data?.trade_history ?? [];
   const rosterGroups = useMemo(() => groupRostersByTeam(data?.rosters ?? []), [data?.rosters]);
@@ -250,6 +253,42 @@ export default function LeagueSettings() {
           leagueStatus={leagueQuery.data?.status}
         />
       </div>
+
+      <section className="rounded-[1.5rem] border border-cfb-gold/25 bg-[linear-gradient(125deg,rgba(59,45,18,0.42),rgba(14,27,45,0.92)_55%,rgba(10,28,45,0.94))] p-5 shadow-[0_18px_60px_rgba(234,179,8,0.08)]">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2 text-cfb-gold">
+              <Swords className="h-5 w-5" aria-hidden="true" />
+              <p className="cfb-micro-label">Your rivalry</p>
+            </div>
+            <p className="mt-2 text-lg font-black text-cfb-text-primary">
+              {rivalryQuery.data?.rival_team_name ?? "Choose a rival manager"}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-cfb-text-secondary">
+              A rival is a human-managed team in this league. It is your personal selection and never changes scheduling, standings, or scoring.
+            </p>
+          </div>
+          <label className="flex min-w-0 flex-col gap-2 sm:min-w-[300px]">
+            <span className="cfb-micro-label text-cfb-text-muted">Rival manager</span>
+            <select
+              aria-label="Choose your rival"
+              value={rivalryQuery.data?.rival_team_id ?? ""}
+              disabled={rivalryQuery.isLoading || !rivalryQuery.data?.can_change || setRivalry.isPending}
+              onChange={(event) => setRivalry.mutate(Number(event.target.value))}
+              className="h-11 rounded-xl border border-cfb-gold/30 bg-cfb-surface px-3 text-sm font-bold text-cfb-text-primary outline-none transition focus:border-cfb-gold focus:ring-2 focus:ring-cfb-gold/20 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="" disabled>{rivalryQuery.isLoading ? "Loading rival options…" : "Choose a rival"}</option>
+              {(rivalryQuery.data?.candidates ?? []).map((candidate) => (
+                <option key={candidate.team_id} value={candidate.team_id}>{candidate.team_name} · {candidate.manager_name}</option>
+              ))}
+            </select>
+            {!rivalryQuery.data?.can_change && rivalryQuery.data?.rival_team_name ? (
+              <span className="text-xs font-medium text-cfb-text-muted">Your first finalized rivalry matchup starts a seven-day change cooldown.</span>
+            ) : null}
+          </label>
+        </div>
+        {setRivalry.isError ? <p className="mt-3 text-sm font-bold text-rose-300">Unable to update your rival. No league data changed.</p> : null}
+      </section>
 
       {data?.invite ? (
         <InviteSettingsCard

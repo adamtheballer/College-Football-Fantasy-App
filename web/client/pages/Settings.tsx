@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { User, Sliders, Shield, Save, LogOut } from "lucide-react";
+import { User, Sliders, Shield, Save, LogOut, Trophy } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { restartGuide } from "@/lib/onboarding";
 import { useLeagues } from "@/hooks/use-leagues";
@@ -249,6 +249,13 @@ export default function Settings() {
             </div>
           </div>
           {profileError ? <p role="alert" className="text-sm font-semibold text-red-300">{profileError}</p> : null}
+          <Link
+            to="/career"
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 text-[10px] font-black uppercase tracking-[0.16em] text-primary transition hover:bg-primary/20"
+          >
+            <Trophy className="h-4 w-4" aria-hidden="true" />
+            View Career Profile
+          </Link>
         </SettingsSection>
 
         {/* PREFERENCES SECTION */}

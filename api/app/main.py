@@ -17,6 +17,7 @@ from collegefootballfantasy_api.app.api.routes import (
     admin_scoring,
     admin_moderation,
     chats,
+    career,
     health,
     insights,
     injuries,
@@ -79,6 +80,7 @@ def log_runtime_identity_on_startup() -> None:
 
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(career.router, prefix="/users", tags=["users"])
 app.include_router(beta_access.router, prefix="/beta-access", tags=["beta-access"])
 app.include_router(admin_scoring.router, prefix="/admin/scoring", tags=["admin-scoring"])
 app.include_router(admin_trades.router, prefix="/admin/trades", tags=["admin-trades"])

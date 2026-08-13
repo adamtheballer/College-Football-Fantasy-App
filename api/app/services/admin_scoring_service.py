@@ -15,6 +15,7 @@ from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.scoring_admin_audit import ScoringAdminAudit
 from collegefootballfantasy_api.app.models.scoring_run import ScoringRun
 from collegefootballfantasy_api.app.models.user import User
+from collegefootballfantasy_api.app.services.career_profile import record_finalized_matchup_events
 from collegefootballfantasy_api.app.schemas.admin_scoring import (
     AdminActionResponse,
     AdminCorrectionRequest,
@@ -291,6 +292,8 @@ def set_week_status(db: Session, *, league_id: int, season: int, week: int, stat
     before_state = {"matchups": [{"id": row.id, "status": row.status} for row in matchups]}
     for matchup in matchups:
         matchup.status = status
+    if status.lower() in {"final", "completed", "complete", "stat_corrected"}:
+        record_finalized_matchup_events(db, matchups)
     audit = _audit(
         db,
         action=f"{status}_week",
