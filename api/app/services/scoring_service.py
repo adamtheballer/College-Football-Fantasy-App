@@ -30,6 +30,7 @@ from collegefootballfantasy_api.app.models.team_week_score import TeamWeekScore
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_starts_for_players
+from collegefootballfantasy_api.app.services.postseason_service import progress_postseason
 
 
 FINAL_MATCHUP_STATUSES = {"final", "stat_corrected"}
@@ -614,6 +615,9 @@ def recalculate_league_week_scores(db: Session, league_id: int, season: int, wee
     teams_scored = recalculate_team_week_scores(db, league_id, season, week)
     matchups_updated = recalculate_matchup_scores(db, league_id, season, week)
     standings_updated = recalculate_standings_for_week(db, league_id, season, week)
+    league = db.get(League, league_id)
+    if league:
+        progress_postseason(db, league, season, week)
     return ScoringSummary(
         players_scored=players_scored,
         teams_scored=teams_scored,

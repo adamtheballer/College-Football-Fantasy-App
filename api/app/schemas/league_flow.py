@@ -67,6 +67,13 @@ class LeagueSettingsInput(BaseModel):
     kicker_enabled: bool
     defense_enabled: bool
 
+    @field_validator("playoff_teams")
+    @classmethod
+    def validate_playoff_teams(cls, value: int) -> int:
+        if value not in {2, 4, 6, 8}:
+            raise ValueError("playoff_teams must be one of 2, 4, 6, or 8")
+        return value
+
     @field_validator("waiver_period_hours")
     @classmethod
     def validate_waiver_period_hours(cls, value: int) -> int:
@@ -270,6 +277,13 @@ class LeagueSettingsUpdate(BaseModel):
     kicker_enabled: bool
     defense_enabled: bool
 
+    @field_validator("playoff_teams")
+    @classmethod
+    def validate_updated_playoff_teams(cls, value: int) -> int:
+        if value not in {2, 4, 6, 8}:
+            raise ValueError("playoff_teams must be one of 2, 4, 6, or 8")
+        return value
+
     @field_validator("waiver_period_hours")
     @classmethod
     def validate_waiver_period_hours(cls, value: int | None) -> int | None:
@@ -434,6 +448,7 @@ class LeagueWorkspaceStandingSummaryRead(BaseModel):
     losses: int | None = None
     ties: int | None = None
     points_for: float | None = None
+    points_against: float | None = None
     rank: int | None = None
 
 

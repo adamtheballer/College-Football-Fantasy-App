@@ -16,6 +16,7 @@ from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
+from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.notification import NotificationLog
 from collegefootballfantasy_api.app.models.team import Team
@@ -430,6 +431,23 @@ def update_league_settings(
         settings_row = LeagueSettings(league_id=league.id)
 
     payload = normalize_roster_settings(payload)
+    postseason_settings = (
+        db.query(LeaguePostseasonSettings)
+        .filter(
+            LeaguePostseasonSettings.league_id == league.id,
+            LeaguePostseasonSettings.season == league.season_year,
+        )
+        .one_or_none()
+    )
+    if (
+        postseason_settings is not None
+        and postseason_settings.locked_at is not None
+        and payload.playoff_teams != settings_row.playoff_teams
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="playoff team count is locked after the bracket is seeded",
+        )
     if (
         settings.beta_scoring_lock_enabled
         and settings_row.scoring_locked_at is not None

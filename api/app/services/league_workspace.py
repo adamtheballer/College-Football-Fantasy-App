@@ -207,7 +207,12 @@ def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspace
         )
         ordered_rows = sorted(
             standings_rows,
-            key=lambda row: (-row[0].wins, row[0].losses, -row[0].points_for, row[1].name),
+            key=lambda row: (
+                -((row[0].wins + (0.5 * row[0].ties)) / max(row[0].wins + row[0].losses + row[0].ties, 1)),
+                -row[0].points_for,
+                row[0].points_against,
+                row[1].id,
+            ),
         )
         return [
             LeagueWorkspaceStandingSummaryRead(
@@ -217,6 +222,7 @@ def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspace
                 losses=standing.losses,
                 ties=standing.ties,
                 points_for=standing.points_for,
+                points_against=standing.points_against,
                 rank=index,
             )
             for index, (standing, team) in enumerate(ordered_rows, start=1)
@@ -230,6 +236,7 @@ def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspace
             "losses": 0,
             "ties": 0,
             "points_for": 0.0,
+            "points_against": 0.0,
         }
         for team in teams
     }
@@ -245,6 +252,8 @@ def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspace
             continue
         home_stats["points_for"] += float(matchup.home_score or 0.0)
         away_stats["points_for"] += float(matchup.away_score or 0.0)
+        home_stats["points_against"] += float(matchup.away_score or 0.0)
+        away_stats["points_against"] += float(matchup.home_score or 0.0)
         if matchup.status != "final":
             continue
         if matchup.home_score > matchup.away_score:
@@ -259,7 +268,12 @@ def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspace
 
     ordered_rows = sorted(
         team_stats.values(),
-        key=lambda row: (-row["wins"], row["losses"], -row["points_for"], row["team"].name),
+        key=lambda row: (
+            -((row["wins"] + (0.5 * row["ties"])) / max(row["wins"] + row["losses"] + row["ties"], 1)),
+            -row["points_for"],
+            row["points_against"],
+            row["team"].id,
+        ),
     )
     return [
         LeagueWorkspaceStandingSummaryRead(
@@ -269,6 +283,7 @@ def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspace
             losses=int(row["losses"]),
             ties=int(row["ties"]),
             points_for=float(row["points_for"]),
+            points_against=float(row["points_against"]),
             rank=index,
         )
         for index, row in enumerate(ordered_rows, start=1)

@@ -158,6 +158,7 @@ export interface LeagueWorkspaceStandingSummary {
   losses?: number;
   ties?: number;
   points_for?: number;
+  points_against?: number;
   rank?: number;
 }
 

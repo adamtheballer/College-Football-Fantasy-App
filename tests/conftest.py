@@ -34,6 +34,7 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     mock_draft_pick,
     moderation_event,
     notification,
+    postseason,
     player,
     player_season_rank,
     player_stat,
