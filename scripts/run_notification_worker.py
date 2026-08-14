@@ -15,6 +15,7 @@ if ROOT_DIR not in sys.path:
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.core.logging import configure_logging
+from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.services.notification_service import (
     notification_queue_health,
@@ -36,6 +37,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    # Unlike the API process, this worker does not import routes as a side
+    # effect. Register every relationship target before the first ORM query
+    # so a clean worker process cannot fail mapper configuration at runtime.
+    ensure_models_registered()
     interval_seconds = max(1, args.interval_seconds)
     worker_id = f"notification_processor:{uuid4()}"
     configure_logging(settings.api_log_level)
