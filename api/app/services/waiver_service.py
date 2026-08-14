@@ -283,9 +283,9 @@ def _notify_user(
     *,
     user_id: int | None,
     alert_type: str,
-    title: str,
-    body: str,
     payload: dict,
+    title: str | None = None,
+    body: str | None = None,
 ) -> None:
     if user_id is None:
         return
@@ -1223,8 +1223,6 @@ def _apply_claim_award(
         db,
         user_id=team.owner_user_id,
         alert_type="WAIVER_PROCESSED",
-        title="Waiver claim successful",
-        body=f"You added {add_player.name}.",
         payload={"league_id": league.id, "claim_id": claim.id, "run_id": run.id, "player_name": add_player.name},
     )
     chat_body = (
@@ -1260,13 +1258,17 @@ def _terminalize_claim(
     db.add(claim)
     _audit_claim(db, claim, action=status_value, actor_user_id=None, reason=reason, before_state=before)
     team = db.get(Team, claim.team_id)
+    player = db.get(Player, claim.add_player_id)
     _notify_user(
         db,
         user_id=team.owner_user_id if team else claim.created_by_user_id,
         alert_type="WAIVER_FAILED" if status_value != WAIVER_STATUS_LOST else "WAIVER_LOST",
-        title="Waiver claim unsuccessful",
-        body=reason,
-        payload={"league_id": claim.league_id, "claim_id": claim.id, "run_id": run.id},
+        payload={
+            "league_id": claim.league_id,
+            "claim_id": claim.id,
+            "run_id": run.id,
+            **({"player_name": player.name} if player else {}),
+        },
     )
 
 

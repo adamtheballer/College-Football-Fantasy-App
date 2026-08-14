@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from enum import Enum
+from html import escape
 from typing import Any
 
 
@@ -94,31 +95,31 @@ NOTIFICATION_EVENTS: dict[str, NotificationEventDefinition] = {
     "DRAFT_1H": _event(
         "DRAFT_1H", "DRAFT", "draft scheduling", "each eligible human manager",
         "official scheduled draft at least one hour away", "Your draft starts in 1 hour",
-        "{league_name} begins at {localized_draft_time}.", "draft",
+        "{league_name} begins at {local_draft_time}.", "draft",
         "draft_1h:{draft_id}:{schedule_revision}:{recipient_user_id}", "draft_alerts", "draft_alerts",
         time_critical=True,
     ),
     "DRAFT_SOON": _event(
         "DRAFT_SOON", "DRAFT", "draft scheduling", "each eligible human manager",
         "official draft scheduled less than one hour away", "Your draft starts soon",
-        "{league_name} begins at {localized_draft_time}.", "draft",
+        "{league_name} begins at {local_draft_time}.", "draft",
         "draft_soon:{draft_id}:{schedule_revision}:{recipient_user_id}", "draft_alerts", "draft_alerts",
         time_critical=True,
     ),
     "DRAFT_START": _event(
         "DRAFT_START", "DRAFT", "draft state transition", "each eligible human manager",
-        "draft entered on_clock", "Your draft is starting", "{league_name} is starting now.", "draft",
+        "draft entered on_clock", "Your draft is starting", "Enter the {league_name} draft room now.", "draft",
         "draft_start:{draft_id}:{recipient_user_id}", "draft_alerts", "draft_alerts", time_critical=True,
     ),
     "DRAFT_ON_CLOCK": _event(
         "DRAFT_ON_CLOCK", "DRAFT", "draft pick transition", "current human manager only",
-        "official on_clock turn", "You're on the clock", "Make your Round {round_number} pick in {league_name}.", "draft",
+        "official on_clock turn", "You’re on the clock", "Make your Round {round} pick in {league_name}.", "draft",
         "draft_on_clock:{draft_id}:{overall_pick}:{recipient_user_id}", "draft_alerts", "draft_alerts", time_critical=True,
     ),
     "DRAFT_AUTO_PICK": _event(
         "DRAFT_AUTO_PICK", "DRAFT", "draft pick transaction", "affected human manager only",
         "auto-pick and roster mutation committed", "Your pick was made automatically",
-        "{player_name} was selected for you in Round {round_number}.", "draft",
+        "{player_name} was selected for you in Round {round}.", "draft",
         "draft_autopick:{draft_id}:{draft_pick_id}:{recipient_user_id}", "draft_alerts", "draft_alerts", time_critical=True,
     ),
     "DRAFT_COMPLETED": _event(
@@ -130,20 +131,20 @@ NOTIFICATION_EVENTS: dict[str, NotificationEventDefinition] = {
     "MATCHUP_START": _event(
         "MATCHUP_START", "MATCHUP", "lineup snapshot scheduler", "each human matchup participant",
         "earliest verified eligible starter kickoff", "Your matchup is underway",
-        "Your Week {week} matchup against {opponent_team_name} has started.", "matchup",
+        "Your Week {week} matchup against {opponent_team} has started.", "matchup",
         "matchup_start:{matchup_id}:{recipient_user_id}", "matchup_start_alerts", "matchup_start_alerts",
         privacy_scope=NotificationScope.MATCHUP_PARTICIPANT,
     ),
     "TRADE_RECEIVED": _event(
         "TRADE_RECEIVED", "TRADE", "trade creation", "receiving manager only",
-        "trade offer committed", "New trade offer", "{actor_name} sent you a trade offer in {league_name}.", "trade",
+        "trade offer committed", "New trade offer", "{manager_or_team} sent you a trade offer in {league_name}.", "trade",
         "trade_received:{trade_id}:{recipient_user_id}", "trade_alerts", "trade_alerts",
         privacy_scope=NotificationScope.PRIVATE_TRADE_PARTICIPANT,
     ),
     "TRADE_ACCEPTED_PENDING": _event(
         "TRADE_ACCEPTED_PENDING", "TRADE", "trade acceptance", "trade participants only",
         "accepted while roster movement is deferred", "Trade accepted",
-        "The trade was accepted and will process when the involved players are eligible.", "trade",
+        "The trade will process when the involved players are eligible.", "trade",
         "trade_accepted_pending:{trade_id}:{recipient_user_id}", "trade_alerts", "trade_alerts",
         privacy_scope=NotificationScope.PRIVATE_TRADE_PARTICIPANT,
     ),
@@ -155,22 +156,22 @@ NOTIFICATION_EVENTS: dict[str, NotificationEventDefinition] = {
     ),
     "TRADE_DECLINED": _event(
         "TRADE_DECLINED", "TRADE", "trade action", "trade participants only", "trade declined", "Trade declined",
-        "A trade offer was declined.", "trade", "trade_declined:{trade_id}:{recipient_user_id}",
+        "Your trade offer in {league_name} was declined.", "trade", "trade_declined:{trade_id}:{recipient_user_id}",
         "trade_alerts", "trade_alerts", privacy_scope=NotificationScope.PRIVATE_TRADE_PARTICIPANT,
     ),
     "TRADE_CANCELED": _event(
         "TRADE_CANCELED", "TRADE", "trade action", "trade participants only", "trade canceled", "Trade canceled",
-        "A trade offer was canceled.", "trade", "trade_canceled:{trade_id}:{recipient_user_id}",
+        "The trade offer in {league_name} was canceled.", "trade", "trade_canceled:{trade_id}:{recipient_user_id}",
         "trade_alerts", "trade_alerts", privacy_scope=NotificationScope.PRIVATE_TRADE_PARTICIPANT,
     ),
     "TRADE_EXPIRED": _event(
         "TRADE_EXPIRED", "TRADE", "trade expiry worker", "trade participants only", "trade expired", "Trade expired",
-        "A trade offer expired before acceptance.", "trade", "trade_expired:{trade_id}:{recipient_user_id}",
+        "The trade offer in {league_name} expired.", "trade", "trade_expired:{trade_id}:{recipient_user_id}",
         "trade_alerts", "trade_alerts", privacy_scope=NotificationScope.PRIVATE_TRADE_PARTICIPANT,
     ),
     "WAIVER_WON": _event(
         "WAIVER_WON", "WAIVER", "waiver processor", "claim owner only",
-        "roster mutation and priority or FAAB transaction committed", "Waiver claim successful", "You added {player_name}.", "waivers",
+        "roster mutation and priority or FAAB transaction committed", "Waiver claim successful", "You added {player_name} in {league_name}.", "waivers",
         "waiver_won:{waiver_claim_id}:{recipient_user_id}", "waiver_alerts", "waiver_alerts", time_critical=True,
     ),
     "WAIVER_LOST": _event(
@@ -186,7 +187,7 @@ NOTIFICATION_EVENTS: dict[str, NotificationEventDefinition] = {
     ),
     "MATCHUP_CORRECTED": _event(
         "MATCHUP_CORRECTED", "MATCHUP", "certified scoring finalizer", "each human matchup participant",
-        "certified result revision after stat correction", "Matchup corrected", "Your Week {week} matchup result was corrected.", "matchup",
+        "certified result revision after stat correction", "Matchup result updated", "A stat correction changed your Week {week} matchup result.", "matchup",
         "matchup_corrected:{matchup_id}:{recipient_user_id}:{correction_revision}", "matchup_result_alerts", "matchup_result_alerts",
         privacy_scope=NotificationScope.MATCHUP_PARTICIPANT,
     ),
@@ -267,7 +268,7 @@ NOTIFICATION_EVENTS: dict[str, NotificationEventDefinition] = {
     ),
     "WAIVER_FAILED": _event(
         "WAIVER_FAILED", "WAIVER", "waiver processor", "claim owner only", "claim terminalized as invalid or failed",
-        "Waiver claim unsuccessful", "Your waiver claim could not be completed.", "waivers",
+        "Waiver claim could not process", "Review your roster or waiver settings in {league_name}.", "waivers",
         "waiver_failed:{waiver_claim_id}:{recipient_user_id}", "waiver_alerts", "waiver_alerts",
     ),
     "FREE_AGENT_ADDED": _event(
@@ -321,21 +322,96 @@ def get_notification_event(value: str) -> NotificationEventDefinition:
         raise ValueError(f"unsupported notification event type: {canonical}") from exc
 
 
+_MAX_TEMPLATE_VALUE_LENGTH = 80
+
+
+def _safe_template_value(value: Any, fallback: str) -> str:
+    """Render a short plain-text value without allowing markup into notification copy."""
+
+    if value is None:
+        return fallback
+    rendered = str(value).strip()
+    if not rendered:
+        return fallback
+    if len(rendered) > _MAX_TEMPLATE_VALUE_LENGTH:
+        rendered = f"{rendered[:_MAX_TEMPLATE_VALUE_LENGTH - 1].rstrip()}…"
+    return escape(rendered, quote=False)
+
+
+def _safe_score(value: Any) -> str | None:
+    """Return a display score only when the producer supplied a real number."""
+
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        return f"{float(value):g}"
+    except (TypeError, ValueError):
+        return None
+
+
+def _render_matchup_final(payload: dict[str, Any]) -> tuple[str, str]:
+    """Keep final-result wording truthful when an optional score is unavailable."""
+
+    opponent = _safe_template_value(
+        payload.get("opponent_team", payload.get("opponent_team_name")),
+        "your opponent",
+    )
+    user_score = _safe_score(payload.get("user_score"))
+    opponent_score = _safe_score(payload.get("opponent_score"))
+    outcome = str(payload.get("outcome") or "").strip().lower()
+    if user_score is None or opponent_score is None or outcome not in {"won", "lost", "tied"}:
+        week = _safe_template_value(payload.get("week"), "")
+        return (
+            "Matchup final",
+            f"Your Week {week} matchup is final." if week else "Your matchup is final.",
+        )
+    if outcome == "won":
+        return "Matchup won", f"You defeated {opponent}, {user_score}–{opponent_score}."
+    if outcome == "lost":
+        return "Matchup final", f"{opponent} defeated your team, {opponent_score}–{user_score}."
+    return "Matchup tied", f"Your matchup with {opponent} ended {user_score}–{opponent_score}."
+
+
 def render_event_content(event_type: str, payload: dict[str, Any], league_name: str) -> tuple[str, str, str]:
-    """Render bounded text from the registry without treating user input as HTML."""
+    """Render approved, bounded plain-text copy from the event registry.
+
+    All user-controlled league, manager, team, and player values are escaped
+    here once before either the in-app log, push provider, or email provider
+    receives them. Producers retain responsibility only for durable event
+    facts; they never need to duplicate presentation copy.
+    """
 
     definition = get_notification_event(event_type)
     context = {
-        "league_name": league_name,
-        "localized_draft_time": "the scheduled time",
-        "round_number": "next",
-        "overall_pick": "next",
-        "player_name": "a player",
-        "actor_name": "a manager",
-        "week": "this",
-        "opponent_team_name": "your opponent",
+        "league_name": _safe_template_value(league_name, "your league"),
+        "local_draft_time": _safe_template_value(
+            payload.get("local_draft_time", payload.get("localized_draft_time")),
+            "the scheduled time",
+        ),
+        "round": _safe_template_value(payload.get("round", payload.get("round_number")), "next"),
+        "player_name": _safe_template_value(payload.get("player_name"), "a player"),
+        "manager_or_team": _safe_template_value(
+            payload.get("manager_or_team", payload.get("actor_name")),
+            "A manager",
+        ),
+        "week": _safe_template_value(payload.get("week"), "this"),
+        "opponent_team": _safe_template_value(
+            payload.get("opponent_team", payload.get("opponent_team_name")),
+            "your opponent",
+        ),
     }
-    context.update({key: value for key, value in payload.items() if isinstance(value, (str, int, float))})
+    canonical = canonical_event_type(event_type)
+    if canonical == "MATCHUP_FINAL":
+        title, body = _render_matchup_final(payload)
+        return definition.category, title, body
+    if canonical == "MATCHUP_START" and not str(payload.get("week") or "").strip():
+        return (
+            definition.category,
+            definition.in_app_title,
+            f"Your matchup against {context['opponent_team']} has started.",
+        )
+    if canonical == "MATCHUP_CORRECTED" and "week" not in payload:
+        return definition.category, definition.in_app_title, "A stat correction changed your matchup result."
     return (
         definition.category,
         definition.in_app_title.format(**context),

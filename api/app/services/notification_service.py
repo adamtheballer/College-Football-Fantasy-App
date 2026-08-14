@@ -823,15 +823,6 @@ def queue_certified_matchup_final_notifications(db: Session, matchup: Matchup) -
             else f"matchup_final:{matchup.id}:{owner.id}:{revision}"
         )
         before = db.query(ScheduledNotification.id).filter(ScheduledNotification.event_key == event_key).first()
-        if outcome == "won":
-            title = "Matchup won"
-            body = f"You defeated {opponent.name if opponent else 'your opponent'}, {_format_matchup_score(own_score)}–{_format_matchup_score(opponent_score)}."
-        elif outcome == "lost":
-            title = "Matchup final"
-            body = f"{opponent.name if opponent else 'Your opponent'} defeated your team, {_format_matchup_score(opponent_score)}–{_format_matchup_score(own_score)}."
-        else:
-            title = "Matchup tied"
-            body = f"Your matchup with {opponent.name if opponent else 'your opponent'} ended {_format_matchup_score(own_score)}–{_format_matchup_score(opponent_score)}."
         queue_notification_event(
             db,
             league_id=matchup.league_id,
@@ -839,8 +830,6 @@ def queue_certified_matchup_final_notifications(db: Session, matchup: Matchup) -
             event_type=event_type,
             event_key=event_key,
             channels=("in_app", "push", "email") if not correction or prior_outcome != outcome else ("in_app",),
-            title=title,
-            body=body,
             payload={
                 "matchup_id": matchup.id,
                 "team_id": team_id,
@@ -849,6 +838,9 @@ def queue_certified_matchup_final_notifications(db: Session, matchup: Matchup) -
                 "final_revision": revision,
                 "correction_revision": revision if correction else None,
                 "outcome": outcome,
+                "opponent_team": opponent.name if opponent else None,
+                "user_score": own_score,
+                "opponent_score": opponent_score,
                 "home_score": float(matchup.home_score or 0.0),
                 "away_score": float(matchup.away_score or 0.0),
             },
