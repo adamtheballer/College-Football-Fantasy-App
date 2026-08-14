@@ -395,7 +395,7 @@ def test_trade_proposal_queues_an_idempotent_recipient_notification(client, db_s
     assert body["process_after"] is None
     assert body["processed_at"] is None
     assert body["failure_reason"] is None
-    event = db_session.query(ScheduledNotification).filter(ScheduledNotification.notification_type == "TRADE_PROPOSED").one()
+    event = db_session.query(ScheduledNotification).filter(ScheduledNotification.event_type == "TRADE_RECEIVED").one()
     assert event.user_id == seed["receiving"].owner_user_id
     assert event.payload["trade_id"] == body["id"]
     assert event.payload["destination"] == {"type": "trade", "league_id": league["id"], "resource_id": body["id"]}
@@ -492,7 +492,7 @@ def test_trade_proposal_is_idempotent_and_writes_only_one_private_card(client, d
     assert db_session.query(TradeOffer).filter_by(league_id=league["id"]).count() == 1
     assert db_session.query(ChatThread).filter_by(league_id=league["id"], thread_type="direct").count() == 1
     assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{first.json()['id']}:created").count() == 1
-    assert db_session.query(ScheduledNotification).filter_by(notification_type="TRADE_PROPOSED").count() == 1
+    assert db_session.query(ScheduledNotification).filter_by(event_type="TRADE_RECEIVED").count() == 1
 
     changed_payload = {**payload, "message": "A different offer under the same request id"}
     conflict = client.post(
@@ -617,7 +617,7 @@ def test_private_trade_card_failure_rolls_back_trade_and_notification(client, db
     assert db_session.query(ChatMessage).filter_by(league_id=league["id"]).count() == 0
     assert (
         db_session.query(ScheduledNotification)
-        .filter_by(user_id=seed["receiving"].owner_user_id, notification_type="TRADE_PROPOSED")
+        .filter_by(user_id=seed["receiving"].owner_user_id, event_type="TRADE_RECEIVED")
         .count()
         == 0
     )
@@ -875,10 +875,9 @@ def test_delayed_trade_updates_its_finalized_chat_card_after_processing(client, 
     )
     assert accepted.status_code == 200
     assert accepted.json()["status"] == "accepted_pending"
-    message = db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:finalized").one()
-    message_id = message.id
-    assert message.metadata_json["processing_status"] == "pending_transfer"
-    assert message.metadata_json["players_process_at"] is not None
+    # Pending acceptance must not create a "finalized" card before roster
+    # movement has actually committed.
+    assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:finalized").count() == 0
 
     offer = db_session.get(TradeOffer, created["id"])
     offer.process_after = datetime.now(timezone.utc) - timedelta(minutes=1)
@@ -888,7 +887,6 @@ def test_delayed_trade_updates_its_finalized_chat_card_after_processing(client, 
     assert process_trade_offers_once(db_session) == {"processed": 1, "failed": 0}
     db_session.expire_all()
     updated_message = db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:finalized").one()
-    assert updated_message.id == message_id
     assert updated_message.metadata_json["processing_status"] == "processed"
     assert updated_message.metadata_json["processed_at"] is not None
     assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:finalized").count() == 1

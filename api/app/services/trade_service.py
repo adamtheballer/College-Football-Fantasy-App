@@ -1007,6 +1007,7 @@ def process_trade_offers_once(db: Session, now: datetime | None = None) -> dict[
                     now=current,
                     review_action="processed",
                 )
+                _announce_trade_finalized(db, offer, finalized_at=current)
                 mark_trade_finalized_chat_message_processed(db, offer)
             processed += 1
         except Exception as exc:

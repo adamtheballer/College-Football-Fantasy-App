@@ -623,7 +623,7 @@ def rebuild_matchup_start_notifications(db: Session, *, league_id: int, season: 
         snapshots_by_team.setdefault(snapshot.team_id, []).append(snapshot)
 
     desired_keys: set[str] = set()
-    queued = 0
+    rescheduled = 0
     for matchup in matchups:
         for team_id in (matchup.home_team_id, matchup.away_team_id):
             team = team_by_id.get(team_id)
@@ -666,6 +666,8 @@ def rebuild_matchup_start_notifications(db: Session, *, league_id: int, season: 
                         scheduled_for=kickoff,
                         payload=payload,
                     )
+                schedule_changed = _as_utc(existing.scheduled_for) != kickoff
+                revision_changed = (existing.payload or {}).get("kickoff_revision") != revision
                 existing.scheduled_for = kickoff
                 existing.payload = {
                     **payload,
@@ -675,6 +677,7 @@ def rebuild_matchup_start_notifications(db: Session, *, league_id: int, season: 
                 }
                 existing.category, existing.title, existing.body = _event_metadata("MATCHUP_START", existing.payload, db.get(League, league_id).name)
                 db.add(existing)
+                rescheduled += int(schedule_changed or revision_changed)
                 continue
             queue_notification_event(
                 db,
@@ -685,7 +688,6 @@ def rebuild_matchup_start_notifications(db: Session, *, league_id: int, season: 
                 scheduled_for=kickoff,
                 payload=payload,
             )
-            queued += 1
 
     obsolete = (
         db.query(ScheduledNotification)
@@ -724,7 +726,7 @@ def rebuild_matchup_start_notifications(db: Session, *, league_id: int, season: 
                 synchronize_session=False,
             )
         )
-    return queued
+    return rescheduled
 
 
 def rebuild_matchup_start_notifications_for_schedule(
@@ -1043,6 +1045,10 @@ def _schedule_retry(db: Session, attempt: NotificationDeliveryAttempt, *, now: d
             next_retry_at=next_retry_at,
         )
     )
+    # The session deliberately disables autoflush. Persist the successor
+    # attempt before recalculating the event state so a retry cannot be
+    # mistaken for a completed delivery in this worker transaction.
+    db.flush()
 
 
 def _process_attempt(
@@ -1306,6 +1312,9 @@ def process_due_notifications_once(
             if row.status == "delivered":
                 summary["delivered"] += 1
             elif row.status == "provider_accepted":
+                # In-app delivery completed, while the provider has accepted
+                # (but cannot prove display of) the external notification.
+                summary["delivered"] += 1
                 summary["provider_accepted"] += 1
             elif row.status == "dead_letter":
                 summary["failed"] += 1

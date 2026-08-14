@@ -34,6 +34,10 @@ def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
 def create_user(client, suffix: str = "one") -> dict:
     response = client.post(
         "/auth/signup",
@@ -432,6 +436,7 @@ def test_same_event_and_worker_replay_create_one_in_app_log_and_one_push(client,
         email_provider=FakeEmailProvider(),
     )
     assert result["delivered"] == 1
+    assert result["provider_accepted"] == 1
     assert len(push.messages) == 1
     assert db_session.query(NotificationLog).filter(NotificationLog.user_id == user_id).count() == 1
 
@@ -592,7 +597,7 @@ def test_matchup_start_rebuild_uses_only_verified_starters_and_reschedules_the_s
     assert rebuild_matchup_start_notifications(db_session, league_id=league["id"], season=2026, week=1) == 0
     db_session.commit()
     first = db_session.query(ScheduledNotification).filter_by(notification_type="MATCHUP_START").one()
-    assert first.scheduled_for == kickoff
+    assert as_utc(first.scheduled_for) == kickoff
 
     snapshot.game_start_at = kickoff + timedelta(hours=1)
     db_session.commit()
@@ -601,7 +606,7 @@ def test_matchup_start_rebuild_uses_only_verified_starters_and_reschedules_the_s
     rows = db_session.query(ScheduledNotification).filter_by(notification_type="MATCHUP_START").order_by(ScheduledNotification.id).all()
     assert len(rows) == 1
     assert rows[0].status == "pending"
-    assert rows[0].scheduled_for == kickoff + timedelta(hours=1)
+    assert as_utc(rows[0].scheduled_for) == kickoff + timedelta(hours=1)
 
 
 def test_certified_matchup_final_notifications_are_revision_idempotent(client, db_session):

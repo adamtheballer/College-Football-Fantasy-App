@@ -356,6 +356,11 @@ def create_league(
         )
     )
 
+    # The notification scheduler reads both the just-created Draft and the
+    # commissioner's membership. This session intentionally disables
+    # autoflush, so make those rows visible before deriving the durable
+    # reminder event inside the same transaction.
+    db.flush()
     schedule_draft_notifications(db, league.id, current_user.id, payload.draft.draft_datetime_utc)
 
     db.commit()
@@ -387,6 +392,9 @@ def join_league(db: Session, league: League, current_user: User) -> LeagueDetail
             owner_user_id=current_user.id,
         )
     )
+    # See league creation above: the scheduler queries membership eligibility
+    # and this session does not autoflush pending joins.
+    db.flush()
     draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
     if draft_row:
         schedule_draft_notifications(db, league.id, current_user.id, draft_row.draft_datetime_utc)
