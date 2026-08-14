@@ -55,12 +55,20 @@ class Settings(BaseSettings):
     scoring_mode: Literal["enabled", "disabled"] = "enabled"
     scoring_provider: str = "sportsdata"
     scoring_allow_unofficial_providers: bool = False
-    scoring_worker_interval_live_seconds: int = 60
+    # Every live provider cycle ingests the global weekly box-score slate once
+    # before recalculating affected league scores. Keep that external polling
+    # cadence at three minutes or slower; workers may perform internal work
+    # more frequently, but must not re-fetch the same live slate faster.
+    scoring_worker_interval_live_seconds: int = 180
     scoring_worker_interval_postgame_seconds: int = 900
     scoring_worker_interval_correction_seconds: int = 3600
     scoring_worker_retry_max_attempts: int = 3
     scoring_worker_retry_base_seconds: int = 5
     lifecycle_worker_interval_seconds: int = 5
+    # This capability exists solely for the disposable Compose browser suite.
+    # It is guarded again at route level and may only be enabled when the
+    # process explicitly identifies itself as an E2E environment.
+    e2e_lifecycle_time_travel_enabled: bool = False
     draft_cpu_pick_delay_seconds: int = 4
     scoring_dead_letter_after_failures: int = 3
     provider_unmatched_failure_threshold_percent: float = 10.0
@@ -176,6 +184,13 @@ class Settings(BaseSettings):
             raise ValueError("DRAFT_CPU_PICK_DELAY_SECONDS must be between 2 and 8")
         return value
 
+    @field_validator("scoring_worker_interval_live_seconds")
+    @classmethod
+    def validate_scoring_worker_interval_live_seconds(cls, value: int) -> int:
+        if value < 180:
+            raise ValueError("SCORING_WORKER_INTERVAL_LIVE_SECONDS must be at least 180")
+        return value
+
     @field_validator("email_delivery_mode")
     @classmethod
     def validate_email_delivery_mode(cls, value: str) -> str:
@@ -237,6 +252,9 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_safety(self) -> "Settings":
+        if self.e2e_lifecycle_time_travel_enabled and self.environment.strip().lower() != "e2e":
+            raise ValueError("E2E_LIFECYCLE_TIME_TRAVEL_ENABLED requires ENVIRONMENT=e2e")
+
         # A beta gate is an authentication boundary even in a local release
         # candidate.  Permitting its published fallback HMAC secrets outside
         # production makes a restart silently invalidate every imported code
@@ -305,9 +323,6 @@ class Settings(BaseSettings):
             not self.sportsdata_enabled or not self.sportsdata_api_key
         ):
             raise ValueError("SPORTSDATA_ENABLED=true and SPORTSDATA_API_KEY are required for production sportsdata scoring")
-
-        if self.scoring_worker_interval_live_seconds < 30:
-            raise ValueError("SCORING_WORKER_INTERVAL_LIVE_SECONDS must be at least 30 in production")
 
         return self
 

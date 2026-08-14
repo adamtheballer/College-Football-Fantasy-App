@@ -47,6 +47,22 @@ def test_development_allows_local_default_cors_and_jwt_secret():
     assert "http://localhost:5173" in settings.allowed_cors_origins
 
 
+def test_live_scoring_poll_interval_defaults_to_three_minutes():
+    assert make_settings().scoring_worker_interval_live_seconds == 180
+
+
+def test_live_scoring_poll_interval_rejects_a_faster_provider_cadence():
+    with pytest.raises(ValidationError, match="SCORING_WORKER_INTERVAL_LIVE_SECONDS must be at least 180"):
+        make_settings(scoring_worker_interval_live_seconds=179)
+
+
+def test_e2e_lifecycle_time_travel_requires_the_explicit_e2e_environment():
+    with pytest.raises(ValidationError, match="E2E_LIFECYCLE_TIME_TRAVEL_ENABLED requires ENVIRONMENT=e2e"):
+        make_settings(e2e_lifecycle_time_travel_enabled=True)
+
+    assert make_settings(environment="e2e", e2e_lifecycle_time_travel_enabled=True).e2e_lifecycle_time_travel_enabled
+
+
 @pytest.mark.parametrize("value", ("false", "0", "no", "off"))
 def test_sportsdata_false_environment_forms_disable_provider(value):
     settings = make_settings(sportsdata_enabled=value)

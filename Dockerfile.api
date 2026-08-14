@@ -20,3 +20,9 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen
 
 COPY . .
+
+# These five files are the immutable inputs to the runtime's pre-season source
+# contract. Keep them in an explicit final layer: the API must boot from the
+# exact identity/projection snapshot whose manifest is verified at startup,
+# rather than silently accepting an incomplete broad-context copy.
+COPY reports/source-imports/2026/player-identities.csv reports/source-imports/2026/player-projections.csv reports/source-imports/2026/player-identities.manifest.json reports/source-imports/2026/player-projections.manifest.json reports/source-imports/2026/source-manifest.json /app/reports/source-imports/2026/

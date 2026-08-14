@@ -5,6 +5,7 @@ from collegefootballfantasy_api.app.api.routes.trades import (
     DEFAULT_ROSTER_SLOTS,
     _normalize_roster_slots,
 )
+from collegefootballfantasy_api.app.api.routes import admin_trades
 from conftest import TestingSessionLocal
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.chat import ChatAuditEvent, ChatMessage, ChatThread
@@ -798,6 +799,19 @@ def test_admin_process_due_trades_endpoint_processes_accepted_pending_offer(clie
     assert db_session.query(RosterEntry).filter_by(team_id=seed["receiving"].id, player_id=seed["give"].id).one()
     assert db_session.query(RosterEntry).filter_by(team_id=seed["proposing"].id, player_id=seed["receive"].id).one()
     assert db_session.get(TradeOffer, created["id"]).status == "processed"
+
+
+def test_admin_due_trade_endpoint_rejects_time_travel_outside_the_e2e_runtime(client, monkeypatch):
+    monkeypatch.setattr(admin_trades.settings, "e2e_lifecycle_time_travel_enabled", False)
+    admin_token = create_user_and_token(client, "admin-time-travel", admin=True)
+
+    response = client.post(
+        "/admin/trades/process-due?as_of=2026-09-07T04%3A01%3A00%2B00%3A00",
+        headers=auth_headers(admin_token),
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "lifecycle time travel is available only in the E2E runtime"
 
 
 def test_accept_commissioner_review_trade_waits_for_approval_then_processes(client, db_session, monkeypatch):

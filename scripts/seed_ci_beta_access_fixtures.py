@@ -8,11 +8,14 @@ only after ``run_real_stack_e2e.sh`` creates a fresh Compose database.
 from __future__ import annotations
 
 import os
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
+from collegefootballfantasy_api.app.core.security import generate_token, hash_password
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.models.beta_access import BetaAccessCode
+from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.beta_access import beta_access_hmac, normalize_beta_code, normalize_beta_email
 
 
@@ -27,6 +30,8 @@ FIXTURES = (
     ("ci-e2e-beta-trade-proposer", "ci-beta-trade-proposer@example.test", "EARLY-CI1237"),
     ("ci-e2e-beta-trade-recipient", "ci-beta-trade-recipient@example.test", "EARLY-CI1238"),
 )
+CI_ADMIN_EMAIL = "ci-e2e-admin@example.test"
+CI_ADMIN_PASSWORD = "E2E-Only-Admin-Pass-2026!"
 
 
 def main() -> None:
@@ -51,6 +56,28 @@ def main() -> None:
                     manual_review=False,
                 )
             )
+        # The real-stack trade test invokes the existing admin-only due-trade
+        # endpoint. This principal is created only in the fresh disposable
+        # database behind the script's CI environment guard above; it is not a
+        # beta-access fixture and cannot exist in a normal runtime.
+        ci_admin = db.scalar(select(User).where(User.email == CI_ADMIN_EMAIL))
+        if ci_admin is None:
+            now = datetime.now(UTC)
+            db.add(
+                User(
+                    first_name="CI E2E Admin",
+                    email=CI_ADMIN_EMAIL,
+                    username="ci-e2e-admin",
+                    password_hash=hash_password(CI_ADMIN_PASSWORD),
+                    api_token=generate_token(32),
+                    is_admin=True,
+                    email_verified_at=now,
+                    password_changed_at=now,
+                    last_login=now,
+                )
+            )
+        elif not ci_admin.is_admin:
+            raise RuntimeError("CI E2E admin fixture exists without admin privileges.")
     print("Seeded synthetic CI beta-access fixtures.")
 
 
