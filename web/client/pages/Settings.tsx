@@ -19,6 +19,7 @@ import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { PasswordChangeForm } from "@/components/auth/PasswordChangeForm";
 import { useRuntimeCapabilities } from "@/components/RuntimeCompatibilityGate";
 import { SupportContactCard } from "@/components/support/SupportContactCard";
+import { NotificationSettingsPanel } from "@/components/NotificationSettingsPanel";
 
 const SettingsSection = ({ title, description, children, icon: Icon }: any) => (
   <Card className="group relative overflow-hidden rounded-3xl border-border/60 bg-card/40 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-md transition-all duration-700 hover:border-primary/20 sm:rounded-[2.5rem]">
@@ -298,6 +299,8 @@ export default function Settings() {
             </SettingItem>
           </div>
         </SettingsSection>
+
+        <NotificationSettingsPanel />
 
         {/* SECURITY SECTION */}
         <SettingsSection 

@@ -18,6 +18,9 @@ class Game(TimestampMixin, Base):
     season: Mapped[int] = mapped_column(Integer)
     week: Mapped[int] = mapped_column(Integer)
     season_type: Mapped[str] = mapped_column(String(20), default="regular")
+    # Provider schedule status is used only to decide whether a kickoff is
+    # eligible for lineup locking and notification scheduling.
+    schedule_status: Mapped[str | None] = mapped_column(String(40), nullable=True)
     start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     home_team: Mapped[str] = mapped_column(String(200))
     away_team: Mapped[str] = mapped_column(String(200))

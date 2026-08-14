@@ -587,6 +587,14 @@ def import_team_schedule_rows(
             for key, value in values.items():
                 setattr(schedule, key, value)
     if apply:
+        db.flush()
+        from collegefootballfantasy_api.app.services.notification_service import rebuild_matchup_start_notifications_for_schedule
+
+        rebuild_matchup_start_notifications_for_schedule(
+            db,
+            season=rows[0].season if rows else 0,
+            weeks={row.week for row in rows if not row.is_bye},
+        )
         db.commit()
         report.applied = True
     return report

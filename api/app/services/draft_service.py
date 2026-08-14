@@ -28,6 +28,7 @@ from collegefootballfantasy_api.app.schemas.draft_room import (
 )
 from collegefootballfantasy_api.app.services.draft_completion import finalize_draft_rosters_and_matchups
 from collegefootballfantasy_api.app.services.league_flow import FIXED_ROSTER_SLOTS
+from collegefootballfantasy_api.app.services.notification_service import queue_notification_event
 from collegefootballfantasy_api.app.services.player_pool_filters import (
     canonical_fantasy_player_filter,
     is_canonical_fantasy_player,
@@ -110,6 +111,50 @@ def _complete_draft(
     draft_row.draft_version += 1
     league.status = "post_draft"
     finalize_draft_rosters_and_matchups(db, league)
+    for team in db.query(Team).filter(Team.league_id == league.id, Team.owner_user_id.isnot(None)).all():
+        owner = db.get(User, team.owner_user_id)
+        if owner is None or not owner.is_active:
+            continue
+        queue_notification_event(
+            db,
+            league_id=league.id,
+            user_id=team.owner_user_id,
+            event_type="DRAFT_COMPLETED",
+            event_key=f"draft_complete:{draft_row.id}:{team.owner_user_id}",
+            payload={"draft_id": draft_row.id},
+        )
+
+
+def _notify_draft_start(db: Session, *, league: League, draft_row: Draft) -> None:
+    """Emit only after the state machine has entered ``on_clock``."""
+    for team in db.query(Team).filter(Team.league_id == league.id, Team.owner_user_id.isnot(None)).all():
+        owner = db.get(User, team.owner_user_id)
+        if owner is None or not owner.is_active:
+            continue
+        queue_notification_event(
+            db,
+            league_id=league.id,
+            user_id=owner.id,
+            event_type="DRAFT_START",
+            event_key=f"draft_start:{draft_row.id}:{owner.id}",
+            payload={"draft_id": draft_row.id},
+        )
+
+
+def _notify_on_clock(db: Session, *, league: League, draft_row: Draft, team: Team | None, round_number: int) -> None:
+    if team is None or team.owner_user_id is None:
+        return
+    owner = db.get(User, team.owner_user_id)
+    if owner is None or not owner.is_active:
+        return
+    queue_notification_event(
+        db,
+        league_id=league.id,
+        user_id=owner.id,
+        event_type="DRAFT_ON_CLOCK",
+        event_key=f"draft_on_clock:{draft_row.id}:{draft_row.current_pick_number}:{owner.id}",
+        payload={"draft_id": draft_row.id, "round_number": round_number, "pick_number": draft_row.current_pick_number},
+    )
 
 
 def _draft_teams_are_ready(db: Session, league: League, teams: list[Team]) -> bool:
@@ -169,6 +214,9 @@ def start_draft(db: Session, *, league: League, current_user: User) -> DraftRoom
             now=now,
         )
         league.status = "draft_live"
+        round_number, _round_pick, active_team = draft_pick_team_for_number(ordered_draft_teams(db, league.id), draft_row.current_pick_number)
+        _notify_draft_start(db, league=league, draft_row=draft_row)
+        _notify_on_clock(db, league=league, draft_row=draft_row, team=active_team, round_number=round_number)
         db.commit()
         return build_draft_room_state(db, league, current_user)
 
@@ -197,6 +245,9 @@ def start_draft(db: Session, *, league: League, current_user: User) -> DraftRoom
     draft_row.completed_at = None
     _transition_to_on_clock(draft_row, pick_number=1, now=now)
     league.status = "draft_live"
+    round_number, _round_pick, active_team = draft_pick_team_for_number(ordered_draft_teams(db, league.id), draft_row.current_pick_number)
+    _notify_draft_start(db, league=league, draft_row=draft_row)
+    _notify_on_clock(db, league=league, draft_row=draft_row, team=active_team, round_number=round_number)
     db.commit()
     return build_draft_room_state(db, league, current_user)
 
@@ -452,12 +503,30 @@ def _record_draft_pick(
             "auto_pick": auto_pick,
         },
     )
+    if auto_pick and current_team.owner_user_id is not None:
+        owner = db.get(User, current_team.owner_user_id)
+        if owner is not None and owner.is_active:
+            queue_notification_event(
+                db,
+                league_id=league.id,
+                user_id=owner.id,
+                event_type="DRAFT_AUTO_PICK",
+                event_key=f"draft_autopick:{draft_row.id}:{draft_pick.id}:{owner.id}",
+                payload={
+                    "draft_id": draft_row.id,
+                    "draft_pick_id": draft_pick.id,
+                    "player_name": player.name,
+                    "round_number": round_number,
+                },
+            )
     total_picks = _draft_total_picks(settings_row, teams)
     if draft_row.current_pick_number >= total_picks:
         _complete_draft(db, league=league, draft_row=draft_row, now=now)
     else:
         _transition_to_on_clock(draft_row, pick_number=draft_row.current_pick_number + 1, now=now)
         league.status = "draft_live"
+        next_round, _next_round_pick, next_team = draft_pick_team_for_number(teams, draft_row.current_pick_number)
+        _notify_on_clock(db, league=league, draft_row=draft_row, team=next_team, round_number=next_round)
 
 
 def _auto_pick_current_turn(
@@ -573,6 +642,9 @@ def process_expired_draft_picks_once(
             if draft_row.status == "pre_draft" and draft_starts_at is not None and draft_starts_at <= current:
                 _transition_to_on_clock(draft_row, pick_number=max(1, draft_row.current_pick_number or 1), now=current)
                 league.status = "draft_live"
+                round_number, _round_pick, active_team = draft_pick_team_for_number(teams, draft_row.current_pick_number)
+                _notify_draft_start(db, league=league, draft_row=draft_row)
+                _notify_on_clock(db, league=league, draft_row=draft_row, team=active_team, round_number=round_number)
                 db.commit()
             elif draft_row.status == "transition" and transition_ends_at is not None and transition_ends_at <= current:
                 pick_count = db.query(DraftPick).filter(DraftPick.draft_id == draft_row.id).count()
@@ -583,6 +655,8 @@ def process_expired_draft_picks_once(
                     db.commit()
                 else:
                     _transition_to_on_clock(draft_row, pick_number=pick_count + 1, now=current)
+                    round_number, _round_pick, active_team = draft_pick_team_for_number(teams, draft_row.current_pick_number)
+                    _notify_on_clock(db, league=league, draft_row=draft_row, team=active_team, round_number=round_number)
                     db.commit()
             elif draft_row.status == "on_clock":
                 teams = ordered_draft_teams(db, league.id)

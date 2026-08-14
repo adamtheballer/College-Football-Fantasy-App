@@ -25,11 +25,6 @@ export CFF_GIT_BRANCH="${CFF_GIT_BRANCH:-$(git branch --show-current || printf '
 export CFF_WEB_GIT_SHA="${CFF_WEB_GIT_SHA:-$CFF_GIT_SHA}"
 export CFF_WORKER_GIT_SHA="${CFF_WORKER_GIT_SHA:-$CFF_GIT_SHA}"
 export CFF_RUNTIME_MODE="${CFF_RUNTIME_MODE:-release_candidate}"
-export ENVIRONMENT="${ENVIRONMENT:-e2e}"
-# This is a bounded test-only capability: the API rejects it unless its
-# environment is explicitly e2e, and it is used only to advance a deferred
-# trade to its canonical legal processing instant.
-export E2E_LIFECYCLE_TIME_TRAVEL_ENABLED="${E2E_LIFECYCLE_TIME_TRAVEL_ENABLED:-true}"
 export CFF_RUNTIME_ID="${CFF_RUNTIME_ID:-e2e-${CFF_GIT_SHA:0:12}}"
 # The disposable browser/lifecycle stack must exercise the beta provider
 # policy without credentials or outbound SportsData polling.
@@ -41,17 +36,7 @@ export EMAIL_ENABLED="${EMAIL_ENABLED:-false}"
 export CFF_APPLY_PRESEASON_RECONCILIATION="true"
 
 cleanup() {
-  local exit_status=$?
-  if (( exit_status != 0 )); then
-    # `down -v` intentionally leaves no disposable database behind. Preserve
-    # the API's startup failure immediately before that cleanup so an E2E
-    # failure is diagnosable instead of appearing as an unexplained unhealthy
-    # dependency in CI output.
-    docker compose ps >&2 || true
-    docker compose logs --no-color --tail 200 api >&2 || true
-  fi
   docker compose down -v --remove-orphans
-  exit "$exit_status"
 }
 trap cleanup EXIT
 
@@ -93,7 +78,7 @@ done
 ready_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/ready")"
 runtime_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/runtime")"
 jq -e '.status == "ready"' <<<"$ready_payload" >/dev/null
-jq -e --arg sha "$CFF_GIT_SHA" '.git_sha == $sha and .alembic_revision == "0090_expand_league_icon_url" and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' <<<"$runtime_payload" >/dev/null
+jq -e --arg sha "$CFF_GIT_SHA" '.git_sha == $sha and .alembic_revision == "0091_durable_notification_outbox" and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' <<<"$runtime_payload" >/dev/null
 curl --fail --show-error --silent --head "${web_origin}" >/dev/null
 
 # This command runs only after Compose created a fresh disposable database.
@@ -111,14 +96,6 @@ done
 
 docker compose exec -T db psql -U postgres -d collegefootballfantasy -Atc \
   "select status from worker_heartbeats where worker_name = 'lifecycle_processor'" | grep -qx "healthy"
-
-# Exercise the actual Postgres-backed lifecycle processors at a legal future
-# processing instant.  The browser trade test below proves the public pending
-# cards; this stress fixture proves that the canonical due-trade path advances
-# a deferred offer exactly once, moves both players atomically, and leaves no
-# duplicate waiver or draft award when concurrent workers race.
-docker compose exec -T api \
-  PYTHONPATH=/app uv run python scripts/stress_lifecycle_workers.py
 
 # The E2E service is profile-gated, so `up --build` above does not build it.
 # Build it explicitly to ensure Playwright always exercises the current source

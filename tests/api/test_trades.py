@@ -11,7 +11,7 @@ from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.chat import ChatAuditEvent, ChatMessage, ChatThread
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
-from collegefootballfantasy_api.app.models.notification import NotificationLog
+from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.models.roster import RosterEntry
@@ -373,7 +373,7 @@ def test_normalize_roster_slots_rejects_non_numeric_values():
         _normalize_roster_slots({"QB": "bad"})  # type: ignore[dict-item]
 
 
-def test_trade_proposal_creates_recipient_alert(client, db_session):
+def test_trade_proposal_queues_an_idempotent_recipient_notification(client, db_session):
     proposing_token = create_user_and_token(client, "proposal-a")
     receiving_token = create_user_and_token(client, "proposal-b")
     league = create_league(client, proposing_token, "proposal")
@@ -395,10 +395,10 @@ def test_trade_proposal_creates_recipient_alert(client, db_session):
     assert body["process_after"] is None
     assert body["processed_at"] is None
     assert body["failure_reason"] is None
-    alert = db_session.query(NotificationLog).filter(NotificationLog.alert_type == "TRADE_PROPOSED").one()
-    assert alert.user_id == seed["receiving"].owner_user_id
-    assert alert.payload["trade_id"] == body["id"]
-    assert alert.payload["deep_link"] == f"/leagues/{league['id']}/trades/{body['id']}"
+    event = db_session.query(ScheduledNotification).filter(ScheduledNotification.notification_type == "TRADE_PROPOSED").one()
+    assert event.user_id == seed["receiving"].owner_user_id
+    assert event.payload["trade_id"] == body["id"]
+    assert event.payload["destination"] == {"type": "trade", "league_id": league["id"], "resource_id": body["id"]}
 
     read_response = client.get(
         f"/leagues/{league['id']}/trades/{body['id']}",
@@ -492,7 +492,7 @@ def test_trade_proposal_is_idempotent_and_writes_only_one_private_card(client, d
     assert db_session.query(TradeOffer).filter_by(league_id=league["id"]).count() == 1
     assert db_session.query(ChatThread).filter_by(league_id=league["id"], thread_type="direct").count() == 1
     assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{first.json()['id']}:created").count() == 1
-    assert db_session.query(NotificationLog).filter_by(alert_type="TRADE_PROPOSED").count() == 1
+    assert db_session.query(ScheduledNotification).filter_by(notification_type="TRADE_PROPOSED").count() == 1
 
     changed_payload = {**payload, "message": "A different offer under the same request id"}
     conflict = client.post(
@@ -616,8 +616,8 @@ def test_private_trade_card_failure_rolls_back_trade_and_notification(client, db
     assert db_session.query(TradeOffer).filter_by(league_id=league["id"]).count() == 0
     assert db_session.query(ChatMessage).filter_by(league_id=league["id"]).count() == 0
     assert (
-        db_session.query(NotificationLog)
-        .filter_by(user_id=seed["receiving"].owner_user_id, alert_type="TRADE_PROPOSED")
+        db_session.query(ScheduledNotification)
+        .filter_by(user_id=seed["receiving"].owner_user_id, notification_type="TRADE_PROPOSED")
         .count()
         == 0
     )

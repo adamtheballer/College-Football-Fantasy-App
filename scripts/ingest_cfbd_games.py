@@ -12,6 +12,7 @@ if ROOT_DIR not in sys.path:
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.integrations.cfbd import CFBDClient
 from collegefootballfantasy_api.app.models.game import Game
+from collegefootballfantasy_api.app.services.notification_service import rebuild_matchup_start_notifications_for_schedule
 
 
 def main() -> None:
@@ -44,6 +45,7 @@ def main() -> None:
                 game = Game(external_id=str(external_id) if external_id else None, season=args.season, week=args.week)
 
             game.season_type = row.get("seasonType") or row.get("season_type") or "regular"
+            game.schedule_status = row.get("status") or row.get("gameStatus") or row.get("game_status")
             start_date = row.get("startDate") or row.get("start_date")
             if isinstance(start_date, str):
                 try:
@@ -60,6 +62,8 @@ def main() -> None:
             session.add(game)
             created += 1
 
+        session.flush()
+        rebuild_matchup_start_notifications_for_schedule(session, season=args.season, weeks={args.week})
         session.commit()
         print(f"Ingested {created} games.")
     finally:

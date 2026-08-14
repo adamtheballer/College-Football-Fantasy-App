@@ -18,6 +18,7 @@ import {
 } from "./app-shell/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useChatUnreadSummary } from "@/hooks/use-chat";
+import { useNotifications } from "@/hooks/use-notifications";
 import { clearPendingGuide, shouldStartGuide } from "@/lib/onboarding";
 import { useRuntimeCapabilities } from "@/components/RuntimeCompatibilityGate";
 
@@ -34,6 +35,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     isLoggedIn,
     location.pathname === "/chats",
   );
+  const { data: notifications } = useNotifications(isLoggedIn);
   const [isGuideActive, setIsGuideActive] = useState(false);
   const mainScrollRef = useRef<HTMLElement | null>(null);
 
@@ -44,8 +46,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         isLoggedIn,
         unreadChatSummary?.total_unread ?? 0,
         Boolean(supportEmail),
+        notifications?.unread_count ?? 0,
       ),
-    [isLoggedIn, supportEmail, unreadChatSummary?.total_unread, user],
+    [isLoggedIn, notifications?.unread_count, supportEmail, unreadChatSummary?.total_unread, user],
   );
 
   const isDraftRoomPage = isDraftRoomRoute(location.pathname);

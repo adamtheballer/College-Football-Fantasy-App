@@ -161,6 +161,10 @@ environments:
         enabled: true
         command: PYTHONPATH=. uv run python scripts/run_lifecycle_worker.py
         note: Required server-side processor for expired draft picks and due waiver and trade work.
+      notification_processor:
+        enabled: true
+        command: PYTHONPATH=. uv run python scripts/run_notification_worker.py
+        note: Dedicated durable notification outbox processor. It does not poll live scoring and external delivery remains disabled by default.
     required_env:
       - DATABASE_URL
       - JWT_SECRET_KEY
@@ -176,9 +180,20 @@ environments:
       - REFRESH_COOKIE_SECURE
       - REFRESH_COOKIE_SAMESITE
       - EMAIL_ENABLED
+      - PUSH_NOTIFICATIONS_ENABLED
       - SCORING_MODE
     optional_env:
       - EMAIL_DELIVERY_MODE
+      - PUSH_PROVIDER
+      - ONESIGNAL_APP_ID
+      - ONESIGNAL_APP_API_KEY
+      - VITE_ONESIGNAL_APP_ID
+      - RESEND_API_KEY
+      - RESEND_FROM
+      - NOTIFICATION_WORKER_INTERVAL_SECONDS
+      - NOTIFICATION_CLAIM_LEASE_SECONDS
+      - NOTIFICATION_MAX_ATTEMPTS
+      - LIVE_PLAYER_NOTIFICATIONS_ENABLED
       - CORS_ORIGIN_REGEX
       - SMTP_PORT
       - SMTP_USERNAME
@@ -201,6 +216,7 @@ environments:
       refresh_cookie_secure_must_be_true: true
       ui_base_url_must_be_non_local_https: true
       email_disabled_beta_starts_without_smtp: true
+      push_disabled_beta_starts_without_onesignal_credentials: true
       sportsdata_credentials_required_when_scoring_enabled: true
       migrations_before_api: true
       verify_alembic_head_before_promotion: true

@@ -43,6 +43,7 @@ from collegefootballfantasy_api.app.services.content_moderation import (
     normalize_for_moderation,
     record_moderation_event,
 )
+from collegefootballfantasy_api.app.services.notification_service import queue_notification_event
 
 
 SYSTEM_MESSAGE_TYPES = {
@@ -716,6 +717,21 @@ def create_user_message(
     thread.updated_at = utcnow()
     db.add(message)
     db.add(thread)
+    db.flush()
+    if thread.thread_type == "direct":
+        for recipient_user_id in (thread.direct_user_low_id, thread.direct_user_high_id):
+            if recipient_user_id is None or recipient_user_id == current_user.id:
+                continue
+            queue_notification_event(
+                db,
+                league_id=league_id,
+                user_id=recipient_user_id,
+                event_type="CHAT_DIRECT_MESSAGE",
+                event_key=f"chat:{message.id}:recipient:{recipient_user_id}",
+                # Do not put private message content or sender identity into
+                # an operating-system push payload.
+                payload={"thread_id": thread.id, "message_id": message.id},
+            )
     db.commit()
     db.refresh(message)
     return _message_read(db, message)

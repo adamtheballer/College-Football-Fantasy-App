@@ -124,6 +124,7 @@ services:
         CFF_GIT_SHA: "${CFF_GIT_SHA:-unknown}"
         CFF_GIT_BRANCH: "${CFF_GIT_BRANCH:-unknown}"
         VITE_BETA_ACCESS_ENABLED: "${VITE_BETA_ACCESS_ENABLED:-false}"
+        VITE_ONESIGNAL_APP_ID: "${VITE_ONESIGNAL_APP_ID:-}"
     ports:
       - "${WEB_PORT:-8080}:8080"
     restart: unless-stopped
@@ -160,6 +161,38 @@ services:
         condition: service_healthy
     command: >-
       sh -c "PYTHONPATH=/app uv run python scripts/run_lifecycle_worker.py"
+
+  notification_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+      args:
+        CFF_GIT_SHA: "${CFF_GIT_SHA:-unknown}"
+        CFF_GIT_BRANCH: "${CFF_GIT_BRANCH:-unknown}"
+    working_dir: /app
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/collegefootballfantasy
+      PYTHONPATH: /app
+      GIT_SHA: "${CFF_GIT_SHA:-unknown}"
+      GIT_BRANCH: "${CFF_GIT_BRANCH:-unknown}"
+      EMAIL_ENABLED: "${EMAIL_ENABLED:-false}"
+      EMAIL_DELIVERY_MODE: "${EMAIL_DELIVERY_MODE:-console}"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
+      RESEND_FROM: "${RESEND_FROM:-}"
+      PUSH_NOTIFICATIONS_ENABLED: "${PUSH_NOTIFICATIONS_ENABLED:-false}"
+      PUSH_PROVIDER: "${PUSH_PROVIDER:-onesignal}"
+      ONESIGNAL_APP_ID: "${ONESIGNAL_APP_ID:-}"
+      ONESIGNAL_APP_API_KEY: "${ONESIGNAL_APP_API_KEY:-}"
+      NOTIFICATION_WORKER_INTERVAL_SECONDS: "${NOTIFICATION_WORKER_INTERVAL_SECONDS:-5}"
+      NOTIFICATION_CLAIM_LEASE_SECONDS: "${NOTIFICATION_CLAIM_LEASE_SECONDS:-120}"
+      NOTIFICATION_MAX_ATTEMPTS: "${NOTIFICATION_MAX_ATTEMPTS:-5}"
+      LIVE_PLAYER_NOTIFICATIONS_ENABLED: "${LIVE_PLAYER_NOTIFICATIONS_ENABLED:-false}"
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    command: >-
+      sh -c "PYTHONPATH=/app uv run python scripts/run_notification_worker.py"
 
   e2e:
     build:

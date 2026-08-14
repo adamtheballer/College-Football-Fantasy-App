@@ -1,0 +1,9 @@
+{
+  "name": "CFB Fantasy",
+  "short_name": "CFB Fantasy",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07111f",
+  "theme_color": "#07111f",
+  "icons": [{ "src": "/favicon.ico", "sizes": "48x48", "type": "image/x-icon" }]
+}

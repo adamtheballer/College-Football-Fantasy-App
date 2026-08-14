@@ -12,7 +12,6 @@ from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
-from collegefootballfantasy_api.app.models.notification import NotificationLog
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.trade_offer import TradeOffer
@@ -42,7 +41,8 @@ from collegefootballfantasy_api.app.services.league_weeks import (
     is_cfb_game_week_active,
     next_cfb_trade_process_time,
 )
-from collegefootballfantasy_api.app.services.notification_service import legacy_user_key
+from collegefootballfantasy_api.app.services.notification_service import queue_notification_event
+from collegefootballfantasy_api.app.services.notification_events import canonical_event_type
 from collegefootballfantasy_api.app.services.player_lock_service import locked_player_ids
 from collegefootballfantasy_api.app.services.roster_legality import (
     assign_best_roster_slot_for_position,
@@ -191,16 +191,16 @@ def _create_alert(
 ) -> None:
     if user_id is None:
         return
-    db.add(
-        NotificationLog(
-            user_id=user_id,
-            user_key=legacy_user_key(user_id),
-            alert_type=alert_type,
-            title=title,
-            body=body,
-            payload={"league_id": league_id, "trade_id": trade_id, "deep_link": f"/leagues/{league_id}/trades/{trade_id}"},
-            sent_at=datetime.utcnow(),
-        )
+    event_type = canonical_event_type(alert_type)
+    queue_notification_event(
+        db,
+        league_id=league_id,
+        user_id=user_id,
+        event_type=event_type,
+        event_key=f"{event_type.lower()}:{trade_id}:{user_id}",
+        title=title,
+        body=body,
+        payload={"trade_id": trade_id},
     )
 
 
@@ -601,9 +601,9 @@ def _create_trade_offer_record(
     _create_alert(
         db,
         user_id=receiving.owner_user_id,
-        alert_type="TRADE_PROPOSED",
-        title="Trade Offer Received",
-        body=f"{proposing.name} sent you a trade offer.",
+        alert_type="TRADE_RECEIVED",
+        title="New trade offer",
+        body=f"{proposing.name} sent you a trade offer in {league.name}.",
         league_id=league.id,
         trade_id=offer.id,
     )
@@ -690,7 +690,7 @@ def _complete_accepted_trade(
     offer.processed_at = now
     offer.failure_reason = None
     _add_review(db, offer, review_action, actor_user_id, review_reason)
-    _notify_participants(db, offer, "TRADE_PROCESSED", "Trade Processed", "Accepted trade players have moved rosters.")
+    _notify_participants(db, offer, "TRADE_COMPLETED", "Trade completed", f"Your trade in {league.name} has been processed.")
 
 
 def accept_trade_offer(db: Session, league: League, trade_id: int, current_user: User, payload: TradeActionRequest) -> TradeOfferRead:
@@ -730,9 +730,16 @@ def accept_trade_offer(db: Session, league: League, trade_id: int, current_user:
         )
         body = "Trade accepted and processed."
     _add_review(db, offer, "accepted", current_user.id, payload.reason)
-    _notify_participants(db, offer, "TRADE_ACCEPTED", "Trade Accepted", body)
+    if offer.status == TRADE_STATUS_ACCEPTED_PENDING:
+        _notify_participants(
+            db,
+            offer,
+            "TRADE_ACCEPTED_PENDING",
+            "Trade accepted",
+            "The trade was accepted and will process when the involved players are eligible.",
+        )
     create_trade_private_chat_message(db, offer, event_status="accepted")
-    if offer.status != TRADE_STATUS_COMMISSIONER_REVIEW:
+    if offer.status == TRADE_STATUS_PROCESSED:
         _announce_trade_finalized(db, offer, finalized_at=now)
     db.commit()
     return _serialize_offer(_load_offer(db, offer.id))
@@ -768,8 +775,16 @@ def commissioner_approve_trade(db: Session, league: League, trade_id: int, curre
         )
         body = "Trade approved and processed."
     _add_review(db, offer, "approved", current_user.id, payload.reason)
-    _notify_participants(db, offer, "TRADE_APPROVED", "Trade Approved", body)
-    _announce_trade_finalized(db, offer, finalized_at=now)
+    if offer.status == TRADE_STATUS_ACCEPTED_PENDING:
+        _notify_participants(
+            db,
+            offer,
+            "TRADE_ACCEPTED_PENDING",
+            "Trade accepted",
+            "The trade was accepted and will process when the involved players are eligible.",
+        )
+    if offer.status == TRADE_STATUS_PROCESSED:
+        _announce_trade_finalized(db, offer, finalized_at=now)
     db.commit()
     return _serialize_offer(_load_offer(db, offer.id))
 
@@ -787,7 +802,7 @@ def reject_trade_offer(db: Session, league: League, trade_id: int, current_user:
     _require_team_owner(receiving, current_user)
     offer.status = TRADE_STATUS_REJECTED
     _add_review(db, offer, "rejected", current_user.id, payload.reason)
-    _notify_participants(db, offer, "TRADE_REJECTED", "Trade Rejected", "A trade offer was rejected.")
+    _notify_participants(db, offer, "TRADE_DECLINED", "Trade declined", "A trade offer was declined.")
     create_trade_private_chat_message(db, offer, event_status="rejected")
     db.commit()
     return _serialize_offer(_load_offer(db, offer.id))
@@ -806,7 +821,7 @@ def cancel_trade_offer(db: Session, league: League, trade_id: int, current_user:
     _require_team_owner(proposing, current_user)
     offer.status = TRADE_STATUS_CANCELLED
     _add_review(db, offer, "cancelled", current_user.id, payload.reason)
-    _notify_participants(db, offer, "TRADE_CANCELLED", "Trade Cancelled", "A trade offer was cancelled.")
+    _notify_participants(db, offer, "TRADE_CANCELED", "Trade canceled", "A trade offer was canceled.")
     create_trade_private_chat_message(db, offer, event_status="cancelled")
     db.commit()
     return _serialize_offer(_load_offer(db, offer.id))
@@ -930,7 +945,7 @@ def expire_trade_offers_once(db: Session, now: datetime | None = None) -> dict[s
             continue
         offer.status = TRADE_STATUS_EXPIRED
         _add_review(db, offer, "expired", None, "trade offer expired")
-        _notify_participants(db, offer, "TRADE_EXPIRED", "Trade Expired", "A trade offer expired before acceptance.")
+        _notify_participants(db, offer, "TRADE_EXPIRED", "Trade expired", "A trade offer expired before acceptance.")
         create_trade_private_chat_message(db, offer, event_status="expired")
         db.commit()
         expired += 1

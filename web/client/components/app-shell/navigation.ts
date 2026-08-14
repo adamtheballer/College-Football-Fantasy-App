@@ -41,6 +41,7 @@ export const getShellNavItems = (
   isLoggedIn: boolean,
   chatUnreadCount = 0,
   supportAvailable = false,
+  notificationUnreadCount = 0,
 ): ShellNavItem[] => {
   if (!isLoggedIn) {
     return [
@@ -60,7 +61,12 @@ export const getShellNavItems = (
       badge: chatUnreadCount > 99 ? "99+" : chatUnreadCount > 0 ? String(chatUnreadCount) : undefined,
     },
     { name: "INJURY CENTER", path: "/injury-center", icon: ShieldAlert },
-    { name: "ALERTS", path: "/alerts", icon: Bell },
+    {
+      name: "ALERTS",
+      path: "/alerts",
+      icon: Bell,
+      badge: notificationUnreadCount > 99 ? "99+" : notificationUnreadCount > 0 ? String(notificationUnreadCount) : undefined,
+    },
     // This mailto workflow is only reachable after the server has supplied a
     // configured support address. Beta must not expose a dead feedback link.
     ...(supportAvailable ? [{ name: "REPORT BUG", path: "/report-bug", icon: Bug }] : []),

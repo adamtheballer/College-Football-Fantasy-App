@@ -34,6 +34,7 @@ def production_required_settings() -> dict[str, object]:
         "privacy_policy_url": "https://app.example.com/privacy",
         "terms_url": "https://app.example.com/terms",
         "provider_disclosure_url": "https://app.example.com/provider-disclosure",
+        "scoring_mode": "enabled",
         "sportsdata_enabled": True,
         "sportsdata_api_key": "sportsdata-production-key",
     }
@@ -49,6 +50,10 @@ def test_development_allows_local_default_cors_and_jwt_secret():
 
 def test_live_scoring_poll_interval_defaults_to_three_minutes():
     assert make_settings().scoring_worker_interval_live_seconds == 180
+
+
+def test_live_scoring_is_disabled_until_an_environment_explicitly_enables_it():
+    assert make_settings().scoring_enabled is False
 
 
 def test_live_scoring_poll_interval_rejects_a_faster_provider_cadence():
@@ -263,7 +268,19 @@ def test_production_rejects_console_email_delivery():
 
 def test_email_delivery_mode_rejects_unknown_value():
     with pytest.raises(ValidationError, match="EMAIL_DELIVERY_MODE must be one of"):
-        make_settings(email_delivery_mode="resend")
+        make_settings(email_delivery_mode="mailgun")
+
+
+def test_enabled_onesignal_push_requires_server_credentials_in_every_environment():
+    with pytest.raises(ValidationError, match="ONESIGNAL_APP_ID and ONESIGNAL_APP_API_KEY"):
+        make_settings(push_notifications_enabled=True)
+
+    enabled = make_settings(
+        push_notifications_enabled=True,
+        onesignal_app_id="public-app-id",
+        onesignal_app_api_key="server-secret",
+    )
+    assert enabled.push_notifications_enabled is True
 
 
 def test_production_rejects_non_https_or_local_ui_base_url():
@@ -298,6 +315,7 @@ def test_production_allows_scoring_disabled_without_sportsdata_credentials():
     required = production_required_settings()
     required.pop("sportsdata_api_key")
     required["sportsdata_enabled"] = False
+    required["scoring_mode"] = "disabled"
 
     settings = make_settings(
         environment="production",
@@ -305,7 +323,6 @@ def test_production_allows_scoring_disabled_without_sportsdata_credentials():
         cors_origins="https://app.example.com",
         cors_origin_regex=None,
         refresh_cookie_secure=True,
-        scoring_mode="disabled",
         **required,
     )
 
@@ -315,6 +332,8 @@ def test_production_allows_scoring_disabled_without_sportsdata_credentials():
 
 
 def test_production_rejects_provider_enablement_when_scoring_is_disabled():
+    required = production_required_settings()
+    required["scoring_mode"] = "disabled"
     with pytest.raises(ValidationError, match="SPORTSDATA_ENABLED must be false"):
         make_settings(
             environment="production",
@@ -322,8 +341,7 @@ def test_production_rejects_provider_enablement_when_scoring_is_disabled():
             cors_origins="https://app.example.com",
             cors_origin_regex=None,
             refresh_cookie_secure=True,
-            scoring_mode="disabled",
-            **production_required_settings(),
+            **required,
         )
 
 
