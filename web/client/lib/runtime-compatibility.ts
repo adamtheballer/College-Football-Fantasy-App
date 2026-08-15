@@ -77,11 +77,11 @@ export const runtimeCompatibilityError = (
   if (new Set(required).size !== 1) {
     return "The API, web, and worker build identities do not match.";
   }
-  // Only Vercel's generated preview hosts can visual-QA a bundle against an
-  // otherwise aligned runtime. Production custom domains stay fail-closed.
-  if (!isVercelPreviewHostname(hostname) && runtimeDeploymentSkew(runtime, { hostname, frontendGitSha })) {
-    return "The page bundle does not match the running API release.";
-  }
+  // A browser may retain the immediately previous, fully compatible bundle
+  // while a CDN rollout promotes newer static assets. Blocking the shell in
+  // that state cannot repair the cache and can strand installed iOS web apps.
+  // Preserve the skew in the public diagnostic identity, but only block on a
+  // proven server-side split release above.
   return null;
 };
 

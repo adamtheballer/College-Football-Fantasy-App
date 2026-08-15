@@ -63,9 +63,15 @@ describe("runtime compatibility", () => {
     ).toMatch(/Vercel preview bundle/i);
   });
 
-  it("keeps production custom domains fail-closed when the frontend bundle differs", () => {
+  it("keeps a cached production bundle usable while reporting its deployment skew", () => {
     expect(
       runtimeCompatibilityError(runtime(), {
+        hostname: "www.collegefantasyfootball.org",
+        frontendGitSha: "preview-sha",
+      })
+    ).toBeNull();
+    expect(
+      runtimeDeploymentSkew(runtime(), {
         hostname: "www.collegefantasyfootball.org",
         frontendGitSha: "preview-sha",
       })
