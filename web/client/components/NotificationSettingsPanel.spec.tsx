@@ -20,13 +20,14 @@ const deferred = <T,>(): Deferred<T> => {
 };
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
-const push = vi.hoisted(() => ({ enable: vi.fn() }));
+const push = vi.hoisted(() => ({ enable: vi.fn(), prepare: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: 7 } }) }));
 vi.mock("@/lib/api", () => ({ apiGet: api.get, apiPost: api.post }));
 vi.mock("@/lib/push-notifications", () => ({
   getBrowserPushState: () => "default",
   enableBrowserPush: push.enable,
+  prepareBrowserPush: push.prepare,
 }));
 
 import { NotificationSettingsPanel } from "./NotificationSettingsPanel";

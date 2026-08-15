@@ -82,10 +82,12 @@ describe("OneSignal subscription registration", () => {
       },
     };
     api.post.mockResolvedValue({ id: 12, enabled: true });
-    const { enableBrowserPush } = await import("./push-notifications");
+    const { enableBrowserPush, prepareBrowserPush } = await import("./push-notifications");
 
-    const setup = enableBrowserPush(7);
+    const preparation = prepareBrowserPush(7);
     await initializeWith(client);
+    await preparation;
+    const setup = enableBrowserPush(7);
     await expect(setup).resolves.toBe("granted");
     expect(api.post).not.toHaveBeenCalled();
     expect(listeners).toHaveLength(1);

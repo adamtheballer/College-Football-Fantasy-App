@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet, apiPost } from "@/lib/api";
-import { enableBrowserPush, getBrowserPushState, type BrowserPushState } from "@/lib/push-notifications";
+import { enableBrowserPush, getBrowserPushState, prepareBrowserPush, type BrowserPushState } from "@/lib/push-notifications";
 
 type Preferences = {
   push_enabled: boolean;
@@ -116,6 +116,7 @@ export function NotificationSettingsPanel() {
   const [leaguePreferences, setLeaguePreferences] = useState<LeaguePreference[] | null>(null);
   const [permission, setPermission] = useState<BrowserPushState>(getBrowserPushState());
   const [saving, setSaving] = useState(false);
+  const [preparingPush, setPreparingPush] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pushAttempted, setPushAttempted] = useState(false);
   const mountedRef = useRef(false);
@@ -150,6 +151,8 @@ export function NotificationSettingsPanel() {
   const pushDeliveryEnabled = permission === "granted" && preferences?.push_enabled === true;
   const pushStatus = saving
     ? { label: "Checking permission…", icon: LoaderCircle, className: "text-sky-300" }
+    : preparingPush
+      ? { label: "Preparing notification request…", icon: LoaderCircle, className: "text-sky-300" }
     : pushDeliveryEnabled
       ? { label: "Enabled", icon: Check, className: "text-emerald-300" }
       : permission === "granted"
@@ -192,6 +195,22 @@ export function NotificationSettingsPanel() {
       .finally(() => finishRequest(controller));
     return () => controller.abort();
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user || permission === "denied" || permission === "unsupported" || permission === "unconfigured") return;
+    let active = true;
+    setPreparingPush(true);
+    void prepareBrowserPush(user.id)
+      .catch((error: unknown) => {
+        if (active) setMessage(error instanceof Error ? error.message : "Unable to prepare push notifications.");
+      })
+      .finally(() => {
+        if (active) setPreparingPush(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [permission, user?.id]);
 
   const save = async (next: Preferences) => {
     const { controller, generation } = beginRequest();
@@ -268,12 +287,12 @@ export function NotificationSettingsPanel() {
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
             {permission !== "granted" ? (
-              <Button onClick={() => void enablePush()} disabled={saving || permission === "denied" || permission === "unsupported" || permission === "unconfigured"} className="rounded-xl text-[10px] font-black uppercase tracking-[0.14em]">
-                {saving ? "Checking permission…" : "Enable push notifications"}
+              <Button onClick={() => void enablePush()} disabled={saving || preparingPush || permission === "denied" || permission === "unsupported" || permission === "unconfigured"} className="rounded-xl text-[10px] font-black uppercase tracking-[0.14em]">
+                {saving ? "Checking permission…" : preparingPush ? "Preparing notifications…" : "Enable push notifications"}
               </Button>
             ) : null}
             <span data-testid="push-status" aria-live="polite" className={`inline-flex items-center gap-1 text-xs font-bold ${pushStatus.className}`}>
-              <PushStatusIcon className={`h-4 w-4 ${saving ? "animate-spin" : ""}`} /> {pushStatus.label}
+              <PushStatusIcon className={`h-4 w-4 ${saving || preparingPush ? "animate-spin" : ""}`} /> {pushStatus.label}
             </span>
           </div>
         </div>
