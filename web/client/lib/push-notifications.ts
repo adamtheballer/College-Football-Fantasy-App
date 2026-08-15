@@ -27,6 +27,7 @@ export type BrowserPushState = "default" | "granted" | "denied" | "unsupported" 
 const appId = import.meta.env.VITE_ONESIGNAL_APP_ID?.trim();
 let loader: Promise<void> | null = null;
 let initialized = false;
+let readyClient: OneSignalClient | null = null;
 let activePushUserId: number | null = null;
 let observedPushClient: OneSignalClient | null = null;
 let registeredSubscriptionKey: string | null = null;
@@ -90,6 +91,7 @@ const withOneSignal = async <T>(callback: (client: OneSignalClient) => Promise<T
           });
           initialized = true;
         }
+        readyClient = client;
         resolve(await callback(client));
       } catch (error) {
         reject(error instanceof Error ? error : new Error("Unable to configure push notifications."));
@@ -141,20 +143,36 @@ const observePushSubscription = (client: OneSignalClient, userId: number) => {
   });
 };
 
+/**
+ * Prepare the SDK after the user explicitly opens notification settings, but
+ * never prompt here. iOS requires the eventual permission API call to occur
+ * directly inside the button gesture, not after SDK loading or login awaits.
+ */
+export const prepareBrowserPush = async (userId: number): Promise<void> => {
+  const initialState = getBrowserPushState();
+  if (initialState === "denied" || initialState === "unsupported" || initialState === "unconfigured") return;
+  await withOneSignal(async (client) => {
+    await client.login(stableExternalId(userId));
+    observePushSubscription(client, userId);
+  });
+};
+
 export const enableBrowserPush = async (userId: number): Promise<BrowserPushState> => {
   const initialState = getBrowserPushState();
   if (initialState === "denied" || initialState === "unsupported" || initialState === "unconfigured") return initialState;
-  return withOneSignal(async (client) => {
-    await client.login(stableExternalId(userId));
-    observePushSubscription(client, userId);
-    if (Notification.permission === "default") {
-      await client.Notifications.requestPermission();
-    }
-    if (Notification.permission === "granted") {
-      await registerPushSubscription(userId, client.User.PushSubscription.id);
-    }
-    return Notification.permission;
-  });
+  const client = readyClient;
+  if (!client) throw new Error("Notification setup is still preparing. Please try again in a moment.");
+  activePushUserId = userId;
+  // Do not put an await before this invocation. iOS otherwise loses the tap
+  // activation and leaves Notification.permission at "default" with no prompt.
+  const permissionRequest = Notification.permission === "default"
+    ? client.Notifications.requestPermission()
+    : Promise.resolve();
+  await permissionRequest;
+  if (Notification.permission === "granted") {
+    await registerPushSubscription(userId, client.User.PushSubscription.id);
+  }
+  return Notification.permission;
 };
 
 /** Associate an already-permitted subscription after login without prompting. */
@@ -175,6 +193,7 @@ export const syncBrowserPushIdentity = async (userId: number): Promise<void> => 
 /** Detach this browser from the authenticated OneSignal identity on logout. */
 export const clearBrowserPushIdentity = (): void => {
   activePushUserId = null;
+  readyClient = null;
   void (async () => {
     // Detach the authenticated application subscription before releasing the
     // OneSignal identity.  A later account may then register this browser;
