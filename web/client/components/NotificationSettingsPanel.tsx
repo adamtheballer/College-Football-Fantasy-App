@@ -1,4 +1,4 @@
-import { Bell, Check, Info } from "lucide-react";
+import { Bell, Check, Info, LoaderCircle, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -146,6 +146,22 @@ export function NotificationSettingsPanel() {
 
   const isAbortError = (error: unknown) => error instanceof DOMException && error.name === "AbortError";
 
+  const pushDeliveryEnabled = permission === "granted" && preferences?.push_enabled === true;
+  const pushStatus = saving
+    ? { label: "Checking permission…", icon: LoaderCircle, className: "text-sky-300" }
+    : pushDeliveryEnabled
+      ? { label: "Enabled", icon: Check, className: "text-emerald-300" }
+      : permission === "granted"
+        ? { label: "Permission granted — enable delivery below", icon: Info, className: "text-amber-300" }
+        : permission === "denied"
+          ? { label: "Blocked", icon: X, className: "text-rose-300" }
+          : permission === "unsupported"
+            ? { label: "Add to Home Screen", icon: X, className: "text-amber-300" }
+            : permission === "unconfigured"
+              ? { label: "Unavailable", icon: X, className: "text-rose-300" }
+              : { label: "Not enabled", icon: X, className: "text-muted-foreground" };
+  const PushStatusIcon = pushStatus.icon;
+
   useEffect(() => {
     // A user transition invalidates non-abortable SDK work started for the
     // prior identity as well as this effect's abortable API requests.
@@ -246,11 +262,16 @@ export function NotificationSettingsPanel() {
             <p className="text-sm font-bold text-foreground">Push notifications</p>
             <p className="text-xs leading-relaxed text-muted-foreground">{permissionCopy[permission]}</p>
           </div>
-          {permission === "granted" ? <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-300"><Check className="h-4 w-4" /> Enabled</span> : (
-            <Button onClick={() => void enablePush()} disabled={saving || permission === "denied" || permission === "unsupported" || permission === "unconfigured"} className="rounded-xl text-[10px] font-black uppercase tracking-[0.14em]">
-              Enable push notifications
-            </Button>
-          )}
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            {permission !== "granted" ? (
+              <Button onClick={() => void enablePush()} disabled={saving || permission === "denied" || permission === "unsupported" || permission === "unconfigured"} className="rounded-xl text-[10px] font-black uppercase tracking-[0.14em]">
+                {saving ? "Checking permission…" : "Enable push notifications"}
+              </Button>
+            ) : null}
+            <span data-testid="push-status" aria-live="polite" className={`inline-flex items-center gap-1 text-xs font-bold ${pushStatus.className}`}>
+              <PushStatusIcon className={`h-4 w-4 ${saving ? "animate-spin" : ""}`} /> {pushStatus.label}
+            </span>
+          </div>
         </div>
         {preferences ? rows.map((row) => (
           <div key={row.key} className="flex items-center justify-between gap-5 border-b border-border/35 py-3 last:border-0">
