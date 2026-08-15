@@ -46,7 +46,7 @@ def test_legacy_event_names_normalize_to_the_canonical_alpha_contract() -> None:
         ("MATCHUP_START", {"week": 3, "opponent_team_name": "Rival Team"}, "Your matchup is underway", "Your Week 3 matchup against Rival Team has started."),
         ("MATCHUP_FINAL", {"outcome": "won", "opponent_team": "Rival Team", "user_score": 31, "opponent_score": 28}, "Matchup won", "You defeated Rival Team, 31–28."),
         ("MATCHUP_FINAL", {"outcome": "lost", "opponent_team": "Rival Team", "user_score": 28, "opponent_score": 31}, "Matchup final", "Rival Team defeated your team, 31–28."),
-        ("MATCHUP_FINAL", {"outcome": "tied", "opponent_team": "Rival Team", "user_score": 28, "opponent_score": 28}, "Matchup tied", "Your matchup with Rival Team ended 28–28."),
+        ("MATCHUP_FINAL", {"outcome": "tied", "week": 3, "opponent_team": "Rival Team", "user_score": 28, "opponent_score": 28}, "Matchup final", "Your Week 3 matchup is final."),
         ("MATCHUP_CORRECTED", {"week": 3}, "Matchup result updated", "A stat correction changed your Week 3 matchup result."),
         ("TRADE_RECEIVED", {"manager_or_team": "Rival Team"}, "New trade offer", "Rival Team sent you a trade offer in Alpha League."),
         ("TRADE_ACCEPTED_PENDING", {}, "Trade accepted", "The trade will process when the involved players are eligible."),

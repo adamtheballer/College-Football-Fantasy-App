@@ -762,12 +762,16 @@ def _certified_matchup_revision(matchup: Matchup) -> str:
     return sha256(material.encode("utf-8")).hexdigest()[:16]
 
 
-def _matchup_outcome(own_score: float, opponent_score: float) -> str:
+def _matchup_outcome(own_score: float, opponent_score: float) -> str | None:
     if own_score > opponent_score:
         return "won"
     if own_score < opponent_score:
         return "lost"
-    return "tied"
+    # A certified workflow is expected to resolve every matchup to a winner.
+    # Keep an unexpected exact equality neutral rather than emitting a false
+    # "tied" notification; the scoring layer remains responsible for the
+    # competition's final tie-break policy.
+    return None
 
 
 def _latest_certified_outcome(db: Session, *, matchup_id: int, user_id: int) -> str | None:
@@ -782,7 +786,7 @@ def _latest_certified_outcome(db: Session, *, matchup_id: int, user_id: int) -> 
     )
     for row in rows:
         payload = row.payload or {}
-        if payload.get("matchup_id") == matchup_id and payload.get("outcome") in {"won", "lost", "tied"}:
+        if payload.get("matchup_id") == matchup_id and payload.get("outcome") in {"won", "lost"}:
             return str(payload["outcome"])
     return None
 
