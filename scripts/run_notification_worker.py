@@ -27,6 +27,29 @@ from collegefootballfantasy_api.app.services.worker_health import record_worker_
 logger = logging.getLogger("collegefootballfantasy_api.notification_worker")
 
 
+def log_iteration_result(result: dict[str, int], health: dict[str, int | str | None]) -> None:
+    """Classify only safe aggregate worker outcomes at their operational severity."""
+    claimed = int(result.get("claimed", 0))
+    delivered = int(result.get("delivered", 0))
+    accepted = int(result.get("provider_accepted", 0))
+    retried = int(result.get("retried", 0))
+    failed = int(result.get("failed", 0))
+    pending = int(health.get("pending", 0) or 0)
+    retry = int(health.get("retry", 0) or 0)
+    dead_letter = int(health.get("dead_letter", 0) or 0)
+    message = (
+        "notification_worker_iteration claimed=%s delivered=%s provider_accepted=%s "
+        "retried=%s failed=%s pending=%s retry=%s dead_letter=%s"
+    )
+    values = (claimed, delivered, accepted, retried, failed, pending, retry, dead_letter)
+    if failed or dead_letter:
+        logger.error(message, *values)
+    elif retried or retry:
+        logger.warning(message, *values)
+    else:
+        logger.info(message, *values)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Process the durable notification outbox.")
     parser.add_argument("--once", action="store_true", help="Run one processor iteration and exit.")
@@ -61,7 +84,7 @@ def main() -> None:
                     success=True,
                     details={**health, **result},
                 )
-            logger.info("notification_worker_iteration_complete", extra=result)
+            log_iteration_result(result, health)
         except Exception:  # pragma: no cover - operational path
             with SessionLocal() as db:
                 record_worker_heartbeat(db, worker_name="notification_processor", success=False)

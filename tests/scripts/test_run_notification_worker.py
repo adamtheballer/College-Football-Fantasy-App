@@ -35,3 +35,26 @@ def test_notification_worker_registers_models_before_its_first_queue_query(monke
     worker.main()
 
     assert calls == ["models", "session", "process", "heartbeat"]
+
+
+def test_notification_worker_logs_normal_and_failed_iterations_at_correct_severity(monkeypatch):
+    worker = _load_worker_module()
+    calls: list[str] = []
+    monkeypatch.setattr(worker.logger, "info", lambda *_args: calls.append("info"))
+    monkeypatch.setattr(worker.logger, "warning", lambda *_args: calls.append("warning"))
+    monkeypatch.setattr(worker.logger, "error", lambda *_args: calls.append("error"))
+
+    worker.log_iteration_result(
+        {"claimed": 0, "delivered": 0, "provider_accepted": 0, "retried": 0, "failed": 0},
+        {"pending": 0, "retry": 0, "dead_letter": 0},
+    )
+    worker.log_iteration_result(
+        {"claimed": 1, "delivered": 0, "provider_accepted": 0, "retried": 1, "failed": 0},
+        {"pending": 0, "retry": 1, "dead_letter": 0},
+    )
+    worker.log_iteration_result(
+        {"claimed": 1, "delivered": 0, "provider_accepted": 0, "retried": 0, "failed": 1},
+        {"pending": 0, "retry": 0, "dead_letter": 1},
+    )
+
+    assert calls == ["info", "warning", "error"]

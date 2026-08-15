@@ -1,5 +1,5 @@
 import { Bell, Check, Info } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -117,63 +117,119 @@ export function NotificationSettingsPanel() {
   const [permission, setPermission] = useState<BrowserPushState>(getBrowserPushState());
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const mountedRef = useRef(false);
+  const requestGenerationRef = useRef(0);
+  const requestControllersRef = useRef(new Set<AbortController>());
 
   useEffect(() => {
-    if (!user) return;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      requestGenerationRef.current += 1;
+      for (const controller of requestControllersRef.current) controller.abort();
+      requestControllersRef.current.clear();
+    };
+  }, []);
+
+  const beginRequest = () => {
+    const controller = new AbortController();
+    requestControllersRef.current.add(controller);
+    return { controller, generation: requestGenerationRef.current };
+  };
+
+  const finishRequest = (controller: AbortController) => {
+    requestControllersRef.current.delete(controller);
+  };
+
+  const isCurrentRequest = (controller: AbortController, generation: number) =>
+    mountedRef.current && !controller.signal.aborted && requestGenerationRef.current === generation;
+
+  const isAbortError = (error: unknown) => error instanceof DOMException && error.name === "AbortError";
+
+  useEffect(() => {
+    // A user transition invalidates non-abortable SDK work started for the
+    // prior identity as well as this effect's abortable API requests.
+    requestGenerationRef.current += 1;
+    const { controller, generation } = beginRequest();
+    if (!user) {
+      if (isCurrentRequest(controller, generation)) {
+        setPreferences(null);
+        setLeaguePreferences(null);
+      }
+      finishRequest(controller);
+      return () => controller.abort();
+    }
     Promise.all([
-      apiGet<Preferences>("/notifications/preferences"),
-      apiGet<LeaguePreferencesResponse>("/notifications/league-preferences"),
+      apiGet<Preferences>("/notifications/preferences", undefined, controller.signal),
+      apiGet<LeaguePreferencesResponse>("/notifications/league-preferences", undefined, controller.signal),
     ])
       .then(([nextPreferences, leagueResponse]) => {
+        if (!isCurrentRequest(controller, generation)) return;
         setPreferences(nextPreferences);
         setLeaguePreferences(leagueResponse.data);
       })
-      .catch(() => setMessage("Unable to load notification settings."));
+      .catch((error: unknown) => {
+        if (!isCurrentRequest(controller, generation) || isAbortError(error)) return;
+        setMessage("Unable to load notification settings.");
+      })
+      .finally(() => finishRequest(controller));
+    return () => controller.abort();
   }, [user?.id]);
 
   const save = async (next: Preferences) => {
+    const { controller, generation } = beginRequest();
     setPreferences(next);
     setSaving(true);
     setMessage(null);
     try {
-      setPreferences(await apiPost<Preferences>("/notifications/preferences", next));
-    } catch {
+      const saved = await apiPost<Preferences>("/notifications/preferences", next, undefined, controller.signal);
+      if (isCurrentRequest(controller, generation)) setPreferences(saved);
+    } catch (error) {
+      if (!isCurrentRequest(controller, generation) || isAbortError(error)) return;
       setMessage("Unable to save notification settings.");
     } finally {
-      setSaving(false);
+      finishRequest(controller);
+      if (isCurrentRequest(controller, generation)) setSaving(false);
     }
   };
 
   const enablePush = async () => {
     if (!user) return;
+    const { controller, generation } = beginRequest();
     setSaving(true);
     setMessage(null);
     try {
       const nextPermission = await enableBrowserPush(user.id);
+      if (!isCurrentRequest(controller, generation)) return;
       setPermission(nextPermission);
       if (nextPermission === "granted" && preferences) {
         await save({ ...preferences, push_enabled: true });
       }
     } catch (error) {
+      if (!isCurrentRequest(controller, generation) || isAbortError(error)) return;
       setMessage(error instanceof Error ? error.message : "Unable to enable push notifications.");
     } finally {
-      setSaving(false);
+      finishRequest(controller);
+      if (isCurrentRequest(controller, generation)) setSaving(false);
     }
   };
 
   const saveLeaguePreference = async (nextLeague: LeaguePreference) => {
     if (!leaguePreferences) return;
+    const { controller, generation } = beginRequest();
     const next = leaguePreferences.map((item) => item.league_id === nextLeague.league_id ? nextLeague : item);
     setLeaguePreferences(next);
     setSaving(true);
     setMessage(null);
     try {
-      const response = await apiPost<LeaguePreferencesResponse>("/notifications/league-preferences", { items: next });
-      setLeaguePreferences(response.data);
-    } catch {
+      const response = await apiPost<LeaguePreferencesResponse>("/notifications/league-preferences", { items: next }, undefined, controller.signal);
+      if (isCurrentRequest(controller, generation)) setLeaguePreferences(response.data);
+    } catch (error) {
+      if (!isCurrentRequest(controller, generation) || isAbortError(error)) return;
       setMessage("Unable to save league notification settings.");
     } finally {
-      setSaving(false);
+      finishRequest(controller);
+      if (isCurrentRequest(controller, generation)) setSaving(false);
     }
   };
 

@@ -355,9 +355,10 @@ export const getLeaguePlayerHistory = async <T>(
 export const apiPost = async <T>(
   path: string,
   body: unknown,
-  params?: Record<string, string | number | boolean | undefined>
+  params?: Record<string, string | number | boolean | undefined>,
+  signal?: AbortSignal
 ): Promise<T> => {
-  return apiRequest<T>({ method: "POST", path, body, params });
+  return apiRequest<T>({ method: "POST", path, body, params, signal });
 };
 
 export const apiPut = async <T>(
