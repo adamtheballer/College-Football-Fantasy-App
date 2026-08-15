@@ -33,12 +33,24 @@ let registeredSubscriptionKey: string | null = null;
 let registrationInFlight: Promise<void> | null = null;
 let registrationInFlightKey: string | null = null;
 
+const isIosHomeScreenWebApp = (): boolean => {
+  const userAgent = navigator.userAgent ?? "";
+  const isIos = /iPad|iPhone|iPod/.test(userAgent);
+  if (!isIos) return true;
+
+  const navigatorWithStandalone = navigator as Navigator & { standalone?: boolean };
+  return navigatorWithStandalone.standalone === true || window.matchMedia?.("(display-mode: standalone)").matches === true;
+};
+
 export const getBrowserPushState = (): BrowserPushState => {
   if (!appId) return "unconfigured";
   if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
     return "unsupported";
   }
   if (!window.isSecureContext) return "unsupported";
+  // iOS allows Web Push only from a Home Screen web app. Safari tabs can
+  // expose the generic browser APIs but cannot complete a usable push setup.
+  if (!isIosHomeScreenWebApp()) return "unsupported";
   return Notification.permission;
 };
 
