@@ -117,6 +117,7 @@ export function NotificationSettingsPanel() {
   const [permission, setPermission] = useState<BrowserPushState>(getBrowserPushState());
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [pushAttempted, setPushAttempted] = useState(false);
   const mountedRef = useRef(false);
   const requestGenerationRef = useRef(0);
   const requestControllersRef = useRef(new Set<AbortController>());
@@ -159,7 +160,7 @@ export function NotificationSettingsPanel() {
             ? { label: "Add to Home Screen", icon: X, className: "text-amber-300" }
             : permission === "unconfigured"
               ? { label: "Unavailable", icon: X, className: "text-rose-300" }
-              : { label: "Not enabled", icon: X, className: "text-muted-foreground" };
+              : { label: pushAttempted ? "Permission not granted" : "Not enabled", icon: X, className: "text-muted-foreground" };
   const PushStatusIcon = pushStatus.icon;
 
   useEffect(() => {
@@ -214,12 +215,15 @@ export function NotificationSettingsPanel() {
     const { controller, generation } = beginRequest();
     setSaving(true);
     setMessage(null);
+    setPushAttempted(true);
     try {
       const nextPermission = await enableBrowserPush(user.id);
       if (!isCurrentRequest(controller, generation)) return;
       setPermission(nextPermission);
       if (nextPermission === "granted" && preferences) {
         await save({ ...preferences, push_enabled: true });
+      } else if (nextPermission === "default") {
+        setMessage("iPhone did not grant notification permission. Open CFB Fantasy from its Home Screen icon and try again.");
       }
     } catch (error) {
       if (!isCurrentRequest(controller, generation) || isAbortError(error)) return;

@@ -10,6 +10,8 @@ type PushChangeListener = (event: { current?: { id?: string | null } }) => void;
 
 const prepareBrowser = (permissionRef: { value: "default" | "granted" | "denied" }) => {
   vi.stubEnv("VITE_ONESIGNAL_APP_ID", "test-app-id");
+  Object.defineProperty(globalThis.navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 (test browser)" });
+  Object.defineProperty(globalThis.navigator, "standalone", { configurable: true, value: undefined });
   Object.defineProperty(globalThis, "Notification", {
     configurable: true,
     value: { get permission() { return permissionRef.value; } },
@@ -48,6 +50,17 @@ afterEach(() => {
 });
 
 describe("OneSignal subscription registration", () => {
+  it("requires an iPhone Home Screen web app before offering web push", async () => {
+    const permission: { value: "default" | "granted" | "denied" } = { value: "default" };
+    prepareBrowser(permission);
+    Object.defineProperty(globalThis.navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)" });
+    Object.defineProperty(globalThis.navigator, "standalone", { configurable: true, value: false });
+    Object.defineProperty(globalThis.window, "matchMedia", { configurable: true, value: vi.fn(() => ({ matches: false })) });
+    const { getBrowserPushState } = await import("./push-notifications");
+
+    expect(getBrowserPushState()).toBe("unsupported");
+  });
+
   it("registers the subscription that OneSignal creates after the permission prompt", async () => {
     const permission: { value: "default" | "granted" | "denied" } = { value: "default" };
     prepareBrowser(permission);
