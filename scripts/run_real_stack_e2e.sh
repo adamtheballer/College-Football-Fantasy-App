@@ -26,11 +26,18 @@ export CFF_WEB_GIT_SHA="${CFF_WEB_GIT_SHA:-$CFF_GIT_SHA}"
 export CFF_WORKER_GIT_SHA="${CFF_WORKER_GIT_SHA:-$CFF_GIT_SHA}"
 export CFF_RUNTIME_MODE="${CFF_RUNTIME_MODE:-release_candidate}"
 export CFF_RUNTIME_ID="${CFF_RUNTIME_ID:-e2e-${CFF_GIT_SHA:0:12}}"
+# Never inherit a developer or deployment environment into the disposable
+# runner. The API allows time travel only for this explicit E2E environment.
+export ENVIRONMENT="e2e"
 # The disposable browser/lifecycle stack must exercise the beta provider
 # policy without credentials or outbound SportsData polling.
 export SCORING_MODE="${SCORING_MODE:-disabled}"
 export SPORTSDATA_ENABLED="${SPORTSDATA_ENABLED:-false}"
 export EMAIL_ENABLED="${EMAIL_ENABLED:-false}"
+# The private-trade scenario advances only this disposable database to the
+# server-calculated processing time. This endpoint remains unavailable unless
+# this E2E-only guard is explicitly set by the supported test runner.
+export E2E_LIFECYCLE_TIME_TRAVEL_ENABLED="true"
 # The E2E stack is a fresh disposable database. Its catalog must be created by
 # the explicit all-or-nothing reconciler, never by ordinary runtime startup.
 export CFF_APPLY_PRESEASON_RECONCILIATION="true"

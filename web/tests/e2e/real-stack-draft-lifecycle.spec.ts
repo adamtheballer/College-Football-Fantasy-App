@@ -100,7 +100,7 @@ test.describe("real two-manager draft lifecycle", () => {
       await manager.goto(`/join/${createResponse.body.invite_code}`);
       await expect(manager.getByText(/League Preview/i)).toBeVisible();
       await manager.getByRole("main").getByRole("button", { name: /^Join League$/i }).click();
-      await expect(manager).toHaveURL(new RegExp(`/league/${leagueId}$`));
+      await expect(manager).toHaveURL(new RegExp(`/league/${leagueId}/lobby$`));
 
       await commissioner.goto(`/league/${leagueId}/draft`);
       await expect(commissioner.getByRole("button", { name: /^Start Draft$/i })).toBeVisible();

@@ -460,12 +460,15 @@ test.describe("real FastAPI/PostgreSQL league chat", () => {
         message.message_type === "trade_finalized" &&
         message.metadata.trade_id === trade.id,
     );
-    expect(finalizedTrades).toHaveLength(1);
-    expect(finalizedTrades[0].metadata.processing_status).toBe(
-      acceptedTrade.status === "accepted_pending"
-        ? "pending_transfer"
-        : "processed",
-    );
+    // An in-week acceptance is deliberately not announced as finalized until
+    // the lifecycle worker has committed the roster transfer. A trade that
+    // processes synchronously still produces its one completed card here.
+    if (acceptedTrade.status === "accepted_pending") {
+      expect(finalizedTrades).toHaveLength(0);
+    } else {
+      expect(finalizedTrades).toHaveLength(1);
+      expect(finalizedTrades[0].metadata.processing_status).toBe("processed");
+    }
 
     const acceptedPrivateMessages = await request.get(
       `${apiBaseUrl}/leagues/${leagueOne.id}/chats/${privateThread.id}/messages`,
