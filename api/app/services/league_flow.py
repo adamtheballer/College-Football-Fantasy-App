@@ -17,7 +17,6 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
-from collegefootballfantasy_api.app.models.notification import NotificationLog
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.league_flow import (
@@ -33,6 +32,7 @@ from collegefootballfantasy_api.app.services.chat_service import get_or_create_l
 from collegefootballfantasy_api.app.services.content_moderation import moderate_user_text, moderate_user_url
 from collegefootballfantasy_api.app.services.notification_service import (
     cancel_scheduled_notifications,
+    queue_notification_event,
     schedule_draft_notifications,
 )
 
@@ -356,6 +356,11 @@ def create_league(
         )
     )
 
+    # The notification scheduler reads both the just-created Draft and the
+    # commissioner's membership. This session intentionally disables
+    # autoflush, so make those rows visible before deriving the durable
+    # reminder event inside the same transaction.
+    db.flush()
     schedule_draft_notifications(db, league.id, current_user.id, payload.draft.draft_datetime_utc)
 
     db.commit()
@@ -387,6 +392,9 @@ def join_league(db: Session, league: League, current_user: User) -> LeagueDetail
             owner_user_id=current_user.id,
         )
     )
+    # See league creation above: the scheduler queries membership eligibility
+    # and this session does not autoflush pending joins.
+    db.flush()
     draft_row = db.query(Draft).filter(Draft.league_id == league.id).first()
     if draft_row:
         schedule_draft_notifications(db, league.id, current_user.id, draft_row.draft_datetime_utc)
@@ -539,24 +547,28 @@ def reschedule_draft(
         # advances drafts after start_draft has transitioned the status from scheduled. Replacing
         # this canonical UTC timestamp therefore invalidates the prior start time; notification
         # jobs are explicitly canceled and rebuilt for every league member.
-        cancel_scheduled_notifications(db, locked_league.id, reason="draft rescheduled")
+        cancel_scheduled_notifications(
+            db,
+            locked_league.id,
+            reason="draft rescheduled",
+            event_types=("DRAFT_1H", "DRAFT_SOON"),
+        )
         members = db.query(LeagueMember).filter(LeagueMember.league_id == locked_league.id).all()
         for member in members:
             schedule_draft_notifications(db, locked_league.id, member.user_id, draft_row.draft_datetime_utc)
-            db.add(
-                NotificationLog(
-                    user_id=member.user_id,
-                    user_key=str(member.user_id),
-                    alert_type="DRAFT",
-                    title="Draft Rescheduled",
-                    body="Your league draft time was updated. Open the draft lobby for the new schedule.",
-                    payload={
-                        "league_id": locked_league.id,
-                        "draft_datetime_utc": next_draft_time.isoformat(),
-                        "timezone": draft_row.timezone,
-                        "draft_version": draft_row.draft_version,
-                    },
-                )
+            queue_notification_event(
+                db,
+                league_id=locked_league.id,
+                user_id=member.user_id,
+                event_type="DRAFT_RESCHEDULED",
+                event_key=f"draft:{draft_row.id}:rescheduled:{draft_row.draft_version}:{member.user_id}",
+                title="Draft Rescheduled",
+                body="Your league draft time was updated. Open the draft lobby for the new schedule.",
+                payload={
+                    "draft_datetime_utc": next_draft_time.isoformat(),
+                    "timezone": draft_row.timezone,
+                    "draft_version": draft_row.draft_version,
+                },
             )
 
         db.commit()

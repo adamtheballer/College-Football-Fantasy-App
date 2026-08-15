@@ -19,6 +19,7 @@ import {
   getStoredAccessToken,
   storeAccessTokenSession,
 } from "@/lib/api";
+import { clearBrowserPushIdentity, syncBrowserPushIdentity } from "@/lib/push-notifications";
 
 export interface User {
   firstName: string;
@@ -216,6 +217,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (user) {
+      void syncBrowserPushIdentity(user.id);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
     const syncAuth = () => setUser(loadStoredUser());
     window.addEventListener("storage", syncAuth);
     window.addEventListener(AUTH_CHANGED_EVENT, syncAuth);
@@ -267,6 +274,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void apiPost("/auth/logout", {}).catch(() => {
       // Ignore network failures; local logout must still complete.
     });
+    clearBrowserPushIdentity();
     clearStoredAuth();
     queryClient.clear();
     setUser(null);
@@ -274,6 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const clearPasswordChangeAuth = useCallback(() => {
+    clearBrowserPushIdentity();
     clearStoredAuth();
     queryClient.clear();
     setUser(null);
@@ -319,6 +328,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutAll = useCallback(async () => {
     await apiPost("/auth/logout-all", {});
+    clearBrowserPushIdentity();
     clearStoredAuth();
     queryClient.clear();
     setUser(null);

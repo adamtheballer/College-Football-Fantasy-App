@@ -67,12 +67,14 @@ describe("Settings beta preferences", () => {
     state.updateProfile.mockResolvedValue({ id: 7, firstName: "Updated Adam" });
   });
 
-  it("removes unsupported notification and third-party theme controls", () => {
+  it("shows the notification permission state without third-party theme controls", () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
     expect(screen.getByText("App Preferences")).toBeTruthy();
-    expect(screen.queryByText(/push notifications/i)).toBeNull();
-    expect(screen.queryByText(/draft alerts/i)).toBeNull();
+    expect(screen.getByText("Notifications")).toBeTruthy();
+    expect(screen.getByText("Push notifications")).toBeTruthy();
+    expect(screen.getByText("Push notifications are not configured for this environment yet.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /enable push notifications/i }).getAttribute("disabled")).not.toBeNull();
     expect(screen.queryByText(/espn/i)).toBeNull();
   });
 

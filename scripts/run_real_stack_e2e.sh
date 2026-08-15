@@ -26,11 +26,18 @@ export CFF_WEB_GIT_SHA="${CFF_WEB_GIT_SHA:-$CFF_GIT_SHA}"
 export CFF_WORKER_GIT_SHA="${CFF_WORKER_GIT_SHA:-$CFF_GIT_SHA}"
 export CFF_RUNTIME_MODE="${CFF_RUNTIME_MODE:-release_candidate}"
 export CFF_RUNTIME_ID="${CFF_RUNTIME_ID:-e2e-${CFF_GIT_SHA:0:12}}"
+# Never inherit a developer or deployment environment into the disposable
+# runner. The API allows time travel only for this explicit E2E environment.
+export ENVIRONMENT="e2e"
 # The disposable browser/lifecycle stack must exercise the beta provider
 # policy without credentials or outbound SportsData polling.
 export SCORING_MODE="${SCORING_MODE:-disabled}"
 export SPORTSDATA_ENABLED="${SPORTSDATA_ENABLED:-false}"
 export EMAIL_ENABLED="${EMAIL_ENABLED:-false}"
+# The private-trade scenario advances only this disposable database to the
+# server-calculated processing time. This endpoint remains unavailable unless
+# this E2E-only guard is explicitly set by the supported test runner.
+export E2E_LIFECYCLE_TIME_TRAVEL_ENABLED="true"
 # The E2E stack is a fresh disposable database. Its catalog must be created by
 # the explicit all-or-nothing reconciler, never by ordinary runtime startup.
 export CFF_APPLY_PRESEASON_RECONCILIATION="true"
@@ -78,7 +85,7 @@ done
 ready_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/ready")"
 runtime_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/runtime")"
 jq -e '.status == "ready"' <<<"$ready_payload" >/dev/null
-jq -e --arg sha "$CFF_GIT_SHA" '.git_sha == $sha and .alembic_revision == "0090_expand_league_icon_url" and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' <<<"$runtime_payload" >/dev/null
+jq -e --arg sha "$CFF_GIT_SHA" '.git_sha == $sha and .alembic_revision == "0091_durable_notification_outbox" and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' <<<"$runtime_payload" >/dev/null
 curl --fail --show-error --silent --head "${web_origin}" >/dev/null
 
 # This command runs only after Compose created a fresh disposable database.

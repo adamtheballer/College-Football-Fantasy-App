@@ -59,6 +59,9 @@ def test_disabled_scoring_mode_skips_standings_provider_refresh(client, monkeypa
 
 
 def test_player_stats_endpoint_uses_db_backed_sportsdata_cache(client, db_session, monkeypatch):
+    # The endpoint must never make provider requests while scoring is disabled.
+    # This cache behavior is exercised with the provider-enabled runtime mode.
+    monkeypatch.setattr(settings, "scoring_mode", "enabled")
     monkeypatch.setattr(settings, "sportsdata_enabled", True)
     create_response = client.post(
         "/players",
@@ -111,6 +114,7 @@ def test_player_stats_endpoint_uses_db_backed_sportsdata_cache(client, db_sessio
 
 
 def test_player_stats_endpoint_falls_back_to_stale_cache_when_provider_fails(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "scoring_mode", "enabled")
     monkeypatch.setattr(settings, "sportsdata_enabled", True)
     create_response = client.post(
         "/players",
@@ -174,6 +178,7 @@ def test_player_stats_endpoint_falls_back_to_stale_cache_when_provider_fails(cli
 
 
 def test_standings_endpoint_uses_db_snapshot_cache(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "scoring_mode", "enabled")
     monkeypatch.setattr(settings, "sportsdata_enabled", True)
     calls = {"count": 0}
 
@@ -238,6 +243,7 @@ def test_standings_endpoint_uses_db_snapshot_cache(client, db_session, monkeypat
 
 
 def test_injuries_endpoint_uses_cached_db_rows_when_feed_is_fresh(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "scoring_mode", "enabled")
     monkeypatch.setattr(settings, "sportsdata_enabled", True)
     calls = {"count": 0}
 

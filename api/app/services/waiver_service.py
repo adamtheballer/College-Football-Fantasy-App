@@ -15,7 +15,6 @@ from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
-from collegefootballfantasy_api.app.models.notification import NotificationLog
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_waiver_availability import PlayerWaiverAvailability
 from collegefootballfantasy_api.app.models.roster import RosterEntry
@@ -29,6 +28,8 @@ from collegefootballfantasy_api.app.services.league_player_history import (
     EVENT_WAIVER_CLAIMED,
     append_league_player_event,
 )
+from collegefootballfantasy_api.app.services.notification_service import queue_notification_event
+from collegefootballfantasy_api.app.services.notification_events import canonical_event_type
 from collegefootballfantasy_api.app.models.waiver_claim_audit import WaiverClaimAudit
 from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
@@ -282,21 +283,26 @@ def _notify_user(
     *,
     user_id: int | None,
     alert_type: str,
-    title: str,
-    body: str,
     payload: dict,
+    title: str | None = None,
+    body: str | None = None,
 ) -> None:
     if user_id is None:
         return
-    db.add(
-        NotificationLog(
-            user_id=user_id,
-            user_key=str(user_id),
-            alert_type=alert_type,
-            title=title,
-            body=body,
-            payload=payload,
-        )
+    league_id = payload.get("league_id")
+    entity_id = payload.get("claim_id") or payload.get("transaction_id") or payload.get("player_id")
+    if not isinstance(league_id, int) or not isinstance(entity_id, int):
+        raise ValueError("waiver notifications require a league and stable entity identifier")
+    event_type = canonical_event_type(alert_type)
+    queue_notification_event(
+        db,
+        league_id=league_id,
+        user_id=user_id,
+        event_type=event_type,
+        event_key=f"{event_type.lower()}:{entity_id}:{user_id}",
+        title=title,
+        body=body,
+        payload=payload,
     )
 
 
@@ -1217,13 +1223,7 @@ def _apply_claim_award(
         db,
         user_id=team.owner_user_id,
         alert_type="WAIVER_PROCESSED",
-        title="Waiver claim successful",
-        body=(
-            f"You added {add_player.name} for ${claim.winning_bid} FAAB."
-            if _waiver_type(settings) == "faab"
-            else f"You added {add_player.name} and moved to the back of waiver priority."
-        ),
-        payload={"league_id": league.id, "claim_id": claim.id, "run_id": run.id},
+        payload={"league_id": league.id, "claim_id": claim.id, "run_id": run.id, "player_name": add_player.name},
     )
     chat_body = (
         f"{team.name} claimed {add_player.name} for ${claim.winning_bid} FAAB."
@@ -1258,13 +1258,17 @@ def _terminalize_claim(
     db.add(claim)
     _audit_claim(db, claim, action=status_value, actor_user_id=None, reason=reason, before_state=before)
     team = db.get(Team, claim.team_id)
+    player = db.get(Player, claim.add_player_id)
     _notify_user(
         db,
         user_id=team.owner_user_id if team else claim.created_by_user_id,
         alert_type="WAIVER_FAILED" if status_value != WAIVER_STATUS_LOST else "WAIVER_LOST",
-        title="Waiver claim unsuccessful",
-        body=reason,
-        payload={"league_id": claim.league_id, "claim_id": claim.id, "run_id": run.id},
+        payload={
+            "league_id": claim.league_id,
+            "claim_id": claim.id,
+            "run_id": run.id,
+            **({"player_name": player.name} if player else {}),
+        },
     )
 
 

@@ -52,15 +52,23 @@ class Settings(BaseSettings):
     # Public beta can run all non-scoring workflows without a live provider.
     # Keep this explicit rather than inferring it from whether a key happened
     # to be configured, so a later credential change cannot start polling.
-    scoring_mode: Literal["enabled", "disabled"] = "enabled"
+    scoring_mode: Literal["enabled", "disabled"] = "disabled"
     scoring_provider: str = "sportsdata"
     scoring_allow_unofficial_providers: bool = False
-    scoring_worker_interval_live_seconds: int = 60
+    # Every live provider cycle ingests the global weekly box-score slate once
+    # before recalculating affected league scores. Keep that external polling
+    # cadence at three minutes or slower; workers may perform internal work
+    # more frequently, but must not re-fetch the same live slate faster.
+    scoring_worker_interval_live_seconds: int = 180
     scoring_worker_interval_postgame_seconds: int = 900
     scoring_worker_interval_correction_seconds: int = 3600
     scoring_worker_retry_max_attempts: int = 3
     scoring_worker_retry_base_seconds: int = 5
     lifecycle_worker_interval_seconds: int = 5
+    # This capability exists solely for the disposable Compose browser suite.
+    # It is guarded again at route level and may only be enabled when the
+    # process explicitly identifies itself as an E2E environment.
+    e2e_lifecycle_time_travel_enabled: bool = False
     draft_cpu_pick_delay_seconds: int = 4
     scoring_dead_letter_after_failures: int = 3
     provider_unmatched_failure_threshold_percent: float = 10.0
@@ -148,6 +156,21 @@ class Settings(BaseSettings):
     # is approved. Keep this off by default so an omitted deployment variable
     # cannot accidentally make SMTP a startup dependency or emit mail.
     email_enabled: bool = False
+    # External notification delivery is opt-in. The durable in-app outbox is
+    # independent of both this email capability and push configuration.
+    push_notifications_enabled: bool = False
+    push_provider: Literal["onesignal", "fake"] = "onesignal"
+    onesignal_app_id: str | None = None
+    onesignal_app_api_key: str | None = None
+    notification_worker_interval_seconds: int = 5
+    notification_claim_lease_seconds: int = 120
+    notification_max_attempts: int = 5
+    # Injury and other live player-update alerts remain explicitly disabled
+    # until the product has a verified, authoritative live-data source and an
+    # owner has approved the operational runbook. The notification pipeline
+    # can still process durable product events while this is false.
+    live_player_notifications_enabled: bool = False
+    resend_from: str | None = None
     smtp_host: str | None = None
     smtp_port: int = 587
     smtp_username: str | None = None
@@ -176,12 +199,19 @@ class Settings(BaseSettings):
             raise ValueError("DRAFT_CPU_PICK_DELAY_SECONDS must be between 2 and 8")
         return value
 
+    @field_validator("scoring_worker_interval_live_seconds")
+    @classmethod
+    def validate_scoring_worker_interval_live_seconds(cls, value: int) -> int:
+        if value < 180:
+            raise ValueError("SCORING_WORKER_INTERVAL_LIVE_SECONDS must be at least 180")
+        return value
+
     @field_validator("email_delivery_mode")
     @classmethod
     def validate_email_delivery_mode(cls, value: str) -> str:
         normalized = value.strip().lower()
-        if normalized not in {"console", "smtp"}:
-            raise ValueError("EMAIL_DELIVERY_MODE must be one of: console, smtp")
+        if normalized not in {"console", "smtp", "resend"}:
+            raise ValueError("EMAIL_DELIVERY_MODE must be one of: console, smtp, resend")
         return normalized
 
     @field_validator("email_enabled", mode="before")
@@ -194,6 +224,27 @@ class Settings(BaseSettings):
                 return True
             if normalized in {"false", "0", "no", "off", ""}:
                 return False
+        return value
+
+    @field_validator("notification_worker_interval_seconds")
+    @classmethod
+    def validate_notification_worker_interval_seconds(cls, value: int) -> int:
+        if value < 1 or value > 300:
+            raise ValueError("NOTIFICATION_WORKER_INTERVAL_SECONDS must be between 1 and 300")
+        return value
+
+    @field_validator("notification_claim_lease_seconds")
+    @classmethod
+    def validate_notification_claim_lease_seconds(cls, value: int) -> int:
+        if value < 30 or value > 900:
+            raise ValueError("NOTIFICATION_CLAIM_LEASE_SECONDS must be between 30 and 900")
+        return value
+
+    @field_validator("notification_max_attempts")
+    @classmethod
+    def validate_notification_max_attempts(cls, value: int) -> int:
+        if value < 1 or value > 5:
+            raise ValueError("NOTIFICATION_MAX_ATTEMPTS must be between 1 and 5")
         return value
 
     @field_validator("beta_access_reservation_ttl_minutes")
@@ -237,6 +288,9 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_safety(self) -> "Settings":
+        if self.e2e_lifecycle_time_travel_enabled and self.environment.strip().lower() != "e2e":
+            raise ValueError("E2E_LIFECYCLE_TIME_TRAVEL_ENABLED requires ENVIRONMENT=e2e")
+
         # A beta gate is an authentication boundary even in a local release
         # candidate.  Permitting its published fallback HMAC secrets outside
         # production makes a restart silently invalidate every imported code
@@ -249,6 +303,12 @@ class Settings(BaseSettings):
                 raise ValueError("BETA_ACCESS_RESERVATION_SECRET must be changed when Early Access Pro codes are enabled")
             if len(self.beta_access_code_hmac_secret) < 32 or len(self.beta_access_reservation_secret) < 32:
                 raise ValueError("Early Access Pro-code secrets must each contain at least 32 characters")
+
+        if self.push_notifications_enabled and self.push_provider == "onesignal":
+            if not self.onesignal_app_id or not self.onesignal_app_api_key:
+                raise ValueError(
+                    "ONESIGNAL_APP_ID and ONESIGNAL_APP_API_KEY are required when PUSH_NOTIFICATIONS_ENABLED=true"
+                )
 
         if not self.is_production:
             return self
@@ -285,14 +345,19 @@ class Settings(BaseSettings):
         # without SMTP or legal/support links. Re-enabling email restores the
         # production sender requirements without changing application logic.
         if self.email_enabled:
-            if self.email_delivery_mode != "smtp":
-                raise ValueError("EMAIL_DELIVERY_MODE must be smtp when EMAIL_ENABLED=true in production")
+            if self.email_delivery_mode == "smtp":
+                if not self.smtp_host or not self.smtp_from_email:
+                    raise ValueError("SMTP_HOST and SMTP_FROM_EMAIL are required when EMAIL_ENABLED=true with SMTP")
+                if not self.smtp_use_tls:
+                    raise ValueError("SMTP_USE_TLS must be true when EMAIL_ENABLED=true with SMTP")
+            elif self.email_delivery_mode == "resend":
+                if not self.resend_api_key or not self.resend_from:
+                    raise ValueError("RESEND_API_KEY and RESEND_FROM are required when EMAIL_DELIVERY_MODE=resend")
+            else:
+                raise ValueError("EMAIL_DELIVERY_MODE must be smtp or resend when EMAIL_ENABLED=true in production")
 
-            if not self.smtp_host or not self.smtp_from_email:
-                raise ValueError("SMTP_HOST and SMTP_FROM_EMAIL are required when EMAIL_ENABLED=true in production")
-
-            if not self.smtp_use_tls:
-                raise ValueError("SMTP_USE_TLS must be true when EMAIL_ENABLED=true in production")
+        if self.push_notifications_enabled and self.push_provider != "onesignal":
+            raise ValueError("PUSH_PROVIDER must be onesignal when PUSH_NOTIFICATIONS_ENABLED=true in production")
 
         if not self.scoring_enabled and self.sportsdata_enabled:
             raise ValueError("SPORTSDATA_ENABLED must be false when SCORING_MODE=disabled")
@@ -305,9 +370,6 @@ class Settings(BaseSettings):
             not self.sportsdata_enabled or not self.sportsdata_api_key
         ):
             raise ValueError("SPORTSDATA_ENABLED=true and SPORTSDATA_API_KEY are required for production sportsdata scoring")
-
-        if self.scoring_worker_interval_live_seconds < 30:
-            raise ValueError("SCORING_WORKER_INTERVAL_LIVE_SECONDS must be at least 30 in production")
 
         return self
 

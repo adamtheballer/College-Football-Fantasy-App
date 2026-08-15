@@ -49,6 +49,8 @@ def game_context_for_players(
     starts_by_school: dict[str, datetime] = {}
     opponents_by_school: dict[str, str] = {}
     for game in games:
+        if (game.schedule_status or "").strip().lower() in {"cancelled", "canceled", "postponed", "tbd"}:
+            continue
         home_key = _school_schedule_key(game.home_team)
         away_key = _school_schedule_key(game.away_team)
         if home_key in school_keys:

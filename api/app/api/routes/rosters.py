@@ -42,6 +42,8 @@ from collegefootballfantasy_api.app.services.roster_slots import (
     build_team_roster_slots,
     first_open_eligible_slot,
 )
+from collegefootballfantasy_api.app.services.notification_service import rebuild_matchup_start_notifications
+from collegefootballfantasy_api.app.services.scoring_service import create_or_refresh_lineup_snapshots
 from collegefootballfantasy_api.app.services.league_weeks import resolve_current_week
 from collegefootballfantasy_api.app.services.player_lock_service import locked_player_ids
 from collegefootballfantasy_api.app.services.waiver_service import (
@@ -253,6 +255,13 @@ def _best_available_slot(
     raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Team roster is full.")
 
 
+def _refresh_matchup_start_schedule(db: Session, league: League) -> None:
+    """Rebuild unclaimed kickoff events in the same roster transaction."""
+    week = resolve_current_week(db, league)
+    create_or_refresh_lineup_snapshots(db, league.id, league.season_year, week)
+    rebuild_matchup_start_notifications(db, league_id=league.id, season=league.season_year, week=week)
+
+
 @router.post(
     "/teams/{team_id}/roster",
     response_model=RosterEntryRead,
@@ -316,6 +325,7 @@ def add_roster_entry_endpoint(
             event_key=f"roster-add:{transaction.id}:{player.id}", fantasy_team=team, to_team=team,
             manager=current_user, transaction_id=transaction.id, metadata={"reason": "direct roster add"},
         )
+        _refresh_matchup_start_schedule(db, league)
     db.commit()
     db.refresh(entry)
     refreshed = (
@@ -390,6 +400,7 @@ def delete_roster_entry_endpoint(
         event_key=f"roster-drop:{transaction.id}:{dropped_player_id}", fantasy_team=team, from_team=team,
         manager=current_user, transaction_id=transaction.id,
     )
+    _refresh_matchup_start_schedule(db, league)
     db.commit()
 
 
@@ -501,6 +512,11 @@ def update_lineup_endpoint(
                     metadata={"from_slot": previous_slot, "to_slot": entry.slot},
                 )
 
+    if changed_entries:
+        league = db.get(League, team.league_id)
+        if league:
+            _refresh_matchup_start_schedule(db, league)
+
     db.commit()
     return LineupUpdateResponse(
         data=[RosterEntryRead.model_validate(entry) for entry in _load_roster_entry_rows(db, team.id)]
@@ -574,6 +590,7 @@ def add_drop_endpoint(
         event_key=f"roster-add-drop-drop:{transaction.id}:{dropped_player_id}", fantasy_team=team, from_team=team,
         manager=current_user, transaction_id=transaction.id, metadata={"added_player_id": add_player.id},
     )
+    _refresh_matchup_start_schedule(db, league)
     db.commit()
 
     return AddDropResponse(

@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import os
 import sys
 from datetime import datetime
@@ -9,12 +10,15 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.integrations.rotowire import RotowireClient
 from collegefootballfantasy_api.app.models import league, roster, team, user  # noqa: F401
 from collegefootballfantasy_api.app.models.injury import Injury
-from collegefootballfantasy_api.app.models.notification import NotificationLog
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.services.notification_service import queue_notification_event
 from collegefootballfantasy_api.app.services.power4 import conference_for_school, resolve_power4_school
 
 
@@ -76,7 +80,8 @@ def _injury_changed(
     )
 
 
-def _create_injury_alert(
+def _queue_injury_alerts(
+    session,
     *,
     player: Player,
     team_name: str,
@@ -86,20 +91,42 @@ def _create_injury_alert(
     week: int,
     title: str,
     body: str,
-) -> NotificationLog:
-    return NotificationLog(
-        user_key=None,
-        alert_type="INJURY",
-        title=title,
-        body=body,
-        payload={
-            "player_id": player.id,
-            "team": team_name,
-            "conference": conference,
-            "status": status,
-            "season": season,
-            "week": week,
-        },
+) -> int:
+    """Queue a recipient-scoped injury event for each current roster owner.
+
+    The feed does not identify recipients, so a global NotificationLog row is
+    neither visible nor safe to deliver. Resolve current roster ownership and
+    enqueue through the canonical outbox in the same transaction instead.
+    """
+    owners = session.execute(
+        select(RosterEntry.league_id, Team.owner_user_id)
+        .join(Team, Team.id == RosterEntry.team_id)
+        .where(RosterEntry.player_id == player.id, Team.owner_user_id.is_not(None))
+    ).all()
+    revision = hashlib.sha256(
+        "|".join((str(player.id), status, title, body, str(season), str(week))).encode("utf-8")
+    ).hexdigest()[:20]
+    queued = 0
+    for league_id, user_id in {(league_id, user_id) for league_id, user_id in owners if user_id is not None}:
+        queue_notification_event(
+            session,
+            league_id=league_id,
+            user_id=user_id,
+            event_type="INJURY",
+            event_key=f"injury:{season}:{week}:{player.id}:{revision}:{league_id}:{user_id}",
+            title=title,
+            body=body,
+            payload={
+                "player_id": player.id,
+                "team": team_name,
+                "conference": conference,
+                "status": status,
+                "season": season,
+                "week": week,
+            },
+        )
+        queued += 1
+    return queued
     )
 
 
@@ -205,22 +232,20 @@ def ingest_once(season: int, week: int, emit_alerts: bool = True) -> tuple[int, 
                 if changed:
                     updated += 1
                     if emit_alerts:
-                        session.add(
-                            _create_injury_alert(
-                                player=player,
-                                team_name=canonical_team,
-                                conference=team_conference,
-                                status=mapped_status,
-                                season=season,
-                                week=week,
-                                title=f"Injury Update: {player.name}",
-                                body=(
-                                    f"{player.name} ({canonical_team} {player.position}) "
-                                    f"changed from {previous_status} to {mapped_status}."
-                                ),
-                            )
+                        emitted_alerts += _queue_injury_alerts(
+                            session,
+                            player=player,
+                            team_name=canonical_team,
+                            conference=team_conference,
+                            status=mapped_status,
+                            season=season,
+                            week=week,
+                            title=f"Injury Update: {player.name}",
+                            body=(
+                                f"{player.name} ({canonical_team} {player.position}) "
+                                f"changed from {previous_status} to {mapped_status}."
+                            ),
                         )
-                        emitted_alerts += 1
                 continue
 
             session.add(
@@ -239,19 +264,17 @@ def ingest_once(season: int, week: int, emit_alerts: bool = True) -> tuple[int, 
             )
             created += 1
             if emit_alerts:
-                session.add(
-                    _create_injury_alert(
-                        player=player,
-                        team_name=canonical_team,
-                        conference=team_conference,
-                        status=mapped_status,
-                        season=season,
-                        week=week,
-                        title=f"New Injury: {player.name}",
-                        body=f"{player.name} ({canonical_team} {player.position}) is now listed as {mapped_status}.",
-                    )
+                emitted_alerts += _queue_injury_alerts(
+                    session,
+                    player=player,
+                    team_name=canonical_team,
+                    conference=team_conference,
+                    status=mapped_status,
+                    season=season,
+                    week=week,
+                    title=f"New Injury: {player.name}",
+                    body=f"{player.name} ({canonical_team} {player.position}) is now listed as {mapped_status}.",
                 )
-                emitted_alerts += 1
 
         for player_id, existing in existing_by_player_id.items():
             if player_id in seen_player_ids:
@@ -273,8 +296,8 @@ def main() -> None:
         "--emit-alerts",
         dest="emit_alerts",
         action="store_true",
-        default=True,
-        help="Emit INJURY notifications for new/changed rows (default: enabled).",
+        default=settings.live_player_notifications_enabled,
+        help="Emit INJURY notifications for roster owners (default: disabled unless explicitly enabled).",
     )
     parser.add_argument(
         "--no-emit-alerts",

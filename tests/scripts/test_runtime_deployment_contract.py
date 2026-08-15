@@ -75,7 +75,10 @@ def test_beta_runtime_scripts_enforce_one_public_origin_and_an_existing_data_vol
     assert override.count('SPORTSDATA_ENABLED: "false"') == 2
     assert override.count('EMAIL_ENABLED: "false"') == 2
     assert override.count('SCORING_MODE: "disabled"') == 2
-    assert 'export EMAIL_ENABLED="${EMAIL_ENABLED:-false}"' in (REPO_ROOT / "scripts" / "run_real_stack_e2e.sh").read_text(encoding="utf-8")
+    real_stack_runner = (REPO_ROOT / "scripts" / "run_real_stack_e2e.sh").read_text(encoding="utf-8")
+    assert 'export EMAIL_ENABLED="${EMAIL_ENABLED:-false}"' in real_stack_runner
+    assert 'export ENVIRONMENT="e2e"' in real_stack_runner
+    assert 'export E2E_LIFECYCLE_TIME_TRAVEL_ENABLED="true"' in real_stack_runner
     assert '"sportsdata_enabled"] is False' in start
     assert '"email_enabled"] is False' in start
     assert '"provider_polling_expected"] is False' in start

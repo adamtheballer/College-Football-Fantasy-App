@@ -5,12 +5,13 @@ from collegefootballfantasy_api.app.api.routes.trades import (
     DEFAULT_ROSTER_SLOTS,
     _normalize_roster_slots,
 )
+from collegefootballfantasy_api.app.api.routes import admin_trades
 from conftest import TestingSessionLocal
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.chat import ChatAuditEvent, ChatMessage, ChatThread
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
-from collegefootballfantasy_api.app.models.notification import NotificationLog
+from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.models.roster import RosterEntry
@@ -372,7 +373,7 @@ def test_normalize_roster_slots_rejects_non_numeric_values():
         _normalize_roster_slots({"QB": "bad"})  # type: ignore[dict-item]
 
 
-def test_trade_proposal_creates_recipient_alert(client, db_session):
+def test_trade_proposal_queues_an_idempotent_recipient_notification(client, db_session):
     proposing_token = create_user_and_token(client, "proposal-a")
     receiving_token = create_user_and_token(client, "proposal-b")
     league = create_league(client, proposing_token, "proposal")
@@ -394,10 +395,10 @@ def test_trade_proposal_creates_recipient_alert(client, db_session):
     assert body["process_after"] is None
     assert body["processed_at"] is None
     assert body["failure_reason"] is None
-    alert = db_session.query(NotificationLog).filter(NotificationLog.alert_type == "TRADE_PROPOSED").one()
-    assert alert.user_id == seed["receiving"].owner_user_id
-    assert alert.payload["trade_id"] == body["id"]
-    assert alert.payload["deep_link"] == f"/leagues/{league['id']}/trades/{body['id']}"
+    event = db_session.query(ScheduledNotification).filter(ScheduledNotification.event_type == "TRADE_RECEIVED").one()
+    assert event.user_id == seed["receiving"].owner_user_id
+    assert event.payload["trade_id"] == body["id"]
+    assert event.payload["destination"] == {"type": "trade", "league_id": league["id"], "resource_id": body["id"]}
 
     read_response = client.get(
         f"/leagues/{league['id']}/trades/{body['id']}",
@@ -491,7 +492,7 @@ def test_trade_proposal_is_idempotent_and_writes_only_one_private_card(client, d
     assert db_session.query(TradeOffer).filter_by(league_id=league["id"]).count() == 1
     assert db_session.query(ChatThread).filter_by(league_id=league["id"], thread_type="direct").count() == 1
     assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{first.json()['id']}:created").count() == 1
-    assert db_session.query(NotificationLog).filter_by(alert_type="TRADE_PROPOSED").count() == 1
+    assert db_session.query(ScheduledNotification).filter_by(event_type="TRADE_RECEIVED").count() == 1
 
     changed_payload = {**payload, "message": "A different offer under the same request id"}
     conflict = client.post(
@@ -615,8 +616,8 @@ def test_private_trade_card_failure_rolls_back_trade_and_notification(client, db
     assert db_session.query(TradeOffer).filter_by(league_id=league["id"]).count() == 0
     assert db_session.query(ChatMessage).filter_by(league_id=league["id"]).count() == 0
     assert (
-        db_session.query(NotificationLog)
-        .filter_by(user_id=seed["receiving"].owner_user_id, alert_type="TRADE_PROPOSED")
+        db_session.query(ScheduledNotification)
+        .filter_by(user_id=seed["receiving"].owner_user_id, event_type="TRADE_RECEIVED")
         .count()
         == 0
     )
@@ -800,6 +801,19 @@ def test_admin_process_due_trades_endpoint_processes_accepted_pending_offer(clie
     assert db_session.get(TradeOffer, created["id"]).status == "processed"
 
 
+def test_admin_due_trade_endpoint_rejects_time_travel_outside_the_e2e_runtime(client, monkeypatch):
+    monkeypatch.setattr(admin_trades.settings, "e2e_lifecycle_time_travel_enabled", False)
+    admin_token = create_user_and_token(client, "admin-time-travel", admin=True)
+
+    response = client.post(
+        "/admin/trades/process-due?as_of=2026-09-07T04%3A01%3A00%2B00%3A00",
+        headers=auth_headers(admin_token),
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "lifecycle time travel is available only in the E2E runtime"
+
+
 def test_accept_commissioner_review_trade_waits_for_approval_then_processes(client, db_session, monkeypatch):
     monkeypatch.setattr(trade_service, "is_cfb_game_week_active", lambda now=None, timezone_name="UTC": False)
     proposing_token = create_user_and_token(client, "review-a")
@@ -861,10 +875,9 @@ def test_delayed_trade_updates_its_finalized_chat_card_after_processing(client, 
     )
     assert accepted.status_code == 200
     assert accepted.json()["status"] == "accepted_pending"
-    message = db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:finalized").one()
-    message_id = message.id
-    assert message.metadata_json["processing_status"] == "pending_transfer"
-    assert message.metadata_json["players_process_at"] is not None
+    # Pending acceptance must not create a "finalized" card before roster
+    # movement has actually committed.
+    assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:finalized").count() == 0
 
     offer = db_session.get(TradeOffer, created["id"])
     offer.process_after = datetime.now(timezone.utc) - timedelta(minutes=1)
@@ -874,7 +887,6 @@ def test_delayed_trade_updates_its_finalized_chat_card_after_processing(client, 
     assert process_trade_offers_once(db_session) == {"processed": 1, "failed": 0}
     db_session.expire_all()
     updated_message = db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:finalized").one()
-    assert updated_message.id == message_id
     assert updated_message.metadata_json["processing_status"] == "processed"
     assert updated_message.metadata_json["processed_at"] is not None
     assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:finalized").count() == 1

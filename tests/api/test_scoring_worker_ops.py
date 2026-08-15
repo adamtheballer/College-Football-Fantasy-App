@@ -14,6 +14,7 @@ def test_scoring_worker_uses_distinct_cadence_profiles():
     assert live.mode == "live"
     assert postgame.mode == "postgame"
     assert correction.mode == "correction"
+    assert live.interval_seconds == 180
     assert live.interval_seconds < postgame.interval_seconds <= correction.interval_seconds
 
 

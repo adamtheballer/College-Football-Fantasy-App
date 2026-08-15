@@ -27,6 +27,10 @@ from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.team_week_score import TeamWeekScore
 from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_starts_for_players
+from collegefootballfantasy_api.app.services.notification_service import (
+    queue_certified_matchup_final_notifications,
+    rebuild_matchup_start_notifications,
+)
 
 
 FINAL_MATCHUP_STATUSES = {"final", "stat_corrected"}
@@ -388,6 +392,10 @@ def recalculate_matchup_scores(db: Session, league_id: int, season: int, week: i
             updated += 1
     if updated:
         db.flush()
+    # This observes only a state the scoring workflow has already certified;
+    # it never infers finality from elapsed time or a box-score update.
+    for matchup in matchups:
+        queue_certified_matchup_final_notifications(db, matchup)
     return updated
 
 
@@ -475,6 +483,7 @@ def recalculate_standings_for_week(db: Session, league_id: int, season: int, wee
 
 def recalculate_league_week_scores(db: Session, league_id: int, season: int, week: int) -> ScoringSummary:
     create_or_refresh_lineup_snapshots(db, league_id, season, week)
+    rebuild_matchup_start_notifications(db, league_id=league_id, season=season, week=week)
     players_scored = recalculate_player_week_scores(db, league_id, season, week)
     teams_scored = recalculate_team_week_scores(db, league_id, season, week)
     matchups_updated = recalculate_matchup_scores(db, league_id, season, week)

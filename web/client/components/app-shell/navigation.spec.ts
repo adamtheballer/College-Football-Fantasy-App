@@ -83,6 +83,14 @@ describe("app shell navigation helpers", () => {
     expect(cappedChats?.badge).toBe("99+");
   });
 
+  it("surfaces a separate unread badge for notifications", () => {
+    const alerts = getShellNavItems(user, true, 0, false, 3).find((item) => item.name === "ALERTS");
+    const cappedAlerts = getShellNavItems(user, true, 0, false, 120).find((item) => item.name === "ALERTS");
+
+    expect(alerts?.badge).toBe("3");
+    expect(cappedAlerts?.badge).toBe("99+");
+  });
+
   it("keeps mobile navigation focused on the primary destinations", () => {
     const mobileItems = getMobileNavItems(getShellNavItems(user, true, 1, true));
     const mobile = mobileItems.map((item) => item.name);

@@ -112,6 +112,7 @@ def _ingest_games(client: CFBDClient, season: int, conferences: list[str], max_w
                 game.season = season
                 game.week = int(row.get("week") or game.week or 0)
                 game.season_type = row.get("seasonType") or row.get("season_type") or "regular"
+                game.schedule_status = row.get("status") or row.get("gameStatus") or row.get("game_status")
                 start_date = row.get("startDate") or row.get("start_date")
                 if isinstance(start_date, str):
                     try:

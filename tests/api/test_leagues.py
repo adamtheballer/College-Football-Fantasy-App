@@ -10,7 +10,6 @@ from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
-from collegefootballfantasy_api.app.models.notification import NotificationLog
 from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
@@ -1252,7 +1251,9 @@ def test_reschedule_persists_utc_time_replaces_notifications_and_records_member_
         .filter(ScheduledNotification.league_id == league["id"], ScheduledNotification.canceled_at.is_(None))
         .all()
     )
-    assert len(before) == 4
+    # One durable one-hour reminder exists for each eligible manager. Draft
+    # start is emitted only when the draft state machine enters on_clock.
+    assert len(before) == 2
     next_time = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=5)
 
     response = client.patch(
@@ -1283,22 +1284,25 @@ def test_reschedule_persists_utc_time_replaces_notifications_and_records_member_
         for row in db_session.query(LeagueMember).filter(LeagueMember.league_id == league["id"]).all()
     }
     assert {row.user_id for row in active} == member_user_ids
-    assert all(row.scheduled_for.replace(tzinfo=timezone.utc) in {next_time, next_time - timedelta(hours=1)} for row in active)
+    reminders = [row for row in active if row.event_type == "DRAFT_1H"]
+    reschedules = [row for row in active if row.event_type == "DRAFT_RESCHEDULED"]
+    assert len(reminders) == 2
+    assert len(reschedules) == 2
+    assert all(row.scheduled_for.replace(tzinfo=timezone.utc) == next_time - timedelta(hours=1) for row in reminders)
+    assert all(row.payload["draft_version"] == 1 for row in reschedules)
     canceled = (
         db_session.query(ScheduledNotification)
         .filter(ScheduledNotification.league_id == league["id"], ScheduledNotification.canceled_at.is_not(None))
         .count()
     )
-    assert canceled == 4
-    events = (
-        db_session.query(NotificationLog)
-        .filter(NotificationLog.alert_type == "DRAFT")
-        .order_by(NotificationLog.id.asc())
-        .all()
-    )
-    assert len(events) == 2
-    assert {event.payload["league_id"] for event in events} == {league["id"]}
-    assert {event.payload["draft_version"] for event in events} == {1}
+    assert canceled == 2
+    # Producers enqueue durable outbox rows only; the notification worker is
+    # solely responsible for materializing in-app log entries after commit.
+    assert not db_session.query(ScheduledNotification).filter(
+        ScheduledNotification.league_id == league["id"],
+        ScheduledNotification.event_type == "DRAFT_RESCHEDULED",
+        ScheduledNotification.sent_at.is_not(None),
+    ).count()
 
 
 def test_reschedule_requires_timestamp_with_timezone_offset(client):

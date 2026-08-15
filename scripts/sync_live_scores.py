@@ -23,10 +23,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--league-id", type=int, default=None)
     parser.add_argument("--provider", choices=("sportsdata", "espn"), default="espn")
     parser.add_argument("--watch", action="store_true", help="Keep polling provider stats and recalculating scores.")
-    parser.add_argument("--interval-seconds", type=int, default=90, help="Polling interval in seconds. Must be 1-90.")
+    parser.add_argument(
+        "--interval-seconds",
+        type=int,
+        default=settings.scoring_worker_interval_live_seconds,
+        help="Polling interval in seconds. Must be at least the configured live-provider interval.",
+    )
     args = parser.parse_args()
-    if args.interval_seconds < 1 or args.interval_seconds > 90:
-        raise SystemExit("--interval-seconds must be between 1 and 90.")
+    minimum_interval = settings.scoring_worker_interval_live_seconds
+    if args.interval_seconds < minimum_interval:
+        raise SystemExit(f"--interval-seconds must be at least {minimum_interval}.")
     return args
 
 

@@ -173,12 +173,14 @@ def sync_power4_schedule_from_sportsdata(db: Session, season: int) -> dict[str, 
     created = 0
     updated = 0
     skipped = 0
+    affected_weeks: set[int] = set()
 
     for row in rows:
         week_value = _pick_int(row, "Week", "GameWeek")
         if week_value is None or week_value <= 0:
             skipped += 1
             continue
+        affected_weeks.add(week_value)
 
         home_raw = _pick_str(row, "HomeTeamName", "HomeTeam", "HomeSchool")
         away_raw = _pick_str(row, "AwayTeamName", "AwayTeam", "AwaySchool")
@@ -208,6 +210,7 @@ def sync_power4_schedule_from_sportsdata(db: Session, season: int) -> dict[str, 
         game.season = season
         game.week = week_value
         game.season_type = season_type
+        game.schedule_status = _pick_str(row, "Status", "GameStatus", "StatusCode")
         game.start_date = _parse_datetime(_pick_str(row, "DateTime", "Day", "Date"))
         game.home_team = home_team
         game.away_team = away_team
@@ -217,6 +220,12 @@ def sync_power4_schedule_from_sportsdata(db: Session, season: int) -> dict[str, 
         db.add(game)
 
     db.flush()
+    # Schedule data is the verified kickoff source used by locked lineup
+    # snapshots. Reconcile only affected weeks; this queues/cancels durable
+    # events and never sends provider HTTP from the sync transaction.
+    from collegefootballfantasy_api.app.services.notification_service import rebuild_matchup_start_notifications_for_schedule
+
+    rebuild_matchup_start_notifications_for_schedule(db, season=season, weeks=affected_weeks)
     return {"created": created, "updated": updated, "skipped": skipped}
 
 
