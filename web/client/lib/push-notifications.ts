@@ -5,7 +5,15 @@ type OneSignalClient = {
   login: (externalId: string) => Promise<void>;
   logout: () => Promise<void>;
   Notifications: { requestPermission: () => Promise<void> };
-  User: { PushSubscription: { id?: string | null } };
+  User: {
+    PushSubscription: {
+      id?: string | null;
+      addEventListener?: (
+        event: "change",
+        listener: (event: { current?: { id?: string | null } }) => void,
+      ) => void;
+    };
+  };
 };
 
 declare global {
@@ -19,6 +27,11 @@ export type BrowserPushState = "default" | "granted" | "denied" | "unsupported" 
 const appId = import.meta.env.VITE_ONESIGNAL_APP_ID?.trim();
 let loader: Promise<void> | null = null;
 let initialized = false;
+let activePushUserId: number | null = null;
+let observedPushClient: OneSignalClient | null = null;
+let registeredSubscriptionKey: string | null = null;
+let registrationInFlight: Promise<void> | null = null;
+let registrationInFlightKey: string | null = null;
 
 export const getBrowserPushState = (): BrowserPushState => {
   if (!appId) return "unconfigured";
@@ -75,20 +88,58 @@ const withOneSignal = async <T>(callback: (client: OneSignalClient) => Promise<T
 
 const stableExternalId = (userId: number) => `cfb_user:${userId}`;
 
+const registerPushSubscription = async (userId: number, subscriptionId: string | null | undefined): Promise<void> => {
+  if (!subscriptionId) return;
+  const key = `${userId}:${subscriptionId}`;
+  if (registeredSubscriptionKey === key) return;
+  if (registrationInFlight && registrationInFlightKey === key) return registrationInFlight;
+
+  registrationInFlightKey = key;
+  registrationInFlight = apiPost("/notifications/tokens", {
+    subscription_id: subscriptionId,
+    platform: "web",
+    provider: "onesignal",
+  })
+    .then(() => {
+      registeredSubscriptionKey = key;
+    })
+    .finally(() => {
+      if (registrationInFlightKey === key) {
+        registrationInFlight = null;
+        registrationInFlightKey = null;
+      }
+    });
+  return registrationInFlight;
+};
+
+const observePushSubscription = (client: OneSignalClient, userId: number) => {
+  activePushUserId = userId;
+  if (observedPushClient === client || !client.User.PushSubscription.addEventListener) return;
+
+  observedPushClient = client;
+  client.User.PushSubscription.addEventListener("change", (event) => {
+    // OneSignal may assign the Subscription ID after the system permission
+    // prompt resolves. Register from the authoritative change event instead
+    // of treating a transient null ID as a completed setup.
+    const currentUserId = activePushUserId;
+    if (currentUserId === null) return;
+    void registerPushSubscription(currentUserId, event.current?.id ?? client.User.PushSubscription.id).catch(() => {
+      // The next SDK change or signed-in session sync retries registration.
+    });
+  });
+};
+
 export const enableBrowserPush = async (userId: number): Promise<BrowserPushState> => {
   const initialState = getBrowserPushState();
   if (initialState === "denied" || initialState === "unsupported" || initialState === "unconfigured") return initialState;
   return withOneSignal(async (client) => {
     await client.login(stableExternalId(userId));
+    observePushSubscription(client, userId);
     if (Notification.permission === "default") {
       await client.Notifications.requestPermission();
     }
-    if (Notification.permission === "granted" && client.User.PushSubscription.id) {
-      await apiPost("/notifications/tokens", {
-        subscription_id: client.User.PushSubscription.id,
-        platform: "web",
-        provider: "onesignal",
-      });
+    if (Notification.permission === "granted") {
+      await registerPushSubscription(userId, client.User.PushSubscription.id);
     }
     return Notification.permission;
   });
@@ -100,13 +151,8 @@ export const syncBrowserPushIdentity = async (userId: number): Promise<void> => 
   try {
     await withOneSignal(async (client) => {
       await client.login(stableExternalId(userId));
-      if (client.User.PushSubscription.id) {
-        await apiPost("/notifications/tokens", {
-          subscription_id: client.User.PushSubscription.id,
-          platform: "web",
-          provider: "onesignal",
-        });
-      }
+      observePushSubscription(client, userId);
+      await registerPushSubscription(userId, client.User.PushSubscription.id);
     });
   } catch {
     // Identity synchronization is best effort after login. The explicit
@@ -116,6 +162,7 @@ export const syncBrowserPushIdentity = async (userId: number): Promise<void> => 
 
 /** Detach this browser from the authenticated OneSignal identity on logout. */
 export const clearBrowserPushIdentity = (): void => {
+  activePushUserId = null;
   void (async () => {
     // Detach the authenticated application subscription before releasing the
     // OneSignal identity.  A later account may then register this browser;
