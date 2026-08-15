@@ -10,6 +10,9 @@ import type {
   LeagueMatchupTabResponse,
   LeagueNewsResponse,
   LeaguePowerRankingResponse,
+  PlayoffBracket,
+  PlayoffFinalizeResponse,
+  PlayoffSeeding,
   LeagueRosterTabResponse,
   LeagueScoreboardResponse,
   LeagueSettingsTabResponse,
@@ -274,6 +277,52 @@ export function useLeaguePowerRankings(leagueId?: number, enabled = true) {
       return failureCount < 2;
     },
     queryFn: () => apiGet<LeaguePowerRankingResponse>(`/leagues/${leagueId}/power-rankings`),
+  });
+}
+
+export function useLeaguePlayoffSeeding(leagueId?: number, enabled = true) {
+  return useQuery({
+    queryKey: ["league", leagueId, "playoffs", "seeding"],
+    enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
+    staleTime: 15_000,
+    retry: (failureCount, error) => !(error instanceof ApiError && [401, 403, 404, 409].includes(error.status)) && failureCount < 2,
+    queryFn: () => apiGet<PlayoffSeeding>(`/leagues/${leagueId}/playoffs/seeding`),
+  });
+}
+
+export function useLeaguePlayoffBracket(leagueId?: number, enabled = true) {
+  return useQuery({
+    queryKey: ["league", leagueId, "playoffs"],
+    enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
+    staleTime: 15_000,
+    retry: (failureCount, error) => !(error instanceof ApiError && [401, 403, 404].includes(error.status)) && failureCount < 2,
+    queryFn: () => apiGet<PlayoffBracket | null>(`/leagues/${leagueId}/playoffs`),
+  });
+}
+
+export function useLockLeaguePlayoffSeeding(leagueId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => {
+      if (typeof leagueId !== "number" || Number.isNaN(leagueId)) throw new ApiError(400, "Invalid league ID.");
+      return apiPost<PlayoffBracket>(`/leagues/${leagueId}/playoffs/lock`, {});
+    },
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "playoffs"] }),
+      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "playoffs", "seeding"] }),
+      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "settings-view"] }),
+    ]),
+  });
+}
+
+export function useReconcileLeaguePlayoffs(leagueId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => {
+      if (typeof leagueId !== "number" || Number.isNaN(leagueId)) throw new ApiError(400, "Invalid league ID.");
+      return apiPost<PlayoffFinalizeResponse>(`/leagues/${leagueId}/playoffs/reconcile`, {});
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["league", leagueId, "playoffs"] }),
   });
 }
 

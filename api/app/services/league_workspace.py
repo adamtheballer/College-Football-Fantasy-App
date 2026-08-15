@@ -33,6 +33,13 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
 )
 
 
+def _standing_sort_key(*, wins: int, losses: int, ties: int, points_for: float, team_name: str) -> tuple[float, float, str]:
+    """Keep regular standings tie-aware without creating a second record engine."""
+    games = wins + losses + ties
+    winning_percentage = (wins + (0.5 * ties)) / games if games else 0.0
+    return (-winning_percentage, -points_for, team_name.casefold())
+
+
 def get_league_detail(
     db: Session,
     league: League,
@@ -207,7 +214,13 @@ def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspace
         )
         ordered_rows = sorted(
             standings_rows,
-            key=lambda row: (-row[0].wins, row[0].losses, -row[0].points_for, row[1].name),
+            key=lambda row: _standing_sort_key(
+                wins=row[0].wins,
+                losses=row[0].losses,
+                ties=row[0].ties,
+                points_for=row[0].points_for,
+                team_name=row[1].name,
+            ),
         )
         return [
             LeagueWorkspaceStandingSummaryRead(
@@ -245,7 +258,7 @@ def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspace
             continue
         home_stats["points_for"] += float(matchup.home_score or 0.0)
         away_stats["points_for"] += float(matchup.away_score or 0.0)
-        if matchup.status != "final":
+        if matchup.status not in {"final", "stat_corrected"}:
             continue
         if matchup.home_score > matchup.away_score:
             home_stats["wins"] += 1
@@ -259,7 +272,13 @@ def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspace
 
     ordered_rows = sorted(
         team_stats.values(),
-        key=lambda row: (-row["wins"], row["losses"], -row["points_for"], row["team"].name),
+        key=lambda row: _standing_sort_key(
+            wins=int(row["wins"]),
+            losses=int(row["losses"]),
+            ties=int(row["ties"]),
+            points_for=float(row["points_for"]),
+            team_name=row["team"].name,
+        ),
     )
     return [
         LeagueWorkspaceStandingSummaryRead(

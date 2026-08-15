@@ -488,6 +488,18 @@ def recalculate_league_week_scores(db: Session, league_id: int, season: int, wee
     teams_scored = recalculate_team_week_scores(db, league_id, season, week)
     matchups_updated = recalculate_matchup_scores(db, league_id, season, week)
     standings_updated = recalculate_standings_for_week(db, league_id, season, week)
+    # Postseason progression consumes only the same certified Matchup rows
+    # produced above. Import here to avoid a module cycle: the seeding service
+    # itself uses this standings function for its regular-season snapshot.
+    from collegefootballfantasy_api.app.services.postseason_service import (
+        finalize_certified_postseason_matchups,
+        refresh_locked_postseason_after_regular_correction,
+    )
+
+    league = db.get(League, league_id)
+    if league is not None:
+        refresh_locked_postseason_after_regular_correction(db, league, scoring_week=week)
+        finalize_certified_postseason_matchups(db, league)
     return ScoringSummary(
         players_scored=players_scored,
         teams_scored=teams_scored,

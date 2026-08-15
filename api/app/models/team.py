@@ -11,6 +11,12 @@ class Team(TimestampMixin, Base):
         UniqueConstraint("league_id", "owner_user_id", name="uq_team_league_owner"),
         Index("ix_teams_league_id", "league_id"),
         Index("ix_teams_league_draft_position", "league_id", "draft_position", unique=True),
+        Index(
+            "uq_teams_league_postseason_tiebreak_lot",
+            "league_id",
+            "postseason_tiebreak_lot",
+            unique=True,
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -21,6 +27,9 @@ class Team(TimestampMixin, Base):
     # Null is intentional before a commissioner finishes a custom order or a
     # random order is materialized at draft start.
     draft_position: Mapped[int | None] = mapped_column(nullable=True)
+    # Persisted before seeding so an exact competitive tie is reproducible and
+    # never depends on request order, a browser, or a clock.
+    postseason_tiebreak_lot: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     league = relationship("League", back_populates="teams")
     roster_entries = relationship("RosterEntry", back_populates="team", cascade="all, delete-orphan")

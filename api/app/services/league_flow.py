@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from secrets import token_hex
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -17,6 +18,7 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
+from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.league_flow import (
@@ -353,6 +355,22 @@ def create_league(
             name=f"{current_user.first_name}'s Team",
             owner_name=current_user.first_name,
             owner_user_id=current_user.id,
+            postseason_tiebreak_lot=token_hex(24),
+        )
+    )
+    db.add(
+        LeaguePostseasonSettings(
+            league_id=league.id,
+            season=league.season_year,
+            regular_season_start_week=1,
+            regular_season_end_week=10,
+            playoff_start_week=11,
+            championship_week=13,
+            playoff_team_count=payload.settings.playoff_teams,
+            championship_bracket_size=payload.settings.playoff_teams,
+            reseeding_enabled=False,
+            third_place_game_enabled=False,
+            losers_bracket_enabled=False,
         )
     )
 
@@ -390,6 +408,7 @@ def join_league(db: Session, league: League, current_user: User) -> LeagueDetail
             name=f"{current_user.first_name}'s Team",
             owner_name=current_user.first_name,
             owner_user_id=current_user.id,
+            postseason_tiebreak_lot=token_hex(24),
         )
     )
     # See league creation above: the scheduler queries membership eligibility
@@ -451,6 +470,30 @@ def update_league_settings(
     settings_row.scoring_json = payload.scoring_json
     settings_row.roster_slots_json = payload.roster_slots_json
     settings_row.playoff_teams = payload.playoff_teams
+    postseason_settings = (
+        db.query(LeaguePostseasonSettings)
+        .filter(
+            LeaguePostseasonSettings.league_id == league.id,
+            LeaguePostseasonSettings.season == league.season_year,
+        )
+        .one_or_none()
+    )
+    if postseason_settings is None:
+        postseason_settings = LeaguePostseasonSettings(
+            league_id=league.id,
+            season=league.season_year,
+            playoff_team_count=payload.playoff_teams,
+            championship_bracket_size=payload.playoff_teams,
+        )
+        db.add(postseason_settings)
+    elif postseason_settings.locked_at is not None and postseason_settings.playoff_team_count != payload.playoff_teams:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="playoff team count is locked after postseason seeding",
+        )
+    else:
+        postseason_settings.playoff_team_count = payload.playoff_teams
+        postseason_settings.championship_bracket_size = payload.playoff_teams
     settings_row.waiver_type = payload.waiver_type
     if payload.waiver_period_hours is not None:
         settings_row.waiver_period_hours = payload.waiver_period_hours

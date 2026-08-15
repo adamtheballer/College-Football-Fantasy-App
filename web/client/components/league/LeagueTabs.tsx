@@ -1,4 +1,4 @@
-import { Bookmark, CalendarClock, ClipboardList, Settings2, ShieldCheck, Swords } from "lucide-react";
+import { Bookmark, CalendarClock, ClipboardList, Settings2, ShieldCheck, Swords, Trophy } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 import { shouldRestrictLeagueToDraft } from "@/lib/leagueLifecycle";
@@ -8,6 +8,7 @@ const tabs = [
   { label: "Matchup", mobileLabel: "Matchup", path: "matchup", icon: Swords },
   { label: "Available Players", mobileLabel: "Waivers", path: "waivers", icon: ShieldCheck },
   { label: "Watchlist", mobileLabel: "Watch", path: "watchlist", icon: Bookmark },
+  { label: "Playoffs", mobileLabel: "Playoffs", path: "playoffs", icon: Trophy },
   { label: "Settings", mobileLabel: "Settings", path: "settings", icon: Settings2 },
 ];
 

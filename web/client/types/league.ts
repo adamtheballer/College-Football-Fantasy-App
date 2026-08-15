@@ -203,6 +203,80 @@ export interface LeaguePowerRankingResponse {
   total: number;
 }
 
+export interface PlayoffSeedRecord {
+  wins: number;
+  losses: number;
+  ties: number;
+  games_played: number;
+  winning_percentage: number | null;
+  points_for: number;
+  points_against: number;
+}
+
+export interface PlayoffSeed {
+  seed: number;
+  team_id: number;
+  team_name: string;
+  record: PlayoffSeedRecord;
+  qualified: boolean;
+  resolved_by: string;
+  tiebreak_group_team_ids: number[];
+  trace: Array<Record<string, unknown>>;
+}
+
+export interface PlayoffSeeding {
+  league_id: number;
+  season: number;
+  state: "SEEDING_PENDING" | "SEEDING_LOCKED";
+  playoff_team_count: number;
+  seeding_locked_at: string | null;
+  tiebreak_order: string[];
+  entries: PlayoffSeed[];
+}
+
+export interface PlayoffBracketTeam {
+  team_id: number | null;
+  team_name: string | null;
+  seed: number | null;
+}
+
+export interface PlayoffBracketMatchup {
+  round_number: number;
+  round_type: string;
+  week: number;
+  slot_number: number;
+  status: string;
+  team_a: PlayoffBracketTeam;
+  team_b: PlayoffBracketTeam;
+  advancing_team_id: number | null;
+  tiebreaker_used: string | null;
+  fantasy_matchup_id: number | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface PlayoffBracket {
+  league_id: number;
+  season: number;
+  status: string;
+  generated_at: string | null;
+  finalized_at: string | null;
+  seeding_locked_at: string | null;
+  entries: Array<{
+    team_id: number;
+    team_name: string;
+    seed: number;
+    regular_season_rank: number;
+    status: string;
+    explanation: Record<string, unknown> | null;
+  }>;
+  rounds: PlayoffBracketMatchup[];
+}
+
+export interface PlayoffFinalizeResponse {
+  finalized_matchups: number;
+  bracket: PlayoffBracket | null;
+}
+
 export interface LeagueNewsItem {
   id: number;
   team_id: number;

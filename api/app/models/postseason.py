@@ -63,6 +63,7 @@ class PostseasonEntry(TimestampMixin, Base):
     bracket_seed: Mapped[int] = mapped_column(Integer, nullable=False)
     qualification_status: Mapped[str] = mapped_column(String(32), nullable=False)
     tiebreaker_explanation: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    seeding_trace_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     qualified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     final_place: Mapped[int | None] = mapped_column(Integer, nullable=True)
     eliminated_or_escaped_round: Mapped[int | None] = mapped_column(Integer, nullable=True)

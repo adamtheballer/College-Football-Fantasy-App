@@ -22,6 +22,11 @@ from collegefootballfantasy_api.app.schemas.draft_room import (
 )
 from collegefootballfantasy_api.app.schemas.league import LeagueList
 from collegefootballfantasy_api.app.schemas.league_player_history import LeaguePlayerHistoryRead
+from collegefootballfantasy_api.app.schemas.postseason import (
+    PlayoffBracketRead,
+    PlayoffFinalizeRead,
+    PlayoffSeedingRead,
+)
 from collegefootballfantasy_api.app.schemas.league_flow import (
     DraftOrderRead,
     DraftOrderUpdate,
@@ -72,8 +77,19 @@ from collegefootballfantasy_api.app.services.league_roster_matchup import (
     build_settings_view,
 )
 from collegefootballfantasy_api.app.services.scoring_service import run_league_scoring_recalculation
+from collegefootballfantasy_api.app.services.postseason_service import (
+    PostseasonError,
+    finalize_certified_postseason_matchups,
+    lock_postseason_seeding,
+    postseason_bracket_payload,
+    preview_postseason_seeding,
+)
 
 router = APIRouter()
+
+
+def _postseason_conflict(exc: PostseasonError) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
 @router.post("", response_model=LeagueCreateResponse, status_code=status.HTTP_201_CREATED)
 def create_league_endpoint(
     payload: LeagueCreateRequest,
@@ -228,6 +244,68 @@ def get_league_matchups_endpoint(
     require_league_member(db, league.id, current_user)
     rows = build_scoreboard_rows(db, league, week=week)
     return LeagueScoreboardList(data=rows, total=len(rows))
+
+
+@router.get("/{league_id}/playoffs/seeding", response_model=PlayoffSeedingRead)
+def get_playoff_seeding_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> PlayoffSeedingRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    try:
+        return PlayoffSeedingRead.model_validate(preview_postseason_seeding(db, league))
+    except PostseasonError as exc:
+        raise _postseason_conflict(exc) from exc
+
+
+@router.get("/{league_id}/playoffs", response_model=PlayoffBracketRead | None)
+def get_playoff_bracket_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> PlayoffBracketRead | None:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    payload = postseason_bracket_payload(db, league)
+    return PlayoffBracketRead.model_validate(payload) if payload else None
+
+
+@router.post("/{league_id}/playoffs/lock", response_model=PlayoffBracketRead)
+def lock_playoff_seeding_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> PlayoffBracketRead:
+    league, _ = require_commissioner(db, league_id, current_user)
+    try:
+        lock_postseason_seeding(db, league)
+        db.commit()
+        payload = postseason_bracket_payload(db, league)
+        if payload is None:
+            raise RuntimeError("postseason bracket was not persisted")
+        return PlayoffBracketRead.model_validate(payload)
+    except PostseasonError as exc:
+        db.rollback()
+        raise _postseason_conflict(exc) from exc
+
+
+@router.post("/{league_id}/playoffs/reconcile", response_model=PlayoffFinalizeRead)
+def reconcile_playoff_results_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> PlayoffFinalizeRead:
+    """Advance only already-certified playoff scores; no client picks a winner."""
+    league, _ = require_commissioner(db, league_id, current_user)
+    finalized = finalize_certified_postseason_matchups(db, league)
+    db.commit()
+    payload = postseason_bracket_payload(db, league)
+    return PlayoffFinalizeRead(
+        finalized_matchups=finalized,
+        bracket=PlayoffBracketRead.model_validate(payload) if payload else None,
+    )
 
 
 @router.post("/{league_id}/weeks/{week}/recalculate-scores", response_model=LeagueScoreRecalculateResponse)
