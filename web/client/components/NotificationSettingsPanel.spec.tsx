@@ -112,4 +112,22 @@ describe("NotificationSettingsPanel async lifecycle", () => {
     expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();
   });
+
+  it("shows a persisted enabled check after granting push permission", async () => {
+    api.get.mockResolvedValueOnce(preferences).mockResolvedValueOnce({ data: [] });
+    push.enable.mockResolvedValueOnce("granted");
+    api.post.mockResolvedValueOnce({ ...preferences, push_enabled: true });
+    render(<NotificationSettingsPanel />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Enable push notifications" }));
+
+    expect((await screen.findByTestId("push-status")).textContent).toContain("Enabled");
+    expect(screen.getByTestId("push-status").querySelector("svg")).toBeTruthy();
+    expect(api.post).toHaveBeenCalledWith(
+      "/notifications/preferences",
+      { ...preferences, push_enabled: true },
+      undefined,
+      expect.any(AbortSignal)
+    );
+  });
 });
