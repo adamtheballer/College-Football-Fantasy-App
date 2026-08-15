@@ -637,9 +637,9 @@ def test_certified_matchup_final_notifications_are_revision_idempotent(client, d
     assert {attempt.channel for attempt in corrected_attempts} == {"in_app"}
 
 
-def test_certified_matchup_final_never_persists_a_tied_notification_outcome(client, db_session):
-    identity = create_user(client, "matchup-no-tie")
-    league = create_league(client, identity["access_token"], "No Tie League")
+def test_certified_matchup_final_persists_a_tied_notification_outcome(client, db_session):
+    identity = create_user(client, "matchup-tie")
+    league = create_league(client, identity["access_token"], "Tie League")
     team = db_session.query(Team).filter_by(league_id=league["id"], owner_user_id=identity["user"]["id"]).one()
     matchup = Matchup(
         league_id=league["id"], season=2026, week=1,
@@ -651,9 +651,9 @@ def test_certified_matchup_final_never_persists_a_tied_notification_outcome(clie
 
     assert queue_certified_matchup_final_notifications(db_session, matchup) == 1
     queued = db_session.query(ScheduledNotification).filter_by(notification_type="MATCHUP_FINAL").one()
-    assert queued.payload["outcome"] is None
-    assert queued.title == "Matchup final"
-    assert queued.body == "Your Week 1 matchup is final."
+    assert queued.payload["outcome"] == "tied"
+    assert queued.title == "Matchup tied"
+    assert queued.body == f"Your matchup with {team.name} ended 21–21."
 
 
 def test_stale_claim_is_recovered_once_and_big_play_intake_is_disabled_by_default(client, db_session, monkeypatch):

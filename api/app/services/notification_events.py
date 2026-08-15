@@ -359,10 +359,7 @@ def _render_matchup_final(payload: dict[str, Any]) -> tuple[str, str]:
     user_score = _safe_score(payload.get("user_score"))
     opponent_score = _safe_score(payload.get("opponent_score"))
     outcome = str(payload.get("outcome") or "").strip().lower()
-    # A matchup result is always a win or a loss.  Do not surface a "tied"
-    # result even defensively: an unexpected equal persisted score falls back
-    # to neutral final copy until the scoring workflow resolves it.
-    if user_score is None or opponent_score is None or outcome not in {"won", "lost"}:
+    if user_score is None or opponent_score is None or outcome not in {"won", "lost", "tied"}:
         week = _safe_template_value(payload.get("week"), "")
         return (
             "Matchup final",
@@ -372,7 +369,7 @@ def _render_matchup_final(payload: dict[str, Any]) -> tuple[str, str]:
         return "Matchup won", f"You defeated {opponent}, {user_score}–{opponent_score}."
     if outcome == "lost":
         return "Matchup final", f"{opponent} defeated your team, {opponent_score}–{user_score}."
-    raise AssertionError("unreachable: matchup outcomes are win or loss only")
+    return "Matchup tied", f"Your matchup with {opponent} ended {user_score}–{opponent_score}."
 
 
 def render_event_content(event_type: str, payload: dict[str, Any], league_name: str) -> tuple[str, str, str]:
