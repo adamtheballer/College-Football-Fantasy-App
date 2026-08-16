@@ -19,6 +19,7 @@ from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.integrations.espn import ESPNClient
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.services.espn_live_scoring import EspnCycleResult, run_espn_scoring_cycle
+from collegefootballfantasy_api.app.services.live_scoring_readiness import scoring_operations_report
 from collegefootballfantasy_api.app.services.worker_health import record_worker_heartbeat
 
 
@@ -98,6 +99,19 @@ def run_iteration(*, now: datetime | None = None, client: ESPNClient | None = No
                 worker_id="espn-scoring-scheduler",
                 now=now,
             )
+            # The admin report is also the durable alert-policy source.  Emit
+            # structured worker logs only for actionable conditions; idle
+            # no-game windows deliberately generate no alert noise.
+            for alert in scoring_operations_report(db, season=season, week=week, now=now).get("alerts", []):
+                severity = alert["severity"]
+                logger.log(
+                    logging.ERROR if severity in {"critical", "error"} else logging.WARNING,
+                    "espn_scoring_alert severity=%s code=%s season=%s week=%s",
+                    severity,
+                    alert["code"],
+                    season,
+                    week,
+                )
             record_worker_heartbeat(
                 db,
                 worker_name="espn_scoring_processor",

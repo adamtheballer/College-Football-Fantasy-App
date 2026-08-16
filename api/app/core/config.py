@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     scoring_mode: Literal["enabled", "disabled", "shadow"] = "disabled"
     scoring_provider: str = "espn"
     scoring_allow_unofficial_providers: bool = False
+    # Blocks acquiring a player who lacks a verified ESPN identity into an
+    # official league.  This remains separately opt-in so a rollout can be
+    # tested before it affects the existing beta API; production enables it
+    # explicitly once the release containing the guard is deployed.
+    live_scoring_identity_guard_enabled: bool = False
     # ESPN alpha polling is per relevant game, never per league or user. The
     # durable game lease enforces this three-minute minimum even when its
     # scheduler wakes more frequently to discover due work.

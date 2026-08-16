@@ -33,6 +33,7 @@ from collegefootballfantasy_api.app.services.player_pool_filters import (
     canonical_fantasy_player_filter,
     is_canonical_fantasy_player,
 )
+from collegefootballfantasy_api.app.services.live_scoring_readiness import ensure_official_acquisition_identity
 from collegefootballfantasy_api.app.services.roster_legality import (
     assign_best_roster_slot_for_team,
     normalize_roster_slot_limits,
@@ -451,6 +452,7 @@ def _record_draft_pick(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="player is not in this season's approved draft pool",
         )
+    ensure_official_acquisition_identity(db, league=league, player=player)
 
     roster_slots = settings_row.roster_slots_json or FIXED_ROSTER_SLOTS
     roster_slot = assign_best_roster_slot_for_team(
