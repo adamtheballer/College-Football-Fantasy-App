@@ -5,7 +5,7 @@ import pytest
 
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.player import Player
-from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
+from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId, ProviderIdentityAudit
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from scripts.import_espn_live_identities import (
     CachedESPNReference,
@@ -195,3 +195,23 @@ def test_explicit_dry_run_cannot_be_combined_with_apply(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["import_espn_live_identities.py", "--dry-run", "--apply"])
     with pytest.raises(SystemExit):
         parse_args()
+
+
+def test_schedule_import_promotes_an_exact_legacy_sheet_game_with_auditable_espn_event(db_session):
+    game = Game(external_id="sheet-2026-w1-pitt-vs-syracuse", season=2026, week=1, home_team="Pitt", away_team="Syracuse")
+    db_session.add(game)
+    db_session.flush()
+    db_session.add(TeamSchedule(team_name="Syracuse", season=2026, week=1, game_id=game.id, opponent_name="Pitt", location="away", is_bye=False))
+    db_session.flush()
+    record = {
+        "espn_event_id": "401858225", "season": 2026, "week": 1, "home_team": "Pittsburgh",
+        "away_team": "Syracuse", "kickoff": "2026-09-17T23:30:00+00:00", "status": "pre",
+    }
+
+    assert apply_verified_schedule(db_session, [record]) == 1
+    assert game.id is not None
+    assert game.external_id == "401858225"
+    assert game.home_team == "Pittsburgh"
+    audit = db_session.query(ProviderIdentityAudit).filter_by(entity_id=game.id, action="attach_verified_espn_event").one()
+    assert audit.before_state["external_id"] == "sheet-2026-w1-pitt-vs-syracuse"
+    assert audit.after_state["external_id"] == "401858225"
