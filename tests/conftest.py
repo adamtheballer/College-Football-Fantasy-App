@@ -26,6 +26,7 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     league_invite,
     league_message,
     league_member,
+    league_scoring_migration,
     league_settings,
     lineup_week_snapshot,
     matchup,
