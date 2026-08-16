@@ -127,7 +127,6 @@ def _queue_injury_alerts(
         )
         queued += 1
     return queued
-    )
 
 
 def ingest_once(season: int, week: int, emit_alerts: bool = True) -> tuple[int, int, int, int]:

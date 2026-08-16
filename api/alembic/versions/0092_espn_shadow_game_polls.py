@@ -36,8 +36,11 @@ def upgrade() -> None:
         sa.Column("error_message", sa.String(length=500), nullable=True),
         sa.Column("latest_snapshot_hash", sa.String(length=64), nullable=True),
         sa.Column("latest_payload", sa.JSON(), nullable=False, server_default=sa.text("'{}'::json")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
+        # TimestampMixin is non-nullable in the runtime metadata.  Keep this
+        # unreleased migration exact so `alembic check` protects the shadow
+        # worker contract instead of reporting false schema drift.
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("provider", "provider_game_id", name="uq_provider_game_polls_provider_game"),
     )
@@ -57,8 +60,8 @@ def upgrade() -> None:
         sa.Column("snapshot_hash", sa.String(length=64), nullable=False),
         sa.Column("raw_payload", sa.JSON(), nullable=False, server_default=sa.text("'{}'::json")),
         sa.Column("normalized_rows", sa.JSON(), nullable=False, server_default=sa.text("'[]'::json")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
             "provider", "provider_game_id", "snapshot_hash", name="uq_provider_game_snapshots_provider_game_hash"
