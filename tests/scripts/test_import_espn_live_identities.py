@@ -1,11 +1,14 @@
 from datetime import datetime, timezone
 
+import pytest
+
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from scripts.import_espn_live_identities import (
     CachedESPNReference,
+    RateLimitPaused,
     apply_verified_player_mappings,
     apply_verified_schedule,
     flatten_roster,
@@ -123,6 +126,21 @@ def test_reference_cache_refetches_a_partial_entry_atomically(tmp_path, monkeypa
 
     assert reference._load_or_fetch("profiles", "101", lambda: {"athlete": {"id": "101"}}) == {"athlete": {"id": "101"}}
     assert path.with_suffix(".tmp").exists() is False
+    metadata = reference._metadata_path("profiles", "101")
+    assert metadata.is_file()
+    assert '"http_status": 200' in metadata.read_text(encoding="utf-8")
+
+
+def test_reference_cache_persists_rate_limit_checkpoint(tmp_path):
+    reference = CachedESPNReference(object(), tmp_path, delay_seconds=0.2)
+
+    with pytest.raises(RateLimitPaused):
+        reference._record_rate_limit("60")
+
+    checkpoint = reference._rate_limit_path()
+    assert checkpoint.is_file()
+    with pytest.raises(RateLimitPaused):
+        reference._assert_not_rate_limited()
 
 
 def test_schedule_planner_requires_event_participants_and_kickoff_then_applies_idempotently(db_session):

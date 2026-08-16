@@ -52,6 +52,12 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+class RateLimitPaused(RuntimeError):
+    def __init__(self, resume_at: datetime) -> None:
+        self.resume_at = resume_at
+        super().__init__(f"ESPN reference import paused until {resume_at.isoformat()}")
+
+
 def _as_utc(value: datetime) -> datetime:
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
@@ -73,6 +79,16 @@ def _position(value: Any) -> str:
         value = value.get("abbreviation") or value.get("displayName") or value.get("name")
     text = str(value or "").strip().upper()
     return POSITION_ALIASES.get(text, text)
+
+
+def _review_priority(player: Player) -> str:
+    """Rank review order only; never relax the verification contract."""
+
+    if (player.depth_order or 99) <= 1 or (player.sheet_adp or float("inf")) <= 120:
+        return "P0"
+    if (player.depth_order or 99) <= 2 or (player.sheet_adp or float("inf")) <= 350:
+        return "P1"
+    return "P2"
 
 
 def _athlete_name(row: dict[str, Any]) -> str:
@@ -121,40 +137,99 @@ class CachedESPNReference:
         self.client = client
         self.cache_dir = cache_dir
         self.delay_seconds = max(0.2, delay_seconds)
+        self.rate_limit_events = 0
+        self.cache_hits = 0
+        self.new_requests = 0
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _path(self, category: str, key: str) -> Path:
         safe_key = re.sub(r"[^A-Za-z0-9._-]+", "-", key)
         return self.cache_dir / category / f"{safe_key}.json"
 
+    def _metadata_path(self, category: str, key: str) -> Path:
+        return self._path(category, key).with_suffix(".meta.json")
+
+    def _rate_limit_path(self) -> Path:
+        return self.cache_dir / "rate-limit.json"
+
+    def _assert_not_rate_limited(self) -> None:
+        path = self._rate_limit_path()
+        if not path.is_file():
+            return
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            resume_at = datetime.fromisoformat(str(payload.get("resume_at", "")).replace("Z", "+00:00"))
+        except (ValueError, json.JSONDecodeError):
+            return
+        if resume_at.tzinfo is None:
+            resume_at = resume_at.replace(tzinfo=timezone.utc)
+        if resume_at > datetime.now(timezone.utc):
+            raise RateLimitPaused(resume_at.astimezone(timezone.utc))
+
+    def _record_rate_limit(self, retry_after: str | None) -> None:
+        try:
+            delay = max(self.delay_seconds, float(retry_after or 60))
+        except ValueError:
+            delay = max(self.delay_seconds, 60)
+        resume_at = datetime.now(timezone.utc).timestamp() + delay
+        payload = {
+            "event": "http_429",
+            "captured_at": _utc_now(),
+            "retry_after_seconds": delay,
+            "resume_at": datetime.fromtimestamp(resume_at, timezone.utc).isoformat(),
+        }
+        temporary_path = self._rate_limit_path().with_suffix(".tmp")
+        temporary_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        temporary_path.replace(self._rate_limit_path())
+        self.rate_limit_events += 1
+        raise RateLimitPaused(datetime.fromtimestamp(resume_at, timezone.utc))
+
+    def _write_metadata(self, category: str, key: str, payload: dict[str, Any], *, cached: bool) -> None:
+        path = self._metadata_path(category, key)
+        if path.is_file():
+            return
+        source_path = self._path(category, key)
+        captured_at = datetime.fromtimestamp(source_path.stat().st_mtime, timezone.utc).isoformat() if cached else _utc_now()
+        metadata = {
+            "endpoint_feed": category,
+            "reference_id": key,
+            "captured_at": captured_at,
+            "http_status": 200,
+            "payload_sha256": _hash(payload),
+            "parser_version": PARSER_VERSION,
+        }
+        temporary_path = path.with_suffix(".tmp")
+        temporary_path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        temporary_path.replace(path)
+
     def _load_or_fetch(self, category: str, key: str, fetch: Callable[[], dict[str, Any]]) -> dict[str, Any]:
         path = self._path(category, key)
         if path.is_file():
             try:
-                return json.loads(path.read_text(encoding="utf-8"))
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                self.cache_hits += 1
+                self._write_metadata(category, key, payload, cached=True)
+                return payload
             except json.JSONDecodeError:
                 # A killed dry run can leave a partial cache entry. Treat it
                 # as absent and fetch it again; never use malformed evidence.
                 pass
+        self._assert_not_rate_limited()
         try:
             payload = fetch()
         except httpx.HTTPStatusError as error:
             if error.response.status_code == 403:
                 raise RuntimeError("ESPN returned 403; importer stopped without any bypass.") from error
             if error.response.status_code == 429:
-                retry_after = error.response.headers.get("Retry-After")
-                try:
-                    delay = max(self.delay_seconds, float(retry_after or 0))
-                except ValueError:
-                    delay = self.delay_seconds
-                time.sleep(delay)
-                payload = fetch()
+                self._record_rate_limit(error.response.headers.get("Retry-After"))
             else:
                 raise
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary_path = path.with_suffix(".tmp")
         temporary_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         temporary_path.replace(path)
+        self.new_requests += 1
+        self._write_metadata(category, key, payload, cached=False)
         time.sleep(self.delay_seconds)
         return payload
 
@@ -257,6 +332,8 @@ def plan_player_identities(
             "player_name": player.name,
             "school": player.school,
             "position": player.position,
+            "depth_chart_slot": player.depth_chart_position,
+            "review_priority": _review_priority(player),
             "verification_method": "exact_roster_name_school_position_plus_profile",
             "verified_at": _utc_now(),
             "parser_version": PARSER_VERSION,
@@ -315,6 +392,29 @@ def _summary(records: list[dict[str, Any]]) -> dict[str, int | float]:
     counts = Counter(record["status"] for record in records)
     total = len(records)
     return {"total": total, "auto_verified": counts["verified"], "needs_review": counts["needs_review"], "unresolved": counts["unresolved"], "verified_percent": round(100 * counts["verified"] / total, 2) if total else 0.0}
+
+
+def _player_summary(records: list[dict[str, Any]]) -> dict[str, int | float]:
+    summary = _summary(records)
+    summary["duplicate_espn_ids"] = len({record.get("espn_player_id") for record in records if record.get("reason") == "duplicate_espn_player_id_candidate"})
+    summary["conflicts"] = sum(1 for record in records if "conflict" in str(record.get("reason") or ""))
+    summary["invalid_espn_ids"] = sum(1 for record in records if record.get("espn_player_id") and not str(record["espn_player_id"]).isdigit())
+    for priority in ("P0", "P1", "P2"):
+        summary[f"{priority.lower()}_review"] = sum(1 for record in records if record.get("status") != "verified" and record.get("review_priority") == priority)
+    return summary
+
+
+def _game_summary(records: list[dict[str, Any]], review: list[dict[str, Any]]) -> dict[str, int | float]:
+    total = len(records) + len(review)
+    return {
+        "total_relevant_games": total,
+        "verified_event_ids": len(records),
+        "unresolved_events": len(review),
+        "conflicting_events": sum(1 for row in review if "conflict" in str(row.get("reason") or "")),
+        "duplicate_events": sum(1 for row in review if "duplicate" in str(row.get("reason") or "")),
+        "tbd_kickoffs": sum(1 for row in review if "kickoff" in str(row.get("reason") or "")),
+        "verified_percent": round(100 * len(records) / total, 2) if total else 0.0,
+    }
 
 
 def _write_report(path: Path, payload: dict[str, Any]) -> None:
@@ -407,25 +507,32 @@ def main() -> int:
         existing = {row.player_id: row for row in db.query(PlayerProviderId).filter_by(provider="espn").all()}
         schools = {_school_key(player.school) for player in players}
         reference = CachedESPNReference(client, args.cache_dir / str(args.season), delay_seconds=args.request_delay_seconds)
-        scoreboards = [(week, event) for week in weeks for event in reference.scoreboard(args.season, week)]
-        schedule_records, schedule_review = plan_schedule([event for _, event in scoreboards], season=args.season, weeks=[week for week, _ in scoreboards], internal_schools=schools)
-        # The internal player universe, not ESPN's full opponent list, defines
-        # which roster references are needed. A Power Four team may play a
-        # non-rosterable opponent, but fetching that opponent's roster cannot
-        # help map one of our players.
-        team_ids = {
-            team_id
-            for record in schedule_records
-            for team_name, team_id in (
-                (record.get("home_team"), record.get("home_team_id")),
-                (record.get("away_team"), record.get("away_team_id")),
-            )
-            if team_id and _school_key(team_name) in schools
-        }
-        roster_rows = [athlete for team_id in sorted(team_ids) for athlete in flatten_roster(reference.roster(team_id))]
-        player_records = plan_player_identities(players, roster_rows, reference.profile, existing)
-        player_payload = {"season": args.season, "generated_at": _utc_now(), "mode": "apply" if args.apply else "dry_run", "summary": _summary(player_records), "records": player_records}
-        game_summary = _summary([{**record, "status": "verified"} for record in schedule_records] + [{"status": "needs_review"} for _ in schedule_review])
+        try:
+            scoreboards = [(week, event) for week in weeks for event in reference.scoreboard(args.season, week)]
+            schedule_records, schedule_review = plan_schedule([event for _, event in scoreboards], season=args.season, weeks=[week for week, _ in scoreboards], internal_schools=schools)
+            team_ids = {
+                team_id
+                for record in schedule_records
+                for team_name, team_id in (
+                    (record.get("home_team"), record.get("home_team_id")),
+                    (record.get("away_team"), record.get("away_team_id")),
+                )
+                if team_id and _school_key(team_name) in schools
+            }
+            roster_rows = [athlete for team_id in sorted(team_ids) for athlete in flatten_roster(reference.roster(team_id))]
+            player_records = plan_player_identities(players, roster_rows, reference.profile, existing)
+        except RateLimitPaused as error:
+            db.rollback()
+            print(json.dumps({
+                "state": "rate_limited",
+                "resume_at": error.resume_at.isoformat(),
+                "cache_hits": reference.cache_hits,
+                "new_requests": reference.new_requests,
+                "rate_limit_events": reference.rate_limit_events,
+            }, sort_keys=True))
+            return 75
+        player_payload = {"season": args.season, "generated_at": _utc_now(), "mode": "apply" if args.apply else "dry_run", "summary": _player_summary(player_records), "records": player_records}
+        game_summary = _game_summary(schedule_records, schedule_review)
         game_payload = {"season": args.season, "generated_at": _utc_now(), "mode": "apply" if args.apply else "dry_run", "summary": game_summary, "records": schedule_records, "review": schedule_review}
         _write_report(args.report_dir / f"espn-player-readiness-{args.season}.json", player_payload)
         _write_report(args.report_dir / f"espn-game-readiness-{args.season}.json", game_payload)
@@ -435,10 +542,10 @@ def main() -> int:
             applied_players = apply_verified_player_mappings(db, player_records)
             applied_games = apply_verified_schedule(db, schedule_records)
             db.commit()
-            print(json.dumps({"applied_players": applied_players, "applied_games": applied_games, "players": player_payload["summary"], "games": game_summary}, sort_keys=True))
+            print(json.dumps({"applied_players": applied_players, "applied_games": applied_games, "players": player_payload["summary"], "games": game_summary, "cache_hits": reference.cache_hits, "new_requests": reference.new_requests, "rate_limit_events": reference.rate_limit_events}, sort_keys=True))
         else:
             db.rollback()
-            print(json.dumps({"players": player_payload["summary"], "games": game_summary}, sort_keys=True))
+            print(json.dumps({"players": player_payload["summary"], "games": game_summary, "cache_hits": reference.cache_hits, "new_requests": reference.new_requests, "rate_limit_events": reference.rate_limit_events}, sort_keys=True))
     return 0
 
 
