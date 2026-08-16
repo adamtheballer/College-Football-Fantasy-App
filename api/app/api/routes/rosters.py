@@ -58,6 +58,7 @@ from collegefootballfantasy_api.app.services.league_player_history import (
     EVENT_PLACED_ON_IR,
     append_league_player_event,
 )
+from collegefootballfantasy_api.app.services.live_scoring_readiness import ensure_official_acquisition_identity
 
 router = APIRouter()
 
@@ -532,6 +533,10 @@ def add_drop_endpoint(
 ) -> AddDropResponse:
     team = require_team_owner(db, team_id, current_user)
     add_player = _ensure_player_exists(db, payload.add_player_id)
+    league_for_identity = db.get(League, team.league_id)
+    if league_for_identity is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
+    ensure_official_acquisition_identity(db, league=league_for_identity, player=add_player)
     _ensure_player_available(db, team.league_id, add_player.id)
 
     drop_entry = db.get(RosterEntry, payload.drop_roster_entry_id)

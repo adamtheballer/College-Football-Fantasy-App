@@ -15,8 +15,10 @@ from typing import Any
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
+from fastapi import HTTPException, status
 
-from collegefootballfantasy_api.app.domain.scoring_rules import ScoringRulesValidationError, validate_scoring_rules
+from collegefootballfantasy_api.app.core.config import settings
+from collegefootballfantasy_api.app.domain.scoring_rules import BETA_KICKER_RULES, ScoringRulesValidationError, validate_scoring_rules
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
@@ -57,6 +59,25 @@ def _now() -> datetime:
 
 def _is_verified_mapping(mapping: PlayerProviderId | None) -> bool:
     return bool(mapping and mapping.verification_status == "verified" and str(mapping.provider_player_id or "").isdigit())
+
+
+def ensure_official_acquisition_identity(db: Session, *, league: League, player: Player) -> None:
+    """Keep unresolved players searchable while preventing official score risk."""
+
+    if not settings.live_scoring_identity_guard_enabled:
+        return
+    if (league.platform or "").lower() in {"mock", "practice", "non_authoritative"}:
+        return
+    mapping = (
+        db.query(PlayerProviderId)
+        .filter(PlayerProviderId.player_id == player.id, PlayerProviderId.provider == ESPN_PROVIDER)
+        .one_or_none()
+    )
+    if not _is_verified_mapping(mapping):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Live scoring identity pending; this player cannot be added to an official league until ESPN identity verification completes.",
+        )
 
 
 def unresolved_active_starters(db: Session, *, season: int, week: int) -> list[dict[str, Any]]:
@@ -282,6 +303,36 @@ def scoring_operations_report(db: Session, *, season: int, week: int, now: datet
 def flat_field_goal_league_audit(db: Session, *, season: int) -> dict[str, Any]:
     """Read-only classification; historical league rules are never changed here."""
 
+    def provenance(settings: LeagueSettings | None) -> tuple[str, str]:
+        """Classify only when the stored beta lock proves the source.
+
+        JSON values alone cannot tell a deliberate flat-three selection from
+        the former beta default.  The creation-time immutable snapshot is the
+        proof.  Anything without it intentionally remains unknown instead of
+        being silently treated as a product default.
+        """
+
+        snapshot = (settings.scoring_snapshot_json if settings else None) or {}
+        raw = (settings.scoring_json if settings else None) or {}
+        beta_values = {key: float(value) for key, value in BETA_KICKER_RULES.items()}
+        snapshot_kicker = snapshot.get("kicker") if isinstance(snapshot.get("kicker"), dict) else snapshot
+        raw_kicker = raw.get("kicker") if isinstance(raw.get("kicker"), dict) else raw
+        snapshot_values = {
+            key: snapshot_kicker.get(key)
+            for key in beta_values
+        }
+        raw_values = {key: raw_kicker.get(key) for key in beta_values}
+        if (
+            settings is not None
+            and settings.scoring_locked_at is not None
+            and snapshot_values == beta_values
+            and raw_values == beta_values
+        ):
+            return "LEGACY_BETA_DEFAULT", "immutable beta scoring snapshot matches the former flat-three kicker default"
+        if settings is not None and settings.scoring_locked_at is None and all(key in raw_kicker for key in beta_values):
+            return "EXPLICIT_OR_LEGACY_UNPROVEN", "flat rules are stored but no immutable creation snapshot proves commissioner intent"
+        return "UNKNOWN", "no immutable creation snapshot proves whether flat field goals were selected or inherited"
+
     leagues = db.query(League).filter(League.season_year == season, League.status.notin_(("cancelled", "archived"))).all()
     flat: list[dict[str, Any]] = []
     for league in leagues:
@@ -296,11 +347,22 @@ def flat_field_goal_league_audit(db: Session, *, season: int) -> dict[str, Any]:
         scored = db.query(PlayerWeekScore.id).filter(PlayerWeekScore.league_id == league.id).first() is not None
         status = (league.status or "").lower()
         phase = "already_scored" if scored else "pre_draft" if status in {"pre_draft", "draft_pending", "setup"} else "post_draft_pre_season"
-        flat.append({"league_id": league.id, "phase": phase})
+        source, evidence = provenance(settings)
+        flat.append({
+            "league_id": league.id,
+            "league_name": league.name,
+            "phase": phase,
+            "provenance": source,
+            "provenance_evidence": evidence,
+        })
     return {
         "total_official_leagues": len(leagues),
         "flat_fg_leagues": len(flat),
         "tiered_fg_leagues": len(leagues) - len(flat),
         "flat_fg": flat,
         "counts": {phase: sum(item["phase"] == phase for item in flat) for phase in ("pre_draft", "post_draft_pre_season", "already_scored")},
+        "provenance_counts": {
+            category: sum(item["provenance"] == category for item in flat)
+            for category in ("LEGACY_BETA_DEFAULT", "EXPLICIT_OR_LEGACY_UNPROVEN", "UNKNOWN")
+        },
     }

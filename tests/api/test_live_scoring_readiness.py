@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from fastapi import HTTPException
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
@@ -14,6 +16,7 @@ from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbe
 from collegefootballfantasy_api.app.services.live_scoring_readiness import (
     PublicScoringPreflightError,
     assert_public_scoring_ready,
+    ensure_official_acquisition_identity,
     flat_field_goal_league_audit,
     public_scoring_preflight,
     scoring_operations_report,
@@ -77,6 +80,31 @@ def test_public_preflight_accepts_verified_starter_and_healthy_dependencies(db_s
     assert report["reason_codes"] == []
 
 
+def test_official_acquisition_guard_blocks_only_unverified_players_when_enabled(db_session, monkeypatch):
+    league = League(name="Official League", season_year=2026, status="active")
+    unverified = Player(name="Identity Pending", school="Texas", position="WR")
+    verified = Player(name="Identity Ready", school="Texas", position="QB")
+    db_session.add_all([league, unverified, verified])
+    db_session.flush()
+    db_session.add(
+        PlayerProviderId(
+            player_id=verified.id,
+            provider="espn",
+            provider_player_id="456",
+            verification_status="verified",
+        )
+    )
+    db_session.commit()
+    monkeypatch.setattr(settings, "live_scoring_identity_guard_enabled", True)
+
+    with pytest.raises(HTTPException) as error:
+        ensure_official_acquisition_identity(db_session, league=league, player=unverified)
+
+    assert error.value.status_code == 409
+    assert error.value.detail.startswith("Live scoring identity pending")
+    ensure_official_acquisition_identity(db_session, league=league, player=verified)
+
+
 def test_operations_report_surfaces_provider_failures_without_idle_alert_spam(db_session):
     _ready_baseline(db_session)
     db_session.add(ProviderGamePoll(
@@ -108,4 +136,31 @@ def test_flat_field_goal_audit_never_changes_league_rules(db_session):
     assert report["total_official_leagues"] == 2
     assert report["flat_fg_leagues"] == 1
     assert report["counts"]["pre_draft"] == 1
+    assert report["provenance_counts"] == {"LEGACY_BETA_DEFAULT": 0, "EXPLICIT_OR_LEGACY_UNPROVEN": 0, "UNKNOWN": 1}
     assert db_session.get(LeagueSettings, flat_settings.id).scoring_json["kicker"]["fg_made_31_40"] == 3
+
+
+def test_flat_field_goal_audit_proves_legacy_beta_default_from_locked_snapshot(db_session):
+    league = League(name="Locked beta league", season_year=2026, status="pre_draft")
+    db_session.add(league)
+    db_session.flush()
+    flat_beta = {
+        "fg_made_0_30": 3,
+        "fg_made_31_40": 3,
+        "fg_made_41_50": 3,
+        "fg_made_51_60": 3,
+        "fg_made_61_plus": 3,
+        "xp_made": 1,
+    }
+    db_session.add(LeagueSettings(
+        league_id=league.id,
+        scoring_json=flat_beta,
+        scoring_snapshot_json=flat_beta,
+        scoring_locked_at=NOW,
+    ))
+    db_session.commit()
+
+    report = flat_field_goal_league_audit(db_session, season=2026)
+
+    assert report["provenance_counts"] == {"LEGACY_BETA_DEFAULT": 1, "EXPLICIT_OR_LEGACY_UNPROVEN": 0, "UNKNOWN": 0}
+    assert report["flat_fg"][0]["provenance"] == "LEGACY_BETA_DEFAULT"
