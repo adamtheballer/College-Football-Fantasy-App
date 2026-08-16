@@ -4,7 +4,7 @@ from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
-from scripts.audit_espn_live_readiness import build_readiness_report
+from scripts.audit_espn_live_readiness import build_readiness_report, render_readiness_markdown
 
 
 def test_readiness_audit_requires_explicit_event_crosscheck_and_reports_safe_remediation(db_session, tmp_path):
@@ -52,6 +52,7 @@ def test_readiness_audit_requires_explicit_event_crosscheck_and_reports_safe_rem
     assert report["players"]["missing_espn_player_ids"] == 2
     assert report["players"]["remediation_players"][0]["depth_chart_position"] == "WR"
     assert report["players"]["remediation_players"][0]["reason_unresolved"] == "missing_espn_mapping"
+    assert report["players"]["remediation_players"][0]["current_provider_mapping"] is None
     assert len(report["players"]["invalid_espn_player_ids"]) == 1
     assert report["games"]["total_relevant_games"] == 2
     assert report["games"]["espn_event_crosscheck_available"] is True
@@ -59,3 +60,4 @@ def test_readiness_audit_requires_explicit_event_crosscheck_and_reports_safe_rem
     assert report["games"]["verified_espn_event_ids"] == 1
     assert report["games"]["missing_espn_event_ids"] == 1
     assert report["games"]["tbd_kickoffs"] == 2
+    assert "Verified ESPN IDs: 1" in render_readiness_markdown(report)

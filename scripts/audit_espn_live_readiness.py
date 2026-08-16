@@ -135,6 +135,14 @@ def build_readiness_report(db: Session, *, season: int, event_fixture: Path | No
                 "position": player.position,
                 "depth_chart_position": player.depth_chart_position,
                 "reason_unresolved": reason,
+                "current_provider_mapping": (
+                    {
+                        "provider_player_id": mapping.provider_player_id,
+                        "verification_status": mapping.verification_status,
+                    }
+                    if mapping is not None
+                    else None
+                ),
             }
         )
     invalid_mappings = [
@@ -209,10 +217,47 @@ def build_readiness_report(db: Session, *, season: int, event_fixture: Path | No
     }
 
 
+def render_readiness_markdown(report: dict) -> str:
+    """Render a reviewable companion without changing the machine report."""
+
+    players = report["players"]
+    games = report["games"]
+    player_total = players["total_rosterable_players"]
+    game_total = games["total_relevant_games"]
+    return "\n".join(
+        [
+            f"# ESPN live-scoring readiness — {report['season']}",
+            "",
+            "## Players",
+            "",
+            f"- Total rosterable players: {player_total}",
+            f"- Verified ESPN IDs: {players['verified_espn_player_ids']}",
+            f"- Missing/unresolved ESPN IDs: {players['missing_espn_player_ids']}",
+            f"- Duplicate ESPN IDs: {len(players['duplicate_espn_player_ids'])}",
+            f"- Invalid ESPN IDs: {len(players['invalid_espn_player_ids'])}",
+            f"- Verified percentage: {(100 * players['verified_espn_player_ids'] / player_total) if player_total else 0:.2f}%",
+            "",
+            "## Games",
+            "",
+            f"- Total relevant games: {game_total}",
+            f"- ESPN event cross-check fixture supplied: {'yes' if games['espn_event_crosscheck_available'] else 'no'}",
+            f"- Verified ESPN event IDs: {games['verified_espn_event_ids']}",
+            f"- Missing ESPN event IDs: {games['missing_espn_event_ids']}",
+            f"- Duplicate ESPN event IDs: {len(games['duplicate_espn_event_ids'])}",
+            f"- TBD/postponed/cancelled kickoffs: {games['tbd_kickoffs']}",
+            f"- Verified percentage: {(100 * games['verified_espn_event_ids'] / game_total) if game_total else 0:.2f}%",
+            "",
+            "The JSON companion contains every unresolved player and game. Numeric event IDs are not treated as verified without a captured ESPN event fixture that matches ID, home team, away team, and kickoff.",
+            "",
+        ]
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate a read-only ESPN live-scoring readiness report.")
     parser.add_argument("--season", type=int, required=True)
     parser.add_argument("--output", type=Path, help="Optional JSON report destination.")
+    parser.add_argument("--markdown-output", type=Path, help="Optional human-readable Markdown companion.")
     parser.add_argument(
         "--event-fixture",
         type=Path,
@@ -235,6 +280,8 @@ def main() -> None:
     rendered = json.dumps(report, indent=2, sort_keys=True)
     if args.output:
         args.output.write_text(rendered + "\n", encoding="utf-8")
+    if args.markdown_output:
+        args.markdown_output.write_text(render_readiness_markdown(report), encoding="utf-8")
     print(rendered)
 
 
