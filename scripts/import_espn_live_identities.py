@@ -163,7 +163,17 @@ class CachedESPNReference:
         return self._load_or_fetch("rosters", team_id, lambda: self.client.get_team_roster(team_id))
 
     def profile(self, player_id: str) -> dict[str, Any]:
-        return self._load_or_fetch("profiles", player_id, lambda: self.client.get_athlete_profile(player_id))
+        try:
+            return self._load_or_fetch("profiles", player_id, lambda: self.client.get_athlete_profile(player_id))
+        except httpx.HTTPStatusError as error:
+            # A missing/stale profile cannot establish identity. It is a
+            # review row, not a reason to discard every other safe mapping.
+            # 403 and rate limiting remain hard stops handled above.
+            if error.response.status_code in {403, 429}:
+                raise
+            return {"_reference_error": f"HTTP {error.response.status_code}"}
+        except httpx.TimeoutException:
+            return {"_reference_error": "timeout"}
 
 
 def _event_facts(event: dict[str, Any], *, season: int, requested_week: int) -> dict[str, Any] | None:
@@ -249,6 +259,17 @@ def plan_player_identities(
             continue
         candidate = candidates[0]
         profile_payload = profile_lookup(candidate["espn_player_id"])
+        if profile_payload.get("_reference_error"):
+            records.append(
+                {
+                    **base,
+                    **candidate,
+                    "status": "needs_review",
+                    "reason": "profile_reference_unavailable",
+                    "reference_error": profile_payload["_reference_error"],
+                }
+            )
+            continue
         profile = profile_facts(profile_payload)
         profile_matches = (
             profile["espn_player_id"] == candidate["espn_player_id"]

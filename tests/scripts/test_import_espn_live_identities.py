@@ -96,6 +96,23 @@ def test_identity_planner_verifies_only_exact_roster_and_profile_matches(db_sess
     assert mapping.verification_status == "verified"
 
 
+def test_identity_planner_marks_an_unavailable_profile_for_review_instead_of_guessing(db_session):
+    player = _player("Chris Henry Jr.")
+    db_session.add(player)
+    db_session.flush()
+
+    records = plan_player_identities(
+        [player],
+        flatten_roster(_roster_payload()),
+        lambda _player_id: {"_reference_error": "HTTP 404"},
+        {},
+    )
+
+    assert records[0]["status"] == "needs_review"
+    assert records[0]["reason"] == "profile_reference_unavailable"
+    assert records[0]["reference_error"] == "HTTP 404"
+
+
 def test_schedule_planner_requires_event_participants_and_kickoff_then_applies_idempotently(db_session):
     event = {
         "id": "401999001",
