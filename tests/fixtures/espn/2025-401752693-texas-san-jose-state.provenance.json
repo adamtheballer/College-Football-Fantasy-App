@@ -1,0 +1,12 @@
+{
+  "captured_at": "2026-08-16T01:42:31Z",
+  "espn_event_id": "401752693",
+  "fixture_parser_version": "espn-summary-sanitized-v1",
+  "home_team": "Texas",
+  "kickoff": "2025-09-06T16:00Z",
+  "raw_fixture_sha256": "b64ac9a9d9dab632c0ec3a7caf66df0297123997e5939f0186e4b586be638586",
+  "season": 2025,
+  "source_url": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=401752693",
+  "visitor_team": "San Jos\u00e9 State",
+  "week": 2
+}

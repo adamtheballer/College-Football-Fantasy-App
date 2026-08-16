@@ -155,8 +155,8 @@ environments:
     workers:
       scoring_processor:
         enabled: false
-        command: PYTHONPATH=. uv run python scripts/run_scoring_worker.py --season ${SCORING_SEASON} --week ${SCORING_WEEK} --mode live
-        note: Omitted for public beta. Enable only with SCORING_MODE=enabled and an approved provider credential.
+        command: PYTHONPATH=. uv run python scripts/run_espn_scoring_worker.py
+        note: Omitted for public beta. Enable only after ESPN shadow validation; the worker resolves verified schedule windows and durable per-game leases itself.
       lifecycle_processor:
         enabled: true
         command: PYTHONPATH=. uv run python scripts/run_lifecycle_worker.py
@@ -217,7 +217,8 @@ environments:
       ui_base_url_must_be_non_local_https: true
       email_disabled_beta_starts_without_smtp: true
       push_disabled_beta_starts_without_onesignal_credentials: true
-      sportsdata_credentials_required_when_scoring_enabled: true
+      sportsdata_credentials_required_when_provider_sportsdata: true
+      espn_shadow_requires_explicit_mode: true
       migrations_before_api: true
       verify_alembic_head_before_promotion: true
       require_health_ready_before_traffic: true

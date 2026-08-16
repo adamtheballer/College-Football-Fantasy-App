@@ -8,7 +8,7 @@ Run production as separate processes:
 
 1. **API**: FastAPI via `collegefootballfantasy_api.app.main:app`.
 2. **Web**: static Vite build from `web/dist/spa`.
-3. **Scoring worker**: `scripts/run_scoring_worker.py`.
+3. **Scoring worker**: `scripts/run_espn_scoring_worker.py` for the ESPN alpha path.
 4. **Lifecycle worker**: `scripts/run_lifecycle_worker.py`; processes expired draft picks, due waiver windows, and due or expired trade offers.
 5. **Notification worker**: `scripts/run_notification_worker.py`; claims and delivers the durable notification outbox.
 
@@ -31,16 +31,17 @@ The worker writes the provider result, retry schedule, and provider message ID t
 
 ## Scoring Provider Policy
 
-- Live scoring is disabled by default (`SCORING_MODE=disabled`). A production rollout must explicitly set `SCORING_MODE=enabled` and configure its approved provider; when enabled, `SCORING_PROVIDER=sportsdata` is the standard provider setting.
-- ESPN/cache/mock providers are unofficial for production scoring unless explicitly enabled with `SCORING_ALLOW_UNOFFICIAL_PROVIDERS=true`.
-- If unofficial providers are used in staging, disclose that scores are test-only and do not market the environment as public scoring.
+- Live scoring is disabled by default (`SCORING_MODE=disabled`). The temporary alpha provider is the isolated ESPN adapter, with `SCORING_PROVIDER=espn` and `SCORING_MODE=shadow` before any public-score promotion.
+- Shadow mode may fetch centrally, store immutable provider snapshots, normalize verified identities, and record discrepancies. It must not update public matchup scores, standings, or authoritative notifications.
+- `SCORING_MODE=enabled` requires a separately approved release decision. ESPN is a temporary public-data dependency, not an official partner or a licensed production guarantee. Do not use aggressive polling, proxy rotation, or anti-bot bypasses.
+- Keep `SPORTSDATA_ENABLED=false` for alpha. SportsData remains dormant and must not be used as an automatic fallback or require a key for ESPN shadow startup.
 - Provider failures must create failed or dead-letter scoring run records. Provider empty responses must not overwrite valid scores with false zeroes.
 
 ## Worker Cadence
 
 Recommended schedules:
 
-- Game window: every 30–90 seconds with `--mode live`.
+- Game-discovery wakeup: about every 30 seconds. An ESPN game itself may be fetched no more often than once every 180 seconds; the durable per-game lease is the authority.
 - Postgame reconciliation: every 10–30 minutes with `--mode postgame`.
 - Next-day correction sweep: hourly or once after provider finalization with `--mode correction`.
 - Lifecycle processing: every 5–15 minutes (or the configured lifecycle interval) with `scripts/run_lifecycle_worker.py`. It must remain active through draft windows, waiver-clear windows, and trade review windows.
@@ -49,9 +50,14 @@ Recommended schedules:
 Examples:
 
 ```bash
-PYTHONPATH=. uv run python scripts/run_scoring_worker.py --season 2026 --week 1 --mode live
-PYTHONPATH=. uv run python scripts/run_scoring_worker.py --season 2026 --week 1 --mode postgame
-PYTHONPATH=. uv run python scripts/run_scoring_worker.py --season 2026 --week 1 --mode correction --once
+# Shadow only. The durable per-game lease enforces the 180-second minimum
+# provider fetch interval even though this scheduler wakes every 30 seconds.
+PYTHONPATH=. uv run python scripts/run_espn_scoring_worker.py
+
+# One bounded local/operations check; it still performs no request when there
+# is no verified schedule window. Do not set SCORING_MODE=enabled without the
+# separately approved live-score release decision.
+PYTHONPATH=. uv run python scripts/run_espn_scoring_worker.py --once
 PYTHONPATH=. uv run python scripts/run_lifecycle_worker.py
 PYTHONPATH=. uv run python scripts/run_notification_worker.py
 ```

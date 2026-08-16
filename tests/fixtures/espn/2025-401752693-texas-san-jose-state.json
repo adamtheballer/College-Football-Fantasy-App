@@ -1,0 +1,67 @@
+{
+  "event_id": "401752693",
+  "header": {
+    "id": "401752693",
+    "competitions": [
+      {
+        "date": "2025-09-06T16:00Z",
+        "status": {"type": {"name": "STATUS_FINAL", "state": "post", "completed": true}},
+        "competitors": [
+          {"team": {"location": "Texas", "displayName": "Texas Longhorns"}},
+          {"team": {"location": "San Jos\u00e9 State", "displayName": "San Jos\u00e9 State Spartans"}}
+        ]
+      }
+    ]
+  },
+  "boxscore": {
+    "players": [
+      {
+        "team": {"location": "San Jos\u00e9 State", "displayName": "San Jos\u00e9 State Spartans"},
+        "statistics": [
+          {
+            "name": "kicking",
+            "keys": ["fieldGoalsMade/fieldGoalAttempts", "fieldGoalPct", "longFieldGoalMade", "extraPointsMade/extraPointAttempts", "totalKickingPoints"],
+            "athletes": [{"athlete": {"id": "4875309", "displayName": "Denis Lynch"}, "stats": ["0/2", "0.0", "0", "1/1", "1"]}]
+          }
+        ]
+      },
+      {
+        "team": {"location": "Texas", "displayName": "Texas Longhorns"},
+        "statistics": [
+          {
+            "name": "passing",
+            "keys": ["completions/passingAttempts", "passingYards", "yardsPerPassAttempt", "passingTouchdowns", "interceptions", "adjQBR"],
+            "athletes": [{"athlete": {"id": "4870906", "displayName": "Arch Manning"}, "stats": ["19/30", "295", "9.8", "4", "1", "59.4"]}]
+          },
+          {
+            "name": "rushing",
+            "keys": ["rushingAttempts", "rushingYards", "yardsPerRushAttempt", "rushingTouchdowns", "longRushing"],
+            "athletes": [
+              {"athlete": {"id": "4870609", "displayName": "CJ Baxter"}, "stats": ["13", "64", "4.9", "0", "18"]},
+              {"athlete": {"id": "4870906", "displayName": "Arch Manning"}, "stats": ["4", "23", "5.8", "1", "20"]}
+            ]
+          },
+          {
+            "name": "receiving",
+            "keys": ["receptions", "receivingYards", "yardsPerReception", "receivingTouchdowns", "longReception"],
+            "athletes": [
+              {"athlete": {"id": "5079556", "displayName": "Parker Livingstone"}, "stats": ["4", "128", "32.0", "2", "83"]},
+              {"athlete": {"id": "5085189", "displayName": "Jack Endries"}, "stats": ["2", "52", "26.0", "2", "36"]},
+              {"athlete": {"id": "4870609", "displayName": "CJ Baxter"}, "stats": ["2", "-3", "-1.5", "0", "2"]}
+            ]
+          },
+          {
+            "name": "fumbles",
+            "keys": ["fumbles", "fumblesLost", "fumblesRecovered"],
+            "athletes": [{"athlete": {"id": "4870906", "displayName": "Arch Manning"}, "stats": ["1", "0", "0"]}]
+          },
+          {
+            "name": "kicking",
+            "keys": ["fieldGoalsMade/fieldGoalAttempts", "fieldGoalPct", "longFieldGoalMade", "extraPointsMade/extraPointAttempts", "totalKickingPoints"],
+            "athletes": [{"athlete": {"id": "4879682", "displayName": "Mason Shipley"}, "stats": ["1/1", "100.0", "47", "5/5", "8"]}]
+          }
+        ]
+      }
+    ]
+  }
+}

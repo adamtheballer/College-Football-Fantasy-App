@@ -28,6 +28,7 @@ from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjec
 from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueMatchupTabRead,
+    LiveScoringFreshnessRead,
     LeagueInviteSettingsRead,
     LeagueMemberRead,
     LeagueRosterTabRead,
@@ -47,6 +48,7 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
 )
 from collegefootballfantasy_api.app.schemas.waiver import WaiverDropCandidateRead
 from collegefootballfantasy_api.app.services.league_weeks import resolve_current_week
+from collegefootballfantasy_api.app.services.espn_live_scoring import espn_week_freshness
 from collegefootballfantasy_api.app.services.league_workspace import build_standings_summary
 from collegefootballfantasy_api.app.services.matchup_probability import (
     calculate_matchup_win_probability,
@@ -417,6 +419,22 @@ def build_matchup_tab_view(
     matchup_id: int | None = None,
 ) -> LeagueMatchupTabRead:
     week = resolve_current_week(db, league, selected_week)
+    freshness_read = LiveScoringFreshnessRead(
+        state="unavailable",
+    )
+    # When provider polling is globally disabled, do not add a database query
+    # to every matchup page solely for absent scoring state.  Shadow/enabled
+    # workers opt in to the persisted ESPN freshness contract below.
+    if app_settings.provider_polling_expected:
+        freshness = espn_week_freshness(db, season=league.season_year, week=week)
+        freshness_read = LiveScoringFreshnessRead(
+            provider=freshness.provider,
+            state=freshness.state,
+            provider_as_of=freshness.provider_as_of,
+            last_successful_update_at=freshness.last_successful_update_at,
+            data_age_seconds=freshness.data_age_seconds,
+            relevant_game_count=freshness.relevant_game_count,
+        )
     viewer_team = _owned_team(db, league, user)
     if matchup_id is not None:
         matchup = (
@@ -459,6 +477,7 @@ def build_matchup_tab_view(
             week=week,
             my_roster=[],
             opponent_roster=[],
+            live_scoring_freshness=freshness_read,
             message="No team found for your user in this league.",
         )
 
@@ -486,6 +505,7 @@ def build_matchup_tab_view(
             opponent_team=None,
             my_roster=my_roster,
             opponent_roster=[],
+            live_scoring_freshness=freshness_read,
             message="No matchup generated yet.",
         )
 
@@ -546,6 +566,7 @@ def build_matchup_tab_view(
         my_roster=my_roster,
         opponent_roster=opponent_roster,
         projection_source="weekly_projections",
+        live_scoring_freshness=freshness_read,
         message=None,
     )
 

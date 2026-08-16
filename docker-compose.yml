@@ -51,7 +51,7 @@ services:
       PLAYER_DATASET_VERSION: "${CFF_PLAYER_DATASET_VERSION:-unknown}"
       PROJECTION_DATASET_VERSION: "${CFF_PROJECTION_DATASET_VERSION:-unknown}"
       CFB27_RATING_DATASET_VERSION: "${CFF_CFB27_RATING_DATASET_VERSION:-unknown}"
-      SCORING_MODE: "${SCORING_MODE:-enabled}"
+      SCORING_MODE: "${SCORING_MODE:-disabled}"
       E2E_LIFECYCLE_TIME_TRAVEL_ENABLED: "${E2E_LIFECYCLE_TIME_TRAVEL_ENABLED:-false}"
       SCORING_WORKER_INTERVAL_LIVE_SECONDS: "${SCORING_WORKER_INTERVAL_LIVE_SECONDS:-180}"
       # Provider polling is opt-in. Beta overrides this explicitly as well,
@@ -150,7 +150,7 @@ services:
       PYTHONPATH: /app
       GIT_SHA: "${CFF_GIT_SHA:-unknown}"
       GIT_BRANCH: "${CFF_GIT_BRANCH:-unknown}"
-      SCORING_MODE: "${SCORING_MODE:-enabled}"
+      SCORING_MODE: "${SCORING_MODE:-disabled}"
       SCORING_WORKER_INTERVAL_LIVE_SECONDS: "${SCORING_WORKER_INTERVAL_LIVE_SECONDS:-180}"
       SPORTSDATA_ENABLED: "${SPORTSDATA_ENABLED:-false}"
       EMAIL_ENABLED: "${EMAIL_ENABLED:-false}"
@@ -193,6 +193,32 @@ services:
         condition: service_healthy
     command: >-
       sh -c "PYTHONPATH=/app uv run python scripts/run_notification_worker.py"
+
+  scoring_worker:
+    # Opt-in only: shadow mode is deployed separately from the public API and
+    # never starts merely because a developer runs the default Compose stack.
+    profiles: ["scoring"]
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+      args:
+        CFF_GIT_SHA: "${CFF_GIT_SHA:-unknown}"
+        CFF_GIT_BRANCH: "${CFF_GIT_BRANCH:-unknown}"
+    working_dir: /app
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/collegefootballfantasy
+      PYTHONPATH: /app
+      GIT_SHA: "${CFF_GIT_SHA:-unknown}"
+      GIT_BRANCH: "${CFF_GIT_BRANCH:-unknown}"
+      SCORING_PROVIDER: "${SCORING_PROVIDER:-espn}"
+      SCORING_MODE: "${SCORING_MODE:-disabled}"
+      SPORTSDATA_ENABLED: "${SPORTSDATA_ENABLED:-false}"
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >-
+      sh -c "PYTHONPATH=/app uv run python scripts/run_espn_scoring_worker.py"
 
   e2e:
     build:

@@ -71,8 +71,10 @@ def record_worker_dead_letter(
 
 
 def run_iteration(args: argparse.Namespace) -> None:
-    if not settings.scoring_enabled:
+    if not settings.scoring_worker_expected:
         raise RuntimeError("Scoring worker cannot run while SCORING_MODE=disabled.")
+    if args.provider.strip().lower() == "espn":
+        raise RuntimeError("Use scripts/run_espn_scoring_worker.py for the durable ESPN scheduler.")
     live_args = argparse.Namespace(
         season=args.season,
         week=args.week,
@@ -136,7 +138,7 @@ def run_with_retries(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    if not settings.scoring_enabled:
+    if not settings.scoring_worker_expected:
         raise SystemExit("Scoring worker cannot start while SCORING_MODE=disabled.")
     args = parse_args()
     schedule = schedule_for_mode(args.mode)

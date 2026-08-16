@@ -600,6 +600,22 @@ class MatchupTeamRead(BaseModel):
     roster: list[RosterTabEntryRead]
 
 
+class LiveScoringFreshnessRead(BaseModel):
+    """Provider freshness metadata for a stored matchup score.
+
+    The matchup endpoint never calls an external provider.  This shape makes
+    the age and condition of the worker's last persisted provider data visible
+    to the client instead of implying that every displayed live score is fresh.
+    """
+
+    provider: str | None = None
+    state: str = "unavailable"
+    provider_as_of: datetime | None = None
+    last_successful_update_at: datetime | None = None
+    data_age_seconds: int | None = None
+    relevant_game_count: int = 0
+
+
 class LeagueMatchupTabRead(BaseModel):
     league_id: int
     season: int
@@ -611,6 +627,7 @@ class LeagueMatchupTabRead(BaseModel):
     my_roster: list[RosterTabEntryRead]
     opponent_roster: list[RosterTabEntryRead]
     projection_source: str = "weekly_projections"
+    live_scoring_freshness: LiveScoringFreshnessRead | None = None
     message: str | None = None
     user_team: MatchupTeamRead | None = None
 

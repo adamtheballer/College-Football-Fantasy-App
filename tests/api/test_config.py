@@ -35,6 +35,7 @@ def production_required_settings() -> dict[str, object]:
         "terms_url": "https://app.example.com/terms",
         "provider_disclosure_url": "https://app.example.com/provider-disclosure",
         "scoring_mode": "enabled",
+        "scoring_provider": "sportsdata",
         "sportsdata_enabled": True,
         "sportsdata_api_key": "sportsdata-production-key",
     }
@@ -54,6 +55,21 @@ def test_live_scoring_poll_interval_defaults_to_three_minutes():
 
 def test_live_scoring_is_disabled_until_an_environment_explicitly_enables_it():
     assert make_settings().scoring_enabled is False
+    assert make_settings().scoring_provider == "espn"
+
+
+def test_espn_shadow_mode_expects_a_worker_without_public_score_promotion():
+    settings = make_settings(scoring_mode="shadow", scoring_provider="espn", sportsdata_enabled=False)
+
+    assert settings.scoring_enabled is False
+    assert settings.scoring_shadow_enabled is True
+    assert settings.scoring_worker_expected is True
+    assert settings.provider_polling_expected is True
+
+
+def test_shadow_mode_rejects_a_non_espn_alpha_provider():
+    with pytest.raises(ValidationError, match="SCORING_MODE=shadow requires SCORING_PROVIDER=espn"):
+        make_settings(scoring_mode="shadow", scoring_provider="sportsdata", sportsdata_enabled=False)
 
 
 def test_live_scoring_poll_interval_rejects_a_faster_provider_cadence():
@@ -360,6 +376,8 @@ def test_production_rejects_insecure_smtp():
 
 
 def test_production_rejects_unofficial_scoring_provider_without_override():
+    required = production_required_settings()
+    required["scoring_provider"] = "espn"
     with pytest.raises(ValidationError, match="Unofficial SCORING_PROVIDER"):
         make_settings(
             environment="production",
@@ -367,21 +385,21 @@ def test_production_rejects_unofficial_scoring_provider_without_override():
             cors_origins="https://app.example.com",
             cors_origin_regex=None,
             refresh_cookie_secure=True,
-            scoring_provider="espn",
-            **production_required_settings(),
+            **required,
         )
 
 
 def test_production_allows_unofficial_scoring_provider_only_with_explicit_override():
+    required = production_required_settings()
+    required["scoring_provider"] = "espn"
     settings = make_settings(
         environment="production",
         jwt_secret_key="safe-production-secret",
         cors_origins="https://app.example.com",
         cors_origin_regex=None,
         refresh_cookie_secure=True,
-        scoring_provider="espn",
         scoring_allow_unofficial_providers=True,
-        **production_required_settings(),
+        **required,
     )
 
     assert settings.scoring_provider == "espn"

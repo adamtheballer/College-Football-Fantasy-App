@@ -52,13 +52,15 @@ class Settings(BaseSettings):
     # Public beta can run all non-scoring workflows without a live provider.
     # Keep this explicit rather than inferring it from whether a key happened
     # to be configured, so a later credential change cannot start polling.
-    scoring_mode: Literal["enabled", "disabled"] = "disabled"
-    scoring_provider: str = "sportsdata"
+    # ESPN is the isolated temporary alpha provider.  ``shadow`` may poll and
+    # persist immutable provider snapshots, but cannot promote public fantasy
+    # scores, standings, or notifications.  Only ``enabled`` may do that.
+    scoring_mode: Literal["enabled", "disabled", "shadow"] = "disabled"
+    scoring_provider: str = "espn"
     scoring_allow_unofficial_providers: bool = False
-    # Every live provider cycle ingests the global weekly box-score slate once
-    # before recalculating affected league scores. Keep that external polling
-    # cadence at three minutes or slower; workers may perform internal work
-    # more frequently, but must not re-fetch the same live slate faster.
+    # ESPN alpha polling is per relevant game, never per league or user. The
+    # durable game lease enforces this three-minute minimum even when its
+    # scheduler wakes more frequently to discover due work.
     scoring_worker_interval_live_seconds: int = 180
     scoring_worker_interval_postgame_seconds: int = 900
     scoring_worker_interval_correction_seconds: int = 3600
@@ -263,12 +265,16 @@ class Settings(BaseSettings):
         return self.scoring_mode == "enabled"
 
     @property
+    def scoring_shadow_enabled(self) -> bool:
+        return self.scoring_mode == "shadow"
+
+    @property
     def scoring_worker_expected(self) -> bool:
-        return self.scoring_enabled
+        return self.scoring_mode in {"shadow", "enabled"}
 
     @property
     def provider_polling_expected(self) -> bool:
-        return self.scoring_enabled and self.sportsdata_enabled
+        return self.scoring_worker_expected and self.scoring_provider.strip().lower() == "espn"
 
     @property
     def allowed_cors_origins(self) -> list[str]:
@@ -309,6 +315,9 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "ONESIGNAL_APP_ID and ONESIGNAL_APP_API_KEY are required when PUSH_NOTIFICATIONS_ENABLED=true"
                 )
+
+        if self.scoring_shadow_enabled and self.scoring_provider.strip().lower() != "espn":
+            raise ValueError("SCORING_MODE=shadow requires SCORING_PROVIDER=espn for the alpha pipeline")
 
         if not self.is_production:
             return self
@@ -359,8 +368,8 @@ class Settings(BaseSettings):
         if self.push_notifications_enabled and self.push_provider != "onesignal":
             raise ValueError("PUSH_PROVIDER must be onesignal when PUSH_NOTIFICATIONS_ENABLED=true in production")
 
-        if not self.scoring_enabled and self.sportsdata_enabled:
-            raise ValueError("SPORTSDATA_ENABLED must be false when SCORING_MODE=disabled")
+        if self.scoring_mode != "enabled" and self.sportsdata_enabled:
+            raise ValueError("SPORTSDATA_ENABLED must be false unless public SportsData scoring is explicitly enabled")
 
         scoring_provider = self.scoring_provider.strip().lower()
         if self.scoring_enabled and scoring_provider in {"espn", "cache", "mock"} and not self.scoring_allow_unofficial_providers:

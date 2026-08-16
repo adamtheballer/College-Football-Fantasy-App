@@ -28,7 +28,8 @@ def test_production_manifest_covers_runtime_startup_requirements():
     assert safety_gates["environment_must_equal"] == "production"
     assert safety_gates["ui_base_url_must_be_non_local_https"] is True
     assert safety_gates["email_disabled_beta_starts_without_smtp"] is True
-    assert safety_gates["sportsdata_credentials_required_when_scoring_enabled"] is True
+    assert safety_gates["sportsdata_credentials_required_when_provider_sportsdata"] is True
+    assert safety_gates["espn_shadow_requires_explicit_mode"] is True
 
 
 def test_production_manifest_starts_required_lifecycle_workers_before_promotion():
