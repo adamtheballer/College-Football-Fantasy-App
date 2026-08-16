@@ -130,7 +130,12 @@ class CachedESPNReference:
     def _load_or_fetch(self, category: str, key: str, fetch: Callable[[], dict[str, Any]]) -> dict[str, Any]:
         path = self._path(category, key)
         if path.is_file():
-            return json.loads(path.read_text(encoding="utf-8"))
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                # A killed dry run can leave a partial cache entry. Treat it
+                # as absent and fetch it again; never use malformed evidence.
+                pass
         try:
             payload = fetch()
         except httpx.HTTPStatusError as error:
@@ -147,7 +152,9 @@ class CachedESPNReference:
             else:
                 raise
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        temporary_path = path.with_suffix(".tmp")
+        temporary_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        temporary_path.replace(path)
         time.sleep(self.delay_seconds)
         return payload
 

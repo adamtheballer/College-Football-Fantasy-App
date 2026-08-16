@@ -5,6 +5,7 @@ from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from scripts.import_espn_live_identities import (
+    CachedESPNReference,
     apply_verified_player_mappings,
     apply_verified_schedule,
     flatten_roster,
@@ -111,6 +112,17 @@ def test_identity_planner_marks_an_unavailable_profile_for_review_instead_of_gue
     assert records[0]["status"] == "needs_review"
     assert records[0]["reason"] == "profile_reference_unavailable"
     assert records[0]["reference_error"] == "HTTP 404"
+
+
+def test_reference_cache_refetches_a_partial_entry_atomically(tmp_path, monkeypatch):
+    monkeypatch.setattr("scripts.import_espn_live_identities.time.sleep", lambda _delay: None)
+    reference = CachedESPNReference(object(), tmp_path, delay_seconds=0.2)
+    path = reference._path("profiles", "101")
+    path.parent.mkdir(parents=True)
+    path.write_text("{", encoding="utf-8")
+
+    assert reference._load_or_fetch("profiles", "101", lambda: {"athlete": {"id": "101"}}) == {"athlete": {"id": "101"}}
+    assert path.with_suffix(".tmp").exists() is False
 
 
 def test_schedule_planner_requires_event_participants_and_kickoff_then_applies_idempotently(db_session):
