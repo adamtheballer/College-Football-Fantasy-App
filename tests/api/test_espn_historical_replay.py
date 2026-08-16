@@ -48,8 +48,8 @@ def test_captured_2025_espn_fixture_replays_qb_rb_wr_te_and_kicker_with_canonica
         "CJ Baxter": ("RB", 8.1),
         "Parker Livingstone": ("WR", 28.8),
         "Jack Endries": ("TE", 19.2),
-        "Mason Shipley": ("K", 12.0),
-        "Denis Lynch": ("K", -1.0),
+        "Mason Shipley": ("K", 9.0),
+        "Denis Lynch": ("K", 1.0),
     }
 
     for name, (position, points) in expected.items():
@@ -57,7 +57,7 @@ def test_captured_2025_espn_fixture_replays_qb_rb_wr_te_and_kicker_with_canonica
         assert actual == points
 
     # The only made FG is 47 yards, supplied exactly by ESPN's
-    # `longFieldGoalMade`; it must land in the 41-50 tier, never flat 3.
+    # `longFieldGoalMade`; it must land in the 41-50 four-point tier.
     assert rows["Mason Shipley"]["fg_made_41_50"] == 1
     assert rows["Mason Shipley"]["espn_field_goal_distance_detail_available"] is True
 

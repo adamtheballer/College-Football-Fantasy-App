@@ -1,7 +1,7 @@
 from copy import deepcopy
 from datetime import datetime, timezone
 
-from collegefootballfantasy_api.app.domain.scoring_rules import BETA_KICKER_RULES, KICKER_RULES, validate_scoring_rules
+from collegefootballfantasy_api.app.domain.scoring_rules import LEGACY_BETA_KICKER_RULES, KICKER_RULES, validate_scoring_rules
 from collegefootballfantasy_api.app.models.chat import ChatMessage
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.league import League
@@ -17,7 +17,7 @@ from collegefootballfantasy_api.app.services.legacy_kicker_migration import (
 
 
 def _legacy_settings(league_id: int, *, receptions: float = 1) -> LeagueSettings:
-    raw = {"receptions": receptions, **BETA_KICKER_RULES}
+    raw = {"receptions": receptions, **LEGACY_BETA_KICKER_RULES}
     return LeagueSettings(
         league_id=league_id,
         scoring_json=deepcopy(raw),
@@ -87,7 +87,7 @@ def test_unproven_flat_scoring_is_never_selected(db_session):
     league = League(name="Unproven", season_year=2026, status="pre_draft")
     db_session.add(league)
     db_session.flush()
-    db_session.add(LeagueSettings(league_id=league.id, scoring_json={"receptions": 1, **BETA_KICKER_RULES}))
+    db_session.add(LeagueSettings(league_id=league.id, scoring_json={"receptions": 1, **LEGACY_BETA_KICKER_RULES}))
     db_session.commit()
 
     plans = plan_legacy_kicker_migration(db_session, season=2026)

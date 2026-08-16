@@ -29,10 +29,11 @@ const fieldGoalTierPoints = (value: unknown) => {
   const base = numberOr(value, 3);
   return {
     fg_made_0_30: base,
-    fg_made_31_40: base + 2,
-    fg_made_41_50: base + 4,
-    fg_made_51_60: base + 6,
-    fg_made_61_plus: base + 8,
+    fg_made_31_40: base,
+    fg_made_41_50: base + 1,
+    fg_made_51_60: base + 2,
+    fg_made_61_plus: base + 2,
+    fg_missed: 0,
   };
 };
 
