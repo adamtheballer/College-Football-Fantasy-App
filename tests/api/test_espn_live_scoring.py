@@ -15,6 +15,7 @@ from collegefootballfantasy_api.app.models.team_week_score import TeamWeekScore
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId, UnmatchedProviderRow
 from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbeat
 from collegefootballfantasy_api.app.services.espn_stats_sync import UnresolvedKickerDistanceError, normalize_espn_summary_player_stats
@@ -680,7 +681,19 @@ def test_week_freshness_is_explicit_when_provider_is_unavailable_delayed_or_stal
 
 def test_finality_requires_explicit_final_espn_status_for_every_starter_and_marks_corrections(db_session):
     league, home, away, players, matchup = create_scoring_fixture(db_session)
-    db_session.add(Game(external_id="401", season=2026, week=1, home_team="Test", away_team="Other", schedule_status="final"))
+    game = Game(external_id="401", season=2026, week=1, home_team="Test", away_team="Other", start_date=NOW, schedule_status="final")
+    db_session.add(game)
+    db_session.flush()
+    db_session.add(TeamSchedule(
+        team_name="Test",
+        season=2026,
+        week=1,
+        game_id=game.id,
+        opponent_name="Other",
+        location="home",
+        is_bye=False,
+        kickoff_at=NOW,
+    ))
     for team_id, player_id in (
         (home.id, players["qb"].id),
         (home.id, players["rb"].id),
@@ -717,3 +730,53 @@ def test_finality_requires_explicit_final_espn_status_for_every_starter_and_mark
         corrected_provider_game_ids={"401"},
     ) == 1
     assert db_session.get(Matchup, matchup.id).status == "stat_corrected"
+
+
+def test_finality_uses_team_schedule_authority_when_a_legacy_game_row_has_the_same_team(db_session):
+    league, home, away, players, matchup = create_scoring_fixture(db_session)
+    legacy = Game(
+        external_id="sheet-2026-w1-test-vs-other",
+        season=2026,
+        week=1,
+        home_team="Test",
+        away_team="Other",
+    )
+    canonical = Game(
+        external_id="401",
+        season=2026,
+        week=1,
+        home_team="Test",
+        away_team="Other",
+        start_date=NOW,
+        schedule_status="final",
+    )
+    db_session.add_all([legacy, canonical])
+    db_session.flush()
+    db_session.add(TeamSchedule(
+        team_name="Test",
+        season=2026,
+        week=1,
+        game_id=canonical.id,
+        opponent_name="Other",
+        location="home",
+        is_bye=False,
+        kickoff_at=NOW,
+    ))
+    for team_id, player_id in (
+        (home.id, players["qb"].id),
+        (away.id, players["away_qb"].id),
+    ):
+        db_session.add(LineupWeekSnapshot(
+            league_id=league.id,
+            team_id=team_id,
+            player_id=player_id,
+            season=2026,
+            week=1,
+            slot="QB",
+            is_starter=True,
+        ))
+    db_session.add(ProviderGamePoll(provider="espn", provider_game_id="401", season=2026, week=1, status="final"))
+    db_session.commit()
+
+    assert certify_espn_matchup_finality(db_session, season=2026, week=1) == 1
+    assert db_session.get(Matchup, matchup.id).status == "final"
