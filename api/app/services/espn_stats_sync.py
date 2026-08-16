@@ -12,6 +12,10 @@ from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.services.provider_identity import record_unmatched_provider_row
 
 
+class UnresolvedKickerDistanceError(ValueError):
+    """A made ESPN field goal cannot be assigned to a safe scoring tier."""
+
+
 def _identity(value: str | None) -> str:
     return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
 
@@ -131,6 +135,21 @@ def normalize_espn_summary_player_stats(
             )
             skipped += 1
             continue
+        if strict_identity and player.position in {"K", "PK"} and row.get("espn_field_goal_distance_detail_available") is False:
+            reason = str(row.get("espn_field_goal_distance_detail_reason") or "made_field_goal_distance_unavailable")
+            record_unmatched_provider_row(
+                db,
+                provider="espn",
+                feed="live_boxscore_kicker_distance",
+                row=row,
+                season=season,
+                week=week,
+                reason=reason,
+            )
+            db.flush()
+            raise UnresolvedKickerDistanceError(
+                f"verified kicker {player.id} has a made field goal without an exact ESPN distance"
+            )
         normalized.append({"player_id": player.id, "stats": row})
     return normalized, skipped
 

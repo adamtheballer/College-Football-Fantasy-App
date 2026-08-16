@@ -128,6 +128,28 @@ def test_espn_box_score_stats_score_with_league_rules():
     assert breakdown["receptions"]["multiplier"] == 0.5
 
 
+def test_single_made_field_goal_uses_exact_espn_long_distance_when_play_detail_is_absent():
+    payload = espn_summary_payload()
+    payload.pop("drives")
+    payload["boxscore"]["players"][0]["statistics"][-1]["athletes"][0]["stats"] = ["1/1", "100.0", "47", "2/2"]
+
+    kicker = next(row for row in extract_player_box_score_stats(payload) if row["PlayerName"] == "Bert Auburn")
+
+    assert kicker["fg_made_41_50"] == 1
+    assert kicker["fg_missed"] == 0
+    assert kicker["espn_field_goal_distance_detail_available"] is True
+
+
+def test_multiple_made_field_goals_without_exact_individual_distances_are_marked_incomplete():
+    payload = espn_summary_payload()
+    payload.pop("drives")
+
+    kicker = next(row for row in extract_player_box_score_stats(payload) if row["PlayerName"] == "Bert Auburn")
+
+    assert kicker["espn_field_goal_distance_detail_available"] is False
+    assert kicker["espn_field_goal_distance_detail_reason"] == "made_field_goal_distance_unavailable"
+
+
 class FakeESPNClient:
     def get_weekly_boxscore_summaries(self, season, week):
         return [espn_summary_payload()]

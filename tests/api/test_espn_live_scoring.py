@@ -2,6 +2,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 
 import httpx
+import pytest
 
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.game import Game
@@ -12,6 +13,7 @@ from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekSc
 from collegefootballfantasy_api.app.models.team_week_score import TeamWeekScore
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId, UnmatchedProviderRow
+from collegefootballfantasy_api.app.services.espn_stats_sync import UnresolvedKickerDistanceError, normalize_espn_summary_player_stats
 from collegefootballfantasy_api.app.services.espn_live_scoring import (
     MIN_GAME_POLL_INTERVAL_SECONDS,
     claim_due_espn_games,
@@ -158,6 +160,33 @@ def test_strict_live_identity_rejects_legacy_backfill_mappings(db_session):
 
     assert result.normalized_rows == 0
     assert result.unmatched_rows == 3
+
+
+def test_verified_kicker_with_unbucketed_made_field_goal_delays_the_game_without_promoting_stats(db_session):
+    kicker = Player(name="Exact Distance Kicker", position="K", school="Texas")
+    db_session.add(kicker)
+    db_session.flush()
+    db_session.add(PlayerProviderId(player_id=kicker.id, provider="espn", provider_player_id="303", verification_status="verified"))
+    db_session.commit()
+
+    summary = espn_summary_payload()
+    summary.pop("drives")
+    with pytest.raises(UnresolvedKickerDistanceError):
+        normalize_espn_summary_player_stats(db_session, season=2026, week=1, summary=summary, strict_identity=True)
+
+    result = run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="shadow",
+        client=FakeLiveESPN(summary=summary),
+        now=NOW,
+        relevant_team_names={"texas"},
+    )
+    assert result.failed_games == 1
+    poll = db_session.query(ProviderGamePoll).filter_by(provider_game_id="401").one()
+    assert poll.status == "delayed"
+    assert db_session.query(UnmatchedProviderRow).filter_by(feed="live_boxscore_kicker_distance").count() == 1
 
 
 def test_identical_replay_creates_one_immutable_snapshot_and_enabled_mode_replaces_cumulative_totals(db_session):

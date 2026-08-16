@@ -277,6 +277,17 @@ def _made(value: Any) -> float:
     return _number(text)
 
 
+def _attempted(value: Any) -> float:
+    text = str(value or "").strip()
+    if not text or text == "--":
+        return 0.0
+    if "/" in text:
+        text = text.split("/", 1)[1]
+    elif "-" in text:
+        text = text.split("-", 1)[1]
+    return _number(text)
+
+
 def _team_aliases(team: dict[str, Any]) -> list[str]:
     aliases: list[str] = []
     for key in ("location", "shortDisplayName", "displayName", "name", "abbreviation"):
@@ -399,14 +410,31 @@ def extract_player_box_score_stats(summary: dict[str, Any]) -> list[dict[str, An
                         row["xp_made"] = row.get("xp_made", 0.0) + _made(stat_value)
                     elif key == "fieldGoalsMade/fieldGoalAttempts":
                         row["espn_field_goals_made_unbucketed"] = row.get("espn_field_goals_made_unbucketed", 0.0) + _made(stat_value)
+                        row["espn_field_goals_attempted"] = row.get("espn_field_goals_attempted", 0.0) + _attempted(stat_value)
+                    elif key == "longFieldGoalMade":
+                        row["espn_long_field_goal_made"] = _number(stat_value)
 
     for row in rows_by_athlete.values():
         player_name = str(row.get("PlayerName") or "").lower()
         buckets = field_goal_buckets.get(player_name)
-        if not buckets:
-            continue
-        for key, value in buckets.items():
-            row[key] = row.get(key, 0.0) + value
-        row["espn_field_goal_distance_detail_available"] = True
+        made = int(row.get("espn_field_goals_made_unbucketed", 0.0) or 0)
+        attempts = int(row.get("espn_field_goals_attempted", 0.0) or 0)
+        if attempts:
+            row["fg_missed"] = max(0, attempts - made)
+        if buckets and sum(buckets.values()) == made:
+            for key, value in buckets.items():
+                row[key] = row.get(key, 0.0) + value
+            row["espn_field_goal_distance_detail_available"] = True
+        elif made == 1 and int(row.get("espn_long_field_goal_made", 0.0) or 0) > 0:
+            # ESPN's final box score exposes this exact distance directly. It
+            # is safe only for one made field goal; with two or more makes the
+            # individual distance buckets remain unknowable without play data.
+            row[_field_goal_bucket(int(row["espn_long_field_goal_made"]))] = 1
+            row["espn_field_goal_distance_detail_available"] = True
+        elif made:
+            row["espn_field_goal_distance_detail_available"] = False
+            row["espn_field_goal_distance_detail_reason"] = "made_field_goal_distance_unavailable"
+        else:
+            row["espn_field_goal_distance_detail_available"] = True
 
     return list(rows_by_athlete.values())
