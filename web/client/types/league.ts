@@ -292,6 +292,15 @@ export interface LeagueMatchupTeam {
   roster: LeagueRosterPlayer[];
 }
 
+export interface LiveScoringFreshness {
+  provider?: string | null;
+  state: "fresh" | "delayed" | "stale" | "unavailable" | string;
+  provider_as_of?: string | null;
+  last_successful_update_at?: string | null;
+  data_age_seconds?: number | null;
+  relevant_game_count: number;
+}
+
 export interface LeagueMatchupTabResponse {
   league_id: number;
   season?: number;
@@ -304,6 +313,7 @@ export interface LeagueMatchupTabResponse {
   my_roster?: LeagueRosterPlayer[];
   opponent_roster?: LeagueRosterPlayer[];
   projection_source?: string;
+  live_scoring_freshness?: LiveScoringFreshness | null;
   message?: string | null;
 }
 

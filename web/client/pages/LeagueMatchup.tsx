@@ -88,7 +88,18 @@ function displayedProbabilityPair(
   return { my, opponent: Math.round((100 - my + Number.EPSILON) * 10) / 10 };
 }
 
-function freshnessText(data: LeagueMatchupTabResponse | undefined) {
+export function freshnessText(data: LeagueMatchupTabResponse | undefined) {
+  const freshness = data?.live_scoring_freshness;
+  if (freshness?.state === "fresh") {
+    const age = freshness.data_age_seconds;
+    const ageText = typeof age === "number" ? ` Last provider update ${age < 60 ? "just now" : `${Math.floor(age / 60)}m ago`}.` : "";
+    return `Live provider data is current.${ageText}`;
+  }
+  if (freshness?.state === "delayed") return "Live provider data is delayed. Do not treat the score as fully current.";
+  if (freshness?.state === "stale") return "Live provider data is stale. Existing scores are retained while the worker retries.";
+  if (freshness?.state === "unavailable" && data?.status && formatMatchupStatus(data.status) === "Live") {
+    return "Live score data is unavailable. Existing scores should not be replaced by false zeroes.";
+  }
   const label = formatMatchupStatus(data?.status);
   if (label === "Live") return "Live scoring refreshes automatically while games are active.";
   if (label === "Corrected") return "Scores include a stat correction and should be treated as corrected.";

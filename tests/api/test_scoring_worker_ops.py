@@ -23,3 +23,9 @@ def test_scoring_worker_refuses_to_execute_when_scoring_is_disabled(monkeypatch)
 
     with pytest.raises(RuntimeError, match="SCORING_MODE=disabled"):
         run_iteration(argparse.Namespace(season=2026, week=1, league_id=None, provider="sportsdata", mode="live"))
+
+
+def test_legacy_manual_worker_refuses_espn_to_prevent_bypassing_the_durable_scheduler(monkeypatch):
+    monkeypatch.setattr(settings, "scoring_mode", "shadow")
+    with pytest.raises(RuntimeError, match="run_espn_scoring_worker.py"):
+        run_iteration(argparse.Namespace(season=2026, week=1, league_id=None, provider="espn", mode="live"))

@@ -53,6 +53,7 @@ vi.mock("@/hooks/use-leagues", () => ({
 
 import {
   default as LeagueMatchup,
+  freshnessText,
   formatMatchupPoints,
   formatMatchupStatus,
   matchupStatusVariant,
@@ -92,6 +93,31 @@ describe("league matchup helpers", () => {
     expect(shouldShowMatchupScorePanels("live")).toBe(true);
     expect(shouldShowMatchupScorePanels("final")).toBe(true);
     expect(shouldShowMatchupScorePanels("stat_corrected")).toBe(true);
+  });
+
+  it("explains persisted provider freshness without claiming stale data is current", () => {
+    expect(
+      freshnessText({
+        league_id: 42,
+        matchup_id: 1,
+        week: 1,
+        status: "live",
+        user_team: null,
+        opponent_team: null,
+        live_scoring_freshness: { state: "fresh", data_age_seconds: 31, relevant_game_count: 2 },
+      }),
+    ).toContain("current");
+    expect(
+      freshnessText({
+        league_id: 42,
+        matchup_id: 1,
+        week: 1,
+        status: "live",
+        user_team: null,
+        opponent_team: null,
+        live_scoring_freshness: { state: "stale", relevant_game_count: 2 },
+      }),
+    ).toContain("stale");
   });
 });
 

@@ -54,6 +54,7 @@ def ensure_models_registered() -> None:
         postseason,
         preseason_prior,
         provider_identity,
+        provider_game_poll,
         provider_sync_state,
         projection_explanation,
         projection_input_audit,
