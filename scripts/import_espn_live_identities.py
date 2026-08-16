@@ -562,8 +562,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-dir", type=Path, default=Path("reports/.cache/espn-identity-import"))
     parser.add_argument("--report-dir", type=Path, default=Path("reports"))
     parser.add_argument("--request-delay-seconds", type=float, default=1.0)
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Explicitly plan and report only; never persist mappings or schedule rows.",
+    )
     parser.add_argument("--apply", action="store_true", help="Persist only verified, unambiguous mappings to the current database.")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.apply and args.dry_run:
+        parser.error("--apply and --dry-run cannot be used together")
+    return args
 
 
 def main() -> int:
