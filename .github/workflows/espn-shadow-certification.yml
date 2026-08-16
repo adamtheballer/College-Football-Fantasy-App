@@ -1,0 +1,71 @@
+name: ESPN Shadow Certification
+
+on:
+  pull_request:
+    paths:
+      - "api/**"
+      - "scripts/**"
+      - "tests/**"
+      - "web/**"
+      - "docker-compose.yml"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  shadow-stack:
+    name: Disposable PostgreSQL shadow stack
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: cff_shadow_certification
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cff_shadow_certification"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/cff_shadow_certification
+      PYTHONPATH: .
+      JWT_SECRET_KEY: ci-shadow-only-secret
+      UI_BASE_URL: http://127.0.0.1:8080
+      CORS_ORIGINS: http://127.0.0.1:8080
+      SCORING_PROVIDER: espn
+      SCORING_MODE: shadow
+      SPORTSDATA_ENABLED: "false"
+      LIVE_PLAYER_NOTIFICATIONS_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: uv sync --frozen
+      - name: Fresh database migration and single-head proof
+        run: |
+          uv run alembic -c api/alembic.ini upgrade head
+          test "$(uv run alembic -c api/alembic.ini heads | awk '{print $1}')" = "0092_espn_shadow_game_polls"
+      - name: API boot in shadow mode
+        run: |
+          PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 127.0.0.1 --port 8000 >/tmp/cff-api.log 2>&1 &
+          echo $! > /tmp/cff-api.pid
+          for attempt in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/health/ready && break || sleep 1; done
+          curl -fsS http://127.0.0.1:8000/health/runtime | jq -e '.alembic_revision == "0092_espn_shadow_game_polls" and .scoring_mode == "shadow" and .sportsdata_enabled == false'
+      - name: Worker boot is idle without a verified schedule window
+        run: PYTHONPATH=. uv run python scripts/run_espn_scoring_worker.py --once
+      - name: Recorded-provider shadow safety and failure matrix
+        run: PYTHONPATH=. uv run pytest -q tests/api/test_espn_live_scoring.py tests/api/test_espn_scoring_worker.py
+      - name: Frontend build and static API consumer check
+        run: |
+          npm --prefix web ci
+          npm --prefix web run typecheck
+          npm --prefix web run build
+      - name: Clean shutdown
+        if: always()
+        run: |
+          test -f /tmp/cff-api.pid && kill "$(cat /tmp/cff-api.pid)" || true
+          test ! -s /tmp/cff-api.log || tail -200 /tmp/cff-api.log
