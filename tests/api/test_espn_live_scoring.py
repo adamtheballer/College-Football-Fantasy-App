@@ -6,6 +6,7 @@ import pytest
 
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.game import Game
+from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
@@ -13,6 +14,8 @@ from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekSc
 from collegefootballfantasy_api.app.models.team_week_score import TeamWeekScore
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId, UnmatchedProviderRow
+from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.services.espn_stats_sync import UnresolvedKickerDistanceError, normalize_espn_summary_player_stats
 from collegefootballfantasy_api.app.services.espn_live_scoring import (
     MIN_GAME_POLL_INTERVAL_SECONDS,
@@ -101,6 +104,71 @@ def test_shadow_cycle_uses_one_per_game_lease_and_never_promotes_public_scores(d
     poll = db_session.query(ProviderGamePoll).filter_by(provider="espn", provider_game_id="401").one()
     assert _utc(poll.next_poll_at) >= NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS)
     assert db_session.query(UnmatchedProviderRow).filter_by(feed="live_boxscore_player_stats").count() == 1
+
+
+def test_100_league_1000_roster_cache_is_per_game_not_per_roster_or_read(db_session):
+    """A shared college game remains one provider request per 180-second window."""
+
+    players = [Player(name=f"Shared Texas Player {index}", position="WR", school="Texas") for index in range(10)]
+    db_session.add_all(players)
+    db_session.flush()
+    for league_index in range(100):
+        league = League(name=f"ESPN scale {league_index}", season_year=2026, max_teams=1)
+        db_session.add(league)
+        db_session.flush()
+        team = Team(league_id=league.id, name=f"Scale team {league_index}")
+        db_session.add(team)
+        db_session.flush()
+        db_session.add_all(
+            RosterEntry(
+                league_id=league.id,
+                team_id=team.id,
+                player_id=player.id,
+                slot="BE",
+                status="active",
+            )
+            for player in players
+        )
+    db_session.commit()
+
+    assert db_session.query(League).count() == 100
+    assert db_session.query(RosterEntry).count() == 1000
+    client = FakeLiveESPN()
+    first = run_espn_scoring_cycle(db_session, season=2026, week=1, mode="shadow", client=client, worker_id="worker-a", now=NOW)
+    assert first.successful_games == 1
+    assert client.summary_calls == 1
+
+    # These model repeated UI/API freshness reads. Only the worker owns
+    # provider traffic, so no number of manager reads can fetch ESPN.
+    for offset in (30, 60, 90, 120, 150, 179):
+        for _ in range(100):
+            espn_week_freshness(db_session, season=2026, week=1, now=NOW + timedelta(seconds=offset))
+        result = run_espn_scoring_cycle(
+            db_session,
+            season=2026,
+            week=1,
+            mode="shadow",
+            client=client,
+            worker_id=f"worker-before-{offset}",
+            now=NOW + timedelta(seconds=offset),
+        )
+        assert result.claimed_games == 0
+        assert client.summary_calls == 1
+
+    at_boundary = run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="shadow",
+        client=client,
+        worker_id="worker-b",
+        now=NOW + timedelta(seconds=180),
+    )
+    assert at_boundary.successful_games == 1
+    assert client.summary_calls == 2
+    # Discovery is durable/per-week as well: one initial request and one
+    # permitted boundary refresh, never one per league or browser read.
+    assert client.scoreboard_calls == 2
 
 
 def test_shadow_mode_cannot_change_existing_public_score_authority(db_session):

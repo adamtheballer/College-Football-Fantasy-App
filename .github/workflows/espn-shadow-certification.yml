@@ -59,6 +59,10 @@ jobs:
         run: PYTHONPATH=. uv run python scripts/run_espn_scoring_worker.py --once
       - name: Recorded-provider shadow safety and failure matrix
         run: PYTHONPATH=. uv run pytest -q tests/api/test_espn_live_scoring.py tests/api/test_espn_scoring_worker.py
+      - name: Real PostgreSQL 100-league shadow cache certification
+        env:
+          CFF_ALLOW_SHADOW_STRESS_CERTIFICATION: "1"
+        run: PYTHONPATH=. uv run python scripts/certify_espn_shadow_stress.py
       - name: Frontend build and static API consumer check
         run: |
           npm --prefix web ci
