@@ -179,7 +179,7 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
               <span className="inline-flex items-center gap-2 rounded-md border border-cfb-gold/45 bg-cfb-gold/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-yellow-100"><Trophy className="h-4 w-4" /> Saturday Pick 6</span>
               <span className="cfb-micro-label text-cyan-200">Week {contest.week_number} · {contest.contest_position} Week</span>
             </div>
-            <h1 className="mt-5 font-display text-3xl font-black tracking-[-0.04em] text-cfb-text-primary sm:text-4xl">{isResults ? "Live results" : isOpen ? "Make your pick" : contest.status === "SCHEDULED" ? "Picks opening soon" : "Picks locked"}</h1>
+            <h1 className="mt-5 font-display text-3xl font-black tracking-[-0.04em] text-cfb-text-primary sm:text-4xl">{isResults ? "LIVE RESULTS" : isOpen ? "MAKE YOUR PICK" : contest.status === "SCHEDULED" ? "PICKS OPENING SOON" : "PICKS LOCKED"}</h1>
             <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-cfb-text-secondary sm:text-lg">Which featured {positionLabel(contest.contest_position)} will score the most fantasy points this week?</p>
             <p className="mt-4 max-w-2xl rounded-lg border border-cfb-border-subtle bg-cfb-surface px-4 py-3 text-sm leading-6 text-cfb-text-secondary">
               <span className="mr-2 font-bold text-cfb-text-primary">How it works</span>

@@ -10,7 +10,7 @@ type DesktopSidebarProps = {
   onSignOut: () => void;
 };
 
-const displayNavName = (name: string) => name.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase()).replace("Mock Draft", "Draft");
+const displayNavName = (name: string) => name.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarProps) {
   return (
