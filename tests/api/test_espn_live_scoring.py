@@ -16,6 +16,7 @@ from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGam
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId, UnmatchedProviderRow
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbeat
 from collegefootballfantasy_api.app.services.espn_stats_sync import UnresolvedKickerDistanceError, normalize_espn_summary_player_stats
 from collegefootballfantasy_api.app.services.espn_live_scoring import (
     MIN_GAME_POLL_INTERVAL_SECONDS,
@@ -25,6 +26,7 @@ from collegefootballfantasy_api.app.services.espn_live_scoring import (
     espn_week_freshness,
     run_espn_scoring_cycle,
 )
+from collegefootballfantasy_api.app.services.live_scoring_readiness import PublicScoringPreflightError
 from tests.api.scoring_helpers import create_scoring_fixture
 from tests.api.test_espn_boxscores import espn_summary_payload
 
@@ -75,6 +77,20 @@ def _verified_players(db_session):
     return arch, wingo
 
 
+def _make_public_promotion_ready(db_session, *, at):
+    """Model the verified schedule + worker heartbeat required in production."""
+
+    if db_session.query(Game).filter_by(external_id="401", season=2026, week=1).one_or_none() is None:
+        db_session.add(Game(external_id="401", season=2026, week=1, home_team="Texas", away_team="Ohio State", start_date=NOW))
+    heartbeat = db_session.query(WorkerHeartbeat).filter_by(worker_name="espn_scoring_processor").one_or_none()
+    if heartbeat is None:
+        heartbeat = WorkerHeartbeat(worker_name="espn_scoring_processor")
+        db_session.add(heartbeat)
+    heartbeat.status = "healthy"
+    heartbeat.heartbeat_at = at
+    db_session.commit()
+
+
 def test_shadow_cycle_uses_one_per_game_lease_and_never_promotes_public_scores(db_session):
     _verified_players(db_session)
     client = FakeLiveESPN()
@@ -104,6 +120,17 @@ def test_shadow_cycle_uses_one_per_game_lease_and_never_promotes_public_scores(d
     poll = db_session.query(ProviderGamePoll).filter_by(provider="espn", provider_game_id="401").one()
     assert _utc(poll.next_poll_at) >= NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS)
     assert db_session.query(UnmatchedProviderRow).filter_by(feed="live_boxscore_player_stats").count() == 1
+
+
+def test_enabled_cycle_fails_closed_before_public_promotion_when_preflight_is_not_ready(db_session):
+    _verified_players(db_session)
+
+    with pytest.raises(PublicScoringPreflightError, match="SCORING_WORKER_UNHEALTHY"):
+        run_espn_scoring_cycle(
+            db_session, season=2026, week=1, mode="enabled", client=FakeLiveESPN(), now=NOW, relevant_team_names={"texas"}
+        )
+
+    assert db_session.query(PlayerStat).count() == 0
 
 
 def test_100_league_1000_roster_cache_is_per_game_not_per_roster_or_read(db_session):
@@ -279,6 +306,7 @@ def test_identical_replay_creates_one_immutable_snapshot_and_enabled_mode_replac
     updated["boxscore"]["players"][0]["statistics"][0]["athletes"][0]["stats"][1] = "300"
     poll.next_poll_at = NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS * 2)
     db_session.commit()
+    _make_public_promotion_ready(db_session, at=NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS * 2))
     run_espn_scoring_cycle(
         db_session,
         season=2026,
@@ -345,6 +373,7 @@ def test_timeout_marks_only_the_game_poll_delayed_and_does_not_retry_immediately
 def test_empty_or_partial_summary_preserves_last_verified_cumulative_totals(db_session):
     arch, wingo = _verified_players(db_session)
     client = FakeLiveESPN()
+    _make_public_promotion_ready(db_session, at=NOW)
     run_espn_scoring_cycle(
         db_session, season=2026, week=1, mode="enabled", client=client, now=NOW, relevant_team_names={"texas"}
     )

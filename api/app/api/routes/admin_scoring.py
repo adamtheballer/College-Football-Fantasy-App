@@ -30,6 +30,10 @@ from collegefootballfantasy_api.app.services.admin_scoring_service import (
     rerun_scoring,
     set_week_status,
 )
+from collegefootballfantasy_api.app.services.live_scoring_readiness import (
+    flat_field_goal_league_audit,
+    scoring_operations_report,
+)
 
 router = APIRouter()
 
@@ -51,6 +55,27 @@ def list_worker_health(
         }
         for row in rows
     ]
+
+
+@router.get("/live-operations")
+def live_scoring_operations(
+    season: int = Query(ge=2000, le=2100),
+    week: int = Query(ge=1, le=20),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_user),
+) -> dict:
+    """Secret-free operational state for the ESPN shadow/public release gate."""
+
+    return scoring_operations_report(db, season=season, week=week)
+
+
+@router.get("/live-operations/flat-field-goals")
+def live_scoring_flat_field_goals(
+    season: int = Query(ge=2000, le=2100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_user),
+) -> dict:
+    return flat_field_goal_league_audit(db, season=season)
 
 
 @router.get("/runs", response_model=ScoringRunsList)

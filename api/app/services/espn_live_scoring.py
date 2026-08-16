@@ -690,6 +690,12 @@ def run_espn_scoring_cycle(
     if mode == "enabled" and pending_promotion:
         # Promotion is intentionally a short database operation after every
         # provider request has completed.  Shadow mode stops before this line.
+        # The gate lives at the authority boundary, not only in process
+        # configuration: a worker may start correctly then encounter an
+        # unresolved starter or an unhealthy provider before a later cycle.
+        from collegefootballfantasy_api.app.services.live_scoring_readiness import assert_public_scoring_ready
+
+        assert_public_scoring_ready(db, season=season, week=week, now=current)
         promoted = persist_normalized_espn_player_stats(
             db,
             season=season,
