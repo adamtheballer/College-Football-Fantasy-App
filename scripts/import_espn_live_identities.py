@@ -436,12 +436,31 @@ def _write_markdown(path: Path, title: str, summary: dict[str, Any], note: str) 
 
 
 def apply_verified_player_mappings(db: Session, records: list[dict[str, Any]]) -> int:
+    verified_records = [record for record in records if record["status"] == "verified"]
+    existing_by_player = {
+        row.player_id: row
+        for row in db.query(PlayerProviderId)
+        .filter(
+            PlayerProviderId.provider == "espn",
+            PlayerProviderId.player_id.in_([record["internal_player_id"] for record in verified_records] or [0]),
+        )
+        .all()
+    }
     applied = 0
-    for record in records:
-        if record["status"] != "verified":
+    for record in verified_records:
+        existing = existing_by_player.get(record["internal_player_id"])
+        # A rerun must preserve the original verification timestamp and avoid
+        # a second audit write when the verified identity is already exact.
+        if (
+            existing is not None
+            and existing.provider_player_id == record["espn_player_id"]
+            and existing.provider_team_id == record.get("espn_team_id")
+            and existing.verification_status == "verified"
+            and existing.match_confidence == 1.0
+        ):
             continue
         try:
-            upsert_player_provider_mapping(
+            mapping = upsert_player_provider_mapping(
                 db,
                 player_id=record["internal_player_id"],
                 provider="espn",
@@ -453,15 +472,38 @@ def apply_verified_player_mappings(db: Session, records: list[dict[str, Any]]) -
             )
         except ProviderIdentityConflict:
             raise RuntimeError(f"refusing to apply conflicting mapping for player {record['internal_player_id']}") from None
+        existing_by_player[record["internal_player_id"]] = mapping
         applied += 1
     return applied
 
 
 def apply_verified_schedule(db: Session, records: list[dict[str, Any]]) -> int:
+    event_ids = [record["espn_event_id"] for record in records]
+    games_by_event = {
+        game.external_id: game
+        for game in db.query(Game).filter(Game.external_id.in_(event_ids or ["__none__"])).all()
+    }
+    schedule_keys = {
+        (canonical_school_name(team_name), record["season"], record["week"])
+        for record in records
+        for team_name in (record["home_team"], record["away_team"])
+        if canonical_school_name(team_name)
+    }
+    schedules_by_key = {
+        (row.team_name, row.season, row.week): row
+        for row in db.query(TeamSchedule)
+        .filter(
+            TeamSchedule.season.in_({record["season"] for record in records} or {0}),
+            TeamSchedule.week.in_({record["week"] for record in records} or {0}),
+        )
+        .all()
+        if (row.team_name, row.season, row.week) in schedule_keys
+    }
     applied = 0
     for record in records:
         kickoff = datetime.fromisoformat(record["kickoff"])
-        existing = db.query(Game).filter_by(external_id=record["espn_event_id"]).one_or_none()
+        existing = games_by_event.get(record["espn_event_id"])
+        changed = False
         if existing is None:
             existing = Game(
                 external_id=record["espn_event_id"], season=record["season"], week=record["week"],
@@ -470,25 +512,46 @@ def apply_verified_schedule(db: Session, records: list[dict[str, Any]]) -> int:
             )
             db.add(existing)
             db.flush()
+            games_by_event[record["espn_event_id"]] = existing
+            changed = True
         elif (
             {existing.home_team, existing.away_team} != {record["home_team"], record["away_team"]}
             or existing.start_date is None
             or _as_utc(existing.start_date) != _as_utc(kickoff)
         ):
             raise RuntimeError(f"refusing conflicting existing ESPN event {record['espn_event_id']}")
+        elif existing.schedule_status != record["status"]:
+            existing.schedule_status = record["status"]
+            changed = True
         for team_name, opponent_name, location in ((record["home_team"], record["away_team"], "home"), (record["away_team"], record["home_team"], "away")):
             canonical = canonical_school_name(team_name)
             if not canonical:
                 continue
-            row = db.query(TeamSchedule).filter_by(team_name=canonical, season=record["season"], week=record["week"]).one_or_none()
+            schedule_key = (canonical, record["season"], record["week"])
+            row = schedules_by_key.get(schedule_key)
             if row and row.game_id not in {None, existing.id}:
                 raise RuntimeError(f"refusing conflicting schedule for {canonical} week {record['week']}")
             if row is None:
                 row = TeamSchedule(team_name=canonical, season=record["season"], week=record["week"], location=location)
                 db.add(row)
-            row.game_id, row.opponent_name, row.kickoff_at, row.game_date = existing.id, opponent_name, kickoff, kickoff.date()
-            row.is_bye, row.date_confirmed, row.source_url = False, True, "https://site.api.espn.com/"
-        applied += 1
+                schedules_by_key[schedule_key] = row
+                changed = True
+            schedule_is_exact = (
+                row.game_id == existing.id
+                and row.opponent_name == opponent_name
+                and row.kickoff_at is not None
+                and _as_utc(row.kickoff_at) == _as_utc(kickoff)
+                and row.game_date == kickoff.date()
+                and row.location == location
+                and row.is_bye is False
+                and row.date_confirmed is True
+                and row.source_url == "https://site.api.espn.com/"
+            )
+            if not schedule_is_exact:
+                row.game_id, row.opponent_name, row.kickoff_at, row.game_date = existing.id, opponent_name, kickoff, kickoff.date()
+                row.location, row.is_bye, row.date_confirmed, row.source_url = location, False, True, "https://site.api.espn.com/"
+                changed = True
+        applied += int(changed)
     return applied
 
 

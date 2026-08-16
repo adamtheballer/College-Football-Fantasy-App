@@ -98,6 +98,7 @@ def test_identity_planner_verifies_only_exact_roster_and_profile_matches(db_sess
     mapping = db_session.query(PlayerProviderId).filter_by(player_id=exact.id, provider="espn").one()
     assert mapping.provider_player_id == "101"
     assert mapping.verification_status == "verified"
+    assert apply_verified_player_mappings(db_session, records) == 0
 
 
 def test_identity_planner_marks_an_unavailable_profile_for_review_instead_of_guessing(db_session):
@@ -180,6 +181,6 @@ def test_schedule_planner_requires_event_participants_and_kickoff_then_applies_i
     db_session.commit()
     assert db_session.query(Game).filter_by(external_id="401999001").count() == 1
     assert db_session.query(TeamSchedule).filter_by(season=2026, week=1).count() == 2
-    assert apply_verified_schedule(db_session, records) == 1
+    assert apply_verified_schedule(db_session, records) == 0
     db_session.commit()
     assert db_session.query(Game).filter_by(external_id="401999001").count() == 1
