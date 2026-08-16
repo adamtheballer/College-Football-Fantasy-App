@@ -31,7 +31,11 @@ from collegefootballfantasy_api.app.models.provider_identity import PlayerProvid
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.services.player_pool_filters import canonical_fantasy_player_filter
 from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
-from collegefootballfantasy_api.app.services.provider_identity import ProviderIdentityConflict, upsert_player_provider_mapping
+from collegefootballfantasy_api.app.services.provider_identity import (
+    ProviderIdentityConflict,
+    audit_identity_event,
+    upsert_player_provider_mapping,
+)
 
 
 PARSER_VERSION = "espn-identity-import-v1"
@@ -483,6 +487,18 @@ def apply_verified_schedule(db: Session, records: list[dict[str, Any]]) -> int:
         game.external_id: game
         for game in db.query(Game).filter(Game.external_id.in_(event_ids or ["__none__"])).all()
     }
+    def game_pair_key(home_team: str, away_team: str, season: int, week: int) -> tuple[int, int, tuple[str, str]]:
+        def team_key(name: str) -> str:
+            return canonical_school_name(name) or normalize_school(name)
+        return season, week, tuple(sorted((team_key(home_team), team_key(away_team))))
+
+    legacy_games_by_pair: dict[tuple[int, int, tuple[str, str]], list[Game]] = defaultdict(list)
+    for game in db.query(Game).filter(
+        Game.season.in_({record["season"] for record in records} or {0}),
+        Game.week.in_({record["week"] for record in records} or {0}),
+    ).all():
+        if game.external_id and game.external_id.startswith("sheet-"):
+            legacy_games_by_pair[game_pair_key(game.home_team, game.away_team, game.season, game.week)].append(game)
     schedule_keys = {
         (canonical_school_name(team_name), record["season"], record["week"])
         for record in records
@@ -505,13 +521,46 @@ def apply_verified_schedule(db: Session, records: list[dict[str, Any]]) -> int:
         existing = games_by_event.get(record["espn_event_id"])
         changed = False
         if existing is None:
-            existing = Game(
-                external_id=record["espn_event_id"], season=record["season"], week=record["week"],
-                home_team=record["home_team"], away_team=record["away_team"], start_date=kickoff,
-                schedule_status=record["status"],
+            legacy_matches = legacy_games_by_pair.get(
+                game_pair_key(record["home_team"], record["away_team"], record["season"], record["week"]), []
             )
-            db.add(existing)
-            db.flush()
+            if len(legacy_matches) > 1:
+                raise RuntimeError(f"refusing ambiguous legacy schedule for ESPN event {record['espn_event_id']}")
+            if legacy_matches:
+                existing = legacy_matches[0]
+                before_state = {
+                    "external_id": existing.external_id,
+                    "home_team": existing.home_team,
+                    "away_team": existing.away_team,
+                    "start_date": existing.start_date.isoformat() if existing.start_date else None,
+                }
+                existing.external_id = record["espn_event_id"]
+                existing.home_team, existing.away_team = record["home_team"], record["away_team"]
+                existing.start_date, existing.schedule_status = kickoff, record["status"]
+                audit_identity_event(
+                    db,
+                    entity_type="game",
+                    entity_id=existing.id,
+                    action="attach_verified_espn_event",
+                    provider="espn",
+                    after_state={
+                        "external_id": existing.external_id,
+                        "home_team": existing.home_team,
+                        "away_team": existing.away_team,
+                        "start_date": existing.start_date.isoformat(),
+                        "verification_method": "exact canonical team pair, season, and week",
+                    },
+                    before_state=before_state,
+                    reason="Verified ESPN schedule event replaces legacy spreadsheet external ID.",
+                )
+            else:
+                existing = Game(
+                    external_id=record["espn_event_id"], season=record["season"], week=record["week"],
+                    home_team=record["home_team"], away_team=record["away_team"], start_date=kickoff,
+                    schedule_status=record["status"],
+                )
+                db.add(existing)
+                db.flush()
             games_by_event[record["espn_event_id"]] = existing
             changed = True
         elif (
@@ -552,6 +601,7 @@ def apply_verified_schedule(db: Session, records: list[dict[str, Any]]) -> int:
                 row.location, row.is_bye, row.date_confirmed, row.source_url = location, False, True, "https://site.api.espn.com/"
                 changed = True
         applied += int(changed)
+    db.flush()
     return applied
 
 
