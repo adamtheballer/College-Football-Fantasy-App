@@ -39,8 +39,8 @@ def upgrade() -> None:
         # TimestampMixin is non-nullable in the runtime metadata.  Keep this
         # unreleased migration exact so `alembic check` protects the shadow
         # worker contract instead of reporting false schema drift.
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("provider", "provider_game_id", name="uq_provider_game_polls_provider_game"),
     )
@@ -60,8 +60,8 @@ def upgrade() -> None:
         sa.Column("snapshot_hash", sa.String(length=64), nullable=False),
         sa.Column("raw_payload", sa.JSON(), nullable=False, server_default=sa.text("'{}'::json")),
         sa.Column("normalized_rows", sa.JSON(), nullable=False, server_default=sa.text("'[]'::json")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
             "provider", "provider_game_id", "snapshot_hash", name="uq_provider_game_snapshots_provider_game_hash"
