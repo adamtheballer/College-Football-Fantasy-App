@@ -14,6 +14,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from collegefootballfantasy_api.app.core.config import settings
+from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.integrations.espn import ESPNClient
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
@@ -69,6 +70,10 @@ def resolve_scoring_window(db, *, now: datetime | None = None) -> tuple[int, int
 def run_iteration(*, now: datetime | None = None, client: ESPNClient | None = None) -> EspnCycleResult | None:
     if settings.scoring_mode not in {"shadow", "enabled"} or settings.scoring_provider.strip().lower() != "espn":
         raise RuntimeError("ESPN scoring worker requires SCORING_PROVIDER=espn and SCORING_MODE=shadow or enabled.")
+    # This command is intentionally runnable without importing FastAPI.  Load
+    # every relationship target before its first ORM query so a clean worker
+    # process cannot appear healthy after logging a mapper-configuration error.
+    ensure_models_registered()
     with SessionLocal() as db:
         window = resolve_scoring_window(db, now=now)
         if window is None:
@@ -127,6 +132,8 @@ def main() -> None:
             run_iteration()
         except Exception as error:  # pragma: no cover - operational failure path
             logger.exception("espn_scoring_iteration_failed", extra={"error": str(error)})
+            if args.once:
+                raise
         if args.once:
             return
         time.sleep(max(0, args.interval_seconds - (time.monotonic() - started)))
