@@ -20,12 +20,15 @@ from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbe
 from collegefootballfantasy_api.app.services.espn_stats_sync import UnresolvedKickerDistanceError, normalize_espn_summary_player_stats
 from collegefootballfantasy_api.app.services.espn_live_scoring import (
     MIN_GAME_POLL_INTERVAL_SECONDS,
+    SnapshotOrderMetadata,
     claim_due_espn_games,
+    classify_snapshot_order,
     discover_relevant_espn_games,
     certify_espn_matchup_finality,
     espn_week_freshness,
     run_espn_scoring_cycle,
 )
+from collegefootballfantasy_api.app.integrations.espn import ESPNProviderResponse
 from collegefootballfantasy_api.app.services.live_scoring_readiness import PublicScoringPreflightError
 from tests.api.scoring_helpers import create_scoring_fixture
 from tests.api.test_espn_boxscores import espn_summary_payload
@@ -39,9 +42,10 @@ def _utc(value):
 
 
 class FakeLiveESPN:
-    def __init__(self, summary=None, error=None):
+    def __init__(self, summary=None, error=None, response_metadata=None):
         self.summary = summary or espn_summary_payload()
         self.error = error
+        self.response_metadata = response_metadata or {}
         self.scoreboard_calls = 0
         self.summary_calls = 0
 
@@ -60,6 +64,59 @@ class FakeLiveESPN:
         if self.error:
             raise self.error
         return self.summary
+
+    def get_summary_response(self, event_id):
+        self.summary_calls += 1
+        if self.error:
+            raise self.error
+        return ESPNProviderResponse(payload=self.summary, response_metadata=self.response_metadata)
+
+
+def _summary_at(*, period: int, clock: str, pass_yards: int) -> dict:
+    summary = deepcopy(espn_summary_payload())
+    status = summary["header"]["competitions"][0]["status"]
+    status["period"] = period
+    status["displayClock"] = clock
+    status["type"] = {"state": "in", "completed": False}
+    summary["boxscore"]["players"][0]["statistics"][0]["athletes"][0]["stats"][1] = str(pass_yards)
+    return summary
+
+
+def _final_summary(*, pass_yards: int) -> dict:
+    summary = _summary_at(period=4, clock="00:00", pass_yards=pass_yards)
+    summary["header"]["competitions"][0]["status"] = {"type": {"name": "STATUS_FINAL", "state": "post", "completed": True}}
+    return summary
+
+
+def _poll_due(db_session, *, at: datetime) -> ProviderGamePoll:
+    poll = db_session.query(ProviderGamePoll).filter_by(provider_game_id="401").one()
+    poll.next_poll_at = at
+    db_session.commit()
+    return poll
+
+
+def _run_summary(db_session, *, summary: dict, at: datetime, mode: str = "shadow", response_metadata=None):
+    _poll_due(db_session, at=at)
+    return run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode=mode,
+        client=FakeLiveESPN(summary=summary, response_metadata=response_metadata),
+        now=at,
+        relevant_team_names={"texas"},
+    )
+
+
+def _accepted_pass_yards(db_session) -> float:
+    poll = db_session.query(ProviderGamePoll).filter_by(provider_game_id="401").one()
+    snapshot = (
+        db_session.query(ProviderGameSnapshot)
+        .filter_by(provider_game_id="401", snapshot_hash=poll.accepted_snapshot_hash)
+        .order_by(ProviderGameSnapshot.id.desc())
+        .one()
+    )
+    return next(row["stats"]["pass_yards"] for row in snapshot.normalized_rows if row["player_id"])
 
 
 def _verified_players(db_session):
@@ -284,7 +341,7 @@ def test_verified_kicker_with_unbucketed_made_field_goal_delays_the_game_without
     assert db_session.query(UnmatchedProviderRow).filter_by(feed="live_boxscore_kicker_distance").count() == 1
 
 
-def test_identical_replay_creates_one_immutable_snapshot_and_enabled_mode_replaces_cumulative_totals(db_session):
+def test_identical_replay_is_audited_without_promoting_and_later_progress_replaces_cumulative_totals(db_session):
     arch, _wingo = _verified_players(db_session)
     client = FakeLiveESPN()
     run_espn_scoring_cycle(db_session, season=2026, week=1, mode="shadow", client=client, now=NOW, relevant_team_names={"texas"})
@@ -300,9 +357,11 @@ def test_identical_replay_creates_one_immutable_snapshot_and_enabled_mode_replac
         now=NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS),
         relevant_team_names={"texas"},
     )
-    assert db_session.query(ProviderGameSnapshot).count() == 1
+    assert db_session.query(ProviderGameSnapshot).count() == 2
+    assert poll.duplicate_snapshot_count == 1
 
     updated = espn_summary_payload()
+    updated["header"]["competitions"][0]["status"]["displayClock"] = "09:00"
     updated["boxscore"]["players"][0]["statistics"][0]["athletes"][0]["stats"][1] = "300"
     poll.next_poll_at = NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS * 2)
     db_session.commit()
@@ -318,7 +377,169 @@ def test_identical_replay_creates_one_immutable_snapshot_and_enabled_mode_replac
     )
     stat = db_session.query(PlayerStat).filter_by(player_id=arch.id, season=2026, week=1).one()
     assert stat.stats["pass_yards"] == 300.0
-    assert db_session.query(ProviderGameSnapshot).count() == 2
+    assert db_session.query(ProviderGameSnapshot).count() == 3
+
+
+def test_snapshot_ordering_keeps_the_latest_accepted_live_state_on_stale_and_ambiguous_payloads(db_session):
+    _verified_players(db_session)
+    first = _summary_at(period=1, clock="10:00", pass_yards=80)
+    run_espn_scoring_cycle(
+        db_session, season=2026, week=1, mode="shadow", client=FakeLiveESPN(summary=first), now=NOW, relevant_team_names={"texas"}
+    )
+    assert _accepted_pass_yards(db_session) == 80.0
+
+    later = _summary_at(period=1, clock="07:00", pass_yards=180)
+    _run_summary(db_session, summary=later, at=NOW + timedelta(seconds=180))
+    assert _accepted_pass_yards(db_session) == 180.0
+
+    next_period = _summary_at(period=2, clock="12:00", pass_yards=220)
+    _run_summary(db_session, summary=next_period, at=NOW + timedelta(seconds=360))
+    assert _accepted_pass_yards(db_session) == 220.0
+
+    stale = _summary_at(period=1, clock="10:00", pass_yards=80)
+    _run_summary(db_session, summary=stale, at=NOW + timedelta(seconds=540))
+    poll = db_session.query(ProviderGamePoll).filter_by(provider_game_id="401").one()
+    assert poll.last_snapshot_classification == "STALE"
+    assert poll.stale_snapshot_count == 1
+    assert _accepted_pass_yards(db_session) == 220.0
+
+    ambiguous = _summary_at(period=2, clock="12:00", pass_yards=217)
+    _run_summary(db_session, summary=ambiguous, at=NOW + timedelta(seconds=720))
+    db_session.refresh(poll)
+    assert poll.last_snapshot_classification == "AMBIGUOUS"
+    assert poll.ambiguous_snapshot_count == 1
+    assert _accepted_pass_yards(db_session) == 220.0
+
+
+def test_later_live_progress_can_accept_a_legitimate_stat_decrease(db_session):
+    _verified_players(db_session)
+    run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="shadow",
+        client=FakeLiveESPN(summary=_summary_at(period=2, clock="08:00", pass_yards=150)),
+        now=NOW,
+        relevant_team_names={"texas"},
+    )
+    _run_summary(
+        db_session,
+        summary=_summary_at(period=2, clock="04:00", pass_yards=147),
+        at=NOW + timedelta(seconds=180),
+    )
+    poll = db_session.query(ProviderGamePoll).filter_by(provider_game_id="401").one()
+    assert poll.last_snapshot_classification == "NEWER"
+    assert _accepted_pass_yards(db_session) == 147.0
+
+
+def test_final_state_is_immutable_without_a_newer_authoritative_revision(db_session):
+    _verified_players(db_session)
+    run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="shadow",
+        client=FakeLiveESPN(summary=_final_summary(pass_yards=300)),
+        now=NOW,
+        relevant_team_names={"texas"},
+    )
+    _run_summary(
+        db_session,
+        summary=_summary_at(period=4, clock="02:00", pass_yards=280),
+        at=NOW + timedelta(seconds=180),
+    )
+    poll = db_session.query(ProviderGamePoll).filter_by(provider_game_id="401").one()
+    assert poll.last_snapshot_classification == "STALE"
+    assert poll.status == "final"
+    assert _accepted_pass_yards(db_session) == 300.0
+
+    _run_summary(
+        db_session,
+        summary=_final_summary(pass_yards=294),
+        at=NOW + timedelta(seconds=360),
+    )
+    db_session.refresh(poll)
+    assert poll.last_snapshot_classification == "AMBIGUOUS"
+    assert poll.pending_final_correction_count == 1
+    assert _accepted_pass_yards(db_session) == 300.0
+
+
+def test_final_correction_requires_a_monotonic_provider_revision_and_promotes_once(db_session):
+    arch, _wingo = _verified_players(db_session)
+    _make_public_promotion_ready(db_session, at=NOW)
+    run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="enabled",
+        client=FakeLiveESPN(summary=_final_summary(pass_yards=300), response_metadata={"provider_revision": "10"}),
+        now=NOW,
+        relevant_team_names={"texas"},
+    )
+    _make_public_promotion_ready(db_session, at=NOW + timedelta(seconds=180))
+    _run_summary(
+        db_session,
+        summary=_final_summary(pass_yards=294),
+        at=NOW + timedelta(seconds=180),
+        mode="enabled",
+        response_metadata={"provider_revision": "11"},
+    )
+    poll = db_session.query(ProviderGamePoll).filter_by(provider_game_id="401").one()
+    assert poll.last_snapshot_classification == "VERIFIED_CORRECTION"
+    assert db_session.query(PlayerStat).filter_by(player_id=arch.id, season=2026, week=1).one().stats["pass_yards"] == 294.0
+
+
+def test_snapshot_ordering_survives_a_worker_restart_and_two_claimers(db_session):
+    _verified_players(db_session)
+    run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="shadow",
+        client=FakeLiveESPN(summary=_summary_at(period=3, clock="07:00", pass_yards=295)),
+        now=NOW,
+        relevant_team_names={"texas"},
+        worker_id="first-process",
+    )
+    db_session.expunge_all()  # A new process/session must rely on persisted state only.
+    _run_summary(
+        db_session,
+        summary=_summary_at(period=2, clock="05:00", pass_yards=180),
+        at=NOW + timedelta(seconds=180),
+    )
+    assert _accepted_pass_yards(db_session) == 295.0
+    poll = db_session.query(ProviderGamePoll).filter_by(provider_game_id="401").one()
+    assert poll.last_snapshot_classification == "STALE"
+
+    poll.next_poll_at = NOW + timedelta(seconds=360)
+    db_session.commit()
+    first = claim_due_espn_games(db_session, season=2026, week=1, worker_id="worker-a", now=NOW + timedelta(seconds=360))
+    second = claim_due_espn_games(db_session, season=2026, week=1, worker_id="worker-b", now=NOW + timedelta(seconds=360))
+    assert len(first) == 1
+    assert second == []
+
+
+def test_snapshot_classifier_requires_explicit_strong_revision_for_final_correction():
+    previous = ProviderGameSnapshot(
+        provider="espn",
+        provider_game_id="401",
+        season=2026,
+        week=1,
+        status="final",
+        snapshot_hash="a" * 64,
+        captured_at=NOW,
+        provider_revision="10",
+        event_state="final",
+        raw_payload={},
+        normalized_rows=[],
+    )
+    decision = classify_snapshot_order(
+        previous,
+        candidate_hash="b" * 64,
+        candidate=SnapshotOrderMetadata("11", None, None, {}, None, None, "final"),
+    )
+    assert decision.classification == "VERIFIED_CORRECTION"
+    assert decision.accepted is True
 
 
 def test_429_and_403_enter_backoff_without_clearing_verified_data(db_session):

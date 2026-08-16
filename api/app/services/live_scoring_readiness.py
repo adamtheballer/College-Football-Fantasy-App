@@ -227,7 +227,10 @@ def assert_public_scoring_ready(db: Session, *, season: int, week: int, now: dat
 def _minimum_success_interval_seconds(snapshots: list[ProviderGameSnapshot]) -> int | None:
     grouped: dict[str, list[datetime]] = defaultdict(list)
     for snapshot in snapshots:
-        at = _utc(snapshot.provider_as_of)
+        # Receipt time validates the worker's 180-second request cadence.  It
+        # is deliberately separate from provider ordering, which only trusts
+        # explicit ESPN revisions or game-progress markers.
+        at = _utc(snapshot.captured_at) or _utc(snapshot.provider_as_of)
         if at is not None:
             grouped[snapshot.provider_game_id].append(at)
     intervals = [int((right - left).total_seconds()) for values in grouped.values() for left, right in zip(sorted(values), sorted(values)[1:])]
@@ -280,6 +283,17 @@ def scoring_operations_report(db: Session, *, season: int, week: int, now: datet
         alerts.append({"severity": "warning", "code": f"PROVIDER_DATA_{freshness.state.upper()}"})
     if unmatched:
         alerts.append({"severity": "warning", "code": "UNMATCHED_LIVE_PLAYER_ROWS"})
+    stale_rejections = sum(row.stale_snapshot_count for row in game_polls)
+    ambiguous_quarantines = sum(row.ambiguous_snapshot_count for row in game_polls)
+    pending_final_corrections = sum(row.pending_final_correction_count for row in game_polls)
+    # A single rejected response can be normal CDN/provider behavior.  Repeated
+    # unresolved ordering evidence needs an operator without noisy live alerts.
+    if stale_rejections >= 3:
+        alerts.append({"severity": "warning", "code": "REPEATED_STALE_PROVIDER_SNAPSHOTS"})
+    if ambiguous_quarantines >= 3:
+        alerts.append({"severity": "warning", "code": "REPEATED_AMBIGUOUS_PROVIDER_SNAPSHOTS"})
+    if pending_final_corrections:
+        alerts.append({"severity": "error", "code": "PENDING_FINAL_CORRECTION_REVIEW"})
     return {
         "season": season,
         "week": week,
@@ -295,6 +309,11 @@ def scoring_operations_report(db: Session, *, season: int, week: int, now: datet
             "http_429_count": sum("429" in error for error in errors),
             "timeout_count": sum("timeout" in error.lower() for error in errors),
             "provider_failure_count": sum(row.failure_count for row in game_polls),
+            "accepted_snapshot_count": sum(row.accepted_snapshot_count for row in game_polls),
+            "duplicate_snapshot_count": sum(row.duplicate_snapshot_count for row in game_polls),
+            "stale_snapshot_rejection_count": stale_rejections,
+            "ambiguous_snapshot_quarantine_count": ambiguous_quarantines,
+            "pending_final_correction_count": pending_final_corrections,
         },
         "identity": {"open_unmatched_live_rows": unmatched},
         "freshness": {"state": freshness.state, "data_age_seconds": freshness.data_age_seconds, "relevant_game_count": freshness.relevant_game_count},
