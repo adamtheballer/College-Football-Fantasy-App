@@ -51,6 +51,7 @@ class CanonicalEvent:
     away_team: str
     kickoff: str
     status: str
+    evidence: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -63,6 +64,7 @@ class PlannedRepair:
     new_event_id: str | None
     old_kickoff: str | None
     new_kickoff: str | None
+    canonical_game_action: str | None
     evidence: dict[str, Any]
 
 
@@ -79,6 +81,7 @@ def load_events(path: Path, *, season: int, week: int) -> list[CanonicalEvent]:
             event_id=str(record["espn_event_id"]), season=season, week=week,
             home_team=str(record["home_team"]), away_team=str(record["away_team"]),
             kickoff=str(record.get("kickoff") or ""), status=str(record.get("status") or "pre"),
+            evidence=dict(record.get("evidence") or {}),
         ))
     return result
 
@@ -111,25 +114,37 @@ def plan_repairs(db: Session, *, season: int, week: int, events: list[CanonicalE
         candidates = [event for event in by_team.get(key(row.team_name), []) if key(row.opponent_name) in {key(event.home_team), key(event.away_team)}]
         base = dict(schedule_id=row.id, team=row.team_name, opponent=row.opponent_name, old_event_id=old_event, old_kickoff=row.kickoff_at.isoformat() if row.kickoff_at else None)
         if not candidates:
-            plans.append(PlannedRepair("NO_VERIFIED_EVENT", **base, new_event_id=None, new_kickoff=None, evidence={}))
+            plans.append(PlannedRepair("NO_VERIFIED_EVENT", **base, new_event_id=None, new_kickoff=None, canonical_game_action=None, evidence={}))
             continue
         if len(candidates) != 1:
-            plans.append(PlannedRepair("AMBIGUOUS", **base, new_event_id=None, new_kickoff=None, evidence={"candidate_event_ids": [event.event_id for event in candidates]}))
+            plans.append(PlannedRepair("AMBIGUOUS", **base, new_event_id=None, new_kickoff=None, canonical_game_action=None, evidence={"candidate_event_ids": [event.event_id for event in candidates]}))
             continue
         event = candidates[0]
         participants = {key(event.home_team), key(event.away_team)}
         if {key(row.team_name), key(row.opponent_name)} != participants:
-            plans.append(PlannedRepair("PARTICIPANT_CONFLICT", **base, new_event_id=event.event_id, new_kickoff=event.kickoff, evidence={"home_team": event.home_team, "away_team": event.away_team}))
+            plans.append(PlannedRepair("PARTICIPANT_CONFLICT", **base, new_event_id=event.event_id, new_kickoff=event.kickoff, canonical_game_action=None, evidence={"home_team": event.home_team, "away_team": event.away_team, **event.evidence}))
             continue
-        canonical_game = db.query(Game).filter(Game.external_id == event.event_id).one_or_none()
-        if canonical_game is None or {key(canonical_game.home_team), key(canonical_game.away_team)} != participants:
-            plans.append(PlannedRepair("NO_VERIFIED_EVENT", **base, new_event_id=event.event_id, new_kickoff=event.kickoff, evidence={"reason": "canonical_event_not_materialized"}))
+        canonical_games = db.query(Game).filter(Game.external_id == event.event_id).all()
+        if len(canonical_games) > 1:
+            plans.append(PlannedRepair("AMBIGUOUS", **base, new_event_id=event.event_id, new_kickoff=event.kickoff, canonical_game_action=None, evidence={"reason": "duplicate_canonical_event_id", "game_ids": [game.id for game in canonical_games], **event.evidence}))
             continue
+        canonical_game = canonical_games[0] if canonical_games else None
         kickoff = datetime.fromisoformat(event.kickoff.replace("Z", "+00"))
-        same_id = row.game_id == canonical_game.id
+        event_evidence = {"home_team": event.home_team, "away_team": event.away_team, "status": event.status, "version": VERSION, **event.evidence}
+        if canonical_game is not None and (
+            canonical_game.season != season
+            or canonical_game.week != week
+            or {key(canonical_game.home_team), key(canonical_game.away_team)} != participants
+        ):
+            plans.append(PlannedRepair("PARTICIPANT_CONFLICT", **base, new_event_id=event.event_id, new_kickoff=event.kickoff, canonical_game_action=None, evidence={"canonical_game_id": canonical_game.id, **event_evidence}))
+            continue
+        if canonical_game is not None and canonical_game.start_date is not None and as_utc(canonical_game.start_date) != as_utc(kickoff):
+            plans.append(PlannedRepair("KICKOFF_CONFLICT", **base, new_event_id=event.event_id, new_kickoff=event.kickoff, canonical_game_action=None, evidence={"canonical_game_id": canonical_game.id, "canonical_kickoff": canonical_game.start_date.isoformat(), **event_evidence}))
+            continue
+        same_id = canonical_game is not None and row.game_id == canonical_game.id
         same_kickoff = row.kickoff_at is not None and as_utc(row.kickoff_at) == as_utc(kickoff)
         category = "HARMLESS_ALIAS_NORMALIZATION" if same_id and same_kickoff else "SAFE_KICKOFF_REPAIR" if same_id else "SAFE_ID_PROMOTION" if same_kickoff else "SAFE_ID_AND_KICKOFF_REPAIR"
-        plans.append(PlannedRepair(category, **base, new_event_id=event.event_id, new_kickoff=event.kickoff, evidence={"canonical_game_id": canonical_game.id, "home_team": event.home_team, "away_team": event.away_team, "status": event.status, "version": VERSION}))
+        plans.append(PlannedRepair(category, **base, new_event_id=event.event_id, new_kickoff=event.kickoff, canonical_game_action="CREATE" if canonical_game is None else "REUSE", evidence={"canonical_game_id": canonical_game.id if canonical_game else None, **event_evidence}))
     return plans
 
 
@@ -142,9 +157,38 @@ def apply_repairs(db: Session, plans: list[PlannedRepair]) -> int:
         if plan.category not in safe:
             continue
         row = db.get(TeamSchedule, plan.schedule_id)
-        game = db.query(Game).filter(Game.external_id == plan.new_event_id).one()
-        before = {"game_id": row.game_id, "event_id": plan.old_event_id, "kickoff": plan.old_kickoff, "opponent": row.opponent_name}
+        games = db.query(Game).filter(Game.external_id == plan.new_event_id).all()
+        if len(games) > 1:
+            raise RuntimeError(f"refusing apply: duplicate canonical event {plan.new_event_id}")
         kickoff = datetime.fromisoformat(str(plan.new_kickoff).replace("Z", "+00:00"))
+        if not games:
+            game = Game(
+                external_id=plan.new_event_id,
+                season=row.season,
+                week=row.week,
+                home_team=str(plan.evidence["home_team"]),
+                away_team=str(plan.evidence["away_team"]),
+                start_date=kickoff,
+                schedule_status=str(plan.evidence.get("status") or "pre"),
+            )
+            db.add(game)
+            db.flush()
+            audit_identity_event(
+                db,
+                entity_type="game",
+                entity_id=game.id,
+                action="materialize_verified_espn_event",
+                provider="espn",
+                before_state=None,
+                after_state={"event_id": game.external_id, "home_team": game.home_team, "away_team": game.away_team, "kickoff": kickoff.isoformat(), "evidence": plan.evidence},
+                reason="Exact ESPN event participants and kickoff verified before active-roster schedule reconciliation.",
+            )
+        else:
+            game = games[0]
+            expected = {key(str(plan.evidence["home_team"])), key(str(plan.evidence["away_team"]))}
+            if game.season != row.season or game.week != row.week or {key(game.home_team), key(game.away_team)} != expected or (game.start_date is not None and as_utc(game.start_date) != as_utc(kickoff)):
+                raise RuntimeError(f"refusing apply: canonical event {plan.new_event_id} changed after dry run")
+        before = {"game_id": row.game_id, "event_id": plan.old_event_id, "kickoff": plan.old_kickoff, "opponent": row.opponent_name}
         row.game_id, row.kickoff_at, row.game_date = game.id, kickoff, kickoff.date()
         row.opponent_name = game.away_team if key(row.team_name) == key(game.home_team) else game.home_team
         row.location = "home" if key(row.team_name) == key(game.home_team) else "away"

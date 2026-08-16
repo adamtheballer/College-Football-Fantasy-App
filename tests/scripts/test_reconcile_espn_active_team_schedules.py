@@ -39,6 +39,7 @@ def _event() -> CanonicalEvent:
         away_team="Ohio State",
         kickoff="2026-09-05T16:00:00+00:00",
         status="pre",
+        evidence={"espn_payload_sha256": "fixture-hash"},
     )
 
 
@@ -67,5 +68,43 @@ def test_active_schedule_reconciliation_refuses_any_row_without_verified_evidenc
     plans = plan_repairs(db_session, season=2026, week=1, events=[])
 
     assert [plan.category for plan in plans] == ["NO_VERIFIED_EVENT"]
+    with pytest.raises(RuntimeError, match="non-safe schedule rows"):
+        apply_repairs(db_session, plans)
+
+
+def test_active_schedule_reconciliation_materializes_a_proven_event_without_replacing_legacy_game(db_session):
+    schedule = _active_schedule(db_session)
+    legacy_game_id = schedule.game_id
+
+    plans = plan_repairs(db_session, season=2026, week=1, events=[_event()])
+
+    assert [plan.category for plan in plans] == ["SAFE_ID_AND_KICKOFF_REPAIR"]
+    assert plans[0].canonical_game_action == "CREATE"
+    assert apply_repairs(db_session, plans) == 1
+    db_session.commit()
+    canonical = db_session.query(Game).filter_by(external_id="401999001").one()
+    db_session.refresh(schedule)
+    assert canonical.id != legacy_game_id
+    assert schedule.game_id == canonical.id
+    assert db_session.query(ProviderIdentityAudit).filter_by(entity_id=canonical.id, action="materialize_verified_espn_event").count() == 1
+    assert [plan.category for plan in plan_repairs(db_session, season=2026, week=1, events=[_event()])] == ["HARMLESS_ALIAS_NORMALIZATION"]
+
+
+def test_active_schedule_reconciliation_refuses_a_canonical_event_with_conflicting_kickoff(db_session):
+    _active_schedule(db_session)
+    db_session.add(Game(
+        external_id="401999001",
+        season=2026,
+        week=1,
+        home_team="Texas",
+        away_team="Ohio State",
+        start_date=datetime(2026, 9, 5, 17, tzinfo=timezone.utc),
+        schedule_status="pre",
+    ))
+    db_session.commit()
+
+    plans = plan_repairs(db_session, season=2026, week=1, events=[_event()])
+
+    assert [plan.category for plan in plans] == ["KICKOFF_CONFLICT"]
     with pytest.raises(RuntimeError, match="non-safe schedule rows"):
         apply_repairs(db_session, plans)
