@@ -11,14 +11,18 @@ import json
 import os
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+from threading import Lock
 
+import httpx
 from sqlalchemy import func
 
 from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.services.espn_live_scoring import espn_week_freshness, run_espn_scoring_cycle
@@ -31,13 +35,16 @@ class FakeESPN:
     def __init__(self) -> None:
         self.scoreboard_calls = 0
         self.summary_calls = 0
+        self._lock = Lock()
 
     def get_scoreboard_events(self, *, season: int, week: int) -> list[dict]:
-        self.scoreboard_calls += 1
+        with self._lock:
+            self.scoreboard_calls += 1
         return [{"id": "401-stress", "status": {"type": {"state": "in", "completed": False}}, "competitions": [{"competitors": [{"team": {"location": "Texas"}}]}]}]
 
     def get_summary(self, event_id: str) -> dict:
-        self.summary_calls += 1
+        with self._lock:
+            self.summary_calls += 1
         return {
             "event_id": event_id,
             "boxscore": {
@@ -55,6 +62,15 @@ class FakeESPN:
                 ]
             },
         }
+
+
+class TimeoutESPN(FakeESPN):
+    """Recorded failure path; it never makes a network request."""
+
+    def get_summary(self, event_id: str) -> dict:
+        with self._lock:
+            self.summary_calls += 1
+        raise httpx.TimeoutException("certification provider timeout")
 
 
 def _require_disposable_opt_in() -> None:
@@ -111,6 +127,73 @@ def main() -> None:
         )
         if boundary.successful_games != 1 or provider.summary_calls != 2:
             raise AssertionError("one second provider fetch must be permitted at the 180-second boundary")
+
+        # Real PostgreSQL lease race: two independently-created sessions try to
+        # process the same due event. SKIP LOCKED must allow exactly one
+        # summary request and one successful game. Discovery is held fresh so
+        # this tests the per-game claim, not duplicate schedule discovery.
+        race_at = NOW + timedelta(seconds=360)
+        poll = (
+            db.query(ProviderGamePoll)
+            .filter_by(provider="espn", provider_game_id="401-stress")
+            .one()
+        )
+        discovery = (
+            db.query(ProviderGamePoll)
+            .filter_by(provider="espn", provider_game_id="discovery:2026:1")
+            .one()
+        )
+        poll.next_poll_at = race_at
+        discovery.next_poll_at = race_at + timedelta(seconds=180)
+        db.commit()
+
+        def run_worker(worker_id: str):
+            with SessionLocal() as worker_db:
+                return run_espn_scoring_cycle(
+                    worker_db,
+                    season=2026,
+                    week=1,
+                    mode="shadow",
+                    client=provider,
+                    worker_id=worker_id,
+                    now=race_at,
+                )
+
+        before_race_summaries = provider.summary_calls
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            raced = list(executor.map(run_worker, ("stress-race-a", "stress-race-b")))
+        if (
+            sum(result.successful_games for result in raced) != 1
+            or provider.summary_calls != before_race_summaries + 1
+        ):
+            raise AssertionError("two PostgreSQL workers must produce exactly one game fetch")
+
+        # A timeout must delay only that durable game poll. A second worker
+        # inside the retry window must not repeat the provider call.
+        failure_at = race_at + timedelta(seconds=180)
+        with SessionLocal() as failure_db:
+            timed_out = run_espn_scoring_cycle(
+                failure_db,
+                season=2026,
+                week=1,
+                mode="shadow",
+                client=TimeoutESPN(),
+                worker_id="stress-timeout",
+                now=failure_at,
+            )
+            if timed_out.failed_games != 1:
+                raise AssertionError("timeout must fail the claimed game")
+            retried = run_espn_scoring_cycle(
+                failure_db,
+                season=2026,
+                week=1,
+                mode="shadow",
+                client=TimeoutESPN(),
+                worker_id="stress-timeout-retry",
+                now=failure_at + timedelta(seconds=30),
+            )
+            if retried.claimed_games != 0:
+                raise AssertionError("timeout retry window must not immediately re-fetch the game")
         print(
             json.dumps(
                 {
@@ -120,6 +203,8 @@ def main() -> None:
                     "provider_scoreboard_fetches": provider.scoreboard_calls,
                     "poll_work_items": first.claimed_games + boundary.claimed_games,
                     "minimum_successful_fetch_gap_seconds": 180,
+                    "two_worker_race_successful_games": sum(result.successful_games for result in raced),
+                    "timeout_retry_claims_within_30_seconds": retried.claimed_games,
                     "duration_seconds": round(time.monotonic() - started, 3),
                 },
                 sort_keys=True,
