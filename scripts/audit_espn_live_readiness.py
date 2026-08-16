@@ -271,10 +271,10 @@ def main() -> None:
     ensure_models_registered()
     with SessionLocal() as db:
         revision = db.execute(text("select version_num from alembic_version")).scalar_one_or_none()
-        if revision != "0092_espn_shadow_game_polls":
+        if revision != "0093_legacy_kicker_scoring_audit":
             raise SystemExit(
                 "Refusing readiness audit: database must be migrated to "
-                "0092_espn_shadow_game_polls before its player/game identity data can be certified."
+                "0093_legacy_kicker_scoring_audit before its player/game identity data can be certified."
             )
         report = build_readiness_report(db, season=args.season, event_fixture=args.event_fixture)
     rendered = json.dumps(report, indent=2, sort_keys=True)
