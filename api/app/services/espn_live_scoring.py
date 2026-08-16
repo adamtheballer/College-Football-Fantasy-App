@@ -17,10 +17,9 @@ from typing import Any, Literal
 
 import httpx
 from sqlalchemy import or_
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from collegefootballfantasy_api.app.integrations.espn import ESPNClient, extract_player_box_score_stats
+from collegefootballfantasy_api.app.integrations.espn import ESPNClient, ESPNProviderResponse, extract_player_box_score_stats
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
@@ -44,6 +43,7 @@ FINAL_RECONCILIATION_INTERVAL_SECONDS = 900
 BLOCKED_PROVIDER_RETRY_SECONDS = 6 * 60 * 60
 
 LiveScoringMode = Literal["shadow", "enabled"]
+SnapshotClassification = Literal["DUPLICATE", "NEWER", "STALE", "AMBIGUOUS", "VERIFIED_CORRECTION"]
 
 
 class ProviderDataIncompleteError(RuntimeError):
@@ -56,6 +56,35 @@ class ClaimedGame:
     provider_game_id: str
     season: int
     week: int
+
+
+@dataclass(frozen=True)
+class SnapshotOrderMetadata:
+    """Only explicit, documented provider order markers belong here.
+
+    ESPN currently supplies no such marker on its public summary endpoint.
+    Response receipt time, HTTP Date, ETag, and Last-Modified are audit data,
+    never ordering evidence.
+    """
+
+    provider_revision: str | None
+    provider_updated_at: datetime | None
+    provider_etag: str | None
+    response_metadata: dict[str, str]
+    event_period: int | None
+    event_clock: str | None
+    event_state: str
+
+
+@dataclass(frozen=True)
+class SnapshotOrderDecision:
+    classification: SnapshotClassification
+    accepted: bool
+    reason: str | None = None
+
+    @property
+    def verified_final_correction(self) -> bool:
+        return self.classification == "VERIFIED_CORRECTION"
 
 
 @dataclass(frozen=True)
@@ -126,6 +155,146 @@ def _summary_status(summary: dict[str, Any], fallback: str) -> str:
     if not isinstance(header, dict):
         return fallback
     return _event_status(header)
+
+
+def _summary_status_payload(summary: dict[str, Any]) -> dict[str, Any]:
+    header = summary.get("header")
+    if not isinstance(header, dict):
+        return {}
+    competitions = header.get("competitions")
+    if not isinstance(competitions, list) or not competitions or not isinstance(competitions[0], dict):
+        return {}
+    status = competitions[0].get("status")
+    return status if isinstance(status, dict) else {}
+
+
+def _parse_period(value: object) -> int | None:
+    try:
+        period = int(value)  # ESPN sends a numeric period for live games.
+    except (TypeError, ValueError):
+        return None
+    return period if period >= 0 else None
+
+
+def _parse_clock_seconds(value: str | None) -> int | None:
+    if not value or not isinstance(value, str):
+        return None
+    parts = value.strip().split(":")
+    if len(parts) != 2 or not all(part.isdigit() for part in parts):
+        return None
+    minutes, seconds = (int(part) for part in parts)
+    return minutes * 60 + seconds if 0 <= seconds < 60 else None
+
+
+def _provider_order_metadata(summary: dict[str, Any], response_metadata: dict[str, str] | None = None) -> SnapshotOrderMetadata:
+    """Extract only verified game-progress data from ESPN's summary body.
+
+    The public ESPN endpoint observed on 2026-08-16 exposes no documented
+    monotonic revision or provider update timestamp.  A future adapter may
+    deliberately provide ``provider_revision`` / ``provider_updated_at`` in
+    response metadata after their provider semantics are verified.  We do not
+    infer either from generic JSON names or HTTP transport headers.
+    """
+
+    metadata = dict(response_metadata or {})
+    status_payload = _summary_status_payload(summary)
+    event_state = _summary_status(summary, "scheduled")
+    event_period = _parse_period(status_payload.get("period"))
+    event_clock = status_payload.get("displayClock") or status_payload.get("clock")
+    event_clock = str(event_clock) if event_clock is not None else None
+    return SnapshotOrderMetadata(
+        provider_revision=metadata.get("provider_revision"),
+        provider_updated_at=_parse_datetime(metadata.get("provider_updated_at")),
+        provider_etag=metadata.get("etag"),
+        response_metadata=metadata,
+        event_period=event_period,
+        event_clock=event_clock,
+        event_state=event_state,
+    )
+
+
+def _revision_comparison(previous: ProviderGameSnapshot, candidate: SnapshotOrderMetadata) -> int | None:
+    """Compare only explicit trusted markers; return 1, 0, -1, or unknown."""
+
+    if previous.provider_revision is not None and candidate.provider_revision is not None:
+        try:
+            before, after = int(previous.provider_revision), int(candidate.provider_revision)
+        except ValueError:
+            return None
+        return (after > before) - (after < before)
+    if previous.provider_updated_at is not None and candidate.provider_updated_at is not None:
+        before = _as_utc(previous.provider_updated_at)
+        after = _as_utc(candidate.provider_updated_at)
+        assert before is not None and after is not None
+        return (after > before) - (after < before)
+    return None
+
+
+def _progress_comparison(previous: ProviderGameSnapshot, candidate: SnapshotOrderMetadata) -> int | None:
+    """Compare verified game progression without treating payload content as time."""
+
+    rank = {"scheduled": 0, "live": 1, "final": 2}
+    previous_state = previous.event_state or previous.status
+    candidate_state = candidate.event_state
+    previous_rank = rank.get(previous_state)
+    candidate_rank = rank.get(candidate_state)
+    if previous_rank is None or candidate_rank is None:
+        return None
+    if candidate_rank != previous_rank:
+        return (candidate_rank > previous_rank) - (candidate_rank < previous_rank)
+    if candidate_state != "live":
+        return 0
+    if previous.event_period is None or candidate.event_period is None:
+        return None
+    if candidate.event_period != previous.event_period:
+        return (candidate.event_period > previous.event_period) - (candidate.event_period < previous.event_period)
+    previous_clock = _parse_clock_seconds(previous.event_clock)
+    candidate_clock = _parse_clock_seconds(candidate.event_clock)
+    if previous_clock is None or candidate_clock is None:
+        return None
+    # ESPN's displayClock is remaining game time.  A lower value in the same
+    # period is later; a higher value is an older provider response.
+    return (previous_clock > candidate_clock) - (previous_clock < candidate_clock)
+
+
+def classify_snapshot_order(
+    previous: ProviderGameSnapshot | None,
+    *,
+    candidate_hash: str,
+    candidate: SnapshotOrderMetadata,
+) -> SnapshotOrderDecision:
+    """Fail closed: content difference alone is never proof of newer data."""
+
+    if previous is None:
+        return SnapshotOrderDecision("NEWER", True, "initial_complete_snapshot")
+    if previous.snapshot_hash == candidate_hash:
+        return SnapshotOrderDecision("DUPLICATE", False, "identical_accepted_payload")
+
+    revision_comparison = _revision_comparison(previous, candidate)
+    if revision_comparison is not None:
+        if revision_comparison < 0:
+            return SnapshotOrderDecision("STALE", False, "provider_revision_regressed")
+        if revision_comparison == 0:
+            return SnapshotOrderDecision("AMBIGUOUS", False, "same_provider_revision_different_payload")
+        if (previous.event_state or previous.status) == "final" and candidate.event_state == "final":
+            return SnapshotOrderDecision("VERIFIED_CORRECTION", True, "newer_final_provider_revision")
+        return SnapshotOrderDecision("NEWER", True, "newer_provider_revision")
+
+    # A final game cannot be reopened by an unordered or regressive response.
+    previous_state = previous.event_state or previous.status
+    if previous_state == "final":
+        if candidate.event_state != "final":
+            return SnapshotOrderDecision("STALE", False, "final_state_regression")
+        return SnapshotOrderDecision("AMBIGUOUS", False, "ambiguous_final_correction_without_provider_revision")
+
+    progress_comparison = _progress_comparison(previous, candidate)
+    if progress_comparison is None:
+        return SnapshotOrderDecision("AMBIGUOUS", False, "provider_progress_unavailable")
+    if progress_comparison < 0:
+        return SnapshotOrderDecision("STALE", False, "provider_game_progress_regressed")
+    if progress_comparison == 0:
+        return SnapshotOrderDecision("AMBIGUOUS", False, "same_provider_progress_different_payload")
+    return SnapshotOrderDecision("NEWER", True, "provider_game_progress_advanced")
 
 
 def _canonical_hash(payload: dict[str, Any]) -> str:
@@ -438,8 +607,9 @@ def discover_relevant_espn_games(
             row.season = season
             row.week = week
             # A blocked provider path remains blocked until the backoff expires;
-            # scoreboard discovery must not accidentally clear that safety state.
-            if row.status != "blocked":
+            # scoreboard discovery must not accidentally clear that safety
+            # state. A stale scoreboard response also cannot reopen a final.
+            if row.status != "blocked" and not (row.status == "final" and status != "final"):
                 row.status = status
             if status == "final" and row.last_success_at is not None:
                 row.next_poll_at = min(
@@ -499,8 +669,10 @@ def _store_snapshot(
     summary: dict[str, Any],
     normalized_rows: list[dict[str, Any]],
     status: str,
+    ordering: SnapshotOrderMetadata,
+    decision: SnapshotOrderDecision,
     now: datetime,
-) -> str:
+) -> ProviderGameSnapshot:
     snapshot_hash = _canonical_hash(summary)
     snapshot = ProviderGameSnapshot(
         provider=ESPN_PROVIDER,
@@ -508,21 +680,56 @@ def _store_snapshot(
         season=row.season,
         week=row.week,
         status=status,
-        provider_as_of=now,
+        provider_as_of=ordering.provider_updated_at,
+        captured_at=now,
+        provider_revision=ordering.provider_revision,
+        provider_updated_at=ordering.provider_updated_at,
+        provider_etag=ordering.provider_etag,
+        response_metadata=ordering.response_metadata,
+        event_period=ordering.event_period,
+        event_clock=ordering.event_clock,
+        event_state=ordering.event_state,
+        classification=decision.classification,
+        accepted=decision.accepted,
+        rejection_reason=decision.reason if not decision.accepted else None,
         snapshot_hash=snapshot_hash,
         raw_payload=summary,
         normalized_rows=normalized_rows,
     )
-    try:
-        with db.begin_nested():
-            db.add(snapshot)
-            db.flush()
-    except IntegrityError:
-        # Identical replay: preserve the existing immutable audit snapshot.
-        pass
-    row.latest_snapshot_hash = snapshot_hash
-    row.latest_payload = summary
-    return snapshot_hash
+    db.add(snapshot)
+    db.flush()
+    return snapshot
+
+
+def _accepted_snapshot(db: Session, row: ProviderGamePoll) -> ProviderGameSnapshot | None:
+    accepted_hash = row.accepted_snapshot_hash or row.latest_snapshot_hash
+    if not accepted_hash:
+        return None
+    snapshot = (
+        db.query(ProviderGameSnapshot)
+        .filter(
+            ProviderGameSnapshot.provider == ESPN_PROVIDER,
+            ProviderGameSnapshot.provider_game_id == row.provider_game_id,
+            ProviderGameSnapshot.snapshot_hash == accepted_hash,
+            ProviderGameSnapshot.accepted.is_(True),
+        )
+        .order_by(ProviderGameSnapshot.id.desc())
+        .first()
+    )
+    if snapshot is not None:
+        return snapshot
+    # Rows created before the safety migration have no persisted accepted flag,
+    # but the poll's existing hash is still the prior canonical state.
+    return (
+        db.query(ProviderGameSnapshot)
+        .filter(
+            ProviderGameSnapshot.provider == ESPN_PROVIDER,
+            ProviderGameSnapshot.provider_game_id == row.provider_game_id,
+            ProviderGameSnapshot.snapshot_hash == accepted_hash,
+        )
+        .order_by(ProviderGameSnapshot.id.desc())
+        .first()
+    )
 
 
 def record_espn_game_success(
@@ -531,31 +738,65 @@ def record_espn_game_success(
     claim: ClaimedGame,
     summary: dict[str, Any],
     normalized_rows: list[dict[str, Any]],
+    response_metadata: dict[str, str] | None = None,
     now: datetime | None = None,
-) -> ProviderGamePoll:
+) -> SnapshotOrderDecision:
     now = _as_utc(now) or _utc_now()
     row = db.get(ProviderGamePoll, claim.id)
     if row is None or row.provider != ESPN_PROVIDER or row.provider_game_id != claim.provider_game_id:
         raise LookupError("claimed ESPN game no longer exists")
     status = _summary_status(summary, row.status)
-    _store_snapshot(db, row=row, summary=summary, normalized_rows=normalized_rows, status=status, now=now)
-    row.status = status
-    row.provider_as_of = now
+    ordering = _provider_order_metadata(summary, response_metadata)
+    decision = classify_snapshot_order(
+        _accepted_snapshot(db, row),
+        candidate_hash=_canonical_hash(summary),
+        candidate=ordering,
+    )
+    snapshot = _store_snapshot(
+        db,
+        row=row,
+        summary=summary,
+        normalized_rows=normalized_rows,
+        status=status,
+        ordering=ordering,
+        decision=decision,
+        now=now,
+    )
+    row.last_captured_at = now
+    row.last_snapshot_classification = decision.classification
     row.last_success_at = now
     row.failure_count = 0
     row.error_message = None
     row.lease_owner = None
     row.lease_expires_at = None
+    if decision.classification == "DUPLICATE":
+        row.duplicate_snapshot_count += 1
+    elif decision.classification == "STALE":
+        row.stale_snapshot_count += 1
+    elif decision.classification == "AMBIGUOUS":
+        row.ambiguous_snapshot_count += 1
+        if (row.status == "final" or status == "final"):
+            row.pending_final_correction_count += 1
+    else:
+        row.accepted_snapshot_count += 1
+    if decision.accepted:
+        row.status = status
+        row.provider_as_of = ordering.provider_updated_at
+        row.accepted_snapshot_hash = snapshot.snapshot_hash
+        # Retain these legacy fields as accepted-state aliases for existing
+        # consumers; rejected captures never overwrite canonical data.
+        row.latest_snapshot_hash = snapshot.snapshot_hash
+        row.latest_payload = summary
     interval = (
         FINAL_RECONCILIATION_INTERVAL_SECONDS
-        if status == "final"
+        if row.status == "final"
         else PRE_KICKOFF_POLL_INTERVAL_SECONDS
-        if status == "scheduled"
+        if row.status == "scheduled"
         else MIN_GAME_POLL_INTERVAL_SECONDS
     )
     row.next_poll_at = now + timedelta(seconds=interval)
     db.commit()
-    return row
+    return decision
 
 
 def record_espn_game_failure(
@@ -593,15 +834,8 @@ def _assert_complete_espn_summary(
     # Treat it as degraded provider data and preserve the prior canonical rows.
     if not extract_player_box_score_stats(summary):
         raise ProviderDataIncompleteError("ESPN summary contains no player box-score rows")
-    previous_snapshot = (
-        db.query(ProviderGameSnapshot)
-        .filter(
-            ProviderGameSnapshot.provider == ESPN_PROVIDER,
-            ProviderGameSnapshot.provider_game_id == claim.provider_game_id,
-        )
-        .order_by(ProviderGameSnapshot.id.desc())
-        .first()
-    )
+    row = db.get(ProviderGamePoll, claim.id)
+    previous_snapshot = _accepted_snapshot(db, row) if row is not None else None
     previous_ids = {
         int(item["player_id"])
         for item in (previous_snapshot.normalized_rows or [])
@@ -653,10 +887,22 @@ def run_espn_scoring_cycle(
     corrected_provider_game_ids: set[str] = set()
     for claim in claims:
         try:
-            summary = client.get_summary(claim.provider_game_id)
-            poll_before_update = db.get(ProviderGamePoll, claim.id)
-            previous_snapshot_hash = poll_before_update.latest_snapshot_hash if poll_before_update is not None else None
-            snapshot_hash = _canonical_hash(summary)
+            response_metadata: dict[str, str] = {}
+            get_summary_response = getattr(client, "get_summary_response", None)
+            if callable(get_summary_response):
+                response = get_summary_response(claim.provider_game_id)
+                if isinstance(response, ESPNProviderResponse):
+                    summary = response.payload
+                    response_metadata = response.response_metadata
+                else:
+                    # Third-party test doubles may expose an equivalent
+                    # response shape without importing our dataclass.
+                    summary = getattr(response, "payload", None)
+                    response_metadata = dict(getattr(response, "response_metadata", {}) or {})
+                    if not isinstance(summary, dict):
+                        raise TypeError("ESPN summary response payload must be an object")
+            else:
+                summary = client.get_summary(claim.provider_game_id)
             normalized, unmatched = normalize_espn_summary_player_stats(
                 db,
                 season=season,
@@ -670,16 +916,18 @@ def run_espn_scoring_cycle(
                 summary=summary,
                 normalized_rows=normalized,
             )
-            record_espn_game_success(
+            decision = record_espn_game_success(
                 db,
                 claim=claim,
                 summary=summary,
                 normalized_rows=normalized,
+                response_metadata=response_metadata,
                 now=current,
             )
-            if previous_snapshot_hash and previous_snapshot_hash != snapshot_hash:
+            if decision.verified_final_correction:
                 corrected_provider_game_ids.add(claim.provider_game_id)
-            pending_promotion.extend(normalized)
+            if decision.accepted:
+                pending_promotion.extend(normalized)
             successful += 1
             normalized_count += len(normalized)
             unmatched_count += unmatched

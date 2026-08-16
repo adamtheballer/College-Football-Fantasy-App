@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Index, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Index, Integer, JSON, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -36,8 +36,18 @@ class ProviderGamePoll(TimestampMixin, Base):
     provider_as_of: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     failure_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # The accepted fields are the sole canonical provider state.  Captured
+    # snapshots may be stale or ambiguous and must never overwrite them.
+    accepted_snapshot_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     latest_snapshot_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     latest_payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    last_captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_snapshot_classification: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    accepted_snapshot_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    duplicate_snapshot_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    stale_snapshot_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ambiguous_snapshot_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    pending_final_correction_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 class ProviderGameSnapshot(TimestampMixin, Base):
@@ -45,9 +55,7 @@ class ProviderGameSnapshot(TimestampMixin, Base):
 
     __tablename__ = "provider_game_snapshots"
     __table_args__ = (
-        UniqueConstraint(
-            "provider", "provider_game_id", "snapshot_hash", name="uq_provider_game_snapshots_provider_game_hash"
-        ),
+        Index("ix_provider_game_snapshots_game_hash", "provider", "provider_game_id", "snapshot_hash"),
         Index("ix_provider_game_snapshots_game", "provider", "provider_game_id", "provider_as_of"),
         Index("ix_provider_game_snapshots_season_week", "provider", "season", "week"),
     )
@@ -58,7 +66,21 @@ class ProviderGameSnapshot(TimestampMixin, Base):
     season: Mapped[int] = mapped_column(Integer, nullable=False)
     week: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
+    # ``provider_as_of`` is only populated from a genuinely authoritative
+    # provider field.  ``captured_at`` is our receipt time and is never used
+    # to prove ordering.
     provider_as_of: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    provider_revision: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    provider_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    provider_etag: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    response_metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    event_period: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    event_clock: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    event_state: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    classification: Mapped[str] = mapped_column(String(32), nullable=False, default="NEWER")
+    accepted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    rejection_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
     snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     raw_payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     normalized_rows: Mapped[list] = mapped_column(JSON, nullable=False, default=list)

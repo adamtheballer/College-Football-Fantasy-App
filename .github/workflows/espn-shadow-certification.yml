@@ -48,13 +48,13 @@ jobs:
       - name: Fresh database migration and single-head proof
         run: |
           uv run alembic -c api/alembic.ini upgrade head
-          test "$(uv run alembic -c api/alembic.ini heads | awk '{print $1}')" = "0093_legacy_kicker_scoring_audit"
+          test "$(uv run alembic -c api/alembic.ini heads | awk '{print $1}')" = "0094_espn_snapshot_order_safety"
       - name: API boot in shadow mode
         run: |
           PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 127.0.0.1 --port 8000 >/tmp/cff-api.log 2>&1 &
           echo $! > /tmp/cff-api.pid
           for attempt in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/health/ready && break || sleep 1; done
-          curl -fsS http://127.0.0.1:8000/health/runtime | jq -e '.alembic_revision == "0093_legacy_kicker_scoring_audit" and .scoring_mode == "shadow" and .sportsdata_enabled == false'
+          curl -fsS http://127.0.0.1:8000/health/runtime | jq -e '.alembic_revision == "0094_espn_snapshot_order_safety" and .scoring_mode == "shadow" and .sportsdata_enabled == false'
       - name: Worker boot is idle without a verified schedule window
         run: PYTHONPATH=. uv run python scripts/run_espn_scoring_worker.py --once
       - name: Recorded-provider shadow safety and failure matrix

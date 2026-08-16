@@ -9,6 +9,17 @@ from collegefootballfantasy_api.app.services.scoring_service import calculate_pl
 def espn_summary_payload():
     return {
         "event_id": "401",
+        "header": {
+            "competitions": [
+                {
+                    "status": {
+                        "period": 1,
+                        "displayClock": "10:00",
+                        "type": {"state": "in", "completed": False},
+                    }
+                }
+            ]
+        },
         "boxscore": {
             "players": [
                 {

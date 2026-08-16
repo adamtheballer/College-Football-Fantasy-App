@@ -3,9 +3,24 @@ from __future__ import annotations
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
+
+
+@dataclass(frozen=True)
+class ESPNProviderResponse:
+    """One ESPN response plus non-authoritative transport metadata.
+
+    ESPN's public summary endpoint does not currently expose a documented
+    monotonic revision.  The headers are retained for forensic audit only;
+    callers must not treat an ETag, Last-Modified, or receipt time as proof
+    that a snapshot is newer.
+    """
+
+    payload: dict[str, Any]
+    response_metadata: dict[str, str]
 
 
 class ESPNClient:
@@ -51,13 +66,31 @@ class ESPNClient:
         self.close()
 
     def _request(self, path: str, params: dict[str, Any], *, base_url: str | None = None) -> dict[str, Any]:
+        return self._request_with_metadata(path, params, base_url=base_url).payload
+
+    def _request_with_metadata(
+        self,
+        path: str,
+        params: dict[str, Any],
+        *,
+        base_url: str | None = None,
+    ) -> ESPNProviderResponse:
         url = f"{(base_url or self.base_url).rstrip('/')}/{path.lstrip('/')}"
         response = self._client().get(url, params=params)
         response.raise_for_status()
         payload = response.json()
-        if isinstance(payload, dict):
-            return payload
-        return {}
+        headers = getattr(response, "headers", {})
+        safe_headers = {
+            name: value
+            for name, value in (
+                ("etag", headers.get("ETag")),
+                ("last_modified", headers.get("Last-Modified")),
+                ("date", headers.get("Date")),
+                ("cache_control", headers.get("Cache-Control")),
+            )
+            if value
+        }
+        return ESPNProviderResponse(payload=payload if isinstance(payload, dict) else {}, response_metadata=safe_headers)
 
     def get_scoreboard_events(
         self,
@@ -85,7 +118,12 @@ class ESPNClient:
         return [event for event in events if isinstance(event, dict)]
 
     def get_summary(self, event_id: str | int) -> dict[str, Any]:
-        return self._request("summary", params={"event": event_id}, base_url=self.SITE_BASE_URL)
+        return self.get_summary_response(event_id).payload
+
+    def get_summary_response(self, event_id: str | int) -> ESPNProviderResponse:
+        """Return a summary and audit metadata without changing legacy callers."""
+
+        return self._request_with_metadata("summary", params={"event": event_id}, base_url=self.SITE_BASE_URL)
 
     def get_athlete_profile(self, espn_player_id: str | int) -> dict[str, Any]:
         return self._request(f"athletes/{espn_player_id}", params={}, base_url=self.WEB_BASE_URL)
