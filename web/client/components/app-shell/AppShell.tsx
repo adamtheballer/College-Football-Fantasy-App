@@ -53,9 +53,7 @@ export function AppShell({
       className={cn(
         "isolate relative flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-cfb-canvas font-sans text-cfb-text-primary selection:bg-cfb-brand/30 selection:text-white lg:h-screen lg:flex-row",
       )}
-      style={{
-        background: collegiateCanvasBackground,
-      }}
+      style={{ background: collegiateCanvasBackground }}
     >
       {!hideDecor ? <BackgroundEffects /> : null}
       {!hideFloatingActions ? <FloatingQuickActions /> : null}

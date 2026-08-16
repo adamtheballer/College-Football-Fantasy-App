@@ -6,16 +6,15 @@ import {
   ChevronRight,
   Clock,
   ShieldCheck,
-  Sparkles,
   Trophy,
   Users,
   Zap,
 } from "lucide-react";
 
-import { EmptyState } from "@/components/states";
+import { EmptyState, SkeletonState } from "@/components/states";
 import { formatDisplayedProbabilityPair, WinChanceBar } from "@/components/league/WinChanceMeter";
 import { Button } from "@/components/ui/button";
-import { PlaybookDecor, PositionBadge, StatusBadge, SurfaceCard } from "@/components/fantasy";
+import { PositionBadge, StatusBadge, SurfaceCard } from "@/components/fantasy";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagueWorkspace, useLeagues } from "@/hooks/use-leagues";
@@ -85,72 +84,55 @@ export const isUpcomingDraft = (league: LeagueDetail, now = Date.now()) => {
 
 function GuestHome() {
   return (
-    <div className="mx-auto grid w-full max-w-7xl gap-8 pb-20 pt-8 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
-      <div className="space-y-7">
-        <div className="inline-flex items-center gap-2 rounded-full border border-cfb-brand/30 bg-cfb-brand/[0.12] px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-blue-100">
-          <Sparkles className="h-4 w-4" aria-hidden="true" />
-          College Football Fantasy
+    <div className="mx-auto w-full max-w-6xl space-y-8 pb-16 pt-5 sm:pt-10">
+      <section className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <p className="cfb-micro-label text-cfb-gold">College Football Fantasy · Beta</p>
+            <h1 className="cfb-display-title max-w-2xl text-4xl sm:text-5xl">
+              Fantasy football for college football.
+            </h1>
+            <p className="max-w-xl text-base leading-7 text-cfb-text-secondary sm:text-lg">
+              Create a league, draft real CFB players, and compete every Saturday.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button asChild className="h-11 px-5">
+              <Link to="/signup">Create Your League</Link>
+            </Button>
+            <Button asChild variant="outline" className="h-11 px-5">
+              <Link to="/login">Log In</Link>
+            </Button>
+          </div>
+          <p className="text-sm text-cfb-text-muted">Early access beta. League tools and scoring coverage continue to expand.</p>
         </div>
-        <div className="space-y-4">
-          <h1 className="cfb-display-title max-w-3xl text-5xl sm:text-6xl lg:text-7xl">
-            Draft. Manage. Compete.
-          </h1>
-          <p className="max-w-2xl text-lg font-medium leading-8 text-cfb-text-secondary">
-            Build a league, draft Power 4 stars, manage your roster, and track the weekly
-            matchup with a fantasy dashboard built for college football.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Button asChild className="h-12 rounded-xl px-7 text-[11px] font-black uppercase tracking-[0.16em]">
-            <Link to="/signup">Create Account</Link>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            className="h-12 rounded-xl px-7 text-[11px] font-black uppercase tracking-[0.16em]"
-          >
-            <Link to="/login">Sign In</Link>
-          </Button>
-        </div>
-      </div>
 
-      <SurfaceCard variant="scoreboard" padding="spacious" className="cfb-playbook-pattern relative space-y-6">
-        <PlaybookDecor className="opacity-55" />
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="cfb-micro-label text-cfb-brand">Week 1 Preview</p>
-            <h2 className="mt-2 text-2xl font-black text-cfb-text-primary">Fantasy Matchup</h2>
+        <SurfaceCard variant="scoreboard" padding="default" className="space-y-5">
+          <div className="flex items-center justify-between gap-4 border-b border-cfb-border-subtle pb-4">
+            <div>
+              <p className="cfb-micro-label text-cfb-brand">Matchup preview</p>
+              <h2 className="mt-1 text-xl font-bold text-cfb-text-primary">Your game week, at a glance</h2>
+            </div>
+            <StatusBadge variant="projected">Projected</StatusBadge>
           </div>
-          <StatusBadge variant="projected">Projected</StatusBadge>
-        </div>
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-          <div>
-            <p className="text-sm font-black text-cfb-text-primary">Your Team</p>
-            <p className="mt-2 font-display text-5xl font-black tracking-[-0.06em] text-cfb-brand">—</p>
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+            <div><p className="text-sm font-semibold text-cfb-text-primary">Your Team</p><p className="mt-1 text-3xl font-black tabular-nums text-cfb-brand">—</p></div>
+            <span className="rounded-md border border-cfb-border-subtle px-2 py-1 text-xs font-bold text-cfb-text-secondary">vs</span>
+            <div className="text-right"><p className="text-sm font-semibold text-cfb-text-primary">Opponent</p><p className="mt-1 text-3xl font-black tabular-nums text-cfb-text-secondary">—</p></div>
           </div>
-          <div className="rounded-full border border-cfb-border-strong bg-cfb-surface px-3 py-2 text-xs font-black text-cfb-text-secondary">
-            VS
+          <div className="grid gap-px overflow-hidden rounded-lg border border-cfb-border-subtle bg-cfb-border-subtle sm:grid-cols-3">
+            {[{ label: "Draft", value: "Build your roster" }, { label: "Matchups", value: "Track every week" }, { label: "Pick 6", value: "Make your call" }].map((item) => (
+              <div key={item.label} className="bg-cfb-surface p-3"><p className="cfb-micro-label">{item.label}</p><p className="mt-1 text-sm font-semibold text-cfb-text-primary">{item.value}</p></div>
+            ))}
           </div>
-          <div className="text-right">
-            <p className="text-sm font-black text-cfb-text-primary">Opponent</p>
-            <p className="mt-2 font-display text-5xl font-black tracking-[-0.06em] text-cfb-pink">—</p>
-          </div>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 p-4">
-            <Zap className="h-5 w-5 text-cfb-gold" aria-hidden="true" />
-            <p className="mt-3 text-sm font-black">Live scoring</p>
-          </div>
-          <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 p-4">
-            <Users className="h-5 w-5 text-cfb-cyan" aria-hidden="true" />
-            <p className="mt-3 text-sm font-black">League tools</p>
-          </div>
-          <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 p-4">
-            <Trophy className="h-5 w-5 text-cfb-success" aria-hidden="true" />
-            <p className="mt-3 text-sm font-black">Weekly glory</p>
-          </div>
-        </div>
-      </SurfaceCard>
+        </SurfaceCard>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-3">
+        {[{ title: "Run your league", detail: "Invite managers, set rules, and keep the season moving." }, { title: "Draft real players", detail: "Search a CFB player pool, queue targets, and make every pick count." }, { title: "Compete each Saturday", detail: "Set your lineup and follow your matchup from kickoff to final." }].map((item, index) => (
+          <SurfaceCard key={item.title} padding="compact"><p className="cfb-micro-label text-cfb-brand">0{index + 1}</p><h2 className="mt-2 text-base font-bold">{item.title}</h2><p className="mt-2 text-sm leading-6 text-cfb-text-secondary">{item.detail}</p></SurfaceCard>
+        ))}
+      </section>
     </div>
   );
 }
@@ -363,9 +345,7 @@ export default function Index() {
           </div>
 
           {leaguesLoading ? (
-            <div className="px-6 py-12 text-center text-sm font-black uppercase tracking-[0.18em] text-cfb-text-muted">
-              Loading leagues...
-            </div>
+            <SkeletonState rows={3} label="Loading your leagues" className="p-5 sm:p-6" />
           ) : leagues.length === 0 ? (
             <div className="p-6">
               <EmptyState
@@ -487,9 +467,7 @@ export default function Index() {
             </Button>
           </div>
           {!alertsLoaded ? (
-            <div className="px-6 py-10 text-center text-sm font-black uppercase tracking-[0.18em] text-cfb-text-muted">
-              Loading alerts...
-            </div>
+            <SkeletonState rows={2} label="Loading your alerts" className="p-5 sm:p-6" />
           ) : alerts.length === 0 ? (
             <div className="px-6 py-10 text-center text-sm font-black uppercase tracking-[0.18em] text-cfb-text-muted">
               No alerts available

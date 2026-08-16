@@ -4,15 +4,16 @@ import { cn } from "@/lib/utils";
 
 export interface SkeletonStateProps extends React.HTMLAttributes<HTMLDivElement> {
   rows?: number;
+  label?: string;
 }
 
 export const SkeletonState = React.forwardRef<HTMLDivElement, SkeletonStateProps>(
-  ({ className, rows = 3, ...props }, ref) => (
-    <div ref={ref} className={cn("space-y-3", className)} {...props}>
+  ({ className, rows = 3, label = "Loading content", ...props }, ref) => (
+    <div ref={ref} aria-busy="true" aria-label={label} className={cn("space-y-3", className)} {...props}>
       {Array.from({ length: rows }, (_, index) => (
         <div
           key={index}
-          className="h-14 animate-pulse rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised/55"
+          className="h-14 animate-pulse rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised/55"
         />
       ))}
     </div>

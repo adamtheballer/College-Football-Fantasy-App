@@ -66,7 +66,7 @@
     --input: 216 34% 22%;
     --ring: 210 100% 66%;
 
-    --radius: 1rem;
+    --radius: 0.75rem;
 
     --sidebar-background: 224 52% 7%;
     --sidebar-foreground: 213 31% 91%;
@@ -149,22 +149,29 @@
     @apply border-border;
   }
 
-  *::-webkit-scrollbar:vertical {
-    width: 0;
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border-strong)) hsl(var(--background-sidebar));
   }
 
-  *::-webkit-scrollbar-thumb:vertical,
-  *::-webkit-scrollbar-track:vertical {
-    background: transparent;
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border: 3px solid hsl(var(--background-sidebar));
+    border-radius: 999px;
+    background: hsl(var(--border-strong));
+  }
+
+  *::-webkit-scrollbar-track {
+    background: hsl(var(--background-sidebar));
   }
 
   body {
     @apply bg-background text-foreground;
-    background:
-      radial-gradient(circle at 7% 4%, rgba(251, 191, 36, 0.10), transparent 28%),
-      radial-gradient(circle at 92% 6%, rgba(59, 130, 246, 0.13), transparent 30%),
-      radial-gradient(circle at 88% 90%, rgba(251, 191, 36, 0.08), transparent 28%),
-      linear-gradient(135deg, hsl(var(--background)), #06152a 48%, #020713);
+    background: hsl(var(--background-canvas));
   }
 
   :focus-visible {
@@ -199,42 +206,19 @@
 
 @layer components {
   .cfb-panel {
-    @apply rounded-2xl border border-cfb-border-subtle text-card-foreground backdrop-blur-md shadow-[0_18px_42px_rgba(2,6,23,0.34)];
-    background:
-      radial-gradient(circle at 12% 0%, hsl(var(--accent-cyan) / 0.06), transparent 34%),
-      linear-gradient(135deg, hsl(var(--background-surface) / 0.88), hsl(var(--brand-primary) / 0.045) 48%, hsl(var(--accent-pink) / 0.035)),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
-    box-shadow:
-      0 18px 42px rgba(2, 6, 23, 0.34),
-      0 0 30px hsl(var(--brand-primary) / 0.055),
-      inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    @apply rounded-xl border border-cfb-border-subtle bg-cfb-surface text-card-foreground shadow-[0_8px_20px_rgba(2,6,23,0.18)];
   }
 
   .cfb-panel-strong {
-    @apply rounded-3xl border border-cfb-border-subtle text-card-foreground backdrop-blur-xl shadow-[0_24px_64px_rgba(2,6,23,0.42)];
-    background:
-      radial-gradient(circle at 8% 0%, hsl(var(--accent-cyan) / 0.10), transparent 34%),
-      radial-gradient(circle at 92% 12%, hsl(var(--accent-gold) / 0.07), transparent 30%),
-      radial-gradient(circle at 55% 100%, hsl(var(--accent-pink) / 0.055), transparent 34%),
-      linear-gradient(135deg, hsl(var(--background-surface) / 0.90), hsl(var(--brand-primary) / 0.07), hsl(var(--accent-pink) / 0.045));
-    box-shadow:
-      0 24px 64px rgba(2, 6, 23, 0.42),
-      0 0 42px hsl(var(--brand-primary) / 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    @apply rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised text-card-foreground shadow-[0_12px_26px_rgba(2,6,23,0.22)];
   }
 
   .cfb-control {
-    @apply rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised/70 text-foreground backdrop-blur-md transition-all duration-200;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.045),
-      0 0 20px hsl(var(--brand-primary) / 0.03);
+    @apply rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised text-foreground transition-colors duration-150;
   }
 
   .cfb-control:hover {
-    @apply border-white/15 bg-white/[0.06];
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.055),
-      0 0 30px rgba(14, 165, 233, 0.07);
+    @apply border-cfb-border-strong bg-cfb-surface-hover;
   }
 
   .cfb-control:focus-visible,
@@ -243,15 +227,15 @@
   }
 
   .cfb-micro-label {
-    @apply text-[10px] font-black uppercase tracking-[0.28em] text-cfb-text-muted;
+    @apply text-[11px] font-bold uppercase tracking-[0.08em] text-cfb-text-muted;
   }
 
   .cfb-section-title {
-    @apply text-foreground font-black uppercase italic tracking-tight leading-[1.08];
+    @apply text-foreground font-bold tracking-tight leading-[1.15];
   }
 
   .cfb-display-title {
-    @apply font-display text-foreground font-black uppercase italic tracking-[-0.045em] leading-[1.08];
+    @apply font-display text-foreground font-black tracking-[-0.035em] leading-[1.1];
   }
 
   .cfb-yard-lines {
@@ -266,24 +250,11 @@
   }
 
   .cfb-playbook-pattern::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    opacity: 0.10;
-    background:
-      linear-gradient(115deg, transparent 0 5%, hsl(var(--accent-pink) / 0.22) 5.2% 5.9%, transparent 6.2% 100%),
-      linear-gradient(155deg, transparent 0 72%, hsl(var(--accent-gold) / 0.18) 72.2% 72.9%, transparent 73.2% 100%),
-      radial-gradient(circle at 88% 16%, transparent 0 5px, hsl(var(--accent-cyan) / 0.28) 5px 6px, transparent 6.5px);
-    mask-image: linear-gradient(135deg, transparent, black 24%, black 76%, transparent);
+    display: none;
   }
 
   .cfb-school-grid {
-    background-image:
-      linear-gradient(to right, hsl(var(--accent-cyan) / 0.045) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--accent-cyan) / 0.04) 1px, transparent 1px),
-      repeating-linear-gradient(135deg, transparent 0 26px, hsl(var(--accent-gold) / 0.035) 27px 28px);
-    background-size: 34px 34px, 34px 34px, 120px 120px;
+    background-image: none;
   }
 
   @media (prefers-reduced-motion: reduce) {

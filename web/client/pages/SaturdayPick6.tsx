@@ -4,6 +4,7 @@ import { Check, CircleX, Clock3, Copy, Lock, Radio, Trophy, UserRound } from "lu
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { SkeletonState } from "@/components/states";
 import { type SaturdayPickPlayer, useSaveSaturdayPick, useSaturdayPickContest } from "@/hooks/use-saturday-pick";
 import { getSaturdayPickSponsorLogo, saturdayPick6Sponsor } from "@/lib/saturday-pick-sponsor";
 
@@ -84,11 +85,11 @@ type SaturdayPick6Props = {
 
 function SaturdayPick6ComingSoon({ embedded }: SaturdayPick6Props) {
   return (
-    <section className={embedded ? "rounded-3xl border border-cfb-border-subtle bg-cfb-surface p-6 text-center" : "mx-auto max-w-4xl py-20 text-center"}>
+    <section className={embedded ? "rounded-xl border border-cfb-border-subtle bg-cfb-surface p-6 text-center" : "mx-auto max-w-4xl py-20 text-center"}>
       <p className="cfb-micro-label text-cfb-brand">Saturday Pick 6</p>
       <h1 className="mt-3 text-4xl font-black text-cfb-text-primary">Saturday Pick 6</h1>
       <p className="mx-auto mt-4 max-w-xl text-cfb-text-secondary">{SATURDAY_PICK_6_COMING_SOON_MESSAGE}</p>
-      <div className="mx-auto mt-6 flex max-w-md items-center justify-center gap-4 rounded-2xl border border-cyan-200/25 bg-slate-950/30 p-4 text-left">
+      <div className="mx-auto mt-6 flex max-w-md items-center justify-center gap-4 rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised p-4 text-left">
         <img src={saturdayPick6Sponsor.logo_url} alt={saturdayPick6Sponsor.name} className="h-14 w-14 rounded-xl bg-white object-contain p-1" />
         <div><p className="text-sm font-black text-cfb-text-primary">{saturdayPick6Sponsor.name}</p><p className="mt-1 text-xs font-bold text-cyan-100">{saturdayPick6Sponsor.tagline}</p></div>
       </div>
@@ -130,7 +131,7 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
   }, [contest?.entry?.id, contest?.id, contest?.status]);
 
   if (contestQuery.isLoading) {
-    return <div className="mx-auto max-w-7xl py-20 text-center text-sm font-black uppercase tracking-[0.2em] text-cfb-text-muted">Loading Saturday Pick 6…</div>;
+    return <SkeletonState rows={4} label="Loading Saturday Pick 6" className="mx-auto max-w-7xl py-5" />;
   }
   // A disabled feature, 404 response, unpublished schedule, or empty slate
   // is non-actionable. Keep both route and dashboard card stable.
@@ -171,34 +172,32 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
 
   return (
     <div className={embedded ? "space-y-7" : "mx-auto max-w-7xl space-y-7 pb-20 pt-5"}>
-      <section className="relative overflow-hidden rounded-[2rem] border border-cyan-300/30 bg-[radial-gradient(circle_at_20%_20%,rgba(14,165,233,0.22),transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.98),rgba(30,41,59,0.96),rgba(8,47,73,0.88))] p-6 shadow-[0_0_60px_rgba(14,165,233,0.14)] sm:p-9">
-        <div aria-hidden="true" className="absolute -left-12 top-16 h-3 w-72 rotate-[-18deg] rounded-full bg-cyan-200/25 blur-sm" />
-        <div aria-hidden="true" className="absolute -right-16 -top-14 h-52 w-72 rotate-[-18deg] rounded-full bg-cfb-pink/20 blur-3xl" />
-        <div className="relative flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
+      <section className="rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised p-6 sm:p-8">
+        <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center gap-2 rounded-full border border-cfb-gold/45 bg-cfb-gold/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.2em] text-yellow-100"><Trophy className="h-4 w-4" /> Saturday Pick 6</span>
+              <span className="inline-flex items-center gap-2 rounded-md border border-cfb-gold/45 bg-cfb-gold/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-yellow-100"><Trophy className="h-4 w-4" /> Saturday Pick 6</span>
               <span className="cfb-micro-label text-cyan-200">Week {contest.week_number} · {contest.contest_position} Week</span>
             </div>
-            <h1 className="mt-5 font-display text-4xl font-black italic tracking-[-0.05em] text-cfb-text-primary sm:text-6xl">{isResults ? "LIVE RESULTS" : isOpen ? "MAKE YOUR PICK" : contest.status === "SCHEDULED" ? "PICKS OPENING SOON" : "PICKS LOCKED"}</h1>
+            <h1 className="mt-5 font-display text-3xl font-black tracking-[-0.04em] text-cfb-text-primary sm:text-4xl">{isResults ? "Live results" : isOpen ? "Make your pick" : contest.status === "SCHEDULED" ? "Picks opening soon" : "Picks locked"}</h1>
             <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-cfb-text-secondary sm:text-lg">Which featured {positionLabel(contest.contest_position)} will score the most fantasy points this week?</p>
-            <p className="mt-4 max-w-2xl rounded-2xl border border-cyan-100/20 bg-slate-950/20 px-4 py-3 text-sm font-semibold leading-6 text-cyan-50/90">
-              <span className="mr-2 font-black uppercase tracking-[0.16em] text-cyan-200">How it works</span>
+            <p className="mt-4 max-w-2xl rounded-lg border border-cfb-border-subtle bg-cfb-surface px-4 py-3 text-sm leading-6 text-cfb-text-secondary">
+              <span className="mr-2 font-bold text-cfb-text-primary">How it works</span>
               {SATURDAY_PICK_6_HOW_IT_WORKS.replace("How it works: ", "")}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-6">
             {sponsor ? <>
-              <div className="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-white/25 bg-white p-1.5 shadow-[0_0_34px_rgba(34,211,238,0.20)] sm:h-36 sm:w-36">{sponsorLogo ? <img src={sponsorLogo} alt={sponsor.name} className="h-full w-full object-contain" /> : <span className="text-sm font-black text-cfb-brand">{sponsor.name.slice(0, 2).toUpperCase()}</span>}</div>
-              <div className="max-w-md"><p className="cfb-micro-label text-cyan-200">Presented by</p><p className="mt-2 text-2xl font-black leading-tight text-white sm:text-3xl">{sponsor.name}</p>{sponsor.offer_text ? <p className="mt-3 text-lg font-black leading-7 text-cyan-100 sm:text-xl">{sponsor.offer_text}</p> : null}</div>
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-cfb-border-subtle bg-white p-1.5">{sponsorLogo ? <img src={sponsorLogo} alt={sponsor.name} className="h-full w-full object-contain" /> : <span className="text-sm font-black text-cfb-brand">{sponsor.name.slice(0, 2).toUpperCase()}</span>}</div>
+              <div className="max-w-md"><p className="cfb-micro-label text-cfb-gold">Presented by</p><p className="mt-2 text-xl font-bold leading-tight text-white">{sponsor.name}</p>{sponsor.offer_text ? <p className="mt-2 text-sm font-semibold leading-6 text-cfb-text-secondary">{sponsor.offer_text}</p> : null}</div>
             </> : null}
-            <div className="flex flex-wrap items-center gap-3"><div className="rounded-2xl border border-cfb-border-strong bg-slate-950/55 px-5 py-3 text-right"><p className="cfb-micro-label text-cfb-text-muted">{isOpen ? "Locks in" : "Contest status"}</p><p className="mt-1 font-display text-2xl font-black tabular-nums text-cyan-100">{isOpen ? countdown.value : statusLabel(contest.status)}</p></div>{embedded && isOpen ? <Button asChild><Link to="/saturday-pick-6">{contest.entry ? "Change Your Pick" : "Make Your Pick"}</Link></Button> : null}</div>
+            <div className="flex flex-wrap items-center gap-3"><div className="rounded-lg border border-cfb-border-strong bg-cfb-surface px-4 py-3 text-right"><p className="cfb-micro-label">{isOpen ? "Locks in" : "Contest status"}</p><p className="mt-1 font-display text-xl font-black tabular-nums text-cfb-text-primary">{isOpen ? countdown.value : statusLabel(contest.status)}</p></div>{embedded && isOpen ? <Button asChild><Link to="/saturday-pick-6">{contest.entry ? "Change Your Pick" : "Make Your Pick"}</Link></Button> : null}</div>
           </div>
         </div>
       </section>
 
       {!embedded ? <>
-      {contest.entry && contest.status !== "FINAL" ? <section className="rounded-3xl border border-cyan-200/40 bg-cyan-300/[0.10] p-6 shadow-[0_0_28px_rgba(34,211,238,0.10)]"><p className="cfb-micro-label text-cyan-100">Your pick is in</p><h2 className="mt-2 text-2xl font-black text-cfb-text-primary">{savedPlayer?.player_name ?? "Your Saturday Pick 6 selection"}</h2><p className="mt-2 font-bold text-cfb-text-secondary">{savedPlayer ? pickConfirmationMessage(savedPlayer.player_name) : "Follow your pick this Saturday."}</p><p className="mt-3 text-sm font-bold text-cfb-text-secondary">{isOpen ? lockDeadlineMessage(lockPlayerName, contest.lock_at) : `${lockPlayerName}'s game has started. Your pick is fully locked.`}</p></section> : null}
+      {contest.entry && contest.status !== "FINAL" ? <section className="rounded-xl border border-cfb-brand/35 bg-cfb-brand/[0.08] p-6"><p className="cfb-micro-label text-cfb-brand">Your pick is in</p><h2 className="mt-2 text-xl font-bold text-cfb-text-primary">{savedPlayer?.player_name ?? "Your Saturday Pick 6 selection"}</h2><p className="mt-2 text-sm leading-6 text-cfb-text-secondary">{savedPlayer ? pickConfirmationMessage(savedPlayer.player_name) : "Follow your pick this Saturday."}</p><p className="mt-3 text-sm leading-6 text-cfb-text-secondary">{isOpen ? lockDeadlineMessage(lockPlayerName, contest.lock_at) : `${lockPlayerName}'s game has started. Your pick is fully locked.`}</p></section> : null}
 
       {contest.status === "FINAL" ? <section className="rounded-3xl border border-cfb-gold/35 bg-cfb-gold/[0.08] p-5 text-cfb-text-primary"><p className="cfb-micro-label text-yellow-100">Saturday Pick 6 winner</p><p className="mt-2 text-2xl font-black">{winnerIds.size > 1 ? "Two or more players tied for the top score" : `${players[0]?.player_name ?? "Winner"} led the field`}</p>{contest.entry ? <p className="mt-2 font-bold text-cfb-text-secondary">{contest.entry.is_winner ? "YOU GOT IT RIGHT" : `Your pick finished ${Math.max(1, players.findIndex((player) => player.id === contest.entry?.selected_pick_player_id) + 1)}${"th"}.`}</p> : null}</section> : null}
 
@@ -209,7 +208,7 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
           const shownPoints = displayPoints(player, contest.status);
           const pointLabel = contest.status === "FINAL" ? "Final points" : isResults ? "Live points" : "Projected points";
           return (
-            <article key={player.id} className={`relative overflow-hidden rounded-3xl border p-5 transition ${selected ? "border-cyan-200 bg-cyan-300/[0.12] shadow-[0_0_30px_rgba(34,211,238,0.18)]" : "border-cfb-border-subtle bg-cfb-surface"}`}>
+            <article key={player.id} className={`relative overflow-hidden rounded-xl border p-5 transition-colors ${selected ? "border-cfb-brand bg-cfb-brand/[0.10]" : "border-cfb-border-subtle bg-cfb-surface"}`}>
               {contest.status === "FINAL" && contest.entry?.selected_pick_player_id === player.id && !contest.entry.is_winner ? <div className="absolute inset-0 z-10 flex items-center justify-center bg-rose-950/35" aria-label="Your pick did not win"><CircleX className="h-28 w-28 text-rose-200 drop-shadow-[0_0_18px_rgba(251,113,133,0.8)]" /></div> : null}
               {isResults ? <span className="absolute right-4 top-4 text-xs font-black tabular-nums text-cyan-100">#{index + 1}</span> : null}
               <div className="flex min-w-0 items-center gap-3 pr-8"><div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/12 bg-cfb-surface-raised text-cfb-brand">{player.image_url ? <img src={player.image_url} alt={player.player_name} className="h-full w-full object-cover" /> : <UserRound className="h-7 w-7" />}</div><div className="min-w-0"><h2 className="truncate text-xl font-black text-cfb-text-primary">{player.player_name}</h2><p className="mt-1 text-xs font-black uppercase tracking-[0.14em] text-cfb-text-muted">{player.school} · {player.canonical_position}</p></div></div>
