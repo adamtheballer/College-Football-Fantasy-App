@@ -90,6 +90,20 @@ class ESPNClient:
     def get_athlete_profile(self, espn_player_id: str | int) -> dict[str, Any]:
         return self._request(f"athletes/{espn_player_id}", params={}, base_url=self.WEB_BASE_URL)
 
+    def get_team_roster(self, espn_team_id: str | int) -> dict[str, Any]:
+        """Return one current team roster for the offline identity importer.
+
+        This is deliberately separate from the live scoring client path. The
+        importer caches this finite reference response and never calls it from
+        the scoring worker.
+        """
+
+        return self._request(
+            f"teams/{espn_team_id}/roster",
+            params={},
+            base_url=self.SITE_BASE_URL,
+        )
+
     def search_players(self, query: str, *, limit: int = 10) -> list[dict[str, Any]]:
         payload = self._request(
             "search",
