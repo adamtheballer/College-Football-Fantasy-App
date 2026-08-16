@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import sys
 
 import pytest
 
@@ -15,6 +16,7 @@ from scripts.import_espn_live_identities import (
     normalize_exact_name,
     plan_player_identities,
     plan_schedule,
+    parse_args,
 )
 
 
@@ -184,3 +186,12 @@ def test_schedule_planner_requires_event_participants_and_kickoff_then_applies_i
     assert apply_verified_schedule(db_session, records) == 0
     db_session.commit()
     assert db_session.query(Game).filter_by(external_id="401999001").count() == 1
+
+
+def test_explicit_dry_run_cannot_be_combined_with_apply(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["import_espn_live_identities.py", "--dry-run"])
+    assert parse_args().dry_run is True
+
+    monkeypatch.setattr(sys, "argv", ["import_espn_live_identities.py", "--dry-run", "--apply"])
+    with pytest.raises(SystemExit):
+        parse_args()
