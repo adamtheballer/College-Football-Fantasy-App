@@ -34,7 +34,7 @@ import { NotificationSettingsPanel } from "./NotificationSettingsPanel";
 
 const preferences = {
   push_enabled: false, email_enabled: false, draft_alerts: true, injury_alerts: false,
-  touchdown_alerts: false, usage_alerts: false, waiver_alerts: true, projection_alerts: false,
+  usage_alerts: false, waiver_alerts: true, projection_alerts: false,
   lineup_reminders: true, trade_alerts: true, chat_alerts: true, matchup_results: true,
   matchup_start_alerts: true, matchup_result_alerts: true, big_play_alerts: false,
   long_rush_alerts: false, long_reception_alerts: false, long_pass_alerts: false,
@@ -71,6 +71,18 @@ describe("NotificationSettingsPanel async lifecycle", () => {
 
     expect(await screen.findByLabelText("Drafts notifications")).toBeTruthy();
     expect(screen.getByText("Push delivery")).toBeTruthy();
+  });
+
+  it("groups long-play alerts beneath their Big Plays master control without a touchdown option", async () => {
+    api.get.mockResolvedValueOnce(preferences).mockResolvedValueOnce({ data: [] });
+    render(<NotificationSettingsPanel />);
+
+    const group = await screen.findByTestId("big-play-alert-group");
+    expect(group.textContent).toContain("Master control for the long-play alerts below");
+    expect(group.textContent).toContain("30+ yard rushing plays");
+    expect(group.textContent).toContain("40+ yard receptions");
+    expect(group.textContent).toContain("40+ yard completed passes");
+    expect(screen.queryByLabelText("Touchdowns notifications")).toBeNull();
   });
 
   it("aborts a delayed preference update on unmount without reporting an async error", async () => {

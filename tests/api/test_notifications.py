@@ -4,6 +4,7 @@ from conftest import TestingSessionLocal
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.notification import (
     NotificationDeliveryAttempt,
+    NotificationLeaguePreference,
     NotificationLog,
     NotificationPreference,
     PushToken,
@@ -21,6 +22,8 @@ from collegefootballfantasy_api.app.services.notification_providers import (
     ProviderDeliveryResult,
 )
 from collegefootballfantasy_api.app.services.notification_service import (
+    _league_pref_allows,
+    _pref_allows_category,
     process_due_notifications_once,
     intake_typed_big_play_notification,
     queue_certified_matchup_final_notifications,
@@ -28,6 +31,7 @@ from collegefootballfantasy_api.app.services.notification_service import (
     record_delivery_attempt,
     rebuild_matchup_start_notifications,
 )
+from collegefootballfantasy_api.app.services.notification_events import get_notification_event
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -105,6 +109,10 @@ def test_notification_preferences_are_auth_scoped_without_user_key(client):
             "draft_alerts": False,
             "injury_alerts": True,
             "touchdown_alerts": True,
+            "big_play_alerts": False,
+            "long_rush_alerts": True,
+            "long_reception_alerts": True,
+            "long_pass_alerts": True,
             "usage_alerts": False,
             "waiver_alerts": True,
             "projection_alerts": False,
@@ -118,7 +126,12 @@ def test_notification_preferences_are_auth_scoped_without_user_key(client):
     body = update_response.json()
     assert "user_key" not in body
     assert body["push_enabled"] is False
-    assert body["touchdown_alerts"] is True
+    # Touchdown alerts were retired. Big Plays is now the master switch, so
+    # clearing it also clears every long-play child preference.
+    assert body["touchdown_alerts"] is False
+    assert body["long_rush_alerts"] is False
+    assert body["long_reception_alerts"] is False
+    assert body["long_pass_alerts"] is False
     assert body["quiet_hours_start"] == "22:00"
 
 
@@ -683,10 +696,63 @@ def test_stale_claim_is_recovered_once_and_big_play_intake_is_disabled_by_defaul
         db_session,
         league_id=league["id"],
         user_id=user_id,
-        event_type="TOUCHDOWN",
+        event_type="LONG_RUSH",
         event_key=f"player:disabled:{user_id}",
         player_id=1,
     ) is None
+
+
+def test_long_play_alert_contract_uses_the_master_gate_and_approved_thresholds(client, db_session, monkeypatch):
+    identity = create_user(client, "long-play-contract")
+    league = create_league(client, identity["access_token"], "Long Play League")
+    user_id = identity["user"]["id"]
+
+    assert get_notification_event("LONG_RUSH").minimum_yards == 30
+    assert get_notification_event("LONG_RECEPTION").minimum_yards == 40
+    assert get_notification_event("LONG_PASS").minimum_yards == 40
+
+    global_pref = NotificationPreference(
+        user_id=user_id,
+        user_key=str(user_id),
+        big_play_alerts=False,
+        long_rush_alerts=True,
+    )
+    league_pref = NotificationLeaguePreference(
+        user_id=user_id,
+        user_key=str(user_id),
+        league_id=league["id"],
+        enabled=True,
+        big_play_alerts=False,
+        long_rush_alerts=True,
+    )
+    assert not _pref_allows_category("PLAYER", "LONG_RUSH", global_pref)
+    assert not _league_pref_allows("PLAYER", "LONG_RUSH", league_pref)
+    global_pref.big_play_alerts = True
+    league_pref.big_play_alerts = True
+    assert _pref_allows_category("PLAYER", "LONG_RUSH", global_pref)
+    assert _league_pref_allows("PLAYER", "LONG_RUSH", league_pref)
+
+    monkeypatch.setattr(settings, "live_player_notifications_enabled", True)
+    assert intake_typed_big_play_notification(
+        db_session,
+        league_id=league["id"],
+        user_id=user_id,
+        event_type="LONG_RUSH",
+        event_key=f"long-rush:below-threshold:{user_id}",
+        player_id=1,
+        play_yards=29,
+    ) is None
+    queued = intake_typed_big_play_notification(
+        db_session,
+        league_id=league["id"],
+        user_id=user_id,
+        event_type="LONG_RUSH",
+        event_key=f"long-rush:threshold:{user_id}",
+        player_id=1,
+        play_yards=30,
+    )
+    assert queued is not None
+    assert queued.event_type == "LONG_RUSH"
 
 
 def test_external_dead_letter_keeps_the_in_app_notification_and_sanitizes_error(client, db_session, monkeypatch):

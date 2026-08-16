@@ -236,7 +236,9 @@ def get_notification_preferences(db: Session, current_user_id: int) -> Notificat
         email_enabled=prefs.email_enabled,
         draft_alerts=prefs.draft_alerts,
         injury_alerts=prefs.injury_alerts,
-        touchdown_alerts=prefs.touchdown_alerts,
+        # Retain this legacy API property for already-installed clients, but
+        # never reactivate a standalone touchdown alert.
+        touchdown_alerts=False,
         usage_alerts=prefs.usage_alerts,
         waiver_alerts=prefs.waiver_alerts,
         projection_alerts=prefs.projection_alerts,
@@ -262,6 +264,16 @@ def update_notification_preferences(
     prefs = db.query(NotificationPreference).filter(NotificationPreference.user_id == current_user_id).first()
     if not prefs:
         prefs = NotificationPreference(user_id=current_user_id, user_key=legacy_user_key(current_user_id))
+    # Big Plays is the master switch.  Turning it off also clears every
+    # long-play child control, so a later re-enable always requires an
+    # explicit choice of the desired sub-alerts. Touchdowns are no longer a
+    # product notification type; retain the storage field only for clients
+    # built before this release.
+    payload.touchdown_alerts = False
+    if not payload.big_play_alerts:
+        payload.long_rush_alerts = False
+        payload.long_reception_alerts = False
+        payload.long_pass_alerts = False
     for field in NotificationPreferences.model_fields:
         setattr(prefs, field, getattr(payload, field))
     prefs.user_id = current_user_id
@@ -341,7 +353,7 @@ def get_league_preferences(db: Session, current_user_id: int) -> LeagueNotificat
                 matchup_start_alerts=pref.matchup_start_alerts if pref else True,
                 matchup_result_alerts=pref.matchup_result_alerts if pref else True,
                 lineup_reminders=pref.lineup_reminders if pref else True,
-                touchdown_alerts=pref.touchdown_alerts if pref else False,
+                touchdown_alerts=False,
                 long_rush_alerts=pref.long_rush_alerts if pref else False,
                 long_reception_alerts=pref.long_reception_alerts if pref else False,
                 long_pass_alerts=pref.long_pass_alerts if pref else False,
@@ -370,6 +382,11 @@ def update_league_preferences(
             pref = NotificationLeaguePreference(
                 user_id=current_user_id, user_key=legacy_user_key(current_user_id), league_id=item.league_id
             )
+        item.touchdown_alerts = False
+        if not item.big_play_alerts:
+            item.long_rush_alerts = False
+            item.long_reception_alerts = False
+            item.long_pass_alerts = False
         pref.enabled = item.enabled
         pref.injury_alerts = item.injury_alerts
         pref.big_play_alerts = item.big_play_alerts
@@ -380,7 +397,7 @@ def update_league_preferences(
         pref.matchup_start_alerts = item.matchup_start_alerts
         pref.matchup_result_alerts = item.matchup_result_alerts
         pref.lineup_reminders = item.lineup_reminders
-        pref.touchdown_alerts = item.touchdown_alerts
+        pref.touchdown_alerts = False
         pref.long_rush_alerts = item.long_rush_alerts
         pref.long_reception_alerts = item.long_reception_alerts
         pref.long_pass_alerts = item.long_pass_alerts
@@ -856,12 +873,16 @@ def intake_typed_big_play_notification(
     *,
     league_id: int,
     user_id: int,
-    event_type: Literal["TOUCHDOWN", "LONG_RUSH", "LONG_RECEPTION", "LONG_PASS", "BIG_PLAY"],
+    event_type: Literal["LONG_RUSH", "LONG_RECEPTION", "LONG_PASS"],
     event_key: str,
     player_id: int,
+    play_yards: int | None = None,
 ) -> ScheduledNotification | None:
     """Typed intake only; live data polling/inference remains intentionally absent."""
     if not settings.live_player_notifications_enabled:
+        return None
+    definition = get_notification_event(event_type)
+    if definition.minimum_yards is None or play_yards is None or play_yards < definition.minimum_yards:
         return None
     return queue_notification_event(
         db,
@@ -915,6 +936,8 @@ def _pref_allows_category(category: str, alert_type: str, prefs: NotificationPre
     if prefs is None:
         return True
     preference = get_notification_event(alert_type).global_preference
+    if alert_type in {"LONG_RUSH", "LONG_RECEPTION", "LONG_PASS"} and not prefs.big_play_alerts:
+        return False
     return bool(getattr(prefs, preference, True)) if preference else True
 
 
@@ -924,6 +947,8 @@ def _league_pref_allows(category: str, alert_type: str, pref: NotificationLeague
     if not pref.enabled:
         return False
     preference = get_notification_event(alert_type).league_preference
+    if alert_type in {"LONG_RUSH", "LONG_RECEPTION", "LONG_PASS"} and not pref.big_play_alerts:
+        return False
     return bool(getattr(pref, preference, True)) if preference else True
 
 

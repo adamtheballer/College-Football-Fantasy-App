@@ -14,7 +14,6 @@ type Preferences = {
   email_enabled: boolean;
   draft_alerts: boolean;
   injury_alerts: boolean;
-  touchdown_alerts: boolean;
   usage_alerts: boolean;
   waiver_alerts: boolean;
   projection_alerts: boolean;
@@ -36,7 +35,6 @@ type Preferences = {
 type PreferenceToggleKey =
   | "draft_alerts"
   | "injury_alerts"
-  | "touchdown_alerts"
   | "usage_alerts"
   | "waiver_alerts"
   | "projection_alerts"
@@ -63,7 +61,6 @@ type LeaguePreference = {
   matchup_start_alerts: boolean;
   matchup_result_alerts: boolean;
   lineup_reminders: boolean;
-  touchdown_alerts: boolean;
   long_rush_alerts: boolean;
   long_reception_alerts: boolean;
   long_pass_alerts: boolean;
@@ -71,7 +68,7 @@ type LeaguePreference = {
 
 type LeaguePreferencesResponse = { data: LeaguePreference[] };
 
-const rows: Array<{ key: PreferenceToggleKey; label: string; description: string; comingSoon?: boolean }> = [
+const rows: Array<{ key: PreferenceToggleKey; label: string; description: string }> = [
   { key: "draft_alerts", label: "Drafts", description: "Draft reminders, your turn, and completion." },
   { key: "trade_alerts", label: "Trades", description: "Offers and important trade decisions." },
   { key: "waiver_alerts", label: "Waivers", description: "Claim results and status changes." },
@@ -79,14 +76,15 @@ const rows: Array<{ key: PreferenceToggleKey; label: string; description: string
   { key: "matchup_result_alerts", label: "Matchup results", description: "Only after scoring certifies the result." },
   { key: "lineup_reminders", label: "Lineup reminders", description: "A reminder before your first verified starter kickoff." },
   { key: "chat_alerts", label: "Chat", description: "Private direct-message alerts." },
-  { key: "big_play_alerts", label: "Big Plays", description: "Touchdowns and long plays from live scoring.", comingSoon: true },
-  { key: "touchdown_alerts", label: "Touchdowns", description: "Individual touchdown notifications.", comingSoon: true },
-  { key: "long_rush_alerts", label: "Long rushes", description: "Individual long-rush notifications.", comingSoon: true },
-  { key: "long_reception_alerts", label: "Long receptions", description: "Individual long-reception notifications.", comingSoon: true },
-  { key: "long_pass_alerts", label: "Long passes", description: "Individual long-pass notifications.", comingSoon: true },
 ];
 
-type LeagueToggleKey = "draft_alerts" | "trade_alerts" | "waiver_alerts" | "matchup_start_alerts" | "matchup_result_alerts" | "lineup_reminders" | "big_play_alerts" | "touchdown_alerts" | "long_rush_alerts" | "long_reception_alerts" | "long_pass_alerts";
+const longPlayRows: Array<{ key: "long_rush_alerts" | "long_reception_alerts" | "long_pass_alerts"; label: string; description: string }> = [
+  { key: "long_rush_alerts", label: "Long rushes", description: "30+ yard rushing plays." },
+  { key: "long_reception_alerts", label: "Long receptions", description: "40+ yard receptions." },
+  { key: "long_pass_alerts", label: "Long passes", description: "40+ yard completed passes." },
+];
+
+type LeagueToggleKey = "draft_alerts" | "trade_alerts" | "waiver_alerts" | "matchup_start_alerts" | "matchup_result_alerts" | "lineup_reminders";
 
 const leagueRows: Array<{ key: LeagueToggleKey; label: string }> = [
   { key: "draft_alerts", label: "Drafts" },
@@ -95,11 +93,6 @@ const leagueRows: Array<{ key: LeagueToggleKey; label: string }> = [
   { key: "matchup_start_alerts", label: "Starts" },
   { key: "matchup_result_alerts", label: "Results" },
   { key: "lineup_reminders", label: "Lineup" },
-  { key: "big_play_alerts", label: "Big Plays" },
-  { key: "touchdown_alerts", label: "TDs" },
-  { key: "long_rush_alerts", label: "Long Rush" },
-  { key: "long_reception_alerts", label: "Long Rec" },
-  { key: "long_pass_alerts", label: "Long Pass" },
 ];
 
 const permissionCopy: Record<BrowserPushState, string> = {
@@ -298,10 +291,22 @@ export function NotificationSettingsPanel() {
         </div>
         {preferences ? rows.map((row) => (
           <div key={row.key} className="flex items-center justify-between gap-5 border-b border-border/35 py-3 last:border-0">
-            <div><p className="text-sm font-bold text-foreground">{row.label}{row.comingSoon ? <span className="ml-2 text-[10px] font-black uppercase tracking-[0.12em] text-amber-300">Coming with live scoring</span> : null}</p><p className="text-xs text-muted-foreground">{row.description}</p></div>
-            <Switch checked={Boolean(preferences[row.key])} disabled={saving || row.comingSoon} onCheckedChange={(checked) => void save({ ...preferences, [row.key]: checked })} aria-label={`${row.label} notifications`} />
+            <div><p className="text-sm font-bold text-foreground">{row.label}</p><p className="text-xs text-muted-foreground">{row.description}</p></div>
+            <Switch checked={Boolean(preferences[row.key])} disabled={saving} onCheckedChange={(checked) => void save({ ...preferences, [row.key]: checked })} aria-label={`${row.label} notifications`} />
           </div>
         )) : <p className="text-sm text-muted-foreground">Loading notification settings…</p>}
+        {preferences ? <div className="border-b border-border/35 py-4" data-testid="big-play-alert-group">
+          <div className="flex items-center justify-between gap-5">
+            <div><p className="text-sm font-bold text-foreground">Big Plays <span className="ml-2 text-[10px] font-black uppercase tracking-[0.12em] text-amber-300">Coming with live scoring</span></p><p className="text-xs text-muted-foreground">Master control for the long-play alerts below. Turning it off mutes every sub-alert.</p></div>
+            <Switch checked={preferences.big_play_alerts} disabled aria-label="Big Plays notifications" />
+          </div>
+          <div className="ml-3 mt-3 space-y-1 border-l border-primary/30 pl-4 sm:ml-5">
+            {longPlayRows.map((row) => <div key={row.key} className="flex items-center justify-between gap-4 py-2">
+              <div><p className="text-xs font-semibold text-foreground">{row.label} <span className="ml-1 text-[9px] font-black uppercase tracking-[0.1em] text-amber-300">Coming with live scoring</span></p><p className="text-[11px] text-muted-foreground">{row.description}</p></div>
+              <Switch checked={Boolean(preferences[row.key])} disabled aria-label={`${row.label} notifications`} />
+            </div>)}
+          </div>
+        </div> : null}
         {preferences ? <>
           <div className="flex items-center justify-between gap-5 border-b border-border/35 py-3">
             <div><p className="text-sm font-bold text-foreground">Push delivery</p><p className="text-xs text-muted-foreground">Pause operating-system notifications without removing in-app history.</p></div>
@@ -329,7 +334,7 @@ export function NotificationSettingsPanel() {
                   <Switch checked={league.enabled} disabled={saving} onCheckedChange={(enabled) => void saveLeaguePreference({ ...league, enabled })} aria-label={`${league.league_name ?? "League"} notifications`} />
                 </div>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3">
-                  {leagueRows.map((row) => <label key={String(row.key)} className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground"><span>{row.label}</span><Switch checked={Boolean(league[row.key])} disabled={saving || !league.enabled || row.key === "big_play_alerts" || row.key === "touchdown_alerts" || row.key === "long_rush_alerts" || row.key === "long_reception_alerts" || row.key === "long_pass_alerts"} onCheckedChange={(checked) => void saveLeaguePreference({ ...league, [row.key]: checked })} aria-label={`${league.league_name ?? "League"} ${row.label}`} /></label>)}
+                  {leagueRows.map((row) => <label key={String(row.key)} className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground"><span>{row.label}</span><Switch checked={Boolean(league[row.key])} disabled={saving || !league.enabled} onCheckedChange={(checked) => void saveLeaguePreference({ ...league, [row.key]: checked })} aria-label={`${league.league_name ?? "League"} ${row.label}`} /></label>)}
                 </div>
               </div>
             ))}

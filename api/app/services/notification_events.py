@@ -48,6 +48,10 @@ class NotificationEventDefinition:
     quiet_hours_apply: bool
     time_critical: bool
     privacy_scope: NotificationScope
+    # Player-play alerts are intentionally declared here, rather than hidden
+    # in a future provider adapter.  This keeps the product threshold visible
+    # in the API contract before live scoring is enabled.
+    minimum_yards: int | None = None
 
 
 def _event(
@@ -66,6 +70,7 @@ def _event(
     quiet_hours_apply: bool = True,
     time_critical: bool = False,
     privacy_scope: NotificationScope = NotificationScope.DIRECT_USER,
+    minimum_yards: int | None = None,
 ) -> NotificationEventDefinition:
     if time_critical:
         quiet_hours_apply = False
@@ -86,6 +91,7 @@ def _event(
         quiet_hours_apply=quiet_hours_apply,
         time_critical=time_critical,
         privacy_scope=privacy_scope,
+        minimum_yards=minimum_yards,
     )
 
 
@@ -196,12 +202,9 @@ NOTIFICATION_EVENTS: dict[str, NotificationEventDefinition] = {
         "Set your lineup", "Your Week {week} matchup starts soon.", "matchup",
         "lineup_reminder:{matchup_id}:{recipient_user_id}:{kickoff_revision}", "lineup_reminders", "lineup_reminders",
     ),
-    "BIG_PLAY": _event(
-        "BIG_PLAY", "PLAYER", "canonical live-play intake", "eligible subscribed roster manager",
-        "canonical provider play event and production flag enabled", "Player update", "{player_name} made a big play.", "league",
-        "big_play:{provider}:{provider_game_id}:{provider_play_id}:{recipient_user_id}", "big_play_alerts", "big_play_alerts",
-        privacy_scope=NotificationScope.LEAGUE_MEMBER,
-    ),
+    # ``big_play_alerts`` is a master preference, not its own push event.
+    # A recipient chooses which of the three long-play event types below can
+    # pass through that master gate.
     "TOUCHDOWN": _event(
         "TOUCHDOWN", "PLAYER", "canonical live-play intake", "eligible subscribed roster manager",
         "canonical provider touchdown event and production flag enabled", "Player scoring update", "{player_name} scored a touchdown.", "league",
@@ -210,21 +213,21 @@ NOTIFICATION_EVENTS: dict[str, NotificationEventDefinition] = {
     ),
     "LONG_RUSH": _event(
         "LONG_RUSH", "PLAYER", "canonical live-play intake", "eligible subscribed roster manager",
-        "canonical provider rush event and production flag enabled", "Long rush", "{player_name} had a long rushing play.", "league",
+        "canonical provider rushing play of at least 30 yards and production flag enabled", "Long rush", "{player_name} had a 30+ yard rushing play.", "league",
         "big_play:{provider}:{provider_game_id}:{provider_play_id}:{recipient_user_id}", "long_rush_alerts", "long_rush_alerts",
-        privacy_scope=NotificationScope.LEAGUE_MEMBER,
+        privacy_scope=NotificationScope.LEAGUE_MEMBER, minimum_yards=30,
     ),
     "LONG_RECEPTION": _event(
         "LONG_RECEPTION", "PLAYER", "canonical live-play intake", "eligible subscribed roster manager",
-        "canonical provider reception event and production flag enabled", "Long reception", "{player_name} had a long reception.", "league",
+        "canonical provider reception of at least 40 yards and production flag enabled", "Long reception", "{player_name} had a 40+ yard reception.", "league",
         "big_play:{provider}:{provider_game_id}:{provider_play_id}:{recipient_user_id}", "long_reception_alerts", "long_reception_alerts",
-        privacy_scope=NotificationScope.LEAGUE_MEMBER,
+        privacy_scope=NotificationScope.LEAGUE_MEMBER, minimum_yards=40,
     ),
     "LONG_PASS": _event(
         "LONG_PASS", "PLAYER", "canonical live-play intake", "eligible subscribed roster manager",
-        "canonical provider pass event and production flag enabled", "Long pass", "{player_name} had a long passing play.", "league",
+        "canonical provider completed pass of at least 40 yards and production flag enabled", "Long pass", "{player_name} completed a 40+ yard pass.", "league",
         "big_play:{provider}:{provider_game_id}:{provider_play_id}:{recipient_user_id}", "long_pass_alerts", "long_pass_alerts",
-        privacy_scope=NotificationScope.LEAGUE_MEMBER,
+        privacy_scope=NotificationScope.LEAGUE_MEMBER, minimum_yards=40,
     ),
     "CHAT_DIRECT_MESSAGE": _event(
         "CHAT_DIRECT_MESSAGE", "CHAT", "private chat service", "private chat recipient only", "message committed", "New direct message",
