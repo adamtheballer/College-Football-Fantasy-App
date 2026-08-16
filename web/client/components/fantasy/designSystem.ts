@@ -6,15 +6,15 @@ export const surfaceCardVariants = cva(
     variants: {
       variant: {
         default:
-          "rounded-2xl border-cfb-border-subtle bg-cfb-surface/90 shadow-[0_18px_42px_rgba(2,6,23,0.28)]",
+          "rounded-xl border-cfb-border-subtle bg-cfb-surface shadow-[0_8px_20px_rgba(2,6,23,0.18)]",
         raised:
-          "rounded-3xl border-cfb-border-subtle bg-cfb-surface-raised/95 shadow-[0_22px_52px_rgba(2,6,23,0.36)]",
+          "rounded-xl border-cfb-border-subtle bg-cfb-surface-raised shadow-[0_12px_26px_rgba(2,6,23,0.22)]",
         interactive:
-          "rounded-2xl border-cfb-border-subtle bg-cfb-surface/90 shadow-[0_18px_42px_rgba(2,6,23,0.28)] hover:border-cfb-border-strong hover:bg-cfb-surface-hover/90",
+          "rounded-xl border-cfb-border-subtle bg-cfb-surface shadow-[0_8px_20px_rgba(2,6,23,0.18)] hover:border-cfb-border-strong hover:bg-cfb-surface-hover",
         scoreboard:
-          "rounded-2xl border-cfb-border-strong/70 bg-[linear-gradient(135deg,hsl(var(--background-surface-raised)/0.96),hsl(var(--brand-primary)/0.12))] shadow-[0_20px_50px_rgba(2,6,23,0.34)]",
+          "rounded-xl border-cfb-border-strong/70 bg-cfb-surface-raised shadow-[0_12px_26px_rgba(2,6,23,0.22)]",
         field:
-          "cfb-yard-lines rounded-2xl border-cfb-border-subtle bg-cfb-surface/90 shadow-[0_18px_42px_rgba(2,6,23,0.28)]",
+          "cfb-yard-lines rounded-xl border-cfb-border-subtle bg-cfb-surface shadow-[0_8px_20px_rgba(2,6,23,0.18)]",
       },
       padding: {
         none: "p-0",

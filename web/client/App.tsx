@@ -9,6 +9,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/use-auth";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { SkeletonState } from "@/components/states";
 import { ApiError } from "@/lib/api";
 import RuntimeCompatibilityGate from "@/components/RuntimeCompatibilityGate";
 import { lazyWithRouteRecovery } from "@/lib/lazyWithRouteRecovery";
@@ -62,10 +63,8 @@ const queryClient = new QueryClient({
 });
 
 const RouteFallback = () => (
-  <div className="flex min-h-[45vh] items-center justify-center">
-    <div className="rounded-[2rem] border border-sky-300/20 bg-slate-950/55 px-8 py-6 text-[11px] font-black uppercase tracking-[0.22em] text-sky-200 shadow-[0_0_40px_rgba(56,189,248,0.12)]">
-      Loading view...
-    </div>
+  <div className="mx-auto w-full max-w-6xl py-5">
+    <SkeletonState rows={5} label="Loading view" />
   </div>
 );
 

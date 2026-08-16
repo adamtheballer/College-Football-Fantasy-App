@@ -54,10 +54,10 @@ describe("MobileNavigation", () => {
 
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "All navigation" })).toBeTruthy();
-    expect(screen.getByText("INJURY CENTER")).toBeTruthy();
-    expect(screen.getByText("ALERTS")).toBeTruthy();
-    expect(screen.getByText("REPORT BUG")).toBeTruthy();
-    expect(screen.getByText("SETTINGS")).toBeTruthy();
+    expect(screen.getByText("Injury Center")).toBeTruthy();
+    expect(screen.getByText("Alerts")).toBeTruthy();
+    expect(screen.getByText("Report Bug")).toBeTruthy();
+    expect(screen.getByText("Settings")).toBeTruthy();
     expect(screen.getByRole("button", { name: "SIGN OUT" })).toBeTruthy();
   });
 
@@ -74,7 +74,7 @@ describe("MobileNavigation", () => {
   it("keeps the five primary labels on one line at narrow mobile widths", () => {
     renderNavigation();
 
-    for (const label of ["HOME", "LEAGUES", "CHATS", "DRAFT", "More"]) {
+    for (const label of ["Home", "Leagues", "Chats", "Draft", "More"]) {
       expect(screen.getByText(label).className).toContain("whitespace-nowrap");
     }
   });

@@ -1,6 +1,7 @@
 export { PositionBadge } from "./PositionBadge";
 export type { PositionBadgeProps } from "./PositionBadge";
 export { PlaybookDecor } from "./PlaybookDecor";
+export { PageHeader } from "./PageHeader";
 export { StatCard } from "./StatCard";
 export type { StatCardProps } from "./StatCard";
 export { StatusBadge } from "./StatusBadge";

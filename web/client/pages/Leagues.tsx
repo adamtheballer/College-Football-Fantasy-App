@@ -13,6 +13,8 @@ import {
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/fantasy";
+import { ErrorState, SkeletonState } from "@/components/states";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagues } from "@/hooks/use-leagues";
@@ -282,56 +284,43 @@ export default function Leagues() {
 
   return (
     <div className="relative z-10 mx-auto max-w-6xl space-y-6 pb-4 pt-1 animate-in fade-in duration-300">
-      <div className="space-y-3 border-b border-cfb-border-subtle pb-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="cfb-micro-label text-cfb-brand">League Command Center</p>
-            <h1 className="mt-1 break-normal font-display text-3xl font-black tracking-[-0.04em] text-foreground sm:text-4xl">
-              Leagues
-            </h1>
-          </div>
-          {isLoggedIn && (
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+      <PageHeader
+        eyebrow="League command center"
+        title="Leagues"
+        description={isLoggedIn
+          ? "Manage your active leagues, jump into drafts, and open the right league hub."
+          : "Sign in to create or join a league and use the supported React experience."}
+        actions={isLoggedIn ? (
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
               <Button
                 variant="outline"
-                className="h-11 rounded-lg border-primary/35 bg-primary/[0.08] px-3 text-[10px] font-bold uppercase tracking-[0.08em] text-primary hover:bg-primary/[0.14]"
+                className="h-11 border-primary/35 bg-primary/[0.08] px-4 text-sm text-primary hover:bg-primary/[0.14]"
                 onClick={() => navigate("/leagues/create")}
               >
-                Create
+                Create league
               </Button>
               <Button
                 variant="outline"
-                className="h-11 rounded-lg border-emerald-500/30 bg-emerald-500/[0.06] px-3 text-[10px] font-bold uppercase tracking-[0.08em] text-emerald-300 hover:bg-emerald-500/[0.12]"
+                className="h-11 border-emerald-500/30 bg-emerald-500/[0.06] px-4 text-sm text-emerald-300 hover:bg-emerald-500/[0.12]"
                 onClick={() => navigate("/leagues/join")}
               >
-                Join
+                Join league
               </Button>
-            </div>
-          )}
-        </div>
-        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-          {isLoggedIn
-            ? "Manage your active leagues, jump into drafts, and open the right league hub."
-            : "Sign in to create or join a league and use the supported React experience."}
-        </p>
-      </div>
+          </div>
+        ) : undefined}
+      />
 
       {isLoggedIn ? (
         <div className="space-y-4">
           {isLoading && (
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
-              Loading leagues...
-            </div>
+            <SkeletonState rows={3} label="Loading your leagues" />
           )}
           {isError && (
-            <Card className="rounded-xl border-border/60 bg-[#15181c] p-6 text-center">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-red-300">
-                Unable to load leagues. Confirm the backend is running and your session is valid.
-              </p>
-              <Button variant="outline" onClick={() => void refetch()} className="mt-5 rounded-lg border-sky-300/25 text-sky-100">
-                Try Again
-              </Button>
-            </Card>
+            <ErrorState
+              message="Unable to load leagues. Confirm the backend is running and your session is valid."
+              retryLabel="Try again"
+              onRetry={() => void refetch()}
+            />
           )}
           {leagueRows.map((league) => (
             <LeagueCard
