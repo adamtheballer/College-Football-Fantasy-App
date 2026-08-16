@@ -1827,8 +1827,11 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("My QB", { exact: true })).toBeVisible();
     await expect(page.getByText("Managing your roster", { exact: true })).toBeVisible();
 
-    await page.getByRole("combobox").click();
-    await page.getByRole("option", { name: "Rival Team", exact: true }).click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    const rosterRail = page.getByLabel("Swipe through league rosters");
+    await expect(rosterRail).toBeVisible();
+    expect(await rosterRail.evaluate((element) => element.scrollWidth > element.clientWidth)).toBeTruthy();
+    await page.getByRole("button", { name: "View Rival Team roster" }).click();
     await expect(page.getByText("Rival QB", { exact: true })).toBeVisible();
     await expect(page.getByText("Viewing league roster", { exact: true })).toBeVisible();
     await expect(page.getByText("Rival Team · 0-0-0 · Read-only", { exact: true })).toBeVisible();

@@ -5,7 +5,6 @@ import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
 import { WeekSelector } from "@/components/league/WeekSelector";
 import { ErrorState } from "@/components/states/ErrorState";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLeagueDetail, useLeagueRosterTab } from "@/hooks/use-leagues";
 import { ApiError } from "@/lib/api";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
@@ -57,6 +56,65 @@ export const getLeagueRosterTeams = (rosterData?: LeagueRosterTabResponse): Leag
     },
   ];
 };
+
+function TeamRosterRail({
+  teams,
+  selectedTeamId,
+  ownedTeamId,
+  onSelect,
+}: {
+  teams: LeagueRosterTeam[];
+  selectedTeamId: number | null;
+  ownedTeamId: number | null;
+  onSelect: (teamId: number) => void;
+}) {
+  if (teams.length < 2) return null;
+
+  return (
+    <section
+      aria-label="League rosters"
+      className="overflow-hidden rounded-[1.25rem] border border-cfb-border-subtle bg-cfb-surface/70"
+    >
+      <div
+        aria-label="Swipe through league rosters"
+        className="flex snap-x snap-mandatory gap-2 overflow-x-auto px-3 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-4"
+      >
+        {teams.map((teamRoster) => {
+          const { team } = teamRoster;
+          const selected = team.id === selectedTeamId;
+          const isOwned = team.id === ownedTeamId;
+          return (
+            <button
+              key={team.id}
+              type="button"
+              aria-label={`View ${team.name} roster`}
+              aria-pressed={selected}
+              onClick={() => onSelect(team.id)}
+              className={`snap-start shrink-0 rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 ${
+                selected
+                  ? "border-cfb-brand/80 bg-cfb-brand/[0.12] text-cfb-text-primary"
+                  : "border-cfb-border-subtle bg-cfb-surface-raised text-cfb-text-secondary hover:border-cfb-border-strong hover:bg-cfb-surface-hover"
+              }`}
+            >
+              <div className="flex min-w-[172px] items-center gap-2.5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cfb-brand/45 bg-cfb-brand/[0.08] text-[10px] font-black text-cfb-brand">
+                  {team.name.trim().slice(0, 2).toUpperCase() || "TM"}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[11px] font-black leading-4">{team.name}</span>
+                  <span className="mt-0.5 block truncate text-[9px] font-bold text-cfb-text-muted">
+                    {isOwned ? "Your roster" : team.record || "League roster"}
+                  </span>
+                </span>
+                {isOwned ? <span className="text-[8px] font-black uppercase tracking-[0.12em] text-cfb-brand">You</span> : null}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
 export default function LeagueRoster() {
   const { leagueId } = useParams();
@@ -169,36 +227,16 @@ export default function LeagueRoster() {
 
   return (
     <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-4 px-3 pb-24 pt-4 sm:gap-6 sm:px-6 sm:py-8">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] rounded-[3rem] bg-[radial-gradient(circle_at_18%_12%,rgba(56,189,248,0.2),transparent_34%),radial-gradient(circle_at_78%_8%,rgba(59,130,246,0.18),transparent_36%)] blur-2xl" />
       <div className="space-y-4">
-        <p className="text-[11px] font-black uppercase tracking-[0.24em] text-sky-300">
-          League Roster
-        </p>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-black italic text-slate-50 sm:text-4xl">Roster</h1>
-            <p className="mt-1 hidden text-sm text-slate-400 sm:block">
+            <p className="cfb-micro-label text-cfb-brand">League Roster</p>
+            <h1 className="cfb-display-title mt-1 text-3xl sm:mt-2 sm:text-5xl">Roster</h1>
+            <p className="mt-2 hidden max-w-2xl text-sm font-medium leading-6 text-cfb-text-secondary sm:block">
               Manage your lineup or inspect every league team&apos;s current roster.
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            {teamRosters.length > 1 ? (
-              <div className="min-w-[240px]">
-                <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">View team roster</p>
-                <Select value={selectedTeamId === null ? undefined : String(selectedTeamId)} onValueChange={(value) => setSelectedTeamId(Number(value))}>
-                  <SelectTrigger className="h-11 rounded-xl border-sky-300/25 bg-slate-950/45 text-sm font-black text-slate-100">
-                    <SelectValue placeholder="Choose a team" />
-                  </SelectTrigger>
-                  <SelectContent className="border-sky-300/20 bg-slate-950 text-slate-100">
-                    {teamRosters.map((teamRoster) => (
-                      <SelectItem key={teamRoster.team.id} value={String(teamRoster.team.id)}>
-                        {teamRoster.team.name}{teamRoster.team.id === ownedTeamId ? " (You)" : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
             <WeekSelector
               week={rosterData?.week}
               selectedWeek={selectedWeek}
@@ -213,50 +251,57 @@ export default function LeagueRoster() {
         />
       </div>
 
+      <TeamRosterRail
+        teams={teamRosters}
+        selectedTeamId={selectedTeamId}
+        ownedTeamId={ownedTeamId}
+        onSelect={setSelectedTeamId}
+      />
+
       {isEmptyRoster ? (
-        <section className="cfb-playbook-pattern rounded-[1.25rem] border border-cfb-brand/30 bg-cfb-brand/[0.09] px-5 py-4 shadow-[0_0_36px_hsl(var(--brand-primary)/0.12)]">
-          <p className="relative text-sm font-bold text-blue-50">
+        <section className="rounded-[1.25rem] border border-cfb-brand/30 bg-cfb-brand/[0.09] px-5 py-4">
+          <p className="text-sm font-bold text-cfb-text-primary">
             No players on this roster yet. Complete the draft to populate your roster.
           </p>
         </section>
       ) : null}
 
-      <section className="rounded-[1.25rem] border border-sky-300/20 bg-sky-300/[0.055] px-4 py-3 sm:px-5 sm:py-4">
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-300">
+      <section className="rounded-[1.25rem] border border-cfb-border-subtle bg-cfb-surface/70 px-4 py-3 sm:px-5 sm:py-4">
+        <p className="cfb-micro-label text-cfb-brand">
           {viewingOwnedTeam ? "Managing your roster" : "Viewing league roster"}
         </p>
-        <p className="mt-1 text-sm font-bold text-slate-200">
+        <p className="mt-1 text-sm font-bold text-cfb-text-primary">
           {previewTeamName}{selectedTeamRoster?.team.record ? ` · ${selectedTeamRoster.team.record}` : ""}
           {!viewingOwnedTeam ? " · Read-only" : ""}
         </p>
       </section>
 
       <section className="grid grid-cols-3 gap-2 sm:gap-4">
-        <div className="rounded-[1.1rem] border border-cfb-brand/30 bg-[linear-gradient(135deg,hsl(var(--brand-primary)/0.16),hsl(var(--background-surface-raised)/0.94))] p-3 shadow-[0_18px_60px_hsl(var(--brand-primary)/0.12)] sm:rounded-[1.35rem] sm:p-5">
-          <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-slate-400 sm:text-[10px] sm:tracking-[0.2em]">
+        <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised p-3 sm:p-5">
+          <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-cfb-text-muted sm:text-[10px] sm:tracking-[0.2em]">
             Starter Proj
           </p>
-          <p className="mt-1 text-xl font-black tabular-nums text-sky-100 sm:text-3xl">{starterTotal === null ? "N/A" : starterTotal.toFixed(1)}</p>
+          <p className="mt-1 text-xl font-black tabular-nums text-cfb-brand sm:text-3xl">{starterTotal === null ? "N/A" : starterTotal.toFixed(1)}</p>
         </div>
-        <div className="rounded-[1.1rem] border border-cfb-border-subtle bg-cfb-surface-raised/90 p-3 sm:rounded-[1.35rem] sm:p-5">
-          <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-slate-500 sm:text-[10px] sm:tracking-[0.2em]">
+        <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised p-3 sm:p-5">
+          <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-cfb-text-muted sm:text-[10px] sm:tracking-[0.2em]">
             Bench Depth
           </p>
-          <p className="mt-1 text-xl font-black tabular-nums text-slate-100 sm:text-3xl">{benchTotal === null ? "N/A" : benchTotal.toFixed(1)}</p>
+          <p className="mt-1 text-xl font-black tabular-nums text-cfb-text-primary sm:text-3xl">{benchTotal === null ? "N/A" : benchTotal.toFixed(1)}</p>
         </div>
-        <div className="rounded-[1.1rem] border border-cfb-border-subtle bg-cfb-surface-raised/90 p-3 sm:rounded-[1.35rem] sm:p-5">
-          <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-slate-500 sm:text-[10px] sm:tracking-[0.2em]">
+        <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised p-3 sm:p-5">
+          <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-cfb-text-muted sm:text-[10px] sm:tracking-[0.2em]">
             Week
           </p>
-          <p className="mt-1 text-xl font-black tabular-nums text-slate-100 sm:text-3xl">{selectedWeek ?? rosterData?.week ?? 1}</p>
+          <p className="mt-1 text-xl font-black tabular-nums text-cfb-text-primary sm:text-3xl">{selectedWeek ?? rosterData?.week ?? 1}</p>
           {rosterData?.message ? (
-            <p className="mt-2 text-xs font-semibold text-slate-400">{rosterData.message}</p>
+            <p className="mt-2 text-xs font-semibold text-cfb-text-secondary">{rosterData.message}</p>
           ) : null}
         </div>
       </section>
 
       <RosterSlotTable title="Starters" players={starters} emptyText="No starters set yet." leagueId={parsedLeagueId} ownedRosterActions={ownedRosterActions} />
-      <RosterSlotTable title="Bench" players={bench} emptyText="Bench is empty." leagueId={parsedLeagueId} ownedRosterActions={ownedRosterActions} />
+      <RosterSlotTable title="Bench" players={bench} emptyText="Bench is empty." tone="bench" leagueId={parsedLeagueId} ownedRosterActions={ownedRosterActions} />
       <RosterSlotTable
         title={`IR (${rosterData?.ir_slots ?? 0})`}
         players={ir}
