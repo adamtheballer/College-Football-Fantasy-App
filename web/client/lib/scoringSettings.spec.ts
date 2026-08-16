@@ -28,11 +28,12 @@ describe("createLeagueScoringToApi", () => {
       interceptions: -2,
       fumbles_lost: -2,
       fg_made_0_30: 3,
-      fg_made_31_40: 5,
-      fg_made_41_50: 7,
-      fg_made_51_60: 9,
-      fg_made_61_plus: 11,
+      fg_made_31_40: 3,
+      fg_made_41_50: 4,
+      fg_made_51_60: 5,
+      fg_made_61_plus: 5,
       xp_made: 1,
+      fg_missed: 0,
     });
     expect(scoring).not.toHaveProperty("pass_yds_per_pt");
     expect(scoring).not.toHaveProperty("rush_yds_per_pt");

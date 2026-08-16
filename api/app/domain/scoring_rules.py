@@ -29,6 +29,30 @@ OFFENSE_RULES: dict[str, float] = {
 
 KICKER_RULES: dict[str, float] = {
     "fg_made_0_30": 3,
+    "fg_made_31_40": 3,
+    "fg_made_41_50": 4,
+    "fg_made_51_60": 5,
+    "fg_made_61_plus": 5,
+    "xp_made": 1,
+    "fg_missed": 0,
+}
+
+# Kept solely to identify and audit the former beta default.  It must never be
+# used for new league creation or present-day scoring.
+LEGACY_BETA_KICKER_RULES: dict[str, float] = {
+    "fg_made_0_30": 3,
+    "fg_made_31_40": 3,
+    "fg_made_41_50": 3,
+    "fg_made_51_60": 3,
+    "fg_made_61_plus": 3,
+    "xp_made": 1,
+}
+
+# Kept solely to target the pre-Week-1 3/5/7/9/11 policy for the versioned
+# correction.  Do not derive this from KICKER_RULES: production migrations must
+# retain the exact historic policy they are allowed to alter.
+PREVIOUS_KICKER_RULES: dict[str, float] = {
+    "fg_made_0_30": 3,
     "fg_made_31_40": 5,
     "fg_made_41_50": 7,
     "fg_made_51_60": 9,
@@ -37,17 +61,9 @@ KICKER_RULES: dict[str, float] = {
     "fg_missed": -1,
 }
 
-# Beta has one fixed kicker policy.  This must be applied explicitly by beta
-# flows instead of changing the app-wide/default scoring contract for existing
-# non-beta leagues.
-BETA_KICKER_RULES: dict[str, float] = {
-    "fg_made_0_30": 3,
-    "fg_made_31_40": 3,
-    "fg_made_41_50": 3,
-    "fg_made_51_60": 3,
-    "fg_made_61_plus": 3,
-    "xp_made": 1,
-}
+# Public beta league creation uses the same canonical rule set as the scoring
+# engine, including an explicit zero for missed field goals.
+BETA_KICKER_RULES: dict[str, float] = KICKER_RULES.copy()
 
 RULES_BY_PROFILE = {
     "offense": OFFENSE_RULES,
@@ -169,14 +185,15 @@ def _coerce_rule_value(key: str, value: Any) -> float:
 
 
 def field_goal_tier_rules(base_points: Any) -> dict[str, float]:
-    """Build the fixed field-goal schedule from the selected 30-yard base."""
+    """Build the 0-40/base, 41-50/+1, and 51+/+2 field-goal schedule."""
     base = _coerce_rule_value("fg", base_points)
     return {
         "fg_made_0_30": base,
-        "fg_made_31_40": base + 2,
-        "fg_made_41_50": base + 4,
-        "fg_made_51_60": base + 6,
-        "fg_made_61_plus": base + 8,
+        "fg_made_31_40": base,
+        "fg_made_41_50": base + 1,
+        "fg_made_51_60": base + 2,
+        "fg_made_61_plus": base + 2,
+        "fg_missed": 0,
     }
 
 

@@ -18,7 +18,11 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
 from collegefootballfantasy_api.app.core.config import settings
-from collegefootballfantasy_api.app.domain.scoring_rules import BETA_KICKER_RULES, ScoringRulesValidationError, validate_scoring_rules
+from collegefootballfantasy_api.app.domain.scoring_rules import (
+    LEGACY_BETA_KICKER_RULES,
+    ScoringRulesValidationError,
+    validate_scoring_rules,
+)
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
@@ -314,7 +318,7 @@ def flat_field_goal_league_audit(db: Session, *, season: int) -> dict[str, Any]:
 
         snapshot = (settings.scoring_snapshot_json if settings else None) or {}
         raw = (settings.scoring_json if settings else None) or {}
-        beta_values = {key: float(value) for key, value in BETA_KICKER_RULES.items()}
+        beta_values = {key: float(value) for key, value in LEGACY_BETA_KICKER_RULES.items()}
         snapshot_kicker = snapshot.get("kicker") if isinstance(snapshot.get("kicker"), dict) else snapshot
         raw_kicker = raw.get("kicker") if isinstance(raw.get("kicker"), dict) else raw
         snapshot_values = {

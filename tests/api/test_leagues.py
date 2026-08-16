@@ -128,10 +128,11 @@ def test_beta_scoring_requires_acknowledgment_locks_snapshot_and_enforces_flat_k
     expected_beta_kicker_rules = {
         "fg_made_0_30": 3,
         "fg_made_31_40": 3,
-        "fg_made_41_50": 3,
-        "fg_made_51_60": 3,
-        "fg_made_61_plus": 3,
+        "fg_made_41_50": 4,
+        "fg_made_51_60": 5,
+        "fg_made_61_plus": 5,
         "xp_made": 1,
+        "fg_missed": 0,
     }
     assert league["settings"]["scoring_snapshot_json"] == {"receptions": 1, **expected_beta_kicker_rules}
     assert league["settings"]["scoring_json"] == {"receptions": 1, **expected_beta_kicker_rules}
@@ -211,11 +212,12 @@ def test_scoring_rules_normalize_create_form_aliases():
     assert rules["interceptions"] == -2
     assert rules["fumbles_lost"] == -2
     assert rules["fg_made_0_30"] == 3
-    assert rules["fg_made_31_40"] == 5
-    assert rules["fg_made_41_50"] == 7
-    assert rules["fg_made_51_60"] == 9
-    assert rules["fg_made_61_plus"] == 11
+    assert rules["fg_made_31_40"] == 3
+    assert rules["fg_made_41_50"] == 4
+    assert rules["fg_made_51_60"] == 5
+    assert rules["fg_made_61_plus"] == 5
     assert rules["xp_made"] == 1
+    assert rules["fg_missed"] == 0
 
 
 def test_create_league_enforces_standard_beta_roster_and_managed_processing(client):
@@ -343,11 +345,12 @@ def test_create_league_accepts_create_form_scoring_keys(client):
     assert scoring["interceptions"] == -2
     assert scoring["fumbles_lost"] == -2
     assert scoring["fg_made_0_30"] == 3
-    assert scoring["fg_made_31_40"] == 5
-    assert scoring["fg_made_41_50"] == 7
-    assert scoring["fg_made_51_60"] == 9
-    assert scoring["fg_made_61_plus"] == 11
+    assert scoring["fg_made_31_40"] == 3
+    assert scoring["fg_made_41_50"] == 4
+    assert scoring["fg_made_51_60"] == 5
+    assert scoring["fg_made_61_plus"] == 5
     assert scoring["xp_made"] == 1
+    assert scoring["fg_missed"] == 0
     assert "pass_yds_per_pt" not in scoring
     assert "rush_yds_per_pt" not in scoring
     assert "rec_yds_per_pt" not in scoring

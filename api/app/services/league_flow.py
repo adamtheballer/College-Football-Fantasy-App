@@ -98,6 +98,7 @@ CANONICAL_SCORING_KEYS = {
     "fg_made_51_60",
     "fg_made_61_plus",
     "xp_made",
+    "fg_missed",
 }
 
 SCORING_KEY_ALIASES = {

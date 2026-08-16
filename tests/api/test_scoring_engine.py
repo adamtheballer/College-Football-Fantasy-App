@@ -60,7 +60,7 @@ def test_kicker_scoring_works_if_stat_fields_exist():
     )
     points, _ = calculate_player_fantasy_points(stats, {})
 
-    assert points == 38.0
+    assert points == 23.0
 
 
 def test_missing_stats_score_zero():
