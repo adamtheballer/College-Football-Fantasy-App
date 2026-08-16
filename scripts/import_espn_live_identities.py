@@ -381,7 +381,19 @@ def main() -> int:
         reference = CachedESPNReference(client, args.cache_dir / str(args.season), delay_seconds=args.request_delay_seconds)
         scoreboards = [(week, event) for week in weeks for event in reference.scoreboard(args.season, week)]
         schedule_records, schedule_review = plan_schedule([event for _, event in scoreboards], season=args.season, weeks=[week for week, _ in scoreboards], internal_schools=schools)
-        team_ids = {team_id for record in schedule_records for team_id in (record.get("home_team_id"), record.get("away_team_id")) if team_id}
+        # The internal player universe, not ESPN's full opponent list, defines
+        # which roster references are needed. A Power Four team may play a
+        # non-rosterable opponent, but fetching that opponent's roster cannot
+        # help map one of our players.
+        team_ids = {
+            team_id
+            for record in schedule_records
+            for team_name, team_id in (
+                (record.get("home_team"), record.get("home_team_id")),
+                (record.get("away_team"), record.get("away_team_id")),
+            )
+            if team_id and _school_key(team_name) in schools
+        }
         roster_rows = [athlete for team_id in sorted(team_ids) for athlete in flatten_roster(reference.roster(team_id))]
         player_records = plan_player_identities(players, roster_rows, reference.profile, existing)
         player_payload = {"season": args.season, "generated_at": _utc_now(), "mode": "apply" if args.apply else "dry_run", "summary": _summary(player_records), "records": player_records}
