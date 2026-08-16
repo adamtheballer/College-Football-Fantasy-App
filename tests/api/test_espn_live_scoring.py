@@ -8,6 +8,8 @@ from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
+from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
+from collegefootballfantasy_api.app.models.team_week_score import TeamWeekScore
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId, UnmatchedProviderRow
 from collegefootballfantasy_api.app.services.espn_live_scoring import (
@@ -99,6 +101,31 @@ def test_shadow_cycle_uses_one_per_game_lease_and_never_promotes_public_scores(d
     assert db_session.query(UnmatchedProviderRow).filter_by(feed="live_boxscore_player_stats").count() == 1
 
 
+def test_shadow_mode_cannot_change_existing_public_score_authority(db_session):
+    league, _home, _away, _players, matchup = create_scoring_fixture(db_session)
+    before_stats = db_session.query(PlayerStat).count()
+    before_player_scores = db_session.query(PlayerWeekScore).count()
+    before_team_scores = db_session.query(TeamWeekScore).count()
+    before_status = matchup.status
+
+    result = run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="shadow",
+        client=FakeLiveESPN(),
+        now=NOW,
+        relevant_team_names={"texas"},
+    )
+
+    assert result.promoted_rows == 0
+    assert db_session.query(PlayerStat).count() == before_stats
+    assert db_session.query(PlayerWeekScore).count() == before_player_scores
+    assert db_session.query(TeamWeekScore).count() == before_team_scores
+    assert db_session.get(Matchup, matchup.id).status == before_status
+    assert db_session.query(ProviderGameSnapshot).count() == 1
+
+
 def test_strict_live_identity_never_uses_external_or_name_school_fallback(db_session):
     db_session.add(Player(name="Arch Manning", position="QB", school="Texas", external_id="espn:101"))
     db_session.commit()
@@ -109,6 +136,28 @@ def test_strict_live_identity_never_uses_external_or_name_school_fallback(db_ses
     assert result.normalized_rows == 0
     assert result.unmatched_rows == 3
     assert db_session.query(ProviderGameSnapshot).one().normalized_rows == []
+
+
+def test_strict_live_identity_rejects_legacy_backfill_mappings(db_session):
+    player = Player(name="Arch Manning", position="QB", school="Texas")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        PlayerProviderId(
+            player_id=player.id,
+            provider="espn",
+            provider_player_id="101",
+            verification_status="legacy_backfill",
+        )
+    )
+    db_session.commit()
+
+    result = run_espn_scoring_cycle(
+        db_session, season=2026, week=1, mode="shadow", client=FakeLiveESPN(), now=NOW, relevant_team_names={"texas"}
+    )
+
+    assert result.normalized_rows == 0
+    assert result.unmatched_rows == 3
 
 
 def test_identical_replay_creates_one_immutable_snapshot_and_enabled_mode_replaces_cumulative_totals(db_session):

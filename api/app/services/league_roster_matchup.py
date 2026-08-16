@@ -419,15 +419,22 @@ def build_matchup_tab_view(
     matchup_id: int | None = None,
 ) -> LeagueMatchupTabRead:
     week = resolve_current_week(db, league, selected_week)
-    freshness = espn_week_freshness(db, season=league.season_year, week=week)
     freshness_read = LiveScoringFreshnessRead(
-        provider=freshness.provider,
-        state=freshness.state,
-        provider_as_of=freshness.provider_as_of,
-        last_successful_update_at=freshness.last_successful_update_at,
-        data_age_seconds=freshness.data_age_seconds,
-        relevant_game_count=freshness.relevant_game_count,
+        state="unavailable",
     )
+    # When provider polling is globally disabled, do not add a database query
+    # to every matchup page solely for absent scoring state.  Shadow/enabled
+    # workers opt in to the persisted ESPN freshness contract below.
+    if app_settings.provider_polling_expected:
+        freshness = espn_week_freshness(db, season=league.season_year, week=week)
+        freshness_read = LiveScoringFreshnessRead(
+            provider=freshness.provider,
+            state=freshness.state,
+            provider_as_of=freshness.provider_as_of,
+            last_successful_update_at=freshness.last_successful_update_at,
+            data_age_seconds=freshness.data_age_seconds,
+            relevant_game_count=freshness.relevant_game_count,
+        )
     viewer_team = _owned_team(db, league, user)
     if matchup_id is not None:
         matchup = (

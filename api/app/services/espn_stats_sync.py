@@ -43,7 +43,10 @@ def _build_provider_player_index(db: Session) -> dict[str, Player]:
     mappings = (
         db.query(PlayerProviderId)
         .filter(PlayerProviderId.provider == "espn")
-        .filter(PlayerProviderId.verification_status.in_(["verified", "legacy_backfill"]))
+        # Live authority must be an explicitly reviewed mapping. Historical
+        # tools retain their isolated fallback behavior, but they may never
+        # promote an inherited/legacy mapping into live fantasy scoring.
+        .filter(PlayerProviderId.verification_status == "verified")
         .all()
     )
     return {mapping.provider_player_id: mapping.player for mapping in mappings}
