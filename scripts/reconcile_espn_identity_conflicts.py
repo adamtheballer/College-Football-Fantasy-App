@@ -18,6 +18,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.services.provider_identity import (
@@ -161,6 +162,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     decisions = load_decisions(args.decisions)
+    ensure_models_registered()
     with SessionLocal() as db:
         reconciled = reconcile_decisions(db, decisions)
         result = {"decisions": len(decisions), "reconciled": reconciled, "applied": args.apply}
