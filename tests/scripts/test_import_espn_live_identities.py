@@ -117,6 +117,18 @@ def test_identity_planner_marks_an_unavailable_profile_for_review_instead_of_gue
     assert records[0]["reference_error"] == "HTTP 404"
 
 
+def test_identity_planner_uses_canonical_rank_only_for_review_order(db_session):
+    player = _player("Missing Player")
+    player.cfb27_rank = 7
+    db_session.add(player)
+    db_session.flush()
+
+    records = plan_player_identities([player], [], _profile, {})
+
+    assert records[0]["status"] == "unresolved"
+    assert records[0]["review_priority"] == "P0"
+
+
 def test_reference_cache_refetches_a_partial_entry_atomically(tmp_path, monkeypatch):
     monkeypatch.setattr("scripts.import_espn_live_identities.time.sleep", lambda _delay: None)
     reference = CachedESPNReference(object(), tmp_path, delay_seconds=0.2)

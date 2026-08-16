@@ -84,9 +84,14 @@ def _position(value: Any) -> str:
 def _review_priority(player: Player) -> str:
     """Rank review order only; never relax the verification contract."""
 
-    if (player.depth_order or 99) <= 1 or (player.sheet_adp or float("inf")) <= 120:
+    # The canonical preseason source currently has complete CFB27 ranks but
+    # intentionally omits ADP and depth chart ordering.  Prefer the most
+    # specific populated rank so a high-impact unresolved player never sinks
+    # into P2 merely because optional enrichment has not run.
+    rank = player.sheet_adp or player.cfb27_rank or float("inf")
+    if (player.depth_order or 99) <= 1 or rank <= 120:
         return "P0"
-    if (player.depth_order or 99) <= 2 or (player.sheet_adp or float("inf")) <= 350:
+    if (player.depth_order or 99) <= 2 or rank <= 350:
         return "P1"
     return "P2"
 
