@@ -19,9 +19,12 @@ def test_alpha_event_registry_is_machine_readable_and_complete() -> None:
         "DRAFT_1H", "DRAFT_START", "DRAFT_ON_CLOCK", "DRAFT_AUTO_PICK", "DRAFT_COMPLETED",
         "MATCHUP_START", "TRADE_RECEIVED", "TRADE_ACCEPTED_PENDING", "TRADE_COMPLETED",
         "TRADE_DECLINED", "TRADE_CANCELED", "TRADE_EXPIRED", "WAIVER_WON", "WAIVER_LOST",
-        "MATCHUP_FINAL", "MATCHUP_CORRECTED", "BIG_PLAY",
+        "MATCHUP_FINAL", "MATCHUP_CORRECTED", "LONG_RUSH", "LONG_RECEPTION", "LONG_PASS",
     }
     assert expected <= set(NOTIFICATION_EVENTS)
+    # Big Plays is the parent preference only. Touchdowns and a generic
+    # BIG_PLAY event are not selectable live-play notifications.
+    assert "BIG_PLAY" not in NOTIFICATION_EVENTS
     assert {definition.privacy_scope for definition in NOTIFICATION_EVENTS.values()} <= set(NotificationScope)
     assert json.loads(json.dumps(notification_event_contract()))["version"] == 1
 
