@@ -300,7 +300,12 @@ test.describe("critical browser workflows", () => {
 
     await rail.evaluate((element) => {
       const railElement = element as HTMLElement;
-      railElement.scrollLeft = railElement.scrollWidth;
+      // The rail has a leading clone for circular navigation. Index 2 is the
+      // actual second league; the physical final card is the clone that wraps
+      // back to league one.
+      const secondLeagueCard = railElement.querySelector<HTMLButtonElement>('[data-testid="league-carousel-card-2-2"]');
+      if (!secondLeagueCard) throw new Error("Expected the second league card");
+      railElement.scrollLeft = secondLeagueCard.offsetLeft;
       railElement.dispatchEvent(new Event("scroll"));
     });
 
