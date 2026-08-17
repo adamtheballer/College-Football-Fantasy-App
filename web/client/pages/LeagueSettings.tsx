@@ -190,7 +190,7 @@ export default function LeagueSettings() {
 
   if (leagueQuery.isLoading) {
     return (
-      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
+      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-0 py-4 sm:px-6 sm:py-8">
         <div className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface-raised/80 p-8 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cfb-text-muted">
           Loading league...
         </div>
@@ -200,7 +200,7 @@ export default function LeagueSettings() {
 
   if (leagueQuery.isError) {
     return (
-      <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
+      <main className="relative mx-auto w-full max-w-[1320px] px-0 py-4 sm:px-6 sm:py-8">
         <ErrorState
           title="Unable to load league"
           message="The league could not be loaded. Confirm the backend is available, then try again."
@@ -212,7 +212,7 @@ export default function LeagueSettings() {
   }
 
   return (
-    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
+    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-0 py-4 sm:px-6 sm:py-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[460px] rounded-[3rem] bg-[radial-gradient(circle_at_18%_8%,rgba(56,189,248,0.2),transparent_34%),radial-gradient(circle_at_76%_0%,rgba(99,102,241,0.18),transparent_38%)] blur-2xl" />
       <div className="space-y-4">
         <p className="text-[11px] font-black uppercase tracking-[0.24em] text-sky-300">

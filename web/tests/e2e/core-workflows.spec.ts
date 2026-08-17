@@ -2750,12 +2750,21 @@ test.describe("critical browser workflows", () => {
     await expect(mobileRow).toBeVisible();
     await expect(mobileRow.getByText("Arch Manning")).toBeVisible();
     await expect(mobileRow.getByRole("button", { name: /Remove Arch Manning from watchlist/i })).toBeVisible();
+    const playerBoard = page.getByTestId("league-player-board");
+    const playerBoardBox = await playerBoard.boundingBox();
+    expect(playerBoardBox).not.toBeNull();
+    expect(playerBoardBox?.x).toBeLessThanOrEqual(17);
+    expect(playerBoardBox?.width).toBeGreaterThanOrEqual(356);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
     await page.screenshot({ path: "test-results/mobile-waivers-compact.png", fullPage: true });
 
     await page.goto("/league/1/watchlist");
     await expect(page.getByRole("heading", { name: /^Watchlist$/i })).toBeVisible();
     await expect(page.getByText("Arch Manning").first()).toBeVisible();
+    const watchlistBoardBox = await page.getByTestId("league-watchlist-board").boundingBox();
+    expect(watchlistBoardBox).not.toBeNull();
+    expect(watchlistBoardBox?.x).toBeLessThanOrEqual(17);
+    expect(watchlistBoardBox?.width).toBeGreaterThanOrEqual(356);
 
     await page.getByRole("button", { name: /Remove Arch Manning from watchlist/i }).evaluate((button) => {
       (button as HTMLButtonElement).click();
