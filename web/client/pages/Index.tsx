@@ -3,16 +3,13 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import {
   Bell,
   CalendarClock,
-  ChevronRight,
   Clock,
   ShieldCheck,
-  Trophy,
-  Users,
-  Zap,
 } from "lucide-react";
 
 import { EmptyState, SkeletonState } from "@/components/states";
-import { formatDisplayedProbabilityPair, WinChanceBar } from "@/components/league/WinChanceMeter";
+import { LeagueMatchupCarousel } from "@/components/league/LeagueMatchupCarousel";
+import { formatDisplayedProbabilityPair } from "@/components/league/WinChanceMeter";
 import { Button } from "@/components/ui/button";
 import { PositionBadge, StatusBadge, SurfaceCard } from "@/components/fantasy";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
@@ -206,188 +203,43 @@ export default function Index() {
     return <GuestHome />;
   }
 
-  const matchup = workspace?.matchup_summary ?? null;
   const standings = workspace?.standings_summary ?? [];
   const ownedTeamName = workspace?.owned_team?.name ?? "Your Team";
-  const winChance = formatDashboardWinChance(
-    matchup?.win_probability_for,
-    matchup?.win_probability_against,
-  );
 
   return (
     <div className="mx-auto w-full touch-pan-y max-w-7xl space-y-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] pt-1 sm:space-y-6 sm:pb-24 sm:pt-3">
-      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <SurfaceCard variant="raised" padding="compact" className="relative min-h-0 sm:p-7">
-          <div className="flex h-full flex-col justify-between gap-4 sm:gap-6">
-            <div className="space-y-2 sm:space-y-3">
-              <div className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-cfb-brand sm:font-black sm:tracking-[0.14em]">
-                <Zap className="h-4 w-4" aria-hidden="true" />
-                Game Week Command Center
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold leading-tight tracking-[-0.03em] text-cfb-text-primary sm:text-5xl sm:font-black">
-                  Good to see you, {user?.firstName ?? "Manager"}.
-                </h1>
-                <p className="mt-1.5 max-w-2xl text-sm leading-6 text-cfb-text-secondary sm:mt-3 sm:text-base sm:leading-7">
-                  Resume your active league, check the matchup board, and handle roster decisions
-                  before kickoff.
-                </p>
-              </div>
-            </div>
-
-            {selectedLeague ? (
-              <div className="grid gap-3 border-t border-cfb-border-subtle pt-3 lg:grid-cols-[1fr_auto] lg:items-end">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-cfb-brand sm:font-black sm:tracking-[0.16em]">Current League</p>
-                  <h2 className="mt-1 text-xl font-bold text-cfb-text-primary sm:mt-2 sm:text-3xl sm:font-black sm:italic">
-                    {selectedLeague.name}
-                  </h2>
-                  <p className="mt-1 text-xs font-medium text-cfb-text-muted sm:mt-2 sm:font-black sm:uppercase sm:tracking-[0.12em]">
-                    {formatDashboardStatus(selectedLeague.status)} • {selectedLeague.members.length}/
-                    {selectedLeague.max_teams} managers • {formatDraftTime(selectedLeague.draft?.draft_datetime_utc)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 sm:flex-wrap">
-                  <Button
-                    className="h-10 flex-1 justify-center rounded-lg text-[11px] font-black uppercase tracking-[0.08em] sm:h-11 sm:flex-none sm:rounded-xl sm:tracking-[0.14em]"
-                    onClick={() => navigate(`/league/${selectedLeague.id}`)}
-                  >
-                    Open League
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="h-10 flex-1 justify-center rounded-lg text-[11px] font-bold text-cfb-text-secondary hover:bg-cfb-surface-hover hover:text-cfb-text-primary sm:h-11 sm:flex-none sm:rounded-xl sm:font-black sm:uppercase sm:tracking-[0.1em]"
-                    onClick={() => navigate(`/league/${selectedLeague.id}/matchup`)}
-                  >
-                    View Matchup
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex gap-2 sm:flex-wrap">
-                <Button className="h-10 flex-1 rounded-lg sm:h-11 sm:flex-none sm:rounded-xl" onClick={() => navigate("/leagues/create")}>Create League</Button>
-                <Button className="h-10 flex-1 rounded-lg sm:h-11 sm:flex-none sm:rounded-xl" variant="outline" onClick={() => navigate("/leagues/join")}>
-                  Join League
-                </Button>
-              </div>
-            )}
-          </div>
-        </SurfaceCard>
-
-        <SurfaceCard variant="default" padding="compact" className="space-y-3 sm:space-y-4 sm:p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-cfb-brand sm:font-black sm:tracking-[0.16em]">Week {matchup?.week ?? 1}</p>
-              <h2 className="mt-1 text-lg font-bold text-cfb-text-primary sm:mt-2 sm:text-2xl sm:font-black">Matchup Snapshot</h2>
-            </div>
-            <StatusBadge className="text-[10px] tracking-[0.1em] sm:text-[11px] sm:tracking-[0.14em]" variant={matchup?.status === "live" ? "live" : "projected"}>
-              {matchup?.status ? formatDashboardStatus(matchup.status) : "Projected"}
-            </StatusBadge>
-          </div>
-
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-            <div>
-              <p className="truncate text-sm font-black text-cfb-text-primary">{ownedTeamName}</p>
-              <p className="mt-1 font-display text-3xl font-black tracking-[-0.06em] text-cfb-brand sm:mt-2 sm:text-4xl">
-                {formatDashboardPoints(matchup?.projected_points_for)}
-              </p>
-            </div>
-            <span className="rounded-full border border-cfb-border-subtle bg-cfb-surface px-3 py-2 text-xs font-black text-cfb-text-secondary">
-              VS
-            </span>
-            <div className="text-right">
-              <p className="truncate text-sm font-black text-cfb-text-primary">
-                {matchup?.opponent_team_name ?? "Opponent TBD"}
-              </p>
-              <p className="mt-1 font-display text-3xl font-black tracking-[-0.06em] text-cfb-pink sm:mt-2 sm:text-4xl">
-                {formatDashboardPoints(matchup?.projected_points_against)}
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-2 rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 px-3 py-2.5 sm:px-4 sm:py-3">
-            <div className="flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
-              <span>Win chance</span>
-              <span className="whitespace-nowrap text-cfb-text-secondary">
-                {winChance ? `${winChance.left.toFixed(1)}% / ${winChance.right.toFixed(1)}%` : "Unavailable"}
-              </span>
-            </div>
-            <WinChanceBar
-              myPercent={matchup?.win_probability_for}
-              opponentPercent={matchup?.win_probability_against}
-              className="h-2.5"
-              testIdPrefix="dashboard-win-chance"
-            />
-          </div>
-
-          <div className="border-t border-cfb-border-subtle pt-3">
-            <p className="text-sm text-cfb-text-secondary">
-              {matchup
-                ? "Projected totals update as the league scoring data refreshes."
-                : "No scheduled matchup is available yet. Draft or schedule generation will populate this card."}
-            </p>
-          </div>
-        </SurfaceCard>
+      <section className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface/55 p-3 sm:p-5">
+        <div className="mb-4 border-b border-cfb-border-subtle px-1 pb-4 sm:mb-5">
+          <p className="cfb-micro-label text-cfb-brand">League dashboard</p>
+          <h1 className="mt-1 text-2xl font-black tracking-[-0.04em] text-cfb-text-primary sm:text-3xl">
+            Good to see you, {user?.firstName ?? "Manager"}.
+          </h1>
+        </div>
+        {leaguesLoading ? (
+          <SkeletonState rows={1} label="Loading your league matchups" />
+        ) : leagues.length === 0 ? (
+          <EmptyState
+            title="No leagues joined yet"
+            description="Create a league or join with an invite code to start building your team."
+            actionLabel="Create League"
+            onAction={() => navigate("/leagues/create")}
+          />
+        ) : (
+          <LeagueMatchupCarousel
+            leagues={leagues}
+            activeLeagueId={selectedLeague?.id}
+            onOpenLeague={(leagueId) => {
+              setActiveLeagueId(leagueId);
+              navigate(`/league/${leagueId}/matchup`);
+            }}
+          />
+        )}
       </section>
 
       <SaturdayPick6 embedded />
 
-      <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+      <section className="grid gap-6 xl:grid-cols-2">
         <SurfaceCard variant="default" padding="none">
-          <div className="flex items-center justify-between border-b border-cfb-border-subtle px-5 py-4 sm:px-6">
-            <div>
-              <p className="cfb-micro-label text-cfb-brand">Your Leagues</p>
-              <h2 className="mt-1 text-xl font-black text-cfb-text-primary">Pick up where you left off</h2>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => navigate("/leagues")}>
-              View All
-            </Button>
-          </div>
-
-          {leaguesLoading ? (
-            <SkeletonState rows={3} label="Loading your leagues" className="p-5 sm:p-6" />
-          ) : leagues.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                title="No leagues joined yet"
-                description="Create a league or join with an invite code to start building your team."
-                actionLabel="Create League"
-                onAction={() => navigate("/leagues/create")}
-              />
-            </div>
-          ) : (
-            leagues.map((league) => {
-              const isActive = league.id === selectedLeague?.id;
-              return (
-                <button
-                  key={league.id}
-                  type="button"
-                  onClick={() => {
-                    setActiveLeagueId(league.id);
-                    navigate(`/league/${league.id}`);
-                  }}
-                  className={`flex w-full items-center justify-between gap-4 border-b border-cfb-border-subtle px-5 py-5 text-left transition last:border-b-0 hover:bg-cfb-surface-hover/60 sm:px-6 ${
-                    isActive ? "bg-cfb-brand/[0.10]" : ""
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate text-base font-black text-cfb-text-primary">{league.name}</p>
-                      {isActive ? <StatusBadge variant="projected">Active</StatusBadge> : null}
-                    </div>
-                    <p className="mt-1 text-[11px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
-                      {formatDashboardStatus(league.status)} • {league.members.length}/{league.max_teams} managers
-                    </p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-cfb-brand" aria-hidden="true" />
-                </button>
-              );
-            })
-          )}
-        </SurfaceCard>
-
-        <div className="grid gap-6">
-          <SurfaceCard variant="default" padding="none">
             <div className="border-b border-cfb-border-subtle px-5 py-4 sm:px-6">
               <p className="cfb-micro-label text-cfb-brand">Roster Status</p>
               <h2 className="mt-1 text-xl font-black text-cfb-text-primary">{ownedTeamName}</h2>
@@ -405,9 +257,9 @@ export default function Index() {
                 </p>
               </div>
             </div>
-          </SurfaceCard>
+        </SurfaceCard>
 
-          <SurfaceCard variant="default" padding="none">
+        <SurfaceCard variant="default" padding="none">
             <div className="border-b border-cfb-border-subtle px-5 py-4 sm:px-6">
               <p className="cfb-micro-label text-cfb-brand">Upcoming Drafts</p>
             </div>
@@ -428,8 +280,7 @@ export default function Index() {
                 </div>
               ))
             )}
-          </SurfaceCard>
-        </div>
+        </SurfaceCard>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">

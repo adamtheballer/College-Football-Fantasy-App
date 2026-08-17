@@ -183,6 +183,8 @@ def build_league_list_current_user_summary(
         ties=standing.ties if standing else 0,
         opponent_team_name=matchup.opponent_team_name if matchup else None,
         matchup_week=matchup.week if matchup else None,
+        projected_points_for=matchup.projected_points_for if matchup else None,
+        projected_points_against=matchup.projected_points_against if matchup else None,
         win_probability_for=matchup.win_probability_for if matchup else None,
         win_probability_against=matchup.win_probability_against if matchup else None,
     )

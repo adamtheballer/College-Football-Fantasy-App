@@ -21,6 +21,8 @@ const props = {
     ties: 0,
     opponent_team_name: "Sunday Stars",
     matchup_week: 1,
+    projected_points_for: 133.1,
+    projected_points_against: 127.6,
     win_probability_for: 52.4,
   },
   onOpen: vi.fn(),
@@ -77,6 +79,7 @@ describe("LeagueCard", () => {
 
     expect(screen.getByText("2-1")).toBeTruthy();
     expect(screen.getByText("Sunday Stars")).toBeTruthy();
+    expect(screen.getByText("133.1 - 127.6")).toBeTruthy();
     expect(screen.getByText("Win chance 52%")).toBeTruthy();
   });
 });

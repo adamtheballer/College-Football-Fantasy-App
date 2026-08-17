@@ -913,6 +913,8 @@ def test_league_workspace_returns_real_matchup_and_standings(client, db_session)
     assert card_summary["losses"] == 0
     assert card_summary["opponent_team_name"] == member_team.name
     assert card_summary["matchup_week"] == 3
+    assert card_summary["projected_points_for"] == 133.1
+    assert card_summary["projected_points_against"] == 137.0
     assert card_summary["win_probability_for"] == 48.05
 
 
