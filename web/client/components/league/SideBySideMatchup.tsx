@@ -83,28 +83,46 @@ export const formatPlayerGameContext = (player?: LeagueRosterPlayer) => {
 function CompactMatchupPlayer({ player, align }: { player?: LeagueRosterPlayer; align: "left" | "right" }) {
   const hasPlayer = Boolean(player?.player_id && player.player_name);
   const points = compactProjection(player);
+  const playerName = hasPlayer ? compactMatchupPlayerName(player?.player_name) : "No starter set";
+  const gameMatchup = hasPlayer ? formatPlayerGameMatchup(player) : "Set a starter in your roster";
+  const gameTime = hasPlayer ? formatPlayerGameTime(player) : "Kickoff TBD";
+
+  // A flex row that is justified to the right moves the player name whenever
+  // the projection or name changes width. Keep a fixed projection rail on
+  // the opponent side instead, then anchor all three player-detail lines to
+  // the same content column.
+  if (align === "right") {
+    return (
+      <div data-mobile-matchup-player="right" className="grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)] gap-x-1.5 text-left">
+        <p className="pt-px text-[11px] font-black tabular-nums text-cfb-pink">{points}</p>
+        <div className="min-w-0">
+          <p className={`truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
+            {playerName}
+          </p>
+          <p data-player-game-matchup className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
+            {gameMatchup}
+          </p>
+          <p data-player-game-time className="truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
+            {gameTime}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
-      <div className={`flex min-w-0 items-baseline gap-1.5 ${align === "right" ? "justify-end" : "justify-start"}`}>
-        {align === "right" ? (
-          <p className="shrink-0 text-[11px] font-black tabular-nums text-cfb-pink">
-            {points}
-          </p>
-        ) : null}
+    <div data-mobile-matchup-player="left" className="min-w-0 text-left">
+      <div className="flex min-w-0 items-baseline gap-1.5">
         <p className={`min-w-0 truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
-          {hasPlayer ? compactMatchupPlayerName(player?.player_name) : "No starter set"}
+          {playerName}
         </p>
-        {align === "left" ? (
-          <p className="shrink-0 text-[11px] font-black tabular-nums text-cfb-brand">
-            {points}
-          </p>
-        ) : null}
+        <p className="shrink-0 text-[11px] font-black tabular-nums text-cfb-brand">{points}</p>
       </div>
       <p data-player-game-matchup className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
-        {hasPlayer ? formatPlayerGameMatchup(player) : "Set a starter in your roster"}
+        {gameMatchup}
       </p>
       <p data-player-game-time className="truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
-        {hasPlayer ? formatPlayerGameTime(player) : "Kickoff TBD"}
+        {gameTime}
       </p>
     </div>
   );
