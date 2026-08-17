@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Bot, ClipboardList, History, LocateFixed, Loader2, Lock, Search, ShieldAlert, Trophy, User, Users } from "lucide-react";
+import { ArrowLeft, Bot, ClipboardList, Grid3X3, History, LocateFixed, Loader2, Lock, Search, ShieldAlert, Trophy, User, Users } from "lucide-react";
 
+import { DraftBoard } from "@/components/DraftBoard";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { DraftRoomVisuals, draftMatteControlClass, draftMattePanelClass } from "@/components/DraftRoomVisuals";
 import { Button } from "@/components/ui/button";
@@ -30,11 +31,12 @@ import type { DraftRoom, DraftRoomPick, DraftRoomTeam } from "@/types/draft";
 const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K"];
 const DRAFT_PLAYER_PAGE_SIZE = 200;
 const DRAFT_SLOT_KEYS = ["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "BENCH"] as const;
-type DraftTab = "draft" | "queue" | "roster" | "history";
+type DraftTab = "draft" | "queue" | "board" | "roster" | "history";
 
 const DRAFT_TABS: Array<{ value: DraftTab; label: string }> = [
-  { value: "draft", label: "Draft" },
+  { value: "draft", label: "Players" },
   { value: "queue", label: "Queue" },
+  { value: "board", label: "Board" },
   { value: "roster", label: "Roster" },
   { value: "history", label: "History" },
 ];
@@ -883,6 +885,24 @@ export default function Draft() {
     </section>
   );
 
+  const renderBoard = () => (
+    <DraftBoard
+      slots={draftOrderPicks.map((slot) => ({
+        overallPick: slot.overallPick,
+        round: slot.round,
+        roundPick: slot.roundPick,
+        teamId: slot.team.id,
+        teamName: slot.team.name,
+        playerName: slot.pick?.player_name,
+        playerPosition: slot.pick?.player_position,
+        isCurrent: !completed && slot.overallPick === displayPick,
+        isUser: slot.team.id === draftRoom.user_team_id,
+      }))}
+      totalRounds={totalRounds}
+      onOpenRosters={() => setActiveTab("roster")}
+    />
+  );
+
   return (
     <div data-draft-room="league" className="relative min-h-[100dvh] overflow-x-clip text-foreground">
       <DraftRoomVisuals />
@@ -1001,12 +1021,14 @@ export default function Draft() {
           </div>
         </div>
 
-        <header className={cn(draftMattePanelClass, "hidden p-6 sm:block md:p-8")}>
-          <p className="text-[10px] font-black uppercase tracking-[0.26em] text-amber-200">Real League Draft Room</p>
-          <h1 className="mt-3 text-4xl font-black italic uppercase tracking-tight text-white md:text-6xl">
-            {leagueName}
-          </h1>
-          <div className="mt-5 flex flex-wrap gap-3">
+        <header className={cn(draftMattePanelClass, "hidden items-center justify-between gap-6 px-6 py-5 sm:flex")}>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.26em] text-amber-200">Live league draft</p>
+            <h1 className="mt-1 truncate text-2xl font-black uppercase tracking-tight text-white md:text-3xl">
+              {leagueName}
+            </h1>
+          </div>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
             <span className="rounded-full border border-amber-200/25 bg-amber-300/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-amber-100">
               {formatStatus(draftRoom.status)}
             </span>
@@ -1023,16 +1045,9 @@ export default function Draft() {
               </span>
             ) : null}
           </div>
-          {isScheduledPreview ? (
-            <p className="mt-5 max-w-3xl text-[11px] font-black uppercase leading-6 tracking-[0.18em] text-muted-foreground">
-              {isLeagueFull
-                ? "When the commissioner starts the draft, pick one is immediately on the clock and each manager receives the league's configured pick timer."
-                : "Draft order remains locked until every league slot is filled. Invite more managers or reschedule the draft."}
-            </p>
-          ) : null}
           {draftRoom.can_start_draft ? (
             <Button
-              className="mt-6 h-12 rounded-2xl border border-cyan-100/35 bg-[#1b3349] px-6 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)]"
+              className="h-10 rounded-xl border border-cyan-100/35 bg-[#1b3349] px-5 text-[10px] font-black uppercase tracking-[0.16em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)]"
               disabled={startDraftMutation.isPending}
               onClick={startDraft}
             >
@@ -1108,7 +1123,7 @@ export default function Draft() {
               </p>
             </div>
           </div>
-          <div ref={carouselRef} className="flex gap-4 overflow-x-auto px-5 py-5 scroll-smooth">
+          <div ref={carouselRef} className="flex gap-2 overflow-x-auto px-4 py-3 scroll-smooth snap-x">
             {draftOrderPicks.map((slot) => {
               const isCurrent = !completed && slot.overallPick === displayPick;
               const isUser = slot.team?.id === draftRoom.user_team_id;
@@ -1126,7 +1141,7 @@ export default function Draft() {
                     }
                   }}
                   className={cn(
-                    "relative min-w-[178px] rounded-3xl border border-white/10 bg-[#131c27] p-4 shadow-[0_8px_18px_rgba(2,6,23,0.22)] transition",
+                    "relative min-w-[142px] snap-start rounded-2xl border border-white/10 bg-[#131c27] p-3 shadow-[0_8px_18px_rgba(2,6,23,0.22)] transition",
                     isCurrent && isDraftActive
                       ? "border-amber-200/70 bg-amber-300/12 shadow-[0_0_28px_rgba(251,191,36,0.16)]"
                       : isCurrent
@@ -1147,10 +1162,10 @@ export default function Draft() {
                   ) : null}
                   <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Pick {slot.overallPick}</p>
                   <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{slot.round}.{slot.roundPick}</p>
-                  <div className="mt-3 flex h-8 w-8 items-center justify-center rounded-xl border border-white/14 bg-black/20 text-amber-100">
+                  <div className="mt-2 flex h-7 w-7 items-center justify-center rounded-lg border border-white/14 bg-black/20 text-amber-100">
                     {slot.team?.is_cpu ? <Bot className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" /> : <User className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" />}
                   </div>
-                  <p className="mt-3 truncate text-base font-black text-foreground">
+                  <p className="mt-2 truncate text-sm font-black text-foreground">
                     {slot.pick?.player_name ?? slot.team?.name ?? `Team ${slot.roundPick}`}
                   </p>
                   <p className="mt-1 truncate text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
@@ -1162,11 +1177,9 @@ export default function Draft() {
                           ? "CPU manager"
                           : slot.team?.owner_name || "Manager"}
                   </p>
-                  {slot.pick ? (
-                    <p className="mt-3 truncate border-t border-cyan-200/10 pt-2 text-[9px] font-black uppercase tracking-[0.14em] text-cyan-100/90">
-                      Picked by <span className="text-white">{pickerName}</span>
-                    </p>
-                  ) : null}
+                  <p className="mt-2 truncate border-t border-cyan-200/10 pt-1.5 text-[8px] font-black uppercase tracking-[0.12em] text-cyan-100/90">
+                    {slot.pick ? <>By <span className="text-white">{pickerName}</span></> : isUser ? "Your pick" : "Upcoming"}
+                  </p>
                 </div>
               );
             })}
@@ -1225,9 +1238,10 @@ export default function Draft() {
             </div>
           </div>
 
-          <div className="grid grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground sm:grid-cols-[64px_minmax(0,1fr)_110px_140px] sm:gap-3 sm:px-5 sm:py-3 sm:text-[9px] sm:tracking-[0.22em]">
+          <div className="grid grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground sm:grid-cols-[56px_minmax(0,1fr)_72px_88px_120px] sm:gap-3 sm:px-5 sm:py-3 sm:text-[9px] sm:tracking-[0.22em]">
             <span>RK</span>
             <span>Player</span>
+            <span className="hidden text-right sm:block">ADP</span>
             <span className="text-right">Proj</span>
             <span className="text-right">Action</span>
           </div>
@@ -1273,7 +1287,7 @@ export default function Draft() {
                       }
                     }}
                     className={cn(
-                      "grid min-h-[66px] cursor-pointer grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 outline-none transition-[background-color,box-shadow,color] duration-200 sm:min-h-0 sm:grid-cols-[64px_minmax(0,1fr)_110px_140px] sm:items-center sm:gap-3 sm:px-5 sm:py-3",
+                      "grid min-h-[66px] cursor-pointer grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 outline-none transition-[background-color,box-shadow,color] duration-200 sm:min-h-0 sm:grid-cols-[56px_minmax(0,1fr)_72px_88px_120px] sm:items-center sm:gap-3 sm:px-5 sm:py-3",
                       positionHoverClass,
                       isSelected && "bg-amber-300/[0.075] shadow-[inset_3px_0_0_rgba(251,191,36,0.72)]"
                     )}
@@ -1286,6 +1300,7 @@ export default function Draft() {
                         <span className={cn("shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black sm:rounded-full sm:px-2 sm:text-[9px]", positionClass)}>{player.pos}</span>
                       </div>
                     </div>
+                    <p className="hidden text-right text-xs font-black tabular-nums text-muted-foreground sm:block">{player.adpEstimate ?? player.adpRank ?? "—"}</p>
                     <p className="text-right text-[10px] font-black tabular-nums text-foreground sm:text-sm">{formatDraftProjection({ seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</p>
                       <Button
                         className={cn(
@@ -1336,6 +1351,7 @@ export default function Draft() {
         </section>
         ) : null}
         {activeTab === "queue" ? <div>{renderQueue()}</div> : null}
+        {activeTab === "board" ? <div>{renderBoard()}</div> : null}
         {activeTab === "roster" ? <div>{renderRoster()}</div> : null}
         {activeTab === "history" ? <div>{renderHistory()}</div> : null}
         </div>
@@ -1418,16 +1434,16 @@ export default function Draft() {
       ) : null}
 
       <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-sky-100/20 bg-[#102f4e]/96 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(7,27,49,0.26)] backdrop-blur-xl sm:pointer-events-none sm:inset-x-auto sm:left-1/2 sm:flex sm:w-auto sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">
-        <div className={cn("grid w-full grid-cols-4 overflow-hidden rounded-xl sm:pointer-events-auto sm:mx-auto sm:max-w-xl", draftMatteControlClass)}>
+        <div className={cn("grid w-full grid-cols-5 overflow-hidden rounded-xl sm:pointer-events-auto sm:mx-auto sm:max-w-2xl", draftMatteControlClass)}>
           {DRAFT_TABS.map((tab) => {
-            const Icon = tab.value === "draft" ? Trophy : tab.value === "queue" ? ClipboardList : tab.value === "roster" ? Users : History;
+            const Icon = tab.value === "draft" ? Trophy : tab.value === "queue" ? ClipboardList : tab.value === "board" ? Grid3X3 : tab.value === "roster" ? Users : History;
             return (
               <button
                 key={tab.value}
                 type="button"
                 onClick={() => setActiveTab(tab.value)}
                 className={cn(
-                  "relative inline-flex min-w-0 items-center justify-center gap-1 whitespace-nowrap px-1.5 py-3 text-[9px] font-bold uppercase leading-none tracking-[0.06em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-transparent sm:gap-2 sm:px-4 sm:text-[10px] sm:tracking-[0.16em]",
+                  "relative inline-flex min-w-0 items-center justify-center gap-1 whitespace-nowrap px-1 py-3 text-[8px] font-bold uppercase leading-none tracking-[0.04em] transition after:absolute after:inset-x-1 after:bottom-0 after:h-0.5 after:bg-transparent sm:gap-2 sm:px-4 sm:text-[10px] sm:tracking-[0.16em]",
                   activeTab === tab.value
                   ? "bg-white/[0.04] text-white after:bg-cfb-brand"
                     : "text-muted-foreground hover:bg-white/[0.035] hover:text-white"

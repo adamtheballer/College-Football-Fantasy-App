@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Bot, ClipboardList, LocateFixed, Loader2, RefreshCcw, Search, Trophy, User } from "lucide-react";
 
+import { DraftBoard } from "@/components/DraftBoard";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { DraftRoomVisuals, draftMatteControlClass, draftMattePanelClass } from "@/components/DraftRoomVisuals";
 import { Button } from "@/components/ui/button";
@@ -40,11 +41,12 @@ import { cn } from "@/lib/utils";
 const STORAGE_KEY = "cfb_single_player_mock_draft";
 const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K"];
 
-type MockDraftTab = "draft" | "queue" | "roster" | "history";
+type MockDraftTab = "draft" | "queue" | "board" | "roster" | "history";
 
 const MOCK_TABS: Array<{ value: MockDraftTab; label: string }> = [
-  { value: "draft", label: "Draft" },
+  { value: "draft", label: "Players" },
   { value: "queue", label: "Queue" },
+  { value: "board", label: "Board" },
   { value: "roster", label: "Roster" },
   { value: "history", label: "History" },
 ];
@@ -435,9 +437,10 @@ export default function SinglePlayerMockDraftRoom() {
         </div>
       </div>
 
-      <div className="grid grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground sm:grid-cols-[64px_minmax(0,1fr)_110px_140px] sm:gap-3 sm:px-5 sm:py-3 sm:text-[9px] sm:tracking-[0.22em]">
+      <div className="grid grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground sm:grid-cols-[56px_minmax(0,1fr)_72px_88px_120px] sm:gap-3 sm:px-5 sm:py-3 sm:text-[9px] sm:tracking-[0.22em]">
         <span>RK</span>
         <span>Player</span>
+        <span className="hidden text-right sm:block">ADP</span>
         <span className="text-right">Proj</span>
         <span className="text-right">Action</span>
       </div>
@@ -484,7 +487,7 @@ export default function SinglePlayerMockDraftRoom() {
                   }
                 }}
                 className={cn(
-                  "grid min-h-[66px] cursor-pointer grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 outline-none transition-[background-color,box-shadow,color] duration-200 sm:min-h-0 sm:grid-cols-[64px_minmax(0,1fr)_110px_140px] sm:items-center sm:gap-3 sm:px-5 sm:py-3",
+                  "grid min-h-[66px] cursor-pointer grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 outline-none transition-[background-color,box-shadow,color] duration-200 sm:min-h-0 sm:grid-cols-[56px_minmax(0,1fr)_72px_88px_120px] sm:items-center sm:gap-3 sm:px-5 sm:py-3",
                   positionHoverClass,
                   isSelected && "bg-amber-300/[0.075] shadow-[inset_3px_0_0_rgba(251,191,36,0.72)]"
                 )}
@@ -497,6 +500,7 @@ export default function SinglePlayerMockDraftRoom() {
                     <span className={cn("shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black sm:rounded-full sm:px-2 sm:text-[9px]", positionClass)}>{player.pos}</span>
                   </div>
                 </div>
+                <p className="hidden text-right text-xs font-black tabular-nums text-muted-foreground sm:block">{player.adpEstimate ?? player.adpRank ?? "—"}</p>
                 <p className="text-right text-[10px] font-black tabular-nums text-foreground sm:text-sm">{formatDraftProjection({ seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</p>
                   <Button
                     className={cn(
@@ -801,6 +805,24 @@ export default function SinglePlayerMockDraftRoom() {
     </section>
   );
 
+  const renderBoard = () => (
+    <DraftBoard
+      slots={draftOrderPicks.map((slot) => ({
+        overallPick: slot.overallPick,
+        round: slot.round,
+        roundPick: slot.roundPick,
+        teamId: slot.teamId,
+        teamName: slot.team?.name ?? `Team ${slot.teamId}`,
+        playerName: slot.pick?.playerName,
+        playerPosition: slot.pick?.position,
+        isCurrent: draftState.status !== "complete" && slot.overallPick === draftState.currentPick,
+        isUser: slot.teamId === draftState.userTeamId,
+      }))}
+      totalRounds={mockSettings.rounds}
+      onOpenRosters={() => setActiveTab("roster")}
+    />
+  );
+
   return (
     <div data-draft-room="mock" className="relative min-h-[100dvh] overflow-x-clip text-foreground">
       <DraftRoomVisuals />
@@ -961,7 +983,7 @@ export default function SinglePlayerMockDraftRoom() {
               <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">{totalPicks - draftedCount} Unlocked</p>
             </div>
           </div>
-          <div ref={carouselRef} className="flex gap-4 overflow-x-auto px-5 py-5 scroll-smooth">
+          <div ref={carouselRef} className="flex gap-2 overflow-x-auto px-4 py-3 scroll-smooth snap-x">
             {draftOrderPicks.map((slot) => {
               const isCurrent = draftState.status !== "complete" && slot.overallPick === draftState.currentPick;
               const isUser = slot.teamId === draftState.userTeamId;
@@ -978,7 +1000,7 @@ export default function SinglePlayerMockDraftRoom() {
                     }
                   }}
                   className={cn(
-                    "relative min-w-[178px] rounded-3xl border border-white/10 bg-[#131c27] p-4 shadow-[0_8px_18px_rgba(2,6,23,0.22)] transition",
+                    "relative min-w-[142px] snap-start rounded-2xl border border-white/10 bg-[#131c27] p-3 shadow-[0_8px_18px_rgba(2,6,23,0.22)] transition",
                     isCurrent
                       ? "border-amber-200/70 bg-amber-300/12 shadow-[0_0_28px_rgba(251,191,36,0.16)]"
                       : isUser
@@ -997,10 +1019,10 @@ export default function SinglePlayerMockDraftRoom() {
                   ) : null}
                   <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Pick {slot.overallPick}</p>
                   <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{slot.round}.{slot.roundPick}</p>
-                  <div className="mt-3 flex h-8 w-8 items-center justify-center rounded-xl border border-white/14 bg-black/20 text-amber-100">
+                  <div className="mt-2 flex h-7 w-7 items-center justify-center rounded-lg border border-white/14 bg-black/20 text-amber-100">
                     {isUser ? <User className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" /> : <Bot className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" />}
                   </div>
-                  <p className="mt-3 truncate text-base font-black text-foreground">{slot.pick?.playerName ?? slot.team?.name ?? `Team ${slot.teamId}`}</p>
+                  <p className="mt-2 truncate text-sm font-black text-foreground">{slot.pick?.playerName ?? slot.team?.name ?? `Team ${slot.teamId}`}</p>
                   <p className="mt-1 truncate text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
                     {slot.pick ? `${slot.pick.position} • ${slot.pick.school}` : isUser ? "Adam • You" : slot.team?.name?.replace("Team", "") ?? "Bot"}
                   </p>
@@ -1019,6 +1041,7 @@ export default function SinglePlayerMockDraftRoom() {
         <div className="flex min-h-0 flex-1 flex-col sm:block">
           {activeTab === "draft" ? renderAvailablePlayers() : null}
           {activeTab === "queue" ? <div>{renderQueue()}</div> : null}
+          {activeTab === "board" ? <div>{renderBoard()}</div> : null}
           {activeTab === "roster" ? <div>{renderRoster()}</div> : null}
           {activeTab === "history" ? <div>{renderHistory()}</div> : null}
         </div>
@@ -1084,14 +1107,14 @@ export default function SinglePlayerMockDraftRoom() {
       ) : null}
 
       <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-sky-100/20 bg-[#102f4e]/96 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(7,27,49,0.26)] backdrop-blur-xl sm:pointer-events-none sm:inset-x-auto sm:left-1/2 sm:flex sm:w-auto sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">
-        <div className={cn("grid w-full grid-cols-4 overflow-hidden rounded-xl sm:pointer-events-auto sm:mx-auto sm:max-w-xl", draftMatteControlClass)}>
+        <div className={cn("grid w-full grid-cols-5 overflow-hidden rounded-xl sm:pointer-events-auto sm:mx-auto sm:max-w-2xl", draftMatteControlClass)}>
           {MOCK_TABS.map((tab) => (
             <button
               key={tab.value}
               type="button"
               onClick={() => setActiveTab(tab.value)}
               className={cn(
-                "relative min-w-0 whitespace-nowrap px-1.5 py-3 text-[9px] font-bold uppercase leading-none tracking-[0.06em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-transparent sm:px-4 sm:text-[10px] sm:tracking-[0.16em]",
+                "relative min-w-0 whitespace-nowrap px-1 py-3 text-[8px] font-bold uppercase leading-none tracking-[0.04em] transition after:absolute after:inset-x-1 after:bottom-0 after:h-0.5 after:bg-transparent sm:px-4 sm:text-[10px] sm:tracking-[0.16em]",
                 activeTab === tab.value
                   ? "bg-white/[0.04] text-white after:bg-cfb-brand"
                   : "text-muted-foreground hover:bg-white/[0.035] hover:text-white"
