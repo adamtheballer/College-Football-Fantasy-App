@@ -63,6 +63,10 @@ describe("SideBySideMatchup", () => {
     expect(starters.textContent).toMatch(/Sat,? Aug 29.*12:00 PM|Sat,? Aug 29.*4:00 PM|Sat,? Aug 29.*11:00 AM/);
     expect(starters.querySelectorAll("[data-player-game-matchup]")).toHaveLength(2);
     expect(starters.querySelectorAll("[data-player-game-time]")).toHaveLength(2);
+    expect(starters.querySelector('[data-mobile-matchup-player="right"]')?.className).toContain(
+      "grid-cols-[2.75rem_minmax(0,1fr)]",
+    );
+    expect(starters.querySelector('[data-mobile-matchup-player="right"]')?.className).toContain("text-left");
     expect(starters.querySelector("[data-mobile-slot-rail]")).toBeTruthy();
     expect(starters.querySelector("[data-mobile-slot-column]")?.className).not.toContain("border-x");
   });
