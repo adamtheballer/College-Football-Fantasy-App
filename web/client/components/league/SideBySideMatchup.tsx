@@ -53,7 +53,8 @@ const kickoffLabel = (value?: string | null) => {
 const compactPlayerMeta = (player?: LeagueRosterPlayer) => {
   if (!player?.player_id) return "Open slot";
   const school = player.school ?? player.player_school ?? "School TBD";
-  const opponent = player.opponent ? `vs ${player.opponent}` : "Opponent TBD";
+  const location = player.game_location === "away" ? "@" : player.game_location === "neutral" ? "vs" : "vs";
+  const opponent = player.opponent ? `${location} ${player.opponent}` : "Opponent TBD";
   return `${school} ${opponent} · ${kickoffLabel(player.game_start_at)}`;
 };
 

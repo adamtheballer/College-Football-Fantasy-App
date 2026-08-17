@@ -242,6 +242,7 @@ export interface LeagueRosterPlayer {
   is_starter?: boolean;
   is_ir?: boolean;
   opponent: string | null;
+  game_location?: "home" | "away" | "neutral" | "bye" | null;
   projected_points?: number | null;
   floor?: number | null;
   ceiling?: number | null;
