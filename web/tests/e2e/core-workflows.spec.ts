@@ -1548,6 +1548,40 @@ test.describe("critical browser workflows", () => {
     const matchupRail = page.getByLabel("Swipe through league matchups");
     await expect(matchupRail).toBeVisible();
     expect(await matchupRail.evaluate((element) => element.scrollWidth > element.clientWidth)).toBeTruthy();
+    expect(
+      await matchupRail.evaluate((element) => {
+        element.scrollLeft = 80;
+        return element.scrollLeft;
+      }),
+    ).toBeGreaterThan(0);
+    const appViewport = page.locator("[data-app-viewport='true']");
+    const appScroll = page.locator("main[data-app-scroll='true']");
+    await expect(appViewport).toHaveCSS("overflow-x", "clip");
+    await expect(appScroll).toHaveCSS("overflow-x", "hidden");
+    expect(
+      await page.evaluate(() => {
+        return new Promise((resolve) => {
+          document.documentElement.scrollLeft = 80;
+          document.body.scrollLeft = 80;
+          const appScroller = document.querySelector<HTMLElement>("main[data-app-scroll='true']");
+          if (appScroller) appScroller.scrollLeft = 80;
+          requestAnimationFrame(() => {
+            resolve({
+              document: document.documentElement.scrollLeft,
+              body: document.body.scrollLeft,
+              app: appScroller?.scrollLeft ?? 0,
+            });
+          });
+        });
+      }),
+    ).toEqual({ document: 0, body: 0, app: 0 });
+    const outerWidths = await page.evaluate(() => ({
+      documentWidth: document.documentElement.scrollWidth,
+      bodyWidth: document.body.scrollWidth,
+      viewportWidth: window.innerWidth,
+    }));
+    expect(outerWidths.documentWidth).toBeLessThanOrEqual(outerWidths.viewportWidth + 1);
+    expect(outerWidths.bodyWidth).toBeLessThanOrEqual(outerWidths.viewportWidth + 1);
     await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toBeVisible();
     await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toHaveClass(/from-rose-800/);
     await expect(page.getByTestId("scoreboard-win-chance-right-bar")).toHaveClass(/from-emerald-700/);
@@ -1560,7 +1594,6 @@ test.describe("critical browser workflows", () => {
     await page.getByRole("button", { name: "Open A. Manning player card" }).click();
     const playerCard = page.getByRole("dialog", { name: "Arch Manning player card" });
     await expect(playerCard).toBeVisible();
-    const appScroll = page.locator("main[data-app-scroll='true']");
     const playerCardScroll = playerCard.getByTestId("player-card-scroll-area");
     await expect(appScroll).toHaveCSS("overflow-y", "hidden");
     await expect(playerCardScroll).toHaveCSS("overflow-y", "auto");
