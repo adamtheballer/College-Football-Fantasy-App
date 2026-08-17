@@ -113,7 +113,7 @@ function CompactMatchupPlayer({
   if (align === "right") {
     const content = (
       <>
-        <p className="pt-px text-[11px] font-black tabular-nums text-cfb-pink">{points}</p>
+        <p className="self-center text-[11px] font-black tabular-nums text-cfb-pink">{points}</p>
         <div className="min-w-0">
           <p className={`truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
             {playerName}
@@ -153,7 +153,7 @@ function CompactMatchupPlayer({
           {gameTime}
         </p>
       </div>
-      <p className="pt-px text-right text-[11px] font-black tabular-nums text-cfb-brand">{points}</p>
+      <p className="self-center text-right text-[11px] font-black tabular-nums text-cfb-brand">{points}</p>
     </>
   );
 

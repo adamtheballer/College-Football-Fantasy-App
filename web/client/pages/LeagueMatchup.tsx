@@ -87,7 +87,7 @@ function MatchupRail({
     <section aria-label="League matchups" className="border-y border-cfb-border-subtle bg-cfb-surface/75">
       <div
         aria-label="Swipe through league matchups"
-        className="flex snap-x snap-mandatory items-center gap-2 overflow-x-auto px-3 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-4"
+        className="flex min-w-0 max-w-full snap-x snap-mandatory items-center gap-2 overflow-x-auto overscroll-x-contain px-3 py-2.5 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-4"
       >
         <span className="inline-flex min-h-10 shrink-0 items-center rounded-full border border-cfb-border-subtle bg-cfb-canvas px-3 text-[10px] font-black uppercase tracking-[0.12em] text-cfb-text-secondary">
           League scores
@@ -178,16 +178,12 @@ function MatchupTeamSummary({
   team,
   accent,
   align,
-  label,
-  compactLabel,
   status,
   currentScore,
 }: {
   team: LeagueMatchupTeam | null;
   accent: "brand" | "pink";
   align: "left" | "right";
-  label: string;
-  compactLabel: string;
   status: string;
   currentScore?: number | null;
 }) {
@@ -197,7 +193,7 @@ function MatchupTeamSummary({
 
   return (
     <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
-      <div className={`flex items-center gap-2 ${align === "right" ? "justify-end" : "justify-start"}`}>
+      <div className={`flex items-center ${align === "right" ? "justify-end" : "justify-start"}`}>
         <div
           aria-hidden="true"
           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-black tracking-tight sm:h-10 sm:w-10 sm:text-sm ${
@@ -208,9 +204,7 @@ function MatchupTeamSummary({
         >
           {teamInitials(team?.fantasy_team_name)}
         </div>
-        <p className="hidden cfb-micro-label text-cfb-text-muted sm:block">{label}</p>
       </div>
-      <p className="mt-1 truncate text-[8px] font-black uppercase tracking-[0.1em] text-cfb-text-muted sm:hidden">{compactLabel}</p>
       <p className="mt-0.5 truncate text-[11px] font-black text-cfb-text-primary sm:mt-1 sm:text-sm">
         {team?.fantasy_team_name ?? "Team TBD"}
       </p>
@@ -230,14 +224,12 @@ function CompactMatchupScoreboard({
   myTeam,
   opponentTeam,
   displayWeek,
-  isViewingOwnMatchup,
   scoreRow,
 }: {
   data: LeagueMatchupTabResponse;
   myTeam: LeagueMatchupTeam | null;
   opponentTeam: LeagueMatchupTeam | null;
   displayWeek: number;
-  isViewingOwnMatchup: boolean;
   scoreRow?: LeagueScoreboardRow;
 }) {
   const winChance = displayedProbabilityPair(myTeam?.win_probability, opponentTeam?.win_probability);
@@ -260,8 +252,6 @@ function CompactMatchupScoreboard({
 
       <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-5">
         <MatchupTeamSummary
-          label={isViewingOwnMatchup ? "My Team" : "Home Team"}
-          compactLabel={isViewingOwnMatchup ? "My team" : "Home team"}
           team={myTeam}
           accent="brand"
           align="left"
@@ -283,8 +273,6 @@ function CompactMatchupScoreboard({
         </div>
 
         <MatchupTeamSummary
-          label={isViewingOwnMatchup ? "Their Team" : "Away Team"}
-          compactLabel={isViewingOwnMatchup ? "Their team" : "Away team"}
           team={opponentTeam}
           accent="pink"
           align="right"
@@ -330,10 +318,6 @@ export default function LeagueMatchup() {
   const scheduledMatchups = scoreboardQuery.data?.data ?? [];
   const activeMatchupId = selectedMatchupId ?? data?.matchup_id;
   const activeScoreRow = scheduledMatchups.find((matchup) => matchup.matchup_id === activeMatchupId);
-  const isViewingOwnMatchup = Boolean(
-    data?.my_team?.fantasy_team_id && data?.user_team?.fantasy_team_id === data.my_team.fantasy_team_id,
-  );
-
   const updateSelection = (week: number, matchupId?: number) => {
     const next = new URLSearchParams(searchParams);
     next.set("week", String(week));
@@ -380,7 +364,7 @@ export default function LeagueMatchup() {
         <button type="button" aria-label="Messages" onClick={() => navigate("/chats")} className="flex h-11 w-11 items-center justify-center rounded-full bg-cfb-surface-raised text-cfb-text-primary hover:bg-cfb-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"><MessageCircle className="h-4 w-4" aria-hidden="true" /></button>
       </header>
       <div className="px-3 sm:px-5">
-        <LeagueTabs leagueId={parsedLeagueId} draftStatus={leagueQuery.data?.draft?.status} leagueStatus={leagueQuery.data?.status} variant="matchup" />
+        <LeagueTabs leagueId={parsedLeagueId} draftStatus={leagueQuery.data?.draft?.status} leagueStatus={leagueQuery.data?.status} />
       </div>
 
       <MatchupRail
@@ -418,7 +402,6 @@ export default function LeagueMatchup() {
               myTeam={myTeam}
               opponentTeam={opponentTeam}
               displayWeek={displayWeek}
-              isViewingOwnMatchup={isViewingOwnMatchup}
               scoreRow={activeScoreRow}
             />
 
