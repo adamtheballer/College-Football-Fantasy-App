@@ -71,7 +71,7 @@ export function AppShell({
         data-app-scroll="true"
         data-scroll-owner={fixedViewport ? "draft-room" : "page"}
         className={cn(
-          "relative z-10 flex min-h-0 min-w-0 flex-1 flex-col lg:h-full",
+          "relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overscroll-x-none lg:h-full",
           fixedViewport
             ? "overflow-hidden"
             : "overflow-y-auto overscroll-y-contain touch-pan-y",
@@ -81,7 +81,7 @@ export function AppShell({
 
         <div
           className={cn(
-            "flex-1",
+            "min-w-0 flex-1",
             compactContent
               ? "p-0"
               : "px-4 py-4 pb-5 sm:px-6 sm:py-6 sm:pb-6 lg:p-8",
