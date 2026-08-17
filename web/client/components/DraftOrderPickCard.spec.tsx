@@ -23,6 +23,7 @@ describe("draft order pick card", () => {
     expect(screen.getByText("(1.2)")).toBeTruthy();
     expect(screen.getByTestId("draft-order-picked-player").textContent).toBe("Smith");
     expect(getDraftManagerInitials("Adam Bajdechi")).toBe("AB");
+    expect(getDraftManagerInitials("Codex")).toBe("C");
   });
 
   it("uses the bot indicator for mock draft cards and leaves future picks blank", () => {

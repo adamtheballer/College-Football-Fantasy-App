@@ -1161,7 +1161,11 @@ test.describe("critical browser workflows", () => {
       .click();
     await expect(page.getByText(/Last pick/i)).toBeVisible();
     await expect(page.getByText(/Arch Manning/i).first()).toBeVisible();
-    await expect(page.getByText(/^By Codex$/i)).toBeVisible();
+    const completedOrderCard = page.getByTestId("mobile-draft-order-card-1");
+    await expect(completedOrderCard.getByText("Codex", { exact: true })).toBeVisible();
+    await expect(completedOrderCard.getByLabel("Codex initials C")).toBeVisible();
+    await expect(completedOrderCard.getByText("(1.1)", { exact: true })).toBeVisible();
+    await expect(completedOrderCard.getByTestId("draft-order-picked-player")).toHaveText("Manning");
     await expect(page.getByText(/Other Team/i).first()).toBeVisible();
     const queuedRow = page.getByTestId("draft-player-row").filter({ hasText: "Quinn Ewers" });
     await expect(page.getByTestId("draft-player-row").filter({ hasText: "Arch Manning" })).toHaveCount(0);
@@ -2469,7 +2473,7 @@ test.describe("critical browser workflows", () => {
     const firstOrderCard = page.getByTestId("mobile-draft-order-card-1");
     await expect(
       firstOrderCard.getByLabel(
-        firstCompletedPick.pickedBy === "bot" ? "Computer manager" : "You initials YO",
+        firstCompletedPick.pickedBy === "bot" ? "Computer manager" : "You initials Y",
       ),
     ).toBeVisible();
     await expect(firstOrderCard.getByText("(1.1)", { exact: true })).toBeVisible();
