@@ -1455,7 +1455,7 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toHaveAttribute("style", /width: 48\.05%/);
     await expect(page.getByTestId("scoreboard-win-chance-right-bar")).toHaveAttribute("style", /width: 51\.95%/);
     await expect(page.getByText("Starters", { exact: true })).toBeVisible();
-    await expect(page.getByText("CFB Scores", { exact: true })).toBeVisible();
+    await expect(page.getByText("CFB Scores", { exact: true })).toHaveCount(0);
     // The responsive matchup view keeps a compact mobile lineup mounted alongside
     // the desktop tables. Assert against the visible desktop player controls here
     // rather than an ambiguous text locator shared by both representations.
@@ -1475,11 +1475,15 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByTestId("scoreboard-win-chance-right-bar")).toHaveClass(/from-emerald-700/);
     await expect(page.locator('[style*="conic-gradient"]')).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
-    const appScroller = page.locator("main[data-app-scroll='true']");
-    expect(await appScroller.evaluate((element) => element.scrollHeight > element.clientHeight)).toBeTruthy();
-    await appScroller.evaluate((element) => element.scrollTo({ top: element.scrollHeight, behavior: "instant" }));
-    await expect(page.getByTestId("mobile-starting-lineup").getByText("A. Manning", { exact: true })).toBeVisible();
-    await expect(page.getByText("CFB Scores", { exact: true })).toBeVisible();
+    const mobileStartingLineup = page.getByTestId("mobile-starting-lineup");
+    await mobileStartingLineup.scrollIntoViewIfNeeded();
+    await expect(mobileStartingLineup.getByText("A. Manning", { exact: true })).toBeVisible();
+    await expect(page.getByText("CFB Scores", { exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Open A. Manning player card" }).click();
+    const playerCard = page.getByRole("dialog", { name: "Arch Manning player card" });
+    await expect(playerCard).toBeVisible();
+    await playerCard.getByRole("button", { name: "Close player card" }).click();
+    await expect(playerCard).toHaveCount(0);
     await page.screenshot({ path: "test-results/mobile-matchup-linear-meter.png", fullPage: true });
 
     await page.setViewportSize({ width: 1280, height: 900 });

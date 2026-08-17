@@ -1,8 +1,8 @@
-import { Bell, MessageCircle, Radio, ShieldAlert } from "lucide-react";
+import { Bell, MessageCircle, ShieldAlert } from "lucide-react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
-import { formatPlayerGameContext, SideBySideMatchup } from "@/components/league/SideBySideMatchup";
+import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
 import { WinChanceBar } from "@/components/league/WinChanceMeter";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
@@ -302,20 +302,6 @@ function CompactMatchupScoreboard({
   );
 }
 
-function CfbScoresTicker({ teams }: { teams: LeagueMatchupTeam[] }) {
-  const starter = teams.flatMap((team) => team.roster).find((player) => player.game_start_at || player.opponent);
-  const matchup = starter
-    ? formatPlayerGameContext(starter)
-    : null;
-  return (
-    <aside aria-label="CFB scores" className="sticky bottom-2 z-10 mx-auto flex w-full max-w-[760px] items-center gap-3 rounded-xl border border-cfb-border-subtle bg-cfb-canvas/95 px-4 py-3 shadow-[0_-8px_28px_rgba(2,6,23,0.35)] backdrop-blur">
-      <Radio className="h-4 w-4 shrink-0 text-cfb-brand" aria-hidden="true" />
-      <span className="shrink-0 text-xs font-black uppercase tracking-[0.1em] text-cfb-text-primary">CFB Scores</span>
-      <span className="min-w-0 truncate text-xs font-bold text-cfb-text-secondary">{matchup ?? "CFB Scores available once games begin"}</span>
-    </aside>
-  );
-}
-
 export default function LeagueMatchup() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
@@ -440,7 +426,6 @@ export default function LeagueMatchup() {
 
           <div className="mx-3 mt-3 rounded-full bg-cfb-surface px-4 py-2 sm:mx-5"><p className="text-sm font-black text-cfb-text-primary">Starters</p></div>
           <div className="mt-2"><SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={parsedLeagueId} /></div>
-          <div className="mx-3 mt-3 sm:mx-5"><CfbScoresTicker teams={[myTeam, opponentTeam].filter((team): team is LeagueMatchupTeam => Boolean(team))} /></div>
         </>
       )}
     </main>

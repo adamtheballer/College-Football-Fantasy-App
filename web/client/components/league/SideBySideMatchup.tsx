@@ -1,5 +1,9 @@
+import { useState } from "react";
+
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
+import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { SurfaceCard } from "@/components/fantasy";
+import { usePlayerCard } from "@/hooks/use-players";
 import { formatProjectionDisplay } from "@/lib/projection-display";
 import type { LeagueMatchupTeam, LeagueRosterPlayer } from "@/types/league";
 
@@ -80,20 +84,35 @@ export const formatPlayerGameContext = (player?: LeagueRosterPlayer) => {
   return matchup === "Open slot" ? matchup : `${matchup} · ${kickoff}`;
 };
 
-function CompactMatchupPlayer({ player, align }: { player?: LeagueRosterPlayer; align: "left" | "right" }) {
+function CompactMatchupPlayer({
+  player,
+  align,
+  onSelect,
+}: {
+  player?: LeagueRosterPlayer;
+  align: "left" | "right";
+  onSelect?: (player: LeagueRosterPlayer) => void;
+}) {
   const hasPlayer = Boolean(player?.player_id && player.player_name);
   const points = compactProjection(player);
   const playerName = hasPlayer ? compactMatchupPlayerName(player?.player_name) : "No starter set";
   const gameMatchup = hasPlayer ? formatPlayerGameMatchup(player) : "Set a starter in your roster";
   const gameTime = hasPlayer ? formatPlayerGameTime(player) : "Kickoff TBD";
+  const interactive = Boolean(hasPlayer && player && onSelect);
+  const openPlayerCard = () => {
+    if (player && onSelect) onSelect(player);
+  };
+  const interactiveClassName = interactive
+    ? "w-full rounded-md text-left transition-colors hover:bg-white/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"
+    : "";
 
   // A flex row that is justified to the right moves the player name whenever
   // the projection or name changes width. Keep a fixed projection rail on
   // the opponent side instead, then anchor all three player-detail lines to
   // the same content column.
   if (align === "right") {
-    return (
-      <div data-mobile-matchup-player="right" className="grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)] gap-x-1.5 text-left">
+    const content = (
+      <>
         <p className="pt-px text-[11px] font-black tabular-nums text-cfb-pink">{points}</p>
         <div className="min-w-0">
           <p className={`truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
@@ -106,25 +125,48 @@ function CompactMatchupPlayer({ player, align }: { player?: LeagueRosterPlayer; 
             {gameTime}
           </p>
         </div>
-      </div>
+      </>
+    );
+    return (
+      interactive ? (
+        <button type="button" data-mobile-matchup-player="right" aria-label={`Open ${playerName} player card`} onClick={openPlayerCard} className={`grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)] gap-x-1.5 ${interactiveClassName}`}>
+          {content}
+        </button>
+      ) : (
+        <div data-mobile-matchup-player="right" className="grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)] gap-x-1.5 text-left">
+          {content}
+        </div>
+      )
     );
   }
 
-  return (
-    <div data-mobile-matchup-player="left" className="min-w-0 text-left">
-      <div className="flex min-w-0 items-baseline gap-1.5">
-        <p className={`min-w-0 truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
+  const content = (
+    <>
+      <div className="min-w-0">
+        <p className={`truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
           {playerName}
         </p>
-        <p className="shrink-0 text-[11px] font-black tabular-nums text-cfb-brand">{points}</p>
+        <p data-player-game-matchup className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
+          {gameMatchup}
+        </p>
+        <p data-player-game-time className="truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
+          {gameTime}
+        </p>
       </div>
-      <p data-player-game-matchup className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
-        {gameMatchup}
-      </p>
-      <p data-player-game-time className="truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
-        {gameTime}
-      </p>
-    </div>
+      <p className="pt-px text-right text-[11px] font-black tabular-nums text-cfb-brand">{points}</p>
+    </>
+  );
+
+  return (
+    interactive ? (
+      <button type="button" data-mobile-matchup-player="left" aria-label={`Open ${playerName} player card`} onClick={openPlayerCard} className={`grid min-w-0 grid-cols-[minmax(0,1fr)_2.75rem] gap-x-1.5 ${interactiveClassName}`}>
+        {content}
+      </button>
+    ) : (
+      <div data-mobile-matchup-player="left" className="grid min-w-0 grid-cols-[minmax(0,1fr)_2.75rem] gap-x-1.5 text-left">
+        {content}
+      </div>
+    )
   );
 }
 
@@ -134,12 +176,14 @@ function CompactMobileLineup({
   opponentPlayers,
   testId,
   showHeader = true,
+  onPlayerSelect,
 }: {
   title: string;
   myPlayers: LeagueRosterPlayer[];
   opponentPlayers: LeagueRosterPlayer[];
   testId: string;
   showHeader?: boolean;
+  onPlayerSelect?: (player: LeagueRosterPlayer) => void;
 }) {
   const rowCount = Math.max(myPlayers.length, opponentPlayers.length);
 
@@ -169,13 +213,13 @@ function CompactMobileLineup({
               className="relative z-10 grid min-h-[72px] grid-cols-[minmax(0,1fr)_2.75rem_minmax(0,1fr)] items-stretch px-3"
             >
               <div className={`flex min-w-0 items-center py-2 ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""}`}>
-                <CompactMatchupPlayer player={myPlayer} align="left" />
+                <CompactMatchupPlayer player={myPlayer} align="left" onSelect={onPlayerSelect} />
               </div>
               <span data-mobile-slot-column className="inline-flex min-h-[72px] items-center justify-center px-1 text-[9px] font-black uppercase tracking-[0.04em] text-cfb-text-secondary">
                 {slot}
               </span>
               <div className={`flex min-w-0 items-center py-2 ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""}`}>
-                <CompactMatchupPlayer player={opponentPlayer} align="right" />
+                <CompactMatchupPlayer player={opponentPlayer} align="right" onSelect={onPlayerSelect} />
               </div>
             </div>
           );
@@ -194,10 +238,15 @@ export function SideBySideMatchup({
   opponentTeam: LeagueMatchupTeam | null;
   leagueId?: number | string;
 }) {
+  const [selectedPlayer, setSelectedPlayer] = useState<LeagueRosterPlayer | null>(null);
   const myStarters = sortBySlot(startersFor(myTeam));
   const opponentStarters = sortBySlot(startersFor(opponentTeam));
   const myReserves = sortBySlot(reservesFor(myTeam));
   const opponentReserves = sortBySlot(reservesFor(opponentTeam));
+  const selectedPlayerCardQuery = usePlayerCard(selectedPlayer?.player_id, Boolean(selectedPlayer?.player_id));
+  const selectedProjection = selectedPlayer?.projected_points ?? selectedPlayer?.weekly_projected_fantasy_points;
+  const numericLeagueId = typeof leagueId === "number" ? leagueId : Number(leagueId);
+  const resolvedLeagueId = Number.isFinite(numericLeagueId) && numericLeagueId > 0 ? numericLeagueId : undefined;
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -208,6 +257,7 @@ export function SideBySideMatchup({
           opponentPlayers={opponentStarters}
           testId="mobile-starting-lineup"
           showHeader={false}
+          onPlayerSelect={setSelectedPlayer}
         />
         <div className="hidden gap-5 md:grid xl:grid-cols-2">
           <RosterSlotTable
@@ -238,6 +288,7 @@ export function SideBySideMatchup({
             myPlayers={myReserves}
             opponentPlayers={opponentReserves}
             testId="mobile-bench-lineup"
+            onPlayerSelect={setSelectedPlayer}
           />
         </div>
       </details>
@@ -269,6 +320,35 @@ export function SideBySideMatchup({
           />
         </div>
       </SurfaceCard>
+      {selectedPlayer ? (
+        <PlayerCardModal
+          card={selectedPlayerCardQuery.data}
+          error={selectedPlayerCardQuery.isError}
+          leagueId={resolvedLeagueId}
+          loading={selectedPlayerCardQuery.isLoading}
+          onClose={() => setSelectedPlayer(null)}
+          onRetry={() => void selectedPlayerCardQuery.refetch()}
+          player={{
+            id: selectedPlayer.player_id ?? 0,
+            name: selectedPlayer.player_name ?? "Unknown player",
+            school: selectedPlayer.school ?? selectedPlayer.player_school,
+            position: selectedPlayer.position ?? selectedPlayer.player_position ?? rosterSlot(selectedPlayer),
+            rankLabel: selectedPlayer.position ?? selectedPlayer.player_position ?? rosterSlot(selectedPlayer),
+            projectedPoints: selectedProjection,
+            opponent: selectedPlayer.opponent,
+            playerClass: null,
+            status: selectedPlayer.status,
+            projection: {
+              fpts: selectedProjection,
+              floor: selectedPlayer.floor ?? undefined,
+              ceiling: selectedPlayer.ceiling ?? undefined,
+              boomProb: selectedPlayer.boom_prob ?? undefined,
+              bustProb: selectedPlayer.bust_prob ?? undefined,
+            },
+          }}
+          title="Matchup Player Card"
+        />
+      ) : null}
     </div>
   );
 }
