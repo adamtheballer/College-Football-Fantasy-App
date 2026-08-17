@@ -1,4 +1,4 @@
-import { ArrowLeft, Bell, ChevronDown, MessageCircle, Radio, ShieldAlert } from "lucide-react";
+import { Bell, MessageCircle, Radio, ShieldAlert } from "lucide-react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
@@ -218,8 +218,8 @@ function MatchupTeamSummary({
       <p className="mt-0.5 font-display text-2xl font-black leading-none tracking-[-0.06em] text-cfb-text-primary sm:mt-1 sm:text-4xl">
         {showActual ? formatMatchupPoints(currentScore) : "0.0"}
       </p>
-      <p className="mt-0.5 text-[9px] font-bold text-cfb-text-muted">
-        Proj {formatMatchupPoints(projected)}
+      <p aria-label={`Projected ${formatMatchupPoints(projected)}`} className="mt-0.5 text-[9px] font-bold text-cfb-text-muted">
+        {formatMatchupPoints(projected)}
       </p>
     </div>
   );
@@ -260,8 +260,8 @@ function CompactMatchupScoreboard({
 
       <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-5">
         <MatchupTeamSummary
-          label={isViewingOwnMatchup ? "My Projection" : "Home Projection"}
-          compactLabel={isViewingOwnMatchup ? "My proj" : "Home proj"}
+          label={isViewingOwnMatchup ? "My Team" : "Home Team"}
+          compactLabel={isViewingOwnMatchup ? "My team" : "Home team"}
           team={myTeam}
           accent="brand"
           align="left"
@@ -283,8 +283,8 @@ function CompactMatchupScoreboard({
         </div>
 
         <MatchupTeamSummary
-          label={isViewingOwnMatchup ? "Their Projection" : "Away Projection"}
-          compactLabel={isViewingOwnMatchup ? "Their proj" : "Away proj"}
+          label={isViewingOwnMatchup ? "Their Team" : "Away Team"}
+          compactLabel={isViewingOwnMatchup ? "Their team" : "Away team"}
           team={opponentTeam}
           accent="pink"
           align="right"
@@ -386,13 +386,10 @@ export default function LeagueMatchup() {
   return (
     <main className="mx-auto flex w-full max-w-[960px] flex-col gap-0 pb-24 pt-1 sm:pt-4">
       <header className="flex min-h-16 items-center gap-3 border-b border-cfb-border-subtle px-3 sm:px-5">
-        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-cfb-text-primary hover:bg-cfb-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70">
-          <ArrowLeft className="h-5 w-5" aria-hidden="true" />
-        </button>
         <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cfb-brand/50 bg-cfb-brand/[0.1] text-[10px] font-black text-cfb-brand">{teamInitials(leagueQuery.data?.name)}</span>
-        <button type="button" aria-label="League options" className="flex min-w-0 flex-1 items-center gap-1 text-left text-base font-black text-cfb-text-primary">
-          <span className="truncate">{leagueQuery.data?.name ?? "League"}</span><ChevronDown className="h-4 w-4 shrink-0 text-cfb-text-muted" aria-hidden="true" />
-        </button>
+        <div className="min-w-0 flex-1 text-left text-base font-black text-cfb-text-primary">
+          <span className="block truncate">{leagueQuery.data?.name ?? "League"}</span>
+        </div>
         <button type="button" aria-label="Notifications" onClick={() => navigate("/alerts")} className="flex h-11 w-11 items-center justify-center rounded-full bg-cfb-surface-raised text-cfb-text-primary hover:bg-cfb-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"><Bell className="h-4 w-4" aria-hidden="true" /></button>
         <button type="button" aria-label="Messages" onClick={() => navigate("/chats")} className="flex h-11 w-11 items-center justify-center rounded-full bg-cfb-surface-raised text-cfb-text-primary hover:bg-cfb-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"><MessageCircle className="h-4 w-4" aria-hidden="true" /></button>
       </header>

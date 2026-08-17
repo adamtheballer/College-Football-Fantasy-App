@@ -85,7 +85,9 @@ export function LeagueTabs({
               ].join(" ")}
             >
               <Icon className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate sm:hidden">{tab.label}</span>
+              <span className="truncate sm:hidden">
+                {"mobileLabel" in tab && typeof tab.mobileLabel === "string" ? tab.mobileLabel : tab.label}
+              </span>
               <span className="hidden truncate sm:inline">{tab.label}</span>
             </Link>
           </div>

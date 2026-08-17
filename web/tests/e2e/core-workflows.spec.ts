@@ -1441,15 +1441,15 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/league/1/matchup");
-    await expect(page.getByRole("button", { name: "Back" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Back" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Notifications" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Messages" })).toBeVisible();
     await expect(page.getByText("Matchup Test League", { exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Matchup" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Emily's Team vs Adam 2's Team" })).toBeVisible();
     await expect(page.getByText("133.1 - 137.0")).toHaveCount(0);
-    await expect(page.getByText("Proj 133.1")).toBeVisible();
-    await expect(page.getByText("Proj 137.0")).toBeVisible();
+    await expect(page.getByLabel("Projected 133.1")).toBeVisible();
+    await expect(page.getByLabel("Projected 137.0")).toBeVisible();
     await expect(page.getByText("48.1%", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("51.9%", { exact: true }).first()).toBeVisible();
     await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toHaveAttribute("style", /width: 48\.05%/);
@@ -1478,7 +1478,7 @@ test.describe("critical browser workflows", () => {
     const appScroller = page.locator("main[data-app-scroll='true']");
     expect(await appScroller.evaluate((element) => element.scrollHeight > element.clientHeight)).toBeTruthy();
     await appScroller.evaluate((element) => element.scrollTo({ top: element.scrollHeight, behavior: "instant" }));
-    await expect(page.getByTestId("mobile-starting-lineup").getByText("Arch Manning", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("mobile-starting-lineup").getByText("A. Manning", { exact: true })).toBeVisible();
     await expect(page.getByText("CFB Scores", { exact: true })).toBeVisible();
     await page.screenshot({ path: "test-results/mobile-matchup-linear-meter.png", fullPage: true });
 
