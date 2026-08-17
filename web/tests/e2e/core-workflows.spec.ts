@@ -1560,8 +1560,29 @@ test.describe("critical browser workflows", () => {
     await page.getByRole("button", { name: "Open A. Manning player card" }).click();
     const playerCard = page.getByRole("dialog", { name: "Arch Manning player card" });
     await expect(playerCard).toBeVisible();
+    const appScroll = page.locator("main[data-app-scroll='true']");
+    const playerCardScroll = playerCard.getByTestId("player-card-scroll-area");
+    await expect(appScroll).toHaveCSS("overflow-y", "hidden");
+    await expect(playerCardScroll).toHaveCSS("overflow-y", "auto");
+    await playerCardScroll.evaluate((element) => {
+      const spacer = document.createElement("div");
+      spacer.setAttribute("data-testid", "player-card-scroll-test-spacer");
+      spacer.style.height = "1200px";
+      element.append(spacer);
+    });
+    await appScroll.evaluate((element) => {
+      element.scrollTop = 0;
+    });
+    expect(
+      await playerCardScroll.evaluate((element) => {
+        element.scrollTop = 640;
+        return element.scrollTop;
+      }),
+    ).toBeGreaterThan(0);
+    expect(await appScroll.evaluate((element) => element.scrollTop)).toBe(0);
     await playerCard.getByRole("button", { name: "Close player card" }).click();
     await expect(playerCard).toHaveCount(0);
+    await expect(appScroll).toHaveCSS("overflow-y", "auto");
     await page.screenshot({ path: "test-results/mobile-matchup-linear-meter.png", fullPage: true });
 
     await page.setViewportSize({ width: 1280, height: 900 });

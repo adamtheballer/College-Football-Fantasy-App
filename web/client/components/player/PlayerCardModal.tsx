@@ -406,9 +406,36 @@ export function PlayerCardModal({
     setActiveTab("summary");
   }, [player.id]);
 
+  useEffect(() => {
+    // The app shell owns the page scroll in its <main> element. This card is a
+    // fixed overlay inside that shell, so locking only document.body still lets
+    // touch scrolls move the matchup or roster behind it on mobile Safari.
+    const appScroller = document.querySelector<HTMLElement>("main[data-app-scroll='true']");
+    const originalAppOverflowY = appScroller?.style.overflowY;
+    const originalAppOverscrollBehaviorY = appScroller?.style.overscrollBehaviorY;
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalDocumentOverflow = document.documentElement.style.overflow;
+
+    if (appScroller) {
+      appScroller.style.overflowY = "hidden";
+      appScroller.style.overscrollBehaviorY = "none";
+    }
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      if (appScroller) {
+        appScroller.style.overflowY = originalAppOverflowY ?? "";
+        appScroller.style.overscrollBehaviorY = originalAppOverscrollBehaviorY ?? "";
+      }
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalDocumentOverflow;
+    };
+  }, []);
+
   return (
     <div
-      className="fixed inset-0 z-[1400] flex items-end justify-center bg-slate-950/78 p-3 backdrop-blur-md sm:items-center sm:p-6"
+      className="fixed inset-0 z-[1400] flex items-end justify-center overscroll-none bg-slate-950/78 p-3 backdrop-blur-md sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label={`${player.name} player card`}
@@ -454,7 +481,10 @@ export function PlayerCardModal({
           })}
         </nav>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] scroll-pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-8">
+        <div
+          data-testid="player-card-scroll-area"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] p-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] scroll-pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-8"
+        >
           {loading ? (
             <div className="flex min-h-56 items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/[0.04] text-[10px] font-black uppercase tracking-[0.22em] text-white/55">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading player card
