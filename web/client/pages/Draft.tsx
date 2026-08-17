@@ -15,10 +15,17 @@ import { ApiError } from "@/lib/api";
 import { buildDraftBoard, type DraftConfig, type DraftPlayer } from "@/lib/draftRankings";
 import { formatDraftProjection } from "@/lib/draft-projections";
 import { getCenteredDraftOrderScrollLeft } from "@/lib/draftOrderCarousel";
+import {
+  DRAFT_START_INTRO_AUDIO_URL,
+  didFirstLiveDraftPickStart,
+  getDraftStartIntroCueKey,
+  isFirstLiveDraftPick,
+  type DraftStartIntroState,
+} from "@/lib/draftStartIntro";
 import { isTerminalDraftStatus } from "@/lib/draftStatus";
 import { filterDraftablePlayers, getLegalPositionsForRoster } from "@/lib/rosterLegality";
 import { cn } from "@/lib/utils";
-import type { DraftRoomPick, DraftRoomTeam } from "@/types/draft";
+import type { DraftRoom, DraftRoomPick, DraftRoomTeam } from "@/types/draft";
 
 const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K"];
 const DRAFT_PLAYER_PAGE_SIZE = 200;
@@ -221,6 +228,9 @@ export default function Draft() {
   const [now, setNow] = useState(Date.now());
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const pickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
+  const draftStartIntroAudioRef = useRef<HTMLAudioElement | null>(null);
+  const playedDraftStartCueKeysRef = useRef<Set<string>>(new Set());
+  const previousDraftStartIntroStateRef = useRef<DraftStartIntroState | null>(null);
 
   const parsedLeagueId =
     leagueId && !Number.isNaN(Number(leagueId)) ? Number(leagueId) : undefined;
@@ -234,6 +244,60 @@ export default function Draft() {
   } = useDraftRoom(parsedLeagueId);
   const pickMutation = useDraftPick(parsedLeagueId);
   const startDraftMutation = useStartDraft(parsedLeagueId);
+
+  const playDraftStartIntro = useCallback((room: Pick<DraftRoom, "draft_id" | "status" | "current_pick" | "current_pick_started_at">) => {
+    const state = {
+      draftId: room.draft_id,
+      status: room.status,
+      currentPick: room.current_pick,
+      currentPickStartedAt: room.current_pick_started_at,
+    };
+    if (!isFirstLiveDraftPick(state)) return;
+
+    const cueKey = getDraftStartIntroCueKey(state);
+    if (playedDraftStartCueKeysRef.current.has(cueKey)) return;
+
+    try {
+      if (window.sessionStorage.getItem(cueKey) === "played") {
+        playedDraftStartCueKeysRef.current.add(cueKey);
+        return;
+      }
+    } catch {
+      // Private-mode storage can be unavailable. The in-memory guard still
+      // prevents rerender and polling replays for this visit.
+    }
+
+    playedDraftStartCueKeysRef.current.add(cueKey);
+    const audio = draftStartIntroAudioRef.current ?? new Audio(DRAFT_START_INTRO_AUDIO_URL);
+    draftStartIntroAudioRef.current = audio;
+    audio.currentTime = 0;
+    audio.preload = "auto";
+
+    void audio.play().then(
+      () => {
+        try {
+          window.sessionStorage.setItem(cueKey, "played");
+        } catch {
+          // The in-memory guard above remains sufficient for this page visit.
+        }
+      },
+      () => {
+        // Some browsers require a prior user interaction for audible playback.
+        // Do not convert that browser policy into a draft-room error or replay
+        // the clip on every polling response.
+      },
+    );
+  }, []);
+
+  const startDraft = useCallback(() => {
+    setLocalError(null);
+    startDraftMutation.mutate(undefined, {
+      // This comes from the start endpoint after the server has created the
+      // first-pick deadline, so the commissioner never hears the cue for a
+      // failed or mock-draft start.
+      onSuccess: playDraftStartIntro,
+    });
+  }, [playDraftStartIntro, startDraftMutation]);
 
   const viewFinalRoster = useCallback(async () => {
     if (!parsedLeagueId) return;
@@ -265,6 +329,30 @@ export default function Draft() {
   const isPreDraft = draftRoom?.status === "pre_draft";
   const isTransition = draftRoom?.status === "transition";
   const isDraftActive = draftRoom?.status === "on_clock";
+
+  useEffect(() => {
+    if (!draftRoom) return;
+    const currentState: DraftStartIntroState = {
+      draftId: draftRoom.draft_id,
+      status: draftRoom.status,
+      currentPick: draftRoom.current_pick,
+      currentPickStartedAt: draftRoom.current_pick_started_at,
+    };
+    const previousState = previousDraftStartIntroStateRef.current;
+    previousDraftStartIntroStateRef.current = currentState;
+
+    // A page opened or reconnected after the clock began must not replay the
+    // intro. Only an observed server transition to the first timer can play.
+    if (didFirstLiveDraftPickStart(previousState, currentState)) {
+      playDraftStartIntro(draftRoom);
+    }
+  }, [
+    draftRoom?.current_pick,
+    draftRoom?.current_pick_started_at,
+    draftRoom?.draft_id,
+    draftRoom?.status,
+    playDraftStartIntro,
+  ]);
   const serverNowAtFetchMs = draftRoom?.server_time ? Date.parse(draftRoom.server_time) : Number.NaN;
   const countdownDeadline = isPreDraft
     ? draftRoom?.draft_starts_at
@@ -828,10 +916,7 @@ export default function Draft() {
             <Button
               className="h-9 shrink-0 rounded-lg border border-cyan-100/35 bg-[#1b3349] px-2.5 text-[9px] font-black uppercase tracking-[0.06em] text-white"
               disabled={startDraftMutation.isPending}
-              onClick={() => {
-                setLocalError(null);
-                startDraftMutation.mutate();
-              }}
+              onClick={startDraft}
             >
               {startDraftMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Start"}
             </Button>
@@ -949,10 +1034,7 @@ export default function Draft() {
             <Button
               className="mt-6 h-12 rounded-2xl border border-cyan-100/35 bg-[#1b3349] px-6 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)]"
               disabled={startDraftMutation.isPending}
-              onClick={() => {
-                setLocalError(null);
-                startDraftMutation.mutate();
-              }}
+              onClick={startDraft}
             >
               {startDraftMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Start Draft"}
             </Button>
