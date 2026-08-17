@@ -36,6 +36,7 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     notification,
     player,
     player_season_rank,
+    player_season_outlook,
     player_stat,
     player_week_score,
     player_waiver_availability,

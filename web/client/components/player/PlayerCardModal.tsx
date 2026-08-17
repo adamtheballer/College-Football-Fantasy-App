@@ -350,6 +350,7 @@ export function PlayerCardModal({
   title?: string;
 }) {
   const [activeTab, setActiveTab] = useState<PlayerCardTab>("summary");
+  const [isOutlookExpanded, setIsOutlookExpanded] = useState(false);
   const historicalStatsScrollRef = useRef<HTMLDivElement>(null);
   const hasLeagueContext = typeof leagueId === "number" && Number.isFinite(leagueId) && leagueId > 0;
   const position = (card?.about.position ?? player.position ?? "").toUpperCase();
@@ -404,6 +405,7 @@ export function PlayerCardModal({
     : [];
   useEffect(() => {
     setActiveTab("summary");
+    setIsOutlookExpanded(false);
   }, [player.id]);
 
   useEffect(() => {
@@ -526,6 +528,34 @@ export function PlayerCardModal({
                   <p className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-3 text-xs font-bold leading-5 text-amber-100">
                     {aboutMessage}
                   </p>
+                ) : null}
+                {card?.season_outlook?.outlook_text ? (
+                  <section
+                    aria-label={`${card.season_outlook.season_year} season outlook`}
+                    className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3 sm:p-4"
+                  >
+                    <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>
+                      {card.season_outlook.season_year} Outlook
+                    </p>
+                    <p className={cn(
+                      "mt-2 text-xs font-semibold leading-5 text-white/70 sm:text-sm",
+                      !isOutlookExpanded && "line-clamp-3",
+                    )}>
+                      {card.season_outlook.outlook_text}
+                    </p>
+                    {card.season_outlook.outlook_text.length > 180 ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsOutlookExpanded((expanded) => !expanded)}
+                        className={cn(
+                          "mt-2 text-[10px] font-black uppercase tracking-[0.16em] transition hover:text-white",
+                          palette.accent,
+                        )}
+                      >
+                        {isOutlookExpanded ? "Show less" : "Show more"}
+                      </button>
+                    ) : null}
+                  </section>
                 ) : null}
                 {cardActions.length ? (
                   <div className="mt-4 grid gap-2 sm:grid-cols-2">

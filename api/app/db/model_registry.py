@@ -50,6 +50,7 @@ def ensure_models_registered() -> None:
         player_availability_event,
         player_news_event,
         player_role_snapshot,
+        player_season_outlook,
         player_week_score,
         player_waiver_availability,
         postseason,
