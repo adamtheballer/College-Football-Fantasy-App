@@ -132,7 +132,7 @@ describe("league matchup scoreboard", () => {
     expect(screen.getAllByText("54.0%")).toHaveLength(2);
     expect(screen.getAllByText("46.0%")).toHaveLength(2);
     expect(screen.queryByText(/Projected matchup values are shown until live scoring begins/i)).toBeNull();
-    expect(screen.getByText("CFB Scores available once games begin")).toBeTruthy();
+    expect(screen.queryByText("CFB Scores available once games begin")).toBeNull();
   });
 
   it("lets a member swipe or tap through same-league matchups through the canonical detail query", () => {

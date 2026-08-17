@@ -1,12 +1,25 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LeagueMatchupTeam, LeagueRosterPlayer } from "@/types/league";
 
 vi.mock("@/components/league/RosterSlotTable", () => ({
   RosterSlotTable: () => <div data-testid="desktop-roster-table" />,
+}));
+
+vi.mock("@/components/player/PlayerCardModal", () => ({
+  PlayerCardModal: ({ player, onClose }: { player: { name: string }; onClose: () => void }) => (
+    <div role="dialog">
+      <span>{player.name} matchup player card</span>
+      <button type="button" onClick={onClose}>Close player card</button>
+    </div>
+  ),
+}));
+
+vi.mock("@/hooks/use-players", () => ({
+  usePlayerCard: () => ({ data: undefined, isError: false, isLoading: false, refetch: vi.fn() }),
 }));
 
 import { compactMatchupPlayerName, SideBySideMatchup } from "./SideBySideMatchup";
@@ -67,8 +80,22 @@ describe("SideBySideMatchup", () => {
       "grid-cols-[2.75rem_minmax(0,1fr)]",
     );
     expect(starters.querySelector('[data-mobile-matchup-player="right"]')?.className).toContain("text-left");
+    expect(starters.querySelector('[data-mobile-matchup-player="left"]')?.className).toContain(
+      "grid-cols-[minmax(0,1fr)_2.75rem]",
+    );
     expect(starters.querySelector("[data-mobile-slot-rail]")).toBeTruthy();
     expect(starters.querySelector("[data-mobile-slot-column]")?.className).not.toContain("border-x");
+  });
+
+  it("opens the existing player card from either side of a mobile matchup row", () => {
+    render(<SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={42} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open L. Name Quarterback player card" }));
+    expect(screen.getByRole("dialog").textContent).toContain("Long Name Quarterback matchup player card");
+
+    fireEvent.click(screen.getByRole("button", { name: "Close player card" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open O. Quarterback player card" }));
+    expect(screen.getByRole("dialog").textContent).toContain("Opponent Quarterback matchup player card");
   });
 
   it("uses a first-name initial and preserves multi-word last names for compact matchup rows", () => {
