@@ -79,6 +79,8 @@ export interface LeagueListCurrentUserSummary {
   ties?: number | null;
   opponent_team_name?: string | null;
   matchup_week?: number | null;
+  projected_points_for?: number | null;
+  projected_points_against?: number | null;
   win_probability_for?: number | null;
   win_probability_against?: number | null;
 }

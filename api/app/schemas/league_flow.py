@@ -372,6 +372,8 @@ class LeagueListCurrentUserSummaryRead(BaseModel):
     ties: int | None = None
     opponent_team_name: str | None = None
     matchup_week: int | None = None
+    projected_points_for: float | None = None
+    projected_points_against: float | None = None
     win_probability_for: float | None = None
     win_probability_against: float | None = None
 

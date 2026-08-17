@@ -36,6 +36,9 @@ const formatRecord = (summary: LeagueListCurrentUserSummary | null | undefined) 
   return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
 };
 
+const formatProjectedPoints = (value: number | null | undefined) =>
+  typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "—";
+
 export const LeagueCard = ({
   id,
   name,
@@ -125,12 +128,12 @@ export const LeagueCard = ({
           openLeague();
         }
       }}
-      className="relative cursor-pointer overflow-hidden rounded-xl border-border/70 bg-[#15181c] shadow-[0_8px_20px_rgba(0,0,0,0.22)] transition-colors hover:border-primary/45 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="relative cursor-pointer overflow-hidden rounded-2xl border-border/70 bg-[#15181c] shadow-[0_8px_20px_rgba(0,0,0,0.22)] transition-colors hover:border-primary/45 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
-    <div className="flex flex-col md:flex-row relative z-10">
-      <div className="flex-1 border-b border-border/60 p-4 md:border-b-0 md:border-r">
-        <div className="flex h-full flex-col justify-between gap-4">
-          <div className="space-y-3">
+    <div className="relative z-10 grid gap-0 sm:grid-cols-[minmax(11rem,0.8fr)_minmax(14rem,1.1fr)_11rem]">
+      <div className="border-b border-border/60 p-3 sm:border-b-0 sm:border-r sm:p-4">
+        <div className="flex h-full flex-col justify-between gap-3">
+          <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-primary/30 bg-primary/10 text-primary">
               {leagueImageUrl && !iconFailed ? (
                 <img
@@ -143,7 +146,7 @@ export const LeagueCard = ({
                 <Trophy className="w-6 h-6 text-white" aria-label="Default league trophy" />
               )}
             </div>
-            <div className="space-y-1">
+            <div className="min-w-0 space-y-1">
               <h3 className="text-base font-bold tracking-tight text-foreground">
                 {name}
               </h3>
@@ -153,7 +156,7 @@ export const LeagueCard = ({
             </div>
           </div>
           <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/15 px-2.5 py-1.5">
                 <Users className="w-3 h-3 text-primary" />
                 {memberCount}/{teams} members
@@ -164,13 +167,13 @@ export const LeagueCard = ({
               </span>
             </div>
             {inviteShouldBeVisible ? (
-              <div
-                className="max-w-md rounded-lg border border-sky-300/20 bg-sky-300/[0.06] p-3"
+              <details
+                className="max-w-md rounded-lg border border-sky-300/20 bg-sky-300/[0.06] px-3 py-2"
                 onClick={(event) => event.stopPropagation()}
               >
-                <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-200/80">
-                  Invite stays here until the draft is complete
-                </p>
+                <summary className="cursor-pointer text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-200/80">
+                  Invite options
+                </summary>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <span className="min-w-0 flex-1 truncate rounded-md border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs font-bold tracking-[0.08em] text-slate-50">
                     {inviteCode}
@@ -192,26 +195,26 @@ export const LeagueCard = ({
                     {copiedInviteField === "link" ? "Copied" : "Link"}
                   </button>
                 </div>
-              </div>
+              </details>
             ) : null}
           </div>
         </div>
       </div>
 
-      <div className="flex-[1.1] border-b border-border/60 bg-black/10 p-4 md:border-b-0 md:border-r">
-        <div className="space-y-3">
+      <div className="border-b border-border/60 bg-black/10 p-3 sm:border-b-0 sm:border-r sm:p-4">
+        <div className="space-y-2">
           <h4 className="text-[10px] font-semibold tracking-[0.12em] text-primary uppercase opacity-80">
             League snapshot
           </h4>
           <div>
-            <div className="grid gap-2 sm:grid-cols-3">
-              <div className="rounded-lg border border-white/10 bg-black/15 p-3">
+            <div className="grid gap-2 grid-cols-3">
+              <div className="rounded-lg border border-white/10 bg-black/15 p-2.5">
                 <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
                   Draft
                 </p>
                 <p className="mt-1.5 text-sm font-semibold text-foreground">{draftLabel}</p>
               </div>
-              <div className="rounded-lg border border-white/10 bg-black/15 p-3">
+              <div className="rounded-lg border border-white/10 bg-black/15 p-2.5">
                 <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
                   Your record
                 </p>
@@ -219,12 +222,15 @@ export const LeagueCard = ({
                   {formatRecord(currentUserSummary)}
                 </p>
               </div>
-              <div className="rounded-lg border border-white/10 bg-black/15 p-3">
+              <div className="rounded-lg border border-white/10 bg-black/15 p-2.5">
                 <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
                   {currentUserSummary?.matchup_week ? `Week ${currentUserSummary.matchup_week}` : "Matchup"}
                 </p>
                 <p className="mt-1.5 truncate text-sm font-semibold text-foreground">
                   {currentUserSummary?.opponent_team_name || "Schedule pending"}
+                </p>
+                <p className="mt-1 text-xs font-bold tabular-nums text-foreground">
+                  {formatProjectedPoints(currentUserSummary?.projected_points_for)} - {formatProjectedPoints(currentUserSummary?.projected_points_against)}
                 </p>
                 <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-sky-200">
                   Win chance {formatWinProbability(currentUserSummary?.win_probability_for)}
@@ -235,10 +241,10 @@ export const LeagueCard = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 p-4 md:flex md:min-w-[190px] md:flex-col md:justify-center">
+      <div className="grid grid-cols-2 gap-2 p-3 sm:flex sm:min-w-[11rem] sm:flex-col sm:justify-center sm:p-4">
         <Button
           variant="outline"
-          className="h-11 w-full rounded-lg border-white/10 bg-white/[0.04] px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-foreground hover:bg-white/[0.08]"
+          className="h-10 w-full rounded-lg border-white/10 bg-white/[0.04] px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-foreground hover:bg-white/[0.08]"
           onClick={(event) => {
             event.stopPropagation();
             openLeague();
@@ -251,7 +257,7 @@ export const LeagueCard = ({
           <Button
             variant="outline"
             className={[
-              "h-11 w-full rounded-lg px-3 text-[10px] font-bold uppercase tracking-[0.1em] transition-colors",
+              "h-10 w-full rounded-lg px-3 text-[10px] font-bold uppercase tracking-[0.1em] transition-colors",
               draftUnlocked
                 ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
                 : "border-amber-300/25 bg-amber-300/10 text-amber-100 hover:bg-amber-300/15",
@@ -266,7 +272,7 @@ export const LeagueCard = ({
           </Button>
         )}
         {shouldShowDraftAction && !draftUnlocked ? (
-          <p className="col-span-2 text-center text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-100/80 md:col-auto">
+          <p className="col-span-2 text-center text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-100/80 sm:col-auto">
             Opens in {formatDraftCountdown(draftDateTime, now)}
           </p>
         ) : null}
