@@ -60,7 +60,11 @@ describe("SideBySideMatchup", () => {
     const starters = screen.getByTestId("mobile-starting-lineup");
     expect(starters.textContent).toContain("Week One Opponent @ Ohio State");
     expect(starters.textContent).toContain("Texas @ Week One Opponent");
-    expect(starters.textContent).toMatch(/Sat.*12:00 PM|Sat.*4:00 PM|Sat.*11:00 AM/);
+    expect(starters.textContent).toMatch(/Sat,? Aug 29.*12:00 PM|Sat,? Aug 29.*4:00 PM|Sat,? Aug 29.*11:00 AM/);
+    expect(starters.querySelectorAll("[data-player-game-matchup]")).toHaveLength(2);
+    expect(starters.querySelectorAll("[data-player-game-time]")).toHaveLength(2);
+    expect(starters.querySelector("[data-mobile-slot-rail]")).toBeTruthy();
+    expect(starters.querySelector("[data-mobile-slot-column]")?.className).not.toContain("border-x");
   });
 
   it("uses a first-name initial and preserves multi-word last names for compact matchup rows", () => {
