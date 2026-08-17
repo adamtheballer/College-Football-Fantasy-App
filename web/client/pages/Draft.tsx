@@ -1178,7 +1178,7 @@ export default function Draft() {
                           : slot.team?.owner_name || "Manager"}
                   </p>
                   <p className="mt-2 truncate border-t border-cyan-200/10 pt-1.5 text-[8px] font-black uppercase tracking-[0.12em] text-cyan-100/90">
-                    {slot.pick ? <>By <span className="text-white">{pickerName}</span></> : isUser ? "Your pick" : "Upcoming"}
+                    {slot.pick ? <>Selected: <span className="text-white">{pickerName}</span></> : isUser ? "Your pick" : "Upcoming"}
                   </p>
                 </div>
               );
