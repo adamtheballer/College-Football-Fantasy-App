@@ -48,22 +48,36 @@ const kickoffLabel = (value?: string | null) => {
   if (!value) return "Kickoff TBD";
   const kickoff = new Date(value);
   if (Number.isNaN(kickoff.getTime())) return "Kickoff TBD";
-  return new Intl.DateTimeFormat(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }).format(kickoff);
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(kickoff);
 };
 
-export const formatPlayerGameContext = (player?: LeagueRosterPlayer) => {
+export const formatPlayerGameMatchup = (player?: LeagueRosterPlayer) => {
   if (!player?.player_id) return "Open slot";
   const school = player.school ?? player.player_school ?? "School TBD";
-  if (!player.opponent) return `${school} · ${kickoffLabel(player.game_start_at)}`;
+  if (!player.opponent) return school;
 
   // The API supplies the player's team's venue. Keep the road team first in the
   // compact matchup notation so it reads consistently across the app.
-  const matchup = player.game_location === "home"
+  return player.game_location === "home"
     ? `${player.opponent} @ ${school}`
     : player.game_location === "neutral"
       ? `${school} vs ${player.opponent} · Neutral`
       : `${school} @ ${player.opponent}`;
-  return `${matchup} · ${kickoffLabel(player.game_start_at)}`;
+};
+
+export const formatPlayerGameTime = (player?: LeagueRosterPlayer) =>
+  player?.player_id ? kickoffLabel(player.game_start_at) : "Kickoff TBD";
+
+export const formatPlayerGameContext = (player?: LeagueRosterPlayer) => {
+  const matchup = formatPlayerGameMatchup(player);
+  const kickoff = formatPlayerGameTime(player);
+  return matchup === "Open slot" ? matchup : `${matchup} · ${kickoff}`;
 };
 
 function CompactMatchupPlayer({ player, align }: { player?: LeagueRosterPlayer; align: "left" | "right" }) {
@@ -86,8 +100,11 @@ function CompactMatchupPlayer({ player, align }: { player?: LeagueRosterPlayer; 
           </p>
         ) : null}
       </div>
-      <p className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
-        {hasPlayer ? formatPlayerGameContext(player) : "Set a starter in your roster"}
+      <p data-player-game-matchup className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
+        {hasPlayer ? formatPlayerGameMatchup(player) : "Set a starter in your roster"}
+      </p>
+      <p data-player-game-time className="truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
+        {hasPlayer ? formatPlayerGameTime(player) : "Kickoff TBD"}
       </p>
     </div>
   );
@@ -116,22 +133,32 @@ function CompactMobileLineup({
           <span className="text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Points</span>
         </div>
       ) : null}
-      <div>
+      <div className="relative">
+        <div
+          aria-hidden="true"
+          data-mobile-slot-rail
+          className="pointer-events-none absolute inset-y-0 left-1/2 z-0 w-11 -translate-x-1/2 border-x border-[#101d31] bg-[#060c17]"
+        />
         {Array.from({ length: rowCount }, (_, index) => {
           const myPlayer = myPlayers[index];
           const opponentPlayer = opponentPlayers[index];
           const slot = compactSlot(myPlayer ?? opponentPlayer);
+          const hasFollowingRow = index < rowCount - 1;
           return (
             <div
               key={`${slot}-${index}`}
               data-mobile-matchup-row
-              className="grid min-h-[64px] grid-cols-[minmax(0,1fr)_2.75rem_minmax(0,1fr)] items-center border-b-2 border-[#07101f] px-3 py-2 last:border-b-0"
+              className="relative z-10 grid min-h-[72px] grid-cols-[minmax(0,1fr)_2.75rem_minmax(0,1fr)] items-stretch px-3"
             >
-              <CompactMatchupPlayer player={myPlayer} align="left" />
-              <span data-mobile-slot-column className="inline-flex min-h-[64px] self-stretch items-center justify-center border-x border-[#101d31] bg-[#060c17] px-1 text-[9px] font-black uppercase tracking-[0.04em] text-cfb-text-secondary">
+              <div className={`flex min-w-0 items-center py-2 ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""}`}>
+                <CompactMatchupPlayer player={myPlayer} align="left" />
+              </div>
+              <span data-mobile-slot-column className="inline-flex min-h-[72px] items-center justify-center px-1 text-[9px] font-black uppercase tracking-[0.04em] text-cfb-text-secondary">
                 {slot}
               </span>
-              <CompactMatchupPlayer player={opponentPlayer} align="right" />
+              <div className={`flex min-w-0 items-center py-2 ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""}`}>
+                <CompactMatchupPlayer player={opponentPlayer} align="right" />
+              </div>
             </div>
           );
         })}
