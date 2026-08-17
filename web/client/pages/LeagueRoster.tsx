@@ -187,7 +187,7 @@ export default function LeagueRoster() {
 
   if (leagueQuery.isLoading) {
     return (
-      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
+      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-0 py-4 sm:px-6 sm:py-8">
         <div className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface-raised/80 p-8 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cfb-text-muted">
           Loading league...
         </div>
@@ -197,7 +197,7 @@ export default function LeagueRoster() {
 
   if (leagueQuery.isError) {
     return (
-      <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
+      <main className="relative mx-auto w-full max-w-[1320px] px-0 py-4 sm:px-6 sm:py-8">
         <ErrorState
           title="Unable to load league"
           message={formatRosterLoadError(leagueQuery.error, "The league could not be loaded. Please try again.")}
@@ -214,7 +214,7 @@ export default function LeagueRoster() {
 
   if (rosterQuery.isError) {
     return (
-      <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
+      <main className="relative mx-auto w-full max-w-[1320px] px-0 py-4 sm:px-6 sm:py-8">
         <ErrorState
           title="Unable to load roster"
           message={formatRosterLoadError(rosterQuery.error, "The roster could not be loaded. Please try again.")}
@@ -226,7 +226,7 @@ export default function LeagueRoster() {
   }
 
   return (
-    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-4 px-3 pb-24 pt-4 sm:gap-6 sm:px-6 sm:py-8">
+    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-4 px-0 pb-24 pt-4 sm:gap-6 sm:px-6 sm:py-8">
       <div className="space-y-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>

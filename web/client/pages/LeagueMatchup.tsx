@@ -328,7 +328,7 @@ export default function LeagueMatchup() {
 
   if (leagueQuery.isLoading) {
     return (
-      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
+      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-0 py-4 sm:px-6 sm:py-8">
         <div className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface-raised/80 p-8 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cfb-text-muted">
           Loading league...
         </div>
@@ -338,7 +338,7 @@ export default function LeagueMatchup() {
 
   if (leagueQuery.isError) {
     return (
-      <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
+      <main className="relative mx-auto w-full max-w-[1320px] px-0 py-4 sm:px-6 sm:py-8">
         <ErrorState
           title="Unable to load league"
           message="The league could not be loaded. Confirm the backend is available, then try again."

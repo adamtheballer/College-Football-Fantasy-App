@@ -364,7 +364,7 @@ export default function LeagueWaivers() {
 
   if (leagueQuery.isLoading) {
     return (
-      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
+      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-0 py-4 sm:px-6 sm:py-8">
         <div className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface-raised/80 p-8 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cfb-text-muted">
           Loading league...
         </div>
@@ -374,7 +374,7 @@ export default function LeagueWaivers() {
 
   if (leagueQuery.isError) {
     return (
-      <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
+      <main className="relative mx-auto w-full max-w-[1320px] px-0 py-4 sm:px-6 sm:py-8">
         <ErrorState
           title="Unable to load league"
           message="The league could not be loaded. Confirm the backend is available, then try again."
@@ -390,7 +390,7 @@ export default function LeagueWaivers() {
   }
 
   return (
-    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
+    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-0 py-4 sm:px-6 sm:py-8">
       <Dialog open={Boolean(claimPlayer)} onOpenChange={(open) => {
         if (!open) {
           setClaimPlayer(null);
@@ -517,7 +517,7 @@ export default function LeagueWaivers() {
         />
       </div>
 
-      <section className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(13,23,39,0.96),rgba(16,30,52,0.9)_48%,rgba(15,23,42,0.96))] shadow-[0_24px_90px_rgba(14,165,233,0.12)]">
+      <section data-testid="league-player-board" className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(13,23,39,0.96),rgba(16,30,52,0.9)_48%,rgba(15,23,42,0.96))] shadow-[0_24px_90px_rgba(14,165,233,0.12)]">
         <div className="border-b border-sky-300/10 px-4 py-4 sm:px-5 sm:py-5">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>

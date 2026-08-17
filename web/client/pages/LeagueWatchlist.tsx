@@ -65,7 +65,7 @@ export default function LeagueWatchlist() {
 
   if (leagueQuery.isLoading) {
     return (
-      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
+      <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-0 py-4 sm:px-6 sm:py-8">
         <div className="rounded-[1.5rem] border border-cfb-border-subtle bg-cfb-surface-raised/80 p-8 text-center text-[10px] font-black uppercase tracking-[0.22em] text-cfb-text-muted">
           Loading league...
         </div>
@@ -75,7 +75,7 @@ export default function LeagueWatchlist() {
 
   if (leagueQuery.isError) {
     return (
-      <main className="relative mx-auto w-full max-w-[1320px] px-6 py-8">
+      <main className="relative mx-auto w-full max-w-[1320px] px-0 py-4 sm:px-6 sm:py-8">
         <ErrorState
           title="Unable to load league"
           message="The league could not be loaded. Confirm the backend is available, then try again."
@@ -91,7 +91,7 @@ export default function LeagueWatchlist() {
   }
 
   return (
-    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-6 py-8">
+    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-0 py-4 sm:px-6 sm:py-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] rounded-[3rem] bg-[radial-gradient(circle_at_20%_8%,rgba(56,189,248,0.16),transparent_32%),radial-gradient(circle_at_72%_0%,rgba(59,130,246,0.13),transparent_38%)] blur-2xl" />
       <div className="space-y-4">
         <p className="text-[11px] font-black uppercase tracking-[0.24em] text-sky-300">
@@ -116,7 +116,7 @@ export default function LeagueWatchlist() {
         />
       </div>
 
-      <section className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(8,15,29,0.97),rgba(12,25,45,0.94))] shadow-[0_24px_80px_rgba(14,165,233,0.10)]">
+      <section data-testid="league-watchlist-board" className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(8,15,29,0.97),rgba(12,25,45,0.94))] shadow-[0_24px_80px_rgba(14,165,233,0.10)]">
         <div className="border-b border-sky-300/10 px-5 py-5">
           <h2 className="text-[11px] font-black uppercase tracking-[0.22em] text-sky-300">
             Saved Targets
