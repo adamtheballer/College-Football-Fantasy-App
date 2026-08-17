@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Bot, ClipboardList, Grid3X3, History, LocateFixed, Loader2, Lock, Search, ShieldAlert, Trophy, User, Users } from "lucide-react";
+import { ArrowLeft, ClipboardList, Grid3X3, History, LocateFixed, Loader2, Lock, Search, ShieldAlert, Trophy, Users } from "lucide-react";
 
 import { DraftBoard } from "@/components/DraftBoard";
+import { DraftOrderPickCard } from "@/components/DraftOrderPickCard";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { DraftRoomVisuals, draftMatteControlClass, draftMattePanelClass } from "@/components/DraftRoomVisuals";
 import { Button } from "@/components/ui/button";
@@ -1085,13 +1086,17 @@ export default function Draft() {
               {draftOrderPicks.map((slot) => {
                 const isCurrent = !completed && slot.overallPick === displayPick;
                 const isUser = slot.team?.id === draftRoom.user_team_id;
-                const pickerName = slot.team?.owner_name || slot.pick?.team_name || slot.team?.name || "Manager";
+                const managerName = slot.team?.owner_name || slot.pick?.team_name || slot.team?.name || "Manager";
                 return (
-                  <div key={slot.overallPick} aria-current={isCurrent ? "step" : undefined} className={cn("flex w-[4.15rem] shrink-0 snap-start flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}>
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/12 bg-black/20">{slot.team?.is_cpu ? <Bot className="h-3 w-3" /> : <User className="h-3 w-3" />}</span>
-                    <span className="mt-1 whitespace-nowrap text-[9px] font-black tabular-nums">{slot.round}.{slot.roundPick}</span>
-                    <span className="mt-0.5 max-w-full truncate text-[8px] font-black uppercase tracking-[0.04em]">{slot.pick?.player_name ?? (isUser ? "You" : slot.team?.name?.replace("Bot Team", "B") ?? "Team")}</span>
-                    <span className="max-w-full truncate text-[7px] font-bold uppercase tracking-[0.03em] text-cyan-100/80">{slot.pick ? `By ${pickerName}` : pickerName}</span>
+                  <div key={slot.overallPick} data-testid={`mobile-draft-order-card-${slot.overallPick}`} aria-current={isCurrent ? "step" : undefined} className={cn("flex w-[4.15rem] shrink-0 snap-start flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}>
+                    <DraftOrderPickCard
+                      compact
+                      managerName={managerName}
+                      isCpu={Boolean(slot.team?.is_cpu)}
+                      round={slot.round}
+                      roundPick={slot.roundPick}
+                      playerName={slot.pick?.player_name}
+                    />
                   </div>
                 );
               })}
@@ -1128,7 +1133,7 @@ export default function Draft() {
               const isCurrent = !completed && slot.overallPick === displayPick;
               const isUser = slot.team?.id === draftRoom.user_team_id;
               const isLocked = Boolean(slot.pick);
-              const pickerName = slot.team?.owner_name || slot.pick?.team_name || slot.team?.name || "Manager";
+              const managerName = slot.team?.owner_name || slot.pick?.team_name || slot.team?.name || "Manager";
               return (
                 <div
                   key={slot.overallPick}
@@ -1160,26 +1165,13 @@ export default function Draft() {
                       <LocateFixed className="h-3.5 w-3.5" />
                     </div>
                   ) : null}
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Pick {slot.overallPick}</p>
-                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{slot.round}.{slot.roundPick}</p>
-                  <div className="mt-2 flex h-7 w-7 items-center justify-center rounded-lg border border-white/14 bg-black/20 text-amber-100">
-                    {slot.team?.is_cpu ? <Bot className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" /> : <User className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" />}
-                  </div>
-                  <p className="mt-2 truncate text-sm font-black text-foreground">
-                    {slot.pick?.player_name ?? slot.team?.name ?? `Team ${slot.roundPick}`}
-                  </p>
-                  <p className="mt-1 truncate text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-                    {slot.pick
-                      ? `${slot.pick.player_position} • ${slot.pick.player_school}`
-                      : slot.team?.isPlaceholder
-                        ? "Waiting for manager"
-                        : slot.team?.is_cpu
-                          ? "CPU manager"
-                          : slot.team?.owner_name || "Manager"}
-                  </p>
-                  <p className="mt-2 truncate border-t border-cyan-200/10 pt-1.5 text-[8px] font-black uppercase tracking-[0.12em] text-cyan-100/90">
-                    {slot.pick ? <>Selected: <span className="text-white">{pickerName}</span></> : isUser ? "Your pick" : "Upcoming"}
-                  </p>
+                  <DraftOrderPickCard
+                    managerName={managerName}
+                    isCpu={Boolean(slot.team?.is_cpu)}
+                    round={slot.round}
+                    roundPick={slot.roundPick}
+                    playerName={slot.pick?.player_name}
+                  />
                 </div>
               );
             })}

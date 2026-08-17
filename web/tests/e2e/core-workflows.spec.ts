@@ -2464,6 +2464,20 @@ test.describe("critical browser workflows", () => {
     const afterCpuPick = await page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}"));
     expect(afterCpuPick.picks[userPickIndex + 1].pickedBy).toBe("bot");
 
+    const firstCompletedPick = afterCpuPick.picks[0] as { playerName: string; pickedBy: "bot" | "user" | "auto" };
+    const expectedSurname = firstCompletedPick.playerName.split(/\s+/).slice(-1)[0];
+    const firstOrderCard = page.getByTestId("mobile-draft-order-card-1");
+    await expect(
+      firstOrderCard.getByLabel(
+        firstCompletedPick.pickedBy === "bot" ? "Computer manager" : "You initials YO",
+      ),
+    ).toBeVisible();
+    await expect(firstOrderCard.getByText("(1.1)", { exact: true })).toBeVisible();
+    await expect(firstOrderCard.getByTestId("draft-order-picked-player")).toHaveText(expectedSurname);
+    if (process.env.CAPTURE_MOBILE_UI === "1") {
+      await page.screenshot({ path: testInfo.outputPath("mobile-mock-draft-completed-pick-430x932.png"), fullPage: false });
+    }
+
     const rosterPlayerName = afterUserPick.picks[userPickIndex].playerName;
     await page.getByRole("button", { name: /^Roster$/ }).click();
     await page.getByRole("button", { name: `Open ${rosterPlayerName} player card` }).click();

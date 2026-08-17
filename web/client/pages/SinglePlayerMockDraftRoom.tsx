@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Bot, ClipboardList, LocateFixed, Loader2, RefreshCcw, Search, Trophy, User } from "lucide-react";
+import { ArrowLeft, ClipboardList, LocateFixed, Loader2, RefreshCcw, Search, Trophy } from "lucide-react";
 
 import { DraftBoard } from "@/components/DraftBoard";
+import { DraftOrderPickCard } from "@/components/DraftOrderPickCard";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { DraftRoomVisuals, draftMatteControlClass, draftMattePanelClass } from "@/components/DraftRoomVisuals";
 import { Button } from "@/components/ui/button";
@@ -951,11 +952,17 @@ export default function SinglePlayerMockDraftRoom() {
               {draftOrderPicks.map((slot) => {
                 const isCurrent = draftState.status !== "complete" && slot.overallPick === draftState.currentPick;
                 const isUser = slot.teamId === draftState.userTeamId;
+                const managerName = isUser ? "You" : slot.team?.name ?? "Bot";
                 return (
-                  <div key={slot.overallPick} aria-current={isCurrent ? "step" : undefined} className={cn("flex w-[4.15rem] shrink-0 snap-start flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}>
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/12 bg-black/20">{isUser ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}</span>
-                    <span className="mt-1 whitespace-nowrap text-[9px] font-black tabular-nums">{slot.round}.{slot.roundPick}</span>
-                    <span className="max-w-full truncate text-[8px] font-black uppercase tracking-[0.04em]">{isUser ? "You" : slot.team?.name?.replace("Bot Team", "B") ?? "Bot"}</span>
+                  <div key={slot.overallPick} data-testid={`mobile-draft-order-card-${slot.overallPick}`} aria-current={isCurrent ? "step" : undefined} className={cn("flex w-[4.15rem] shrink-0 snap-start flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}>
+                    <DraftOrderPickCard
+                      compact
+                      managerName={managerName}
+                      isCpu={!isUser}
+                      round={slot.round}
+                      roundPick={slot.roundPick}
+                      playerName={slot.pick?.playerName}
+                    />
                   </div>
                 );
               })}
@@ -988,6 +995,7 @@ export default function SinglePlayerMockDraftRoom() {
               const isCurrent = draftState.status !== "complete" && slot.overallPick === draftState.currentPick;
               const isUser = slot.teamId === draftState.userTeamId;
               const isLocked = Boolean(slot.pick);
+              const managerName = isUser ? "You" : slot.team?.name ?? "Bot";
               return (
                 <div
                   key={slot.overallPick}
@@ -1017,15 +1025,13 @@ export default function SinglePlayerMockDraftRoom() {
                       <LocateFixed className="h-3.5 w-3.5" />
                     </div>
                   ) : null}
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Pick {slot.overallPick}</p>
-                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{slot.round}.{slot.roundPick}</p>
-                  <div className="mt-2 flex h-7 w-7 items-center justify-center rounded-lg border border-white/14 bg-black/20 text-amber-100">
-                    {isUser ? <User className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" /> : <Bot className="h-3.5 w-3.5 drop-shadow-[0_0_8px_rgba(103,232,249,0.65)]" />}
-                  </div>
-                  <p className="mt-2 truncate text-sm font-black text-foreground">{slot.pick?.playerName ?? slot.team?.name ?? `Team ${slot.teamId}`}</p>
-                  <p className="mt-1 truncate text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-                    {slot.pick ? `${slot.pick.position} • ${slot.pick.school}` : isUser ? "Adam • You" : slot.team?.name?.replace("Team", "") ?? "Bot"}
-                  </p>
+                  <DraftOrderPickCard
+                    managerName={managerName}
+                    isCpu={!isUser}
+                    round={slot.round}
+                    roundPick={slot.roundPick}
+                    playerName={slot.pick?.playerName}
+                  />
                 </div>
               );
             })}
