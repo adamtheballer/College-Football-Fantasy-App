@@ -128,22 +128,22 @@ describe("league matchup scoreboard", () => {
     expect(screen.getByText("Week 1 Matchup")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "My Team vs My Opponent" })).toBeTruthy();
     expect(screen.getByText("Preweek baseline")).toBeTruthy();
-    expect(screen.getByText("111.2")).toBeTruthy();
-    expect(screen.getByText("106.4")).toBeTruthy();
+    expect(screen.getAllByText("111.2")).toHaveLength(2);
+    expect(screen.getAllByText("106.4")).toHaveLength(2);
     expect(screen.getAllByText("54.0%")).toHaveLength(1);
     expect(screen.getAllByText("46.0%")).toHaveLength(1);
     expect(screen.getByText("Win chance from weekly lineup totals")).toBeTruthy();
   });
 
-  it("lets a member load another same-league matchup through the canonical detail query", () => {
+  it("lets a member swipe or tap through same-league matchups through the canonical detail query", () => {
     render(createElement(LeagueMatchup));
 
-    const selector = screen.getByRole("combobox", { name: "League matchup" });
-    expect(selector).toBeTruthy();
-    expect(screen.getByRole("option", { name: "My Team vs My Opponent" })).toBeTruthy();
-    expect(screen.getByRole("option", { name: "League Mate One vs League Mate Two" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "League matchups" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "View My Team versus My Opponent" }).getAttribute("aria-pressed")).toBe("true");
+    const otherMatchup = screen.getByRole("button", { name: "View League Mate One versus League Mate Two" });
+    expect(otherMatchup).toBeTruthy();
 
-    fireEvent.change(selector, { target: { value: "2" } });
+    fireEvent.click(otherMatchup);
 
     expect(routerMocks.setSearchParams).toHaveBeenCalledTimes(1);
     const nextParams = routerMocks.setSearchParams.mock.calls[0][0] as URLSearchParams;

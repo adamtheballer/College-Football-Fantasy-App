@@ -1463,6 +1463,9 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("Next", { exact: true })).toHaveCount(0);
 
     await page.setViewportSize({ width: 390, height: 844 });
+    const matchupRail = page.getByLabel("Swipe through league matchups");
+    await expect(matchupRail).toBeVisible();
+    expect(await matchupRail.evaluate((element) => element.scrollWidth > element.clientWidth)).toBeTruthy();
     await expect(page.getByTestId("compact-win-chance-left-bar")).toBeVisible();
     await expect(page.getByTestId("compact-win-chance-left-bar")).toHaveClass(/from-rose-800/);
     await expect(page.getByTestId("compact-win-chance-right-bar")).toHaveClass(/from-emerald-700/);
@@ -1473,7 +1476,7 @@ test.describe("critical browser workflows", () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.reload();
     await expect(page.getByText("48.1% / 51.9%")).toBeVisible();
-    await page.getByRole("combobox", { name: "League matchup" }).selectOption("102");
+    await page.getByRole("button", { name: "View League Mate One versus League Mate Two" }).click();
     await expect(page.getByText("70.0% / 30.0%")).toBeVisible();
     await expect(page.getByTestId("win-chance-left-bar")).toHaveAttribute("style", /width: 70%/);
 
@@ -1824,8 +1827,11 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("My QB", { exact: true })).toBeVisible();
     await expect(page.getByText("Managing your roster", { exact: true })).toBeVisible();
 
-    await page.getByRole("combobox").click();
-    await page.getByRole("option", { name: "Rival Team", exact: true }).click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    const rosterRail = page.getByLabel("Swipe through league rosters");
+    await expect(rosterRail).toBeVisible();
+    expect(await rosterRail.evaluate((element) => element.scrollWidth > element.clientWidth)).toBeTruthy();
+    await page.getByRole("button", { name: "View Rival Team roster" }).click();
     await expect(page.getByText("Rival QB", { exact: true })).toBeVisible();
     await expect(page.getByText("Viewing league roster", { exact: true })).toBeVisible();
     await expect(page.getByText("Rival Team · 0-0-0 · Read-only", { exact: true })).toBeVisible();

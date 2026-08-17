@@ -58,85 +58,14 @@ const isRealRosterPlayer = (player: LeagueRosterPlayer) =>
       !/\bpreview\b/i.test(player.player_name ?? ""),
   );
 
-const positionStyles: Record<
-  string,
-  {
-    pill: string;
-    row: string;
-    dot: string;
-    text: string;
-    border: string;
-    panel: string;
-  }
-> = {
-  QB: {
-    pill: "border-blue-300/45 bg-blue-400/15 text-blue-100 shadow-[0_0_22px_rgba(96,165,250,0.18)]",
-    row: "hover:bg-blue-400/[0.06]",
-    dot: "bg-blue-300 shadow-[0_0_16px_rgba(147,197,253,0.75)]",
-    text: "text-blue-200",
-    border: "border-blue-300/25",
-    panel: "from-blue-500/18",
-  },
-  RB: {
-    pill: "border-emerald-300/45 bg-emerald-400/15 text-emerald-100 shadow-[0_0_22px_rgba(52,211,153,0.18)]",
-    row: "hover:bg-emerald-400/[0.06]",
-    dot: "bg-emerald-300 shadow-[0_0_16px_rgba(110,231,183,0.75)]",
-    text: "text-emerald-200",
-    border: "border-emerald-300/25",
-    panel: "from-emerald-500/18",
-  },
-  WR: {
-    pill: "border-violet-300/45 bg-violet-400/15 text-violet-100 shadow-[0_0_22px_rgba(167,139,250,0.18)]",
-    row: "hover:bg-violet-400/[0.06]",
-    dot: "bg-violet-300 shadow-[0_0_16px_rgba(196,181,253,0.75)]",
-    text: "text-violet-200",
-    border: "border-violet-300/25",
-    panel: "from-violet-500/18",
-  },
-  TE: {
-    pill: "border-amber-300/45 bg-amber-400/15 text-amber-100 shadow-[0_0_22px_rgba(251,191,36,0.18)]",
-    row: "hover:bg-amber-400/[0.06]",
-    dot: "bg-amber-300 shadow-[0_0_16px_rgba(252,211,77,0.75)]",
-    text: "text-amber-200",
-    border: "border-amber-300/25",
-    panel: "from-amber-500/18",
-  },
-  K: {
-    pill: "border-white/70 bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.28)]",
-    row: "hover:bg-white/[0.07]",
-    dot: "bg-white shadow-[0_0_18px_rgba(255,255,255,0.95)]",
-    text: "text-white",
-    border: "border-white/35",
-    panel: "from-white/18",
-  },
-  FLEX: {
-    pill: "border-fuchsia-300/45 bg-fuchsia-400/15 text-fuchsia-100 shadow-[0_0_22px_rgba(217,70,239,0.18)]",
-    row: "hover:bg-fuchsia-400/[0.06]",
-    dot: "bg-fuchsia-300 shadow-[0_0_16px_rgba(240,171,252,0.75)]",
-    text: "text-fuchsia-200",
-    border: "border-fuchsia-300/25",
-    panel: "from-fuchsia-500/18",
-  },
-  BENCH: {
-    pill: "border-slate-300/30 bg-slate-300/10 text-slate-200",
-    row: "hover:bg-slate-300/[0.04]",
-    dot: "bg-slate-400 shadow-[0_0_14px_rgba(148,163,184,0.55)]",
-    text: "text-slate-200",
-    border: "border-slate-300/15",
-    panel: "from-slate-500/12",
-  },
-  IR: {
-    pill: "border-rose-300/40 bg-rose-400/15 text-rose-100",
-    row: "hover:bg-rose-400/[0.05]",
-    dot: "bg-rose-300 shadow-[0_0_14px_rgba(251,113,133,0.6)]",
-    text: "text-rose-200",
-    border: "border-rose-300/20",
-    panel: "from-rose-500/14",
-  },
+const rosterRowStyle = {
+  pill: "border-cfb-border-subtle bg-cfb-surface text-cfb-text-secondary",
+  row: "hover:bg-cfb-surface-hover",
+  dot: "bg-cfb-brand",
+  text: "text-cfb-text-primary",
 };
 
-const getPositionStyle = (position?: string | null) =>
-  positionStyles[(position || "").toUpperCase()] ?? positionStyles.FLEX;
+const getPositionStyle = () => rosterRowStyle;
 
 type RosterSlotTableTone = "default" | "bench";
 
@@ -256,24 +185,16 @@ export function RosterSlotTable({
   };
 
   return (
-    <section
-      className={cn(
-        "overflow-hidden rounded-[1.5rem] border",
-        isBenchTone
-          ? "border-slate-300/15 bg-[linear-gradient(135deg,rgba(5,10,18,0.98),rgba(13,18,28,0.94)_52%,rgba(8,13,24,0.98))] shadow-[0_18px_54px_rgba(2,6,23,0.42)]"
-          : "border-sky-300/15 bg-[linear-gradient(135deg,rgba(8,18,32,0.98),rgba(13,23,39,0.94)_48%,rgba(15,23,42,0.98))] shadow-[0_22px_70px_rgba(14,165,233,0.08)]"
-      )}
-    >
+    <section className="overflow-hidden rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised">
       <div
         className={cn(
-          "border-b px-5 py-4",
-          isBenchTone ? "border-white/10 bg-white/[0.025]" : "border-sky-300/10 bg-sky-300/[0.03]"
+          "border-b border-cfb-border-subtle bg-cfb-surface/70 px-4 py-3 sm:px-5 sm:py-4"
         )}
       >
         <h2
           className={cn(
-            "text-[11px] font-black uppercase tracking-[0.22em]",
-            isBenchTone ? "text-slate-300" : "text-sky-300"
+            "text-[11px] font-black uppercase tracking-[0.18em]",
+            isBenchTone ? "text-cfb-text-secondary" : "text-cfb-brand"
           )}
         >
           {title}
@@ -282,15 +203,14 @@ export function RosterSlotTable({
       {sorted.length === 0 ? (
         <p
           className={cn(
-            "border-t border-dashed px-5 py-6 text-sm text-slate-400",
-            isBenchTone ? "border-white/10" : "border-sky-300/10"
+            "border-t border-dashed border-cfb-border-subtle px-4 py-6 text-sm text-cfb-text-secondary sm:px-5"
           )}
         >
           {emptyText}
         </p>
       ) : (
-        <div className="divide-y divide-white/10">
-          <div className={cn("hidden gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 md:grid", tableColumns)}>
+        <div className="divide-y divide-cfb-border-subtle">
+          <div className={cn("hidden gap-3 px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-cfb-text-muted md:grid", tableColumns)}>
             <span>Slot</span>
             <span>Player</span>
             <span>School</span>
@@ -301,7 +221,7 @@ export function RosterSlotTable({
           {sorted.map((player) => {
             const position = positionLabel(player);
             const isRealPlayer = isRealRosterPlayer(player);
-            const style = getPositionStyle(isRealPlayer ? position : slotType(player));
+            const style = getPositionStyle();
             const projection = isRealPlayer
               ? player.projected_points ?? player.weekly_projected_fantasy_points ?? null
               : 0;
@@ -317,7 +237,7 @@ export function RosterSlotTable({
                 disabled={!isRealPlayer}
                 aria-disabled={!isRealPlayer}
                 className={cn(
-                  "grid min-h-[76px] w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-3 text-left text-sm text-cfb-text-secondary transition focus:outline-none focus-visible:bg-cfb-brand/[0.08] focus-visible:ring-2 focus-visible:ring-cfb-brand/50 md:min-h-0 md:gap-3 md:px-5 md:py-4",
+                  "grid min-h-[72px] w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-3 text-left text-sm text-cfb-text-secondary transition focus:outline-none focus-visible:bg-cfb-brand/[0.08] focus-visible:ring-2 focus-visible:ring-cfb-brand/50 md:min-h-0 md:gap-3 md:px-5 md:py-4",
                   tableColumns,
                   isRealPlayer ? style.row : "cursor-not-allowed opacity-75"
                 )}
@@ -325,7 +245,7 @@ export function RosterSlotTable({
                 <span className="flex items-center gap-2">
                   <span
                     className={cn(
-                      "inline-flex min-w-[3.4rem] shrink-0 justify-center whitespace-nowrap rounded-full border px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] md:min-w-[3.25rem] md:px-3 md:py-1 md:tracking-[0.14em]",
+                      "inline-flex min-w-[3.4rem] shrink-0 justify-center whitespace-nowrap rounded-md border px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] md:min-w-[3.25rem] md:px-3 md:py-1 md:tracking-[0.14em]",
                       style.pill
                     )}
                   >
@@ -337,7 +257,7 @@ export function RosterSlotTable({
                   <span className="truncate font-black text-cfb-text-primary">{isRealPlayer ? player.player_name : "N/A"}</span>
                   <span
                     className={cn(
-                      "hidden w-fit shrink-0 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] md:inline-flex",
+                      "hidden w-fit shrink-0 whitespace-nowrap rounded-md border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] md:inline-flex",
                       style.pill
                     )}
                   >

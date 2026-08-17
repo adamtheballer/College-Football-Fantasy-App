@@ -9,7 +9,7 @@ import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
 import { useLeagueDetail, useLeagueMatchupTab, useLeagueScoreboard } from "@/hooks/use-leagues";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
-import type { LeagueMatchupTabResponse, LeagueMatchupTeam } from "@/types/league";
+import type { LeagueMatchupTabResponse, LeagueMatchupTeam, LeagueScoreboardRow } from "@/types/league";
 
 export function formatMatchupStatus(status: string | null | undefined) {
   const normalized = (status || "projected").toLowerCase();
@@ -69,6 +69,74 @@ function teamInitials(name: string | null | undefined) {
     .map((word) => word[0]?.toUpperCase() ?? "")
     .join("");
   return letters || "TM";
+}
+
+function MatchupRail({
+  matchups,
+  selectedMatchupId,
+  isLoading,
+  onSelect,
+}: {
+  matchups: LeagueScoreboardRow[];
+  selectedMatchupId: number | undefined;
+  isLoading: boolean;
+  onSelect: (matchupId: number) => void;
+}) {
+  if (!isLoading && matchups.length === 0) return null;
+
+  return (
+    <section
+      aria-label="League matchups"
+      className="overflow-hidden rounded-[1.25rem] border border-cfb-border-subtle bg-cfb-surface/70"
+    >
+      <div
+        aria-label="Swipe through league matchups"
+        className="flex snap-x snap-mandatory gap-2 overflow-x-auto px-3 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-4"
+      >
+        {isLoading ? Array.from({ length: 3 }, (_, index) => (
+          <div key={index} className="h-[62px] min-w-[184px] animate-pulse rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised" />
+        )) : matchups.map((matchup) => {
+          const selected = matchup.matchup_id === selectedMatchupId;
+          const status = formatMatchupStatus(matchup.status);
+          return (
+            <button
+              key={matchup.matchup_id}
+              type="button"
+              aria-label={`View ${matchup.home_team_name} versus ${matchup.away_team_name}`}
+              aria-pressed={selected}
+              onClick={() => onSelect(matchup.matchup_id)}
+              className={`snap-start shrink-0 rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 ${
+                selected
+                  ? "border-cfb-brand/80 bg-cfb-brand/[0.12] text-cfb-text-primary"
+                  : "border-cfb-border-subtle bg-cfb-surface-raised text-cfb-text-secondary hover:border-cfb-border-strong hover:bg-cfb-surface-hover"
+              }`}
+            >
+              <div className="flex min-w-[188px] items-center gap-2">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cfb-brand/45 bg-cfb-brand/[0.08] text-[10px] font-black text-cfb-brand">
+                  {teamInitials(matchup.home_team_name)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] font-black leading-4">{matchup.home_team_name}</p>
+                  <p className="truncate text-[10px] font-bold text-cfb-text-muted">{formatMatchupPoints(matchup.home_score)}</p>
+                </div>
+                <span className="text-[9px] font-black uppercase tracking-[0.1em] text-cfb-text-muted">vs</span>
+                <div className="min-w-0 flex-1 text-right">
+                  <p className="truncate text-[11px] font-black leading-4">{matchup.away_team_name}</p>
+                  <p className="truncate text-[10px] font-bold text-cfb-text-muted">{formatMatchupPoints(matchup.away_score)}</p>
+                </div>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cfb-pink/45 bg-cfb-pink/[0.08] text-[10px] font-black text-cfb-pink">
+                  {teamInitials(matchup.away_team_name)}
+                </span>
+              </div>
+              <p className={`mt-1.5 text-center text-[8px] font-black uppercase tracking-[0.13em] ${selected ? "text-cfb-brand" : "text-cfb-text-muted"}`}>
+                {status}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
 function displayedProbabilityPair(
@@ -175,15 +243,11 @@ function CompactMatchupScoreboard({
   const statusLabel = formatMatchupStatus(data.status);
 
   return (
-    <section className="relative overflow-hidden rounded-[1.65rem] border border-cfb-border-strong bg-[linear-gradient(135deg,hsl(var(--background-surface-raised)/0.98),hsl(var(--background-surface)/0.94))] p-4 shadow-[0_22px_60px_rgba(2,6,23,0.34)] sm:p-6">
+    <section className="overflow-hidden rounded-xl border border-cfb-border-strong bg-cfb-surface-raised p-4 sm:p-6">
       <h2 className="sr-only">
         {myTeam?.fantasy_team_name ?? "Your team"} vs {opponentTeam?.fantasy_team_name ?? "Opponent"}
       </h2>
-      <div className="pointer-events-none absolute inset-x-[22%] top-0 h-px bg-gradient-to-r from-transparent via-cfb-brand/60 to-transparent" />
-      <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-cfb-pink/10 blur-3xl" />
-      <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-cfb-brand/10 blur-3xl" />
-
-      <div className="relative flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <p className="cfb-micro-label text-cfb-text-secondary">Week {displayWeek} Matchup</p>
           <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb-text-muted">
@@ -195,7 +259,7 @@ function CompactMatchupScoreboard({
         </span>
       </div>
 
-      <div className="relative mt-5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:mt-6 sm:gap-6">
+      <div className="mt-5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:mt-6 sm:gap-6">
         <MatchupTeamSummary
           label={isViewingOwnMatchup ? "My Projection" : "Home Projection"}
           compactLabel={isViewingOwnMatchup ? "My proj" : "Home proj"}
@@ -234,12 +298,12 @@ function CompactMatchupScoreboard({
         />
       </div>
 
-      <div className="relative mt-5 flex items-center justify-between gap-3 border-t border-cfb-border-subtle pt-3 text-[10px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-cfb-border-subtle pt-3 text-[10px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
         <span>Week {displayWeek}</span>
         <span className="text-right">{winChance ? "Win chance from weekly lineup totals" : "Win chance unavailable"}</span>
       </div>
 
-      <div className="relative mt-4 hidden grid-cols-[1fr_auto] items-center gap-4 border-t border-cfb-border-subtle pt-4 sm:grid">
+      <div className="mt-4 hidden grid-cols-[1fr_auto] items-center gap-4 border-t border-cfb-border-subtle pt-4 sm:grid">
         <WinChanceMeter
           myPercent={myTeam?.win_probability}
           opponentPercent={opponentTeam?.win_probability}
@@ -282,7 +346,7 @@ export default function LeagueMatchup() {
     postDraft,
   );
   const scheduledMatchups = scoreboardQuery.data?.data ?? [];
-  const selectedMatchupValue = selectedMatchupId ?? data?.matchup_id ?? "";
+  const activeMatchupId = selectedMatchupId ?? data?.matchup_id;
   const isViewingOwnMatchup = Boolean(
     data?.my_team?.fantasy_team_id && data?.user_team?.fantasy_team_id === data.my_team.fantasy_team_id,
   );
@@ -323,7 +387,7 @@ export default function LeagueMatchup() {
   }
 
   return (
-    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-4 px-3 pb-24 pt-3 sm:gap-6 sm:px-2 sm:py-2">
+    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-4 px-3 pb-24 pt-4 sm:gap-6 sm:px-6 sm:py-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[380px] rounded-[3rem] bg-[radial-gradient(circle_at_20%_10%,hsl(var(--brand-primary)/0.18),transparent_32%),radial-gradient(circle_at_76%_8%,hsl(var(--accent-pink)/0.12),transparent_34%)] blur-2xl" />
 
       <div className="space-y-4">
@@ -342,22 +406,6 @@ export default function LeagueMatchup() {
               selectedWeek={selectedWeek}
               onChange={(week) => updateSelection(week)}
             />
-            <label className="flex min-w-[260px] flex-col gap-2 text-left">
-              <span className="cfb-micro-label text-cfb-text-muted">League matchup</span>
-              <select
-                aria-label="League matchup"
-                className="h-11 rounded-xl border border-cfb-border-subtle bg-cfb-surface px-3 text-sm font-bold text-cfb-text-primary outline-none transition focus:border-cfb-brand focus:ring-2 focus:ring-cfb-brand/20"
-                value={selectedMatchupValue}
-                disabled={scoreboardQuery.isLoading || scoreboardQuery.isError || !scheduledMatchups.length}
-                onChange={(event) => updateSelection(displayWeek, Number(event.target.value))}
-              >
-                {scheduledMatchups.map((matchup) => (
-                  <option key={matchup.matchup_id} value={matchup.matchup_id}>
-                    {matchup.home_team_name} vs {matchup.away_team_name}
-                  </option>
-                ))}
-              </select>
-            </label>
           </div>
         </div>
         <LeagueTabs
@@ -366,6 +414,13 @@ export default function LeagueMatchup() {
           leagueStatus={leagueQuery.data?.status}
         />
       </div>
+
+      <MatchupRail
+        matchups={scheduledMatchups}
+        selectedMatchupId={activeMatchupId}
+        isLoading={scoreboardQuery.isLoading}
+        onSelect={(matchupId) => updateSelection(displayWeek, matchupId)}
+      />
 
       {matchupQuery.isError ? (
         <ErrorState
