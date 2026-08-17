@@ -11,21 +11,55 @@ const tabs = [
   { label: "Settings", mobileLabel: "Settings", path: "settings", icon: Settings2 },
 ];
 
+const matchupTabs = [
+  { label: "Roster", path: "roster", icon: ClipboardList },
+  { label: "Matchup", path: "matchup", icon: Swords },
+  { label: "Players", path: "waivers", icon: ShieldCheck },
+  { label: "League", path: "settings", icon: Settings2 },
+];
+
 export function LeagueTabs({
   leagueId,
   draftStatus,
   leagueStatus,
+  variant = "default",
 }: {
   leagueId: number;
   draftStatus?: string | null;
   leagueStatus?: string | null;
+  variant?: "default" | "matchup";
 }) {
   const location = useLocation();
   const hasLifecycleStatus = draftStatus !== undefined || leagueStatus !== undefined;
   const restrictedToDraft = hasLifecycleStatus && shouldRestrictLeagueToDraft({ draftStatus, leagueStatus });
   const visibleTabs = restrictedToDraft
     ? [{ label: "Draft", path: "lobby", icon: CalendarClock }]
-    : tabs;
+    : variant === "matchup" ? matchupTabs : tabs;
+
+  if (variant === "matchup" && !restrictedToDraft) {
+    return (
+      <nav aria-label="League sections" className="border-b border-cfb-border-subtle">
+        <div className="flex min-w-max items-stretch gap-7 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-10">
+          {visibleTabs.map((tab) => {
+            const href = `/league/${leagueId}/${tab.path}`;
+            const active = location.pathname === href;
+            return (
+              <Link
+                key={tab.path}
+                to={href}
+                className={`relative flex min-h-12 shrink-0 items-center px-1 text-xs font-black uppercase tracking-[0.11em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 ${
+                  active ? "text-cfb-text-primary" : "text-cfb-text-muted hover:text-cfb-text-secondary"
+                }`}
+              >
+                {tab.label}
+                {active ? <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-cfb-brand" /> : null}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <div
@@ -51,7 +85,7 @@ export function LeagueTabs({
               ].join(" ")}
             >
               <Icon className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate sm:hidden">{tab.mobileLabel}</span>
+              <span className="truncate sm:hidden">{tab.label}</span>
               <span className="hidden truncate sm:inline">{tab.label}</span>
             </Link>
           </div>

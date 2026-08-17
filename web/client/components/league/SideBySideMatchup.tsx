@@ -38,25 +38,38 @@ const compactProjection = (player?: LeagueRosterPlayer) =>
     player?.projection_status,
   );
 
+const pointsLabel = (player?: LeagueRosterPlayer) => {
+  const points = compactProjection(player);
+  return player?.projection_status?.toUpperCase() === "SCORED" ? { value: points, label: "points" } : { value: points, label: "proj" };
+};
+
+const kickoffLabel = (value?: string | null) => {
+  if (!value) return "Kickoff TBD";
+  const kickoff = new Date(value);
+  if (Number.isNaN(kickoff.getTime())) return "Kickoff TBD";
+  return new Intl.DateTimeFormat(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }).format(kickoff);
+};
+
 const compactPlayerMeta = (player?: LeagueRosterPlayer) => {
   if (!player?.player_id) return "Open slot";
   const school = player.school ?? player.player_school ?? "School TBD";
   const opponent = player.opponent ? `vs ${player.opponent}` : "Opponent TBD";
-  return `${school} · ${opponent}`;
+  return `${school} ${opponent} · ${kickoffLabel(player.game_start_at)}`;
 };
 
 function CompactMatchupPlayer({ player, align }: { player?: LeagueRosterPlayer; align: "left" | "right" }) {
   const hasPlayer = Boolean(player?.player_id && player.player_name);
+  const points = pointsLabel(player);
   return (
     <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
       <p className={`truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
-        {hasPlayer ? player?.player_name : "Open slot"}
+        {hasPlayer ? player?.player_name : "No starter set"}
       </p>
       <p className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
-        {compactPlayerMeta(player)}
+        {hasPlayer ? compactPlayerMeta(player) : "Set a starter in your roster"}
       </p>
       <p className={`mt-1 text-[11px] font-black tabular-nums ${align === "right" ? "text-cfb-pink" : "text-cfb-brand"}`}>
-        {compactProjection(player)} <span className="text-[8px] uppercase tracking-[0.08em] text-cfb-text-muted">proj</span>
+        {points.value} <span className="text-[8px] uppercase tracking-[0.08em] text-cfb-text-muted">{points.label}</span>
       </p>
     </div>
   );
@@ -76,10 +89,10 @@ function CompactMobileLineup({
   const rowCount = Math.max(myPlayers.length, opponentPlayers.length);
 
   return (
-    <section data-testid={testId} className="overflow-hidden rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised/95 shadow-[0_16px_38px_rgba(2,6,23,0.26)] md:hidden">
-      <div className="flex items-center justify-between border-b border-cfb-border-subtle bg-cfb-surface/70 px-4 py-3">
-        <h2 className="text-[11px] font-black uppercase tracking-[0.17em] text-cfb-brand">{title}</h2>
-        <span className="text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Weekly proj</span>
+    <section data-testid={testId} className="overflow-hidden border-y border-cfb-border-subtle bg-cfb-surface-raised/70 md:hidden">
+      <div className="flex items-center justify-between bg-cfb-surface/70 px-4 py-3">
+        <h2 className="text-[11px] font-black uppercase tracking-[0.17em] text-cfb-text-primary">{title}</h2>
+        <span className="text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Points / proj</span>
       </div>
       <div className="divide-y divide-cfb-border-subtle/80">
         {Array.from({ length: rowCount }, (_, index) => {
@@ -90,10 +103,10 @@ function CompactMobileLineup({
             <div
               key={`${slot}-${index}`}
               data-mobile-matchup-row
-              className="grid min-h-[74px] grid-cols-[minmax(0,1fr)_2.7rem_minmax(0,1fr)] items-center gap-2 px-3 py-2.5"
+              className="grid min-h-[76px] grid-cols-[minmax(0,1fr)_2.9rem_minmax(0,1fr)] items-center gap-2 px-3 py-2.5"
             >
               <CompactMatchupPlayer player={myPlayer} align="left" />
-              <span className="inline-flex min-h-8 items-center justify-center rounded-full border border-cfb-brand/35 bg-cfb-brand/[0.08] px-1 text-[9px] font-black uppercase tracking-[0.04em] text-cfb-text-secondary">
+              <span className="inline-flex min-h-8 items-center justify-center border-x border-cfb-border-subtle bg-cfb-canvas/65 px-1 text-[9px] font-black uppercase tracking-[0.04em] text-cfb-text-secondary">
                 {slot}
               </span>
               <CompactMatchupPlayer player={opponentPlayer} align="right" />
@@ -122,13 +135,8 @@ export function SideBySideMatchup({
   return (
     <div className="space-y-4 sm:space-y-6">
       <section className="space-y-3">
-        <div>
-          <p className="cfb-micro-label text-cfb-brand">
-            Starting Matchup
-          </p>
-        </div>
         <CompactMobileLineup
-          title="Starting lineup"
+          title="Starter matchup"
           myPlayers={myStarters}
           opponentPlayers={opponentStarters}
           testId="mobile-starting-lineup"

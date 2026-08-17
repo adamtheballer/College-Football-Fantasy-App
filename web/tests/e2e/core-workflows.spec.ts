@@ -1441,17 +1441,21 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/league/1/matchup");
-    await expect(page.getByRole("heading", { name: /^Matchup$/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Back" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Notifications" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Messages" })).toBeVisible();
+    await expect(page.getByText("Matchup Test League", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Matchup" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Emily's Team vs Adam 2's Team" })).toBeVisible();
     await expect(page.getByText("133.1 - 137.0")).toHaveCount(0);
-    await expect(page.getByText("My Projection")).toBeVisible();
-    await expect(page.getByText("Their Projection")).toBeVisible();
-    await expect(page.getByText("133.1").first()).toBeVisible();
-    await expect(page.getByText("137.0").first()).toBeVisible();
-    await expect(page.getByText("48.1% / 51.9%")).toBeVisible();
-    await expect(page.getByText("Projected Leader").locator("..").getByText("Adam 2's Team")).toBeVisible();
-    await expect(page.getByTestId("win-chance-left-bar")).toHaveAttribute("style", /width: 48\.05%/);
-    await expect(page.getByTestId("win-chance-right-bar")).toHaveAttribute("style", /width: 51\.95%/);
+    await expect(page.getByText("Projected: 133.1")).toBeVisible();
+    await expect(page.getByText("Projected: 137.0")).toBeVisible();
+    await expect(page.getByText("48.1%", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("51.9%", { exact: true }).first()).toBeVisible();
+    await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toHaveAttribute("style", /width: 48\.05%/);
+    await expect(page.getByTestId("scoreboard-win-chance-right-bar")).toHaveAttribute("style", /width: 51\.95%/);
+    await expect(page.getByText("Starters", { exact: true })).toBeVisible();
+    await expect(page.getByText("CFB Scores", { exact: true })).toBeVisible();
     // The responsive matchup view keeps a compact mobile lineup mounted alongside
     // the desktop tables. Assert against the visible desktop player controls here
     // rather than an ambiguous text locator shared by both representations.
@@ -1466,19 +1470,24 @@ test.describe("critical browser workflows", () => {
     const matchupRail = page.getByLabel("Swipe through league matchups");
     await expect(matchupRail).toBeVisible();
     expect(await matchupRail.evaluate((element) => element.scrollWidth > element.clientWidth)).toBeTruthy();
-    await expect(page.getByTestId("compact-win-chance-left-bar")).toBeVisible();
-    await expect(page.getByTestId("compact-win-chance-left-bar")).toHaveClass(/from-rose-800/);
-    await expect(page.getByTestId("compact-win-chance-right-bar")).toHaveClass(/from-emerald-700/);
+    await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toBeVisible();
+    await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toHaveClass(/from-rose-800/);
+    await expect(page.getByTestId("scoreboard-win-chance-right-bar")).toHaveClass(/from-emerald-700/);
     await expect(page.locator('[style*="conic-gradient"]')).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
+    const appScroller = page.locator("main[data-app-scroll='true']");
+    expect(await appScroller.evaluate((element) => element.scrollHeight > element.clientHeight)).toBeTruthy();
+    await appScroller.evaluate((element) => element.scrollTo({ top: element.scrollHeight, behavior: "instant" }));
+    await expect(page.getByText("Starter matchup", { exact: true })).toBeVisible();
+    await expect(page.getByText("CFB Scores", { exact: true })).toBeVisible();
     await page.screenshot({ path: "test-results/mobile-matchup-linear-meter.png", fullPage: true });
 
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.reload();
-    await expect(page.getByText("48.1% / 51.9%")).toBeVisible();
+    await expect(page.getByText("48.1%", { exact: true }).first()).toBeVisible();
     await page.getByRole("button", { name: "View League Mate One versus League Mate Two" }).click();
-    await expect(page.getByText("70.0% / 30.0%")).toBeVisible();
-    await expect(page.getByTestId("win-chance-left-bar")).toHaveAttribute("style", /width: 70%/);
+    await expect(page.getByText("70.0%", { exact: true }).first()).toBeVisible();
+    await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toHaveAttribute("style", /width: 70%/);
 
     await page.getByRole("button", { name: "Next week" }).click();
     await expect(page.getByTestId("matchup-week-label")).toHaveText("Week 2");

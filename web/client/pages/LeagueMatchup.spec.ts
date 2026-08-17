@@ -4,12 +4,13 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const routerMocks = vi.hoisted(() => ({ setSearchParams: vi.fn() }));
+const routerMocks = vi.hoisted(() => ({ setSearchParams: vi.fn(), navigate: vi.fn() }));
 
 vi.mock("react-router-dom", () => ({
   Navigate: () => null,
   useParams: () => ({ leagueId: "42" }),
   useSearchParams: () => [new URLSearchParams(), routerMocks.setSearchParams],
+  useNavigate: () => routerMocks.navigate,
 }));
 
 vi.mock("@/components/league/LeagueTabs", () => ({ LeagueTabs: () => null }));
@@ -122,17 +123,18 @@ describe("league matchup helpers", () => {
 });
 
 describe("league matchup scoreboard", () => {
-  it("renders a compact Week 1 preweek-baseline scoreboard with both projected totals and win chances", () => {
+  it("renders the mobile scoreboard with truthful pregame scores, projections, and win chances", () => {
     render(createElement(LeagueMatchup));
 
-    expect(screen.getByText("Week 1 Matchup")).toBeTruthy();
+    expect(screen.getByText("Week 1 matchup")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "My Team vs My Opponent" })).toBeTruthy();
     expect(screen.getByText("Preweek baseline")).toBeTruthy();
-    expect(screen.getAllByText("111.2")).toHaveLength(2);
-    expect(screen.getAllByText("106.4")).toHaveLength(2);
-    expect(screen.getAllByText("54.0%")).toHaveLength(1);
-    expect(screen.getAllByText("46.0%")).toHaveLength(1);
-    expect(screen.getByText("Win chance from weekly lineup totals")).toBeTruthy();
+    expect(screen.getByText("Projected: 111.2")).toBeTruthy();
+    expect(screen.getByText("Projected: 106.4")).toBeTruthy();
+    expect(screen.getAllByText("54.0%")).toHaveLength(2);
+    expect(screen.getAllByText("46.0%")).toHaveLength(2);
+    expect(screen.getByText(/Week 1 matchups begin when college games kick off/i)).toBeTruthy();
+    expect(screen.getByText("CFB Scores available once games begin")).toBeTruthy();
   });
 
   it("lets a member swipe or tap through same-league matchups through the canonical detail query", () => {
