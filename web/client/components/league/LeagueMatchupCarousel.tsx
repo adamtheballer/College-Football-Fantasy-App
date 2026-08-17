@@ -64,17 +64,20 @@ export function LeagueMatchupCarousel({
 }) {
   const railRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef(new Map<number, HTMLButtonElement>());
+  const loopResetTimeoutRef = useRef<number | null>(null);
   const [visibleLeagueIndex, setVisibleLeagueIndex] = useState(0);
+  const hasLoop = leagues.length > 1;
+  const carouselLeagues = hasLoop ? [leagues[leagues.length - 1], ...leagues, leagues[0]] : leagues;
 
-  const syncVisibleLeague = useCallback(() => {
+  const nearestCardIndex = useCallback(() => {
     const rail = railRef.current;
-    if (!rail || rail.clientWidth <= 0 || leagues.length === 0) return;
+    if (!rail || rail.clientWidth <= 0 || carouselLeagues.length === 0) return null;
 
     const railCenter = rail.scrollLeft + rail.clientWidth / 2;
     let nearestIndex = 0;
     let nearestDistance = Number.POSITIVE_INFINITY;
 
-    for (let index = 0; index < leagues.length; index += 1) {
+    for (let index = 0; index < carouselLeagues.length; index += 1) {
       const card = cardRefs.current.get(index);
       if (!card) continue;
       const cardCenter = card.offsetLeft + card.offsetWidth / 2;
@@ -85,18 +88,65 @@ export function LeagueMatchupCarousel({
       }
     }
 
-    setVisibleLeagueIndex((current) => (current === nearestIndex ? current : nearestIndex));
-  }, [leagues.length]);
+    return nearestIndex;
+  }, [carouselLeagues.length]);
+
+  const scrollToCard = useCallback((index: number, behavior: ScrollBehavior = "auto") => {
+    const rail = railRef.current;
+    const card = cardRefs.current.get(index);
+    if (!rail || !card) return;
+    const target = { left: card.offsetLeft, behavior };
+    if (typeof rail.scrollTo === "function") {
+      rail.scrollTo(target);
+    } else {
+      // JSDOM does not implement Element#scrollTo, and this fallback also
+      // keeps the carousel usable in older embedded web views.
+      rail.scrollLeft = card.offsetLeft;
+    }
+  }, []);
+
+  const syncVisibleLeague = useCallback(() => {
+    const nearestIndex = nearestCardIndex();
+    if (nearestIndex === null) return;
+    const leagueIndex = hasLoop
+      ? (nearestIndex === 0 ? leagues.length - 1 : nearestIndex === leagues.length + 1 ? 0 : nearestIndex - 1)
+      : nearestIndex;
+    setVisibleLeagueIndex((current) => (current === leagueIndex ? current : leagueIndex));
+  }, [hasLoop, leagues.length, nearestCardIndex]);
+
+  const normalizeLoopPosition = useCallback(() => {
+    if (!hasLoop) return;
+    const nearestIndex = nearestCardIndex();
+    if (nearestIndex === 0) {
+      scrollToCard(leagues.length);
+    } else if (nearestIndex === leagues.length + 1) {
+      scrollToCard(1);
+    }
+  }, [hasLoop, leagues.length, nearestCardIndex, scrollToCard]);
+
+  const handleScroll = useCallback(() => {
+    syncVisibleLeague();
+    if (!hasLoop) return;
+    if (loopResetTimeoutRef.current !== null) window.clearTimeout(loopResetTimeoutRef.current);
+    loopResetTimeoutRef.current = window.setTimeout(() => {
+      normalizeLoopPosition();
+      loopResetTimeoutRef.current = null;
+    }, 120);
+  }, [hasLoop, normalizeLoopPosition, syncVisibleLeague]);
 
   useEffect(() => {
     setVisibleLeagueIndex(0);
-    const animationFrame = window.requestAnimationFrame(syncVisibleLeague);
+    const animationFrame = window.requestAnimationFrame(() => {
+      if (hasLoop) scrollToCard(1);
+      syncVisibleLeague();
+    });
     window.addEventListener("resize", syncVisibleLeague);
     return () => {
       window.cancelAnimationFrame(animationFrame);
+      if (loopResetTimeoutRef.current !== null) window.clearTimeout(loopResetTimeoutRef.current);
       window.removeEventListener("resize", syncVisibleLeague);
     };
-  }, [leagues.length, syncVisibleLeague]);
+  }, [hasLoop, leagues.length, scrollToCard, syncVisibleLeague]);
 
   return (
     <section aria-labelledby="league-matchup-carousel-title">
@@ -135,10 +185,10 @@ export function LeagueMatchupCarousel({
       <div
         aria-label="Swipe through your league matchups"
         ref={railRef}
-        onScroll={syncVisibleLeague}
+        onScroll={handleScroll}
         className="flex min-w-0 max-w-full snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {leagues.map((league, index) => {
+        {carouselLeagues.map((league, index) => {
           const summary = league.current_user_summary;
           const chance = probabilityPair(league);
           const active = league.id === activeLeagueId;
@@ -146,7 +196,8 @@ export function LeagueMatchupCarousel({
 
           return (
             <button
-              key={league.id}
+              key={`${league.id}-${index}`}
+              data-testid={`league-carousel-card-${league.id}-${index}`}
               type="button"
               ref={(element) => {
                 if (element) cardRefs.current.set(index, element);

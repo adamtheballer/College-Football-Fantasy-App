@@ -60,7 +60,7 @@ describe("LeagueMatchupCarousel", () => {
 
     const rail = screen.getByLabelText("Swipe through your league matchups");
     Object.defineProperty(rail, "clientWidth", { configurable: true, value: 320 });
-    Object.defineProperty(rail, "scrollLeft", { configurable: true, writable: true, value: 0 });
+    Object.defineProperty(rail, "scrollLeft", { configurable: true, writable: true, value: 340 });
     const cards = screen.getAllByRole("button", { name: /Saturday Legends|Midnight Managers/i });
     cards.forEach((card, index) => {
       Object.defineProperty(card, "offsetLeft", { configurable: true, value: index * 340 });
@@ -72,12 +72,39 @@ describe("LeagueMatchupCarousel", () => {
       expect(screen.getByTestId("league-carousel-pagination").getAttribute("aria-label")).toBe("Showing league 1 of 2");
     });
 
-    rail.scrollLeft = 340;
+    rail.scrollLeft = 680;
     fireEvent.scroll(rail);
     await waitFor(() => {
       expect(screen.getByTestId("league-carousel-pagination").getAttribute("aria-label")).toBe("Showing league 2 of 2");
     });
     expect(screen.getAllByTestId("league-carousel-pagination").flatMap((pagination) => Array.from(pagination.children)).map((dot) => dot.getAttribute("data-active"))).toEqual(["false", "true"]);
+  });
+
+  it("loops from the final league clone back to the first league without widening the page", async () => {
+    const multipleLeagues = [
+      ...leagues,
+      { ...leagues[0], id: 18, name: "Midnight Managers" },
+    ];
+    render(<LeagueMatchupCarousel leagues={multipleLeagues} activeLeagueId={17} onOpenLeague={vi.fn()} />);
+
+    const rail = screen.getByLabelText("Swipe through your league matchups") as HTMLDivElement;
+    Object.defineProperty(rail, "clientWidth", { configurable: true, value: 320 });
+    Object.defineProperty(rail, "scrollLeft", { configurable: true, writable: true, value: 1020 });
+    const scrollTo = vi.fn();
+    Object.defineProperty(rail, "scrollTo", { configurable: true, value: scrollTo });
+    screen.getAllByRole("button", { name: /Saturday Legends|Midnight Managers/i }).forEach((card, index) => {
+      Object.defineProperty(card, "offsetLeft", { configurable: true, value: index * 340 });
+      Object.defineProperty(card, "offsetWidth", { configurable: true, value: 320 });
+    });
+
+    fireEvent.scroll(rail);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("league-carousel-pagination").getAttribute("aria-label")).toBe("Showing league 1 of 2");
+    });
+    await waitFor(() => {
+      expect(scrollTo).toHaveBeenCalledWith({ left: 340, behavior: "auto" });
+    });
   });
 
   it("opens the selected league matchup from the home carousel", () => {
