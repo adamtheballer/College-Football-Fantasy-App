@@ -92,10 +92,24 @@ class PlayerCardStatRowRead(BaseModel):
     updated_at: datetime
 
 
+class PlayerSeasonOutlookRead(BaseModel):
+    """Public, persisted copy only; the evidence record remains server-side."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    season_year: int
+    outlook_type: str
+    outlook_text: str
+    generator_version: str
+    generated_at: datetime
+    review_status: str
+
+
 class PlayerCardRead(BaseModel):
     player: PlayerRead
     about: PlayerCardAboutRead
     current_injury_status: str | None = None
     injuries: list[PlayerCardInjuryRead]
     season_stats: list[PlayerCardStatRowRead]
+    season_outlook: PlayerSeasonOutlookRead | None = None
     historical_stats: PlayerHistoricalStatsResponse | None = None

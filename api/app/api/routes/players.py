@@ -19,6 +19,7 @@ from collegefootballfantasy_api.app.schemas.player import (
     PlayerCardAboutRead,
     PlayerCardInjuryRead,
     PlayerCardRead,
+    PlayerSeasonOutlookRead,
     PlayerCardStatRowRead,
     PlayerCreate,
     PlayerList,
@@ -41,6 +42,7 @@ from collegefootballfantasy_api.app.services.historical_stats import (
 from collegefootballfantasy_api.app.services.player_game_log import build_player_game_log
 from collegefootballfantasy_api.app.services.player_trade_value import get_player_trade_values
 from collegefootballfantasy_api.app.services.player_trajectory import build_player_trajectory
+from collegefootballfantasy_api.app.services.player_season_outlook import get_persisted_player_season_outlook
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
 from collegefootballfantasy_api.app.services.auth_security import enforce_auth_rate_limit
 from collegefootballfantasy_api.app.services.injury_status import (
@@ -373,6 +375,13 @@ def get_player_card_endpoint(
             historical_stats.message = f"{historical_stats.message or 'ESPN historical stats unavailable.'} {exc}"
 
     card_player = _player_card_player_with_sheet_projection_fallback(db, player)
+    # Card reads are intentionally retrieval-only. The explicit batch job is
+    # the sole generator so an opened card never creates unreviewed copy.
+    season_outlook = get_persisted_player_season_outlook(
+        db,
+        player_id=player.id,
+        season_year=datetime.now(timezone.utc).year,
+    )
     return PlayerCardRead(
         player=card_player,
         about=_map_espn_about(player, card_player, profile_payload, profile_message, espn_player_id=espn_id),
@@ -403,6 +412,11 @@ def get_player_card_endpoint(
             )
             for row in stat_rows
         ],
+        season_outlook=(
+            PlayerSeasonOutlookRead.model_validate(season_outlook)
+            if season_outlook is not None
+            else None
+        ),
         historical_stats=historical_stats,
     )
 
