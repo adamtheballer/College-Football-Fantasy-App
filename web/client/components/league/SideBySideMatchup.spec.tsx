@@ -58,7 +58,7 @@ describe("SideBySideMatchup", () => {
     expect(screen.getByText("24.1")).toBeTruthy();
     expect(screen.getByText("22.7")).toBeTruthy();
     const starters = screen.getByTestId("mobile-starting-lineup");
-    expect(starters.textContent).toContain("Ohio State vs Week One Opponent");
+    expect(starters.textContent).toContain("Week One Opponent @ Ohio State");
     expect(starters.textContent).toContain("Texas @ Week One Opponent");
     expect(starters.textContent).toMatch(/Sat.*12:00 PM|Sat.*4:00 PM|Sat.*11:00 AM/);
   });

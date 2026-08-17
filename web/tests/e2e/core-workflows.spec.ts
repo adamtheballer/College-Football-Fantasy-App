@@ -1448,8 +1448,8 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByRole("link", { name: "Matchup" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Emily's Team vs Adam 2's Team" })).toBeVisible();
     await expect(page.getByText("133.1 - 137.0")).toHaveCount(0);
-    await expect(page.getByText("Projected: 133.1")).toBeVisible();
-    await expect(page.getByText("Projected: 137.0")).toBeVisible();
+    await expect(page.getByText("Proj 133.1")).toBeVisible();
+    await expect(page.getByText("Proj 137.0")).toBeVisible();
     await expect(page.getByText("48.1%", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("51.9%", { exact: true }).first()).toBeVisible();
     await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toHaveAttribute("style", /width: 48\.05%/);
@@ -1461,8 +1461,8 @@ test.describe("critical browser workflows", () => {
     // rather than an ambiguous text locator shared by both representations.
     await expect(page.getByRole("button", { name: /Arch Manning/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Rival QB/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Previous week" })).toBeDisabled();
-    await expect(page.getByRole("button", { name: "Next week" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Previous week" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Next week" })).toHaveCount(0);
     await expect(page.getByText("Prev", { exact: true })).toHaveCount(0);
     await expect(page.getByText("Next", { exact: true })).toHaveCount(0);
 
@@ -1478,24 +1478,19 @@ test.describe("critical browser workflows", () => {
     const appScroller = page.locator("main[data-app-scroll='true']");
     expect(await appScroller.evaluate((element) => element.scrollHeight > element.clientHeight)).toBeTruthy();
     await appScroller.evaluate((element) => element.scrollTo({ top: element.scrollHeight, behavior: "instant" }));
-    await expect(page.getByText("Starter matchup", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("mobile-starting-lineup").getByText("Arch Manning", { exact: true })).toBeVisible();
     await expect(page.getByText("CFB Scores", { exact: true })).toBeVisible();
     await page.screenshot({ path: "test-results/mobile-matchup-linear-meter.png", fullPage: true });
 
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.reload();
     await expect(page.getByText("48.1%", { exact: true }).first()).toBeVisible();
-    await page.getByRole("button", { name: "View League Mate One versus League Mate Two" }).click();
+    await page.getByRole("button", { name: "View League Mate Two at League Mate One" }).click();
     await expect(page.getByText("70.0%", { exact: true }).first()).toBeVisible();
     await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toHaveAttribute("style", /width: 70%/);
 
-    await page.getByRole("button", { name: "Next week" }).click();
-    await expect(page.getByTestId("matchup-week-label")).toHaveText("Week 2");
-    await page.getByRole("button", { name: "Previous week" }).click();
-    await expect(page.getByTestId("matchup-week-label")).toHaveText("Week 1");
-
     matchupPayload = emptyPayload;
-    await page.reload();
+    await page.goto("/league/1/matchup");
     await expect(page.getByText(/No matchup scheduled/i)).toBeVisible();
     await expect(page.getByText(/No matchup generated yet/i)).toBeVisible();
     await expect(page.getByText("Rival Team")).toHaveCount(0);
