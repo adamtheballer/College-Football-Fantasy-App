@@ -185,6 +185,7 @@ def _serialize_roster_entry(
     team: Team,
     projection: WeeklyProjection | None,
     opponent: str | None = None,
+    game_location: str | None = None,
     game_start_at: datetime | None = None,
     is_locked: bool = False,
 ) -> RosterTabEntryRead:
@@ -218,6 +219,7 @@ def _serialize_roster_entry(
         boom_prob=float(projection.boom_prob or 0.0) if projection else 0.0,
         bust_prob=float(projection.bust_prob or 0.0) if projection else 0.0,
         opponent=opponent,
+        game_location=game_location,
         weekly_projected_fantasy_points=projected,
         projection_status=projection.projection_status if projection else "UNAVAILABLE",
         game_start_at=game_start_at,
@@ -243,7 +245,7 @@ def _serialize_team_roster(
         entry.player_id: entry.player.school if entry.player else None
         for entry in entries
     }
-    game_starts, opponents = game_context_for_players(
+    game_starts, opponents, game_locations = game_context_for_players(
         db,
         player_ids=player_ids,
         season=league.season_year,
@@ -259,6 +261,7 @@ def _serialize_team_roster(
             team,
             projection_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             opponents.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+            game_location=game_locations.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             game_start_at=game_starts.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             is_locked=(
                 roster_slot.entry is not None
@@ -284,7 +287,7 @@ def _serialize_team_rosters(
         for entries in entries_by_team.values()
         for entry in entries
     }
-    game_starts, opponents = game_context_for_players(
+    game_starts, opponents, game_locations = game_context_for_players(
         db,
         player_ids=player_ids,
         season=league.season_year,
@@ -301,6 +304,7 @@ def _serialize_team_rosters(
                 team,
                 projection_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 opponents.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+                game_location=game_locations.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 game_start_at=game_starts.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 is_locked=(
                     roster_slot.entry is not None

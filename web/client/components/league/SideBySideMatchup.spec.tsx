@@ -24,6 +24,8 @@ const makePlayer = (id: number, name: string, slot: string, projection: number):
   slot,
   slot_index: 1,
   opponent: "Week One Opponent",
+  game_location: id < 10 ? "home" : "away",
+  game_start_at: "2026-08-29T16:00:00Z",
   projected_points: projection,
   weekly_projected_fantasy_points: projection,
 });
@@ -55,6 +57,10 @@ describe("SideBySideMatchup", () => {
     expect(screen.getByText("QB")).toBeTruthy();
     expect(screen.getByText("24.1")).toBeTruthy();
     expect(screen.getByText("22.7")).toBeTruthy();
+    const starters = screen.getByTestId("mobile-starting-lineup");
+    expect(starters.textContent).toContain("Week One Opponent @ Ohio State");
+    expect(starters.textContent).toContain("Texas @ Week One Opponent");
+    expect(starters.textContent).toMatch(/Sat.*12:00 PM|Sat.*4:00 PM|Sat.*11:00 AM/);
   });
 
   it("keeps bench rows collapsed until a user chooses to inspect them", () => {

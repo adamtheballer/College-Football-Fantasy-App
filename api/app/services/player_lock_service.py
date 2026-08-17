@@ -28,9 +28,9 @@ def game_context_for_players(
     season: int,
     week: int,
     player_schools: dict[int, str | None] | None = None,
-) -> tuple[dict[int, datetime | None], dict[int, str | None]]:
+) -> tuple[dict[int, datetime | None], dict[int, str | None], dict[int, str | None]]:
     if not player_ids:
-        return {}, {}
+        return {}, {}, {}
     if player_schools is None:
         player_schools = {
             player_id: school
@@ -43,17 +43,19 @@ def game_context_for_players(
     }
     if not school_keys:
         empty = {player_id: None for player_id in player_ids}
-        return empty, empty.copy()
+        return empty, empty.copy(), empty.copy()
 
     games = db.query(Game).filter(Game.season == season, Game.week == week).all()
     starts_by_school: dict[str, datetime] = {}
     opponents_by_school: dict[str, str] = {}
+    locations_by_school: dict[str, str] = {}
     for game in games:
         if (game.schedule_status or "").strip().lower() in {"cancelled", "canceled", "postponed", "tbd"}:
             continue
         home_key = _school_schedule_key(game.home_team)
         away_key = _school_schedule_key(game.away_team)
         if home_key in school_keys:
+            locations_by_school.setdefault(home_key, "home")
             if away_key:
                 opponents_by_school.setdefault(home_key, game.away_team)
             if game.start_date is not None:
@@ -61,6 +63,7 @@ def game_context_for_players(
                 if home_key not in starts_by_school or start < starts_by_school[home_key]:
                     starts_by_school[home_key] = start
         if away_key in school_keys:
+            locations_by_school.setdefault(away_key, "away")
             if home_key:
                 opponents_by_school.setdefault(away_key, game.home_team)
             if game.start_date is not None:
@@ -81,6 +84,10 @@ def game_context_for_players(
             player_id: opponents_by_school.get(player_school_keys[player_id])
             for player_id in player_ids
         },
+        {
+            player_id: locations_by_school.get(player_school_keys[player_id])
+            for player_id in player_ids
+        },
     )
 
 
@@ -92,7 +99,7 @@ def game_starts_for_players(
     week: int,
     player_schools: dict[int, str | None] | None = None,
 ) -> dict[int, datetime | None]:
-    starts, _opponents = game_context_for_players(
+    starts, _opponents, _locations = game_context_for_players(
         db,
         player_ids=player_ids,
         season=season,
