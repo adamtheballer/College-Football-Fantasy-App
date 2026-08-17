@@ -33,6 +33,26 @@ const probabilityPair = (league: LeagueDetail) => {
   return formatDisplayedProbabilityPair(left, right);
 };
 
+function LeagueIcon({ league }: { league: LeagueDetail }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const imageUrl = league.icon_url?.trim();
+
+  return (
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-cfb-brand/35 bg-cfb-brand/[0.10] text-cfb-brand">
+      {imageUrl && !imageFailed ? (
+        <img
+          src={imageUrl}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <Trophy data-testid={`league-icon-fallback-${league.id}`} className="h-4 w-4" aria-hidden="true" />
+      )}
+    </div>
+  );
+}
+
 export function LeagueMatchupCarousel({
   leagues,
   activeLeagueId,
@@ -140,13 +160,7 @@ export function LeagueMatchupCarousel({
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-cfb-brand/35 bg-cfb-brand/[0.10] text-cfb-brand">
-                  {league.icon_url ? (
-                    <img src={league.icon_url} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <Trophy className="h-4 w-4" aria-hidden="true" />
-                  )}
-                </div>
+                <LeagueIcon league={league} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-black text-cfb-text-primary">{league.name}</p>
                   <p className="mt-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">

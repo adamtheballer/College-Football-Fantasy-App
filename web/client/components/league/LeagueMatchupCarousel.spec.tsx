@@ -88,4 +88,16 @@ describe("LeagueMatchupCarousel", () => {
 
     expect(onOpenLeague).toHaveBeenCalledWith(17);
   });
+
+  it("replaces a failed league image with the default trophy icon", () => {
+    const leagueWithBrokenIcon = [{ ...leagues[0], icon_url: "https://example.invalid/broken-logo.png" }];
+    const { container } = render(<LeagueMatchupCarousel leagues={leagueWithBrokenIcon} onOpenLeague={vi.fn()} />);
+
+    const leagueImage = container.querySelector('img[src="https://example.invalid/broken-logo.png"]');
+    expect(leagueImage).toBeTruthy();
+    fireEvent.error(leagueImage!);
+
+    expect(container.querySelector('img[src="https://example.invalid/broken-logo.png"]')).toBeNull();
+    expect(screen.getByTestId("league-icon-fallback-17")).toBeTruthy();
+  });
 });
