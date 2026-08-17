@@ -33,3 +33,16 @@ def test_game_context_includes_kickoff_opponent_and_home_away_location(db_sessio
     assert starts == {home_player.id: kickoff, away_player.id: kickoff}
     assert opponents == {home_player.id: "Ohio State", away_player.id: "Texas"}
     assert locations == {home_player.id: "home", away_player.id: "away"}
+
+
+def test_game_context_returns_the_full_contract_for_an_empty_roster(db_session):
+    starts, opponents, locations = game_context_for_players(
+        db_session,
+        player_ids=set(),
+        season=2026,
+        week=1,
+    )
+
+    assert starts == {}
+    assert opponents == {}
+    assert locations == {}

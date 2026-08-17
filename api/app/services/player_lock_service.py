@@ -30,7 +30,7 @@ def game_context_for_players(
     player_schools: dict[int, str | None] | None = None,
 ) -> tuple[dict[int, datetime | None], dict[int, str | None], dict[int, str | None]]:
     if not player_ids:
-        return {}, {}
+        return {}, {}, {}
     if player_schools is None:
         player_schools = {
             player_id: school
