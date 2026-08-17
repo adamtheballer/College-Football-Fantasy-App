@@ -255,7 +255,13 @@ def validate_player_season_outlook(facts: dict[str, Any], text: str | None) -> l
     words = re.findall(r"\b[\w'-]+\b", text)
     if not 45 <= len(words) <= 100:
         errors.append("outlook must contain 45-100 words")
-    if len(re.findall(r"[.!?]", text)) not in {2, 3}:
+    # Player names can contain normal abbreviations such as "Jr.", "St.",
+    # and initials. Those periods are not sentence boundaries. Count only
+    # punctuation that ends a sentence, after stripping short abbreviations
+    # when they precede another capitalized name token.
+    sentence_text = re.sub(r"\b(?:Jr|Sr|II|III|IV)\.(?=\s)", "", text)
+    sentence_text = re.sub(r"\b(?:[A-Za-z]{1,3})\.(?=\s+[A-Z])", "", sentence_text)
+    if len(re.findall(r"[.!?](?=\s|$)", sentence_text)) not in {2, 3}:
         errors.append("outlook must contain two or three sentences")
     allowed_tokens = _allowed_numeric_tokens(facts)
     for token in re.findall(r"\d[\d,]*(?:\.\d+)?", text):
