@@ -38,9 +38,10 @@ const compactProjection = (player?: LeagueRosterPlayer) =>
     player?.projection_status,
   );
 
-const pointsLabel = (player?: LeagueRosterPlayer) => {
-  const points = compactProjection(player);
-  return player?.projection_status?.toUpperCase() === "SCORED" ? { value: points, label: "points" } : { value: points, label: "proj" };
+export const compactMatchupPlayerName = (name?: string | null) => {
+  const parts = name?.trim().split(/\s+/).filter(Boolean) ?? [];
+  if (parts.length < 2) return name?.trim() || "No starter set";
+  return `${parts[0][0]?.toUpperCase() ?? ""}. ${parts.slice(1).join(" ")}`;
 };
 
 const kickoffLabel = (value?: string | null) => {
@@ -67,21 +68,21 @@ export const formatPlayerGameContext = (player?: LeagueRosterPlayer) => {
 
 function CompactMatchupPlayer({ player, align }: { player?: LeagueRosterPlayer; align: "left" | "right" }) {
   const hasPlayer = Boolean(player?.player_id && player.player_name);
-  const points = pointsLabel(player);
+  const points = compactProjection(player);
   return (
     <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
       <div className={`flex min-w-0 items-baseline gap-1.5 ${align === "right" ? "justify-end" : "justify-start"}`}>
         {align === "right" ? (
           <p className="shrink-0 text-[11px] font-black tabular-nums text-cfb-pink">
-            {points.value} <span className="text-[8px] uppercase tracking-[0.08em] text-cfb-text-muted">{points.label}</span>
+            {points}
           </p>
         ) : null}
         <p className={`min-w-0 truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
-          {hasPlayer ? player?.player_name : "No starter set"}
+          {hasPlayer ? compactMatchupPlayerName(player?.player_name) : "No starter set"}
         </p>
         {align === "left" ? (
           <p className="shrink-0 text-[11px] font-black tabular-nums text-cfb-brand">
-            {points.value} <span className="text-[8px] uppercase tracking-[0.08em] text-cfb-text-muted">{points.label}</span>
+            {points}
           </p>
         ) : null}
       </div>
@@ -112,10 +113,10 @@ function CompactMobileLineup({
       {showHeader ? (
         <div className="flex items-center justify-between bg-cfb-surface/70 px-4 py-3">
           <h2 className="text-[11px] font-black uppercase tracking-[0.17em] text-cfb-text-primary">{title}</h2>
-          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Points / proj</span>
+          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Points</span>
         </div>
       ) : null}
-      <div className="divide-y divide-cfb-border-subtle/80">
+      <div>
         {Array.from({ length: rowCount }, (_, index) => {
           const myPlayer = myPlayers[index];
           const opponentPlayer = opponentPlayers[index];
@@ -124,10 +125,10 @@ function CompactMobileLineup({
             <div
               key={`${slot}-${index}`}
               data-mobile-matchup-row
-              className="grid min-h-[60px] grid-cols-[minmax(0,1fr)_2.6rem_minmax(0,1fr)] items-center gap-2 px-3 py-2"
+              className="grid min-h-[64px] grid-cols-[minmax(0,1fr)_2.75rem_minmax(0,1fr)] items-center border-b-2 border-[#07101f] px-3 py-2 last:border-b-0"
             >
               <CompactMatchupPlayer player={myPlayer} align="left" />
-              <span className="inline-flex min-h-8 items-center justify-center border-x border-cfb-border-subtle bg-cfb-canvas/65 px-1 text-[9px] font-black uppercase tracking-[0.04em] text-cfb-text-secondary">
+              <span data-mobile-slot-column className="inline-flex min-h-[64px] self-stretch items-center justify-center border-x border-[#101d31] bg-[#060c17] px-1 text-[9px] font-black uppercase tracking-[0.04em] text-cfb-text-secondary">
                 {slot}
               </span>
               <CompactMatchupPlayer player={opponentPlayer} align="right" />

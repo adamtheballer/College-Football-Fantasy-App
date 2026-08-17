@@ -127,8 +127,8 @@ describe("league matchup scoreboard", () => {
 
     expect(screen.getByText("Week 1 matchup")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "My Team vs My Opponent" })).toBeTruthy();
-    expect(screen.getByText("Proj 111.2")).toBeTruthy();
-    expect(screen.getByText("Proj 106.4")).toBeTruthy();
+    expect(screen.getByLabelText("Projected 111.2")).toBeTruthy();
+    expect(screen.getByLabelText("Projected 106.4")).toBeTruthy();
     expect(screen.getAllByText("54.0%")).toHaveLength(2);
     expect(screen.getAllByText("46.0%")).toHaveLength(2);
     expect(screen.queryByText(/Projected matchup values are shown until live scoring begins/i)).toBeNull();

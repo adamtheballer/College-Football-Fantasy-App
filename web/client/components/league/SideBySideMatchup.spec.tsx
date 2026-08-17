@@ -9,7 +9,7 @@ vi.mock("@/components/league/RosterSlotTable", () => ({
   RosterSlotTable: () => <div data-testid="desktop-roster-table" />,
 }));
 
-import { SideBySideMatchup } from "./SideBySideMatchup";
+import { compactMatchupPlayerName, SideBySideMatchup } from "./SideBySideMatchup";
 
 afterEach(cleanup);
 
@@ -52,8 +52,8 @@ describe("SideBySideMatchup", () => {
 
     expect(screen.getByTestId("mobile-starting-lineup")).toBeTruthy();
     expect(screen.getByTestId("mobile-starting-lineup").querySelectorAll("[data-mobile-matchup-row]")).toHaveLength(1);
-    expect(screen.getByText("Long Name Quarterback")).toBeTruthy();
-    expect(screen.getByText("Opponent Quarterback")).toBeTruthy();
+    expect(screen.getByText("L. Name Quarterback")).toBeTruthy();
+    expect(screen.getByText("O. Quarterback")).toBeTruthy();
     expect(screen.getByText("QB")).toBeTruthy();
     expect(screen.getByText("24.1")).toBeTruthy();
     expect(screen.getByText("22.7")).toBeTruthy();
@@ -61,6 +61,11 @@ describe("SideBySideMatchup", () => {
     expect(starters.textContent).toContain("Week One Opponent @ Ohio State");
     expect(starters.textContent).toContain("Texas @ Week One Opponent");
     expect(starters.textContent).toMatch(/Sat.*12:00 PM|Sat.*4:00 PM|Sat.*11:00 AM/);
+  });
+
+  it("uses a first-name initial and preserves multi-word last names for compact matchup rows", () => {
+    expect(compactMatchupPlayerName("Amon-Ra St. Brown")).toBe("A. St. Brown");
+    expect(compactMatchupPlayerName("Cher")).toBe("Cher");
   });
 
   it("keeps bench rows collapsed until a user chooses to inspect them", () => {
