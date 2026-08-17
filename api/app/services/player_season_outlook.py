@@ -260,6 +260,10 @@ def validate_player_season_outlook(facts: dict[str, Any], text: str | None) -> l
     # punctuation that ends a sentence, after stripping short abbreviations
     # when they precede another capitalized name token.
     sentence_text = re.sub(r"\b(?:Jr|Sr|II|III|IV)\.(?=\s)", "", text)
+    # A chained initial such as "A.J." has no whitespace after the first
+    # period, so it must be removed as a complete token before the generic
+    # short-abbreviation rule below.
+    sentence_text = re.sub(r"\b(?:[A-Za-z]\.){2,}(?=\s)", "", sentence_text)
     sentence_text = re.sub(r"\b(?:[A-Za-z]{1,3})\.(?=\s+[A-Z])", "", sentence_text)
     if len(re.findall(r"[.!?](?=\s|$)", sentence_text)) not in {2, 3}:
         errors.append("outlook must contain two or three sentences")

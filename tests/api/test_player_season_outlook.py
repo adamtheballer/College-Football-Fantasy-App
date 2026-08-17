@@ -43,10 +43,11 @@ def test_outlook_is_position_aware_and_stays_within_copy_constraints(position: s
     assert validate_player_season_outlook(facts, generated.text) == []
 
 
-def test_outlook_sentence_validation_ignores_name_abbreviations():
+@pytest.mark.parametrize("name", ["Mark Fletcher Jr.", "A.J. Turner", "T.J. Moore"])
+def test_outlook_sentence_validation_ignores_name_abbreviations(name: str):
     facts = _base_facts("RB")
     text = (
-        "Mark Fletcher Jr. enters 2026 at Miami as a senior RB with a projected starting role. "
+        f"{name} enters 2026 at Miami as a senior RB with a projected starting role. "
         "In 2025, he recorded 500 rushing yards and 5 rushing touchdowns. "
         "The local preseason model combines verified production and role context for a grounded outlook."
     )
