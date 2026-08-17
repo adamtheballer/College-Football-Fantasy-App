@@ -1,4 +1,5 @@
 import { ChevronRight, Trophy } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { WinChanceBar, formatDisplayedProbabilityPair } from "@/components/league/WinChanceMeter";
 import type { LeagueDetail } from "@/types/league";
@@ -41,6 +42,42 @@ export function LeagueMatchupCarousel({
   activeLeagueId?: number | null;
   onOpenLeague: (leagueId: number) => void;
 }) {
+  const railRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef(new Map<number, HTMLButtonElement>());
+  const [visibleLeagueIndex, setVisibleLeagueIndex] = useState(0);
+
+  const syncVisibleLeague = useCallback(() => {
+    const rail = railRef.current;
+    if (!rail || rail.clientWidth <= 0 || leagues.length === 0) return;
+
+    const railCenter = rail.scrollLeft + rail.clientWidth / 2;
+    let nearestIndex = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    for (let index = 0; index < leagues.length; index += 1) {
+      const card = cardRefs.current.get(index);
+      if (!card) continue;
+      const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+      const distance = Math.abs(cardCenter - railCenter);
+      if (distance < nearestDistance) {
+        nearestIndex = index;
+        nearestDistance = distance;
+      }
+    }
+
+    setVisibleLeagueIndex((current) => (current === nearestIndex ? current : nearestIndex));
+  }, [leagues.length]);
+
+  useEffect(() => {
+    setVisibleLeagueIndex(0);
+    const animationFrame = window.requestAnimationFrame(syncVisibleLeague);
+    window.addEventListener("resize", syncVisibleLeague);
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.removeEventListener("resize", syncVisibleLeague);
+    };
+  }, [leagues.length, syncVisibleLeague]);
+
   return (
     <section aria-labelledby="league-matchup-carousel-title">
       <div className="mb-3 flex items-center justify-between gap-3 px-1 sm:mb-4">
@@ -50,14 +87,38 @@ export function LeagueMatchupCarousel({
             Matchups at a glance
           </h2>
         </div>
-        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Swipe leagues</p>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Swipe leagues</p>
+          {leagues.length > 0 ? (
+            <div
+              aria-label={`Showing league ${visibleLeagueIndex + 1} of ${leagues.length}`}
+              data-testid="league-carousel-pagination"
+              className="flex h-2 items-center justify-end gap-1.5"
+            >
+              {leagues.map((league, index) => (
+                <span
+                  key={league.id}
+                  aria-hidden="true"
+                  data-active={index === visibleLeagueIndex ? "true" : "false"}
+                  className={`block rounded-full transition-[width,background-color] duration-200 ${
+                    index === visibleLeagueIndex
+                      ? "h-1.5 w-4 bg-cfb-brand"
+                      : "h-1.5 w-1.5 bg-cfb-text-muted/50"
+                  }`}
+                />
+              ))}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div
         aria-label="Swipe through your league matchups"
+        ref={railRef}
+        onScroll={syncVisibleLeague}
         className="flex min-w-0 max-w-full snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {leagues.map((league) => {
+        {leagues.map((league, index) => {
           const summary = league.current_user_summary;
           const chance = probabilityPair(league);
           const active = league.id === activeLeagueId;
@@ -67,6 +128,10 @@ export function LeagueMatchupCarousel({
             <button
               key={league.id}
               type="button"
+              ref={(element) => {
+                if (element) cardRefs.current.set(index, element);
+                else cardRefs.current.delete(index);
+              }}
               onClick={() => onOpenLeague(league.id)}
               className={`w-[min(21rem,calc(100vw-2.5rem))] shrink-0 snap-start rounded-2xl border p-4 text-left shadow-[0_14px_34px_rgba(2,6,23,0.28)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 sm:w-[22rem] ${
                 active

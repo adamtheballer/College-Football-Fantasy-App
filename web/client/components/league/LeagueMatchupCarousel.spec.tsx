@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LeagueDetail } from "@/types/league";
@@ -39,6 +39,45 @@ describe("LeagueMatchupCarousel", () => {
     expect(screen.getByText("127.6")).toBeTruthy();
     expect(screen.getByText("55.2% / 44.8%")).toBeTruthy();
     expect(screen.getByLabelText("Swipe through your league matchups").className).toContain("overflow-x-auto");
+    expect(screen.getByTestId("league-carousel-pagination").getAttribute("aria-label")).toBe("Showing league 1 of 1");
+  });
+
+  it("moves the active pagination dot with the league card centered in the swipe rail", async () => {
+    const multipleLeagues = [
+      ...leagues,
+      {
+        ...leagues[0],
+        id: 18,
+        name: "Midnight Managers",
+        current_user_summary: {
+          ...leagues[0].current_user_summary!,
+          team_name: "Second Team",
+          opponent_team_name: "Third Team",
+        },
+      },
+    ];
+    render(<LeagueMatchupCarousel leagues={multipleLeagues} activeLeagueId={17} onOpenLeague={vi.fn()} />);
+
+    const rail = screen.getByLabelText("Swipe through your league matchups");
+    Object.defineProperty(rail, "clientWidth", { configurable: true, value: 320 });
+    Object.defineProperty(rail, "scrollLeft", { configurable: true, writable: true, value: 0 });
+    const cards = screen.getAllByRole("button", { name: /Saturday Legends|Midnight Managers/i });
+    cards.forEach((card, index) => {
+      Object.defineProperty(card, "offsetLeft", { configurable: true, value: index * 340 });
+      Object.defineProperty(card, "offsetWidth", { configurable: true, value: 320 });
+    });
+
+    fireEvent.scroll(rail);
+    await waitFor(() => {
+      expect(screen.getByTestId("league-carousel-pagination").getAttribute("aria-label")).toBe("Showing league 1 of 2");
+    });
+
+    rail.scrollLeft = 340;
+    fireEvent.scroll(rail);
+    await waitFor(() => {
+      expect(screen.getByTestId("league-carousel-pagination").getAttribute("aria-label")).toBe("Showing league 2 of 2");
+    });
+    expect(screen.getAllByTestId("league-carousel-pagination").flatMap((pagination) => Array.from(pagination.children)).map((dot) => dot.getAttribute("data-active"))).toEqual(["false", "true"]);
   });
 
   it("opens the selected league matchup from the home carousel", () => {

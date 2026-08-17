@@ -231,6 +231,84 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("Your reward code is being prepared.")).toBeVisible();
   });
 
+  test("home league carousel moves its active pagination dot as the visible card changes", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+    await page.route("**/leagues?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: [
+            {
+              id: 1,
+              name: "Saturday Legends",
+              icon_url: null,
+              current_user_summary: {
+                team_name: "Codex Team",
+                opponent_team_name: "Rival Team",
+                matchup_week: 1,
+                wins: 0,
+                losses: 0,
+                ties: 0,
+                projected_points_for: 121.5,
+                projected_points_against: 118.4,
+                win_probability_for: 53.2,
+                win_probability_against: 46.8,
+              },
+            },
+            {
+              id: 2,
+              name: "Midnight Managers",
+              icon_url: null,
+              current_user_summary: {
+                team_name: "Second Team",
+                opponent_team_name: "Third Team",
+                matchup_week: 1,
+                wins: 0,
+                losses: 0,
+                ties: 0,
+                projected_points_for: 110.2,
+                projected_points_against: 107.3,
+                win_probability_for: 54.4,
+                win_probability_against: 45.6,
+              },
+            },
+          ],
+          total: 2,
+          limit: 20,
+          offset: 0,
+        }),
+      });
+    });
+    await page.route("**/leagues/1/workspace", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({}) });
+    });
+    await page.route("**/notifications/alerts?**", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [] }) });
+    });
+    await page.route("**/saturday-pick-6/current?**", async (route) => {
+      await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ detail: "No active contest" }) });
+    });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    const pagination = page.getByTestId("league-carousel-pagination");
+    const rail = page.getByLabel("Swipe through your league matchups");
+    await expect(pagination).toHaveAttribute("aria-label", "Showing league 1 of 2");
+    await expect(rail).toBeVisible();
+    expect(await rail.evaluate((element) => element.scrollWidth > element.clientWidth)).toBeTruthy();
+
+    await rail.evaluate((element) => {
+      const railElement = element as HTMLElement;
+      railElement.scrollLeft = railElement.scrollWidth;
+      railElement.dispatchEvent(new Event("scroll"));
+    });
+
+    await expect(pagination).toHaveAttribute("aria-label", "Showing league 2 of 2");
+    await expect(pagination.locator("[data-active='true']")).toHaveCount(1);
+    await expect(pagination.locator("[data-active='true']").nth(0)).toHaveAttribute("data-active", "true");
+  });
+
   test("mobile dashboard retains the normal page scroller outside draft rooms", async ({ page }, testInfo) => {
     await seedAuthenticatedSession(page);
     await page.route("**/leagues?**", async (route) => {
