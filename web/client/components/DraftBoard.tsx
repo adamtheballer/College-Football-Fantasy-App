@@ -4,6 +4,14 @@ import { useCallback, useEffect, useRef } from "react";
 import { Button } from "./ui/button";
 import { cn } from "../lib/utils";
 
+const BOARD_POSITION_TONES: Record<string, string> = {
+  QB: "border-blue-300/35 bg-blue-400/[0.10] text-blue-50",
+  RB: "border-emerald-300/35 bg-emerald-400/[0.10] text-emerald-50",
+  WR: "border-violet-300/35 bg-violet-400/[0.10] text-violet-50",
+  TE: "border-amber-300/35 bg-amber-400/[0.10] text-amber-50",
+  K: "border-slate-300/35 bg-slate-200/[0.10] text-slate-50",
+};
+
 export type DraftBoardSlot = {
   overallPick: number;
   round: number;
@@ -118,8 +126,20 @@ export function DraftBoard({
                   <div
                     key={slot.overallPick}
                     ref={slot.isCurrent ? currentPickRef : undefined}
+                    data-testid={`draft-board-pick-${slot.overallPick}`}
                     aria-current={slot.isCurrent ? "step" : undefined}
-                    className={cn("relative min-h-[5.25rem] overflow-hidden rounded-xl border p-2.5 transition", slot.isCurrent ? "border-amber-200/75 bg-amber-300/12 shadow-[0_0_24px_rgba(251,191,36,0.16)]" : slot.isUser ? "border-cyan-200/45 bg-cyan-300/[0.09]" : "border-white/10 bg-black/20")}
+                    className={cn(
+                      "relative min-h-[5.25rem] overflow-hidden rounded-xl border p-2.5 transition",
+                      slot.playerName
+                        ? (BOARD_POSITION_TONES[slot.playerPosition ?? ""] ?? "border-white/10 bg-black/20")
+                        : slot.isCurrent
+                          ? "border-amber-200/75 bg-amber-300/12 shadow-[0_0_24px_rgba(251,191,36,0.16)]"
+                          : slot.isUser
+                            ? "border-cyan-200/45 bg-cyan-300/[0.09]"
+                            : "border-white/10 bg-black/20",
+                      slot.isUser && slot.playerName && "shadow-[inset_0_0_0_1px_rgba(103,232,249,0.38)]",
+                      slot.isCurrent && slot.playerName && "ring-1 ring-inset ring-amber-200/70",
+                    )}
                   >
                     <p className="text-[8px] font-black tabular-nums tracking-[0.16em] text-muted-foreground">{slot.round}.{slot.roundPick}</p>
                     <p className="mt-2 truncate text-xs font-black text-white">{slot.playerName ?? "On deck"}</p>

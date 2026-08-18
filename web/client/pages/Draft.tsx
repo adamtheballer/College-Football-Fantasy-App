@@ -58,6 +58,14 @@ const POSITION_ROW_HOVER_STYLES: Record<string, string> = {
   K: "hover:bg-slate-200/[0.07] hover:shadow-[inset_2px_0_0_rgba(226,232,240,0.65)] focus:bg-slate-200/[0.10]",
 };
 
+const ROSTER_POSITION_ROW_TINTS: Record<string, string> = {
+  QB: "bg-blue-400/[0.07] hover:bg-blue-400/[0.12]",
+  RB: "bg-emerald-400/[0.07] hover:bg-emerald-400/[0.12]",
+  WR: "bg-violet-400/[0.07] hover:bg-violet-400/[0.12]",
+  TE: "bg-amber-400/[0.07] hover:bg-amber-400/[0.12]",
+  K: "bg-slate-200/[0.07] hover:bg-slate-200/[0.12]",
+};
+
 type PreviewTeam = DraftRoomTeam & {
   isPlaceholder?: boolean;
 };
@@ -763,7 +771,9 @@ export default function Draft() {
           className={cn(
             "grid min-h-[46px] grid-cols-[2.6rem_minmax(0,1fr)_auto] items-center gap-2 border-b border-white/[0.08] px-3 py-1.5 last:border-b-0 sm:grid-cols-[3.1rem_minmax(0,1fr)_auto] sm:px-4",
             index % 2 === 0 ? "bg-[#1c1f23]" : "bg-[#17191d]",
-            slot.player ? "transition-colors hover:bg-[#252a30]" : "text-slate-500"
+            slot.player
+              ? cn("transition-colors", ROSTER_POSITION_ROW_TINTS[position] ?? "hover:bg-[#252a30]")
+              : "text-slate-500"
           )}
         >
           <p className="text-center text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
