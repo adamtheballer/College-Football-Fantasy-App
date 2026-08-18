@@ -248,7 +248,7 @@ test.describe("player card modal", () => {
     }
 
     await dialog.getByRole("button", { name: "Stats" }).click();
-    await expect(dialog.getByText("Historical Season Stats", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("Season Stats", { exact: true })).toBeVisible();
     await expect(dialog.getByRole("columnheader", { name: "Fantasy Points" })).toHaveCount(0);
     await expect(dialog.getByRole("columnheader", { name: "Rec Yds" })).toBeVisible();
     await expect(dialog.getByLabel("Historical stats table; scroll horizontally for all columns")).toBeVisible();

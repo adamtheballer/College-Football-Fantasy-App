@@ -1592,8 +1592,8 @@ test.describe("critical browser workflows", () => {
     expect(outerWidths.documentWidth).toBeLessThanOrEqual(outerWidths.viewportWidth + 1);
     expect(outerWidths.bodyWidth).toBeLessThanOrEqual(outerWidths.viewportWidth + 1);
     await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toBeVisible();
-    await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toHaveClass(/from-rose-800/);
-    await expect(page.getByTestId("scoreboard-win-chance-right-bar")).toHaveClass(/from-emerald-700/);
+    await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toHaveClass(/bg-cfb-brand/);
+    await expect(page.getByTestId("scoreboard-win-chance-right-bar")).toHaveClass(/bg-cfb-pink/);
     await expect(page.locator('[style*="conic-gradient"]')).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
     const mobileStartingLineup = page.getByTestId("mobile-starting-lineup");
