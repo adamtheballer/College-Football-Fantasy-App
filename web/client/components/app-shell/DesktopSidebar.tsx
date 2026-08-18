@@ -45,7 +45,7 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
                   : isAuth
                     ? "border-cfb-border-subtle/60 bg-cfb-surface-raised/25 text-cfb-text-secondary hover:border-cfb-brand/55 hover:bg-cfb-brand/[0.16] hover:text-white focus-visible:border-cfb-brand/55 focus-visible:bg-cfb-brand/[0.16] focus-visible:text-white"
                     : isActive
-                      ? "border-cfb-brand/50 bg-cfb-brand/[0.14] text-white shadow-[inset_3px_0_0_hsl(var(--brand-primary))]"
+                      ? "border-transparent bg-cfb-surface-raised text-white shadow-[inset_3px_0_0_hsl(var(--brand-primary))]"
                       : isAdmin
                         ? "border-cfb-gold/15 text-cfb-text-secondary hover:border-cfb-gold/40 hover:bg-cfb-gold/10 hover:text-yellow-100"
                         : "border-transparent text-cfb-text-muted hover:border-cfb-border-subtle hover:bg-cfb-surface-hover/55 hover:text-cfb-text-primary",
@@ -72,12 +72,6 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
                 >
                   {item.badge}
                 </span>
-              ) : null}
-              {isActive && !isSignOut && !isAuth ? (
-                <div
-                  aria-hidden="true"
-                  className="nav-active-overlay pointer-events-none absolute inset-0 rounded-lg bg-cfb-brand/[0.04]"
-                />
               ) : null}
             </div>
           );

@@ -38,7 +38,7 @@ function LeagueIcon({ league }: { league: LeagueDetail }) {
   const imageUrl = league.icon_url?.trim();
 
   return (
-    <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-cfb-brand/35 bg-cfb-brand/[0.10] text-cfb-brand">
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-cfb-border-subtle bg-cfb-surface text-cfb-brand">
       {imageUrl && !imageFailed ? (
         <img
           src={imageUrl}
@@ -206,7 +206,7 @@ export function LeagueMatchupCarousel({
               onClick={() => onOpenLeague(league.id)}
               className={`w-[min(21rem,calc(100vw-2.5rem))] shrink-0 snap-start rounded-2xl border p-4 text-left shadow-[0_14px_34px_rgba(2,6,23,0.28)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 sm:w-[22rem] ${
                 active
-                  ? "border-cfb-brand/70 bg-cfb-brand/[0.12]"
+                  ? "border-cfb-brand/70 bg-cfb-surface-raised"
                   : "border-cfb-border-subtle bg-cfb-surface-raised/90 hover:border-cfb-brand/45 hover:bg-cfb-surface-hover"
               }`}
             >

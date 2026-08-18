@@ -4,9 +4,9 @@ interface BackgroundEffectsProps {
   className?: string;
 }
 
-// Keep the application canvas quiet. The old playbook backdrop competed with
-// live scores and draft controls on every route.
-export const collegiateCanvasBackground = "radial-gradient(circle at 0 0, rgba(251, 191, 36, 0.14), transparent 18%), linear-gradient(135deg, rgb(2, 6, 17), rgb(7, 27, 53) 58%, rgb(2, 7, 19))";
+// Keep the application canvas neutral. Score colors and selected controls own
+// the visual emphasis; the page background must not compete with them.
+export const collegiateCanvasBackground = "rgb(9, 11, 15)";
 
 export const BackgroundEffects = ({ className }: BackgroundEffectsProps) => (
   <div

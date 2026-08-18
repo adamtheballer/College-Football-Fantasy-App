@@ -75,15 +75,15 @@ export function DraftBoard({
   return (
     <section
       data-testid="draft-board"
-      className="overflow-hidden rounded-[1.75rem] border border-sky-100/18 bg-[#08172b]/[0.92] shadow-[0_14px_34px_rgba(2,6,23,0.48)] backdrop-blur-sm"
+      className="overflow-hidden rounded-[1.75rem] border border-cfb-border-subtle bg-cfb-surface-raised shadow-[0_14px_34px_rgba(0,0,0,0.28)]"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-4 sm:px-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cfb-border-subtle px-4 py-4 sm:px-5">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-200">Draft board</p>
           <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Every pick, live in draft order</p>
         </div>
-        <div className="flex items-center gap-1 rounded-xl border border-white/12 bg-black/20 p-1">
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-300/15 px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-cyan-50">
+        <div className="flex items-center gap-1 rounded-xl border border-cfb-border-subtle bg-cfb-surface p-1">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-cfb-brand/12 px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-cfb-brand">
             <Grid3X3 className="h-3.5 w-3.5" /> Board
           </span>
           {currentPick ? (
@@ -91,14 +91,14 @@ export function DraftBoard({
               type="button"
               variant="ghost"
               onClick={() => focusCurrentPick()}
-              className="h-auto rounded-lg px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-amber-100 hover:bg-amber-200/10 hover:text-amber-50"
+              className="h-auto rounded-lg px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-cfb-gold hover:bg-cfb-gold/10 hover:text-cfb-gold"
               aria-label="Center board on the current draft pick"
               title="Center current pick"
             >
               <LocateFixed className="mr-1.5 h-3.5 w-3.5" /> Current
             </Button>
           ) : null}
-          <Button type="button" variant="ghost" onClick={onOpenRosters} className="h-auto rounded-lg px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground hover:bg-white/[0.06] hover:text-white">
+          <Button type="button" variant="ghost" onClick={onOpenRosters} className="h-auto rounded-lg px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground hover:bg-cfb-surface-hover hover:text-cfb-text-primary">
             <Users className="mr-1.5 h-3.5 w-3.5" /> Rosters
           </Button>
         </div>
@@ -109,7 +109,7 @@ export function DraftBoard({
           {teams.map(([teamId, teamName]) => {
             const isUser = slots.some((slot) => slot.teamId === teamId && slot.isUser);
             return (
-              <div key={teamId} className={cn("min-w-0 border-b px-2 pb-2 text-center text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground", isUser ? "border-cyan-200/55 text-cyan-100" : "border-white/10")} title={teamName}>
+              <div key={teamId} className={cn("min-w-0 border-b px-2 pb-2 text-center text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground", isUser ? "border-cfb-brand text-cfb-brand" : "border-cfb-border-subtle")} title={teamName}>
                 <span className="block truncate">{isUser ? "Your team" : teamName}</span>
               </div>
             );
@@ -118,10 +118,10 @@ export function DraftBoard({
             const roundSlots = slots.filter((slot) => slot.round === round);
             const byTeam = new Map(roundSlots.map((slot) => [slot.teamId, slot]));
             return [
-              <div key={`round-${round}`} className="flex min-h-[5.25rem] items-center px-2 text-sm font-black tabular-nums text-slate-300">{round}</div>,
+              <div key={`round-${round}`} className="flex min-h-[5.25rem] items-center px-2 text-sm font-black tabular-nums text-cfb-text-secondary">{round}</div>,
               ...teams.map(([teamId]) => {
                 const slot = byTeam.get(teamId);
-                if (!slot) return <div key={`${round}-${teamId}`} className="min-h-[5.25rem] rounded-xl border border-white/5 bg-black/10" />;
+                if (!slot) return <div key={`${round}-${teamId}`} className="min-h-[5.25rem] rounded-xl border border-cfb-border-subtle/60 bg-cfb-surface" />;
                 return (
                   <div
                     key={slot.overallPick}
@@ -133,12 +133,12 @@ export function DraftBoard({
                       slot.playerName
                         ? (BOARD_POSITION_TONES[slot.playerPosition ?? ""] ?? "border-white/10 bg-black/20")
                         : slot.isCurrent
-                          ? "border-amber-200/75 bg-amber-300/12 shadow-[0_0_24px_rgba(251,191,36,0.16)]"
+                          ? "border-cfb-gold/75 bg-cfb-gold/10"
                           : slot.isUser
-                            ? "border-cyan-200/45 bg-cyan-300/[0.09]"
-                            : "border-white/10 bg-black/20",
-                      slot.isUser && slot.playerName && "shadow-[inset_0_0_0_1px_rgba(103,232,249,0.38)]",
-                      slot.isCurrent && slot.playerName && "ring-1 ring-inset ring-amber-200/70",
+                            ? "border-cfb-brand/45 bg-cfb-brand/[0.08]"
+                            : "border-cfb-border-subtle bg-cfb-surface",
+                      slot.isUser && slot.playerName && "shadow-[inset_0_0_0_1px_hsl(var(--brand-primary)/0.35)]",
+                      slot.isCurrent && slot.playerName && "ring-1 ring-inset ring-cfb-gold/70",
                     )}
                   >
                     <p className="text-[8px] font-black tabular-nums tracking-[0.16em] text-muted-foreground">{slot.round}.{slot.roundPick}</p>

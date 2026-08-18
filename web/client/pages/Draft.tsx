@@ -943,14 +943,14 @@ export default function Draft() {
               type="button"
               variant="outline"
               size="icon"
-              className="h-12 w-12 rounded-2xl border-sky-100/20 bg-[#102f4e] text-slate-100 shadow-[0_8px_20px_rgba(7,27,49,0.24)] hover:border-amber-100/55 hover:bg-amber-200/14 hover:text-white"
+              className="h-12 w-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised text-cfb-text-primary shadow-[0_8px_20px_rgba(0,0,0,0.24)] hover:border-cfb-gold/55 hover:bg-cfb-gold/10 hover:text-white"
               aria-label="Exit real draft room"
               title="Exit real draft room"
               onClick={() => navigate(exitPath)}
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <Button asChild variant="outline" className="h-12 rounded-2xl border-sky-100/20 bg-[#102f4e] px-5 text-[10px] font-black uppercase tracking-[0.18em] text-slate-100 hover:border-amber-100/55 hover:bg-amber-200/14 hover:text-white">
+            <Button asChild variant="outline" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised px-5 text-[10px] font-black uppercase tracking-[0.18em] text-cfb-text-primary hover:border-cfb-gold/55 hover:bg-cfb-gold/10 hover:text-white">
               <Link to={exitPath}>Exit</Link>
             </Button>
           </div>
@@ -959,7 +959,7 @@ export default function Draft() {
             <div className="pointer-events-none order-3 flex w-full justify-center sm:fixed sm:left-1/2 sm:top-3 sm:z-[1250] sm:w-auto sm:-translate-x-1/2">
               <div
                 className={cn(
-                  "rounded-3xl border border-sky-100/24 bg-[#102f4e]/95 px-6 py-3 text-center shadow-[0_10px_24px_rgba(7,27,49,0.30)] backdrop-blur-sm transition sm:px-8",
+                  "rounded-3xl border border-cfb-border-subtle bg-cfb-surface-raised/95 px-6 py-3 text-center shadow-[0_10px_24px_rgba(0,0,0,0.30)] backdrop-blur-sm transition sm:px-8",
                   timerDanger
                     ? "animate-pulse border-red-300/50 shadow-[0_0_58px_rgba(248,113,113,0.34)]"
                     : "border-white/14"
@@ -983,7 +983,7 @@ export default function Draft() {
           <div className="flex flex-wrap items-center justify-end gap-3">
             <div
               className={cn(
-                "rounded-3xl border border-sky-100/24 bg-[#102f4e]/95 px-6 py-4 text-right shadow-[0_10px_24px_rgba(7,27,49,0.30)] backdrop-blur-sm",
+                "rounded-3xl border border-cfb-border-subtle bg-cfb-surface-raised/95 px-6 py-4 text-right shadow-[0_10px_24px_rgba(0,0,0,0.30)] backdrop-blur-sm",
                 canPick && "border-amber-200/45 bg-amber-300/10 shadow-[0_0_28px_rgba(251,191,36,0.14)]"
               )}
             >
@@ -1009,7 +1009,7 @@ export default function Draft() {
                 <p className="mt-1 text-[9px] font-black uppercase tracking-[0.18em] text-amber-100/90">{draftProgressLabel}</p>
               ) : null}
             </div>
-            <Button asChild variant="outline" className="h-12 rounded-2xl border-sky-100/20 bg-[#102f4e]/90 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-white hover:bg-sky-100/10">
+            <Button asChild variant="outline" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised/90 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-white hover:bg-cfb-surface-hover">
               <Link to={`/league/${parsedLeagueId}`}>League Hub</Link>
             </Button>
           </div>
@@ -1444,7 +1444,7 @@ export default function Draft() {
         </div>
       ) : null}
 
-      <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-sky-100/20 bg-[#102f4e]/96 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(7,27,49,0.26)] backdrop-blur-xl sm:pointer-events-none sm:inset-x-auto sm:left-1/2 sm:flex sm:w-auto sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">
+      <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-cfb-border-subtle bg-cfb-surface-raised/96 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.26)] backdrop-blur-xl sm:pointer-events-none sm:inset-x-auto sm:left-1/2 sm:flex sm:w-auto sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">
         <div className={cn("grid w-full grid-cols-5 overflow-hidden rounded-xl sm:pointer-events-auto sm:mx-auto sm:max-w-2xl", draftMatteControlClass)}>
           {DRAFT_TABS.map((tab) => {
             const Icon = tab.value === "draft" ? Trophy : tab.value === "queue" ? ClipboardList : tab.value === "board" ? Grid3X3 : tab.value === "roster" ? Users : History;
