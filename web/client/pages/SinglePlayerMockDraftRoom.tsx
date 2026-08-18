@@ -820,6 +820,7 @@ export default function SinglePlayerMockDraftRoom() {
         isUser: slot.teamId === draftState.userTeamId,
       }))}
       totalRounds={mockSettings.rounds}
+      followCurrentPick
       onOpenRosters={() => setActiveTab("roster")}
     />
   );

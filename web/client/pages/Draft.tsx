@@ -755,14 +755,15 @@ export default function Draft() {
     const starterSlots = selectedRoster.filter((slot) => !slot.label.startsWith("BENCH"));
     const benchSlots = selectedRoster.filter((slot) => slot.label.startsWith("BENCH"));
 
-    const renderSlotRow = (slot: RealRosterSlot) => {
+    const renderSlotRow = (slot: RealRosterSlot, index: number) => {
       const position = slot.player?.player_position ?? (slot.allowedPositions.length === 1 ? slot.allowedPositions[0] : "EMPTY");
       return (
         <div
           key={slot.label}
           className={cn(
-            "grid min-h-[52px] grid-cols-[2.8rem_minmax(0,1fr)_auto] items-center gap-2 border-b border-white/[0.075] px-3 py-2 last:border-b-0 sm:grid-cols-[3.4rem_minmax(0,1fr)_auto] sm:px-4",
-            slot.player ? "bg-[#0c1727]/70 transition-colors hover:bg-white/[0.05]" : "bg-black/[0.16]"
+            "grid min-h-[46px] grid-cols-[2.6rem_minmax(0,1fr)_auto] items-center gap-2 border-b border-white/[0.08] px-3 py-1.5 last:border-b-0 sm:grid-cols-[3.1rem_minmax(0,1fr)_auto] sm:px-4",
+            index % 2 === 0 ? "bg-[#1c1f23]" : "bg-[#17191d]",
+            slot.player ? "transition-colors hover:bg-[#252a30]" : "text-slate-500"
           )}
         >
           <p className="text-center text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
@@ -775,8 +776,8 @@ export default function Draft() {
               className="min-w-0 text-left focus:outline-none focus-visible:underline"
               aria-label={`Open ${slot.player.player_name} player card`}
             >
-              <span className="block truncate text-[13px] font-black text-foreground transition-colors hover:text-cyan-100 sm:text-sm">{slot.player.player_name}</span>
-              <span className="mt-0.5 block truncate text-[8px] font-bold uppercase tracking-[0.08em] text-muted-foreground sm:text-[9px]">
+              <span className="block truncate text-[13px] font-black text-foreground transition-colors hover:text-white sm:text-sm">{slot.player.player_name}</span>
+              <span className="block truncate text-[8px] font-bold uppercase tracking-[0.08em] text-slate-400 sm:text-[9px]">
                 {slot.player.player_school} · Pick {slot.player.overall_pick}
               </span>
             </button>
@@ -791,12 +792,12 @@ export default function Draft() {
     };
 
     return (
-      <section className="overflow-hidden rounded-xl border border-white/12 bg-[#091323]/95 shadow-[0_10px_28px_rgba(2,6,23,0.22)]">
-        <div className="flex flex-col gap-2 border-b border-white/10 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+      <section className="overflow-hidden rounded-xl border border-white/12 bg-[#141619] shadow-[0_8px_20px_rgba(2,6,23,0.18)]">
+        <div className="flex flex-col gap-2 border-b border-white/10 bg-[#111315] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4">
           <div data-testid="draft-player-list">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-primary">Roster</p>
-            <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-              Inspect every manager's drafted roster
+            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-100">Roster</p>
+            <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-slate-400">
+              Team draft slots
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -807,7 +808,7 @@ export default function Draft() {
               id="real-roster-team-select"
               value={selectedRosterTeam?.id ?? draftRoom.user_team_id ?? ""}
               onChange={(event) => setSelectedRosterTeamId(Number(event.target.value))}
-              className="h-9 min-w-0 flex-1 rounded-lg border border-white/15 bg-black/20 px-3 text-[9px] font-black uppercase tracking-[0.08em] text-cyan-50 outline-none transition focus:border-cyan-200/60 focus:ring-2 focus:ring-cyan-300/20 sm:min-w-[220px]"
+              className="h-8 min-w-0 flex-1 rounded-lg border border-white/15 bg-[#202328] px-3 text-[9px] font-black uppercase tracking-[0.08em] text-slate-100 outline-none transition focus:border-slate-300/60 focus:ring-2 focus:ring-white/10 sm:min-w-[220px]"
             >
               {draftRoom.teams.map((team) => (
                 <option key={team.id} value={team.id}>
@@ -815,20 +816,20 @@ export default function Draft() {
                 </option>
               ))}
             </select>
-            <p className="shrink-0 text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">
+            <p className="shrink-0 text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
               {selectedRoster.filter((slot) => slot.player).length}/{selectedRoster.length} filled
             </p>
           </div>
         </div>
 
         <div className="pt-2">
-          <p className="border-b border-white/10 px-3 pb-2 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground sm:px-4">Starters</p>
+          <p className="border-b border-white/10 bg-[#111315] px-3 pb-1.5 text-[8px] font-black uppercase tracking-[0.14em] text-slate-400 sm:px-4">Starters</p>
           <div>{starterSlots.map(renderSlotRow)}</div>
         </div>
 
         {benchSlots.length ? (
           <div className="border-t border-white/10 pt-2">
-            <p className="border-b border-white/10 px-3 pb-2 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground sm:px-4">Bench / Reserve</p>
+            <p className="border-b border-white/10 bg-[#111315] px-3 pb-1.5 text-[8px] font-black uppercase tracking-[0.14em] text-slate-400 sm:px-4">Bench / Reserve</p>
             <div>{benchSlots.map(renderSlotRow)}</div>
           </div>
         ) : null}
@@ -881,6 +882,7 @@ export default function Draft() {
         isUser: slot.team.id === draftRoom.user_team_id,
       }))}
       totalRounds={totalRounds}
+      followCurrentPick
       onOpenRosters={() => setActiveTab("roster")}
     />
   );
@@ -889,7 +891,7 @@ export default function Draft() {
     <div data-draft-room="league" className="relative min-h-[100dvh] overflow-x-clip text-foreground">
       <DraftRoomVisuals />
 
-      <div className="relative mx-auto flex min-h-0 w-full max-w-[1800px] flex-1 flex-col space-y-2 px-3 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] pt-[max(0.5rem,env(safe-area-inset-top))] sm:block sm:space-y-6 sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+7.5rem)] sm:pt-4 md:px-6 md:pb-28">
+      <div className="relative mx-auto flex min-h-0 w-full max-w-[1800px] flex-1 flex-col space-y-2 px-3 pb-[calc(env(safe-area-inset-bottom)+6.75rem)] pt-[max(0.5rem,env(safe-area-inset-top))] sm:block sm:space-y-6 sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+7.5rem)] sm:pt-4 md:px-6 md:pb-28">
         <div className="relative z-20 flex h-12 shrink-0 items-center gap-2 rounded-xl border border-white/12 bg-[#0b121a]/92 px-2 shadow-[0_8px_20px_rgba(2,6,23,0.28)] sm:hidden">
           <Button
             type="button"
@@ -1059,11 +1061,12 @@ export default function Draft() {
             <button
               type="button"
               onClick={recenterDraftCarousel}
-              className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-100/25 bg-black/20 text-amber-100 transition hover:border-amber-200/55 hover:bg-amber-300/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60"
+              className="ml-auto inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-amber-100/25 bg-black/20 px-2.5 text-amber-100 transition hover:border-amber-200/55 hover:bg-amber-300/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60"
               aria-label="Center draft order on the current pick"
               title="Center current pick"
             >
               <LocateFixed className="h-4 w-4" />
+              <span className="text-[8px] font-black uppercase tracking-[0.08em]">Current</span>
             </button>
             <p className="max-w-[8.5rem] text-right text-[8px] font-black uppercase leading-3 tracking-[0.08em] text-amber-100/90">{draftProgressLabel}</p>
           </div>
@@ -1109,21 +1112,24 @@ export default function Draft() {
 
         <section className={cn("hidden overflow-hidden sm:block", draftMattePanelClass)}>
           <div className="relative flex min-h-[76px] items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.26em] text-amber-200">Draft Order</p>
-              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">
-                Real league draft board preview
-              </p>
+            <div className="flex min-w-0 items-center gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.26em] text-amber-200">Draft Order</p>
+                <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+                  Real league draft board preview
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={recenterDraftCarousel}
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-white/16 bg-[#0b121a] px-3 text-amber-100 shadow-[0_8px_20px_rgba(2,6,23,0.32)] transition hover:border-amber-200/45 hover:bg-amber-300/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60"
+                aria-label="Center draft order on the current pick"
+                title="Center current pick"
+              >
+                <LocateFixed className="h-4 w-4" />
+                <span className="text-[9px] font-black uppercase tracking-[0.12em]">Current pick</span>
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={recenterDraftCarousel}
-              className="absolute left-1/2 top-1/2 inline-flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[1.15rem] border border-white/16 bg-[#0b121a] text-amber-100 shadow-[0_8px_20px_rgba(2,6,23,0.32)] transition hover:border-amber-200/45 hover:bg-amber-300/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60"
-              aria-label="Center draft order on the current pick"
-              title="Center current pick"
-            >
-              <LocateFixed className="h-5 w-5" />
-            </button>
             <div className="ml-auto text-right">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-100">{totalRounds} Rounds · {totalPicks} Picks</p>
               <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">
@@ -1428,7 +1434,7 @@ export default function Draft() {
         </div>
       ) : null}
 
-      <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-sky-100/20 bg-[#102f4e]/96 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(7,27,49,0.26)] backdrop-blur-xl sm:pointer-events-none sm:inset-x-auto sm:left-1/2 sm:flex sm:w-auto sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">
+      <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-sky-100/20 bg-[#102f4e]/96 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(7,27,49,0.26)] backdrop-blur-xl sm:pointer-events-none sm:inset-x-auto sm:left-1/2 sm:flex sm:w-auto sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">
         <div className={cn("grid w-full grid-cols-5 overflow-hidden rounded-xl sm:pointer-events-auto sm:mx-auto sm:max-w-2xl", draftMatteControlClass)}>
           {DRAFT_TABS.map((tab) => {
             const Icon = tab.value === "draft" ? Trophy : tab.value === "queue" ? ClipboardList : tab.value === "board" ? Grid3X3 : tab.value === "roster" ? Users : History;
@@ -1438,13 +1444,13 @@ export default function Draft() {
                 type="button"
                 onClick={() => setActiveTab(tab.value)}
                 className={cn(
-                  "relative inline-flex min-h-[5.1rem] min-w-0 flex-col items-center justify-center gap-1.5 whitespace-nowrap px-2 py-2.5 text-[10px] font-black uppercase leading-none tracking-[0.04em] transition after:absolute after:inset-x-1 after:bottom-0 after:h-0.5 after:bg-transparent sm:min-h-0 sm:flex-row sm:gap-2 sm:px-4 sm:py-3 sm:text-[10px] sm:tracking-[0.16em]",
+                  "relative inline-flex min-h-[6.25rem] min-w-0 flex-col items-center justify-center gap-2 whitespace-nowrap px-1 py-3 text-[11px] font-black uppercase leading-none tracking-[0.02em] transition after:absolute after:inset-x-1.5 after:bottom-0 after:h-1 after:bg-transparent sm:min-h-0 sm:flex-row sm:gap-2 sm:px-4 sm:py-3 sm:text-[10px] sm:tracking-[0.16em]",
                   activeTab === tab.value
                   ? "bg-white/[0.04] text-white after:bg-cfb-brand"
                     : "text-muted-foreground hover:bg-white/[0.035] hover:text-white"
                 )}
               >
-                <Icon className="h-5.5 w-5.5 shrink-0 sm:h-3.5 sm:w-3.5" />
+                <Icon className="h-6 w-6 shrink-0 sm:h-3.5 sm:w-3.5" />
                 {tab.label}
               </button>
             );
