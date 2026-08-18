@@ -357,7 +357,7 @@ export default function LeagueMatchup() {
     <main className="mx-auto flex w-full max-w-[960px] flex-col gap-0 pb-24 pt-1 sm:pt-4">
       <header className="flex min-h-16 items-center gap-3 border-b border-cfb-border-subtle px-3 sm:px-5">
         <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cfb-brand/50 bg-cfb-brand/[0.1] text-[10px] font-black text-cfb-brand">{teamInitials(leagueQuery.data?.name)}</span>
-        <div className="min-w-0 flex-1 text-left text-base font-black text-cfb-text-primary">
+        <div className="min-w-0 flex-1 text-left text-base font-black italic tracking-tight text-cfb-text-primary">
           <span className="block truncate">{leagueQuery.data?.name ?? "League"}</span>
         </div>
         <button type="button" aria-label="Notifications" onClick={() => navigate("/alerts")} className="flex h-11 w-11 items-center justify-center rounded-full bg-cfb-surface-raised text-cfb-text-primary hover:bg-cfb-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"><Bell className="h-4 w-4" aria-hidden="true" /></button>

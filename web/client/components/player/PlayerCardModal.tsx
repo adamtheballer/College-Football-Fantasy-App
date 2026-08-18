@@ -574,42 +574,45 @@ export function PlayerCardModal({
               </section>
             </div>
           ) : activeTab === "stats" ? (
-            <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
+            <section className="rounded-2xl border border-white/10 bg-white/[0.045] p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
                   <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>
-                    Historical Season Stats
+                    Season Stats
                   </p>
-                  <p className="mt-2 text-sm font-bold leading-6 text-white/55">
-                    Verified season totals, with one row for each year this player has recorded stats.
+                  <p className="mt-1 text-[10px] font-bold leading-4 text-white/55">
+                    Verified totals by season
                   </p>
                 </div>
-                <p className="w-fit rounded-full border border-white/15 bg-white/[0.05] px-3 py-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/55">
-                  {position || "Player"}
-                </p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="hidden text-[8px] font-black uppercase tracking-[0.14em] text-white/35 sm:inline">Swipe table</span>
+                  <p className="rounded-full border border-white/15 bg-white/[0.05] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.14em] text-white/55">
+                    {position || "Player"}
+                  </p>
+                </div>
               </div>
 
               {historicalSeasons.length ? (
-                <div ref={historicalStatsScrollRef} className="mt-5 overflow-x-auto overscroll-x-contain touch-pan-x rounded-3xl border border-white/10 bg-black/20" aria-label="Historical stats table; scroll horizontally for all columns">
-                  <table className="min-w-[1050px] w-max border-collapse text-left">
-                    <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
+                <div ref={historicalStatsScrollRef} className="mt-3 overflow-x-auto overscroll-x-contain touch-pan-x rounded-2xl border border-white/10 bg-black/20" aria-label="Historical stats table; scroll horizontally for all columns">
+                  <table className="min-w-[720px] w-max border-collapse text-left">
+                    <thead className="bg-white/[0.055] text-[8px] font-black uppercase tracking-[0.14em] text-white/45">
                       <tr>
-                        <th className="min-w-[5.5rem] whitespace-nowrap px-4 py-4">Year</th>
-                        <th className="min-w-36 whitespace-nowrap px-4 py-4">Team</th>
-                        <th className="min-w-[4.5rem] whitespace-nowrap px-4 py-4">Pos</th>
+                        <th className="min-w-[3.75rem] whitespace-nowrap px-2.5 py-2.5">Year</th>
+                        <th className="min-w-28 whitespace-nowrap px-2.5 py-2.5">Team</th>
+                        <th className="min-w-[3.5rem] whitespace-nowrap px-2.5 py-2.5">Pos</th>
                         {historicalSummaryColumns.map((label) => (
-                          <th key={label} className="whitespace-nowrap px-4 py-4 text-right">{label}</th>
+                          <th key={label} className="whitespace-nowrap px-2.5 py-2.5 text-right">{label}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
                       {historicalSeasons.map((season) => (
-                        <tr key={`${season.season}-${season.team_name ?? "team"}-${season.season_type}`} className="text-sm font-bold text-white/75 transition hover:bg-white/[0.035]">
-                          <td className="whitespace-nowrap px-4 py-5 text-xl font-black tabular-nums text-white">{season.season}</td>
-                          <td className="min-w-36 px-4 py-5"><p className="font-black text-white">{season.team_name ?? card?.about.team ?? player.school}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.14em] text-white/45">{season.season_type}</p></td>
-                          <td className="px-4 py-5"><span className="rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-white/70">{season.position ?? position ?? "—"}</span></td>
+                        <tr key={`${season.season}-${season.team_name ?? "team"}-${season.season_type}`} className="text-xs font-bold text-white/75 transition hover:bg-white/[0.035]">
+                          <td className="whitespace-nowrap px-2.5 py-2.5 text-sm font-black tabular-nums text-white">{season.season}</td>
+                          <td className="min-w-28 px-2.5 py-2.5"><p className="font-black leading-4 text-white">{season.team_name ?? card?.about.team ?? player.school}</p><p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-white/45">{season.season_type}</p></td>
+                          <td className="px-2.5 py-2.5"><span className="rounded-full border border-white/15 bg-white/[0.06] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-white/70">{season.position ?? position ?? "—"}</span></td>
                           {historicalSummaryColumns.map((label) => (
-                            <td key={label} className="px-4 py-5 text-right font-black tabular-nums text-white">
+                            <td key={label} className="px-2.5 py-2.5 text-right font-black tabular-nums text-white">
                               {formatPlayerCardValue(historicalSeasonSummaryValue(season, label))}
                             </td>
                           ))}

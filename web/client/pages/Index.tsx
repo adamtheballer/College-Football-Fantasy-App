@@ -339,8 +339,8 @@ export default function Index() {
         </SurfaceCard>
       </section>
 
-      <div className="rounded-2xl border border-cfb-border-subtle bg-cfb-brand/[0.10] px-5 py-4 text-sm font-bold text-blue-100">
-        <CalendarClock className="mr-2 inline h-4 w-4" aria-hidden="true" />
+      <div className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised px-5 py-4 text-sm font-bold text-cfb-text-secondary">
+        <CalendarClock className="mr-2 inline h-4 w-4 text-cfb-gold" aria-hidden="true" />
         Deadline and lock warnings should always be checked before kickoff.
       </div>
     </div>

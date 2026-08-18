@@ -7,12 +7,11 @@ import { collegiateCanvasBackground } from "@/components/BackgroundEffects";
 import { DraftRoomVisuals, draftRoomCanvasBackground } from "./DraftRoomVisuals";
 
 describe("DraftRoomVisuals", () => {
-  it("uses the same collegiate navy, blue, and gold canvas as the app shell", () => {
+  it("uses the same neutral shared canvas as the app shell", () => {
     const { container } = render(<DraftRoomVisuals />);
     const canvas = container.querySelector("[data-draft-room-canvas='true']");
 
-    expect(canvas?.getAttribute("style")).toContain("rgb(2, 6, 17)");
-    expect(canvas?.getAttribute("style")).toContain("rgba(251, 191, 36, 0.14)");
+    expect(canvas?.getAttribute("style")).toContain(collegiateCanvasBackground);
     expect(draftRoomCanvasBackground).toBe(collegiateCanvasBackground);
   });
 });

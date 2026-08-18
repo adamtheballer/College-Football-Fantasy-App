@@ -44,13 +44,11 @@ describe("AppShell scroll ownership", () => {
       hideDecor: false,
     });
 
-    expect(container.firstElementChild?.getAttribute("style")).toContain("rgb(2, 6, 17)");
-    expect(container.firstElementChild?.getAttribute("style")).toContain("rgb(7, 27, 53)");
+    expect(container.firstElementChild?.getAttribute("style")).toContain("rgb(9, 11, 15)");
 
     const effects = container.querySelector("[data-bg-effects='true']");
     expect(effects).not.toBeNull();
-    expect(effects?.getAttribute("style")).toContain("rgba(251, 191, 36");
-    expect(effects?.getAttribute("style")).toContain("rgb(2, 7, 19)");
+    expect(effects?.getAttribute("style")).toContain("rgb(9, 11, 15)");
   });
 
   it("keeps standard pages on the single app-page scroller", () => {

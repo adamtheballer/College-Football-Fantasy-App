@@ -23,8 +23,8 @@ describe("WinChanceMeter", () => {
     expect(screen.getByText("48.1% / 51.9%")).toBeTruthy();
     expect(screen.getByTestId("win-chance-left-bar").getAttribute("style")).toContain("48.05%");
     expect(screen.getByTestId("win-chance-right-bar").getAttribute("style")).toContain("51.95%");
-    expect(screen.getByTestId("win-chance-left-bar").className).toContain("from-rose-800");
-    expect(screen.getByTestId("win-chance-right-bar").className).toContain("from-emerald-700");
+    expect(screen.getByTestId("win-chance-left-bar").className).toContain("bg-cfb-brand");
+    expect(screen.getByTestId("win-chance-right-bar").className).toContain("bg-cfb-pink");
   });
 
   it("uses a controlled unavailable state instead of a fabricated percentage", () => {

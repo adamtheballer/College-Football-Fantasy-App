@@ -12,7 +12,7 @@ export const surfaceCardVariants = cva(
         interactive:
           "rounded-xl border-cfb-border-subtle bg-cfb-surface shadow-[0_8px_20px_rgba(2,6,23,0.18)] hover:border-cfb-border-strong hover:bg-cfb-surface-hover",
         scoreboard:
-          "rounded-xl border-cfb-border-strong/70 bg-cfb-surface-raised shadow-[0_12px_26px_rgba(2,6,23,0.22)]",
+          "rounded-xl border-cfb-border-subtle bg-cfb-surface-raised shadow-[0_12px_26px_rgba(0,0,0,0.18)]",
         field:
           "cfb-yard-lines rounded-xl border-cfb-border-subtle bg-cfb-surface shadow-[0_8px_20px_rgba(2,6,23,0.18)]",
       },

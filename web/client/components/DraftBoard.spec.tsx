@@ -24,6 +24,8 @@ describe("DraftBoard", () => {
     expect(screen.getByText("Jamie Rivers")).toBeTruthy();
     expect(screen.getByText("On the clock")).toBeTruthy();
     expect(screen.getByText("Your team")).toBeTruthy();
+    expect(screen.getByTestId("draft-board-pick-1").className).toContain("bg-blue-400/[0.10]");
+    expect(screen.getByTestId("draft-board-pick-2").className).not.toContain("bg-blue-400/[0.10]");
     await user.click(screen.getByRole("button", { name: /rosters/i }));
     expect(onOpenRosters).toHaveBeenCalledOnce();
   });

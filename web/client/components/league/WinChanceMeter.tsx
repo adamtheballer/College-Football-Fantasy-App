@@ -10,14 +10,6 @@ function formatDisplayedProbabilityPair(left: number, right: number) {
   return { left: displayedLeft, right: displayedRight };
 }
 
-function chanceGradient(left: number, right: number, side: "left" | "right") {
-  const leftIsLeading = left >= right;
-  const sideIsLeading = side === "left" ? leftIsLeading : !leftIsLeading;
-  return sideIsLeading
-    ? "from-emerald-700 via-emerald-500 to-emerald-300"
-    : "from-rose-800 via-rose-600 to-red-400";
-}
-
 export function WinChanceBar({
   myPercent,
   opponentPercent,
@@ -48,12 +40,12 @@ export function WinChanceBar({
       role="img"
     >
       <div
-        className={`h-full shrink-0 bg-gradient-to-r ${chanceGradient(leftProbability, rightProbability, "left")} shadow-[0_0_26px_rgba(16,185,129,0.22)] transition-[width] duration-500`}
+        className="h-full shrink-0 bg-cfb-brand transition-[width] duration-500"
         data-testid={`${testIdPrefix}-left-bar`}
         style={{ width: `${leftProbability}%` }}
       />
       <div
-        className={`h-full shrink-0 bg-gradient-to-r ${chanceGradient(leftProbability, rightProbability, "right")} shadow-[0_0_26px_rgba(244,63,94,0.2)] transition-[width] duration-500`}
+        className="h-full shrink-0 bg-cfb-pink transition-[width] duration-500"
         data-testid={`${testIdPrefix}-right-bar`}
         style={{ width: `${rightProbability}%` }}
       />
