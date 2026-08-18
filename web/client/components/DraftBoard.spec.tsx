@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DraftBoard } from "./DraftBoard";
 
@@ -14,6 +14,8 @@ describe("DraftBoard", () => {
     { overallPick: 4, round: 2, roundPick: 2, teamId: 1, teamName: "Alpha", playerName: null, playerPosition: null, isCurrent: false, isUser: true },
   ];
 
+  afterEach(() => cleanup());
+
   it("keeps a compact grid of all picks and opens the existing roster view", async () => {
     const user = userEvent.setup();
     const onOpenRosters = vi.fn();
@@ -24,5 +26,15 @@ describe("DraftBoard", () => {
     expect(screen.getByText("Your team")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: /rosters/i }));
     expect(onOpenRosters).toHaveBeenCalledOnce();
+  });
+
+  it("provides a current-pick control when the board has an active pick", async () => {
+    const user = userEvent.setup();
+    render(<DraftBoard slots={slots} totalRounds={2} onOpenRosters={vi.fn()} followCurrentPick />);
+
+    const currentPick = screen.getByRole("button", { name: /center board on the current draft pick/i });
+    expect(currentPick).toBeTruthy();
+    await user.click(currentPick);
+    expect(screen.getByText("On the clock")).toBeTruthy();
   });
 });
