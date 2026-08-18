@@ -231,7 +231,7 @@ export default function LeagueRoster() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="cfb-micro-label text-cfb-brand">League Roster</p>
-            <h1 className="cfb-display-title mt-1 text-3xl sm:mt-2 sm:text-5xl">Roster</h1>
+            <h1 className="cfb-display-title mt-1 text-3xl italic sm:mt-2 sm:text-5xl">Roster</h1>
             <p className="mt-2 hidden max-w-2xl text-sm font-medium leading-6 text-cfb-text-secondary sm:block">
               Manage your lineup or inspect every league team&apos;s current roster.
             </p>

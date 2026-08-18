@@ -1008,7 +1008,7 @@ export default function Draft() {
         <header className={cn(draftMattePanelClass, "hidden items-center justify-between gap-6 px-6 py-5 sm:flex")}>
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.26em] text-amber-200">Live league draft</p>
-            <h1 className="mt-1 truncate text-2xl font-black uppercase tracking-tight text-white md:text-3xl">
+            <h1 className="mt-1 truncate text-2xl font-black italic tracking-tight text-white md:text-3xl">
               {leagueName}
             </h1>
           </div>
