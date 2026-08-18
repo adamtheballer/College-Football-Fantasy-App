@@ -55,7 +55,7 @@ export function DraftBoard({
       </div>
       <div className="overflow-x-auto overscroll-x-contain p-3 sm:p-5">
         <div className="grid min-w-max gap-1.5" style={{ gridTemplateColumns: `4.5rem repeat(${Math.max(1, teams.length)}, minmax(8.5rem, 1fr))` }}>
-          <div className="sticky left-0 z-10 flex items-end bg-[#08172b] px-2 pb-2 text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Round</div>
+          <div className="flex items-end px-2 pb-2 text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Round</div>
           {teams.map(([teamId, teamName]) => {
             const isUser = slots.some((slot) => slot.teamId === teamId && slot.isUser);
             return (
@@ -68,7 +68,7 @@ export function DraftBoard({
             const roundSlots = slots.filter((slot) => slot.round === round);
             const byTeam = new Map(roundSlots.map((slot) => [slot.teamId, slot]));
             return [
-              <div key={`round-${round}`} className="sticky left-0 z-10 flex min-h-[5.25rem] items-center bg-[#08172b] px-2 text-sm font-black tabular-nums text-slate-300">{round}</div>,
+              <div key={`round-${round}`} className="flex min-h-[5.25rem] items-center px-2 text-sm font-black tabular-nums text-slate-300">{round}</div>,
               ...teams.map(([teamId]) => {
                 const slot = byTeam.get(teamId);
                 if (!slot) return <div key={`${round}-${teamId}`} className="min-h-[5.25rem] rounded-xl border border-white/5 bg-black/10" />;

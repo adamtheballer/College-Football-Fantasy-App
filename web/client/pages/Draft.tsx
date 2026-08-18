@@ -58,15 +58,6 @@ const POSITION_ROW_HOVER_STYLES: Record<string, string> = {
   K: "hover:bg-slate-200/[0.07] hover:shadow-[inset_2px_0_0_rgba(226,232,240,0.65)] focus:bg-slate-200/[0.10]",
 };
 
-const ROSTER_POSITION_STYLES: Record<string, { border: string; bg: string; text: string; dot: string; hover: string }> = {
-  QB: { border: "border-blue-300/30", bg: "bg-[#0b1830]", text: "text-blue-100/85", dot: "bg-blue-400/60", hover: "hover:border-blue-300/55 hover:shadow-[0_0_34px_rgba(96,165,250,0.14)]" },
-  RB: { border: "border-emerald-300/30", bg: "bg-[#0a1f24]", text: "text-emerald-100/85", dot: "bg-emerald-400/60", hover: "hover:border-emerald-300/55 hover:shadow-[0_0_34px_rgba(52,211,153,0.14)]" },
-  WR: { border: "border-violet-300/30", bg: "bg-[#151530]", text: "text-violet-100/85", dot: "bg-violet-400/60", hover: "hover:border-violet-300/55 hover:shadow-[0_0_34px_rgba(167,139,250,0.14)]" },
-  TE: { border: "border-amber-300/30", bg: "bg-[#211b16]", text: "text-amber-100/85", dot: "bg-amber-400/60", hover: "hover:border-amber-300/55 hover:shadow-[0_0_34px_rgba(251,191,36,0.14)]" },
-  K: { border: "border-slate-300/25", bg: "bg-[#182235]", text: "text-slate-100/85", dot: "bg-slate-400/55", hover: "hover:border-slate-200/55 hover:shadow-[0_0_34px_rgba(226,232,240,0.12)]" },
-  EMPTY: { border: "border-white/10", bg: "bg-[#071224]", text: "text-muted-foreground", dot: "bg-white/18", hover: "hover:border-cyan-200/18 hover:shadow-[0_0_24px_rgba(34,211,238,0.08)]" },
-};
-
 type PreviewTeam = DraftRoomTeam & {
   isPlaceholder?: boolean;
 };
@@ -770,11 +761,11 @@ export default function Draft() {
         <div
           key={slot.label}
           className={cn(
-            "grid min-h-[60px] grid-cols-[3.3rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-white/[0.075] px-3 py-2.5 last:border-b-0",
-            slot.player ? "bg-white/[0.018] transition-colors hover:bg-white/[0.055]" : "bg-black/[0.12]"
+            "grid min-h-[52px] grid-cols-[2.8rem_minmax(0,1fr)_auto] items-center gap-2 border-b border-white/[0.075] px-3 py-2 last:border-b-0 sm:grid-cols-[3.4rem_minmax(0,1fr)_auto] sm:px-4",
+            slot.player ? "bg-[#0c1727]/70 transition-colors hover:bg-white/[0.05]" : "bg-black/[0.16]"
           )}
         >
-          <p className="rounded-md border border-white/10 bg-black/20 px-1.5 py-1 text-center text-[9px] font-black uppercase tracking-[0.1em] text-slate-300">
+          <p className="text-center text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
             {slot.label.replace(/\s+\d+$/, "")}
           </p>
           {slot.player ? (
@@ -784,15 +775,15 @@ export default function Draft() {
               className="min-w-0 text-left focus:outline-none focus-visible:underline"
               aria-label={`Open ${slot.player.player_name} player card`}
             >
-              <span className="block truncate text-sm font-black text-foreground transition-colors hover:text-cyan-100">{slot.player.player_name}</span>
-              <span className="mt-0.5 block truncate text-[9px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+              <span className="block truncate text-[13px] font-black text-foreground transition-colors hover:text-cyan-100 sm:text-sm">{slot.player.player_name}</span>
+              <span className="mt-0.5 block truncate text-[8px] font-bold uppercase tracking-[0.08em] text-muted-foreground sm:text-[9px]">
                 {slot.player.player_school} · Pick {slot.player.overall_pick}
               </span>
             </button>
           ) : (
-            <p className="truncate text-sm font-black text-slate-400">Open slot</p>
+            <p className="truncate text-[13px] font-black text-slate-500 sm:text-sm">Open slot</p>
           )}
-          <span className="rounded-md border border-cyan-200/15 bg-cyan-300/[0.07] px-2 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-cyan-100">
+          <span className="min-w-[2.15rem] border-l border-white/10 pl-2 text-right text-[9px] font-black uppercase tracking-[0.08em] text-slate-300 sm:min-w-[2.7rem] sm:pl-3">
             {position}
           </span>
         </div>
@@ -800,11 +791,11 @@ export default function Draft() {
     };
 
     return (
-      <section className="overflow-hidden rounded-xl border border-white/12 bg-[#0c1625]/95 shadow-[0_10px_28px_rgba(2,6,23,0.28)]">
-        <div className="flex flex-col gap-3 border-b border-white/10 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+      <section className="overflow-hidden rounded-xl border border-white/12 bg-[#091323]/95 shadow-[0_10px_28px_rgba(2,6,23,0.22)]">
+        <div className="flex flex-col gap-2 border-b border-white/10 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4">
           <div data-testid="draft-player-list">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Roster Viewer</p>
-            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-primary">Roster</p>
+            <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
               Inspect every manager's drafted roster
             </p>
           </div>
@@ -816,7 +807,7 @@ export default function Draft() {
               id="real-roster-team-select"
               value={selectedRosterTeam?.id ?? draftRoom.user_team_id ?? ""}
               onChange={(event) => setSelectedRosterTeamId(Number(event.target.value))}
-              className="h-10 min-w-0 flex-1 rounded-lg border border-white/15 bg-black/20 px-3 text-[9px] font-black uppercase tracking-[0.1em] text-cyan-50 outline-none transition focus:border-cyan-200/60 focus:ring-2 focus:ring-cyan-300/20 sm:min-w-[220px]"
+              className="h-9 min-w-0 flex-1 rounded-lg border border-white/15 bg-black/20 px-3 text-[9px] font-black uppercase tracking-[0.08em] text-cyan-50 outline-none transition focus:border-cyan-200/60 focus:ring-2 focus:ring-cyan-300/20 sm:min-w-[220px]"
             >
               {draftRoom.teams.map((team) => (
                 <option key={team.id} value={team.id}>
@@ -824,23 +815,21 @@ export default function Draft() {
                 </option>
               ))}
             </select>
-            <p className="shrink-0 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2.5 text-[9px] font-black uppercase tracking-[0.1em] text-muted-foreground">
+            <p className="shrink-0 text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">
               {selectedRoster.filter((slot) => slot.player).length}/{selectedRoster.length} filled
             </p>
           </div>
         </div>
 
-        <div className="px-3 py-3 sm:px-4">
-          <p className="mb-2 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">Starters</p>
-          <div className="overflow-hidden rounded-lg border border-white/10">{starterSlots.map(renderSlotRow)}</div>
+        <div className="pt-2">
+          <p className="border-b border-white/10 px-3 pb-2 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground sm:px-4">Starters</p>
+          <div>{starterSlots.map(renderSlotRow)}</div>
         </div>
 
         {benchSlots.length ? (
-          <div className="border-t border-white/10 px-3 py-3 sm:px-4">
-            <p className="mb-2 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">Bench / Reserve</p>
-            <div className="overflow-hidden rounded-lg border border-white/10">
-              {benchSlots.map(renderSlotRow)}
-            </div>
+          <div className="border-t border-white/10 pt-2">
+            <p className="border-b border-white/10 px-3 pb-2 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground sm:px-4">Bench / Reserve</p>
+            <div>{benchSlots.map(renderSlotRow)}</div>
           </div>
         ) : null}
       </section>
@@ -1449,13 +1438,13 @@ export default function Draft() {
                 type="button"
                 onClick={() => setActiveTab(tab.value)}
                 className={cn(
-                  "relative inline-flex min-h-[4.25rem] min-w-0 flex-col items-center justify-center gap-1 whitespace-nowrap px-1.5 py-2 text-[9px] font-black uppercase leading-none tracking-[0.04em] transition after:absolute after:inset-x-1 after:bottom-0 after:h-0.5 after:bg-transparent sm:min-h-0 sm:flex-row sm:gap-2 sm:px-4 sm:py-3 sm:text-[10px] sm:tracking-[0.16em]",
+                  "relative inline-flex min-h-[5.1rem] min-w-0 flex-col items-center justify-center gap-1.5 whitespace-nowrap px-2 py-2.5 text-[10px] font-black uppercase leading-none tracking-[0.04em] transition after:absolute after:inset-x-1 after:bottom-0 after:h-0.5 after:bg-transparent sm:min-h-0 sm:flex-row sm:gap-2 sm:px-4 sm:py-3 sm:text-[10px] sm:tracking-[0.16em]",
                   activeTab === tab.value
                   ? "bg-white/[0.04] text-white after:bg-cfb-brand"
                     : "text-muted-foreground hover:bg-white/[0.035] hover:text-white"
                 )}
               >
-                <Icon className="h-5 w-5 shrink-0 sm:h-3.5 sm:w-3.5" />
+                <Icon className="h-5.5 w-5.5 shrink-0 sm:h-3.5 sm:w-3.5" />
                 {tab.label}
               </button>
             );
