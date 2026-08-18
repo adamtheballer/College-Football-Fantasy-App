@@ -69,11 +69,6 @@ export function PlayerCardHeader({
     { label: "Class", mobileLabel: "Class", value: card?.about.player_class ?? player.playerClass ?? "—" },
     { label: "Status", mobileLabel: "Status", value: playerStatus },
   ];
-  const playerPills = [
-    card?.about.jersey ? `#${card.about.jersey}` : null,
-    position || player.position || null,
-    card?.about.team ?? player.school ?? null,
-  ].filter(Boolean);
   const headerStreakStyle: CSSProperties = {
     backgroundImage: [
       `repeating-linear-gradient(168deg, transparent 0 18px, ${palette.markerA} 19px 27px, transparent 29px 54px)`,
@@ -95,9 +90,9 @@ export function PlayerCardHeader({
         <X className="h-5 w-5" />
       </button>
 
-      <header className={cn("relative shrink-0 overflow-hidden px-4 py-4 pr-14 sm:px-8 sm:py-6 sm:pr-24", palette.headerBase)}>
-        <div className="absolute inset-0 opacity-75 mix-blend-screen" style={headerStreakStyle} />
-        <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent_0_28px,rgba(255,255,255,0.07)_29px,transparent_31px_58px)] opacity-30" />
+      <header className={cn("relative shrink-0 overflow-hidden bg-gradient-to-br px-4 py-5 pr-14 sm:px-8 sm:py-7 sm:pr-24", palette.headerBase)}>
+        <div className="absolute inset-0 opacity-60 mix-blend-screen" style={headerStreakStyle} />
+        <div className="absolute inset-0 bg-[linear-gradient(112deg,rgba(4,8,18,0.14)_0%,transparent_44%,rgba(2,6,23,0.42)_100%)]" />
         <div
           className="pointer-events-none absolute inset-0 hidden text-white/20 [mask-image:linear-gradient(to_right,black_0%,black_58%,transparent_74%)] lg:block"
           aria-hidden="true"
@@ -118,60 +113,48 @@ export function PlayerCardHeader({
             </span>
           ))}
         </div>
-        <div className="relative z-10 grid gap-3 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,440px)] xl:items-end">
-          <div className="min-w-0">
-            <p className="hidden text-[10px] font-black uppercase tracking-[0.28em] text-white/70 sm:block">{title}</p>
-            <div className="flex min-w-0 items-center gap-3 sm:mt-4 sm:gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/25 bg-white/10 shadow-[0_16px_34px_rgba(2,6,23,0.28)] sm:h-20 sm:w-20 sm:rounded-2xl">
+        <div className="relative z-10 min-w-0">
+          <p className="hidden text-[10px] font-black uppercase tracking-[0.28em] text-white/65 sm:block">{title}</p>
+          <div className="flex min-w-0 items-center gap-3 sm:mt-4 sm:gap-5">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/25 bg-white/10 shadow-[0_16px_34px_rgba(2,6,23,0.28)] sm:h-[5.75rem] sm:w-[5.75rem] sm:rounded-[1.6rem]">
                 {card?.about.headshot_url ? (
                   <img src={card.about.headshot_url} alt={player.name} className="h-full w-full object-cover" />
                 ) : (
                   <div className={cn("flex h-full w-full items-center justify-center bg-gradient-to-b", palette.silhouette)}>
-                    <UserRound className="h-7 w-7 text-white/70 sm:h-10 sm:w-10" />
+                    <UserRound className="h-8 w-8 text-white/75 sm:h-11 sm:w-11" />
                   </div>
                 )}
-              </div>
-              <div className="min-w-0">
-                <h2 className="max-w-2xl break-words text-2xl font-black italic leading-[0.9] tracking-tight text-white sm:text-5xl">
-                  {player.name}
-                </h2>
-                <p className="mt-2 truncate text-[10px] font-black uppercase tracking-[0.15em] text-white/75 sm:mt-3 sm:text-xs sm:tracking-[0.18em]">
-                  {[card?.about.jersey ? `#${card.about.jersey}` : null, position || player.position, card?.about.team ?? player.school]
-                    .filter(Boolean)
-                    .join(" • ")}
-                </p>
-              </div>
             </div>
-            <div className="mt-5 hidden flex-wrap gap-2 sm:flex">
-              {playerPills.map((value, index) => (
-                <span
-                  key={`${value}-${index}`}
-                  className={cn(
-                    "max-w-full truncate rounded-full border px-4 py-2 text-xs font-black",
-                    index === 1 ? palette.pill : "border-white/18 bg-black/20 text-white/85",
-                  )}
-                >
-                  {value}
+            <div className="min-w-0">
+              <h2 className="max-w-2xl break-words text-[1.7rem] font-black italic leading-[0.92] tracking-tight text-white sm:text-5xl">
+                {player.name}
+              </h2>
+              <p className="mt-2 truncate text-[10px] font-black uppercase tracking-[0.15em] text-white/80 sm:mt-3 sm:text-xs sm:tracking-[0.18em]">
+                {[position || player.position, card?.about.team ?? player.school].filter(Boolean).join("  |  ")}
+              </p>
+              <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-bold sm:mt-3 sm:text-[11px]">
+                <span className="inline-flex items-center gap-1.5 text-emerald-100">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                  {playerStatus}
                 </span>
-              ))}
-            </div>
-          </div>
-          <div data-testid="player-card-metric-rail" className="grid grid-cols-4 gap-px overflow-hidden rounded-xl border border-white/15 bg-white/10 xl:grid-cols-2 xl:self-end 2xl:grid-cols-4">
-            {metricCards.map(({ label, mobileLabel, value }) => (
-              <div
-                key={label}
-                className="flex min-h-[3.8rem] min-w-0 flex-col justify-center bg-black/30 p-2 backdrop-blur sm:min-h-[4.75rem] sm:p-3"
-              >
-                <p className="truncate text-[8px] font-black uppercase tracking-[0.1em] text-white/55 sm:text-[9px] sm:tracking-[0.18em]">
-                  <span className="sm:hidden" aria-label={label}>{mobileLabel}</span>
-                  <span className="hidden sm:inline">{label}</span>
-                </p>
-                <p className="mt-1 truncate text-base font-black tabular-nums text-white sm:mt-2 sm:text-xl">{value}</p>
+                {card?.about.jersey ? <span className="text-white/70">#{card.about.jersey}</span> : null}
+                {currentValue !== null && currentValue !== undefined ? <span className="text-white/70">Value {formatCurrentValueRating(currentValue)}</span> : null}
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </header>
+      <div data-testid="player-card-metric-rail" className="grid shrink-0 grid-cols-4 divide-x divide-white/10 border-b border-white/10 bg-[#090c11]">
+        {metricCards.map(({ label, mobileLabel, value }) => (
+          <div key={label} className="min-w-0 px-2 py-3 text-center sm:px-4 sm:py-4">
+            <p className="truncate text-[8px] font-black uppercase tracking-[0.1em] text-white/45 sm:text-[9px] sm:tracking-[0.18em]">
+              <span className="sm:hidden" aria-label={label}>{mobileLabel}</span>
+              <span className="hidden sm:inline">{label}</span>
+            </p>
+            <p className="mt-1 truncate text-base font-black tabular-nums text-white sm:mt-1.5 sm:text-2xl">{value}</p>
+          </div>
+        ))}
+      </div>
     </>
   );
 }

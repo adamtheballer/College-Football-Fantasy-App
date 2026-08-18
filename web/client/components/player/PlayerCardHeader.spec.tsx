@@ -35,7 +35,7 @@ describe("PlayerCardHeader injury status", () => {
       />,
     );
 
-    expect(screen.getByText("OUT FOR SEASON")).toBeTruthy();
+    expect(screen.getAllByText("OUT FOR SEASON")).toHaveLength(2);
     expect(screen.queryByText("Active")).toBeNull();
     expect(screen.getByText("Current Value Rating")).toBeTruthy();
   });
