@@ -231,6 +231,8 @@ export default function Draft() {
   const [now, setNow] = useState(Date.now());
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const pickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
+  const mobileCarouselRef = useRef<HTMLDivElement | null>(null);
+  const mobilePickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
   const draftStartIntroAudioRef = useRef<HTMLAudioElement | null>(null);
   const playedDraftStartCueKeysRef = useRef<Set<string>>(new Set());
   const previousDraftStartIntroStateRef = useRef<DraftStartIntroState | null>(null);
@@ -602,6 +604,7 @@ export default function Draft() {
       };
 
       center(carouselRef.current, pickRefs.current);
+      center(mobileCarouselRef.current, mobilePickRefs.current);
     },
     []
   );
@@ -761,59 +764,51 @@ export default function Draft() {
     const starterSlots = selectedRoster.filter((slot) => !slot.label.startsWith("BENCH"));
     const benchSlots = selectedRoster.filter((slot) => slot.label.startsWith("BENCH"));
 
-    const renderSlotCard = (slot: RealRosterSlot) => {
+    const renderSlotRow = (slot: RealRosterSlot) => {
       const position = slot.player?.player_position ?? (slot.allowedPositions.length === 1 ? slot.allowedPositions[0] : "EMPTY");
-      const style = ROSTER_POSITION_STYLES[position] ?? ROSTER_POSITION_STYLES.EMPTY;
       return (
         <div
           key={slot.label}
           className={cn(
-            "relative min-h-[82px] overflow-hidden rounded-2xl border px-4 py-3 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5",
-            "shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]",
-            style.border,
-            style.bg,
-            style.text,
-            style.hover
+            "grid min-h-[60px] grid-cols-[3.3rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-white/[0.075] px-3 py-2.5 last:border-b-0",
+            slot.player ? "bg-white/[0.018] transition-colors hover:bg-white/[0.055]" : "bg-black/[0.12]"
           )}
         >
-          <div className={cn("absolute right-4 top-4 h-2.5 w-2.5 rounded-full shadow-[0_0_18px_currentColor]", style.dot)} />
-          <p className="text-[9px] font-black uppercase tracking-[0.2em]">{slot.label}</p>
+          <p className="rounded-md border border-white/10 bg-black/20 px-1.5 py-1 text-center text-[9px] font-black uppercase tracking-[0.1em] text-slate-300">
+            {slot.label.replace(/\s+\d+$/, "")}
+          </p>
           {slot.player ? (
             <button
               type="button"
               onClick={() => setSelectedPlayerId(slot.player?.player_id ?? null)}
-              className="mt-2 block max-w-full truncate text-left text-base font-black text-foreground transition-colors hover:text-cyan-100 focus:outline-none focus-visible:text-cyan-100 focus-visible:underline"
+              className="min-w-0 text-left focus:outline-none focus-visible:underline"
               aria-label={`Open ${slot.player.player_name} player card`}
             >
-              {slot.player.player_name}
+              <span className="block truncate text-sm font-black text-foreground transition-colors hover:text-cyan-100">{slot.player.player_name}</span>
+              <span className="mt-0.5 block truncate text-[9px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                {slot.player.player_school} · Pick {slot.player.overall_pick}
+              </span>
             </button>
           ) : (
-            <p className="mt-2 truncate text-base font-black text-foreground">Open Slot</p>
+            <p className="truncate text-sm font-black text-slate-400">Open slot</p>
           )}
-          <p className="mt-1 truncate text-[9px] font-black uppercase tracking-[0.16em] opacity-80">
-            {slot.player
-              ? `${slot.player.player_school} • Pick ${slot.player.overall_pick}`
-              : slot.allowedPositions.join("/")}
-          </p>
-          {slot.player ? (
-            <span className="mt-2 inline-flex rounded-full bg-black/20 px-2.5 py-0.5 text-[8px] font-black uppercase tracking-[0.14em]">
-              {slot.player.player_position}
-            </span>
-          ) : null}
+          <span className="rounded-md border border-cyan-200/15 bg-cyan-300/[0.07] px-2 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-cyan-100">
+            {position}
+          </span>
         </div>
       );
     };
 
     return (
-      <section className="rounded-[1.75rem] border border-cyan-200/15 bg-card/45 p-5 shadow-[0_0_44px_rgba(34,211,238,0.08),inset_0_1px_0_rgba(255,255,255,0.035)]">
-        <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <section className="overflow-hidden rounded-xl border border-white/12 bg-[#0c1625]/95 shadow-[0_10px_28px_rgba(2,6,23,0.28)]">
+        <div className="flex flex-col gap-3 border-b border-white/10 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
           <div data-testid="draft-player-list">
-            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary">Roster Viewer</p>
-            <p className="mt-1 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Roster Viewer</p>
+            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
               Inspect every manager's drafted roster
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2">
             <label className="sr-only" htmlFor="real-roster-team-select">
               Select roster team
             </label>
@@ -821,7 +816,7 @@ export default function Draft() {
               id="real-roster-team-select"
               value={selectedRosterTeam?.id ?? draftRoom.user_team_id ?? ""}
               onChange={(event) => setSelectedRosterTeamId(Number(event.target.value))}
-              className="h-12 min-w-[220px] rounded-2xl border border-cyan-200/25 bg-slate-950/70 px-4 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-50 shadow-[0_0_24px_rgba(34,211,238,0.12)] outline-none transition focus:border-cyan-200/60 focus:ring-2 focus:ring-cyan-300/20"
+              className="h-10 min-w-0 flex-1 rounded-lg border border-white/15 bg-black/20 px-3 text-[9px] font-black uppercase tracking-[0.1em] text-cyan-50 outline-none transition focus:border-cyan-200/60 focus:ring-2 focus:ring-cyan-300/20 sm:min-w-[220px]"
             >
               {draftRoom.teams.map((team) => (
                 <option key={team.id} value={team.id}>
@@ -829,27 +824,24 @@ export default function Draft() {
                 </option>
               ))}
             </select>
-            <p className="rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            <p className="shrink-0 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2.5 text-[9px] font-black uppercase tracking-[0.1em] text-muted-foreground">
               {selectedRoster.filter((slot) => slot.player).length}/{selectedRoster.length} filled
             </p>
           </div>
         </div>
 
-        <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-          {starterSlots.map(renderSlotCard)}
+        <div className="px-3 py-3 sm:px-4">
+          <p className="mb-2 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">Starters</p>
+          <div className="overflow-hidden rounded-lg border border-white/10">{starterSlots.map(renderSlotRow)}</div>
         </div>
 
         {benchSlots.length ? (
-          <>
-            <div className="my-5 flex items-center gap-3">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-cyan-300/45 to-cyan-300/12 shadow-[0_0_14px_rgba(103,232,249,0.34)]" />
-              <div className="rounded-full border border-cyan-200/20 bg-cyan-300/10 px-4 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-cyan-100 shadow-[0_0_20px_rgba(34,211,238,0.14)]">
-                Bench / Reserve
-              </div>
-              <div className="h-px flex-1 bg-gradient-to-l from-transparent via-cyan-300/45 to-cyan-300/12 shadow-[0_0_14px_rgba(103,232,249,0.34)]" />
+          <div className="border-t border-white/10 px-3 py-3 sm:px-4">
+            <p className="mb-2 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">Bench / Reserve</p>
+            <div className="overflow-hidden rounded-lg border border-white/10">
+              {benchSlots.map(renderSlotRow)}
             </div>
-            <div className="grid gap-2.5 xl:grid-cols-2">{benchSlots.map(renderSlotCard)}</div>
-          </>
+          </div>
         ) : null}
       </section>
     );
@@ -1070,14 +1062,24 @@ export default function Draft() {
         ) : null}
 
         <section data-testid="mobile-draft-order" className={cn("shrink-0 overflow-hidden sm:hidden", draftMattePanelClass)}>
-          <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
+          <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
             <div>
               <p className="text-[9px] font-black uppercase tracking-[0.14em] text-amber-200">Draft order</p>
               <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Swipe for future rounds</p>
             </div>
-            <p className="text-right text-[8px] font-black uppercase leading-3 tracking-[0.08em] text-amber-100/90">{draftProgressLabel}</p>
+            <button
+              type="button"
+              onClick={recenterDraftCarousel}
+              className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-100/25 bg-black/20 text-amber-100 transition hover:border-amber-200/55 hover:bg-amber-300/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60"
+              aria-label="Center draft order on the current pick"
+              title="Center current pick"
+            >
+              <LocateFixed className="h-4 w-4" />
+            </button>
+            <p className="max-w-[8.5rem] text-right text-[8px] font-black uppercase leading-3 tracking-[0.08em] text-amber-100/90">{draftProgressLabel}</p>
           </div>
           <div
+            ref={mobileCarouselRef}
             data-testid="mobile-draft-order-scroll"
             aria-label="Draft order; swipe horizontally to view every pick and future rounds"
             className="overflow-x-auto overscroll-x-contain scroll-smooth snap-x px-2 py-2 touch-pan-x"
@@ -1088,7 +1090,19 @@ export default function Draft() {
                 const isUser = slot.team?.id === draftRoom.user_team_id;
                 const managerName = slot.team?.owner_name || slot.pick?.team_name || slot.team?.name || "Manager";
                 return (
-                  <div key={slot.overallPick} data-testid={`mobile-draft-order-card-${slot.overallPick}`} aria-current={isCurrent ? "step" : undefined} className={cn("flex w-[4.15rem] shrink-0 snap-start flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}>
+                  <div
+                    key={slot.overallPick}
+                    ref={(node) => {
+                      if (node) {
+                        mobilePickRefs.current.set(slot.overallPick, node);
+                      } else {
+                        mobilePickRefs.current.delete(slot.overallPick);
+                      }
+                    }}
+                    data-testid={`mobile-draft-order-card-${slot.overallPick}`}
+                    aria-current={isCurrent ? "step" : undefined}
+                    className={cn("flex w-[4.15rem] shrink-0 snap-start flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}
+                  >
                     <DraftOrderPickCard
                       compact
                       managerName={managerName}
@@ -1435,13 +1449,13 @@ export default function Draft() {
                 type="button"
                 onClick={() => setActiveTab(tab.value)}
                 className={cn(
-                  "relative inline-flex min-w-0 items-center justify-center gap-1 whitespace-nowrap px-1 py-3 text-[8px] font-bold uppercase leading-none tracking-[0.04em] transition after:absolute after:inset-x-1 after:bottom-0 after:h-0.5 after:bg-transparent sm:gap-2 sm:px-4 sm:text-[10px] sm:tracking-[0.16em]",
+                  "relative inline-flex min-h-[4.25rem] min-w-0 flex-col items-center justify-center gap-1 whitespace-nowrap px-1.5 py-2 text-[9px] font-black uppercase leading-none tracking-[0.04em] transition after:absolute after:inset-x-1 after:bottom-0 after:h-0.5 after:bg-transparent sm:min-h-0 sm:flex-row sm:gap-2 sm:px-4 sm:py-3 sm:text-[10px] sm:tracking-[0.16em]",
                   activeTab === tab.value
                   ? "bg-white/[0.04] text-white after:bg-cfb-brand"
                     : "text-muted-foreground hover:bg-white/[0.035] hover:text-white"
                 )}
               >
-                <Icon className="h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5" />
+                <Icon className="h-5 w-5 shrink-0 sm:h-3.5 sm:w-3.5" />
                 {tab.label}
               </button>
             );
