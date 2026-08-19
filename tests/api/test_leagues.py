@@ -1134,6 +1134,10 @@ def test_league_hub_endpoints_return_scoreboard_rankings_and_news(client, db_ses
     league = create_league(client, commissioner_token, name="Hub League")
     join_response = client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token))
     assert join_response.status_code == 200
+    commissioner_avatar = "https://images.example.com/hub-commissioner.jpg"
+    member_avatar = "https://images.example.com/hub-member.jpg"
+    assert client.patch("/auth/me", json={"avatar_url": commissioner_avatar}, headers=auth_headers(commissioner_token)).status_code == 200
+    assert client.patch("/auth/me", json={"avatar_url": member_avatar}, headers=auth_headers(member_token)).status_code == 200
 
     teams = db_session.query(Team).filter(Team.league_id == league["id"]).order_by(Team.id.asc()).all()
     commissioner_team, member_team = teams
@@ -1220,6 +1224,8 @@ def test_league_hub_endpoints_return_scoreboard_rankings_and_news(client, db_ses
     assert matchup_body["total"] == 1
     assert matchup_body["data"][0]["week"] == 4
     assert matchup_body["data"][0]["home_team_name"] == commissioner_team.name
+    assert matchup_body["data"][0]["home_owner_avatar_url"] == commissioner_avatar
+    assert matchup_body["data"][0]["away_owner_avatar_url"] == member_avatar
 
     rankings_response = client.get(
         f"/leagues/{league['id']}/power-rankings",

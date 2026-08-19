@@ -31,8 +31,8 @@ vi.mock("@/hooks/use-leagues", () => ({
       matchup_id: 1,
       week: 1,
       status: "projected",
-      my_team: { fantasy_team_id: 10, fantasy_team_name: "My Team", record: "0-0-0", projected_total: 111.2, win_probability: 54, roster: [] },
-      opponent_team: { fantasy_team_id: 11, fantasy_team_name: "My Opponent", record: "0-0-0", projected_total: 106.4, win_probability: 46, roster: [] },
+      my_team: { fantasy_team_id: 10, fantasy_team_name: "My Team", owner_avatar_url: "https://images.example.com/my-team.jpg", record: "0-0-0", projected_total: 111.2, win_probability: 54, roster: [] },
+      opponent_team: { fantasy_team_id: 11, fantasy_team_name: "My Opponent", owner_avatar_url: "https://images.example.com/my-opponent.jpg", record: "0-0-0", projected_total: 106.4, win_probability: 46, roster: [] },
     },
     isLoading: false,
     isError: false,
@@ -41,7 +41,7 @@ vi.mock("@/hooks/use-leagues", () => ({
   useLeagueScoreboard: () => ({
     data: {
       data: [
-        { matchup_id: 1, week: 1, status: "projected", home_team_name: "My Team", away_team_name: "My Opponent", home_score: 111.2, away_score: 106.4 },
+        { matchup_id: 1, week: 1, status: "projected", home_team_name: "My Team", home_owner_avatar_url: "https://images.example.com/my-team.jpg", away_team_name: "My Opponent", away_owner_avatar_url: "https://images.example.com/my-opponent.jpg", home_score: 111.2, away_score: 106.4 },
         { matchup_id: 2, week: 1, status: "projected", home_team_name: "League Mate One", away_team_name: "League Mate Two", home_score: 103.1, away_score: 100.8 },
       ],
     },
@@ -133,6 +133,8 @@ describe("league matchup scoreboard", () => {
     expect(screen.getAllByText("46.0%")).toHaveLength(2);
     expect(screen.queryByRole("status")).toBeNull();
     expect(screen.queryByText("CFB Scores available once games begin")).toBeNull();
+    expect(screen.getAllByAltText("My Team profile picture").every((image) => image.getAttribute("src") === "https://images.example.com/my-team.jpg")).toBe(true);
+    expect(screen.getAllByAltText("My Opponent profile picture").every((image) => image.getAttribute("src") === "https://images.example.com/my-opponent.jpg")).toBe(true);
   });
 
   it("lets a member swipe or tap through same-league matchups through the canonical detail query", () => {

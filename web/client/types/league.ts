@@ -185,9 +185,11 @@ export interface LeagueScoreboardRow {
   status: string;
   home_team_id: number;
   home_team_name: string;
+  home_owner_avatar_url?: string | null;
   home_score: number;
   away_team_id: number;
   away_team_name: string;
+  away_owner_avatar_url?: string | null;
   away_score: number;
 }
 
@@ -311,6 +313,7 @@ export interface LeagueMatchupTeam {
   name?: string;
   fantasy_team_id: number;
   fantasy_team_name: string;
+  owner_avatar_url?: string | null;
   record: string;
   projected_points?: number | null;
   projected_total?: number | null;

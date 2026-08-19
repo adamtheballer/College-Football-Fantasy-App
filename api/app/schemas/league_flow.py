@@ -460,9 +460,11 @@ class LeagueScoreboardRow(BaseModel):
     status: str
     home_team_id: int
     home_team_name: str
+    home_owner_avatar_url: str | None = None
     home_score: float
     away_team_id: int
     away_team_name: str
+    away_owner_avatar_url: str | None = None
     away_score: float
 
 
@@ -622,6 +624,7 @@ class MatchupTeamRead(BaseModel):
     win_probability: float | None = None
     fantasy_team_id: int
     fantasy_team_name: str
+    owner_avatar_url: str | None = None
     projected_total: float | None = None
     current_points: float | None = None
     pregame_projected_total: float | None = None

@@ -4,6 +4,7 @@ import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
 import { WinChanceBar } from "@/components/league/WinChanceMeter";
+import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
 import { useLeagueDetail, useLeagueMatchupTab, useLeagueScoreboard } from "@/hooks/use-leagues";
@@ -111,9 +112,12 @@ function MatchupRail({
               }`}
             >
               <div className="flex min-w-[210px] items-center gap-2">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cfb-brand/45 bg-cfb-brand/[0.08] text-[10px] font-black text-cfb-brand">
-                  {teamInitials(matchup.away_team_name)}
-                </span>
+                <ManagerAvatar
+                  avatarUrl={matchup.away_owner_avatar_url}
+                  managerName={matchup.away_team_name}
+                  size="sm"
+                  className="border-cfb-brand/45 bg-cfb-brand/[0.08] text-cfb-brand"
+                />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[11px] font-black leading-4">{matchup.away_team_name}</p>
                   <p className="truncate text-[10px] font-bold text-cfb-text-muted">{formatMatchupPoints(matchup.away_score)}</p>
@@ -123,9 +127,12 @@ function MatchupRail({
                   <p className="truncate text-[11px] font-black leading-4">{matchup.home_team_name}</p>
                   <p className="truncate text-[10px] font-bold text-cfb-text-muted">{formatMatchupPoints(matchup.home_score)}</p>
                 </div>
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cfb-pink/45 bg-cfb-pink/[0.08] text-[10px] font-black text-cfb-pink">
-                  {teamInitials(matchup.home_team_name)}
-                </span>
+                <ManagerAvatar
+                  avatarUrl={matchup.home_owner_avatar_url}
+                  managerName={matchup.home_team_name}
+                  size="sm"
+                  className="border-cfb-pink/45 bg-cfb-pink/[0.08] text-cfb-pink"
+                />
               </div>
               <span className="sr-only">{status}</span>
             </button>
@@ -196,16 +203,16 @@ function MatchupTeamSummary({
   return (
     <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
       <div className={`flex items-center ${align === "right" ? "justify-end" : "justify-start"}`}>
-        <div
-          aria-hidden="true"
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-black tracking-tight sm:h-10 sm:w-10 sm:text-sm ${
+        <ManagerAvatar
+          avatarUrl={team?.owner_avatar_url}
+          managerName={team?.fantasy_team_name}
+          size="sm"
+          className={`sm:h-10 sm:w-10 sm:text-sm ${
             isBrand
               ? "border-cfb-brand/80 bg-cfb-brand/10 text-cfb-brand"
               : "border-cfb-pink/80 bg-cfb-pink/10 text-cfb-pink"
           }`}
-        >
-          {teamInitials(team?.fantasy_team_name)}
-        </div>
+        />
       </div>
       <p className="mt-0.5 truncate text-[11px] font-black text-cfb-text-primary sm:mt-1 sm:text-sm">
         {team?.fantasy_team_name ?? "Team TBD"}

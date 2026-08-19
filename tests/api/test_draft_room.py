@@ -1248,6 +1248,10 @@ def test_matchup_endpoint_returns_current_opponent_and_win_probability(client, d
     owner_token = create_user_and_token(client, "matchup-owner")
     league = create_league(client, owner_token, max_teams=2, fill_league=False)
     member_token = join_league(client, league["id"], "matchup-member")
+    owner_avatar = "https://images.example.com/matchup-owner.jpg"
+    member_avatar = "https://images.example.com/matchup-member.jpg"
+    assert client.patch("/auth/me", json={"avatar_url": owner_avatar}, headers=auth_headers(owner_token)).status_code == 200
+    assert client.patch("/auth/me", json={"avatar_url": member_avatar}, headers=auth_headers(member_token)).status_code == 200
     activate_draft_for_direct_pick_test(db_session, league["id"])
     first_player_id = create_player(client, "Matchup QB One", "QB")
     second_player_id = create_player(client, "Matchup QB Two", "QB")
@@ -1291,6 +1295,8 @@ def test_matchup_endpoint_returns_current_opponent_and_win_probability(client, d
     payload = response.json()
     assert payload["opponent_team"] is not None
     assert payload["my_team"]["fantasy_team_id"] != payload["opponent_team"]["fantasy_team_id"]
+    assert payload["my_team"]["owner_avatar_url"] == owner_avatar
+    assert payload["opponent_team"]["owner_avatar_url"] == member_avatar
     assert payload["my_team"]["projected_total"] == 133.1
     assert payload["opponent_team"]["projected_total"] == 137.0
     assert payload["my_team"]["win_probability"] == 48.05

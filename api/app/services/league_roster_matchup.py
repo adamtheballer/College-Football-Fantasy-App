@@ -260,6 +260,25 @@ def _team_records(db: Session, league: League, team_ids: set[int]) -> dict[int, 
     return records
 
 
+def _owner_avatar_urls(db: Session, teams: list[Team], viewer: User) -> dict[int, str | None]:
+    """Fetch visible matchup manager avatars in one bounded query when needed."""
+    owner_ids = {team.owner_user_id for team in teams if team.owner_user_id is not None}
+    if not owner_ids:
+        return {}
+    # The authenticated viewer was already loaded to authorize this request,
+    # so reuse it when their team is on the matchup instead of querying their
+    # avatar again. The remaining opponents are fetched as one batch.
+    avatars = {viewer.id: viewer.avatar_url} if viewer.id in owner_ids else {}
+    owner_ids -= set(avatars)
+    if not owner_ids:
+        return avatars
+    avatars.update({
+        user_id: avatar_url
+        for user_id, avatar_url in db.query(User.id, User.avatar_url).filter(User.id.in_(owner_ids)).all()
+    })
+    return avatars
+
+
 def _team_read(db: Session, league: League, team: Team) -> RosterTabTeamRead:
     return RosterTabTeamRead(
         id=team.id,
@@ -812,6 +831,11 @@ def build_matchup_tab_view(
     if opponent:
         record_team_ids.add(opponent.id)
     records = _team_records(db, league, record_team_ids)
+    avatars_by_owner_id = _owner_avatar_urls(
+        db,
+        [team for team in (primary_team, opponent) if team is not None],
+        user,
+    )
     my_team = MatchupTeamRead(
         id=primary_team.id,
         name=primary_team.name,
@@ -820,6 +844,7 @@ def build_matchup_tab_view(
         win_probability=my_probability,
         fantasy_team_id=primary_team.id,
         fantasy_team_name=primary_team.name,
+        owner_avatar_url=avatars_by_owner_id.get(primary_team.owner_user_id),
         projected_total=my_total,
         current_points=my_current,
         pregame_projected_total=my_pregame_total,
@@ -835,6 +860,7 @@ def build_matchup_tab_view(
             win_probability=opponent_probability,
             fantasy_team_id=opponent.id,
             fantasy_team_name=opponent.name,
+            owner_avatar_url=avatars_by_owner_id.get(opponent.owner_user_id),
             projected_total=opponent_total,
             current_points=opponent_current,
             pregame_projected_total=opponent_pregame_total,
