@@ -19,4 +19,11 @@ describe("ManagerAvatar", () => {
     fireEvent.error(screen.getByRole("img"));
     expect(screen.getByLabelText(/initials AB/i)).toBeTruthy();
   });
+
+  it("shows a prepared mobile photo immediately before the browser emits a load event", () => {
+    render(<ManagerAvatar avatarUrl="data:image/jpeg;base64,/9j/4AAQ" managerName="Adam Bajdechi" />);
+
+    expect(screen.getByLabelText("Adam Bajdechi profile picture")).toBeTruthy();
+    expect(screen.getByRole("img").className).toContain("opacity-100");
+  });
 });

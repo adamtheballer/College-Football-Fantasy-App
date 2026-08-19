@@ -281,7 +281,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Manager identity appears in cached league, draft, matchup, and chat
     // responses. Mark every related view stale so the newly saved photo is
     // fetched immediately instead of waiting for its normal refresh window.
-    void Promise.all([
+    await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["leagues"] }),
       queryClient.invalidateQueries({ queryKey: ["league"] }),
       queryClient.invalidateQueries({ queryKey: ["draft-room"] }),
