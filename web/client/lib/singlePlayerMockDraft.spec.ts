@@ -229,6 +229,20 @@ describe("single-player mock draft engine", () => {
     expect(source).toContain("draftState.userTeamId");
   });
 
+  it("uses the compact roster table in the mock draft room", () => {
+    const source = readFileSync(
+      new URL("../pages/SinglePlayerMockDraftRoom.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain("Slot</p>");
+    expect(source).toContain("Player</p>");
+    expect(source).toContain("Bye</p>");
+    expect(source).toContain("Position limits");
+    expect(source).not.toContain("Roster Viewer");
+    expect(source).not.toContain("Inspect every manager's roster by position group");
+  });
+
   it("starts a fresh mock when new=1 is present and clears stored state", () => {
     const stored = {
       ...createSinglePlayerMockDraft(1_000),

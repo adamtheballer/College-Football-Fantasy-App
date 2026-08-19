@@ -73,15 +73,6 @@ const POSITION_ROW_HOVER_STYLES: Record<string, string> = {
   K: "hover:bg-slate-200/[0.07] hover:shadow-[inset_2px_0_0_rgba(226,232,240,0.65)] focus:bg-slate-200/[0.10]",
 };
 
-const ROSTER_POSITION_STYLES: Record<string, { border: string; bg: string; text: string; dot: string; hover: string }> = {
-  QB: { border: "border-blue-300/30", bg: "bg-[#0b1830]", text: "text-blue-100/85", dot: "bg-blue-400/60", hover: "hover:border-blue-300/55 hover:shadow-[0_0_34px_rgba(96,165,250,0.14)]" },
-  RB: { border: "border-emerald-300/30", bg: "bg-[#0a1f24]", text: "text-emerald-100/85", dot: "bg-emerald-400/60", hover: "hover:border-emerald-300/55 hover:shadow-[0_0_34px_rgba(52,211,153,0.14)]" },
-  WR: { border: "border-violet-300/30", bg: "bg-[#151530]", text: "text-violet-100/85", dot: "bg-violet-400/60", hover: "hover:border-violet-300/55 hover:shadow-[0_0_34px_rgba(167,139,250,0.14)]" },
-  TE: { border: "border-amber-300/30", bg: "bg-[#211b16]", text: "text-amber-100/85", dot: "bg-amber-400/60", hover: "hover:border-amber-300/55 hover:shadow-[0_0_34px_rgba(251,191,36,0.14)]" },
-  K: { border: "border-slate-300/25", bg: "bg-[#182235]", text: "text-slate-100/85", dot: "bg-slate-400/55", hover: "hover:border-slate-200/55 hover:shadow-[0_0_34px_rgba(226,232,240,0.12)]" },
-  EMPTY: { border: "border-white/10", bg: "bg-[#071224]", text: "text-muted-foreground", dot: "bg-white/18", hover: "hover:border-cyan-200/18 hover:shadow-[0_0_24px_rgba(34,211,238,0.08)]" },
-};
-
 const readStoredDraft = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -605,118 +596,51 @@ export default function SinglePlayerMockDraftRoom() {
   );
 
   const renderRoster = () => {
-    const slotByLabel = new Map(selectedRoster.map((slot) => [slot.label, slot]));
-    const starterRows = [
-      { label: "Quarterback", accent: "QB", slots: ["QB"] },
-      { label: "Running Backs", accent: "RB", slots: ["RB 1", "RB 2"] },
-      { label: "Wide Receivers", accent: "WR", slots: ["WR 1", "WR 2"] },
-      { label: "Tight End", accent: "TE", slots: ["TE"] },
-      { label: "Flex + Kicker", accent: "K", slots: ["FLEX", "K"] },
-    ];
-    const benchSlots = selectedRoster.filter((slot) => slot.label.startsWith("BENCH"));
+    const filledSlots = selectedRoster.filter((slot) => slot.player).length;
+    const rosterSlotLimits = selectedRoster.reduce<Record<string, number>>((limits, slot) => {
+      const limitName = slot.label.startsWith("BENCH") ? "BE" : slot.label.replace(/\s+\d+$/, "");
+      limits[limitName] = (limits[limitName] ?? 0) + 1;
+      return limits;
+    }, {});
 
-    const renderSlotCard = (slotLabel: string) => {
-      const slot = slotByLabel.get(slotLabel);
-      if (!slot) return null;
-      const fallbackPosition =
-        slot.allowedPositions.length === 1 ? slot.allowedPositions[0] : "EMPTY";
-      const position = slot.player?.position ?? fallbackPosition;
-      const style = ROSTER_POSITION_STYLES[position] ?? ROSTER_POSITION_STYLES.EMPTY;
+    const renderSlotRow = (slot: (typeof selectedRoster)[number], index: number) => {
+      const displayLabel = slot.label.startsWith("BENCH") ? "BE" : slot.label.replace(/\s+\d+$/, "");
 
       return (
         <div
           key={slot.label}
           className={cn(
-            "relative min-h-[82px] overflow-hidden rounded-2xl border px-4 py-3 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5",
-            "shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]",
-            style.border,
-            style.bg,
-            style.text,
-            style.hover
+            "grid min-h-14 grid-cols-[3.35rem_minmax(0,1fr)_2.4rem] items-center gap-2 border-b border-white/[0.07] px-3 py-2.5 last:border-b-0 sm:grid-cols-[4.5rem_minmax(0,1fr)_3.25rem] sm:px-5",
+            index % 2 === 0 ? "bg-[#202224]" : "bg-[#1b1d1f]",
+            slot.player ? "transition-colors hover:bg-[#292c2f]" : "text-slate-500"
           )}
         >
-          <div className={cn("absolute right-4 top-4 h-2.5 w-2.5 rounded-full shadow-[0_0_18px_currentColor]", style.dot)} />
-          <p className="text-[9px] font-black uppercase tracking-[0.2em]">{slot.label}</p>
+          <p className="text-center text-xs font-medium uppercase tracking-[0.04em] text-slate-400 sm:text-sm">{displayLabel}</p>
           {slot.player ? (
             <button
               type="button"
               onClick={() => setSelectedPlayerId(slot.player?.playerId ?? null)}
-              className="mt-2 block max-w-full truncate text-left text-base font-black text-foreground transition-colors hover:text-cyan-100 focus:outline-none focus-visible:text-cyan-100 focus-visible:underline"
+              className="min-w-0 text-left focus:outline-none focus-visible:underline"
               aria-label={`Open ${slot.player.playerName} player card`}
             >
-              {slot.player.playerName}
+              <span className="block truncate text-sm font-bold text-foreground transition-colors hover:text-white sm:text-base">{slot.player.playerName}</span>
+              <span className="block truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-400 sm:text-[10px]">
+                {slot.player.position} · {slot.player.school} · {slot.player.projectedPoints.toFixed(1)} proj
+              </span>
             </button>
           ) : (
-            <p className="mt-2 truncate text-base font-black text-foreground">Open Slot</p>
+            <p className="truncate text-sm font-medium text-slate-500 sm:text-base">Open slot</p>
           )}
-          <p className="mt-1 truncate text-[9px] font-black uppercase tracking-[0.16em] opacity-80">
-            {slot.player
-              ? `${slot.player.school} • ${slot.player.projectedPoints.toFixed(1)}`
-              : "Waiting for pick"}
-          </p>
-          {slot.player ? (
-            <span className="mt-2 inline-flex rounded-full bg-black/20 px-2.5 py-0.5 text-[8px] font-black uppercase tracking-[0.14em]">
-              {slot.player.position}
-            </span>
-          ) : null}
-        </div>
-      );
-    };
-
-    const renderBenchSlotCard = (slot: (typeof selectedRoster)[number]) => {
-      const position = slot.player?.position ?? "EMPTY";
-      const style = ROSTER_POSITION_STYLES[position] ?? ROSTER_POSITION_STYLES.EMPTY;
-      return (
-        <div
-          key={slot.label}
-          className={cn(
-            "grid min-h-[64px] grid-cols-[90px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border px-4 py-3 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5",
-            "bg-slate-950/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
-            style.border,
-            style.text,
-            style.hover
-          )}
-        >
-          <p className="text-[9px] font-black uppercase tracking-[0.2em]">{slot.label}</p>
-          <div className="min-w-0">
-            {slot.player ? (
-              <button
-                type="button"
-                onClick={() => setSelectedPlayerId(slot.player?.playerId ?? null)}
-                className="block max-w-full truncate text-left text-base font-black text-foreground transition-colors hover:text-cyan-100 focus:outline-none focus-visible:text-cyan-100 focus-visible:underline"
-                aria-label={`Open ${slot.player.playerName} player card`}
-              >
-                {slot.player.playerName}
-              </button>
-            ) : (
-              <p className="truncate text-base font-black text-foreground">Open Slot</p>
-            )}
-            <p className="mt-1 truncate text-[9px] font-black uppercase tracking-[0.16em] opacity-75">
-              {slot.player ? `${slot.player.position} • ${slot.player.school} • ${slot.player.projectedPoints.toFixed(1)}` : "Bench reserve"}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {slot.player ? (
-              <span className={cn("rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em]", POSITION_STYLES[slot.player.position])}>
-                {slot.player.position}
-              </span>
-            ) : null}
-            <div className={cn("h-2.5 w-2.5 rounded-full shadow-[0_0_18px_currentColor]", style.dot)} />
-          </div>
+          <span className="border-l border-white/10 pl-2 text-right text-xs font-medium tabular-nums text-slate-400 sm:pl-3 sm:text-sm">—</span>
         </div>
       );
     };
 
     return (
-      <section className="rounded-[1.75rem] border border-cyan-200/15 bg-card/45 p-5 shadow-[0_0_44px_rgba(34,211,238,0.08),inset_0_1px_0_rgba(255,255,255,0.035)]">
-        <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary">Roster Viewer</p>
-            <p className="mt-1 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-              Inspect every manager's roster by position group
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <section className="overflow-hidden rounded-xl border border-white/12 bg-[#17191b] shadow-[0_8px_20px_rgba(2,6,23,0.18)]">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-white/10 bg-[#151719] px-3 py-3 sm:px-5">
+          <div className="flex items-center gap-3">
+            <p className="text-sm font-bold text-slate-100">{selectedRosterTeam?.id === draftState.userTeamId ? "My Team" : "Team"}</p>
             <label className="sr-only" htmlFor="mock-roster-team-select">
               Select roster team
             </label>
@@ -724,7 +648,7 @@ export default function SinglePlayerMockDraftRoom() {
               id="mock-roster-team-select"
               value={selectedRosterTeam?.id ?? draftState.userTeamId}
               onChange={(event) => setSelectedRosterTeamId(Number(event.target.value))}
-              className="h-12 min-w-[220px] rounded-2xl border border-cyan-200/25 bg-slate-950/70 px-4 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-50 shadow-[0_0_24px_rgba(34,211,238,0.12)] outline-none transition focus:border-cyan-200/60 focus:ring-2 focus:ring-cyan-300/20"
+              className="h-8 min-w-0 max-w-[13rem] rounded-md border border-white/15 bg-[#202328] px-2.5 text-[10px] font-semibold text-slate-100 outline-none transition focus:border-slate-300/60 focus:ring-2 focus:ring-white/10 sm:min-w-[13rem]"
             >
               {draftState.teams.map((team) => (
                 <option key={team.id} value={team.id}>
@@ -732,45 +656,29 @@ export default function SinglePlayerMockDraftRoom() {
                 </option>
               ))}
             </select>
-            <p className="rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-              {selectedRoster.filter((slot) => slot.player).length}/{selectedRoster.length} filled
-            </p>
           </div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">{filledSlots}/{selectedRoster.length} filled</p>
+          <details className="relative ml-auto">
+            <summary className="cursor-pointer list-none rounded-full border border-primary/70 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-primary transition-colors hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70">
+              Position limits
+            </summary>
+            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-30 flex min-w-44 flex-wrap gap-1.5 rounded-lg border border-white/15 bg-[#151719] p-3 shadow-xl">
+              {Object.entries(rosterSlotLimits).map(([slot, count]) => (
+                <span key={slot} className="rounded border border-white/10 bg-[#202328] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.06em] text-slate-300">
+                  {slot} {count}
+                </span>
+              ))}
+            </div>
+          </details>
         </div>
 
-        <div className="space-y-2.5">
-          {starterRows.map((row) => {
-            const accent = ROSTER_POSITION_STYLES[row.accent] ?? ROSTER_POSITION_STYLES.EMPTY;
-            return (
-              <div
-                key={row.label}
-                className="grid gap-2.5 rounded-3xl border border-white/10 bg-slate-950/22 p-2.5 lg:grid-cols-[132px_minmax(0,1fr)]"
-              >
-                <div className={cn("flex items-center rounded-2xl border px-4 py-3", accent.border, accent.bg, accent.text)}>
-                  <div>
-                    <p className="text-[8px] font-black uppercase tracking-[0.18em] opacity-75">Starters</p>
-                    <p className="mt-1 text-xs font-black uppercase tracking-[0.13em] text-foreground">{row.label}</p>
-                  </div>
-                </div>
-                <div className={cn("grid gap-2.5", row.slots.length > 1 && "md:grid-cols-2")}>
-                  {row.slots.map(renderSlotCard)}
-                </div>
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-[3.35rem_minmax(0,1fr)_2.4rem] items-center border-b border-white/10 bg-[#1a1c1e] px-3 py-2 sm:grid-cols-[4.5rem_minmax(0,1fr)_3.25rem] sm:px-5">
+          <p className="text-center text-[9px] font-bold uppercase tracking-[0.08em] text-slate-100">Slot</p>
+          <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-100">Player</p>
+          <p className="border-l border-white/10 pl-2 text-right text-[9px] font-bold uppercase tracking-[0.08em] text-slate-100 sm:pl-3">Bye</p>
         </div>
 
-        <div className="my-5 flex items-center gap-3">
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-cyan-300/45 to-cyan-300/12 shadow-[0_0_14px_rgba(103,232,249,0.34)]" />
-          <div className="rounded-full border border-cyan-200/20 bg-cyan-300/10 px-4 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-cyan-100 shadow-[0_0_20px_rgba(34,211,238,0.14)]">
-            Bench / Reserve
-          </div>
-          <div className="h-px flex-1 bg-gradient-to-l from-transparent via-cyan-300/45 to-cyan-300/12 shadow-[0_0_14px_rgba(103,232,249,0.34)]" />
-        </div>
-
-        <div className="grid gap-2.5 xl:grid-cols-2">
-          {benchSlots.map(renderBenchSlotCard)}
-        </div>
+        <div>{selectedRoster.map(renderSlotRow)}</div>
       </section>
     );
   };
