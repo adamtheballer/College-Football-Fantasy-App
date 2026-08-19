@@ -28,6 +28,7 @@ def game_context_for_players(
     season: int,
     week: int,
     player_schools: dict[int, str | None] | None = None,
+    games: list[Game] | None = None,
 ) -> tuple[dict[int, datetime | None], dict[int, str | None], dict[int, str | None]]:
     if not player_ids:
         return {}, {}, {}
@@ -45,7 +46,8 @@ def game_context_for_players(
         empty = {player_id: None for player_id in player_ids}
         return empty, empty.copy(), empty.copy()
 
-    games = db.query(Game).filter(Game.season == season, Game.week == week).all()
+    if games is None:
+        games = db.query(Game).filter(Game.season == season, Game.week == week).all()
     starts_by_school: dict[str, datetime] = {}
     opponents_by_school: dict[str, str] = {}
     locations_by_school: dict[str, str] = {}

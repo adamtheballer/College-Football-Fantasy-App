@@ -88,4 +88,41 @@ describe("RosterSlotTable", () => {
     expect(screen.queryByText("18.4")).toBeNull();
     expect(formatRosterPointValue(liveReceiver, "live")).toBe("21.4");
   });
+
+  it("uses a zero live total at kickoff, retains the projection as secondary context, and prioritizes red zone styling", () => {
+    const liveReceiver = {
+      ...projectedReceiver,
+      live_game_state: "live" as const,
+      live_points: null,
+      team_has_possession: true,
+      team_in_red_zone: true,
+    };
+    const { container } = render(<RosterSlotTable title="Starters" players={[liveReceiver]} />);
+
+    expect(screen.getByText("0.0")).toBeTruthy();
+    expect(screen.getByText("Proj 18.4")).toBeTruthy();
+    expect(screen.getByText("Red zone")).toBeTruthy();
+    expect(container.querySelector('[data-live-game-state="live"]')?.getAttribute("data-in-red-zone")).toBe("true");
+    expect(formatRosterPointValue(liveReceiver, "projected")).toBe("0.0");
+  });
+
+  it("keeps a scheduled player's projection visible while another game is live", () => {
+    const scheduledReceiver = { ...projectedReceiver, live_game_state: "scheduled" as const, live_points: null };
+
+    expect(formatRosterPointValue(scheduledReceiver, "live")).toBe("18.4");
+  });
+
+  it("uses the neutral possession treatment when the offense is outside the red zone", () => {
+    const possessionReceiver = {
+      ...projectedReceiver,
+      live_game_state: "live" as const,
+      team_has_possession: true,
+      team_in_red_zone: false,
+    };
+    const { container } = render(<RosterSlotTable title="Starters" players={[possessionReceiver]} />);
+    const row = container.querySelector('[data-has-possession="true"]');
+
+    expect(row?.className).toContain("bg-slate-100/[0.10]");
+    expect(screen.getByText("Possession")).toBeTruthy();
+  });
 });

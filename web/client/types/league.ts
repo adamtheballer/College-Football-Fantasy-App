@@ -255,6 +255,9 @@ export interface LeagueRosterPlayer {
   live_points?: number | null;
   live_scoring_status?: string | null;
   live_scoring_updated_at?: string | null;
+  live_game_state?: "scheduled" | "live" | "final" | "unavailable" | string | null;
+  team_has_possession?: boolean;
+  team_in_red_zone?: boolean;
   game_start_at?: string | null;
   is_locked?: boolean;
   is_placeholder?: boolean;

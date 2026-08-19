@@ -567,6 +567,9 @@ class RosterTabEntryRead(BaseModel):
     live_points: float | None = None
     live_scoring_status: str = "unavailable"
     live_scoring_updated_at: datetime | None = None
+    live_game_state: str = "unavailable"
+    team_has_possession: bool = False
+    team_in_red_zone: bool = False
     game_start_at: datetime | None = None
     is_locked: bool = False
     acquisition_type: str = "ROSTER"

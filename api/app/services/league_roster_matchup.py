@@ -1,5 +1,7 @@
 import math
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
@@ -7,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from collegefootballfantasy_api.app.core.config import settings as app_settings
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
+from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
@@ -15,6 +18,7 @@ from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_waiver_availability import PlayerWaiverAvailability
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
+from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
@@ -55,6 +59,7 @@ from collegefootballfantasy_api.app.services.matchup_probability import (
 )
 from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_context_for_players
 from collegefootballfantasy_api.app.services.player_pool_filters import canonical_fantasy_player_filter
+from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
 from collegefootballfantasy_api.app.services.roster_slots import CanonicalRosterSlot, build_team_roster_slots
 from collegefootballfantasy_api.app.services.waiver_service import serialize_claims, waiver_window_state
 
@@ -67,6 +72,117 @@ DEFAULT_ROSTER_SLOTS = {
     "BENCH": 4,
     "IR": 1,
 }
+
+ESPN_PROVIDER = "espn"
+
+
+@dataclass(frozen=True)
+class LiveGameContext:
+    state: str = "unavailable"
+    has_possession: bool = False
+    in_red_zone: bool = False
+
+
+def _school_key(value: str | None) -> str | None:
+    if not value:
+        return None
+    return canonical_school_name(value) or normalize_school(value)
+
+
+def _summary_live_context(payload: dict[str, Any]) -> tuple[str, set[str], bool]:
+    """Read possession/red-zone from the accepted cached ESPN summary only.
+
+    The roster endpoint must never make a provider call. ESPN's summary payload
+    identifies the offense by competitor id (or a competitor possession flag)
+    and exposes ``situation.isRedZone`` while live. Missing fields stay false
+    rather than being guessed from play text or score shape.
+    """
+
+    header = payload.get("header") if isinstance(payload.get("header"), dict) else {}
+    competitions = header.get("competitions") if isinstance(header.get("competitions"), list) else []
+    competition = competitions[0] if competitions and isinstance(competitions[0], dict) else {}
+    status = competition.get("status") if isinstance(competition.get("status"), dict) else {}
+    status_type = status.get("type") if isinstance(status.get("type"), dict) else {}
+    state = str(status_type.get("state") or "unavailable").strip().lower()
+    state = "live" if state == "in" else "final" if state == "post" or status_type.get("completed") is True else "scheduled" if state == "pre" else "unavailable"
+    if state != "live":
+        return state, set(), False
+
+    situation = payload.get("situation") if isinstance(payload.get("situation"), dict) else {}
+    possession_id = str(situation.get("possession") or "").strip()
+    possession_keys: set[str] = set()
+    competitors = competition.get("competitors") if isinstance(competition.get("competitors"), list) else []
+    for competitor in competitors:
+        if not isinstance(competitor, dict):
+            continue
+        team = competitor.get("team") if isinstance(competitor.get("team"), dict) else {}
+        competitor_id = str(competitor.get("id") or team.get("id") or "").strip()
+        is_possession = (
+            possession_id == competitor_id
+            if possession_id
+            else bool(competitor.get("possession"))
+        )
+        if not is_possession:
+            continue
+        for name in (team.get("location"), team.get("shortDisplayName"), team.get("displayName")):
+            if isinstance(name, str) and (key := _school_key(name)):
+                possession_keys.add(key)
+    return state, possession_keys, situation.get("isRedZone") is True
+
+
+def _live_game_context_by_player(
+    db: Session,
+    *,
+    season: int,
+    week: int,
+    player_schools: dict[int, str | None],
+    games: list[Game] | None = None,
+) -> dict[int, LiveGameContext]:
+    """Map rostered schools to accepted ESPN game snapshots without I/O."""
+
+    school_to_game_id: dict[str, str | None] = {}
+    if games is None:
+        games = db.query(Game).filter(Game.season == season, Game.week == week).all()
+    for game in games:
+        provider_game_id = str(game.external_id or "").strip() or None
+        for school in (game.home_team, game.away_team):
+            key = _school_key(school)
+            if not key:
+                continue
+            if key in school_to_game_id and school_to_game_id[key] != provider_game_id:
+                school_to_game_id[key] = None
+            else:
+                school_to_game_id[key] = provider_game_id
+    game_ids = {game_id for game_id in school_to_game_id.values() if game_id}
+    polls = {
+        poll.provider_game_id: poll
+        for poll in db.query(ProviderGamePoll)
+        .filter(
+            ProviderGamePoll.provider == ESPN_PROVIDER,
+            ProviderGamePoll.season == season,
+            ProviderGamePoll.week == week,
+            ProviderGamePoll.provider_game_id.in_(game_ids),
+        )
+        .all()
+    } if game_ids else {}
+    contexts: dict[int, LiveGameContext] = {}
+    parsed: dict[str, tuple[str, set[str], bool]] = {}
+    for player_id, school in player_schools.items():
+        key = _school_key(school)
+        game_id = school_to_game_id.get(key) if key else None
+        poll = polls.get(game_id) if game_id else None
+        if poll is None or not poll.accepted_snapshot_hash or not isinstance(poll.latest_payload, dict):
+            contexts[player_id] = LiveGameContext()
+            continue
+        if game_id not in parsed:
+            parsed[game_id] = _summary_live_context(poll.latest_payload)
+        state, possession_keys, is_red_zone = parsed[game_id]
+        contexts[player_id] = LiveGameContext(
+            state=state,
+            has_possession=bool(key and key in possession_keys),
+            in_red_zone=bool(is_red_zone and key and key in possession_keys),
+        )
+    return contexts
 
 
 def _slot_limits(db: Session, league: League) -> dict[str, int]:
@@ -211,6 +327,7 @@ def _serialize_roster_entry(
     game_location: str | None = None,
     game_start_at: datetime | None = None,
     is_locked: bool = False,
+    live_game: LiveGameContext | None = None,
 ) -> RosterTabEntryRead:
     entry = roster_slot.entry
     projected = float(projection.fantasy_points) if projection and projection.fantasy_points is not None else None
@@ -248,6 +365,9 @@ def _serialize_roster_entry(
         live_points=float(player_score.fantasy_points) if player_score else None,
         live_scoring_status=player_score.status if player_score else "unavailable",
         live_scoring_updated_at=player_score.calculated_at if player_score else None,
+        live_game_state=live_game.state if live_game else "unavailable",
+        team_has_possession=live_game.has_possession if live_game else False,
+        team_in_red_zone=live_game.in_red_zone if live_game else False,
         game_start_at=game_start_at,
         is_locked=is_locked,
     )
@@ -272,12 +392,21 @@ def _serialize_team_roster(
         entry.player_id: entry.player.school if entry.player else None
         for entry in entries
     }
+    games = (
+        db.query(Game).filter(Game.season == league.season_year, Game.week == week).all()
+        if player_ids
+        else []
+    )
     game_starts, opponents, game_locations = game_context_for_players(
         db,
         player_ids=player_ids,
         season=league.season_year,
         week=week,
         player_schools=player_schools,
+        games=games,
+    )
+    live_games = _live_game_context_by_player(
+        db, season=league.season_year, week=week, player_schools=player_schools, games=games
     )
     current_time = datetime.now(timezone.utc)
     slots = build_team_roster_slots(team.id, _slot_limits(db, league), entries)
@@ -291,6 +420,7 @@ def _serialize_team_roster(
             opponents.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             game_location=game_locations.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             game_start_at=game_starts.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+            live_game=live_games.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             is_locked=(
                 roster_slot.entry is not None
                 and game_starts.get(roster_slot.entry.player_id) is not None
@@ -316,12 +446,21 @@ def _serialize_team_rosters(
         for entries in entries_by_team.values()
         for entry in entries
     }
+    games = (
+        db.query(Game).filter(Game.season == league.season_year, Game.week == week).all()
+        if player_ids
+        else []
+    )
     game_starts, opponents, game_locations = game_context_for_players(
         db,
         player_ids=player_ids,
         season=league.season_year,
         week=week,
         player_schools=player_schools,
+        games=games,
+    )
+    live_games = _live_game_context_by_player(
+        db, season=league.season_year, week=week, player_schools=player_schools, games=games
     )
     current_time = datetime.now(timezone.utc)
     slot_limits = _slot_limits(db, league)
@@ -336,6 +475,7 @@ def _serialize_team_rosters(
                 opponents.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 game_location=game_locations.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 game_start_at=game_starts.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+                live_game=live_games.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 is_locked=(
                     roster_slot.entry is not None
                     and game_starts.get(roster_slot.entry.player_id) is not None
