@@ -193,6 +193,7 @@ export function useLeagueMatchupTab(
   matchupId?: number,
   enabled = true
 ) {
+  const LIVE_REFRESH_MS = 180_000;
   return useQuery({
     queryKey: ["league", leagueId, "matchup", week ?? "auto", matchupId ?? "mine"],
     enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
@@ -210,7 +211,14 @@ export function useLeagueMatchupTab(
       }),
     refetchInterval: (query) => {
       const status = query.state.data?.status?.toLowerCase();
-      if (status === "live") return 10_000;
+      if (status === "live") {
+        const nextRefreshAt = query.state.data?.next_refresh_at;
+        if (nextRefreshAt) {
+          const remaining = new Date(nextRefreshAt).getTime() - Date.now();
+          if (Number.isFinite(remaining) && remaining > 0) return Math.max(15_000, remaining);
+        }
+        return LIVE_REFRESH_MS;
+      }
       if (status === "final" || status === "stat_corrected") return false;
       return 30_000;
     },

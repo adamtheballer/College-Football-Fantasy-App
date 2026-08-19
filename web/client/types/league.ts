@@ -255,6 +255,17 @@ export interface LeagueRosterPlayer {
   live_points?: number | null;
   live_scoring_status?: string | null;
   live_scoring_updated_at?: string | null;
+  current_fantasy_points?: number | null;
+  pregame_projected_points?: number | null;
+  live_projected_final_points?: number | null;
+  live_projection_status?: "PRE" | "LIVE" | "FINAL" | "STALE" | "OUT" | string | null;
+  live_projection_model_version?: string | null;
+  projection_updated_at?: string | null;
+  provider_snapshot_at?: string | null;
+  game_period?: number | null;
+  game_clock?: string | null;
+  game_progress?: number | null;
+  live_projection_fallback_reason?: string | null;
   live_game_state?: "scheduled" | "live" | "final" | "unavailable" | string | null;
   team_has_possession?: boolean;
   team_in_red_zone?: boolean;
@@ -297,6 +308,9 @@ export interface LeagueMatchupTeam {
   record: string;
   projected_points?: number | null;
   projected_total?: number | null;
+  current_points?: number | null;
+  pregame_projected_total?: number | null;
+  live_projected_total?: number | null;
   win_probability?: number | null;
   roster: LeagueRosterPlayer[];
 }
@@ -323,6 +337,9 @@ export interface LeagueMatchupTabResponse {
   opponent_roster?: LeagueRosterPlayer[];
   projection_source?: string;
   live_scoring_freshness?: LiveScoringFreshness | null;
+  projection_updated_at?: string | null;
+  provider_snapshot_at?: string | null;
+  next_refresh_at?: string | null;
   message?: string | null;
 }
 

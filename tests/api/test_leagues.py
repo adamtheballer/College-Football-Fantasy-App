@@ -49,6 +49,10 @@ def create_user_and_token(client, suffix: str = "one") -> str:
 
 
 def create_league(client, token: str, name: str = "Test League", max_teams: int = 12) -> dict:
+    # The default must remain future-dated: durable reminder assertions rely
+    # on a scheduled draft, and a fixed calendar timestamp eventually turns
+    # these generic fixtures into already-started drafts.
+    default_draft_time = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=7)
     payload = {
         "basics": {
             "name": name,
@@ -69,7 +73,7 @@ def create_league(client, token: str, name: str = "Test League", max_teams: int 
             "defense_enabled": False,
         },
         "draft": {
-            "draft_datetime_utc": "2026-08-19T18:00:00Z",
+            "draft_datetime_utc": default_draft_time.isoformat(),
             "timezone": "America/Los_Angeles",
             "draft_type": "snake",
             "pick_timer_seconds": 90,

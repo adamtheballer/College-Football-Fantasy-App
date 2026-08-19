@@ -18,7 +18,7 @@ vi.mock("@/hooks/use-roster-actions", () => ({
   useUpdateLineup: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
-import { formatRosterPointValue, RosterSlotTable } from "./RosterSlotTable";
+import { formatRosterPointValue, liveProjectionDetail, RosterSlotTable } from "./RosterSlotTable";
 
 afterEach(cleanup);
 
@@ -104,6 +104,17 @@ describe("RosterSlotTable", () => {
     expect(screen.getByText("Red zone")).toBeTruthy();
     expect(container.querySelector('[data-live-game-state="live"]')?.getAttribute("data-in-red-zone")).toBe("true");
     expect(formatRosterPointValue(liveReceiver, "projected")).toBe("0.0");
+  });
+
+  it("labels the live predicted final separately from the current score", () => {
+    const liveReceiver = {
+      ...projectedReceiver,
+      live_game_state: "live" as const,
+      current_fantasy_points: 4.2,
+      live_projected_final_points: 16.7,
+    };
+    expect(formatRosterPointValue(liveReceiver, "live")).toBe("4.2");
+    expect(liveProjectionDetail(liveReceiver)).toBe("Proj 16.7");
   });
 
   it("keeps a scheduled player's projection visible while another game is live", () => {

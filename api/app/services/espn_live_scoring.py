@@ -928,6 +928,20 @@ def run_espn_scoring_cycle(
                 corrected_provider_game_ids.add(claim.provider_game_id)
             if decision.accepted:
                 pending_promotion.extend(normalized)
+                if mode == "enabled":
+                    # This consumes the same accepted, persisted provider
+                    # snapshot as scoring. It makes no provider request. Keep
+                    # shadow mode observational-only: it must not surface new
+                    # public matchup state before the existing readiness gate
+                    # has approved live scoring.
+                    from collegefootballfantasy_api.app.services.live_projection import (
+                        persist_live_projections_for_snapshot,
+                    )
+
+                    accepted = _accepted_snapshot(db, db.get(ProviderGamePoll, claim.id))
+                    if accepted is not None:
+                        persist_live_projections_for_snapshot(db, snapshot=accepted)
+                        db.commit()
             successful += 1
             normalized_count += len(normalized)
             unmatched_count += unmatched

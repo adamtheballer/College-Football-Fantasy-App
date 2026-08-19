@@ -7,6 +7,11 @@ import type { LeagueMatchupTeam, LeagueRosterPlayer } from "@/types/league";
 
 vi.mock("@/components/league/RosterSlotTable", () => ({
   RosterSlotTable: () => <div data-testid="desktop-roster-table" />,
+  formatRosterPointValue: (player: LeagueRosterPlayer) => {
+    const value = player.current_fantasy_points ?? player.live_points ?? player.projected_points;
+    return typeof value === "number" ? value.toFixed(1) : "—";
+  },
+  liveProjectionDetail: (player: LeagueRosterPlayer) => player.live_projected_final_points ? `Proj ${player.live_projected_final_points.toFixed(1)}` : null,
 }));
 
 vi.mock("@/components/player/PlayerCardModal", () => ({

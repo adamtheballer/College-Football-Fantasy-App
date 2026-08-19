@@ -39,7 +39,7 @@ export function shouldShowMatchupScorePanels(status: string | null | undefined) 
 }
 
 function teamTotal(team: LeagueMatchupTeam | null) {
-  return team?.projected_total ?? team?.projected_points ?? null;
+  return team?.live_projected_total ?? team?.projected_total ?? team?.projected_points ?? null;
 }
 
 function leadingTeam(myTeam: LeagueMatchupTeam | null, opponentTeam: LeagueMatchupTeam | null) {
@@ -210,10 +210,10 @@ function MatchupTeamSummary({
       </p>
       <p className="text-[9px] font-bold text-cfb-text-muted sm:text-[10px]">{team?.record ?? "0-0-0"}</p>
       <p className="mt-0.5 font-display text-2xl font-black leading-none tracking-[-0.06em] text-cfb-text-primary sm:mt-1 sm:text-4xl">
-        {showActual ? formatMatchupPoints(currentScore) : "0.0"}
+        {showActual ? formatMatchupPoints(team?.current_points ?? currentScore) : formatMatchupPoints(projected)}
       </p>
       <p aria-label={`Projected ${formatMatchupPoints(projected)}`} className="mt-0.5 text-[9px] font-bold text-cfb-text-muted">
-        {formatMatchupPoints(projected)}
+        {showActual ? `Proj ${formatMatchupPoints(projected)}` : "Pregame projection"}
       </p>
     </div>
   );

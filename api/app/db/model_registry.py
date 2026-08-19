@@ -35,6 +35,7 @@ def ensure_models_registered() -> None:
         league_scoring_migration,
         league_settings,
         lineup_week_snapshot,
+        live_player_projection,
         matchup,
         mock_draft,
         mock_draft_pick,
