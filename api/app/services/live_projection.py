@@ -127,6 +127,7 @@ def project_live_player(
     game_status: str,
     game_progress: float | None,
     previous_projection: Mapping[str, float] | None = None,
+    previous_game_progress: float | None = None,
     ruled_out: bool = False,
     pregame_fantasy_points: float | None = None,
 ) -> LiveProjectionResult:
@@ -178,7 +179,10 @@ def project_live_player(
         remaining[field] = max(0.0, prior[field] * remaining_fraction * multiplier)
     raw_final = {field: current[field] + remaining[field] for field in STAT_FIELDS}
     alpha = _clamp(0.35 + 0.50 * progress, 0.35, 0.85)
-    if previous_projection:
+    # Kickoff initializes from the pregame prior. Do not smooth the first
+    # meaningful live snapshot back toward that initialization; it would hide
+    # the required Q1 regression when a player has not produced.
+    if previous_projection and (previous_game_progress is None or previous_game_progress > 0):
         final = {field: max(current[field], alpha * raw_final[field] + (1 - alpha) * _number(previous_projection.get(field))) for field in STAT_FIELDS}
     else:
         final = raw_final
@@ -245,6 +249,7 @@ def persist_live_projections_for_snapshot(db: Session, *, snapshot: ProviderGame
             game_status=snapshot.event_state,
             game_progress=progress,
             previous_projection=earlier.projected_final_stats_json if earlier and earlier.provider_snapshot_hash != snapshot.snapshot_hash else None,
+            previous_game_progress=earlier.game_progress if earlier else None,
             pregame_fantasy_points=_number(pregame.fantasy_points),
         )
         db.add(LivePlayerProjection(

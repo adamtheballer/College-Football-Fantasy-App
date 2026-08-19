@@ -149,3 +149,54 @@ def test_accepted_snapshot_persists_one_idempotent_model_result(db_session):
     assert row.model_version == LIVE_PROJECTION_V1
     assert row.projection_status == "LIVE"
     assert row.game_progress == 0.25
+
+
+def test_cached_snapshot_replay_evolves_from_kickoff_through_final_without_provider_io(db_session):
+    player = Player(name="Jeremiah Smith", school="Ohio State", position="WR")
+    game = Game(external_id="espn-replay", season=2026, week=1, home_team="Ohio State", away_team="Ball State")
+    db_session.add_all([player, game])
+    db_session.flush()
+    db_session.add(WeeklyProjection(
+        player_id=player.id, season=2026, week=1, fantasy_points=28.9,
+        targets=10, receptions=7, rec_yards=99, rec_tds=2,
+    ))
+    db_session.commit()
+
+    captured_at = datetime(2026, 8, 30, 16, 0, tzinfo=timezone.utc)
+    replay = [
+        ("live", 1, "15:00", {}),
+        ("live", 2, "15:00", {}),
+        ("live", 3, "15:00", {"targets": 4, "receptions": 2, "rec_yards": 35}),
+        ("live", 4, "15:00", {"targets": 8, "receptions": 4, "rec_yards": 90, "rec_tds": 1}),
+        ("final", 4, "00:00", {"targets": 10, "receptions": 5, "rec_yards": 160, "rec_tds": 1}),
+    ]
+    hashes: list[str] = []
+    for index, (state, period, clock, stats) in enumerate(replay):
+        snapshot_hash = f"{index + 1:064x}"
+        hashes.append(snapshot_hash)
+        snapshot = ProviderGameSnapshot(
+            provider="espn", provider_game_id="espn-replay", season=2026, week=1,
+            status=state, event_state=state, event_period=period, event_clock=clock,
+            accepted=True, classification="NEWER", snapshot_hash=snapshot_hash,
+            captured_at=captured_at.replace(minute=captured_at.minute + index), raw_payload={},
+            normalized_rows=[{"player_id": player.id, "stats": stats}],
+        )
+        db_session.add(snapshot)
+        db_session.commit()
+        assert persist_live_projections_for_snapshot(db_session, snapshot=snapshot) == 1
+        db_session.commit()
+
+    rows = {
+        row.provider_snapshot_hash: row
+        for row in db_session.query(LivePlayerProjection)
+        .filter(LivePlayerProjection.player_id == player.id)
+        .all()
+    }
+    assert len(rows) == 5
+    assert _points(rows[hashes[0]].projected_final_stats_json) == pytest.approx(28.9)
+    assert 20 <= _points(rows[hashes[1]].projected_final_stats_json) <= 23
+    assert _points(rows[hashes[3]].projected_final_stats_json) > _points(rows[hashes[1]].projected_final_stats_json)
+    final = rows[hashes[4]]
+    assert final.projection_status == "FINAL"
+    assert final.projected_remaining_stats_json["rec_yards"] == 0
+    assert _points(final.projected_final_stats_json) == pytest.approx(27.0)
