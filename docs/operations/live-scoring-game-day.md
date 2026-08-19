@@ -45,6 +45,16 @@ allowed to promote provider totals into public matchup scores.
    response is partial, delayed, or regressive, do not manually zero a player;
    the worker preserves the last accepted snapshot by design.
 
+## Live long-play alerts
+
+Long-play alerts are opt-in and must be enabled only after the first live-game
+check above succeeds. Set `LIVE_PLAYER_NOTIFICATIONS_ENABLED=true` in the ESPN
+scoring-worker environment, then verify one in-app notification before
+enabling external push delivery. Confirm the notification worker remains
+healthy. The scoring worker queues an alert only when a newly
+accepted provider play can be matched uniquely to a verified athlete in that
+same box score; ambiguous names are skipped.
+
 ## After final
 
 1. Confirm the game reaches final and run the postgame reconciliation worker.

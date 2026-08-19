@@ -142,7 +142,11 @@ test.describe("real two-manager draft lifecycle", () => {
         BENCH: 5,
         IR: 1,
       });
-      expect(room.body.picks).toHaveLength(2);
+      // The lifecycle worker can legitimately advance another one-second turn
+      // while the two browser contexts fetch their snapshots. The contract is
+      // that both managers observe the same unique sequence after at least two
+      // timeout picks, not that network timing freezes the sequence at two.
+      expect(room.body.picks.length).toBeGreaterThanOrEqual(2);
       expect(managerRoom.body.picks.map((pick) => pick.player_id)).toEqual(room.body.picks.map((pick) => pick.player_id));
       expect(new Set(room.body.picks.map((pick) => pick.player_id)).size).toBe(room.body.picks.length);
       expect(room.body.picks.every((pick) => pick.auto_pick)).toBe(true);
