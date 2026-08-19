@@ -120,6 +120,33 @@ def test_manager_avatar_profile_patch_preserves_omitted_fields_and_can_remove(cl
     assert db_session.get(User, payload["user"]["id"]).avatar_url is None
 
 
+def test_manager_avatar_profile_patch_accepts_a_compact_jpeg_photo_from_the_app(client, db_session):
+    payload = signup_user(client, "avatar-photo")
+    # The profile client turns chosen photos into compact JPEG data URLs. The
+    # smallest SOI-prefixed payload is sufficient here because the API guards
+    # storage type and byte size, while the browser is responsible for rasterizing.
+    avatar_url = "data:image/jpeg;base64,/9j/4AAQSkY="
+
+    response = client.patch("/auth/me", json={"avatar_url": avatar_url}, headers=auth_headers(payload["access_token"]))
+
+    assert response.status_code == 200
+    assert response.json()["avatar_url"] == avatar_url
+    assert db_session.get(User, payload["user"]["id"]).avatar_url == avatar_url
+
+
+@pytest.mark.parametrize("avatar_url", [
+    "data:image/png;base64,iVBORw0KGgo=",
+    "data:image/jpeg;base64,not-base64!",
+    "data:image/jpeg;base64,ZmFrZS1ub3QtYS1qcGVn",
+])
+def test_manager_avatar_profile_patch_rejects_unsafe_photo_data(client, avatar_url):
+    payload = signup_user(client, f"avatar-photo-{abs(hash(avatar_url))}")
+
+    response = client.patch("/auth/me", json={"avatar_url": avatar_url}, headers=auth_headers(payload["access_token"]))
+
+    assert response.status_code == 422
+
+
 @pytest.mark.parametrize("avatar_url", [
     "http://images.example.com/avatar.jpg",
     "javascript:alert(1)",

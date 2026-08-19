@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   updateProfile: vi.fn(),
   setActiveLeagueId: vi.fn(),
+  prepareProfileImage: vi.fn(),
   user: { id: 7, firstName: "Adam", email: "adam@example.com", isAdmin: false, avatarUrl: null },
 }));
 
@@ -39,6 +40,10 @@ vi.mock("@/components/support/SupportContactCard", () => ({
   SupportContactCard: () => <div>Support</div>,
 }));
 
+vi.mock("@/lib/profileImage", () => ({
+  prepareProfileImage: state.prepareProfileImage,
+}));
+
 vi.mock("@/components/ui/select", async () => {
   const React = await import("react");
   const Context = React.createContext<{ onValueChange?: (value: string) => void }>({});
@@ -65,6 +70,7 @@ describe("Settings beta preferences", () => {
     localStorage.clear();
     state.updateProfile.mockReset();
     state.updateProfile.mockResolvedValue({ id: 7, firstName: "Updated Adam", avatarUrl: null });
+    state.prepareProfileImage.mockReset();
   });
 
   it("shows the notification permission state without third-party theme controls", () => {
@@ -87,7 +93,7 @@ describe("Settings beta preferences", () => {
     await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ firstName: "Updated Adam", avatarUrl: null }));
   });
 
-  it("saves and removes a manager profile image URL through the same profile update", async () => {
+  it("keeps the image-address fallback available and removes it immediately", async () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
     fireEvent.change(screen.getByLabelText("Profile image URL (optional)"), { target: { value: "https://images.example.com/adam.jpg" } });
@@ -95,7 +101,23 @@ describe("Settings beta preferences", () => {
     await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ firstName: "Adam", avatarUrl: "https://images.example.com/adam.jpg" }));
 
     fireEvent.click(screen.getByRole("button", { name: /remove picture/i }));
-    expect((screen.getByLabelText("Profile image URL (optional)") as HTMLInputElement).value).toBe("");
+    await waitFor(() => expect(state.updateProfile).toHaveBeenLastCalledWith({ avatarUrl: null }));
+  });
+
+  it("shows a chosen mobile photo for review and only updates the profile after Select Photo", async () => {
+    state.prepareProfileImage.mockResolvedValue("data:image/jpeg;base64,/9j/4AAQ");
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    fireEvent.change(screen.getByLabelText("Choose a profile photo"), {
+      target: { files: [new File(["photo"], "manager.png", { type: "image/png" })] },
+    });
+
+    await screen.findByRole("button", { name: /select photo/i });
+    expect(state.updateProfile).not.toHaveBeenCalled();
+    expect(screen.getByText(/manager\.png is ready/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /select photo/i }));
+    await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ avatarUrl: "data:image/jpeg;base64,/9j/4AAQ" }));
   });
 
   it("records an explicit replay request before returning to Home", () => {
