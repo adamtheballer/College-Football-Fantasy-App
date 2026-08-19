@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LeagueCard } from "./Leagues";
+import { LeagueCard, orderLeaguesByRecent } from "./Leagues";
 
 const props = {
   id: 1,
@@ -64,22 +64,31 @@ describe("LeagueCard", () => {
       />
     );
 
-    const openHubButton = screen
-      .getAllByRole("button", { name: /Open League Hub/i })
-      .find((element) => element.tagName === "BUTTON");
-    expect(openHubButton).toBeTruthy();
-    fireEvent.click(openHubButton!);
+    fireEvent.click(screen.getByRole("button", { name: /Saturday League/i }));
     expect(props.onOpen).toHaveBeenCalledWith(1);
-    expect(screen.queryByRole("button", { name: /Join Draft Room/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Draft Room Locked/i })).toBeNull();
+    expect(screen.getAllByRole("button")).toHaveLength(2);
   });
 
-  it("shows the signed-in manager's record, opponent, and canonical win chance", () => {
+  it("shows the signed-in manager's compact record and projection metadata", () => {
     render(<LeagueCard {...props} iconUrl={null} />);
 
-    expect(screen.getByText("2-1")).toBeTruthy();
-    expect(screen.getByText("Sunday Stars")).toBeTruthy();
-    expect(screen.getByText("133.1 - 127.6")).toBeTruthy();
-    expect(screen.getByText("Win chance 52%")).toBeTruthy();
+    expect(screen.getByText("Record 2-1")).toBeTruthy();
+    expect(screen.getByText("Proj 133.1")).toBeTruthy();
+    expect(screen.getByText("Week 1 · 52% win")).toBeTruthy();
+    expect(screen.queryByText("Sunday Stars")).toBeNull();
+  });
+});
+
+describe("orderLeaguesByRecent", () => {
+  it("places recently opened leagues first and preserves the remaining server order", () => {
+    expect(orderLeaguesByRecent([
+      { id: 1, name: "First" },
+      { id: 2, name: "Second" },
+      { id: 3, name: "Third" },
+    ], [3, 1])).toEqual([
+      { id: 3, name: "Third" },
+      { id: 1, name: "First" },
+      { id: 2, name: "Second" },
+    ]);
   });
 });
