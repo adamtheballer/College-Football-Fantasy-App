@@ -661,12 +661,15 @@ def build_roster_tab_view(
     teams_by_id = {league_team.id: league_team for league_team in teams}
     rosters_by_team = _serialize_team_rosters(db, league, teams_by_id, week)
     team_records = _team_records(db, league, set(teams_by_id))
+    avatars_by_owner_id = _owner_avatar_urls(db, teams, user)
     team_rosters = [
         LeagueRosterTeamRead(
             team=RosterTabTeamRead(
                 id=league_team.id,
                 name=league_team.name,
                 owner_user_id=league_team.owner_user_id,
+                owner_name=league_team.owner_name,
+                owner_avatar_url=avatars_by_owner_id.get(league_team.owner_user_id),
                 record=team_records.get(league_team.id, "0-0-0"),
             ),
             roster=rosters_by_team.get(league_team.id, []),

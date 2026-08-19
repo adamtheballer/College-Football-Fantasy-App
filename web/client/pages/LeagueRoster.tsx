@@ -4,6 +4,7 @@ import { Navigate, useParams } from "react-router-dom";
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
 import { WeekSelector } from "@/components/league/WeekSelector";
+import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
 import { ErrorState } from "@/components/states/ErrorState";
 import { useLeagueDetail, useLeagueRosterTab } from "@/hooks/use-leagues";
 import { ApiError } from "@/lib/api";
@@ -66,7 +67,7 @@ export const getLeagueRosterTeams = (rosterData?: LeagueRosterTabResponse): Leag
   ];
 };
 
-function TeamRosterRail({
+export function TeamRosterRail({
   teams,
   selectedTeamId,
   ownedTeamId,
@@ -106,9 +107,12 @@ function TeamRosterRail({
               }`}
             >
               <div className="flex min-w-[172px] items-center gap-2.5">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cfb-brand/45 bg-cfb-brand/[0.08] text-[10px] font-black text-cfb-brand">
-                  {team.name.trim().slice(0, 2).toUpperCase() || "TM"}
-                </span>
+                <ManagerAvatar
+                  avatarUrl={team.owner_avatar_url}
+                  managerName={team.owner_name ?? team.name}
+                  size="sm"
+                  className="border-cfb-brand/45 bg-cfb-brand/[0.08] text-cfb-brand"
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[11px] font-black leading-4">{team.name}</span>
                   <span className="mt-0.5 block truncate text-[9px] font-bold text-cfb-text-muted">

@@ -540,6 +540,8 @@ class RosterTabTeamRead(BaseModel):
     id: int
     name: str
     owner_user_id: int | None = None
+    owner_name: str | None = None
+    owner_avatar_url: str | None = None
     record: str | None = None
 
 
