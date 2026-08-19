@@ -61,6 +61,11 @@ def create_user(client, suffix: str = "one") -> dict:
 
 
 def create_league(client, token: str, name: str = "Notify League") -> dict:
+    # Keep the default draft safely more than an hour ahead of the test clock.
+    # The scheduler correctly falls back from DRAFT_1H to DRAFT_SOON for
+    # late-created leagues, so the former fixed August timestamp made these
+    # tests change behavior as real time crossed the one-hour boundary.
+    draft_datetime_utc = (datetime.now(timezone.utc) + timedelta(hours=2)).replace(microsecond=0)
     payload = {
         "basics": {
             "name": name,
@@ -81,7 +86,7 @@ def create_league(client, token: str, name: str = "Notify League") -> dict:
             "defense_enabled": False,
         },
         "draft": {
-            "draft_datetime_utc": "2026-08-19T18:00:00Z",
+            "draft_datetime_utc": draft_datetime_utc.isoformat(),
             "timezone": "America/Los_Angeles",
             "draft_type": "snake",
             "pick_timer_seconds": 90,
