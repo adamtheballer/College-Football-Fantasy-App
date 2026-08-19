@@ -1,4 +1,4 @@
-import { type MouseEvent, useEffect, useState } from "react";
+import { type MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Trophy,
@@ -38,6 +38,32 @@ const formatRecord = (summary: LeagueListCurrentUserSummary | null | undefined) 
 
 const formatProjectedPoints = (value: number | null | undefined) =>
   typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "—";
+
+const RECENT_LEAGUE_IDS_KEY = "cfb_recent_league_ids";
+const MAX_RECENT_LEAGUES = 20;
+
+const readRecentLeagueIds = () => {
+  if (typeof window === "undefined") return [] as number[];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(RECENT_LEAGUE_IDS_KEY) ?? "[]");
+    if (!Array.isArray(parsed)) return [];
+    return Array.from(new Set(parsed.filter((id): id is number => typeof id === "number" && Number.isFinite(id))));
+  } catch {
+    return [];
+  }
+};
+
+export const orderLeaguesByRecent = <T extends { id: number }>(leagues: T[], recentLeagueIds: number[]) => {
+  const recentOrder = new Map(recentLeagueIds.map((leagueId, index) => [leagueId, index]));
+  return [...leagues].sort((left, right) => {
+    const leftIndex = recentOrder.get(left.id);
+    const rightIndex = recentOrder.get(right.id);
+    if (leftIndex === undefined && rightIndex === undefined) return 0;
+    if (leftIndex === undefined) return 1;
+    if (rightIndex === undefined) return -1;
+    return leftIndex - rightIndex;
+  });
+};
 
 export const LeagueCard = ({
   id,
@@ -84,7 +110,6 @@ export const LeagueCard = ({
     leagueStatus: status,
     draftDateTime,
   });
-  const postDraft = isLeaguePostDraft({ draftStatus, leagueStatus: status });
   const completeStatuses = ["completed", "complete", "draft_completed", "final", "closed", "post_draft"];
   const inviteShouldBeVisible =
     Boolean(inviteCode) &&
@@ -128,156 +153,93 @@ export const LeagueCard = ({
           openLeague();
         }
       }}
-      className="relative cursor-pointer overflow-hidden rounded-lg border-cfb-border-subtle bg-cfb-surface shadow-sm transition-colors hover:border-cfb-border-strong hover:bg-cfb-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="relative cursor-pointer overflow-hidden rounded-lg border-cfb-border-subtle bg-cfb-surface transition-colors hover:border-cfb-border-strong hover:bg-cfb-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
-    <div className="relative z-10 grid gap-0 sm:grid-cols-[minmax(11rem,0.8fr)_minmax(14rem,1.1fr)_11rem]">
-      <div className="border-b border-border/60 p-3 sm:border-b-0 sm:border-r sm:p-4">
-        <div className="flex h-full flex-col justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-primary/25 bg-primary/[0.07] text-primary">
-              {leagueImageUrl && !iconFailed ? (
-                <img
-                  src={leagueImageUrl}
-                  alt={`${name} league logo`}
-                  className="h-full w-full object-contain p-1"
-                  onError={() => setIconFailed(true)}
-                />
-              ) : (
-                <Trophy className="h-4 w-4 text-white" aria-label="Default league trophy" />
-              )}
-            </div>
-            <div className="min-w-0 space-y-1">
-              <h3 className="text-base font-bold tracking-tight text-foreground">
-                {name}
-              </h3>
-              <p className="text-[10px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-                {status.replace(/_/g, " ")} • {teams} teams
-              </p>
-            </div>
+      <div className="relative z-10">
+        <div className="flex min-h-16 items-center gap-3 px-3 py-3 sm:px-4">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-primary/25 bg-primary/[0.07] text-primary">
+            {leagueImageUrl && !iconFailed ? (
+              <img
+                src={leagueImageUrl}
+                alt={`${name} league logo`}
+                className="h-full w-full object-contain p-1"
+                onError={() => setIconFailed(true)}
+              />
+            ) : (
+              <Trophy className="h-4 w-4 text-white" aria-label="Default league trophy" />
+            )}
           </div>
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              <span className="inline-flex items-center gap-2 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised px-2.5 py-1.5">
-                <Users className="w-3 h-3 text-primary" />
-                {memberCount}/{teams} members
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised px-2.5 py-1.5">
-                {isPrivate ? <Lock className="w-3 h-3 text-primary" /> : <Globe2 className="w-3 h-3 text-primary" />}
-                {isPrivate ? "Private" : "Public"}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="truncate text-sm font-bold tracking-tight text-foreground sm:text-base">{name}</h3>
+              <span className="hidden rounded-md border border-cfb-border-subtle bg-cfb-surface-raised px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.1em] text-cfb-text-muted sm:inline-flex">
+                {status.replace(/_/g, " ")}
               </span>
             </div>
-            {inviteShouldBeVisible ? (
-              <details
-                className="max-w-md rounded-md border border-cfb-brand/20 bg-cfb-brand/[0.05] px-3 py-2"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <summary className="cursor-pointer text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-200/80">
-                  Invite options
-                </summary>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate rounded-md border border-cfb-border-subtle bg-cfb-surface px-3 py-2 font-mono text-xs font-bold tracking-[0.08em] text-cfb-text-primary">
-                    {inviteCode}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(event) => copyInviteValue(event, "code", inviteCode)}
-                    className="inline-flex h-9 items-center gap-2 rounded-md border border-sky-300/25 bg-sky-300/15 px-3 text-[9px] font-bold uppercase tracking-[0.12em] text-sky-100 transition hover:border-sky-200/60 hover:bg-sky-300/20"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    {copiedInviteField === "code" ? "Copied" : "Code"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(event) => copyInviteValue(event, "link", inviteLink)}
-                    className="inline-flex h-9 items-center gap-2 rounded-md border border-emerald-300/25 bg-emerald-300/12 px-3 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-300/18"
-                  >
-                    <Link2 className="h-3.5 w-3.5" />
-                    {copiedInviteField === "link" ? "Copied" : "Link"}
-                  </button>
-                </div>
-              </details>
-            ) : null}
+            <p className="mt-0.5 truncate text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+              {status.replace(/_/g, " ")} · {teams} teams · {memberCount}/{teams} members
+            </p>
           </div>
-        </div>
-      </div>
-
-      <div className="border-b border-cfb-border-subtle bg-cfb-surface-raised/55 p-3 sm:border-b-0 sm:border-r sm:p-4">
-        <div className="space-y-2">
-          <h4 className="text-[10px] font-semibold tracking-[0.12em] text-primary uppercase opacity-80">
-            League snapshot
-          </h4>
-          <div>
-            <div className="grid gap-2 grid-cols-3">
-              <div className="rounded-md border border-cfb-border-subtle bg-cfb-surface p-2.5">
-                <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
-                  Draft
-                </p>
-                <p className="mt-1.5 text-sm font-semibold text-foreground">{draftLabel}</p>
-              </div>
-              <div className="rounded-md border border-cfb-border-subtle bg-cfb-surface p-2.5">
-                <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
-                  Your record
-                </p>
-                <p className="mt-1.5 text-sm font-semibold text-foreground">
-                  {formatRecord(currentUserSummary)}
-                </p>
-              </div>
-              <div className="rounded-md border border-cfb-border-subtle bg-cfb-surface p-2.5">
-                <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
-                  {currentUserSummary?.matchup_week ? `Week ${currentUserSummary.matchup_week}` : "Matchup"}
-                </p>
-                <p className="mt-1.5 truncate text-sm font-semibold text-foreground">
-                  {currentUserSummary?.opponent_team_name || "Schedule pending"}
-                </p>
-                <p className="mt-1 text-xs font-bold tabular-nums text-foreground">
-                  {formatProjectedPoints(currentUserSummary?.projected_points_for)} - {formatProjectedPoints(currentUserSummary?.projected_points_against)}
-                </p>
-                <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-sky-200">
-                  Win chance {formatWinProbability(currentUserSummary?.win_probability_for)}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 p-3 sm:flex sm:min-w-[11rem] sm:flex-col sm:justify-center sm:p-4">
-        <Button
-          variant="outline"
-          className="h-10 w-full rounded-md border-cfb-border-subtle bg-cfb-surface px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-foreground hover:bg-cfb-surface-hover"
-          onClick={(event) => {
-            event.stopPropagation();
-            openLeague();
-          }}
-        >
-          {postDraft ? "Open League Hub" : "League Hub"}
-          <ChevronRight className="w-3 h-3 ml-2" />
-        </Button>
-        {shouldShowDraftAction && (
-          <Button
-            variant="outline"
-            className={[
-              "h-10 w-full rounded-lg px-3 text-[10px] font-bold uppercase tracking-[0.1em] transition-colors",
-              draftUnlocked
-                ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
-                : "border-amber-400/35 bg-amber-50 text-amber-800 hover:bg-amber-100",
-            ].join(" ")}
+          <button
+            type="button"
+            aria-label="League Hub"
+            title="Open league hub"
+            className="-mr-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-cfb-text-muted transition-colors hover:bg-cfb-surface-hover hover:text-cfb-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"
             onClick={(event) => {
               event.stopPropagation();
-              onOpenDraft(id, draftUnlocked);
+              openLeague();
             }}
           >
-            {draftUnlocked ? "Join Draft Room" : "Draft Room Locked"}
-            {draftUnlocked ? <ChevronRight className="w-3 h-3 ml-2" /> : <LockKeyhole className="w-3 h-3 ml-2" />}
-          </Button>
-        )}
-        {shouldShowDraftAction && !draftUnlocked ? (
-          <p className="col-span-2 text-center text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-100/80 sm:col-auto">
-            Opens in {formatDraftCountdown(draftDateTime, now)}
-          </p>
-        ) : null}
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-cfb-border-subtle bg-cfb-surface-raised/55 px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.1em] text-cfb-text-secondary sm:px-4">
+          <span className="inline-flex items-center gap-1.5">
+            {isPrivate ? <Lock className="h-3 w-3 text-primary" /> : <Globe2 className="h-3 w-3 text-primary" />}
+            {isPrivate ? "Private" : "Public"}
+          </span>
+          <span className="hidden h-1 w-1 rounded-full bg-cfb-border-strong sm:block" />
+          <span>Record {formatRecord(currentUserSummary)}</span>
+          <span className="hidden h-1 w-1 rounded-full bg-cfb-border-strong sm:block" />
+          <span className="hidden sm:inline">Proj {formatProjectedPoints(currentUserSummary?.projected_points_for)}</span>
+          {currentUserSummary?.matchup_week ? <span className="hidden sm:inline">Week {currentUserSummary.matchup_week} · {formatWinProbability(currentUserSummary.win_probability_for)} win</span> : null}
+          <span className="min-w-0 flex-1 truncate text-cfb-text-muted">{draftLabel}</span>
+          {shouldShowDraftAction ? (
+            <Button
+              variant="outline"
+              className={[
+                "h-8 shrink-0 rounded-md px-2.5 text-[9px] font-bold uppercase tracking-[0.1em]",
+                draftUnlocked
+                  ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
+                  : "border-amber-400/35 bg-amber-400/10 text-amber-200 hover:bg-amber-400/15",
+              ].join(" ")}
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenDraft(id, draftUnlocked);
+              }}
+            >
+              {draftUnlocked ? "Draft" : "Locked"}
+              {draftUnlocked ? <ChevronRight className="ml-1 h-3 w-3" /> : <LockKeyhole className="ml-1 h-3 w-3" />}
+            </Button>
+          ) : null}
+          {shouldShowDraftAction && !draftUnlocked ? <span className="text-amber-200/80">{formatDraftCountdown(draftDateTime, now)}</span> : null}
+          {inviteShouldBeVisible ? (
+            <details className="shrink-0" onClick={(event) => event.stopPropagation()}>
+              <summary className="cursor-pointer text-cfb-brand hover:text-cfb-text-primary">Invite</summary>
+              <div className="mt-2 flex min-w-[16rem] flex-wrap items-center gap-2 rounded-md border border-cfb-brand/20 bg-cfb-surface p-2 shadow-lg">
+                <span className="min-w-0 flex-1 truncate font-mono text-xs font-bold text-cfb-text-primary">{inviteCode}</span>
+                <button type="button" onClick={(event) => copyInviteValue(event, "code", inviteCode)} className="inline-flex h-7 items-center gap-1 rounded-md border border-cfb-border-subtle px-2 text-[9px] font-bold text-cfb-text-secondary hover:bg-cfb-surface-hover">
+                  <Copy className="h-3 w-3" />{copiedInviteField === "code" ? "Copied" : "Code"}
+                </button>
+                <button type="button" onClick={(event) => copyInviteValue(event, "link", inviteLink)} className="inline-flex h-7 items-center gap-1 rounded-md border border-cfb-border-subtle px-2 text-[9px] font-bold text-cfb-text-secondary hover:bg-cfb-surface-hover">
+                  <Link2 className="h-3 w-3" />{copiedInviteField === "link" ? "Copied" : "Link"}
+                </button>
+              </div>
+            </details>
+          ) : null}
+        </div>
       </div>
-    </div>
     </Card>
   );
 };
@@ -287,6 +249,28 @@ export default function Leagues() {
   const navigate = useNavigate();
   const { setActiveLeagueId } = useActiveLeagueId();
   const { data: leagueRows = [], isLoading, isError, refetch } = useLeagues(20, isLoggedIn);
+  const [recentLeagueIds, setRecentLeagueIds] = useState(readRecentLeagueIds);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === RECENT_LEAGUE_IDS_KEY) setRecentLeagueIds(readRecentLeagueIds());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const rememberLeague = useCallback((leagueId: number) => {
+    setRecentLeagueIds((current) => {
+      const next = [leagueId, ...current.filter((id) => id !== leagueId)].slice(0, MAX_RECENT_LEAGUES);
+      if (typeof window !== "undefined") window.localStorage.setItem(RECENT_LEAGUE_IDS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const orderedLeagueRows = useMemo(
+    () => orderLeaguesByRecent(leagueRows, recentLeagueIds),
+    [leagueRows, recentLeagueIds]
+  );
 
   return (
     <div className="relative z-10 mx-auto max-w-6xl space-y-6 pb-4 pt-1 animate-in fade-in duration-300">
@@ -328,7 +312,7 @@ export default function Leagues() {
               onRetry={() => void refetch()}
             />
           )}
-          {leagueRows.map((league) => (
+          {orderedLeagueRows.map((league) => (
             <LeagueCard
               key={league.id}
               id={league.id}
@@ -348,6 +332,7 @@ export default function Leagues() {
               iconUrl={league.icon_url}
               currentUserSummary={league.current_user_summary}
               onOpen={(leagueId) => {
+                rememberLeague(leagueId);
                 setActiveLeagueId(leagueId);
                 const postDraft = isLeaguePostDraft({
                   draftStatus: league.draft?.status,
@@ -356,6 +341,7 @@ export default function Leagues() {
                 navigate(postDraft ? `/league/${leagueId}/roster` : `/league/${leagueId}/lobby`);
               }}
               onOpenDraft={(leagueId, draftUnlocked) => {
+                rememberLeague(leagueId);
                 setActiveLeagueId(leagueId);
                 if (draftUnlocked) {
                   navigate(`/league/${leagueId}/draft`);
