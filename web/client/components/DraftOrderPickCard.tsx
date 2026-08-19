@@ -1,6 +1,6 @@
 import { Bot } from "lucide-react";
 
-import { getDraftedPlayerLastName, getDraftManagerInitials } from "@/lib/draftOrderCarousel";
+import { getDraftedPlayerLastName } from "@/lib/draftOrderCarousel";
 import { cn } from "@/lib/utils";
 import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
 
@@ -28,7 +28,6 @@ export function DraftOrderPickCard({
   compact = false,
 }: DraftOrderPickCardProps) {
   const draftedLastName = getDraftedPlayerLastName(playerName);
-  const initials = getDraftManagerInitials(managerName, "M");
 
   return (
     <div className={cn("flex min-w-0 flex-col items-center text-center", compact ? "gap-0.5" : "gap-1.5")}>
@@ -36,7 +35,7 @@ export function DraftOrderPickCard({
         {managerName}
       </p>
       <span
-        aria-label={isCpu ? "Computer manager" : `${managerName} initials ${initials}`}
+        aria-label={isCpu ? "Computer manager" : undefined}
         className={cn(
           "flex shrink-0 items-center justify-center border border-white/14 bg-black/20 font-black text-amber-100 shadow-[0_0_10px_rgba(103,232,249,0.18)]",
           compact ? "h-6 w-6 rounded-full text-[8px]" : "h-8 w-8 rounded-lg text-[10px]",
