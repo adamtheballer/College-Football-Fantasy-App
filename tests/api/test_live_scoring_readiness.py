@@ -11,7 +11,9 @@ from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWee
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
+from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbeat
 from collegefootballfantasy_api.app.services.live_scoring_readiness import (
     PublicScoringPreflightError,
@@ -71,6 +73,45 @@ def test_public_preflight_accepts_verified_starter_and_healthy_dependencies(db_s
     db_session.add_all([
         PlayerProviderId(player_id=player.id, provider="espn", provider_player_id="123", verification_status="verified"),
         LineupWeekSnapshot(league_id=league.id, team_id=team.id, player_id=player.id, season=2026, week=1, slot="QB", is_starter=True),
+    ])
+    db_session.commit()
+
+    report = public_scoring_preflight(db_session, season=2026, week=1, now=NOW + timedelta(seconds=10))
+
+    assert report["ready"] is True
+    assert report["reason_codes"] == []
+
+
+def test_public_preflight_uses_the_schedule_linked_canonical_game_not_a_legacy_game_row(db_session):
+    league = _ready_baseline(db_session)
+    player = Player(name="Verified Roster Player", school="Texas", position="QB")
+    team = Team(league_id=league.id, name="Team")
+    canonical = db_session.query(Game).filter_by(external_id="401", season=2026, week=1).one()
+    db_session.add_all([
+        player,
+        team,
+        Game(
+            external_id="sheet-2026-w1-texas-vs-ohio-state",
+            season=2026,
+            week=1,
+            home_team="Texas",
+            away_team="Ohio State",
+        ),
+    ])
+    db_session.flush()
+    db_session.add_all([
+        PlayerProviderId(player_id=player.id, provider="espn", provider_player_id="456", verification_status="verified"),
+        RosterEntry(league_id=league.id, team_id=team.id, player_id=player.id, slot="QB", status="active"),
+        TeamSchedule(
+            team_name="Texas",
+            season=2026,
+            week=1,
+            game_id=canonical.id,
+            opponent_name="Ohio State",
+            location="home",
+            is_bye=False,
+            kickoff_at=NOW,
+        ),
     ])
     db_session.commit()
 

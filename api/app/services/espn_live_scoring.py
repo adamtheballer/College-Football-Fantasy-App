@@ -27,6 +27,7 @@ from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
 from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.services.espn_stats_sync import (
     normalize_espn_summary_player_stats,
     persist_normalized_espn_player_stats,
@@ -391,11 +392,14 @@ def _provider_game_ids_for_players(
     season: int,
     week: int,
 ) -> dict[int, str | None]:
-    """Map a starter to one *verified schedule* game id without fuzzy matching.
+    """Map a starter through the canonical ``TeamSchedule -> Game`` authority.
 
-    ``Game.external_id`` must already be the ESPN event identifier from the
-    schedule import.  Missing or ambiguous mappings deliberately block
-    automatic fantasy-matchup finality rather than risking a premature final.
+    ``TeamSchedule`` is the team/week authority that schedule reconciliation
+    promotes to the exact ESPN-backed ``Game`` record.  Legacy ``games`` rows
+    are retained for history and must not create a false ambiguity merely
+    because they share a participant with the canonical schedule record.
+    Missing, invalid, or multiply-linked schedule rows deliberately resolve to
+    ``None`` so they block automatic fantasy-matchup finality.
     """
 
     if not player_ids:
@@ -404,22 +408,30 @@ def _provider_game_ids_for_players(
         player_id: _school_key(school)
         for player_id, school in db.query(Player.id, Player.school).filter(Player.id.in_(player_ids)).all()
     }
+    relevant_schools = set(player_schools.values())
     game_by_school: dict[str, str | None] = {}
-    for game in db.query(Game).filter(Game.season == season, Game.week == week).all():
-        if (game.schedule_status or "").strip().lower() in {"cancelled", "canceled", "postponed", "tbd"}:
+    schedule_rows = db.query(TeamSchedule).filter(TeamSchedule.season == season, TeamSchedule.week == week).all()
+    for schedule in schedule_rows:
+        school = _school_key(schedule.team_name)
+        if not school or school not in relevant_schools or schedule.is_bye:
             continue
-        provider_game_id = str(game.external_id or "").strip() or None
-        for school in (game.home_team, game.away_team):
-            key = _school_key(school)
-            if not key:
-                continue
-            previous = game_by_school.get(key)
-            # More than one schedule candidate is not a safe authoritative
-            # mapping.  Treat it as unavailable until schedule data is fixed.
-            if key not in game_by_school:
-                game_by_school[key] = provider_game_id
-            elif previous != provider_game_id:
-                game_by_school[key] = None
+        game = db.get(Game, schedule.game_id) if schedule.game_id is not None else None
+        provider_game_id = str(game.external_id or "").strip() if game is not None else ""
+        if (
+            game is None
+            or not provider_game_id.isdigit()
+            or schedule.kickoff_at is None
+            or game.start_date is None
+            or (game.schedule_status or "").strip().lower() in {"cancelled", "canceled", "postponed", "tbd"}
+        ):
+            provider_game_id = ""
+        previous = game_by_school.get(school)
+        # A team/week schedule has a uniqueness constraint, but preserve a
+        # fail-closed result if legacy data bypassed that invariant.
+        if school not in game_by_school:
+            game_by_school[school] = provider_game_id or None
+        elif previous != (provider_game_id or None):
+            game_by_school[school] = None
     return {player_id: game_by_school.get(school) if school else None for player_id, school in player_schools.items()}
 
 
