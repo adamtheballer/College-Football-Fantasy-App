@@ -278,8 +278,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     safeStorageSet(USER_STORAGE_KEY, JSON.stringify(nextUser));
     setUser(nextUser);
     dispatchAuthChanged();
+    // Manager identity appears in cached league, draft, matchup, and chat
+    // responses. Mark every related view stale so the newly saved photo is
+    // fetched immediately instead of waiting for its normal refresh window.
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["leagues"] }),
+      queryClient.invalidateQueries({ queryKey: ["league"] }),
+      queryClient.invalidateQueries({ queryKey: ["draft-room"] }),
+      queryClient.invalidateQueries({ queryKey: ["chat"] }),
+    ]);
     return nextUser;
-  }, []);
+  }, [queryClient]);
 
   const logout = useCallback(() => {
     void apiPost("/auth/logout", {}).catch(() => {

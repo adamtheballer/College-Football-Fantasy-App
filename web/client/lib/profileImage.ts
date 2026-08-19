@@ -1,7 +1,17 @@
 const MAX_SOURCE_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_PROFILE_IMAGE_BYTES = 250 * 1024;
 const OUTPUT_EDGE_PX = 256;
-const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+// iOS commonly supplies library photos as HEIC/HEIF. The browser decodes the
+// source and we always persist the canvas output as JPEG, so these are safe to
+// accept alongside the formats browsers traditionally expose.
+const ALLOWED_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+]);
+const SUPPORTED_IMAGE_MESSAGE = "Choose an image from your photo library. JPEG, PNG, WebP, and iPhone photos are supported.";
 
 const base64ByteLength = (dataUrl: string) => {
   const encoded = dataUrl.slice(dataUrl.indexOf(",") + 1);
@@ -12,7 +22,7 @@ const base64ByteLength = (dataUrl: string) => {
 const loadImage = (source: string) => new Promise<HTMLImageElement>((resolve, reject) => {
   const image = new Image();
   image.onload = () => resolve(image);
-  image.onerror = () => reject(new Error("This photo could not be read. Choose a JPEG, PNG, or WebP image."));
+  image.onerror = () => reject(new Error(`This photo could not be read. ${SUPPORTED_IMAGE_MESSAGE}`));
   image.src = source;
 });
 
@@ -22,8 +32,10 @@ const loadImage = (source: string) => new Promise<HTMLImageElement>((resolve, re
  * on a third-party image host or an ephemeral application filesystem.
  */
 export async function prepareProfileImage(file: File): Promise<string> {
-  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-    throw new Error("Choose a JPEG, PNG, or WebP photo.");
+  // Some mobile browsers omit the MIME type for a photo-library selection.
+  // Let the browser decoder make the final determination for that case.
+  if (file.type && !ALLOWED_IMAGE_TYPES.has(file.type)) {
+    throw new Error(SUPPORTED_IMAGE_MESSAGE);
   }
   if (file.size > MAX_SOURCE_FILE_BYTES) {
     throw new Error("Choose a photo smaller than 10 MB.");
@@ -34,7 +46,7 @@ export async function prepareProfileImage(file: File): Promise<string> {
     const image = await loadImage(source);
     const largestSide = Math.max(image.naturalWidth, image.naturalHeight);
     if (!largestSide) {
-      throw new Error("This photo could not be read. Choose a JPEG, PNG, or WebP image.");
+      throw new Error(`This photo could not be read. ${SUPPORTED_IMAGE_MESSAGE}`);
     }
     const scale = Math.min(1, OUTPUT_EDGE_PX / largestSide);
     const width = Math.max(1, Math.round(image.naturalWidth * scale));

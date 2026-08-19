@@ -171,16 +171,26 @@ export default function Settings() {
     }
   };
 
-  const handleSelectPhoto = async () => {
+  const handleConfirmPhoto = async () => {
     if (!pendingAvatarUrl) return;
+    const confirmedAvatarUrl = pendingAvatarUrl;
+    const previousAvatarUrl = avatarUrl;
+
+    // Commit the preview before the request resolves. This makes the new
+    // picture visible the instant the user confirms it, while the server save
+    // continues in the background. If persistence fails, restore the prior
+    // avatar and explain that it was not changed.
+    setAvatarUrl(confirmedAvatarUrl);
+    setPendingAvatarUrl(null);
+    setPendingAvatarName(null);
+    setAvatarPreviewError(false);
     setPhotoState("saving");
     setProfileError(null);
     try {
-      const updatedUser = await updateProfile({ avatarUrl: pendingAvatarUrl });
-      setAvatarUrl(updatedUser.avatarUrl ?? pendingAvatarUrl);
-      setPendingAvatarUrl(null);
-      setPendingAvatarName(null);
+      const updatedUser = await updateProfile({ avatarUrl: confirmedAvatarUrl });
+      setAvatarUrl(updatedUser.avatarUrl ?? confirmedAvatarUrl);
     } catch (error) {
+      setAvatarUrl(previousAvatarUrl);
       setProfileError(error instanceof Error ? error.message : "Unable to update your profile picture. Your previous picture is still active.");
     } finally {
       setPhotoState("idle");
@@ -317,6 +327,7 @@ export default function Settings() {
           </div>
           <div className="grid gap-5 rounded-2xl border border-border/70 bg-black/10 p-5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
             <ManagerAvatar
+              key={pendingAvatarUrl ?? (avatarUrl.trim() || "manager-avatar-initials")}
               avatarUrl={pendingAvatarUrl ?? (avatarUrl.trim() || null)}
               managerName={managerName}
               size="xl"
@@ -333,7 +344,7 @@ export default function Settings() {
                 ref={photoInputRef}
                 aria-label="Choose a profile photo"
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/*"
                 className="sr-only"
                 onChange={handlePhotoChosen}
               />
@@ -342,11 +353,11 @@ export default function Settings() {
                   <ImagePlus className="mr-2 h-4 w-4" />
                   {photoState === "preparing" ? "Preparing..." : "Choose Photo"}
                 </Button>
-                {pendingAvatarUrl ? <Button type="button" className="h-10 rounded-xl px-4 text-[10px] font-black uppercase tracking-[0.14em]" onClick={handleSelectPhoto} disabled={photoState !== "idle"}>Select Photo</Button> : null}
+                {pendingAvatarUrl ? <Button type="button" className="h-10 rounded-xl px-4 text-[10px] font-black uppercase tracking-[0.14em]" onClick={handleConfirmPhoto} disabled={photoState !== "idle"}>Confirm Photo</Button> : null}
                 {pendingAvatarUrl ? <Button type="button" variant="ghost" className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.14em]" onClick={() => { setPendingAvatarUrl(null); setPendingAvatarName(null); setAvatarPreviewError(false); }} disabled={photoState !== "idle"}>Cancel</Button> : null}
                 {(avatarUrl.trim() || user.avatarUrl) && !pendingAvatarUrl ? <Button type="button" variant="outline" className="h-10 rounded-xl border-border text-[10px] font-black uppercase tracking-[0.14em]" onClick={handleRemovePhoto} disabled={photoState !== "idle"}>Remove Picture</Button> : null}
               </div>
-              {pendingAvatarUrl ? <p className="text-xs font-medium text-primary">{pendingAvatarName ?? "Selected photo"} is ready. Tap Select Photo to update your profile picture.</p> : null}
+              {pendingAvatarUrl ? <p className="text-xs font-medium text-primary">{pendingAvatarName ?? "Selected photo"} is ready. Tap Confirm Photo to update your profile picture.</p> : null}
               {avatarPreviewError ? <p role="alert" className="text-xs font-medium text-red-300">This image could not be loaded. Choose a different photo.</p> : null}
               <details className="pt-1">
                 <summary className="cursor-pointer text-xs font-medium text-muted-foreground">Use an image address instead</summary>

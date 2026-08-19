@@ -334,7 +334,13 @@ def build_scoreboard_rows(db: Session, league: League, week: int | None = None) 
     home_team = db.query(Team).subquery()
     away_team = db.query(Team).subquery()
     rows = (
-        db.query(Matchup, home_team.c.name, away_team.c.name)
+        db.query(
+            Matchup,
+            home_team.c.name,
+            home_team.c.owner_user_id,
+            away_team.c.name,
+            away_team.c.owner_user_id,
+        )
         .join(home_team, home_team.c.id == Matchup.home_team_id)
         .join(away_team, away_team.c.id == Matchup.away_team_id)
         .filter(
@@ -345,6 +351,17 @@ def build_scoreboard_rows(db: Session, league: League, week: int | None = None) 
         .order_by(Matchup.id.asc())
         .all()
     )
+    owner_ids = {
+        owner_user_id
+        for _matchup, _home_name, home_owner_user_id, _away_name, away_owner_user_id in rows
+        for owner_user_id in (home_owner_user_id, away_owner_user_id)
+        if owner_user_id is not None
+    }
+    avatars_by_owner_id = {
+        user_id: avatar_url
+        for user_id, avatar_url in db.query(User.id, User.avatar_url).filter(User.id.in_(owner_ids)).all()
+    } if owner_ids else {}
+
     return [
         LeagueScoreboardRow(
             matchup_id=matchup.id,
@@ -352,12 +369,14 @@ def build_scoreboard_rows(db: Session, league: League, week: int | None = None) 
             status=matchup.status,
             home_team_id=matchup.home_team_id,
             home_team_name=home_name,
+            home_owner_avatar_url=avatars_by_owner_id.get(home_owner_user_id),
             home_score=float(matchup.home_score or 0.0),
             away_team_id=matchup.away_team_id,
             away_team_name=away_name,
+            away_owner_avatar_url=avatars_by_owner_id.get(away_owner_user_id),
             away_score=float(matchup.away_score or 0.0),
         )
-        for matchup, home_name, away_name in rows
+        for matchup, home_name, home_owner_user_id, away_name, away_owner_user_id in rows
     ]
 
 

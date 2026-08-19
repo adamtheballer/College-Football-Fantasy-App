@@ -104,20 +104,29 @@ describe("Settings beta preferences", () => {
     await waitFor(() => expect(state.updateProfile).toHaveBeenLastCalledWith({ avatarUrl: null }));
   });
 
-  it("shows a chosen mobile photo for review and only updates the profile after Select Photo", async () => {
-    state.prepareProfileImage.mockResolvedValue("data:image/jpeg;base64,/9j/4AAQ");
+  it("shows a chosen mobile photo for review and updates the visible avatar as soon as Confirm Photo is clicked", async () => {
+    const photoDataUrl = "data:image/jpeg;base64,/9j/4AAQ";
+    state.prepareProfileImage.mockResolvedValue(photoDataUrl);
+    let resolveProfileUpdate: (value: { id: number; firstName: string; avatarUrl: string }) => void;
+    state.updateProfile.mockReturnValue(new Promise((resolve) => {
+      resolveProfileUpdate = resolve;
+    }));
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
     fireEvent.change(screen.getByLabelText("Choose a profile photo"), {
       target: { files: [new File(["photo"], "manager.png", { type: "image/png" })] },
     });
 
-    await screen.findByRole("button", { name: /select photo/i });
+    await screen.findByRole("button", { name: /confirm photo/i });
     expect(state.updateProfile).not.toHaveBeenCalled();
     expect(screen.getByText(/manager\.png is ready/i)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: /select photo/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirm photo/i }));
     await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ avatarUrl: "data:image/jpeg;base64,/9j/4AAQ" }));
+    expect(screen.queryByRole("button", { name: /select photo/i })).toBeNull();
+    expect(screen.getByAltText("Adam profile picture").getAttribute("src")).toBe(photoDataUrl);
+
+    resolveProfileUpdate!({ id: 7, firstName: "Adam", avatarUrl: photoDataUrl });
   });
 
   it("records an explicit replay request before returning to Home", () => {
