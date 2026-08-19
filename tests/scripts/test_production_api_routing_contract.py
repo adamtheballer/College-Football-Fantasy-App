@@ -38,7 +38,11 @@ def test_production_manifest_names_one_canonical_frontend_and_railway_api_contra
     assert api["railway_dockerfile_path"] == "Dockerfile.api"
     assert api["port_env"] == "PORT"
     assert api["start_command"] == (
-        "sh -c 'exec uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port \"$PORT\"'"
+        "sh -c 'export GIT_SHA=\"${RAILWAY_GIT_COMMIT_SHA:-${GIT_SHA:-unknown}}\" "
+        "GIT_BRANCH=\"${RAILWAY_GIT_BRANCH:-${GIT_BRANCH:-unknown}}\" "
+        "WEB_GIT_SHA=\"${RAILWAY_GIT_COMMIT_SHA:-${WEB_GIT_SHA:-unknown}}\" "
+        "WORKER_GIT_SHA=\"${RAILWAY_GIT_COMMIT_SHA:-${WORKER_GIT_SHA:-unknown}}\"; "
+        "exec uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port \"$PORT\"'"
     )
     assert api["migrate_command"] == "PYTHONPATH=. uv run alembic -c api/alembic.ini upgrade head"
     assert api["verify_migrations_command"] == "PYTHONPATH=. uv run python scripts/check_alembic_head.py"
@@ -66,7 +70,11 @@ def test_railway_api_config_runs_one_atomic_migration_gate_before_readiness():
     ]
     start_command = config["deploy"]["startCommand"]
     assert start_command == (
-        "sh -c 'exec uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port \"$PORT\"'"
+        "sh -c 'export GIT_SHA=\"${RAILWAY_GIT_COMMIT_SHA:-${GIT_SHA:-unknown}}\" "
+        "GIT_BRANCH=\"${RAILWAY_GIT_BRANCH:-${GIT_BRANCH:-unknown}}\" "
+        "WEB_GIT_SHA=\"${RAILWAY_GIT_COMMIT_SHA:-${WEB_GIT_SHA:-unknown}}\" "
+        "WORKER_GIT_SHA=\"${RAILWAY_GIT_COMMIT_SHA:-${WORKER_GIT_SHA:-unknown}}\"; "
+        "exec uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port \"$PORT\"'"
     )
     assert not start_command.startswith("PYTHONPATH=.")
     assert "sh -c" in start_command

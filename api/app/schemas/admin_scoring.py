@@ -100,6 +100,54 @@ class ProviderHealthResponse(BaseModel):
     failed_scoring_runs: int
 
 
+class LiveScoringWorkerRead(BaseModel):
+    name: str
+    status: str
+    heartbeat_age_seconds: int | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class LiveScoringGamePollingRead(BaseModel):
+    due_games: int
+    active_games: int
+    last_successful_poll_at: datetime | None = None
+    next_poll_at: datetime | None = None
+    minimum_success_interval_seconds: int | None = None
+    minimum_required_interval_seconds: int
+    http_403_count: int
+    http_429_count: int
+    timeout_count: int
+    provider_failure_count: int
+    accepted_snapshot_count: int
+    duplicate_snapshot_count: int
+    stale_snapshot_rejection_count: int
+    ambiguous_snapshot_quarantine_count: int
+    pending_final_correction_count: int
+
+
+class LiveScoringPreflightRead(BaseModel):
+    ready: bool
+    reason_codes: list[str]
+    season: int
+    week: int
+    worker: dict[str, Any]
+    unresolved_starters: list[dict[str, Any]]
+    unsupported_league_ids: list[int]
+    blocked_provider_games: int
+
+
+class LiveScoringOperationsRead(BaseModel):
+    season: int
+    week: int
+    worker: LiveScoringWorkerRead
+    game_polling: LiveScoringGamePollingRead
+    identity: dict[str, int]
+    freshness: dict[str, Any]
+    shadow: dict[str, int]
+    alerts: list[dict[str, str]]
+    preflight: LiveScoringPreflightRead
+
+
 class CorrectionPreviewResponse(BaseModel):
     player_id: int
     season: int

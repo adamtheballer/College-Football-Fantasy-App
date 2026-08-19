@@ -4,7 +4,7 @@ import json
 import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
@@ -21,6 +21,22 @@ class ESPNProviderResponse:
 
     payload: dict[str, Any]
     response_metadata: dict[str, str]
+
+
+@dataclass(frozen=True)
+class ESPNLongPlayAlertCandidate:
+    """A play-text candidate cross-checked against the current box score.
+
+    ESPN's summary payload does not provide stable athlete identifiers on each
+    play.  The worker therefore emits a candidate only when a unique athlete
+    from the same summary's box score appears in the play text.  Ambiguous
+    text is intentionally ignored rather than guessed.
+    """
+
+    provider_play_id: str
+    event_type: Literal["LONG_RUSH", "LONG_RECEPTION", "LONG_PASS"]
+    provider_player_id: str
+    play_yards: int
 
 
 class ESPNClient:
@@ -490,3 +506,81 @@ def extract_player_box_score_stats(summary: dict[str, Any]) -> list[dict[str, An
             row["espn_field_goal_distance_detail_available"] = True
 
     return list(rows_by_athlete.values())
+
+
+def _summary_plays(summary: dict[str, Any]) -> list[dict[str, Any]]:
+    drives = summary.get("drives")
+    if not isinstance(drives, dict):
+        return []
+    raw_drives = list(drives.get("previous") or [])
+    current = drives.get("current")
+    if isinstance(current, dict):
+        raw_drives.append(current)
+    plays: list[dict[str, Any]] = []
+    for drive in raw_drives:
+        if not isinstance(drive, dict):
+            continue
+        plays.extend(play for play in (drive.get("plays") or []) if isinstance(play, dict))
+    return plays
+
+
+def extract_espn_play_ids(summary: dict[str, Any]) -> set[str]:
+    return {
+        str(play.get("id") or play.get("sequenceNumber") or "").strip()
+        for play in _summary_plays(summary)
+        if str(play.get("id") or play.get("sequenceNumber") or "").strip()
+    }
+
+
+def extract_espn_long_play_alert_candidates(
+    summary: dict[str, Any],
+    *,
+    known_play_ids: set[str],
+) -> list[ESPNLongPlayAlertCandidate]:
+    """Return only newly seen, unambiguous long-play player candidates.
+
+    Play text is not a scoring authority.  This is an optional notification
+    path, and it intentionally requires an exact unique box-score-name match
+    from the same accepted provider response before a manager can be notified.
+    """
+
+    names_by_id = {
+        str(row["ESPNPlayerID"]): str(row["PlayerName"]).strip()
+        for row in extract_player_box_score_stats(summary)
+        if row.get("ESPNPlayerID") and row.get("PlayerName")
+    }
+    ids_by_name: dict[str, list[str]] = {}
+    for player_id, name in names_by_id.items():
+        ids_by_name.setdefault(name.casefold(), []).append(player_id)
+    candidates: list[ESPNLongPlayAlertCandidate] = []
+    for play in _summary_plays(summary):
+        play_id = str(play.get("id") or play.get("sequenceNumber") or "").strip()
+        if not play_id or play_id in known_play_ids:
+            continue
+        text = str(play.get("text") or "")
+        # Extra-point/kick annotations can contain a second player who did not
+        # make the long offensive play.
+        offensive_text = text.split("(", 1)[0]
+        try:
+            yards = abs(int(play.get("statYardage")))
+        except (TypeError, ValueError):
+            continue
+        type_payload = play.get("type") if isinstance(play.get("type"), dict) else {}
+        play_type = str(type_payload.get("text") or "").casefold()
+        matched_ids = [
+            player_id
+            for player_id, name in names_by_id.items()
+            if re.search(rf"(?<!\\w){re.escape(name)}(?!\\w)", offensive_text, flags=re.IGNORECASE)
+        ]
+        # A duplicate display name cannot establish a player identity from
+        # ESPN's text-only play payload.
+        if any(len(ids_by_name[names_by_id[player_id].casefold()]) > 1 for player_id in matched_ids):
+            continue
+        if "pass" in play_type and yards >= 40:
+            if matched_ids:
+                candidates.append(ESPNLongPlayAlertCandidate(play_id, "LONG_PASS", matched_ids[0], yards))
+            if "complete to" in offensive_text.casefold() and len(matched_ids) >= 2:
+                candidates.append(ESPNLongPlayAlertCandidate(play_id, "LONG_RECEPTION", matched_ids[1], yards))
+        elif ("rush" in play_type or "run" in play_type) and yards >= 30 and matched_ids:
+            candidates.append(ESPNLongPlayAlertCandidate(play_id, "LONG_RUSH", matched_ids[0], yards))
+    return list(dict.fromkeys(candidates))

@@ -19,14 +19,24 @@ import httpx
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from collegefootballfantasy_api.app.integrations.espn import ESPNClient, ESPNProviderResponse, extract_player_box_score_stats
+from collegefootballfantasy_api.app.core.config import settings
+from collegefootballfantasy_api.app.integrations.espn import (
+    ESPNClient,
+    ESPNProviderResponse,
+    extract_espn_long_play_alert_candidates,
+    extract_espn_play_ids,
+    extract_player_box_score_stats,
+)
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
 from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
+from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.services.espn_stats_sync import (
     normalize_espn_summary_player_stats,
     persist_normalized_espn_player_stats,
@@ -732,6 +742,72 @@ def _accepted_snapshot(db: Session, row: ProviderGamePoll) -> ProviderGameSnapsh
     )
 
 
+def queue_accepted_espn_long_play_notifications(
+    db: Session,
+    *,
+    provider_game_id: str,
+    summary: dict[str, Any],
+    previous_snapshot: ProviderGameSnapshot | None,
+) -> int:
+    """Queue opted-in player alerts from a newly accepted ESPN snapshot.
+
+    The first accepted snapshot of a game establishes a baseline and never
+    backfills alerts.  Later snapshots can only emit for play IDs that were
+    absent from that baseline and whose text maps uniquely to a verified
+    athlete in the same summary's box score.
+    """
+
+    if not settings.live_player_notifications_enabled or previous_snapshot is None:
+        return 0
+    prior_payload = previous_snapshot.raw_payload if isinstance(previous_snapshot.raw_payload, dict) else {}
+    candidates = extract_espn_long_play_alert_candidates(summary, known_play_ids=extract_espn_play_ids(prior_payload))
+    if not candidates:
+        return 0
+    provider_ids = {candidate.provider_player_id for candidate in candidates}
+    mappings = {
+        mapping.provider_player_id: mapping.player_id
+        for mapping in db.query(PlayerProviderId)
+        .filter(
+            PlayerProviderId.provider == ESPN_PROVIDER,
+            PlayerProviderId.provider_player_id.in_(provider_ids),
+            PlayerProviderId.verification_status == "verified",
+        )
+        .all()
+    }
+    player_ids = set(mappings.values())
+    owners_by_player: dict[int, list[tuple[int, int]]] = {}
+    if player_ids:
+        for league_id, owner_user_id, player_id in (
+            db.query(RosterEntry.league_id, Team.owner_user_id, RosterEntry.player_id)
+            .join(Team, Team.id == RosterEntry.team_id)
+            .filter(RosterEntry.status == "active", RosterEntry.player_id.in_(player_ids), Team.owner_user_id.isnot(None))
+            .all()
+        ):
+            owners_by_player.setdefault(player_id, []).append((league_id, owner_user_id))
+    from collegefootballfantasy_api.app.services.notification_service import intake_typed_big_play_notification
+
+    queued = 0
+    for candidate in candidates:
+        player_id = mappings.get(candidate.provider_player_id)
+        if player_id is None:
+            continue
+        for league_id, user_id in owners_by_player.get(player_id, []):
+            event_key = f"big_play:{ESPN_PROVIDER}:{provider_game_id}:{candidate.provider_play_id}:{player_id}:{user_id}"
+            if db.query(ScheduledNotification.id).filter(ScheduledNotification.event_key == event_key).first() is not None:
+                continue
+            notification = intake_typed_big_play_notification(
+                db,
+                league_id=league_id,
+                user_id=user_id,
+                event_type=candidate.event_type,
+                event_key=event_key,
+                player_id=player_id,
+                play_yards=candidate.play_yards,
+            )
+            queued += int(notification is not None)
+    return queued
+
+
 def record_espn_game_success(
     db: Session,
     *,
@@ -916,6 +992,8 @@ def run_espn_scoring_cycle(
                 summary=summary,
                 normalized_rows=normalized,
             )
+            poll = db.get(ProviderGamePoll, claim.id)
+            previous_snapshot = _accepted_snapshot(db, poll) if poll is not None else None
             decision = record_espn_game_success(
                 db,
                 claim=claim,
@@ -940,6 +1018,12 @@ def run_espn_scoring_cycle(
 
                     accepted = _accepted_snapshot(db, db.get(ProviderGamePoll, claim.id))
                     if accepted is not None:
+                        queue_accepted_espn_long_play_notifications(
+                            db,
+                            provider_game_id=claim.provider_game_id,
+                            summary=summary,
+                            previous_snapshot=previous_snapshot,
+                        )
                         persist_live_projections_for_snapshot(db, snapshot=accepted)
                         db.commit()
             successful += 1

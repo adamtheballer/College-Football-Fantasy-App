@@ -78,7 +78,7 @@ describe("NotificationSettingsPanel async lifecycle", () => {
     render(<NotificationSettingsPanel />);
 
     const group = await screen.findByTestId("big-play-alert-group");
-    expect(group.textContent).toContain("Master control for the long-play alerts below");
+    expect(group.textContent).toContain("Master control for verified live long-play alerts");
     expect(group.textContent).toContain("30+ yard rushing plays");
     expect(group.textContent).toContain("40+ yard receptions");
     expect(group.textContent).toContain("40+ yard completed passes");

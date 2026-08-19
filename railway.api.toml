@@ -6,7 +6,7 @@ dockerfilePath = "Dockerfile.api"
 preDeployCommand = [
   "sh -c 'uv run alembic -c api/alembic.ini upgrade head && uv run python scripts/check_alembic_head.py'",
 ]
-startCommand = "sh -c 'exec uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port \"$PORT\"'"
+startCommand = "sh -c 'export GIT_SHA=\"${RAILWAY_GIT_COMMIT_SHA:-${GIT_SHA:-unknown}}\" GIT_BRANCH=\"${RAILWAY_GIT_BRANCH:-${GIT_BRANCH:-unknown}}\" WEB_GIT_SHA=\"${RAILWAY_GIT_COMMIT_SHA:-${WEB_GIT_SHA:-unknown}}\" WORKER_GIT_SHA=\"${RAILWAY_GIT_COMMIT_SHA:-${WORKER_GIT_SHA:-unknown}}\"; exec uv run uvicorn collegefootballfantasy_api.app.main:app --host 0.0.0.0 --port \"$PORT\"'"
 healthcheckPath = "/health/ready"
 healthcheckTimeout = 100
 restartPolicyType = "ALWAYS"
