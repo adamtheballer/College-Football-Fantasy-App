@@ -58,14 +58,6 @@ const POSITION_ROW_HOVER_STYLES: Record<string, string> = {
   K: "hover:bg-slate-200/[0.07] hover:shadow-[inset_2px_0_0_rgba(226,232,240,0.65)] focus:bg-slate-200/[0.10]",
 };
 
-const ROSTER_POSITION_ROW_TINTS: Record<string, string> = {
-  QB: "bg-blue-400/[0.07] hover:bg-blue-400/[0.12]",
-  RB: "bg-emerald-400/[0.07] hover:bg-emerald-400/[0.12]",
-  WR: "bg-violet-400/[0.07] hover:bg-violet-400/[0.12]",
-  TE: "bg-amber-400/[0.07] hover:bg-amber-400/[0.12]",
-  K: "bg-slate-200/[0.07] hover:bg-slate-200/[0.12]",
-};
-
 type PreviewTeam = DraftRoomTeam & {
   isPlaceholder?: boolean;
 };
@@ -760,23 +752,20 @@ export default function Draft() {
   );
 
   const renderRoster = () => {
-    const starterSlots = selectedRoster.filter((slot) => !slot.label.startsWith("BENCH"));
-    const benchSlots = selectedRoster.filter((slot) => slot.label.startsWith("BENCH"));
+    const filledSlots = selectedRoster.filter((slot) => slot.player).length;
+    const rosterSlotLimits = Object.entries(draftRoom.roster_slots ?? {}).filter(([, count]) => Number(count) > 0);
 
     const renderSlotRow = (slot: RealRosterSlot, index: number) => {
-      const position = slot.player?.player_position ?? (slot.allowedPositions.length === 1 ? slot.allowedPositions[0] : "EMPTY");
       return (
         <div
           key={slot.label}
           className={cn(
-            "grid min-h-[46px] grid-cols-[2.6rem_minmax(0,1fr)_auto] items-center gap-2 border-b border-white/[0.08] px-3 py-1.5 last:border-b-0 sm:grid-cols-[3.1rem_minmax(0,1fr)_auto] sm:px-4",
-            index % 2 === 0 ? "bg-[#1c1f23]" : "bg-[#17191d]",
-            slot.player
-              ? cn("transition-colors", ROSTER_POSITION_ROW_TINTS[position] ?? "hover:bg-[#252a30]")
-              : "text-slate-500"
+            "grid min-h-14 grid-cols-[3.35rem_minmax(0,1fr)_2.4rem] items-center gap-2 border-b border-white/[0.07] px-3 py-2.5 last:border-b-0 sm:grid-cols-[4.5rem_minmax(0,1fr)_3.25rem] sm:px-5",
+            index % 2 === 0 ? "bg-[#202224]" : "bg-[#1b1d1f]",
+            slot.player ? "transition-colors hover:bg-[#292c2f]" : "text-slate-500"
           )}
         >
-          <p className="text-center text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+          <p className="text-center text-xs font-medium uppercase tracking-[0.04em] text-slate-400 sm:text-sm">
             {slot.label.replace(/\s+\d+$/, "")}
           </p>
           {slot.player ? (
@@ -786,31 +775,26 @@ export default function Draft() {
               className="min-w-0 text-left focus:outline-none focus-visible:underline"
               aria-label={`Open ${slot.player.player_name} player card`}
             >
-              <span className="block truncate text-[13px] font-black text-foreground transition-colors hover:text-white sm:text-sm">{slot.player.player_name}</span>
-              <span className="block truncate text-[8px] font-bold uppercase tracking-[0.08em] text-slate-400 sm:text-[9px]">
-                {slot.player.player_school} · Pick {slot.player.overall_pick}
+              <span className="block truncate text-sm font-bold text-foreground transition-colors hover:text-white sm:text-base">{slot.player.player_name}</span>
+              <span className="block truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-400 sm:text-[10px]">
+                {slot.player.player_position} · {slot.player.player_school} · Pick {slot.player.overall_pick}
               </span>
             </button>
           ) : (
-            <p className="truncate text-[13px] font-black text-slate-500 sm:text-sm">Open slot</p>
+            <p className="truncate text-sm font-medium text-slate-500 sm:text-base">Open slot</p>
           )}
-          <span className="min-w-[2.15rem] border-l border-white/10 pl-2 text-right text-[9px] font-black uppercase tracking-[0.08em] text-slate-300 sm:min-w-[2.7rem] sm:pl-3">
-            {position}
+          <span className="border-l border-white/10 pl-2 text-right text-xs font-medium tabular-nums text-slate-400 sm:pl-3 sm:text-sm">
+            —
           </span>
         </div>
       );
     };
 
     return (
-      <section className="overflow-hidden rounded-xl border border-white/12 bg-[#141619] shadow-[0_8px_20px_rgba(2,6,23,0.18)]">
-        <div className="flex flex-col gap-2 border-b border-white/10 bg-[#111315] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4">
-          <div data-testid="draft-player-list">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-100">Roster</p>
-            <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-slate-400">
-              Team draft slots
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+      <section className="overflow-hidden rounded-xl border border-white/12 bg-[#17191b] shadow-[0_8px_20px_rgba(2,6,23,0.18)]">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-white/10 bg-[#151719] px-3 py-3 sm:px-5">
+          <div data-testid="draft-player-list" className="flex items-center gap-3">
+            <p className="text-sm font-bold text-slate-100">{selectedRosterTeam?.id === draftRoom.user_team_id ? "My Team" : "Team"}</p>
             <label className="sr-only" htmlFor="real-roster-team-select">
               Select roster team
             </label>
@@ -818,7 +802,7 @@ export default function Draft() {
               id="real-roster-team-select"
               value={selectedRosterTeam?.id ?? draftRoom.user_team_id ?? ""}
               onChange={(event) => setSelectedRosterTeamId(Number(event.target.value))}
-              className="h-8 min-w-0 flex-1 rounded-lg border border-white/15 bg-[#202328] px-3 text-[9px] font-black uppercase tracking-[0.08em] text-slate-100 outline-none transition focus:border-slate-300/60 focus:ring-2 focus:ring-white/10 sm:min-w-[220px]"
+              className="h-8 min-w-0 max-w-[13rem] rounded-md border border-white/15 bg-[#202328] px-2.5 text-[10px] font-semibold text-slate-100 outline-none transition focus:border-slate-300/60 focus:ring-2 focus:ring-white/10 sm:min-w-[13rem]"
             >
               {draftRoom.teams.map((team) => (
                 <option key={team.id} value={team.id}>
@@ -826,23 +810,31 @@ export default function Draft() {
                 </option>
               ))}
             </select>
-            <p className="shrink-0 text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
-              {selectedRoster.filter((slot) => slot.player).length}/{selectedRoster.length} filled
-            </p>
           </div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+            {filledSlots}/{selectedRoster.length} filled
+          </p>
+          <details className="relative ml-auto">
+            <summary className="cursor-pointer list-none rounded-full border border-primary/70 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-primary transition-colors hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70">
+              Position limits
+            </summary>
+            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-30 flex min-w-44 flex-wrap gap-1.5 rounded-lg border border-white/15 bg-[#151719] p-3 shadow-xl">
+              {rosterSlotLimits.map(([slot, count]) => (
+                <span key={slot} className="rounded border border-white/10 bg-[#202328] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.06em] text-slate-300">
+                  {slot} {count}
+                </span>
+              ))}
+            </div>
+          </details>
         </div>
 
-        <div className="pt-2">
-          <p className="border-b border-white/10 bg-[#111315] px-3 pb-1.5 text-[8px] font-black uppercase tracking-[0.14em] text-slate-400 sm:px-4">Starters</p>
-          <div>{starterSlots.map(renderSlotRow)}</div>
+        <div className="grid grid-cols-[3.35rem_minmax(0,1fr)_2.4rem] items-center border-b border-white/10 bg-[#1a1c1e] px-3 py-2 sm:grid-cols-[4.5rem_minmax(0,1fr)_3.25rem] sm:px-5">
+          <p className="text-center text-[9px] font-bold uppercase tracking-[0.08em] text-slate-100">Slot</p>
+          <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-100">Player</p>
+          <p className="border-l border-white/10 pl-2 text-right text-[9px] font-bold uppercase tracking-[0.08em] text-slate-100 sm:pl-3">Bye</p>
         </div>
 
-        {benchSlots.length ? (
-          <div className="border-t border-white/10 pt-2">
-            <p className="border-b border-white/10 bg-[#111315] px-3 pb-1.5 text-[8px] font-black uppercase tracking-[0.14em] text-slate-400 sm:px-4">Bench / Reserve</p>
-            <div>{benchSlots.map(renderSlotRow)}</div>
-          </div>
-        ) : null}
+        <div>{selectedRoster.map(renderSlotRow)}</div>
       </section>
     );
   };
