@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { User, Sliders, Shield, Save, LogOut } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { User, Sliders, Shield, Save, LogOut, ImagePlus } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import { useRuntimeCapabilities } from "@/components/RuntimeCompatibilityGate";
 import { SupportContactCard } from "@/components/support/SupportContactCard";
 import { NotificationSettingsPanel } from "@/components/NotificationSettingsPanel";
 import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
+import { prepareProfileImage } from "@/lib/profileImage";
 
 const SettingsSection = ({ title, description, children, icon: Icon }: any) => (
   <Card className="group relative overflow-hidden rounded-3xl border-border/60 bg-card/40 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-md transition-all duration-700 hover:border-primary/20 sm:rounded-[2.5rem]">
@@ -105,13 +106,20 @@ export default function Settings() {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [managerName, setManagerName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [pendingAvatarUrl, setPendingAvatarUrl] = useState<string | null>(null);
+  const [pendingAvatarName, setPendingAvatarName] = useState<string | null>(null);
+  const [photoState, setPhotoState] = useState<"idle" | "preparing" | "saving">("idle");
   const [avatarPreviewError, setAvatarPreviewError] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setManagerName(user?.firstName ?? "");
     setAvatarUrl(user?.avatarUrl ?? "");
+    setPendingAvatarUrl(null);
+    setPendingAvatarName(null);
+    setPhotoState("idle");
     setAvatarPreviewError(false);
     setProfileError(null);
   }, [user]);
@@ -141,6 +149,58 @@ export default function Settings() {
     if (!user) return;
     restartGuide(user.id);
     navigate("/", { state: { replayGuide: true } });
+  };
+
+  const handlePhotoChosen = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const photo = event.target.files?.[0];
+    // Reset first so choosing the same image again emits a change event.
+    event.target.value = "";
+    if (!photo) return;
+
+    setPhotoState("preparing");
+    setProfileError(null);
+    setAvatarPreviewError(false);
+    try {
+      const preparedPhoto = await prepareProfileImage(photo);
+      setPendingAvatarUrl(preparedPhoto);
+      setPendingAvatarName(photo.name);
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : "Unable to prepare this photo.");
+    } finally {
+      setPhotoState("idle");
+    }
+  };
+
+  const handleSelectPhoto = async () => {
+    if (!pendingAvatarUrl) return;
+    setPhotoState("saving");
+    setProfileError(null);
+    try {
+      const updatedUser = await updateProfile({ avatarUrl: pendingAvatarUrl });
+      setAvatarUrl(updatedUser.avatarUrl ?? pendingAvatarUrl);
+      setPendingAvatarUrl(null);
+      setPendingAvatarName(null);
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : "Unable to update your profile picture. Your previous picture is still active.");
+    } finally {
+      setPhotoState("idle");
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    setPendingAvatarUrl(null);
+    setPendingAvatarName(null);
+    setAvatarPreviewError(false);
+    setPhotoState("saving");
+    setProfileError(null);
+    try {
+      await updateProfile({ avatarUrl: null });
+      setAvatarUrl("");
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : "Unable to remove your profile picture. Your previous picture is still active.");
+    } finally {
+      setPhotoState("idle");
+    }
   };
 
   const handleLogoutAll = async () => {
@@ -219,7 +279,7 @@ export default function Settings() {
           <Button
             className="h-12 w-full rounded-2xl bg-primary px-6 text-[10px] font-black uppercase tracking-[0.18em] text-primary-foreground shadow-[0_10px_30px_rgba(var(--primary),0.2)] transition-all duration-300 hover:scale-[1.02] sm:h-14 sm:w-auto sm:px-10 sm:tracking-[0.2em] sm:hover:scale-105"
             onClick={handleSave}
-            disabled={saveState === "saving"}
+            disabled={saveState === "saving" || photoState === "saving"}
           >
             <Save className="w-4 h-4 mr-3" />
             {saveState === "saving" ? "Saving..." : saveState === "saved" ? "Saved" : "Save Changes"}
@@ -257,7 +317,7 @@ export default function Settings() {
           </div>
           <div className="grid gap-5 rounded-2xl border border-border/70 bg-black/10 p-5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
             <ManagerAvatar
-              avatarUrl={avatarUrl.trim() || null}
+              avatarUrl={pendingAvatarUrl ?? (avatarUrl.trim() || null)}
               managerName={managerName}
               size="xl"
               eager
@@ -266,26 +326,48 @@ export default function Settings() {
             />
             <div className="min-w-0 space-y-3">
               <div>
-                <Label htmlFor="profile-image-url" className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Manager Profile Picture</Label>
-                <p className="mt-1 text-xs text-muted-foreground">Paste a public HTTPS image address. Image links up to 2,048 characters are supported.</p>
+                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Manager Profile Picture</Label>
+                <p className="mt-1 text-xs text-muted-foreground">Choose a photo from your device. Your phone handles photo permission and lets you choose the photos to share.</p>
               </div>
-              <Input
-                id="profile-image-url"
-                aria-label="Profile image URL (optional)"
-                type="url"
-                inputMode="url"
-                autoComplete="url"
-                maxLength={2048}
-                placeholder="https://example.com/profile-picture.jpg"
-                value={avatarUrl}
-                onChange={(event) => {
-                  setAvatarUrl(event.target.value);
-                  setAvatarPreviewError(false);
-                }}
-                className="h-12 rounded-xl border-border bg-white/5 px-4 text-sm text-foreground"
+              <input
+                ref={photoInputRef}
+                aria-label="Choose a profile photo"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={handlePhotoChosen}
               />
-              {avatarPreviewError ? <p role="alert" className="text-xs font-medium text-red-300">This image could not be loaded. Check that the address is public and uses HTTPS.</p> : null}
-              {(avatarUrl.trim() || user.avatarUrl) ? <Button type="button" variant="outline" className="h-10 rounded-xl border-border text-[10px] font-black uppercase tracking-[0.14em]" onClick={() => { setAvatarUrl(""); setAvatarPreviewError(false); }}>Remove Picture</Button> : null}
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" className="h-10 rounded-xl border-border text-[10px] font-black uppercase tracking-[0.14em]" onClick={() => photoInputRef.current?.click()} disabled={photoState !== "idle"}>
+                  <ImagePlus className="mr-2 h-4 w-4" />
+                  {photoState === "preparing" ? "Preparing..." : "Choose Photo"}
+                </Button>
+                {pendingAvatarUrl ? <Button type="button" className="h-10 rounded-xl px-4 text-[10px] font-black uppercase tracking-[0.14em]" onClick={handleSelectPhoto} disabled={photoState !== "idle"}>Select Photo</Button> : null}
+                {pendingAvatarUrl ? <Button type="button" variant="ghost" className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.14em]" onClick={() => { setPendingAvatarUrl(null); setPendingAvatarName(null); setAvatarPreviewError(false); }} disabled={photoState !== "idle"}>Cancel</Button> : null}
+                {(avatarUrl.trim() || user.avatarUrl) && !pendingAvatarUrl ? <Button type="button" variant="outline" className="h-10 rounded-xl border-border text-[10px] font-black uppercase tracking-[0.14em]" onClick={handleRemovePhoto} disabled={photoState !== "idle"}>Remove Picture</Button> : null}
+              </div>
+              {pendingAvatarUrl ? <p className="text-xs font-medium text-primary">{pendingAvatarName ?? "Selected photo"} is ready. Tap Select Photo to update your profile picture.</p> : null}
+              {avatarPreviewError ? <p role="alert" className="text-xs font-medium text-red-300">This image could not be loaded. Choose a different photo.</p> : null}
+              <details className="pt-1">
+                <summary className="cursor-pointer text-xs font-medium text-muted-foreground">Use an image address instead</summary>
+                <Input
+                  id="profile-image-url"
+                  aria-label="Profile image URL (optional)"
+                  type="url"
+                  inputMode="url"
+                  autoComplete="url"
+                  maxLength={2048}
+                  placeholder="https://example.com/profile-picture.jpg"
+                  value={avatarUrl.startsWith("data:") ? "" : avatarUrl}
+                  onChange={(event) => {
+                    setAvatarUrl(event.target.value);
+                    setPendingAvatarUrl(null);
+                    setPendingAvatarName(null);
+                    setAvatarPreviewError(false);
+                  }}
+                  className="mt-3 h-12 rounded-xl border-border bg-white/5 px-4 text-sm text-foreground"
+                />
+              </details>
             </div>
           </div>
           {profileError ? <p role="alert" className="text-sm font-semibold text-red-300">{profileError}</p> : null}

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Index, Integer, String
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -17,7 +17,9 @@ class User(TimestampMixin, Base):
     email: Mapped[str] = mapped_column(String(200), unique=True)
     username: Mapped[str | None] = mapped_column(String(80), unique=True, index=True, nullable=True)
     first_name: Mapped[str] = mapped_column(String(100))
-    avatar_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    # An avatar can be either a vetted public HTTPS URL or a compact JPEG data
+    # URL created by the mobile photo picker. Text avoids truncating the latter.
+    avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     password_hash: Mapped[str] = mapped_column(String(200))
     api_token: Mapped[str] = mapped_column(String(100), unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

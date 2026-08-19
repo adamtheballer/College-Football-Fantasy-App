@@ -1,6 +1,8 @@
 from datetime import datetime
 import re
 from typing import Optional
+import base64
+import binascii
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -75,11 +77,16 @@ class UserCreate(BaseModel):
         return normalized or None
 
 
+MAX_AVATAR_DATA_URL_BYTES = 250 * 1024
+MAX_AVATAR_DATA_URL_LENGTH = 350 * 1024
+JPEG_DATA_URL_PREFIX = "data:image/jpeg;base64,"
+
+
 class UserProfileUpdate(BaseModel):
     """The limited, self-service profile fields supported during beta."""
 
     first_name: str | None = Field(default=None, max_length=100)
-    avatar_url: str | None = Field(default=None, max_length=2048)
+    avatar_url: str | None = Field(default=None, max_length=MAX_AVATAR_DATA_URL_LENGTH)
 
     @field_validator("first_name")
     @classmethod
@@ -101,6 +108,19 @@ class UserProfileUpdate(BaseModel):
         normalized = value.strip()
         if not normalized:
             return None
+        if normalized.startswith("data:"):
+            if not normalized.startswith(JPEG_DATA_URL_PREFIX):
+                raise ValueError("Profile photos must be JPEG images selected through the app.")
+            encoded = normalized[len(JPEG_DATA_URL_PREFIX):]
+            try:
+                decoded = base64.b64decode(encoded, validate=True)
+            except (binascii.Error, ValueError):
+                raise ValueError("Profile photo data is invalid.") from None
+            if not decoded.startswith(b"\xff\xd8\xff"):
+                raise ValueError("Profile photos must be valid JPEG images.")
+            if len(decoded) > MAX_AVATAR_DATA_URL_BYTES:
+                raise ValueError("Profile photos must be 250 KB or smaller.")
+            return normalized
         if len(normalized) > 2048:
             raise ValueError("Profile image URL must be 2,048 characters or fewer.")
         parsed = urlparse(normalized)

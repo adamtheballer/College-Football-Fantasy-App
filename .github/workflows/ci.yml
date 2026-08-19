@@ -112,7 +112,7 @@ jobs:
             runtime="$(curl --fail --silent http://127.0.0.1:8080/api/health/runtime || true)"
             if curl --fail --silent --head http://127.0.0.1:8080 >/dev/null && \
               jq -e '.status == "ready"' <<<"$ready" >/dev/null && \
-              jq -e --arg sha "$expected_sha" '.git_sha == $sha and .alembic_revision == "0097_merge_avatar_live_heads" and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' <<<"$runtime" >/dev/null; then
+              jq -e --arg sha "$expected_sha" '.git_sha == $sha and .alembic_revision == "0098_profile_photo_data" and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' <<<"$runtime" >/dev/null; then
               exit 0
             fi
             sleep 5
