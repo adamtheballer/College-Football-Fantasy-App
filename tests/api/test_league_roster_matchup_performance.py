@@ -3,6 +3,7 @@ from sqlalchemy import event
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.league_roster_matchup import build_matchup_tab_view
+from collegefootballfantasy_api.app.services.scoring_service import recalculate_league_week_scores
 from tests.api.scoring_helpers import create_scoring_fixture
 
 
@@ -45,4 +46,32 @@ def test_matchup_tab_uses_a_bounded_number_of_selects(client, db_session):
     assert response.opponent_team is not None
     assert len(response.my_roster) == 8
     assert len(response.opponent_roster) == 8
-    assert select_count <= 8
+    # Player-level live scoring is fetched as one league/week batch, rather
+    # than per roster slot. Keep that extra bounded query explicit so this
+    # view cannot regress into an N+1 read while live scoring is active.
+    assert select_count <= 9
+
+
+def test_matchup_tab_exposes_persisted_player_scores_without_falling_back_to_projections(client, db_session):
+    league, home, _away, players, _matchup = create_scoring_fixture(db_session)
+    user = User(
+        first_name="Live",
+        email="live-matchup@example.com",
+        password_hash="hash",
+        api_token="live-matchup-token",
+    )
+    db_session.add(user)
+    db_session.flush()
+    home.owner_user_id = user.id
+    recalculate_league_week_scores(db_session, league.id, 2026, 1)
+    db_session.commit()
+
+    response = build_matchup_tab_view(db_session, league, user, selected_week=1)
+    quarterback = next(row for row in response.my_roster if row.player_id == players["qb"].id)
+    open_slot = next(row for row in response.my_roster if row.status == "EMPTY")
+
+    assert quarterback.live_points == 16.0
+    assert quarterback.live_scoring_status == "live"
+    assert quarterback.live_scoring_updated_at is not None
+    assert open_slot.live_points is None
+    assert open_slot.live_scoring_status == "unavailable"

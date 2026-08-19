@@ -252,6 +252,9 @@ export interface LeagueRosterPlayer {
   bust_prob?: number | null;
   weekly_projected_fantasy_points: number | null;
   projection_status?: string | null;
+  live_points?: number | null;
+  live_scoring_status?: string | null;
+  live_scoring_updated_at?: string | null;
   game_start_at?: string | null;
   is_locked?: boolean;
   is_placeholder?: boolean;

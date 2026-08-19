@@ -103,6 +103,24 @@ describe("SideBySideMatchup", () => {
     expect(compactMatchupPlayerName("Cher")).toBe("Cher");
   });
 
+  it("shows persisted player scores instead of projections once a matchup is live", () => {
+    const liveMyTeam = {
+      ...myTeam,
+      roster: [{ ...myTeam.roster[0], live_points: 7.25, live_scoring_status: "live" }],
+    };
+    const liveOpponentTeam = {
+      ...opponentTeam,
+      roster: [{ ...opponentTeam.roster[0], live_points: 13, live_scoring_status: "live" }],
+    };
+
+    render(<SideBySideMatchup myTeam={liveMyTeam} opponentTeam={liveOpponentTeam} scoringStatus="live" />);
+
+    expect(screen.getByText("7.3")).toBeTruthy();
+    expect(screen.getByText("13.0")).toBeTruthy();
+    expect(screen.queryByText("24.1")).toBeNull();
+    expect(screen.queryByText("22.7")).toBeNull();
+  });
+
   it("keeps bench rows collapsed until a user chooses to inspect them", () => {
     const { container } = render(<SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} />);
 

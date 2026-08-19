@@ -18,7 +18,7 @@ vi.mock("@/hooks/use-roster-actions", () => ({
   useUpdateLineup: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
-import { RosterSlotTable } from "./RosterSlotTable";
+import { formatRosterPointValue, RosterSlotTable } from "./RosterSlotTable";
 
 afterEach(cleanup);
 
@@ -78,5 +78,14 @@ describe("RosterSlotTable", () => {
     expect(screen.getByText("A Very Long Receiver Name That Must Stay Compact")).toBeTruthy();
     expect(screen.getByText("Ohio State · vs Michigan")).toBeTruthy();
     expect(screen.getByText("18.4")).toBeTruthy();
+  });
+
+  it("uses persisted live points when the caller marks the table as live", () => {
+    const liveReceiver = { ...projectedReceiver, live_points: 21.37, live_scoring_status: "live" };
+    render(<RosterSlotTable title="Starters" players={[liveReceiver]} pointMode="live" />);
+
+    expect(screen.getByText("21.4")).toBeTruthy();
+    expect(screen.queryByText("18.4")).toBeNull();
+    expect(formatRosterPointValue(liveReceiver, "live")).toBe("21.4");
   });
 });

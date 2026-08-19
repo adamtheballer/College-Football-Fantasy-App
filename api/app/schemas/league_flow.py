@@ -564,6 +564,9 @@ class RosterTabEntryRead(BaseModel):
     game_location: str | None = None
     weekly_projected_fantasy_points: float | None = None
     projection_status: str = "UNAVAILABLE"
+    live_points: float | None = None
+    live_scoring_status: str = "unavailable"
+    live_scoring_updated_at: datetime | None = None
     game_start_at: datetime | None = None
     is_locked: bool = False
     acquisition_type: str = "ROSTER"

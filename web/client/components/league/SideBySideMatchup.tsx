@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { RosterSlotTable } from "@/components/league/RosterSlotTable";
+import { RosterSlotTable, type RosterPointMode } from "@/components/league/RosterSlotTable";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { SurfaceCard } from "@/components/fantasy";
 import { usePlayerCard } from "@/hooks/use-players";
@@ -36,11 +36,22 @@ const sortBySlot = (players: LeagueRosterPlayer[]) =>
 const compactSlot = (player?: LeagueRosterPlayer) =>
   player ? (player.display_label ?? rosterSlot(player) ?? "—").toUpperCase() : "—";
 
-const compactProjection = (player?: LeagueRosterPlayer) =>
-  formatProjectionDisplay(
+const compactPointValue = (player: LeagueRosterPlayer | undefined, pointMode: RosterPointMode) => {
+  if (pointMode === "live") {
+    return typeof player?.live_points === "number" && Number.isFinite(player.live_points)
+      ? player.live_points.toFixed(1)
+      : "—";
+  }
+  return formatProjectionDisplay(
     player?.projected_points ?? player?.weekly_projected_fantasy_points ?? null,
     player?.projection_status,
   );
+};
+
+const pointModeForMatchupStatus = (status?: string | null): RosterPointMode =>
+  ["live", "final", "stat_corrected", "corrected", "delayed"].includes((status ?? "").toLowerCase())
+    ? "live"
+    : "projected";
 
 export const compactMatchupPlayerName = (name?: string | null) => {
   const parts = name?.trim().split(/\s+/).filter(Boolean) ?? [];
@@ -87,14 +98,16 @@ export const formatPlayerGameContext = (player?: LeagueRosterPlayer) => {
 function CompactMatchupPlayer({
   player,
   align,
+  pointMode,
   onSelect,
 }: {
   player?: LeagueRosterPlayer;
   align: "left" | "right";
+  pointMode: RosterPointMode;
   onSelect?: (player: LeagueRosterPlayer) => void;
 }) {
   const hasPlayer = Boolean(player?.player_id && player.player_name);
-  const points = compactProjection(player);
+  const points = compactPointValue(player, pointMode);
   const playerName = hasPlayer ? compactMatchupPlayerName(player?.player_name) : "No starter set";
   const gameMatchup = hasPlayer ? formatPlayerGameMatchup(player) : "Set a starter in your roster";
   const gameTime = hasPlayer ? formatPlayerGameTime(player) : "Kickoff TBD";
@@ -174,6 +187,7 @@ function CompactMobileLineup({
   title,
   myPlayers,
   opponentPlayers,
+  pointMode,
   testId,
   showHeader = true,
   onPlayerSelect,
@@ -181,6 +195,7 @@ function CompactMobileLineup({
   title: string;
   myPlayers: LeagueRosterPlayer[];
   opponentPlayers: LeagueRosterPlayer[];
+  pointMode: RosterPointMode;
   testId: string;
   showHeader?: boolean;
   onPlayerSelect?: (player: LeagueRosterPlayer) => void;
@@ -192,7 +207,7 @@ function CompactMobileLineup({
       {showHeader ? (
         <div className="flex items-center justify-between bg-cfb-surface/70 px-4 py-3">
           <h2 className="text-[11px] font-black uppercase tracking-[0.17em] text-cfb-text-primary">{title}</h2>
-          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Points</span>
+          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">{pointMode === "live" ? "Live" : "Proj"}</span>
         </div>
       ) : null}
       <div className="relative">
@@ -213,13 +228,13 @@ function CompactMobileLineup({
               className="relative z-10 grid min-h-[72px] grid-cols-[minmax(0,1fr)_2.75rem_minmax(0,1fr)] items-stretch px-3"
             >
               <div className={`flex min-w-0 items-center py-2 ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""}`}>
-                <CompactMatchupPlayer player={myPlayer} align="left" onSelect={onPlayerSelect} />
+                <CompactMatchupPlayer player={myPlayer} align="left" pointMode={pointMode} onSelect={onPlayerSelect} />
               </div>
               <span data-mobile-slot-column className="inline-flex min-h-[72px] items-center justify-center px-1 text-[9px] font-black uppercase tracking-[0.04em] text-cfb-text-secondary">
                 {slot}
               </span>
               <div className={`flex min-w-0 items-center py-2 ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""}`}>
-                <CompactMatchupPlayer player={opponentPlayer} align="right" onSelect={onPlayerSelect} />
+                <CompactMatchupPlayer player={opponentPlayer} align="right" pointMode={pointMode} onSelect={onPlayerSelect} />
               </div>
             </div>
           );
@@ -233,10 +248,12 @@ export function SideBySideMatchup({
   myTeam,
   opponentTeam,
   leagueId,
+  scoringStatus,
 }: {
   myTeam: LeagueMatchupTeam | null;
   opponentTeam: LeagueMatchupTeam | null;
   leagueId?: number | string;
+  scoringStatus?: string | null;
 }) {
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueRosterPlayer | null>(null);
   const myStarters = sortBySlot(startersFor(myTeam));
@@ -247,6 +264,7 @@ export function SideBySideMatchup({
   const selectedProjection = selectedPlayer?.projected_points ?? selectedPlayer?.weekly_projected_fantasy_points;
   const numericLeagueId = typeof leagueId === "number" ? leagueId : Number(leagueId);
   const resolvedLeagueId = Number.isFinite(numericLeagueId) && numericLeagueId > 0 ? numericLeagueId : undefined;
+  const pointMode = pointModeForMatchupStatus(scoringStatus);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -255,6 +273,7 @@ export function SideBySideMatchup({
           title="Starter matchup"
           myPlayers={myStarters}
           opponentPlayers={opponentStarters}
+          pointMode={pointMode}
           testId="mobile-starting-lineup"
           showHeader={false}
           onPlayerSelect={setSelectedPlayer}
@@ -265,6 +284,7 @@ export function SideBySideMatchup({
             players={myStarters}
             emptyText="Your starters are empty or projections are unavailable."
             showPositionColumn={false}
+            pointMode={pointMode}
             leagueId={leagueId}
           />
           <RosterSlotTable
@@ -272,6 +292,7 @@ export function SideBySideMatchup({
             players={opponentStarters}
             emptyText="Opponent starters are pending."
             showPositionColumn={false}
+            pointMode={pointMode}
             leagueId={leagueId}
           />
         </div>
@@ -287,6 +308,7 @@ export function SideBySideMatchup({
             title="Bench"
             myPlayers={myReserves}
             opponentPlayers={opponentReserves}
+            pointMode={pointMode}
             testId="mobile-bench-lineup"
             onPlayerSelect={setSelectedPlayer}
           />
@@ -308,6 +330,7 @@ export function SideBySideMatchup({
             emptyText="Your bench is empty."
             showPositionColumn={false}
             tone="bench"
+            pointMode={pointMode}
             leagueId={leagueId}
           />
           <RosterSlotTable
@@ -316,6 +339,7 @@ export function SideBySideMatchup({
             emptyText="Opponent bench is pending."
             showPositionColumn={false}
             tone="bench"
+            pointMode={pointMode}
             leagueId={leagueId}
           />
         </div>

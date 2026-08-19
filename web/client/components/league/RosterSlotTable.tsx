@@ -46,6 +46,17 @@ const displaySchoolName = (school?: string | null) => {
 };
 
 const weeklyProjectionLabel = (player: LeagueRosterPlayer) => {
+  return weeklyProjectionLabel(player);
+};
+
+export type RosterPointMode = "projected" | "live";
+
+export const formatRosterPointValue = (player: LeagueRosterPlayer, pointMode: RosterPointMode) => {
+  if (pointMode === "live") {
+    return typeof player.live_points === "number" && Number.isFinite(player.live_points)
+      ? player.live_points.toFixed(1)
+      : "—";
+  }
   const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
   return formatProjectionDisplay(projection, player.projection_status);
 };
@@ -91,6 +102,7 @@ export function RosterSlotTable({
   emptyText = "No roster players yet.",
   showPositionColumn = true,
   tone = "default",
+  pointMode = "projected",
   leagueId,
   ownedRosterActions,
 }: {
@@ -99,6 +111,7 @@ export function RosterSlotTable({
   emptyText?: string;
   showPositionColumn?: boolean;
   tone?: RosterSlotTableTone;
+  pointMode?: RosterPointMode;
   leagueId?: number | string;
   ownedRosterActions?: OwnedRosterActions;
 }) {
@@ -216,15 +229,13 @@ export function RosterSlotTable({
             <span>School</span>
             {showPositionColumn ? <span>Pos</span> : null}
             <span>Opp</span>
-            <span className="text-right">Proj</span>
+            <span className="text-right">{pointMode === "live" ? "Pts" : "Proj"}</span>
           </div>
           {sorted.map((player) => {
             const position = positionLabel(player);
             const isRealPlayer = isRealRosterPlayer(player);
             const style = getPositionStyle();
-            const projection = isRealPlayer
-              ? player.projected_points ?? player.weekly_projected_fantasy_points ?? null
-              : 0;
+            const pointValue = isRealPlayer ? formatRosterPointValue(player, pointMode) : pointMode === "live" ? "—" : "0.0";
             return (
               <button
                 key={player.slot_id ?? `${player.team_id ?? player.fantasy_team_id}-${slotType(player)}-${player.slot_index ?? 0}`}
@@ -275,8 +286,8 @@ export function RosterSlotTable({
                 ) : null}
                 <span className="hidden text-cfb-text-muted md:block">{isRealPlayer ? player.opponent ?? "TBD" : "—"}</span>
                 <span className={cn("flex flex-col items-end text-right font-black tabular-nums", style.text)}>
-                  <span className="text-[8px] uppercase tracking-[0.12em] text-cfb-text-muted md:hidden">Proj</span>
-                  <span>{formatProjectionDisplay(projection, player.projection_status)}</span>
+                  <span className="text-[8px] uppercase tracking-[0.12em] text-cfb-text-muted md:hidden">{pointMode === "live" ? "Live" : "Proj"}</span>
+                  <span>{pointValue}</span>
                 </span>
               </button>
             );
