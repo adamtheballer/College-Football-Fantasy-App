@@ -271,10 +271,10 @@ def main() -> None:
     ensure_models_registered()
     with SessionLocal() as db:
         revision = db.execute(text("select version_num from alembic_version")).scalar_one_or_none()
-        if revision != "0096_live_player_projections":
+        if revision != "0097_merge_avatar_live_heads":
             raise SystemExit(
                 "Refusing readiness audit: database must be migrated to "
-                "0096_live_player_projections before its player/game identity data can be certified."
+                "0097_merge_avatar_live_heads before its player/game identity data can be certified."
             )
         report = build_readiness_report(db, season=args.season, event_fixture=args.event_fixture)
     rendered = json.dumps(report, indent=2, sort_keys=True)

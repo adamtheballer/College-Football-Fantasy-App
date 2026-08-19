@@ -1,8 +1,9 @@
 from datetime import datetime
 import re
 from typing import Optional
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 PASSWORD_POLICY_MESSAGE = (
@@ -77,15 +78,46 @@ class UserCreate(BaseModel):
 class UserProfileUpdate(BaseModel):
     """The limited, self-service profile fields supported during beta."""
 
-    first_name: str = Field(min_length=1, max_length=100)
+    first_name: str | None = Field(default=None, max_length=100)
+    avatar_url: str | None = Field(default=None, max_length=2048)
 
     @field_validator("first_name")
     @classmethod
-    def validate_first_name(cls, value: str) -> str:
+    def validate_first_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         normalized = value.strip()
         if not normalized:
             raise ValueError("manager name is required")
         return normalized
+
+    @field_validator("avatar_url", mode="before")
+    @classmethod
+    def validate_avatar_url(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("Enter a valid public HTTPS image address.")
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if len(normalized) > 2048:
+            raise ValueError("Profile image URL must be 2,048 characters or fewer.")
+        parsed = urlparse(normalized)
+        if (
+            parsed.scheme.lower() != "https"
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
+            raise ValueError("Enter a valid public HTTPS image address.")
+        return normalized
+
+    @model_validator(mode="after")
+    def require_profile_change(self) -> "UserProfileUpdate":
+        if not self.model_fields_set:
+            raise ValueError("at least one profile field is required")
+        return self
 
 
 class UserLogin(BaseModel):
@@ -120,6 +152,7 @@ class UserRead(BaseModel):
     first_name: str
     email: str
     username: str | None = None
+    avatar_url: str | None = None
     is_admin: bool = False
     created_at: datetime
     email_verified_at: datetime | None = None

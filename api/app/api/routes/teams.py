@@ -60,7 +60,7 @@ def create_team_endpoint(
     db.add(team)
     db.commit()
     db.refresh(team)
-    return TeamRead.model_validate(team)
+    return TeamRead.model_validate(team).model_copy(update={"owner_avatar_url": current_user.avatar_url})
 
 
 @router.get("/leagues/{league_id}/teams", response_model=TeamList)
@@ -74,4 +74,19 @@ def list_teams_endpoint(
     get_league_or_404(db, league_id)
     require_league_member(db, league_id, current_user)
     teams, total = list_teams(db, league_id=league_id, limit=limit, offset=offset)
-    return TeamList(data=teams, total=total, limit=limit, offset=offset)
+    owner_ids = {team.owner_user_id for team in teams if team.owner_user_id is not None}
+    avatars_by_owner_id = {
+        user.id: user.avatar_url
+        for user in db.query(User).filter(User.id.in_(owner_ids)).all()
+    } if owner_ids else {}
+    return TeamList(
+        data=[
+            TeamRead.model_validate(team).model_copy(
+                update={"owner_avatar_url": avatars_by_owner_id.get(team.owner_user_id)}
+            )
+            for team in teams
+        ],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )

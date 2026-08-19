@@ -6,6 +6,7 @@ import { ArrowLeft, ClipboardList, Grid3X3, History, LocateFixed, Loader2, Lock,
 import { DraftBoard } from "@/components/DraftBoard";
 import { DraftOrderPickCard } from "@/components/DraftOrderPickCard";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
+import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
 import { DraftRoomVisuals, draftMatteControlClass, draftMattePanelClass } from "@/components/DraftRoomVisuals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1100,6 +1101,7 @@ export default function Draft() {
                     <DraftOrderPickCard
                       compact
                       managerName={managerName}
+                      avatarUrl={slot.team?.owner_avatar_url}
                       isCpu={Boolean(slot.team?.is_cpu)}
                       round={slot.round}
                       roundPick={slot.roundPick}
@@ -1178,6 +1180,7 @@ export default function Draft() {
                   ) : null}
                   <DraftOrderPickCard
                     managerName={managerName}
+                    avatarUrl={slot.team?.owner_avatar_url}
                     isCpu={Boolean(slot.team?.is_cpu)}
                     round={slot.round}
                     roundPick={slot.roundPick}

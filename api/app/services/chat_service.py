@@ -280,6 +280,7 @@ def _participant_reads_by_thread(db: Session, *, thread_ids: list[int]) -> dict[
                 user_id=participant.user_id,
                 joined_at=participant.joined_at,
                 display_name=_participant_display_name(user),
+                avatar_url=user.avatar_url,
                 fantasy_team_name=team.name if team else None,
             )
         )
@@ -305,6 +306,7 @@ def _participant_reads_by_thread(db: Session, *, thread_ids: list[int]) -> dict[
                 user_id=member.user_id,
                 joined_at=member.joined_at,
                 display_name=_participant_display_name(user),
+                avatar_url=user.avatar_url,
                 fantasy_team_name=team.name if team else None,
             )
             for member, user, team in member_rows
@@ -368,7 +370,7 @@ def _thread_read(
     )
 
 
-def _user_profiles(db: Session, *, league_id: int, user_ids: set[int]) -> dict[int, tuple[str, str | None]]:
+def _user_profiles(db: Session, *, league_id: int, user_ids: set[int]) -> dict[int, tuple[str, str | None, str | None]]:
     if not user_ids:
         return {}
     rows = (
@@ -378,7 +380,7 @@ def _user_profiles(db: Session, *, league_id: int, user_ids: set[int]) -> dict[i
         .all()
     )
     return {
-        user.id: (_participant_display_name(user), team.name if team else None)
+        user.id: (_participant_display_name(user), user.avatar_url, team.name if team else None)
         for user, team in rows
     }
 
@@ -403,7 +405,7 @@ def _message_reads(db: Session, messages: list[ChatMessage]) -> list[ChatMessage
     profiles = _user_profiles(db, league_id=messages[0].league_id, user_ids=user_ids)
     results: list[ChatMessageRead] = []
     for message in messages:
-        sender_display_name, sender_team_name = profiles.get(message.sender_user_id, (None, None))
+        sender_display_name, sender_avatar_url, sender_team_name = profiles.get(message.sender_user_id, (None, None, None))
         reply = reply_by_id.get(message.reply_to_message_id)
         reply_sender_name = profiles.get(reply.sender_user_id, (None, None))[0] if reply else None
         results.append(
@@ -422,6 +424,7 @@ def _message_reads(db: Session, messages: list[ChatMessage]) -> list[ChatMessage
                 created_at=message.created_at,
                 updated_at=message.updated_at,
                 sender_display_name=sender_display_name,
+                sender_avatar_url=sender_avatar_url,
                 sender_fantasy_team_name=sender_team_name,
                 reply_to_message=(
                     ChatMessagePreview(

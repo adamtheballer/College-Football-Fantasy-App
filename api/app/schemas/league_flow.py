@@ -154,6 +154,8 @@ class LeagueMemberRead(BaseModel):
     user_id: int
     role: str
     joined_at: datetime
+    manager_name: str | None = None
+    manager_avatar_url: str | None = None
 
 
 class DraftRead(BaseModel):
@@ -173,6 +175,7 @@ class DraftOrderEntryRead(BaseModel):
     team_name: str
     owner_user_id: int | None = None
     owner_name: str | None = None
+    owner_avatar_url: str | None = None
     draft_position: int | None = None
 
 
@@ -383,6 +386,8 @@ class LeagueDetailRead(BaseModel):
     id: int
     name: str
     commissioner_user_id: int | None
+    commissioner_name: str | None = None
+    commissioner_avatar_url: str | None = None
     season_year: int
     max_teams: int
     is_private: bool
@@ -507,6 +512,7 @@ class LeaguePreview(BaseModel):
     id: int
     name: str
     commissioner_name: str | None
+    commissioner_avatar_url: str | None = None
     max_teams: int
     member_count: int
     is_private: bool
@@ -730,6 +736,7 @@ class LeagueTradeHistoryPartyRead(BaseModel):
     team_id: int
     team_name: str
     manager_name: str | None = None
+    manager_avatar_url: str | None = None
 
 
 class LeagueTradeHistoryAssetRead(BaseModel):

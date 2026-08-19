@@ -54,6 +54,7 @@ class ChatParticipantRead(BaseModel):
     user_id: int
     joined_at: datetime
     display_name: str
+    avatar_url: str | None = None
     fantasy_team_name: str | None
 
 
@@ -105,6 +106,7 @@ class ChatMessageRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     sender_display_name: str | None
+    sender_avatar_url: str | None = None
     sender_fantasy_team_name: str | None
     reply_to_message: ChatMessagePreview | None = None
 

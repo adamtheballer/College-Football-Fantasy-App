@@ -207,13 +207,17 @@ def update_current_user_profile(
 ) -> UserRead:
     """Update only the signed-in manager's beta profile fields."""
 
-    current_user.first_name = moderate_user_text(
-        db,
-        actor_user_id=current_user.id,
-        field_name="manager_name",
-        value=payload.first_name,
-        required=True,
-    ) or current_user.first_name
+    fields_set = payload.model_fields_set
+    if "first_name" in fields_set:
+        current_user.first_name = moderate_user_text(
+            db,
+            actor_user_id=current_user.id,
+            field_name="manager_name",
+            value=payload.first_name,
+            required=True,
+        ) or current_user.first_name
+    if "avatar_url" in fields_set:
+        current_user.avatar_url = payload.avatar_url
     db.add(current_user)
     db.commit()
     db.refresh(current_user)

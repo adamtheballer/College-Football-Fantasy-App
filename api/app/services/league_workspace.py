@@ -48,6 +48,19 @@ def get_league_detail(
     members_rows = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).all()
 
     teams = db.query(Team).filter(Team.league_id == league.id).order_by(Team.id.asc()).all()
+    manager_ids = {
+        user_id
+        for user_id in [
+            league.commissioner_user_id,
+            *(member.user_id for member in members_rows),
+            *(team.owner_user_id for team in teams),
+        ]
+        if user_id is not None
+    }
+    managers = {
+        manager.id: manager
+        for manager in db.query(User).filter(User.id.in_(manager_ids)).all()
+    } if manager_ids else {}
     draft_order = None
     if draft_row:
         positioned = [team.draft_position for team in teams]
@@ -64,6 +77,7 @@ def get_league_detail(
                     team_name=team.name,
                     owner_user_id=team.owner_user_id,
                     owner_name=team.owner_name,
+                    owner_avatar_url=(managers.get(team.owner_user_id).avatar_url if team.owner_user_id else None),
                     draft_position=team.draft_position,
                 )
                 for team in teams
@@ -74,6 +88,8 @@ def get_league_detail(
         id=league.id,
         name=league.name,
         commissioner_user_id=league.commissioner_user_id,
+        commissioner_name=(managers.get(league.commissioner_user_id).first_name if league.commissioner_user_id in managers else None),
+        commissioner_avatar_url=(managers.get(league.commissioner_user_id).avatar_url if league.commissioner_user_id in managers else None),
         season_year=league.season_year,
         max_teams=league.max_teams,
         is_private=league.is_private,
@@ -90,7 +106,17 @@ def get_league_detail(
         settings=LeagueSettingsRead.model_validate(settings_row),
         draft=DraftRead.model_validate(draft_row) if draft_row else None,
         draft_order=draft_order,
-        members=[LeagueMemberRead.model_validate(m) for m in members_rows],
+        members=[
+            LeagueMemberRead(
+                id=member.id,
+                user_id=member.user_id,
+                role=member.role,
+                joined_at=member.joined_at,
+                manager_name=(managers.get(member.user_id).first_name if member.user_id in managers else None),
+                manager_avatar_url=(managers.get(member.user_id).avatar_url if member.user_id in managers else None),
+            )
+            for member in members_rows
+        ],
         current_user_summary=(
             build_league_list_current_user_summary(db, league, viewer)
             if include_current_user_summary and viewer is not None

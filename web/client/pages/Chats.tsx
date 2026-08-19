@@ -16,6 +16,7 @@ import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagues } from "@/hooks/use-leagues";
 import { ApiError } from "@/lib/api";
+import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
 import { tradeOfferPath } from "@/lib/trade-links";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, ChatThread } from "@/types/chat";
@@ -38,8 +39,6 @@ const dateLabel = (value: string) => {
 };
 
 const sameDay = (left: string, right: string) => new Date(left).toDateString() === new Date(right).toDateString();
-
-const initials = (value: string) => value.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "M";
 
 const errorMessage = (error: unknown) =>
   error instanceof ApiError ? error.message : "Chat could not be loaded. Please try again.";
@@ -445,7 +444,7 @@ export default function Chats() {
                 <div className="rounded-xl border border-primary/30 bg-primary/[0.06] p-3">
                   <p className="mb-2 text-[9px] font-black uppercase tracking-[0.16em] text-primary">Message a league manager</p>
                   <div className="max-h-56 space-y-1 overflow-y-auto">
-                    {managerOptions.map((member) => <button key={member.user_id} type="button" onClick={() => handleCreateDirectThread(member.user_id)} disabled={createDirectThread.isPending} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-white/[0.06] disabled:opacity-50"><span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 text-[9px] font-black text-primary">{initials(member.display_name)}</span><span className="min-w-0"><span className="block truncate text-xs font-bold text-foreground">{member.display_name}</span><span className="block truncate text-[10px] text-muted-foreground">{member.fantasy_team_name ?? "League manager"}</span></span></button>)}
+                    {managerOptions.map((member) => <button key={member.user_id} type="button" onClick={() => handleCreateDirectThread(member.user_id)} disabled={createDirectThread.isPending} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-white/[0.06] disabled:opacity-50"><ManagerAvatar avatarUrl={member.avatar_url} managerName={member.display_name} size="sm" /><span className="min-w-0"><span className="block truncate text-xs font-bold text-foreground">{member.display_name}</span><span className="block truncate text-[10px] text-muted-foreground">{member.fantasy_team_name ?? "League manager"}</span></span></button>)}
                     {!managerOptions.length ? <p className="px-2 py-3 text-xs text-muted-foreground">No other active managers yet.</p> : null}
                   </div>
                   {createDirectThread.isError ? <p className="mt-2 text-xs text-red-200">{errorMessage(createDirectThread.error)}</p> : null}
@@ -459,7 +458,7 @@ export default function Chats() {
                   const title = thread.thread_type === "league" ? `# ${thread.title || "General"}` : participant?.display_name ?? "Direct message";
                   const preview = thread.last_message_preview ?? (thread.thread_type === "league" ? "All current league members" : participant?.fantasy_team_name ?? "Private league conversation");
                   return <button key={thread.id} type="button" onClick={() => { setSelectedThreadId(thread.id); lastMarkedMessageId.current = null; }} className={cn("flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition", selectedThreadId === thread.id ? "border-primary/60 bg-primary/10" : "border-transparent hover:border-white/10 hover:bg-white/[0.035]")}>
-                    <span className={cn("inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[10px] font-black", thread.thread_type === "league" ? "bg-primary/15 text-primary" : "bg-white/[0.08] text-foreground")}>{thread.thread_type === "league" ? "#" : initials(participant?.display_name ?? "DM")}</span>
+                    {thread.thread_type === "league" ? <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-black text-primary">#</span> : <ManagerAvatar avatarUrl={participant?.avatar_url} managerName={participant?.display_name ?? "DM"} size="md" />}
                     <span className="min-w-0 flex-1"><span className="block truncate text-xs font-black text-foreground">{title}</span><span className="mt-0.5 block truncate text-[10px] text-muted-foreground">{preview}</span></span>
                     <span className="flex shrink-0 flex-col items-end gap-1">{thread.last_message_at ? <span className="text-[8px] font-bold text-muted-foreground">{formatTime(thread.last_message_at)}</span> : null}{thread.unread_count > 0 ? <span className="inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[9px] font-black text-white">{thread.unread_count > 99 ? "99+" : thread.unread_count}</span> : null}</span>
                   </button>;
@@ -484,7 +483,7 @@ export default function Chats() {
                 {allMessages.map((message, index) => <div key={message.id} className="space-y-3">
                   {index === 0 || !sameDay(allMessages[index - 1].created_at, message.created_at) ? <div className="flex items-center gap-3 py-2"><span className="h-px flex-1 bg-white/10" /><span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">{dateLabel(message.created_at)}</span><span className="h-px flex-1 bg-white/10" /></div> : null}
                   <div className={cn("max-w-[88%] rounded-2xl border px-4 py-3", isSystemMessage(message.message_type) ? "mx-auto max-w-[96%] border-cfb-gold/30 bg-cfb-gold/10" : message.sender_user_id === user?.id ? "ml-auto border-primary/40 bg-primary/15" : "border-white/10 bg-white/[0.04]")}>
-                    <div className="flex items-center justify-between gap-4 text-[9px] font-black uppercase tracking-[0.13em] text-muted-foreground/70"><span>{isSystemMessage(message.message_type) ? message.message_type.replace("_", " ") : message.sender_user_id === user?.id ? "You" : message.sender_display_name ?? `Manager #${message.sender_user_id}`}{message.sender_fantasy_team_name ? ` · ${message.sender_fantasy_team_name}` : ""}</span><span>{formatTime(message.created_at)}</span></div>
+                    <div className="flex items-center justify-between gap-4 text-[9px] font-black uppercase tracking-[0.13em] text-muted-foreground/70"><span className="flex min-w-0 items-center gap-2">{!isSystemMessage(message.message_type) ? <ManagerAvatar avatarUrl={message.sender_avatar_url} managerName={message.sender_display_name} size="xs" /> : null}<span className="truncate">{isSystemMessage(message.message_type) ? message.message_type.replace("_", " ") : message.sender_user_id === user?.id ? "You" : message.sender_display_name ?? `Manager #${message.sender_user_id}`}{message.sender_fantasy_team_name ? ` · ${message.sender_fantasy_team_name}` : ""}</span></span><span>{formatTime(message.created_at)}</span></div>
                     {isPrivateTradeMessage(message) ? <div className="mt-2"><PrivateTradeOfferCard message={message} currentUserId={user?.id} returnTo={`/chats?leagueId=${selectedLeagueId}&threadId=${selectedThreadId}`} /></div> : message.message_type === "trade_finalized" ? <div className="mt-2"><TradeFinalizedCard message={message} returnTo={`/chats?leagueId=${selectedLeagueId}&threadId=${selectedThreadId}`} /></div> : message.deleted_at ? <p className="mt-2 text-sm italic text-muted-foreground">Message deleted</p> : message.body ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">{message.body}</p> : null}
                     {message.delivery_status === "sending" ? <p className="mt-2 flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.12em] text-primary"><LoaderCircle className="h-3 w-3 animate-spin" />Sending</p> : null}
                     {message.delivery_status === "failed" ? <div className="mt-2 flex items-center justify-between gap-2 text-[9px] font-black uppercase tracking-[0.12em] text-red-200"><span className="flex items-center gap-1"><CircleAlert className="h-3 w-3" />Failed to send</span><button type="button" onClick={() => handleRetry(message)} className="inline-flex items-center gap-1 rounded-md border border-red-300/40 px-2 py-1 hover:bg-red-500/10"><RotateCcw className="h-3 w-3" />Retry</button></div> : null}

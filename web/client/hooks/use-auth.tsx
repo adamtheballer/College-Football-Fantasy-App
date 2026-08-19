@@ -26,6 +26,7 @@ export interface User {
   email: string;
   id: number;
   isAdmin: boolean;
+  avatarUrl: string | null;
 }
 
 export type AuthSession = {
@@ -43,6 +44,7 @@ type AuthUserPayload = {
   first_name: string;
   email: string;
   is_admin?: boolean;
+  avatar_url?: string | null;
   email_verified_at?: string | null;
 };
 
@@ -72,7 +74,7 @@ type AuthContextValue = {
   user: User | null;
   login: (email: string, password: string, betaAccessReservation?: string) => Promise<User>;
   signup: (firstName: string, email: string, password: string, betaAccessReservation?: string) => Promise<User>;
-  updateProfile: (firstName: string) => Promise<User>;
+  updateProfile: (input: UpdateProfileInput) => Promise<User>;
   logout: () => void;
   resetPasswordWithCurrentPassword: (
     email: string,
@@ -92,6 +94,11 @@ const AUTH_CHANGED_EVENT = "cfb-auth-changed";
 const USER_STORAGE_KEY = "cfb_user";
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+export type UpdateProfileInput = {
+  firstName?: string;
+  avatarUrl?: string | null;
+};
 
 const safeStorageGet = (key: string): string | null => {
   try {
@@ -138,7 +145,7 @@ const loadStoredUser = (): User | null => {
       clearStoredAuth();
       return null;
     }
-    return { ...parsedUser, isAdmin: !!parsedUser.isAdmin };
+    return { ...parsedUser, isAdmin: !!parsedUser.isAdmin, avatarUrl: parsedUser.avatarUrl ?? null };
   } catch {
     clearStoredAuth();
     return null;
@@ -155,6 +162,7 @@ const mapUserPayload = (payload: AuthUserPayload): User => ({
   firstName: payload.first_name,
   email: payload.email,
   isAdmin: !!payload.is_admin,
+  avatarUrl: payload.avatar_url ?? null,
 });
 
 const mapAuthPayload = (payload: AuthPayload): User => mapUserPayload(payload.user);
@@ -261,8 +269,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return nextUser;
   }, [queryClient]);
 
-  const updateProfile = useCallback(async (firstName: string) => {
-    const payload = await apiPatch<AuthUserPayload>("/auth/me", { first_name: firstName });
+  const updateProfile = useCallback(async (input: UpdateProfileInput) => {
+    const request: Record<string, string | null> = {};
+    if (input.firstName !== undefined) request.first_name = input.firstName;
+    if (input.avatarUrl !== undefined) request.avatar_url = input.avatarUrl;
+    const payload = await apiPatch<AuthUserPayload>("/auth/me", request);
     const nextUser = mapUserPayload(payload);
     safeStorageSet(USER_STORAGE_KEY, JSON.stringify(nextUser));
     setUser(nextUser);
