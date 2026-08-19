@@ -13,14 +13,14 @@ export function TopBar({ isLoggedIn, user }: TopBarProps) {
   return (
     <header
       id="app-header"
-      className="sticky top-0 z-[120] border-b border-cfb-border-subtle bg-cfb-canvas px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-4 lg:px-8"
+      className="sticky top-0 z-[120] border-b border-cfb-border-subtle bg-cfb-sidebar px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-3 lg:px-8"
     >
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <Link
             to="/"
             aria-label="Early Access CFB Fantasy Beta"
-            className="group relative inline-flex min-h-10 items-center rounded-xl px-1 py-1 lg:hidden"
+            className="group relative inline-flex min-h-10 items-center rounded-md px-1 py-1 lg:hidden"
           >
             <AppBrandLockup variant="compact" />
           </Link>
@@ -40,7 +40,7 @@ export function TopBar({ isLoggedIn, user }: TopBarProps) {
           ) : (
             <Link
               to="/login"
-              className="inline-flex items-center gap-2 rounded-lg border border-cfb-brand/40 bg-cfb-brand/[0.16] px-4 py-2 text-sm font-semibold text-blue-50 transition hover:border-cfb-brand hover:bg-cfb-brand/[0.24]"
+              className="inline-flex items-center gap-2 rounded-md bg-cfb-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-cfb-brand-hover"
             >
               <LogIn className="h-3.5 w-3.5" aria-hidden="true" />
               Sign In

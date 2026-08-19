@@ -208,7 +208,7 @@ export default function Index() {
 
   return (
     <div className="mx-auto w-full touch-pan-y max-w-7xl space-y-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] pt-1 sm:space-y-6 sm:pb-24 sm:pt-3">
-      <section className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface/55 p-3 sm:p-5">
+      <section className="rounded-lg border border-cfb-border-subtle bg-cfb-surface p-3 shadow-sm sm:p-5">
         <div className="mb-4 border-b border-cfb-border-subtle px-1 pb-4 sm:mb-5">
           <p className="cfb-micro-label text-cfb-brand">League dashboard</p>
           <h1 className="mt-1 text-2xl font-black tracking-[-0.04em] text-cfb-text-primary sm:text-3xl">
@@ -245,12 +245,12 @@ export default function Index() {
               <h2 className="mt-1 text-xl font-black text-cfb-text-primary">{ownedTeamName}</h2>
             </div>
             <div className="grid gap-3 p-5 sm:grid-cols-2 sm:p-6">
-              <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 p-4">
+              <div className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised/55 p-4">
                 <ShieldCheck className="h-5 w-5 text-cfb-success" aria-hidden="true" />
                 <p className="mt-3 text-2xl font-black text-cfb-text-primary">{rosterSize}</p>
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-cfb-text-muted">Players rostered</p>
+                <p className="text-xs font-semibold text-cfb-text-muted">Players rostered</p>
               </div>
-              <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 p-4">
+              <div className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised/55 p-4">
                 <PositionBadge position="FLEX" />
                 <p className="mt-3 text-sm font-bold text-cfb-text-secondary">
                   {rosterSize > 0 ? "Roster is ready for lineup review." : "Roster fills after the draft."}
@@ -264,7 +264,7 @@ export default function Index() {
               <p className="cfb-micro-label text-cfb-brand">Upcoming Drafts</p>
             </div>
             {upcomingDrafts.length === 0 ? (
-              <div className="px-6 py-10 text-center text-sm font-black uppercase tracking-[0.18em] text-cfb-text-muted">
+              <div className="px-6 py-8 text-center text-sm font-semibold text-cfb-text-muted">
                 No scheduled drafts
               </div>
             ) : (
@@ -273,7 +273,7 @@ export default function Index() {
                   <Clock className="h-4 w-4 text-cfb-gold" aria-hidden="true" />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-black text-cfb-text-primary">{league.name}</p>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
+                    <p className="text-[11px] font-semibold text-cfb-text-muted">
                       {formatDraftTime(league.draft?.draft_datetime_utc)}
                     </p>
                   </div>
@@ -289,7 +289,7 @@ export default function Index() {
             <p className="cfb-micro-label text-cfb-brand">League Standings</p>
           </div>
           {standings.length === 0 ? (
-            <div className="px-6 py-10 text-center text-sm font-black uppercase tracking-[0.18em] text-cfb-text-muted">
+            <div className="px-6 py-8 text-center text-sm font-semibold text-cfb-text-muted">
               Standings appear after league schedule data is available
             </div>
           ) : (
@@ -320,13 +320,13 @@ export default function Index() {
           {!alertsLoaded ? (
             <SkeletonState rows={2} label="Loading your alerts" className="p-5 sm:p-6" />
           ) : alerts.length === 0 ? (
-            <div className="px-6 py-10 text-center text-sm font-black uppercase tracking-[0.18em] text-cfb-text-muted">
+            <div className="px-6 py-8 text-center text-sm font-semibold text-cfb-text-muted">
               No alerts available
             </div>
           ) : (
             alerts.map((alert) => (
               <div key={alert.id} className="flex items-start gap-4 border-b border-cfb-border-subtle px-5 py-5 last:border-b-0 sm:px-6">
-                <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised text-cfb-brand">
+                <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-cfb-border-subtle bg-cfb-surface-raised text-cfb-brand">
                   <Bell className="h-4 w-4" aria-hidden="true" />
                 </div>
                 <div className="min-w-0">
@@ -339,7 +339,7 @@ export default function Index() {
         </SurfaceCard>
       </section>
 
-      <div className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised px-5 py-4 text-sm font-bold text-cfb-text-secondary">
+      <div className="rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised px-5 py-4 text-sm font-semibold text-cfb-text-secondary">
         <CalendarClock className="mr-2 inline h-4 w-4 text-cfb-gold" aria-hidden="true" />
         Deadline and lock warnings should always be checked before kickoff.
       </div>

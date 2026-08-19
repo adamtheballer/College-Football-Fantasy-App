@@ -11,11 +11,9 @@ afterEach(cleanup);
 function renderShell({
   compactContent,
   fixedViewport,
-  hideDecor = true,
 }: {
   compactContent: boolean;
   fixedViewport: boolean;
-  hideDecor?: boolean;
 }) {
   return render(
     <AppShell
@@ -24,7 +22,6 @@ function renderShell({
       user={null}
       isLoggedIn={false}
       hideChrome
-      hideDecor={hideDecor}
       hideFloatingActions
       compactContent={compactContent}
       fixedViewport={fixedViewport}
@@ -37,18 +34,15 @@ function renderShell({
 }
 
 describe("AppShell scroll ownership", () => {
-  it("can render the shared collegiate canvas behind authenticated page content", () => {
+  it("uses a quiet app canvas without decorative background effects", () => {
     const { container } = renderShell({
       compactContent: false,
       fixedViewport: false,
-      hideDecor: false,
     });
 
-    expect(container.firstElementChild?.getAttribute("style")).toContain("rgb(9, 11, 15)");
-
     const effects = container.querySelector("[data-bg-effects='true']");
-    expect(effects).not.toBeNull();
-    expect(effects?.getAttribute("style")).toContain("rgb(9, 11, 15)");
+    expect(effects).toBeNull();
+    expect(container.firstElementChild?.className).toContain("bg-cfb-canvas");
   });
 
   it("keeps standard pages on the single app-page scroller", () => {

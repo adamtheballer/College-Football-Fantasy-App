@@ -15,7 +15,7 @@ export const PositionBadge = React.forwardRef<HTMLSpanElement, PositionBadgeProp
       <span
         ref={ref}
         className={cn(
-          "inline-flex min-w-10 items-center justify-center rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em]",
+          "inline-flex min-w-10 items-center justify-center rounded-md border px-2 py-1 text-[11px] font-semibold",
           getPositionBadgeClass(position),
           className,
         )}

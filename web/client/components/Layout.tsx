@@ -116,10 +116,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         user={user}
         isLoggedIn={isLoggedIn}
         hideChrome={isDraftRoomPage}
-        // Keep the shared collegiate field treatment behind every route. It is
-        // intentionally quiet enough for data-dense authenticated pages while
-        // preventing the shell from collapsing to a flat black canvas.
-        hideDecor={false}
         hideFloatingActions={
           isLoggedIn ||
           isDraftRoomPage ||

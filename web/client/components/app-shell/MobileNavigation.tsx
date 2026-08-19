@@ -35,7 +35,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
       <nav
         aria-label="Primary mobile navigation"
         className={cn(
-          "relative z-[170] mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))] mt-2 shrink-0 rounded-xl border border-cfb-border-subtle bg-cfb-sidebar p-1 shadow-[0_8px_20px_rgba(2,6,23,0.22)] transition-opacity lg:hidden",
+          "relative z-[170] mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))] mt-2 shrink-0 rounded-lg border border-cfb-border-subtle bg-cfb-sidebar p-1 shadow-sm transition-opacity lg:hidden",
           isMoreOpen && "pointer-events-none opacity-0",
         )}
       >
@@ -50,7 +50,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
                 to={item.path}
                 aria-label={item.badge ? `${item.name}: ${item.badge} unread chat messages` : item.name}
                 className={cn(
-                  "relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-0.5 text-[11px] font-semibold leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent",
+                  "relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[11px] font-semibold leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent",
                   isActive
                     ? "bg-cfb-brand/[0.12] text-cfb-text-primary after:bg-cfb-brand"
                     : "text-cfb-text-muted hover:bg-cfb-surface-hover/70 hover:text-cfb-text-primary",
@@ -62,7 +62,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
                     <span
                       role="status"
                       aria-label={`${item.badge} unread chat messages`}
-                      className="absolute -right-3 -top-2 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-black text-white shadow-[0_0_12px_rgba(239,68,68,0.42)]"
+                      className="absolute -right-3 -top-2 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[8px] font-black text-white"
                     >
                       {item.badge}
                     </span>
@@ -79,7 +79,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
             aria-expanded={isMoreOpen}
             onClick={() => setIsMoreOpen(true)}
             className={cn(
-              "relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-0.5 text-[11px] font-semibold leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent",
+              "relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[11px] font-semibold leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent",
               isMoreActive
                 ? "bg-cfb-brand/[0.12] text-cfb-text-primary after:bg-cfb-brand"
                 : "text-cfb-text-muted hover:bg-cfb-surface-hover/70 hover:text-cfb-text-primary",
@@ -116,9 +116,9 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
                     to={item.path}
                     data-mobile-nav-item={navDomId(item.name)}
                     className={cn(
-                      "flex min-h-[52px] items-center gap-4 rounded-lg border px-4 py-3 text-sm font-semibold transition-colors",
+                      "flex min-h-[52px] items-center gap-4 rounded-md border px-4 py-3 text-sm font-semibold transition-colors",
                       isActive
-                        ? "border-cfb-brand/50 bg-cfb-brand/[0.14] text-white"
+                        ? "border-cfb-brand/40 bg-cfb-brand/[0.10] text-cfb-text-primary"
                         : "border-transparent text-cfb-text-secondary hover:border-cfb-border-subtle hover:bg-cfb-surface-hover/70 hover:text-cfb-text-primary",
                     )}
                   >
@@ -145,7 +145,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
                 setIsMoreOpen(false);
                 onSignOut();
               }}
-              className="flex min-h-[52px] w-full items-center gap-4 rounded-lg border border-cfb-danger/25 bg-cfb-danger/[0.08] px-4 py-3 text-left text-sm font-semibold text-red-100 transition hover:bg-cfb-danger/[0.14]"
+              className="flex min-h-[52px] w-full items-center gap-4 rounded-md border border-cfb-danger/25 bg-cfb-danger/[0.06] px-4 py-3 text-left text-sm font-semibold text-red-700 transition hover:bg-cfb-danger/[0.10]"
             >
               <LogOut className="h-4 w-4" aria-hidden="true" />
               {displayNavName(signOutItem.name)}

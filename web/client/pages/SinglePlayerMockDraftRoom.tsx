@@ -1113,15 +1113,16 @@ export default function SinglePlayerMockDraftRoom() {
         </div>
       ) : null}
 
-      <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-cfb-border-subtle bg-cfb-surface-raised/96 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.26)] backdrop-blur-xl sm:pointer-events-none sm:inset-x-auto sm:left-1/2 sm:flex sm:w-auto sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">
-        <div className={cn("grid w-full grid-cols-5 overflow-hidden rounded-xl sm:pointer-events-auto sm:mx-auto sm:max-w-2xl", draftMatteControlClass)}>
+      <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-cfb-border-subtle bg-cfb-surface-raised/96 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.26)] backdrop-blur-xl sm:pointer-events-none sm:inset-x-auto sm:bottom-3 sm:left-1/2 sm:flex sm:w-[min(100vw-3rem,60rem)] sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">
+        <div className={cn("grid w-full grid-cols-5 overflow-hidden rounded-xl sm:pointer-events-auto sm:mx-auto sm:rounded-2xl", draftMatteControlClass)}>
           {MOCK_TABS.map((tab) => (
             <button
               key={tab.value}
               type="button"
               onClick={() => setActiveTab(tab.value)}
+              aria-current={activeTab === tab.value ? "page" : undefined}
               className={cn(
-                "relative min-w-0 whitespace-nowrap px-1 py-3 text-[8px] font-bold uppercase leading-none tracking-[0.04em] transition after:absolute after:inset-x-1 after:bottom-0 after:h-0.5 after:bg-transparent sm:px-4 sm:text-[10px] sm:tracking-[0.16em]",
+                "relative inline-flex min-h-[4.75rem] min-w-0 touch-manipulation items-center justify-center whitespace-nowrap px-2 py-3 text-xs font-black uppercase leading-none tracking-[0.02em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-1 after:bg-transparent focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand focus-visible:ring-inset sm:min-h-[3.75rem] sm:px-5 sm:py-4 sm:text-[11px] sm:tracking-[0.14em]",
                 activeTab === tab.value
                   ? "bg-white/[0.04] text-white after:bg-cfb-brand"
                   : "text-muted-foreground hover:bg-white/[0.035] hover:text-white"

@@ -128,22 +128,22 @@ export const LeagueCard = ({
           openLeague();
         }
       }}
-      className="relative cursor-pointer overflow-hidden rounded-2xl border-border/70 bg-[#15181c] shadow-[0_8px_20px_rgba(0,0,0,0.22)] transition-colors hover:border-primary/45 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="relative cursor-pointer overflow-hidden rounded-lg border-cfb-border-subtle bg-cfb-surface shadow-sm transition-colors hover:border-cfb-border-strong hover:bg-cfb-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
     <div className="relative z-10 grid gap-0 sm:grid-cols-[minmax(11rem,0.8fr)_minmax(14rem,1.1fr)_11rem]">
       <div className="border-b border-border/60 p-3 sm:border-b-0 sm:border-r sm:p-4">
         <div className="flex h-full flex-col justify-between gap-3">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-primary/30 bg-primary/10 text-primary">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-primary/25 bg-primary/[0.07] text-primary">
               {leagueImageUrl && !iconFailed ? (
                 <img
                   src={leagueImageUrl}
                   alt={`${name} league logo`}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain p-1"
                   onError={() => setIconFailed(true)}
                 />
               ) : (
-                <Trophy className="w-6 h-6 text-white" aria-label="Default league trophy" />
+                <Trophy className="h-4 w-4 text-white" aria-label="Default league trophy" />
               )}
             </div>
             <div className="min-w-0 space-y-1">
@@ -157,25 +157,25 @@ export const LeagueCard = ({
           </div>
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/15 px-2.5 py-1.5">
+              <span className="inline-flex items-center gap-2 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised px-2.5 py-1.5">
                 <Users className="w-3 h-3 text-primary" />
                 {memberCount}/{teams} members
               </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/15 px-2.5 py-1.5">
+              <span className="inline-flex items-center gap-2 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised px-2.5 py-1.5">
                 {isPrivate ? <Lock className="w-3 h-3 text-primary" /> : <Globe2 className="w-3 h-3 text-primary" />}
                 {isPrivate ? "Private" : "Public"}
               </span>
             </div>
             {inviteShouldBeVisible ? (
               <details
-                className="max-w-md rounded-lg border border-sky-300/20 bg-sky-300/[0.06] px-3 py-2"
+                className="max-w-md rounded-md border border-cfb-brand/20 bg-cfb-brand/[0.05] px-3 py-2"
                 onClick={(event) => event.stopPropagation()}
               >
                 <summary className="cursor-pointer text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-200/80">
                   Invite options
                 </summary>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate rounded-md border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs font-bold tracking-[0.08em] text-slate-50">
+                  <span className="min-w-0 flex-1 truncate rounded-md border border-cfb-border-subtle bg-cfb-surface px-3 py-2 font-mono text-xs font-bold tracking-[0.08em] text-cfb-text-primary">
                     {inviteCode}
                   </span>
                   <button
@@ -201,20 +201,20 @@ export const LeagueCard = ({
         </div>
       </div>
 
-      <div className="border-b border-border/60 bg-black/10 p-3 sm:border-b-0 sm:border-r sm:p-4">
+      <div className="border-b border-cfb-border-subtle bg-cfb-surface-raised/55 p-3 sm:border-b-0 sm:border-r sm:p-4">
         <div className="space-y-2">
           <h4 className="text-[10px] font-semibold tracking-[0.12em] text-primary uppercase opacity-80">
             League snapshot
           </h4>
           <div>
             <div className="grid gap-2 grid-cols-3">
-              <div className="rounded-lg border border-white/10 bg-black/15 p-2.5">
+              <div className="rounded-md border border-cfb-border-subtle bg-cfb-surface p-2.5">
                 <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
                   Draft
                 </p>
                 <p className="mt-1.5 text-sm font-semibold text-foreground">{draftLabel}</p>
               </div>
-              <div className="rounded-lg border border-white/10 bg-black/15 p-2.5">
+              <div className="rounded-md border border-cfb-border-subtle bg-cfb-surface p-2.5">
                 <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
                   Your record
                 </p>
@@ -222,7 +222,7 @@ export const LeagueCard = ({
                   {formatRecord(currentUserSummary)}
                 </p>
               </div>
-              <div className="rounded-lg border border-white/10 bg-black/15 p-2.5">
+              <div className="rounded-md border border-cfb-border-subtle bg-cfb-surface p-2.5">
                 <p className="text-[10px] font-semibold tracking-[0.1em] uppercase text-muted-foreground">
                   {currentUserSummary?.matchup_week ? `Week ${currentUserSummary.matchup_week}` : "Matchup"}
                 </p>
@@ -244,7 +244,7 @@ export const LeagueCard = ({
       <div className="grid grid-cols-2 gap-2 p-3 sm:flex sm:min-w-[11rem] sm:flex-col sm:justify-center sm:p-4">
         <Button
           variant="outline"
-          className="h-10 w-full rounded-lg border-white/10 bg-white/[0.04] px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-foreground hover:bg-white/[0.08]"
+          className="h-10 w-full rounded-md border-cfb-border-subtle bg-cfb-surface px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-foreground hover:bg-cfb-surface-hover"
           onClick={(event) => {
             event.stopPropagation();
             openLeague();
@@ -260,7 +260,7 @@ export const LeagueCard = ({
               "h-10 w-full rounded-lg px-3 text-[10px] font-bold uppercase tracking-[0.1em] transition-colors",
               draftUnlocked
                 ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
-                : "border-amber-300/25 bg-amber-300/10 text-amber-100 hover:bg-amber-300/15",
+                : "border-amber-400/35 bg-amber-50 text-amber-800 hover:bg-amber-100",
             ].join(" ")}
             onClick={(event) => {
               event.stopPropagation();
@@ -366,7 +366,7 @@ export default function Leagues() {
             />
           ))}
           {!isLoading && leagueRows.length === 0 && (
-            <Card className="space-y-5 rounded-xl border-border/60 bg-[#15181c] p-6">
+            <Card className="space-y-5 rounded-lg border-cfb-border-subtle bg-cfb-surface p-6 shadow-sm">
               <div className="space-y-2 text-center">
                 <h3 className="text-lg font-bold text-foreground">No leagues yet</h3>
                 <p className="text-sm text-muted-foreground">
@@ -382,7 +382,7 @@ export default function Leagues() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Card className="rounded-xl border-border/60 bg-[#15181c] p-6 text-center">
+          <Card className="rounded-lg border-cfb-border-subtle bg-cfb-surface p-6 text-center shadow-sm">
             <div className="space-y-4">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <Trophy className="w-6 h-6" />
