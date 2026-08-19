@@ -24,6 +24,15 @@ const isRealRosterPlayer = (player: LeagueRosterPlayer) =>
       !/\bpreview\b/i.test(player.player_name ?? ""),
   );
 
+const currentRosterPointValue = (player: LeagueRosterPlayer) => {
+  const state = (player.live_game_state ?? "").toLowerCase();
+  if (["live", "final", "post"].includes(state) || typeof player.live_points === "number") {
+    return player.live_points ?? 0;
+  }
+  const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
+  return isNumericProjection(projection, player.projection_status) ? projection : 0;
+};
+
 export const formatRosterLoadError = (error: unknown, fallback: string) => {
   if (error instanceof ApiError && error.message) return error.message;
   if (error instanceof Error && error.message) return error.message;
@@ -146,7 +155,9 @@ export default function LeagueRoster() {
   const hasRosterSlots = fetchedRoster.length > 0;
   const isEmptyRoster = !rosterQuery.isLoading && !rosterQuery.isError && !hasRosterSlots;
   const roster = fetchedRoster;
-  const rosterPointMode = realRoster.some((player) => typeof player.live_points === "number") ? "live" : "projected";
+  const rosterPointMode = realRoster.some(
+    (player) => typeof player.live_points === "number" || (player.live_game_state ?? "").toLowerCase() === "live"
+  ) ? "live" : "projected";
   const starters = useMemo(
     () => roster.filter((player) => starterSlot(player.slot ?? player.roster_slot)),
     [roster]
@@ -160,11 +171,9 @@ export default function LeagueRoster() {
     [roster]
   );
   const starterTotal = hasRosterSlots
-    ? starters.reduce(
+      ? starters.reduce(
         (total, player) => {
-          if (rosterPointMode === "live") return total + (player.live_points ?? 0);
-          const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
-          return isNumericProjection(projection, player.projection_status) ? total + projection : total;
+          return total + currentRosterPointValue(player);
         },
         0
       )
@@ -178,11 +187,9 @@ export default function LeagueRoster() {
     : undefined;
 
   const benchTotal = hasRosterSlots
-    ? bench.reduce(
+      ? bench.reduce(
         (total, player) => {
-          if (rosterPointMode === "live") return total + (player.live_points ?? 0);
-          const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
-          return isNumericProjection(projection, player.projection_status) ? total + projection : total;
+          return total + currentRosterPointValue(player);
         },
         0
       )
@@ -282,13 +289,13 @@ export default function LeagueRoster() {
       <section className="grid grid-cols-3 gap-2 sm:gap-4">
         <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised p-3 sm:p-5">
           <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-cfb-text-muted sm:text-[10px] sm:tracking-[0.2em]">
-            {rosterPointMode === "live" ? "Starter Pts" : "Starter Proj"}
+            {rosterPointMode === "live" ? "Starter Total" : "Starter Proj"}
           </p>
           <p className="mt-1 text-xl font-black tabular-nums text-cfb-brand sm:text-3xl">{starterTotal === null ? "N/A" : starterTotal.toFixed(1)}</p>
         </div>
         <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised p-3 sm:p-5">
           <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-cfb-text-muted sm:text-[10px] sm:tracking-[0.2em]">
-            {rosterPointMode === "live" ? "Bench Pts" : "Bench Depth"}
+            {rosterPointMode === "live" ? "Bench Total" : "Bench Depth"}
           </p>
           <p className="mt-1 text-xl font-black tabular-nums text-cfb-text-primary sm:text-3xl">{benchTotal === null ? "N/A" : benchTotal.toFixed(1)}</p>
         </div>

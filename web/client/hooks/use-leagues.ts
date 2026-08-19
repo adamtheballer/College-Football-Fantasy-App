@@ -175,7 +175,10 @@ export function useLeagueRosterTab(
         query.state.data?.roster ??
         query.state.data?.data ??
         [];
-      if (roster.some((player) => ["live", "stale"].includes((player.live_scoring_status ?? "").toLowerCase()))) {
+      if (roster.some((player) =>
+        ["live", "stale"].includes((player.live_scoring_status ?? "").toLowerCase()) ||
+        (player.live_game_state ?? "").toLowerCase() === "live"
+      )) {
         return 10_000;
       }
       return 30_000;

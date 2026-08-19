@@ -4,11 +4,13 @@ from conftest import TestingSessionLocal
 import pytest
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.draft import Draft
+from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.standing import Standing
@@ -1052,6 +1054,74 @@ def test_league_roster_tab_includes_every_team_current_roster(client, db_session
         for player in next(team_roster for team_roster in body["team_rosters"] if team_roster["team"]["id"] == member_team.id)["roster"]
         if player["player_id"] is not None
     ] == ["Member Quarterback"]
+
+
+def test_league_roster_tab_uses_cached_espn_possession_and_red_zone_context(client, db_session):
+    owner_token = create_user_and_token(client, "live-roster-owner")
+    league = create_league(client, owner_token, name="Live Roster League")
+    owner_team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    player = Player(name="Live Texas Quarterback", position="QB", school="Texas")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        RosterEntry(
+            league_id=league["id"],
+            team_id=owner_team.id,
+            player_id=player.id,
+            slot="QB",
+            status="active",
+        )
+    )
+    db_session.add(
+        Game(
+            external_id="401-test-live",
+            season=2026,
+            week=1,
+            home_team="Texas",
+            away_team="Ohio State",
+            start_date=datetime(2026, 8, 29, 16, tzinfo=timezone.utc),
+            schedule_status="in_progress",
+        )
+    )
+    db_session.add(
+        ProviderGamePoll(
+            provider="espn",
+            provider_game_id="401-test-live",
+            season=2026,
+            week=1,
+            status="live",
+            accepted_snapshot_hash="accepted-summary",
+            latest_payload={
+                "header": {
+                    "competitions": [
+                        {
+                            "status": {"type": {"state": "in", "completed": False}},
+                            "competitors": [
+                                {
+                                    "id": "10",
+                                    "team": {"id": "10", "location": "Texas", "displayName": "Texas Longhorns"},
+                                },
+                                {
+                                    "id": "20",
+                                    "team": {"id": "20", "location": "Ohio State", "displayName": "Ohio State Buckeyes"},
+                                },
+                            ],
+                        }
+                    ]
+                },
+                "situation": {"possession": "10", "isRedZone": True},
+            },
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/leagues/{league['id']}/roster?week=1", headers=auth_headers(owner_token))
+
+    assert response.status_code == 200
+    roster_player = next(row for row in response.json()["roster"] if row["player_id"] == player.id)
+    assert roster_player["live_game_state"] == "live"
+    assert roster_player["team_has_possession"] is True
+    assert roster_player["team_in_red_zone"] is True
 
 
 def test_league_hub_endpoints_return_scoreboard_rankings_and_news(client, db_session):

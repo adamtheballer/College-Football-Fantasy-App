@@ -46,16 +46,28 @@ const displaySchoolName = (school?: string | null) => {
 };
 
 const weeklyProjectionLabel = (player: LeagueRosterPlayer) => {
-  return weeklyProjectionLabel(player);
+  return formatProjectionDisplay(
+    player.projected_points ?? player.weekly_projected_fantasy_points,
+    player.projection_status,
+  );
 };
 
 export type RosterPointMode = "projected" | "live";
 
 export const formatRosterPointValue = (player: LeagueRosterPlayer, pointMode: RosterPointMode) => {
-  if (pointMode === "live") {
+  const liveGameState = (player.live_game_state ?? "").toLowerCase();
+  if (liveGameState === "live") {
     return typeof player.live_points === "number" && Number.isFinite(player.live_points)
       ? player.live_points.toFixed(1)
-      : "—";
+      : "0.0";
+  }
+  if (liveGameState === "final" || liveGameState === "post") {
+    return typeof player.live_points === "number" && Number.isFinite(player.live_points)
+      ? player.live_points.toFixed(1)
+      : "0.0";
+  }
+  if (pointMode === "live" && typeof player.live_points === "number" && Number.isFinite(player.live_points)) {
+    return player.live_points.toFixed(1);
   }
   const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
   return formatProjectionDisplay(projection, player.projection_status);
@@ -236,6 +248,16 @@ export function RosterSlotTable({
             const isRealPlayer = isRealRosterPlayer(player);
             const style = getPositionStyle();
             const pointValue = isRealPlayer ? formatRosterPointValue(player, pointMode) : pointMode === "live" ? "—" : "0.0";
+            const liveGameState = (player.live_game_state ?? "").toLowerCase();
+            const isLiveGame = isRealPlayer && liveGameState === "live";
+            const isFinalGame = isRealPlayer && ["final", "post"].includes(liveGameState);
+            const hasRedZone = isLiveGame && player.team_in_red_zone === true;
+            const hasPossession = isLiveGame && player.team_has_possession === true;
+            const liveDetail = isLiveGame
+              ? `Proj ${weeklyProjectionLabel(player)}`
+              : isFinalGame
+                ? "Final"
+                : null;
             return (
               <button
                 key={player.slot_id ?? `${player.team_id ?? player.fantasy_team_id}-${slotType(player)}-${player.slot_index ?? 0}`}
@@ -250,8 +272,13 @@ export function RosterSlotTable({
                 className={cn(
                   "grid min-h-[72px] w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-3 text-left text-sm text-cfb-text-secondary transition focus:outline-none focus-visible:bg-cfb-brand/[0.08] focus-visible:ring-2 focus-visible:ring-cfb-brand/50 md:min-h-0 md:gap-3 md:px-5 md:py-4",
                   tableColumns,
-                  isRealPlayer ? style.row : "cursor-not-allowed opacity-75"
+                  isRealPlayer ? style.row : "cursor-not-allowed opacity-75",
+                  hasRedZone && "border-l-2 border-red-300 bg-red-500/[0.10] hover:bg-red-500/[0.14]",
+                  !hasRedZone && hasPossession && "border-l-2 border-slate-200/70 bg-slate-100/[0.10] hover:bg-slate-100/[0.14]",
                 )}
+                data-live-game-state={liveGameState || "unavailable"}
+                data-has-possession={hasPossession ? "true" : "false"}
+                data-in-red-zone={hasRedZone ? "true" : "false"}
               >
                 <span className="flex items-center gap-2">
                   <span
@@ -279,6 +306,14 @@ export function RosterSlotTable({
                       ? [displaySchoolName(player.school ?? player.player_school), player.opponent ? `vs ${player.opponent}` : "Opponent TBD"].filter(Boolean).join(" · ")
                       : "Open roster slot"}
                   </span>
+                  {hasRedZone || hasPossession ? (
+                    <span className={cn(
+                      "w-fit rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.1em]",
+                      hasRedZone ? "bg-red-300/20 text-red-100" : "bg-slate-100/15 text-slate-100",
+                    )}>
+                      {hasRedZone ? "Red zone" : "Possession"}
+                    </span>
+                  ) : null}
                 </span>
                 <span className="hidden text-cfb-text-muted md:block">{isRealPlayer ? displaySchoolName(player.school ?? player.player_school) || "—" : "—"}</span>
                 {showPositionColumn ? (
@@ -288,6 +323,7 @@ export function RosterSlotTable({
                 <span className={cn("flex flex-col items-end text-right font-black tabular-nums", style.text)}>
                   <span className="text-[8px] uppercase tracking-[0.12em] text-cfb-text-muted md:hidden">{pointMode === "live" ? "Live" : "Proj"}</span>
                   <span>{pointValue}</span>
+                  {liveDetail ? <span className="text-[9px] font-semibold text-cfb-text-muted">{liveDetail}</span> : null}
                 </span>
               </button>
             );
