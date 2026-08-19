@@ -81,14 +81,16 @@ jobs:
       - name: Build frontend
         run: npm --prefix web run build
 
-      - name: Install Playwright browser
-        # ubuntu-latest already supplies Chromium's shared libraries. Installing
-        # OS dependencies here can block indefinitely in apt before Playwright
-        # downloads its pinned browser binary, leaving the release gate hung.
-        run: timeout 8m npm --prefix web exec -- playwright install chromium
-
       - name: Run frontend E2E tests
-        run: npm --prefix web run test:e2e
+        # Use the pinned Playwright image instead of downloading Chromium on
+        # the hosted runner. The latter can hang indefinitely on the browser
+        # CDN; this image is also used by the passing real-stack E2E gate.
+        run: |
+          docker build --file Dockerfile.e2e --tag cff_frontend_e2e .
+          docker run --rm --network none \
+            -e REAL_STACK_E2E=0 \
+            -e E2E_BASE_URL=http://127.0.0.1:4173 \
+            cff_frontend_e2e npm run test:e2e
 
   docker-clean-boot:
     runs-on: ubuntu-latest

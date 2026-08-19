@@ -2545,7 +2545,10 @@ test.describe("critical browser workflows", () => {
 
     await expect
       .poll(() => page.evaluate((index) => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}").picks?.[index + 1]?.pickedBy ?? null, userPickIndex), {
-        timeout: 5_000,
+        // The bot decision itself is two seconds, but allow a full draft
+        // timer for a browser under containerized CI to process its interval
+        // and persist the follow-up pick.
+        timeout: 15_000,
       })
       .toBe("bot");
 
