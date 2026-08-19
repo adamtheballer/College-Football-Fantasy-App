@@ -82,7 +82,10 @@ jobs:
         run: npm --prefix web run build
 
       - name: Install Playwright browser
-        run: npm --prefix web exec -- playwright install --with-deps chromium
+        # ubuntu-latest already supplies Chromium's shared libraries. Installing
+        # OS dependencies here can block indefinitely in apt before Playwright
+        # downloads its pinned browser binary, leaving the release gate hung.
+        run: timeout 8m npm --prefix web exec -- playwright install chromium
 
       - name: Run frontend E2E tests
         run: npm --prefix web run test:e2e
