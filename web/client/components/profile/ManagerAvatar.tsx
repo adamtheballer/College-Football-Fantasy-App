@@ -51,6 +51,12 @@ export function ManagerAvatar({
   const alt = managerName?.trim() || username?.trim()
     ? `${managerName?.trim() || username?.trim()} profile picture`
     : "Manager profile picture";
+  // The mobile picker turns a chosen photo into a compact data URL before it
+  // reaches this component. It is already locally available, so do not hide
+  // it behind another image-load event; doing so causes a visible initials
+  // flash and can make the preview appear delayed on mobile Safari.
+  const isPreparedLocalPhoto = Boolean(avatarUrl?.startsWith("data:image/"));
+  const showImage = Boolean(avatarUrl && !imageFailed && (imageLoaded || isPreparedLocalPhoto));
 
   return (
     <span
@@ -59,16 +65,16 @@ export function ManagerAvatar({
         sizeClasses[size],
         className,
       )}
-      aria-label={imageLoaded && avatarUrl && !imageFailed ? alt : `${managerName?.trim() || username?.trim() || "Manager"} initials ${initials}`}
+      aria-label={showImage ? alt : `${managerName?.trim() || username?.trim() || "Manager"} initials ${initials}`}
     >
-      <span className={cn("absolute inset-0 flex items-center justify-center", imageLoaded && avatarUrl && !imageFailed && "opacity-0")}>{initials}</span>
+      <span className={cn("absolute inset-0 flex items-center justify-center", showImage && "opacity-0")}>{initials}</span>
       {avatarUrl && !imageFailed ? (
         <img
           src={avatarUrl}
           alt={alt}
-          loading={eager ? "eager" : "lazy"}
+          loading={eager || isPreparedLocalPhoto ? "eager" : "lazy"}
           referrerPolicy="no-referrer"
-          className={cn("absolute inset-0 h-full w-full object-cover transition-opacity", imageLoaded ? "opacity-100" : "opacity-0")}
+          className={cn("absolute inset-0 h-full w-full object-cover transition-opacity", showImage ? "opacity-100" : "opacity-0")}
           onLoad={() => {
             setImageLoaded(true);
             onImageLoad?.();
