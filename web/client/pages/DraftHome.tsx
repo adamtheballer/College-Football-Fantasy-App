@@ -91,8 +91,8 @@ export default function DraftHome() {
         </Button>
       </header>
 
-      <div className="relative grid gap-4 xl:grid-cols-[1.15fr_0.85fr] xl:gap-6">
-        <Card className="order-2 cfb-playbook-pattern overflow-hidden rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised/90 shadow-[0_0_54px_hsl(var(--brand-primary)/0.1)] sm:rounded-[2rem] xl:order-1">
+      <div className="relative space-y-4 xl:space-y-6">
+        <Card className="cfb-playbook-pattern overflow-hidden rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised/90 shadow-[0_0_54px_hsl(var(--brand-primary)/0.1)] sm:rounded-[2rem]">
           <CardContent className="space-y-4 p-4 sm:space-y-6 sm:p-6 md:p-8">
             <div className="flex items-start gap-3 sm:gap-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cfb-brand/30 bg-cfb-brand/15 text-blue-100 shadow-[0_0_20px_hsl(var(--brand-primary)/0.16)] sm:h-12 sm:w-12 sm:rounded-2xl">
@@ -161,7 +161,7 @@ export default function DraftHome() {
           </CardContent>
         </Card>
 
-        <div className="order-1 space-y-4 xl:order-2 xl:space-y-6">
+        <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr] xl:gap-6">
           <Card className="overflow-hidden rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised/85 shadow-[0_24px_52px_rgba(2,6,23,0.2)] sm:rounded-[2rem]">
             <CardContent className="space-y-3 p-4 sm:space-y-5 sm:p-6 md:p-8">
               <div className="flex items-center justify-between gap-4">
