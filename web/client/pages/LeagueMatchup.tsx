@@ -318,6 +318,12 @@ export default function LeagueMatchup() {
   const scheduledMatchups = scoreboardQuery.data?.data ?? [];
   const activeMatchupId = selectedMatchupId ?? data?.matchup_id;
   const activeScoreRow = scheduledMatchups.find((matchup) => matchup.matchup_id === activeMatchupId);
+  const scoringFreshnessMessage = freshnessText(data);
+  const scoringFreshnessTone = data?.live_scoring_freshness?.state === "fresh"
+    ? "border-emerald-300/20 bg-emerald-300/[0.06] text-emerald-100"
+    : ["delayed", "stale", "unavailable"].includes(data?.live_scoring_freshness?.state ?? "")
+      ? "border-amber-300/25 bg-amber-300/[0.07] text-amber-100"
+      : "border-cfb-border-subtle bg-cfb-surface text-cfb-text-secondary";
   const updateSelection = (week: number, matchupId?: number) => {
     const next = new URLSearchParams(searchParams);
     next.set("week", String(week));
@@ -404,11 +410,14 @@ export default function LeagueMatchup() {
               displayWeek={displayWeek}
               scoreRow={activeScoreRow}
             />
-
           </div>
 
+          <p role="status" className={`mx-3 mt-3 rounded-lg border px-3 py-2 text-[11px] font-semibold sm:mx-5 ${scoringFreshnessTone}`}>
+            {scoringFreshnessMessage}
+          </p>
+
           <div className="mx-3 mt-3 rounded-full bg-cfb-surface px-4 py-2 sm:mx-5"><p className="text-sm font-black text-cfb-text-primary">Starters</p></div>
-          <div className="mt-2"><SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={parsedLeagueId} /></div>
+          <div className="mt-2"><SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={parsedLeagueId} scoringStatus={data.status} /></div>
         </>
       )}
     </main>

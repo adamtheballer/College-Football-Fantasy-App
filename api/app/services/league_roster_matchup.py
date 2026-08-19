@@ -153,6 +153,28 @@ def _projection_map(
     return {row.player_id: row for row in rows}
 
 
+def _player_week_score_map(
+    db: Session,
+    league_id: int,
+    season: int,
+    week: int,
+    player_ids: set[int],
+) -> dict[int, PlayerWeekScore]:
+    if not player_ids:
+        return {}
+    rows = (
+        db.query(PlayerWeekScore)
+        .filter(
+            PlayerWeekScore.league_id == league_id,
+            PlayerWeekScore.season == season,
+            PlayerWeekScore.week == week,
+            PlayerWeekScore.player_id.in_(player_ids),
+        )
+        .all()
+    )
+    return {row.player_id: row for row in rows}
+
+
 def _roster_rows(db: Session, team_id: int) -> list[RosterEntry]:
     return (
         db.query(RosterEntry)
@@ -184,6 +206,7 @@ def _serialize_roster_entry(
     league: League,
     team: Team,
     projection: WeeklyProjection | None,
+    player_score: PlayerWeekScore | None = None,
     opponent: str | None = None,
     game_location: str | None = None,
     game_start_at: datetime | None = None,
@@ -222,6 +245,9 @@ def _serialize_roster_entry(
         game_location=game_location,
         weekly_projected_fantasy_points=projected,
         projection_status=projection.projection_status if projection else "UNAVAILABLE",
+        live_points=float(player_score.fantasy_points) if player_score else None,
+        live_scoring_status=player_score.status if player_score else "unavailable",
+        live_scoring_updated_at=player_score.calculated_at if player_score else None,
         game_start_at=game_start_at,
         is_locked=is_locked,
     )
@@ -241,6 +267,7 @@ def _serialize_team_roster(
         week,
         player_ids,
     )
+    score_by_player = _player_week_score_map(db, league.id, league.season_year, week, player_ids)
     player_schools = {
         entry.player_id: entry.player.school if entry.player else None
         for entry in entries
@@ -260,6 +287,7 @@ def _serialize_team_roster(
             league,
             team,
             projection_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+            score_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             opponents.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             game_location=game_locations.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             game_start_at=game_starts.get(roster_slot.entry.player_id) if roster_slot.entry else None,
@@ -282,6 +310,7 @@ def _serialize_team_rosters(
     entries_by_team = _rosters_for_teams(db, set(teams))
     player_ids = {entry.player_id for entries in entries_by_team.values() for entry in entries}
     projection_by_player = _projection_map(db, league.season_year, week, player_ids)
+    score_by_player = _player_week_score_map(db, league.id, league.season_year, week, player_ids)
     player_schools = {
         entry.player_id: entry.player.school if entry.player else None
         for entries in entries_by_team.values()
@@ -303,6 +332,7 @@ def _serialize_team_rosters(
                 league,
                 team,
                 projection_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+                score_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 opponents.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 game_location=game_locations.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 game_start_at=game_starts.get(roster_slot.entry.player_id) if roster_slot.entry else None,

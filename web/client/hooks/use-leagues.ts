@@ -167,6 +167,20 @@ export function useLeagueRosterTab(
       apiGet<LeagueRosterTabResponse>(`/leagues/${leagueId}/roster`, {
         week: typeof week === "number" ? week : undefined,
       }),
+    refetchInterval: (query) => {
+      const teamRosters = query.state.data?.team_rosters;
+      const roster =
+        (teamRosters?.length ? teamRosters.flatMap((team) => team.roster) : undefined) ??
+        query.state.data?.slots ??
+        query.state.data?.roster ??
+        query.state.data?.data ??
+        [];
+      if (roster.some((player) => ["live", "stale"].includes((player.live_scoring_status ?? "").toLowerCase()))) {
+        return 10_000;
+      }
+      return 30_000;
+    },
+    refetchIntervalInBackground: true,
   });
 }
 
@@ -259,6 +273,13 @@ export function useLeagueScoreboard(
       apiGet<LeagueScoreboardResponse>(`/leagues/${leagueId}/matchups`, {
         week: typeof week === "number" ? week : undefined,
       }),
+    refetchInterval: (query) => {
+      const statuses = query.state.data?.data.map((matchup) => matchup.status.toLowerCase()) ?? [];
+      if (statuses.some((status) => status === "live" || status === "delayed")) return 10_000;
+      if (statuses.length > 0 && statuses.every((status) => status === "final" || status === "stat_corrected")) return false;
+      return 30_000;
+    },
+    refetchIntervalInBackground: true,
   });
 }
 

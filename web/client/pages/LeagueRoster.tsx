@@ -146,6 +146,7 @@ export default function LeagueRoster() {
   const hasRosterSlots = fetchedRoster.length > 0;
   const isEmptyRoster = !rosterQuery.isLoading && !rosterQuery.isError && !hasRosterSlots;
   const roster = fetchedRoster;
+  const rosterPointMode = realRoster.some((player) => typeof player.live_points === "number") ? "live" : "projected";
   const starters = useMemo(
     () => roster.filter((player) => starterSlot(player.slot ?? player.roster_slot)),
     [roster]
@@ -161,6 +162,7 @@ export default function LeagueRoster() {
   const starterTotal = hasRosterSlots
     ? starters.reduce(
         (total, player) => {
+          if (rosterPointMode === "live") return total + (player.live_points ?? 0);
           const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
           return isNumericProjection(projection, player.projection_status) ? total + projection : total;
         },
@@ -178,6 +180,7 @@ export default function LeagueRoster() {
   const benchTotal = hasRosterSlots
     ? bench.reduce(
         (total, player) => {
+          if (rosterPointMode === "live") return total + (player.live_points ?? 0);
           const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
           return isNumericProjection(projection, player.projection_status) ? total + projection : total;
         },
@@ -279,13 +282,13 @@ export default function LeagueRoster() {
       <section className="grid grid-cols-3 gap-2 sm:gap-4">
         <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised p-3 sm:p-5">
           <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-cfb-text-muted sm:text-[10px] sm:tracking-[0.2em]">
-            Starter Proj
+            {rosterPointMode === "live" ? "Starter Pts" : "Starter Proj"}
           </p>
           <p className="mt-1 text-xl font-black tabular-nums text-cfb-brand sm:text-3xl">{starterTotal === null ? "N/A" : starterTotal.toFixed(1)}</p>
         </div>
         <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised p-3 sm:p-5">
           <p className="text-[9px] font-black uppercase leading-tight tracking-[0.12em] text-cfb-text-muted sm:text-[10px] sm:tracking-[0.2em]">
-            Bench Depth
+            {rosterPointMode === "live" ? "Bench Pts" : "Bench Depth"}
           </p>
           <p className="mt-1 text-xl font-black tabular-nums text-cfb-text-primary sm:text-3xl">{benchTotal === null ? "N/A" : benchTotal.toFixed(1)}</p>
         </div>
@@ -300,12 +303,13 @@ export default function LeagueRoster() {
         </div>
       </section>
 
-      <RosterSlotTable title="Starters" players={starters} emptyText="No starters set yet." leagueId={parsedLeagueId} ownedRosterActions={ownedRosterActions} />
-      <RosterSlotTable title="Bench" players={bench} emptyText="Bench is empty." tone="bench" leagueId={parsedLeagueId} ownedRosterActions={ownedRosterActions} />
+      <RosterSlotTable title="Starters" players={starters} emptyText="No starters set yet." pointMode={rosterPointMode} leagueId={parsedLeagueId} ownedRosterActions={ownedRosterActions} />
+      <RosterSlotTable title="Bench" players={bench} emptyText="Bench is empty." tone="bench" pointMode={rosterPointMode} leagueId={parsedLeagueId} ownedRosterActions={ownedRosterActions} />
       <RosterSlotTable
         title={`IR (${rosterData?.ir_slots ?? 0})`}
         players={ir}
         emptyText="IR spot empty."
+        pointMode={rosterPointMode}
         leagueId={parsedLeagueId}
         ownedRosterActions={ownedRosterActions}
       />
