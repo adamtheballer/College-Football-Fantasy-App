@@ -437,7 +437,7 @@ export function PlayerCardModal({
 
   return (
     <div
-      className="fixed inset-0 z-[1400] flex items-end justify-center overscroll-none bg-slate-950/78 p-3 backdrop-blur-md sm:items-center sm:p-6"
+      className="fixed inset-0 z-[1400] flex items-end justify-center overscroll-none bg-slate-950/78 p-4 backdrop-blur-md sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-label={`${player.name} player card`}
@@ -445,7 +445,7 @@ export function PlayerCardModal({
     >
       <article
         className={cn(
-          "relative flex h-[82dvh] max-h-[82dvh] w-full max-w-5xl flex-col overflow-hidden rounded-[1.75rem] border border-white/12 bg-[#0b0d10] text-white shadow-[0_28px_80px_rgba(2,6,23,0.62)] sm:h-auto sm:max-h-[92vh] sm:rounded-xl",
+          "relative mb-[max(1rem,env(safe-area-inset-bottom))] flex h-[78dvh] max-h-[calc(100dvh-3rem-env(safe-area-inset-bottom))] w-full max-w-5xl flex-col overflow-hidden rounded-[1.75rem] border border-white/12 bg-[#0b0d10] text-white shadow-[0_28px_80px_rgba(2,6,23,0.62)] sm:mb-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-xl",
           palette.glow
         )}
         onClick={(event) => event.stopPropagation()}
@@ -485,7 +485,9 @@ export function PlayerCardModal({
 
         <div
           data-testid="player-card-scroll-area"
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] p-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] scroll-pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-8"
+          tabIndex={0}
+          aria-label="Player card details"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] p-3 pb-20 scroll-pb-20 sm:p-8 sm:pb-8 sm:scroll-pb-8"
         >
           {loading ? (
             <div className="flex min-h-56 items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/[0.04] text-[10px] font-black uppercase tracking-[0.22em] text-white/55">

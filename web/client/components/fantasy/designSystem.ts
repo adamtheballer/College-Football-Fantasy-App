@@ -1,26 +1,26 @@
 import { cva } from "class-variance-authority";
 
 export const surfaceCardVariants = cva(
-  "relative overflow-hidden border text-cfb-text-primary transition-colors duration-200",
+  "relative overflow-hidden border text-cfb-text-primary transition-colors duration-150",
   {
     variants: {
       variant: {
         default:
-          "rounded-xl border-cfb-border-subtle bg-cfb-surface shadow-[0_8px_20px_rgba(2,6,23,0.18)]",
+          "rounded-lg border-cfb-border-subtle bg-cfb-surface shadow-sm",
         raised:
-          "rounded-xl border-cfb-border-subtle bg-cfb-surface-raised shadow-[0_12px_26px_rgba(2,6,23,0.22)]",
+          "rounded-lg border-cfb-border-subtle bg-cfb-surface-raised shadow-sm",
         interactive:
-          "rounded-xl border-cfb-border-subtle bg-cfb-surface shadow-[0_8px_20px_rgba(2,6,23,0.18)] hover:border-cfb-border-strong hover:bg-cfb-surface-hover",
+          "rounded-lg border-cfb-border-subtle bg-cfb-surface hover:border-cfb-border-strong hover:bg-cfb-surface-hover",
         scoreboard:
-          "rounded-xl border-cfb-border-subtle bg-cfb-surface-raised shadow-[0_12px_26px_rgba(0,0,0,0.18)]",
+          "rounded-lg border-cfb-border-subtle bg-cfb-surface-raised shadow-sm",
         field:
-          "cfb-yard-lines rounded-xl border-cfb-border-subtle bg-cfb-surface shadow-[0_8px_20px_rgba(2,6,23,0.18)]",
+          "rounded-lg border-cfb-border-subtle bg-cfb-surface shadow-sm",
       },
       padding: {
         none: "p-0",
         compact: "p-4",
-        default: "p-5 sm:p-6",
-        spacious: "p-6 sm:p-8",
+        default: "p-4 sm:p-5",
+        spacious: "p-5 sm:p-6",
       },
     },
     defaultVariants: {
@@ -38,33 +38,33 @@ export const statCardToneClasses = {
     accent: "bg-cfb-brand",
   },
   brand: {
-    frame: "border-cfb-brand/40 bg-cfb-brand/10",
-    label: "text-blue-200",
-    value: "text-blue-100",
+    frame: "border-cfb-brand/30 bg-cfb-brand/[0.06]",
+    label: "text-cfb-brand",
+    value: "text-cfb-text-primary",
     accent: "bg-cfb-brand",
   },
   pink: {
-    frame: "border-cfb-pink/35 bg-cfb-pink/10",
-    label: "text-pink-200",
-    value: "text-pink-100",
+    frame: "border-cfb-pink/30 bg-cfb-pink/[0.06]",
+    label: "text-cfb-pink",
+    value: "text-cfb-text-primary",
     accent: "bg-cfb-pink",
   },
   gold: {
-    frame: "border-cfb-gold/35 bg-cfb-gold/10",
-    label: "text-yellow-200",
-    value: "text-yellow-100",
+    frame: "border-cfb-gold/30 bg-cfb-gold/[0.06]",
+    label: "text-cfb-gold",
+    value: "text-cfb-text-primary",
     accent: "bg-cfb-gold",
   },
   success: {
-    frame: "border-cfb-success/35 bg-cfb-success/10",
-    label: "text-emerald-200",
-    value: "text-emerald-100",
+    frame: "border-cfb-success/30 bg-cfb-success/[0.06]",
+    label: "text-cfb-success",
+    value: "text-cfb-text-primary",
     accent: "bg-cfb-success",
   },
   danger: {
-    frame: "border-cfb-danger/35 bg-cfb-danger/10",
-    label: "text-red-200",
-    value: "text-red-100",
+    frame: "border-cfb-danger/30 bg-cfb-danger/[0.06]",
+    label: "text-cfb-danger",
+    value: "text-cfb-text-primary",
     accent: "bg-cfb-danger",
   },
 } as const;
@@ -72,16 +72,16 @@ export const statCardToneClasses = {
 export type StatCardTone = keyof typeof statCardToneClasses;
 
 export const statusBadgeClasses = {
-  live: "border-score-live/35 bg-score-live/[0.12] text-emerald-100",
-  projected: "border-score-projected/35 bg-score-projected/[0.12] text-blue-100",
-  final: "border-score-final/35 bg-score-final/[0.12] text-slate-100",
-  corrected: "border-score-corrected/35 bg-score-corrected/[0.12] text-violet-100",
-  delayed: "border-score-delayed/40 bg-score-delayed/[0.14] text-yellow-100",
-  unavailable: "border-score-unavailable/35 bg-score-unavailable/[0.12] text-slate-300",
-  locked: "border-score-locked/40 bg-score-locked/[0.14] text-orange-100",
-  success: "border-cfb-success/35 bg-cfb-success/[0.12] text-emerald-100",
-  warning: "border-cfb-warning/40 bg-cfb-warning/[0.14] text-yellow-100",
-  danger: "border-cfb-danger/40 bg-cfb-danger/[0.14] text-red-100",
+  live: "border-score-live/30 bg-score-live/[0.08] text-emerald-800",
+  projected: "border-score-projected/30 bg-score-projected/[0.08] text-blue-800",
+  final: "border-score-final/30 bg-score-final/[0.08] text-slate-700",
+  corrected: "border-score-corrected/30 bg-score-corrected/[0.08] text-violet-800",
+  delayed: "border-score-delayed/35 bg-score-delayed/[0.08] text-amber-800",
+  unavailable: "border-score-unavailable/30 bg-score-unavailable/[0.08] text-slate-600",
+  locked: "border-score-locked/35 bg-score-locked/[0.08] text-orange-800",
+  success: "border-cfb-success/30 bg-cfb-success/[0.08] text-emerald-800",
+  warning: "border-cfb-warning/35 bg-cfb-warning/[0.08] text-amber-800",
+  danger: "border-cfb-danger/35 bg-cfb-danger/[0.08] text-red-800",
   neutral: "border-cfb-border-subtle bg-cfb-surface-raised/75 text-cfb-text-secondary",
 } as const;
 
@@ -102,13 +102,13 @@ export const statusBadgeLabels: Record<StatusBadgeVariant, string> = {
 };
 
 export const positionBadgeClasses = {
-  QB: "border-blue-300/45 bg-blue-500/[0.14] text-blue-100",
-  RB: "border-emerald-300/45 bg-emerald-500/[0.14] text-emerald-100",
-  WR: "border-violet-300/45 bg-violet-500/[0.14] text-violet-100",
-  TE: "border-amber-300/45 bg-amber-500/[0.14] text-amber-100",
-  K: "border-cyan-300/45 bg-cyan-500/[0.14] text-cyan-100",
-  FLEX: "border-pink-300/45 bg-pink-500/[0.14] text-pink-100",
-  DST: "border-slate-300/45 bg-slate-500/[0.14] text-slate-100",
+  QB: "border-blue-300/60 bg-blue-50 text-blue-800",
+  RB: "border-emerald-300/60 bg-emerald-50 text-emerald-800",
+  WR: "border-violet-300/60 bg-violet-50 text-violet-800",
+  TE: "border-amber-300/60 bg-amber-50 text-amber-800",
+  K: "border-cyan-300/60 bg-cyan-50 text-cyan-800",
+  FLEX: "border-pink-300/60 bg-pink-50 text-pink-800",
+  DST: "border-slate-300/60 bg-slate-50 text-slate-700",
   DEFAULT: "border-cfb-border-subtle bg-cfb-surface-raised/75 text-cfb-text-secondary",
 } as const;
 

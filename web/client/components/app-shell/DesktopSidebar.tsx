@@ -20,7 +20,7 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
         <Link
           to="/"
           aria-label="Early Access CFB Fantasy Beta"
-          className="group relative inline-flex min-h-14 items-center rounded-xl px-1 py-1"
+          className="group relative inline-flex min-h-12 items-center rounded-md px-1 py-1"
         >
           <AppBrandLockup variant="desktop" />
         </Link>
@@ -39,15 +39,15 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
               data-nav-item="true"
               data-nav-active={isActive ? "true" : "false"}
               className={cn(
-                "group relative flex min-h-[48px] w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left font-sans text-sm font-semibold transition-colors duration-150",
+                "group relative flex min-h-[44px] w-full items-center gap-3 rounded-md border px-3 py-2 text-left font-sans text-sm font-semibold transition-colors duration-150",
                 isSignOut
-                  ? "border-transparent text-red-200/50 hover:border-cfb-danger/45 hover:bg-cfb-danger/[0.12] hover:text-red-100"
+                  ? "border-transparent text-red-700 hover:border-cfb-danger/30 hover:bg-cfb-danger/[0.06] hover:text-red-800"
                   : isAuth
-                    ? "border-cfb-border-subtle/60 bg-cfb-surface-raised/25 text-cfb-text-secondary hover:border-cfb-brand/55 hover:bg-cfb-brand/[0.16] hover:text-white focus-visible:border-cfb-brand/55 focus-visible:bg-cfb-brand/[0.16] focus-visible:text-white"
+                    ? "border-cfb-border-subtle bg-cfb-surface-raised text-cfb-text-secondary hover:border-cfb-brand/55 hover:bg-cfb-brand/[0.08] hover:text-cfb-text-primary focus-visible:border-cfb-brand/55 focus-visible:bg-cfb-brand/[0.08]"
                     : isActive
-                      ? "border-transparent bg-cfb-surface-raised text-white shadow-[inset_3px_0_0_hsl(var(--brand-primary))]"
+                      ? "border-cfb-brand/25 bg-cfb-brand/[0.08] text-cfb-text-primary shadow-[inset_3px_0_0_hsl(var(--brand-primary))]"
                       : isAdmin
-                        ? "border-cfb-gold/15 text-cfb-text-secondary hover:border-cfb-gold/40 hover:bg-cfb-gold/10 hover:text-yellow-100"
+                        ? "border-cfb-gold/20 text-cfb-text-secondary hover:border-cfb-gold/40 hover:bg-cfb-gold/[0.08] hover:text-cfb-text-primary"
                         : "border-transparent text-cfb-text-muted hover:border-cfb-border-subtle hover:bg-cfb-surface-hover/55 hover:text-cfb-text-primary",
               )}
             >
@@ -55,7 +55,7 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
                 className={cn(
                   "h-4 w-4 transition-colors duration-200",
                   isSignOut
-                    ? "text-red-200/50 group-hover:text-red-100"
+                    ? "text-red-500 group-hover:text-red-700"
                     : isAuth
                       ? "text-cfb-brand/70 group-hover:text-cfb-brand"
                     : isActive
@@ -68,7 +68,7 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
                 <span
                   role="status"
                   aria-label={`${item.badge} unread chat messages`}
-                  className="ml-auto inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-black tracking-normal text-white shadow-[0_0_14px_rgba(239,68,68,0.42)]"
+                  className="ml-auto inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] font-black tracking-normal text-white"
                 >
                   {item.badge}
                 </span>

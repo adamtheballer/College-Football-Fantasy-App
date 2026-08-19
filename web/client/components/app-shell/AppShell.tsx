@@ -1,6 +1,5 @@
 import * as React from "react";
 
-import { BackgroundEffects, collegiateCanvasBackground } from "@/components/BackgroundEffects";
 import { FloatingQuickActions } from "@/components/FloatingQuickActions";
 import type { User } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -16,7 +15,6 @@ type AppShellProps = {
   user: User | null;
   isLoggedIn: boolean;
   hideChrome: boolean;
-  hideDecor: boolean;
   hideFloatingActions: boolean;
   compactContent: boolean;
   fixedViewport: boolean;
@@ -35,7 +33,6 @@ export function AppShell({
   user,
   isLoggedIn,
   hideChrome,
-  hideDecor,
   hideFloatingActions,
   compactContent,
   fixedViewport,
@@ -57,11 +54,9 @@ export function AppShell({
     <div
       data-app-viewport="true"
       className={cn(
-        "isolate relative flex h-[100dvh] min-h-0 max-w-full flex-col overflow-clip bg-cfb-canvas font-sans text-cfb-text-primary selection:bg-cfb-brand/30 selection:text-white lg:h-screen lg:flex-row",
+        "isolate relative flex h-[100dvh] min-h-0 max-w-full flex-col overflow-clip bg-cfb-canvas font-sans text-cfb-text-primary selection:bg-cfb-brand/20 selection:text-cfb-text-primary lg:h-screen lg:flex-row",
       )}
-      style={{ background: collegiateCanvasBackground }}
     >
-      {!hideDecor ? <BackgroundEffects /> : null}
       {!hideFloatingActions ? <FloatingQuickActions /> : null}
 
       {!hideChrome ? (
