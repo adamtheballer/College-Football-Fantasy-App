@@ -84,7 +84,7 @@ const longPlayRows: Array<{ key: "long_rush_alerts" | "long_reception_alerts" | 
   { key: "long_pass_alerts", label: "Long passes", description: "40+ yard completed passes." },
 ];
 
-type LeagueToggleKey = "draft_alerts" | "trade_alerts" | "waiver_alerts" | "matchup_start_alerts" | "matchup_result_alerts" | "lineup_reminders";
+type LeagueToggleKey = "draft_alerts" | "trade_alerts" | "waiver_alerts" | "matchup_start_alerts" | "matchup_result_alerts" | "lineup_reminders" | "big_play_alerts" | "long_rush_alerts" | "long_reception_alerts" | "long_pass_alerts";
 
 const leagueRows: Array<{ key: LeagueToggleKey; label: string }> = [
   { key: "draft_alerts", label: "Drafts" },
@@ -93,6 +93,10 @@ const leagueRows: Array<{ key: LeagueToggleKey; label: string }> = [
   { key: "matchup_start_alerts", label: "Starts" },
   { key: "matchup_result_alerts", label: "Results" },
   { key: "lineup_reminders", label: "Lineup" },
+  { key: "big_play_alerts", label: "Big plays" },
+  { key: "long_rush_alerts", label: "Long rushes" },
+  { key: "long_reception_alerts", label: "Long receptions" },
+  { key: "long_pass_alerts", label: "Long passes" },
 ];
 
 const permissionCopy: Record<BrowserPushState, string> = {
@@ -297,13 +301,13 @@ export function NotificationSettingsPanel() {
         )) : <p className="text-sm text-muted-foreground">Loading notification settings…</p>}
         {preferences ? <div className="border-b border-border/35 py-4" data-testid="big-play-alert-group">
           <div className="flex items-center justify-between gap-5">
-            <div><p className="text-sm font-bold text-foreground">Big Plays <span className="ml-2 text-[10px] font-black uppercase tracking-[0.12em] text-amber-300">Coming with live scoring</span></p><p className="text-xs text-muted-foreground">Master control for the long-play alerts below. Turning it off mutes every sub-alert.</p></div>
-            <Switch checked={preferences.big_play_alerts} disabled aria-label="Big Plays notifications" />
+            <div><p className="text-sm font-bold text-foreground">Big Plays</p><p className="text-xs text-muted-foreground">Master control for verified live long-play alerts. Turning it off mutes every sub-alert.</p></div>
+            <Switch checked={preferences.big_play_alerts} disabled={saving} onCheckedChange={(big_play_alerts) => void save({ ...preferences, big_play_alerts })} aria-label="Big Plays notifications" />
           </div>
           <div className="ml-3 mt-3 space-y-1 border-l border-primary/30 pl-4 sm:ml-5">
             {longPlayRows.map((row) => <div key={row.key} className="flex items-center justify-between gap-4 py-2">
-              <div><p className="text-xs font-semibold text-foreground">{row.label} <span className="ml-1 text-[9px] font-black uppercase tracking-[0.1em] text-amber-300">Coming with live scoring</span></p><p className="text-[11px] text-muted-foreground">{row.description}</p></div>
-              <Switch checked={Boolean(preferences[row.key])} disabled aria-label={`${row.label} notifications`} />
+              <div><p className="text-xs font-semibold text-foreground">{row.label}</p><p className="text-[11px] text-muted-foreground">{row.description}</p></div>
+              <Switch checked={Boolean(preferences[row.key])} disabled={saving || !preferences.big_play_alerts} onCheckedChange={(checked) => void save({ ...preferences, [row.key]: checked })} aria-label={`${row.label} notifications`} />
             </div>)}
           </div>
         </div> : null}

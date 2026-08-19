@@ -17,6 +17,7 @@ from collegefootballfantasy_api.app.schemas.admin_scoring import (
     AdminScoringAuditRead,
     AdminWeekStatusRequest,
     CorrectionPreviewResponse,
+    LiveScoringOperationsRead,
     ProviderHealthResponse,
     ScoringRunRead,
     ScoringRunsList,
@@ -57,7 +58,7 @@ def list_worker_health(
     ]
 
 
-@router.get("/live-operations")
+@router.get("/live-operations", response_model=LiveScoringOperationsRead)
 def live_scoring_operations(
     season: int = Query(ge=2000, le=2100),
     week: int = Query(ge=1, le=20),

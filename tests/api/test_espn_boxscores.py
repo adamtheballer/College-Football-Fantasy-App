@@ -1,4 +1,7 @@
-from collegefootballfantasy_api.app.integrations.espn import extract_player_box_score_stats
+from collegefootballfantasy_api.app.integrations.espn import (
+    extract_espn_long_play_alert_candidates,
+    extract_player_box_score_stats,
+)
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.provider_identity import UnmatchedProviderRow
@@ -127,6 +130,30 @@ def test_extract_player_box_score_stats_from_espn_summary():
     assert by_name["Bert Auburn"]["xp_made"] == 3.0
     assert by_name["Bert Auburn"]["fg_made_31_40"] == 1
     assert by_name["Bert Auburn"]["fg_made_41_50"] == 1
+
+
+def test_long_play_alert_candidates_require_a_new_unambiguous_boxscore_identity():
+    payload = espn_summary_payload()
+    payload["drives"]["previous"].append(
+        {
+            "plays": [
+                {
+                    "id": "long-pass-1",
+                    "type": {"text": "Pass"},
+                    "text": "Arch Manning pass complete to Ryan Wingo for 48 yds",
+                    "statYardage": 48,
+                }
+            ]
+        }
+    )
+
+    candidates = extract_espn_long_play_alert_candidates(payload, known_play_ids=set())
+
+    assert {(candidate.event_type, candidate.provider_player_id, candidate.play_yards) for candidate in candidates} == {
+        ("LONG_PASS", "101", 48),
+        ("LONG_RECEPTION", "202", 48),
+    }
+    assert extract_espn_long_play_alert_candidates(payload, known_play_ids={"long-pass-1"}) == []
 
 
 def test_espn_box_score_stats_score_with_league_rules():

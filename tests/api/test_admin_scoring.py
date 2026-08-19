@@ -40,6 +40,7 @@ def test_non_admin_cannot_access_admin_scoring_routes(client):
     routes = [
         ("get", "/admin/scoring/runs", None),
         ("get", "/admin/scoring/provider-health", None),
+        ("get", "/admin/scoring/live-operations?season=2026&week=1", None),
         ("get", "/admin/scoring/corrections", None),
         ("post", "/admin/scoring/rerun", {"season": 2026, "week": 1, "reason": "blocked non-admin"}),
         (
@@ -116,6 +117,23 @@ def test_admin_can_view_provider_health_and_failed_runs(client, db_session):
     db_session.expire_all()
     failed_audit = db_session.query(ScoringAdminAudit).filter_by(action="rerun_scoring_failed").one()
     assert failed_audit.reason == "force a failed run"
+
+
+def test_admin_can_view_typed_live_scoring_operations(client, db_session):
+    token, _user_id = create_user_and_token(client, "live-operations", admin=True)
+
+    response = client.get(
+        "/admin/scoring/live-operations?season=2026&week=1",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["season"] == 2026
+    assert body["week"] == 1
+    assert body["preflight"]["ready"] is False
+    assert "SCORING_WORKER_UNHEALTHY" in body["preflight"]["reason_codes"]
+    assert body["game_polling"]["minimum_required_interval_seconds"] == 180
 
 
 def test_admin_preview_and_apply_stat_correction_recalculates_and_audits(client, db_session):

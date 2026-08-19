@@ -44,6 +44,43 @@ type ProviderHealthResponse = {
   failed_scoring_runs: number;
 };
 
+type LiveScoringOperations = {
+  season: number;
+  week: number;
+  worker: {
+    name: string;
+    status: string;
+    heartbeat_age_seconds: number | null;
+  };
+  game_polling: {
+    due_games: number;
+    active_games: number;
+    last_successful_poll_at: string | null;
+    next_poll_at: string | null;
+    minimum_success_interval_seconds: number | null;
+    minimum_required_interval_seconds: number;
+    http_403_count: number;
+    http_429_count: number;
+    timeout_count: number;
+    provider_failure_count: number;
+    accepted_snapshot_count: number;
+    duplicate_snapshot_count: number;
+    stale_snapshot_rejection_count: number;
+    ambiguous_snapshot_quarantine_count: number;
+    pending_final_correction_count: number;
+  };
+  identity: { open_unmatched_live_rows: number };
+  freshness: { state: string; data_age_seconds: number | null; relevant_game_count: number };
+  alerts: Array<{ severity: string; code: string }>;
+  preflight: {
+    ready: boolean;
+    reason_codes: string[];
+    unresolved_starters: Array<{ player_id: number; name: string; school: string; slot: string }>;
+    unsupported_league_ids: number[];
+    blocked_provider_games: number;
+  };
+};
+
 type CorrectionPreview = {
   player_id: number;
   season: number;
@@ -183,6 +220,14 @@ export default function AdminScoring() {
     enabled: !!user?.isAdmin,
     queryFn: () => apiGet<AuditRow[]>("/admin/scoring/corrections", { limit: 25 }),
   });
+  const numericSeason = Number(season);
+  const numericWeek = Number(week);
+  const liveOperationsQuery = useQuery({
+    queryKey: ["admin", "scoring", "live-operations", numericSeason, numericWeek],
+    enabled: !!user?.isAdmin && Number.isFinite(numericSeason) && Number.isFinite(numericWeek) && numericWeek > 0,
+    queryFn: () => apiGet<LiveScoringOperations>("/admin/scoring/live-operations", { season: numericSeason, week: numericWeek }),
+    refetchInterval: 15_000,
+  });
 
   const invalidateAdmin = () => {
     queryClient.invalidateQueries({ queryKey: ["admin", "scoring"] });
@@ -218,8 +263,6 @@ export default function AdminScoring() {
   const statPreviewRows = useMemo(() => buildStatPreviewRows(preview), [preview]);
 
   const reasonIsValid = reason.trim().length >= 3;
-  const numericSeason = Number(season);
-  const numericWeek = Number(week);
   const numericPlayerId = Number(playerId);
   const baseInputsAreValid = Number.isFinite(numericSeason) && Number.isFinite(numericWeek) && numericWeek > 0 && reasonIsValid;
   const correctionInputsAreValid = baseInputsAreValid && Number.isFinite(numericPlayerId) && numericPlayerId > 0;
@@ -315,6 +358,66 @@ export default function AdminScoring() {
           <p className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Provider Feeds</p>
           <p className="mt-1 text-3xl font-black text-slate-50">{healthQuery.data?.sync_states.length ?? "—"}</p>
         </div>
+      </section>
+
+      <section className="rounded-[2rem] border border-sky-300/20 bg-slate-950/55 p-6" aria-label="Live scoring readiness">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-black text-slate-50">
+              <Activity className="h-5 w-5 text-sky-200" />
+              Live Scoring Readiness
+            </h2>
+            <p className="mt-1 text-sm font-semibold text-slate-400">
+              Week {numericWeek || "—"} preflight and worker telemetry. Scores remain fail-closed until this is ready.
+            </p>
+          </div>
+          <Button type="button" variant="outline" onClick={() => void liveOperationsQuery.refetch()} disabled={liveOperationsQuery.isFetching}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${liveOperationsQuery.isFetching ? "animate-spin" : ""}`} />
+            Refresh readiness
+          </Button>
+        </div>
+        {liveOperationsQuery.isError ? (
+          <p className="mt-4 rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm font-bold text-red-100">
+            Unable to load live scoring readiness. Check your admin session and provider health.
+          </p>
+        ) : null}
+        {liveOperationsQuery.data ? (() => {
+          const operations = liveOperationsQuery.data;
+          const ready = operations.preflight.ready;
+          return <>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className={`rounded-2xl border p-4 ${ready ? "border-emerald-300/25 bg-emerald-400/10" : "border-amber-300/25 bg-amber-400/10"}`}>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Public promotion</p>
+                <p className={`mt-1 text-xl font-black ${ready ? "text-emerald-100" : "text-amber-100"}`}>{ready ? "Ready" : "Blocked"}</p>
+              </div>
+              <div className="rounded-2xl border border-sky-300/15 bg-sky-400/10 p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Worker</p>
+                <p className="mt-1 text-xl font-black text-slate-50">{operations.worker.status}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-400">Heartbeat {operations.worker.heartbeat_age_seconds ?? "—"}s ago</p>
+              </div>
+              <div className="rounded-2xl border border-sky-300/15 bg-sky-400/10 p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Active games</p>
+                <p className="mt-1 text-xl font-black text-slate-50">{operations.game_polling.active_games}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-400">{operations.game_polling.accepted_snapshot_count} accepted snapshots</p>
+              </div>
+              <div className="rounded-2xl border border-sky-300/15 bg-sky-400/10 p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Identity exceptions</p>
+                <p className="mt-1 text-xl font-black text-slate-50">{operations.identity.open_unmatched_live_rows}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-400">{operations.preflight.unresolved_starters.length} unresolved starters</p>
+              </div>
+            </div>
+            {!ready ? <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-100">Resolve before kickoff</p>
+              <p className="mt-1 text-sm font-semibold text-amber-50/85">{operations.preflight.reason_codes.join(" · ") || "Preflight has not cleared."}</p>
+            </div> : null}
+            {operations.alerts.length ? <div className="mt-3 rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm font-bold text-red-100">
+              Operational alerts: {operations.alerts.map((alert) => alert.code).join(" · ")}
+            </div> : null}
+            <p className="mt-4 text-xs font-semibold text-slate-400">
+              Provider freshness: {operations.freshness.state} · Last poll {formatDateTime(operations.game_polling.last_successful_poll_at)} · Minimum game interval {operations.game_polling.minimum_required_interval_seconds}s.
+            </p>
+          </>;
+        })() : <p className="mt-4 text-sm font-semibold text-slate-400">Loading live scoring readiness…</p>}
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
