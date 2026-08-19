@@ -287,6 +287,8 @@ export interface LeagueRosterTeam {
     id: number;
     name: string;
     owner_user_id: number | null;
+    owner_name?: string | null;
+    owner_avatar_url?: string | null;
     record: string | null;
   };
   roster: LeagueRosterPlayer[];

@@ -42,8 +42,8 @@ describe("formatRosterLoadError", () => {
         week: 1,
         data: [],
         team_rosters: [
-          { team: { id: 1, name: "My Team", owner_user_id: 42, record: "0-0-0" }, roster: [] },
-          { team: { id: 2, name: "Rival Team", owner_user_id: 43, record: "0-0-0" }, roster: [] },
+          { team: { id: 1, name: "My Team", owner_user_id: 42, owner_name: "Me", record: "0-0-0" }, roster: [] },
+          { team: { id: 2, name: "Rival Team", owner_user_id: 43, owner_name: "Rival", owner_avatar_url: "data:image/jpeg;base64,avatar", record: "0-0-0" }, roster: [] },
         ],
       })
     ).toHaveLength(2);

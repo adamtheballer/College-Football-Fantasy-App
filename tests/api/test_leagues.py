@@ -1015,6 +1015,10 @@ def test_league_roster_tab_includes_every_team_current_roster(client, db_session
     league = create_league(client, owner_token, name="All Rosters League", max_teams=2)
     join_response = client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token))
     assert join_response.status_code == 200
+    owner_avatar = "https://images.example.com/all-rosters-owner.jpg"
+    member_avatar = "https://images.example.com/all-rosters-member.jpg"
+    assert client.patch("/auth/me", json={"avatar_url": owner_avatar}, headers=auth_headers(owner_token)).status_code == 200
+    assert client.patch("/auth/me", json={"avatar_url": member_avatar}, headers=auth_headers(member_token)).status_code == 200
 
     teams = db_session.query(Team).filter(Team.league_id == league["id"]).order_by(Team.id.asc()).all()
     assert len(teams) == 2
@@ -1048,6 +1052,22 @@ def test_league_roster_tab_includes_every_team_current_roster(client, db_session
     body = response.json()
 
     assert [team_roster["team"]["id"] for team_roster in body["team_rosters"]] == [owner_team.id, member_team.id]
+    avatars_by_team_id = {
+        team_roster["team"]["id"]: team_roster["team"]["owner_avatar_url"]
+        for team_roster in body["team_rosters"]
+    }
+    assert avatars_by_team_id == {
+        owner_team.id: owner_avatar,
+        member_team.id: member_avatar,
+    }
+    names_by_team_id = {
+        team_roster["team"]["id"]: team_roster["team"]["owner_name"]
+        for team_roster in body["team_rosters"]
+    }
+    assert names_by_team_id == {
+        owner_team.id: "Coachall-rosters-owner",
+        member_team.id: "Coachall-rosters-member",
+    }
     assert [
         player["player_name"]
         for player in next(team_roster for team_roster in body["team_rosters"] if team_roster["team"]["id"] == owner_team.id)["roster"]
