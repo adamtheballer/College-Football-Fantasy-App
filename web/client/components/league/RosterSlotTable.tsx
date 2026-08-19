@@ -57,13 +57,15 @@ export type RosterPointMode = "projected" | "live";
 export const formatRosterPointValue = (player: LeagueRosterPlayer, pointMode: RosterPointMode) => {
   const liveGameState = (player.live_game_state ?? "").toLowerCase();
   if (liveGameState === "live") {
-    return typeof player.live_points === "number" && Number.isFinite(player.live_points)
-      ? player.live_points.toFixed(1)
+    const current = player.current_fantasy_points ?? player.live_points;
+    return typeof current === "number" && Number.isFinite(current)
+      ? current.toFixed(1)
       : "0.0";
   }
   if (liveGameState === "final" || liveGameState === "post") {
-    return typeof player.live_points === "number" && Number.isFinite(player.live_points)
-      ? player.live_points.toFixed(1)
+    const current = player.current_fantasy_points ?? player.live_points;
+    return typeof current === "number" && Number.isFinite(current)
+      ? current.toFixed(1)
       : "0.0";
   }
   if (pointMode === "live" && typeof player.live_points === "number" && Number.isFinite(player.live_points)) {
@@ -71,6 +73,16 @@ export const formatRosterPointValue = (player: LeagueRosterPlayer, pointMode: Ro
   }
   const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
   return formatProjectionDisplay(projection, player.projection_status);
+};
+
+export const liveProjectionDetail = (player: LeagueRosterPlayer) => {
+  const state = (player.live_game_state ?? "").toLowerCase();
+  if (["final", "post"].includes(state)) return "Final";
+  if (state !== "live") return null;
+  const final = player.live_projected_final_points ?? player.pregame_projected_points ?? player.projected_points ?? player.weekly_projected_fantasy_points;
+  if (typeof final !== "number" || !Number.isFinite(final)) return null;
+  const delayed = (player.live_projection_status ?? "").toUpperCase() === "STALE";
+  return delayed ? `Proj ${final.toFixed(1)} · Data delayed` : `Proj ${final.toFixed(1)}`;
 };
 
 const isRealRosterPlayer = (player: LeagueRosterPlayer) =>
@@ -253,11 +265,7 @@ export function RosterSlotTable({
             const isFinalGame = isRealPlayer && ["final", "post"].includes(liveGameState);
             const hasRedZone = isLiveGame && player.team_in_red_zone === true;
             const hasPossession = isLiveGame && player.team_has_possession === true;
-            const liveDetail = isLiveGame
-              ? `Proj ${weeklyProjectionLabel(player)}`
-              : isFinalGame
-                ? "Final"
-                : null;
+            const liveDetail = liveProjectionDetail(player);
             return (
               <button
                 key={player.slot_id ?? `${player.team_id ?? player.fantasy_team_id}-${slotType(player)}-${player.slot_index ?? 0}`}

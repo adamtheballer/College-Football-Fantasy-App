@@ -567,6 +567,17 @@ class RosterTabEntryRead(BaseModel):
     live_points: float | None = None
     live_scoring_status: str = "unavailable"
     live_scoring_updated_at: datetime | None = None
+    current_fantasy_points: float | None = None
+    pregame_projected_points: float | None = None
+    live_projected_final_points: float | None = None
+    live_projection_status: str | None = None
+    live_projection_model_version: str | None = None
+    projection_updated_at: datetime | None = None
+    provider_snapshot_at: datetime | None = None
+    game_period: int | None = None
+    game_clock: str | None = None
+    game_progress: float | None = None
+    live_projection_fallback_reason: str | None = None
     live_game_state: str = "unavailable"
     team_has_possession: bool = False
     team_in_red_zone: bool = False
@@ -606,6 +617,9 @@ class MatchupTeamRead(BaseModel):
     fantasy_team_id: int
     fantasy_team_name: str
     projected_total: float | None = None
+    current_points: float | None = None
+    pregame_projected_total: float | None = None
+    live_projected_total: float | None = None
     roster: list[RosterTabEntryRead]
 
 
@@ -637,6 +651,9 @@ class LeagueMatchupTabRead(BaseModel):
     opponent_roster: list[RosterTabEntryRead]
     projection_source: str = "weekly_projections"
     live_scoring_freshness: LiveScoringFreshnessRead | None = None
+    projection_updated_at: datetime | None = None
+    provider_snapshot_at: datetime | None = None
+    next_refresh_at: datetime | None = None
     message: str | None = None
     user_team: MatchupTeamRead | None = None
 

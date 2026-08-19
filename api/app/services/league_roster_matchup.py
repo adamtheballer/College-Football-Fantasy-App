@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import func
@@ -14,6 +14,7 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
+from collegefootballfantasy_api.app.models.live_player_projection import LivePlayerProjection
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_waiver_availability import PlayerWaiverAvailability
@@ -29,6 +30,7 @@ from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+from collegefootballfantasy_api.app.domain.scoring_engine import calculate_player_fantasy_points
 from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueMatchupTabRead,
@@ -81,6 +83,22 @@ class LiveGameContext:
     state: str = "unavailable"
     has_possession: bool = False
     in_red_zone: bool = False
+
+
+def _live_projection_map(
+    db: Session, *, season: int, week: int, player_ids: set[int]
+) -> dict[int, LivePlayerProjection]:
+    if not player_ids:
+        return {}
+    rows = db.query(LivePlayerProjection).filter(
+        LivePlayerProjection.season == season,
+        LivePlayerProjection.week == week,
+        LivePlayerProjection.player_id.in_(player_ids),
+    ).order_by(LivePlayerProjection.provider_snapshot_at.desc(), LivePlayerProjection.id.desc()).all()
+    result: dict[int, LivePlayerProjection] = {}
+    for row in rows:
+        result.setdefault(row.player_id, row)
+    return result
 
 
 def _school_key(value: str | None) -> str | None:
@@ -328,11 +346,35 @@ def _serialize_roster_entry(
     game_start_at: datetime | None = None,
     is_locked: bool = False,
     live_game: LiveGameContext | None = None,
+    live_projection: LivePlayerProjection | None = None,
+    scoring_rules: dict | None = None,
 ) -> RosterTabEntryRead:
     entry = roster_slot.entry
     projected = float(projection.fantasy_points) if projection and projection.fantasy_points is not None else None
     floor = float(projection.floor or 0.0) if projection else 0.0
     ceiling = float(projection.ceiling or 0.0) if projection else 0.0
+    position = entry.player.position if entry and entry.player else None
+    current_points = float(player_score.fantasy_points) if player_score else None
+    live_final_points = None
+    if live_projection is not None:
+        if current_points is None:
+            current_points, _ = calculate_player_fantasy_points(
+                live_projection.current_stats_json or {}, scoring_rules or {}, position
+            )
+        live_final_points, _ = calculate_player_fantasy_points(
+            live_projection.projected_final_stats_json or {}, scoring_rules or {}, position
+        )
+        if live_projection.projected_remaining_fantasy_points is not None and current_points is not None:
+            live_final_points = round(current_points + float(live_projection.projected_remaining_fantasy_points), 2)
+    effective_game_state = (
+        live_game.state if live_game and live_game.state != "unavailable"
+        else "final" if live_projection and live_projection.projection_status == "FINAL"
+        else "live" if live_projection and live_projection.projection_status in {"LIVE", "STALE", "OUT"}
+        # Preserve the existing score-feed behavior during the first accepted
+        # snapshot, before its per-player projection records have been written.
+        else "live" if player_score and player_score.status in {"live", "stale"}
+        else "unavailable"
+    )
     return RosterTabEntryRead(
         id=entry.id if entry else None,
         league_id=league.id,
@@ -361,11 +403,22 @@ def _serialize_roster_entry(
         opponent=opponent,
         game_location=game_location,
         weekly_projected_fantasy_points=projected,
-        projection_status=projection.projection_status if projection else "UNAVAILABLE",
-        live_points=float(player_score.fantasy_points) if player_score else None,
+        projection_status=(live_projection.projection_status if live_projection else projection.projection_status if projection else "UNAVAILABLE"),
+        live_points=current_points,
         live_scoring_status=player_score.status if player_score else "unavailable",
         live_scoring_updated_at=player_score.calculated_at if player_score else None,
-        live_game_state=live_game.state if live_game else "unavailable",
+        current_fantasy_points=current_points,
+        pregame_projected_points=projected,
+        live_projected_final_points=live_final_points,
+        live_projection_status=live_projection.projection_status if live_projection else None,
+        live_projection_model_version=live_projection.model_version if live_projection else None,
+        projection_updated_at=live_projection.calculated_at if live_projection else None,
+        provider_snapshot_at=live_projection.provider_snapshot_at if live_projection else None,
+        game_period=live_projection.game_period if live_projection else None,
+        game_clock=live_projection.game_clock if live_projection else None,
+        game_progress=live_projection.game_progress if live_projection else None,
+        live_projection_fallback_reason=live_projection.fallback_reason if live_projection else None,
+        live_game_state=effective_game_state,
         team_has_possession=live_game.has_possession if live_game else False,
         team_in_red_zone=live_game.in_red_zone if live_game else False,
         game_start_at=game_start_at,
@@ -397,6 +450,8 @@ def _serialize_team_roster(
         if player_ids
         else []
     )
+    live_projection_by_player = _live_projection_map(db, season=league.season_year, week=week, player_ids=player_ids) if games else {}
+    settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first() if live_projection_by_player else None
     game_starts, opponents, game_locations = game_context_for_players(
         db,
         player_ids=player_ids,
@@ -421,6 +476,8 @@ def _serialize_team_roster(
             game_location=game_locations.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             game_start_at=game_starts.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             live_game=live_games.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+            live_projection=live_projection_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+            scoring_rules=settings.scoring_json if settings else {},
             is_locked=(
                 roster_slot.entry is not None
                 and game_starts.get(roster_slot.entry.player_id) is not None
@@ -451,6 +508,8 @@ def _serialize_team_rosters(
         if player_ids
         else []
     )
+    live_projection_by_player = _live_projection_map(db, season=league.season_year, week=week, player_ids=player_ids) if games else {}
+    settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first() if live_projection_by_player else None
     game_starts, opponents, game_locations = game_context_for_players(
         db,
         player_ids=player_ids,
@@ -476,6 +535,8 @@ def _serialize_team_rosters(
                 game_location=game_locations.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 game_start_at=game_starts.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 live_game=live_games.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+                live_projection=live_projection_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+                scoring_rules=settings.scoring_json if settings else {},
                 is_locked=(
                     roster_slot.entry is not None
                     and game_starts.get(roster_slot.entry.player_id) is not None
@@ -517,6 +578,50 @@ def _starter_projection_total(roster: list[RosterTabEntryRead]) -> float | None:
         starter_count += 1
         total += float(projected_points)
     return round(total, 2) if starter_count else None
+
+
+def _starter_live_totals(roster: list[RosterTabEntryRead]) -> tuple[float | None, float | None, float | None, bool]:
+    """Return current, live-final, and original-pregame starter totals.
+
+    Staggered kickoffs are handled explicitly: not-started players contribute
+    zero current points but retain their pregame projection in the final total.
+    """
+    current = final = pregame = 0.0
+    starters = 0
+    any_live = False
+    for entry in roster:
+        if not entry.is_starter or entry.status == "EMPTY":
+            continue
+        starters += 1
+        baseline = entry.pregame_projected_points
+        if baseline is None or not math.isfinite(baseline):
+            return None, None, None, any_live
+        pregame += baseline
+        state = (entry.live_game_state or "").lower()
+        if state in {"live", "final", "post"}:
+            any_live = any_live or state == "live"
+            actual = entry.current_fantasy_points
+            if actual is None or not math.isfinite(actual):
+                return None, None, None, any_live
+            current += actual
+            final_value = entry.live_projected_final_points if entry.live_projected_final_points is not None else actual
+            if not math.isfinite(final_value):
+                return None, None, None, any_live
+            final += final_value
+        else:
+            final += baseline
+    if not starters:
+        return None, None, None, any_live
+    return round(current, 2), round(final, 2), round(pregame, 2), any_live
+
+
+def _latest_projection_metadata(*rosters: list[RosterTabEntryRead]) -> tuple[datetime | None, datetime | None]:
+    rows = [entry for roster in rosters for entry in roster if entry.projection_updated_at]
+    if not rows:
+        return None, None
+    return max((entry.projection_updated_at for entry in rows if entry.projection_updated_at), default=None), max(
+        (entry.provider_snapshot_at for entry in rows if entry.provider_snapshot_at), default=None
+    )
 
 
 def build_roster_tab_view(
@@ -667,6 +772,9 @@ def build_matchup_tab_view(
             fantasy_team_id=primary_team.id,
             fantasy_team_name=primary_team.name,
             projected_total=my_total,
+            current_points=0.0 if my_total is not None else None,
+            pregame_projected_total=my_total,
+            live_projected_total=my_total,
             roster=my_roster,
         )
         return LeagueMatchupTabRead(
@@ -691,8 +799,10 @@ def build_matchup_tab_view(
     )
     my_roster = roster_by_team[primary_team.id]
     opponent_roster = roster_by_team.get(opponent.id, []) if opponent else []
-    my_total = _starter_projection_total(my_roster)
-    opponent_total = _starter_projection_total(opponent_roster)
+    my_current, my_live_total, my_pregame_total, my_has_live = _starter_live_totals(my_roster)
+    opponent_current, opponent_live_total, opponent_pregame_total, opponent_has_live = _starter_live_totals(opponent_roster)
+    my_total = my_live_total if my_has_live else my_pregame_total
+    opponent_total = opponent_live_total if opponent_has_live else opponent_pregame_total
     my_probability, opponent_probability = calculate_matchup_win_probability(
         my_total,
         opponent_total,
@@ -711,6 +821,9 @@ def build_matchup_tab_view(
         fantasy_team_id=primary_team.id,
         fantasy_team_name=primary_team.name,
         projected_total=my_total,
+        current_points=my_current,
+        pregame_projected_total=my_pregame_total,
+        live_projected_total=my_live_total,
         roster=my_roster,
     )
     opponent_team = (
@@ -723,24 +836,32 @@ def build_matchup_tab_view(
             fantasy_team_id=opponent.id,
             fantasy_team_name=opponent.name,
             projected_total=opponent_total,
+            current_points=opponent_current,
+            pregame_projected_total=opponent_pregame_total,
+            live_projected_total=opponent_live_total,
             roster=opponent_roster,
         )
         if opponent
         else None
     )
+    projection_updated_at, provider_snapshot_at = _latest_projection_metadata(my_roster, opponent_roster)
+    effective_status = "live" if my_has_live or opponent_has_live else matchup.status
     return LeagueMatchupTabRead(
         league_id=league.id,
         season=league.season_year,
         week=week,
         matchup_id=matchup.id,
-        status=matchup.status,
+        status=effective_status,
         my_team=my_team,
         user_team=my_team if viewer_team and viewer_team.id == primary_team.id else None,
         opponent_team=opponent_team,
         my_roster=my_roster,
         opponent_roster=opponent_roster,
-        projection_source="weekly_projections",
+        projection_source="live_projection_v1" if projection_updated_at else "weekly_projections",
         live_scoring_freshness=freshness_read,
+        projection_updated_at=projection_updated_at,
+        provider_snapshot_at=provider_snapshot_at,
+        next_refresh_at=(provider_snapshot_at + timedelta(seconds=180)) if provider_snapshot_at else None,
         message=None,
     )
 

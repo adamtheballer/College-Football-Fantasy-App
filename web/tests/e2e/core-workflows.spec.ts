@@ -1498,6 +1498,68 @@ test.describe("critical browser workflows", () => {
       user_team: { ...scheduledPayload.user_team, projected_points: 120.0, projected_total: 120.0, win_probability: 70.0 },
       opponent_team: { ...scheduledPayload.opponent_team, projected_points: 100.0, projected_total: 100.0, win_probability: 30.0 },
     };
+    const liveMyRoster = myRoster.map((player) =>
+      player.player_name === "Arch Manning"
+        ? {
+            ...player,
+            live_game_state: "live",
+            current_fantasy_points: 0,
+            live_points: 0,
+            pregame_projected_points: 133.1,
+            live_projected_final_points: 121.7,
+            live_projection_status: "LIVE",
+            game_period: 1,
+            game_clock: "08:15",
+            game_progress: 0.1125,
+          }
+        : player,
+    );
+    const liveOpponentRoster = opponentRoster.map((player) =>
+      player.player_name === "Rival QB"
+        ? {
+            ...player,
+            live_game_state: "live",
+            current_fantasy_points: 7.4,
+            live_points: 7.4,
+            pregame_projected_points: 137.0,
+            live_projected_final_points: 129.8,
+            live_projection_status: "LIVE",
+            game_period: 1,
+            game_clock: "08:15",
+            game_progress: 0.1125,
+          }
+        : player,
+    );
+    const livePayload = {
+      ...scheduledPayload,
+      status: "live",
+      projection_updated_at: "2026-08-30T19:15:00Z",
+      provider_snapshot_at: "2026-08-30T19:15:00Z",
+      next_refresh_at: "2026-08-30T19:18:00Z",
+      my_team: {
+        ...scheduledPayload.my_team,
+        current_points: 0,
+        pregame_projected_total: 133.1,
+        live_projected_total: 121.7,
+        roster: liveMyRoster,
+      },
+      user_team: {
+        ...scheduledPayload.user_team,
+        current_points: 0,
+        pregame_projected_total: 133.1,
+        live_projected_total: 121.7,
+        roster: liveMyRoster,
+      },
+      opponent_team: {
+        ...scheduledPayload.opponent_team,
+        current_points: 7.4,
+        pregame_projected_total: 137.0,
+        live_projected_total: 129.8,
+        roster: liveOpponentRoster,
+      },
+      my_roster: liveMyRoster,
+      opponent_roster: liveOpponentRoster,
+    };
     let matchupPayload: unknown = scheduledPayload;
 
     await page.route("**/leagues/1", async (route) => {
@@ -1537,6 +1599,8 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("133.1 - 137.0")).toHaveCount(0);
     await expect(page.getByLabel("Projected 133.1")).toBeVisible();
     await expect(page.getByLabel("Projected 137.0")).toBeVisible();
+    await expect(page.getByText("Projected matchup values are shown until live scoring begins.")).toHaveCount(0);
+    await expect(page.getByRole("status")).toHaveCount(0);
     await expect(page.getByText("48.1%", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("51.9%", { exact: true }).first()).toBeVisible();
     await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toHaveAttribute("style", /width: 48\.05%/);
@@ -1633,6 +1697,21 @@ test.describe("critical browser workflows", () => {
     await page.getByRole("button", { name: "View League Mate Two at League Mate One" }).click();
     await expect(page.getByText("70.0%", { exact: true }).first()).toBeVisible();
     await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toHaveAttribute("style", /width: 70%/);
+
+    matchupPayload = livePayload;
+    await page.goto("/league/1/matchup");
+    await expect(page.getByText("0.0", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Proj 121.7", { exact: true }).first()).toBeVisible();
+    await expect(page.getByLabel("Projected 121.7")).toBeVisible();
+    await expect(page.getByText("Pregame projection", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Arch Manning/ }).getByText("0.0", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Arch Manning/ }).getByText("Proj 121.7", { exact: true })).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    const liveMobileLineup = page.getByTestId("mobile-starting-lineup");
+    await liveMobileLineup.scrollIntoViewIfNeeded();
+    await expect(liveMobileLineup.getByText("0.0", { exact: true })).toBeVisible();
+    await expect(liveMobileLineup.getByText("Proj 121.7", { exact: true })).toBeVisible();
+    await page.screenshot({ path: "test-results/live-matchup-current-and-projection.png", fullPage: true });
 
     matchupPayload = emptyPayload;
     await page.goto("/league/1/matchup");

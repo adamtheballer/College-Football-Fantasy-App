@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { RosterSlotTable, type RosterPointMode } from "@/components/league/RosterSlotTable";
+import { RosterSlotTable, type RosterPointMode, formatRosterPointValue, liveProjectionDetail } from "@/components/league/RosterSlotTable";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { SurfaceCard } from "@/components/fantasy";
 import { usePlayerCard } from "@/hooks/use-players";
@@ -38,9 +38,7 @@ const compactSlot = (player?: LeagueRosterPlayer) =>
 
 const compactPointValue = (player: LeagueRosterPlayer | undefined, pointMode: RosterPointMode) => {
   if (pointMode === "live") {
-    return typeof player?.live_points === "number" && Number.isFinite(player.live_points)
-      ? player.live_points.toFixed(1)
-      : "—";
+    return player ? formatRosterPointValue(player, pointMode) : "—";
   }
   return formatProjectionDisplay(
     player?.projected_points ?? player?.weekly_projected_fantasy_points ?? null,
@@ -108,6 +106,7 @@ function CompactMatchupPlayer({
 }) {
   const hasPlayer = Boolean(player?.player_id && player.player_name);
   const points = compactPointValue(player, pointMode);
+  const liveDetail = player ? liveProjectionDetail(player) : null;
   const playerName = hasPlayer ? compactMatchupPlayerName(player?.player_name) : "No starter set";
   const gameMatchup = hasPlayer ? formatPlayerGameMatchup(player) : "Set a starter in your roster";
   const gameTime = hasPlayer ? formatPlayerGameTime(player) : "Kickoff TBD";
@@ -126,7 +125,7 @@ function CompactMatchupPlayer({
   if (align === "right") {
     const content = (
       <>
-        <p className="self-center text-[11px] font-black tabular-nums text-cfb-pink">{points}</p>
+        <span className="self-center text-left text-[11px] font-black tabular-nums text-cfb-pink"><span className="block">{points}</span>{liveDetail ? <span className="block text-[8px] font-semibold text-cfb-text-muted">{liveDetail}</span> : null}</span>
         <div className="min-w-0">
           <p className={`truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
             {playerName}
@@ -166,7 +165,7 @@ function CompactMatchupPlayer({
           {gameTime}
         </p>
       </div>
-      <p className="self-center text-right text-[11px] font-black tabular-nums text-cfb-brand">{points}</p>
+      <span className="self-center text-right text-[11px] font-black tabular-nums text-cfb-brand"><span className="block">{points}</span>{liveDetail ? <span className="block text-[8px] font-semibold text-cfb-text-muted">{liveDetail}</span> : null}</span>
     </>
   );
 
