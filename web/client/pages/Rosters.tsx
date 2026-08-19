@@ -40,8 +40,8 @@ const RosterTable = ({ entries }: { entries: RosterEntry[] }) => {
 
   if (sortedEntries.length === 0) {
     return (
-      <div className="rounded-[2rem] border border-dashed border-white/10 bg-white/[0.03] px-6 py-10 text-center">
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+      <div className="border-t border-dashed border-cfb-border-subtle px-4 py-8 text-center">
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cfb-text-muted">
           No roster entries yet
         </p>
       </div>
@@ -49,35 +49,33 @@ const RosterTable = ({ entries }: { entries: RosterEntry[] }) => {
   }
 
   return (
-    <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.03]">
-      <div className="grid grid-cols-[110px_minmax(0,1fr)_120px_120px] gap-4 border-b border-white/10 px-6 py-4 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+    <div className="overflow-hidden rounded-lg border border-cfb-border-subtle bg-cfb-surface">
+      <div className="grid grid-cols-[4.5rem_minmax(0,1fr)_4.5rem] gap-3 border-b border-cfb-border-subtle bg-cfb-surface-raised px-3 py-2.5 text-[9px] font-black uppercase tracking-[0.16em] text-cfb-text-muted sm:grid-cols-[5.5rem_minmax(0,1fr)_8rem_7rem] sm:px-4">
         <span>Slot</span>
         <span>Player</span>
-        <span>School</span>
-        <span>Status</span>
+        <span className="text-right sm:text-left">Status</span>
+        <span className="hidden sm:block">School</span>
       </div>
       {sortedEntries.map((entry) => (
         <div
           key={entry.id}
-          className="grid grid-cols-[110px_minmax(0,1fr)_120px_120px] gap-4 border-b border-white/5 px-6 py-4 last:border-b-0"
+          className="grid min-h-14 grid-cols-[4.5rem_minmax(0,1fr)_4.5rem] items-center gap-3 border-b border-cfb-border-subtle/70 px-3 py-2.5 last:border-b-0 hover:bg-cfb-surface-hover sm:grid-cols-[5.5rem_minmax(0,1fr)_8rem_7rem] sm:px-4"
         >
-          <span className="text-[10px] font-black uppercase tracking-[0.25em] text-primary">
+          <span className="inline-flex w-fit rounded-md border border-cfb-border-subtle bg-cfb-surface-raised px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-cfb-brand">
             {entry.slot}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-black uppercase tracking-tight text-foreground">
+            <p className="truncate text-sm font-black tracking-tight text-cfb-text-primary">
               {entry.player.name}
             </p>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
               {entry.player.position}
             </p>
           </div>
-          <span className="truncate text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-            {entry.player.school}
-          </span>
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+          <span className="truncate text-right text-[9px] font-black uppercase tracking-[0.1em] text-cfb-text-secondary sm:text-left">
             {entry.status}
           </span>
+          <span className="hidden truncate text-[10px] font-bold text-cfb-text-secondary sm:block">{entry.player.school}</span>
         </div>
       ))}
     </div>
@@ -93,19 +91,19 @@ const TeamRosterCard = ({ team }: { team: Team }) => {
   } = useTeamRoster(team.id);
 
   return (
-    <Card className="bg-card/40 backdrop-blur-md border border-white/5 rounded-[3rem] overflow-hidden">
-      <CardContent className="p-8 space-y-6">
+    <Card className="overflow-hidden rounded-lg border border-cfb-border-subtle bg-cfb-surface">
+      <CardContent className="space-y-4 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-[1.25rem] bg-gradient-to-br from-primary to-blue-600 shadow-2xl">
-                <Users className="h-5 w-5 text-white" />
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-md border border-cfb-border-subtle bg-cfb-surface-raised text-cfb-brand">
+                <Users className="h-4 w-4" />
               </div>
               <div>
-                <h3 className="text-2xl font-black italic uppercase tracking-tight text-foreground">
+                <h3 className="text-base font-black tracking-tight text-cfb-text-primary sm:text-lg">
                   {team.name}
                 </h3>
-                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground/60">
+                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
                   Owner {team.owner_name || "Unassigned"}
                 </p>
               </div>
@@ -115,7 +113,7 @@ const TeamRosterCard = ({ team }: { team: Team }) => {
             asChild
             type="button"
             variant="outline"
-            className="h-11 rounded-2xl px-5 text-[10px] font-black uppercase tracking-[0.2em]"
+            className="h-9 rounded-md border-cfb-border-subtle bg-cfb-surface-raised px-3 text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-secondary hover:bg-cfb-surface-hover hover:text-cfb-text-primary"
           >
             <Link to={`/league/${team.league_id}`}>
               League Hub
@@ -125,14 +123,14 @@ const TeamRosterCard = ({ team }: { team: Team }) => {
         </div>
 
         {isLoading ? (
-          <div className="rounded-[2rem] border border-white/10 bg-white/[0.03] px-6 py-10 text-center">
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+          <div className="rounded-lg border border-dashed border-cfb-border-subtle bg-cfb-surface-raised px-4 py-8 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cfb-text-muted">
               Loading roster...
             </p>
           </div>
         ) : isError ? (
-          <div className="rounded-[2rem] border border-red-400/20 bg-red-500/5 px-6 py-10 text-center">
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-red-300">
+          <div className="rounded-lg border border-red-400/20 bg-red-500/5 px-4 py-8 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-red-300">
               {formatApiError(error, "Unable to load roster entries.")}
             </p>
           </div>
@@ -168,53 +166,53 @@ const LeagueSelectorCard = ({
     className="w-full text-left"
   >
     <Card
-      className={`bg-card/60 backdrop-blur-md border rounded-[3rem] overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-primary/40 cursor-pointer ${
+      className={`overflow-hidden rounded-lg border transition-colors hover:bg-cfb-surface-hover ${
         isActive
-          ? "border-primary/50 shadow-[0_0_0_1px_rgba(59,130,246,0.35)]"
-          : "border-white/10"
+          ? "border-cfb-brand/70 bg-cfb-brand/[0.08]"
+          : "border-cfb-border-subtle bg-cfb-surface"
       }`}
     >
-      <CardContent className="p-10 relative z-10 flex items-center justify-between">
-        <div className="flex items-center gap-8">
-          <div className="w-20 h-20 rounded-[2rem] flex items-center justify-center shadow-2xl transition-transform duration-500 bg-gradient-to-br from-primary to-blue-600">
-            <Trophy className="w-10 h-10 text-white" />
+      <CardContent className="relative z-10 flex items-center justify-between gap-3 p-3 sm:px-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-cfb-border-subtle bg-cfb-surface-raised text-cfb-brand">
+            <Trophy className="h-4 w-4" />
           </div>
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <h3 className="text-3xl font-black italic uppercase tracking-tight text-foreground">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="truncate text-sm font-black tracking-tight text-cfb-text-primary sm:text-base">
               {name}
               </h3>
               <span
-                className={`rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.24em] ${
+                className={`rounded-md border px-2 py-1 text-[8px] font-black uppercase tracking-[0.1em] ${
                   isActive
-                    ? "border-primary/40 bg-primary/15 text-primary"
-                    : "border-white/10 bg-white/5 text-foreground/80"
+                    ? "border-cfb-brand/40 bg-cfb-brand/15 text-cfb-brand"
+                    : "border-cfb-border-subtle bg-cfb-surface-raised text-cfb-text-muted"
                 }`}
               >
                 {isActive ? "Selected" : "Select Roster"}
               </span>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-[10px] font-black tracking-[0.3em] text-primary uppercase">
+            <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.12em]">
+              <span className="text-cfb-brand">
                 {status.replace(/_/g, " ")}
               </span>
-              <div className="w-1 h-1 rounded-full bg-white/10" />
-              <span className="text-[10px] font-black tracking-[0.2em] text-muted-foreground uppercase">
+              <span className="h-1 w-1 rounded-full bg-cfb-border-strong" />
+              <span className="text-cfb-text-muted">
                 {memberCount}/{maxTeams} members
               </span>
             </div>
           </div>
         </div>
         <div
-          className={`w-16 h-16 rounded-[1.5rem] border flex items-center justify-center transition-all duration-300 ${
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border ${
             isActive
-              ? "bg-primary/15 border-primary/40"
-              : "bg-white/5 border-white/10"
+              ? "border-cfb-brand/40 bg-cfb-brand/15"
+              : "border-cfb-border-subtle bg-cfb-surface-raised"
           }`}
         >
           <ArrowRight
-            className={`w-6 h-6 transition-colors ${
-              isActive ? "text-primary" : "text-foreground/75"
+            className={`h-4 w-4 ${
+              isActive ? "text-cfb-brand" : "text-cfb-text-muted"
             }`}
           />
         </div>
@@ -273,54 +271,51 @@ export default function Rosters() {
   }, [selectedLeagueId]);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in duration-1000 py-12">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <div className="h-[2px] w-12 bg-gradient-to-r from-primary to-blue-400" />
-          <span className="text-[10px] font-black tracking-[0.5em] text-primary uppercase">
-            Supported League Flow
-          </span>
-        </div>
-        <h1 className="text-7xl font-black italic tracking-tighter text-foreground uppercase bg-gradient-to-br from-white via-white to-primary/40 bg-clip-text text-transparent">
-          Rosters
-        </h1>
-        <p className="text-muted-foreground text-xl font-medium max-w-2xl leading-relaxed">
-          Browse live league teams and roster entries from backend contracts. Synthetic roster fillers have been removed.
+    <div className="mx-auto max-w-[1320px] space-y-5 px-4 py-5 pb-24 sm:px-6 sm:py-8">
+      <div className="space-y-1.5">
+        <p className="cfb-micro-label text-cfb-brand">League rosters</p>
+        <h1 className="cfb-display-title text-3xl italic sm:text-4xl">Rosters</h1>
+        <p className="max-w-2xl text-sm font-medium leading-6 text-cfb-text-secondary">
+          Select a league, then scan every roster in a compact board view.
         </p>
       </div>
 
       {isLoading ? (
-        <Card className="bg-card/40 backdrop-blur-md border border-white/5 rounded-[3rem] p-20 text-center space-y-4">
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+        <Card className="rounded-lg border border-cfb-border-subtle bg-cfb-surface p-8 text-center">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cfb-text-muted">
             Loading leagues...
           </p>
         </Card>
       ) : isError ? (
-        <Card className="bg-card/40 backdrop-blur-md border border-white/5 rounded-[3rem] p-20 text-center space-y-4">
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-red-300">
+        <Card className="rounded-lg border border-red-400/20 bg-red-500/5 p-8 text-center">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-red-300">
             Unable to load league roster entry points right now.
           </p>
         </Card>
       ) : leagueRows.length === 0 ? (
-        <Card className="bg-card/40 backdrop-blur-md border border-white/5 border-dashed rounded-[3rem] p-20 text-center space-y-8">
-          <div className="w-24 h-24 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center text-muted-foreground mx-auto">
-            <ClipboardList className="w-12 h-12" />
+        <Card className="rounded-lg border border-dashed border-cfb-border-subtle bg-cfb-surface p-8 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised text-cfb-text-muted">
+            <ClipboardList className="h-5 w-5" />
           </div>
-          <div className="space-y-4">
-            <h2 className="text-3xl font-black italic uppercase text-foreground">No leagues joined yet</h2>
-            <p className="text-muted-foreground max-w-sm mx-auto uppercase tracking-widest text-[10px] font-bold leading-loose">
+          <div className="mt-4 space-y-2">
+            <h2 className="text-lg font-black text-cfb-text-primary">No leagues joined yet</h2>
+            <p className="mx-auto max-w-sm text-sm font-medium leading-6 text-cfb-text-secondary">
               Create or join a league first, then open the league hub to access supported roster information.
             </p>
           </div>
-          <Link to="/leagues" className="block">
-            <span className="inline-flex h-14 items-center rounded-2xl bg-primary px-12 text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground shadow-[0_10px_30px_rgba(var(--primary),0.2)]">
+          <Link to="/leagues" className="mt-5 inline-flex">
+            <span className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-[10px] font-black uppercase tracking-[0.14em] text-primary-foreground">
               Browse Leagues
             </span>
           </Link>
         </Card>
       ) : (
         <>
-          <div className="space-y-6">
+          <div className="overflow-hidden rounded-lg border border-cfb-border-subtle bg-cfb-surface">
+            <div className="border-b border-cfb-border-subtle bg-cfb-surface-raised px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cfb-text-muted">Select league</p>
+            </div>
+            <div className="divide-y divide-cfb-border-subtle">
             {leagueRows.map((league) => (
               <LeagueSelectorCard
                 key={league.id}
@@ -333,28 +328,29 @@ export default function Rosters() {
                 onSelect={setSelectedLeagueId}
               />
             ))}
+            </div>
           </div>
 
           {selectedLeague && (
             <div ref={activeLeagueRef}>
-              <Card className="bg-card/40 backdrop-blur-md border border-white/5 rounded-[3rem] overflow-hidden">
-              <CardContent className="p-10 space-y-6">
-                <div className="flex flex-wrap items-start justify-between gap-6">
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">
+              <Card className="overflow-hidden rounded-lg border border-cfb-border-subtle bg-cfb-surface">
+              <CardContent className="space-y-4 p-4 sm:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-4 border-b border-cfb-border-subtle pb-4">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cfb-brand">
                       Active League
                     </p>
-                    <h2 className="text-4xl font-black italic uppercase tracking-tight text-foreground">
+                    <h2 className="text-xl font-black tracking-tight text-cfb-text-primary">
                       {selectedLeague.name}
                     </h2>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                    <p className="text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">
                       {selectedLeague.members.length}/{selectedLeague.max_teams} managers joined
                     </p>
                   </div>
                   <Button
                     asChild
                     type="button"
-                    className="h-12 rounded-2xl bg-primary px-6 text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground"
+                    className="h-9 rounded-md bg-primary px-3 text-[9px] font-black uppercase tracking-[0.12em] text-primary-foreground"
                   >
                     <Link to={`/league/${selectedLeague.id}`}>
                       Open League Hub
@@ -364,30 +360,30 @@ export default function Rosters() {
                 </div>
 
                 {teamsLoading ? (
-                  <div className="rounded-[2rem] border border-white/10 bg-white/[0.03] px-6 py-12 text-center">
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+                  <div className="rounded-lg border border-dashed border-cfb-border-subtle bg-cfb-surface-raised px-4 py-8 text-center">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cfb-text-muted">
                       Loading teams...
                     </p>
                   </div>
                 ) : teamsError ? (
-                  <div className="rounded-[2rem] border border-red-400/20 bg-red-500/5 px-6 py-12 text-center space-y-3">
-                    <ShieldAlert className="mx-auto h-8 w-8 text-red-300" />
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-red-300">
+                  <div className="rounded-lg border border-red-400/20 bg-red-500/5 px-4 py-8 text-center">
+                    <ShieldAlert className="mx-auto h-5 w-5 text-red-300" />
+                    <p className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-red-300">
                       {formatApiError(teamsErrorDetail, "Unable to load team rosters for this league.")}
                     </p>
                   </div>
                 ) : (teamsPayload?.data.length ?? 0) === 0 ? (
-                  <div className="rounded-[2rem] border border-dashed border-white/10 bg-white/[0.03] px-6 py-12 text-center space-y-4">
-                    <Users className="mx-auto h-10 w-10 text-muted-foreground/40" />
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+                  <div className="rounded-lg border border-dashed border-cfb-border-subtle bg-cfb-surface-raised px-4 py-8 text-center">
+                    <Users className="mx-auto h-5 w-5 text-cfb-text-muted" />
+                    <p className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-cfb-text-muted">
                       No teams created in this league yet
                     </p>
-                    <p className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground/50">
+                    <p className="mx-auto mt-2 max-w-xl text-sm font-medium leading-6 text-cfb-text-secondary">
                       Team assignment and full owned-team hydration will land with the canonical league workspace contract.
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-6">
+                  <div className="space-y-3">
                     {teamsPayload?.data.map((team) => (
                       <TeamRosterCard key={team.id} team={team} />
                     ))}
