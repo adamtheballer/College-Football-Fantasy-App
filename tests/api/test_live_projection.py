@@ -33,6 +33,14 @@ def test_jeremiah_smith_scoreless_first_quarter_regresses_toward_remaining_oppor
     assert _points(result.projected_final_stats) < _points(_smith_prior())
 
 
+def test_kickoff_preserves_the_pregame_statline_until_live_evidence_arrives():
+    result = project_live_player(
+        pregame_stats=_smith_prior(), live_stats={}, position="WR", game_status="live", game_progress=0.0,
+    )
+    assert result.projection_status == "LIVE"
+    assert _points(result.projected_final_stats) == pytest.approx(28.9)
+
+
 def test_live_projection_uses_usage_without_extrapolating_touchdowns():
     under = project_live_player(
         pregame_stats=_smith_prior(), live_stats={"targets": 0}, position="WR", game_status="live", game_progress=0.5,
@@ -47,6 +55,18 @@ def test_live_projection_uses_usage_without_extrapolating_touchdowns():
     # The completed TD counts immediately, but the remaining TD prior is not
     # multiplied by the single early touchdown rate.
     assert early_touchdown.projected_remaining_stats["rec_tds"] <= 1.5
+
+
+def test_overperformance_can_raise_a_projection_without_extrapolating_rates():
+    result = project_live_player(
+        pregame_stats=_smith_prior(),
+        live_stats={"targets": 8, "receptions": 8, "rec_yards": 140, "rec_tds": 1},
+        position="WR",
+        game_status="live",
+        game_progress=0.5,
+    )
+    assert _points(result.projected_final_stats) > 28.9
+    assert result.projected_remaining_stats["rec_tds"] <= 1.0
 
 
 def test_final_and_missing_clock_follow_explicit_safe_paths():
@@ -64,12 +84,36 @@ def test_final_and_missing_clock_follow_explicit_safe_paths():
     assert stale.projected_final_stats["rec_yards"] == 85
 
 
+def test_authoritative_out_locks_the_projection_to_current_stats():
+    result = project_live_player(
+        pregame_stats=_smith_prior(),
+        live_stats={"receptions": 2, "rec_yards": 30},
+        position="WR",
+        game_status="live",
+        game_progress=0.5,
+        ruled_out=True,
+    )
+    assert result.projection_status == "OUT"
+    assert result.projected_remaining_stats["rec_yards"] == 0
+    assert _points(result.projected_final_stats) == pytest.approx(5.0)
+
+
 def test_fantasy_points_only_projection_uses_the_documented_clock_fallback():
     result = project_live_player(
         pregame_stats={}, pregame_fantasy_points=28.9, live_stats={}, position="WR", game_status="live", game_progress=0.25,
     )
     assert result.fallback_reason == "fantasy_points_only"
     assert result.projected_remaining_fantasy_points == pytest.approx(21.675)
+
+
+def test_same_statline_is_scored_with_each_leagues_rules_at_read_time():
+    result = project_live_player(
+        pregame_stats=_smith_prior(), live_stats={"targets": 2, "receptions": 1, "rec_yards": 8},
+        position="WR", game_status="live", game_progress=0.25,
+    )
+    full_ppr, _ = calculate_player_fantasy_points(result.projected_final_stats, {"ppr": 1}, "WR")
+    half_ppr, _ = calculate_player_fantasy_points(result.projected_final_stats, {"ppr": 0.5}, "WR")
+    assert full_ppr - half_ppr == pytest.approx(result.projected_final_stats["receptions"] * 0.5, abs=0.01)
 
 
 def test_clock_progress_is_regulation_only():

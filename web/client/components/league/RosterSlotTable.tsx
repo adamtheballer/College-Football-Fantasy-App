@@ -81,7 +81,8 @@ export const liveProjectionDetail = (player: LeagueRosterPlayer) => {
   if (state !== "live") return null;
   const final = player.live_projected_final_points ?? player.pregame_projected_points ?? player.projected_points ?? player.weekly_projected_fantasy_points;
   if (typeof final !== "number" || !Number.isFinite(final)) return null;
-  return `Proj ${final.toFixed(1)}`;
+  const delayed = (player.live_projection_status ?? "").toUpperCase() === "STALE";
+  return delayed ? `Proj ${final.toFixed(1)} · Data delayed` : `Proj ${final.toFixed(1)}`;
 };
 
 const isRealRosterPlayer = (player: LeagueRosterPlayer) =>

@@ -153,7 +153,11 @@ def project_live_player(
     if not any(abs(value) > 0 for value in prior.values()) and _number(pregame_fantasy_points) > 0:
         remaining_points = _number(pregame_fantasy_points) * (1 - progress)
         return LiveProjectionResult(current, {field: 0.0 for field in STAT_FIELDS}, progress, "LIVE", round(progress, 3), "fantasy_points_only", remaining_points, {"live_weight": 0.0, "usage_multiplier": 1.0, "efficiency_multiplier": 1.0, "raw_remaining_fraction": 1 - progress})
-    live_weight = _clamp(((progress - LIVE_WEIGHT_START) / (1 - LIVE_WEIGHT_START)) ** 1.5, 0.0, LIVE_WEIGHT_MAX)
+    # Clamp the normalized base before the fractional power. At kickoff it is
+    # negative before clamping, and a negative value to ``** 1.5`` becomes a
+    # complex number instead of the intended zero live-evidence weight.
+    normalized_live_progress = _clamp((progress - LIVE_WEIGHT_START) / (1 - LIVE_WEIGHT_START), 0.0, 1.0)
+    live_weight = _clamp(normalized_live_progress ** 1.5, 0.0, LIVE_WEIGHT_MAX)
     expected_key, expected_usage = _usage_baseline(position, pregame_stats)
     observed_usage, usage_source = _live_usage(live_stats, position, expected_key)
     if expected_usage > 0 and observed_usage is not None:

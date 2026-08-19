@@ -117,6 +117,18 @@ describe("RosterSlotTable", () => {
     expect(liveProjectionDetail(liveReceiver)).toBe("Proj 16.7");
   });
 
+  it("preserves stale live values and explicitly labels the delayed data", () => {
+    const staleReceiver = {
+      ...projectedReceiver,
+      live_game_state: "live" as const,
+      current_fantasy_points: 12.6,
+      live_projected_final_points: 24.1,
+      live_projection_status: "STALE" as const,
+    };
+    expect(formatRosterPointValue(staleReceiver, "live")).toBe("12.6");
+    expect(liveProjectionDetail(staleReceiver)).toBe("Proj 24.1 · Data delayed");
+  });
+
   it("keeps a scheduled player's projection visible while another game is live", () => {
     const scheduledReceiver = { ...projectedReceiver, live_game_state: "scheduled" as const, live_points: null };
 
