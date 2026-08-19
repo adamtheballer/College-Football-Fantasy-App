@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.league_flow import (
     DraftOrderEntryRead,
     DraftOrderRead,
@@ -11,8 +12,13 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
 )
 
 
-def _serialize(draft: Draft, league: League, teams: list[Team]) -> DraftOrderRead:
+def _serialize(db: Session, draft: Draft, league: League, teams: list[Team]) -> DraftOrderRead:
     positions = [team.draft_position for team in teams]
+    owner_ids = {team.owner_user_id for team in teams if team.owner_user_id is not None}
+    avatars_by_owner_id = {
+        user.id: user.avatar_url
+        for user in db.query(User).filter(User.id.in_(owner_ids)).all()
+    } if owner_ids else {}
     return DraftOrderRead(
         draft_order_mode=draft.draft_order_mode or "random",
         max_teams=league.max_teams,
@@ -26,6 +32,7 @@ def _serialize(draft: Draft, league: League, teams: list[Team]) -> DraftOrderRea
                 team_name=team.name,
                 owner_user_id=team.owner_user_id,
                 owner_name=team.owner_name,
+                owner_avatar_url=avatars_by_owner_id.get(team.owner_user_id),
                 draft_position=team.draft_position,
             )
             for team in sorted(teams, key=lambda team: (team.draft_position is None, team.draft_position or 0, team.id))
@@ -69,7 +76,7 @@ def update_draft_order(db: Session, *, league: League, payload: DraftOrderUpdate
             for team in teams:
                 team.draft_position = position_by_team.get(team.id)
         db.commit()
-        return _serialize(draft, league, teams)
+        return _serialize(db, draft, league, teams)
     except Exception:
         db.rollback()
         raise

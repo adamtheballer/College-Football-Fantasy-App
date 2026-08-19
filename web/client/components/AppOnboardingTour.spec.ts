@@ -11,6 +11,7 @@ describe("first-sign-in onboarding", () => {
       firstName: "New User",
       email: "new.user@example.com",
       isAdmin: false,
+      avatarUrl: null,
     };
 
     expect(TOUR_STEPS.map((step) => step.target)).toEqual(

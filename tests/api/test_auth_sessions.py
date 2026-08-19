@@ -100,6 +100,46 @@ def test_signed_in_manager_can_update_only_their_own_display_name(client, db_ses
     assert db_session.get(User, payload["user"]["id"]).first_name == "Updated Manager"
 
 
+def test_manager_avatar_profile_patch_preserves_omitted_fields_and_can_remove(client, db_session):
+    payload = signup_user(client, "avatar")
+    token = payload["access_token"]
+    avatar_url = "https://images.example.com/profile?id=7"
+
+    avatar_only = client.patch("/auth/me", json={"avatar_url": avatar_url}, headers=auth_headers(token))
+    assert avatar_only.status_code == 200
+    assert avatar_only.json()["avatar_url"] == avatar_url
+    assert avatar_only.json()["first_name"] == "Coachavatar"
+
+    name_only = client.patch("/auth/me", json={"first_name": "Updated Coach"}, headers=auth_headers(token))
+    assert name_only.status_code == 200
+    assert name_only.json()["avatar_url"] == avatar_url
+
+    removed = client.patch("/auth/me", json={"avatar_url": "  "}, headers=auth_headers(token))
+    assert removed.status_code == 200
+    assert removed.json()["avatar_url"] is None
+    assert db_session.get(User, payload["user"]["id"]).avatar_url is None
+
+
+@pytest.mark.parametrize("avatar_url", [
+    "http://images.example.com/avatar.jpg",
+    "javascript:alert(1)",
+    "data:image/png;base64,abc",
+    "file:///tmp/avatar.png",
+    "/relative-avatar.png",
+    "https://user:pass@example.com/avatar.png",
+])
+def test_manager_avatar_profile_patch_rejects_unsafe_urls(client, avatar_url):
+    payload = signup_user(client, f"avatar-{abs(hash(avatar_url))}")
+    response = client.patch("/auth/me", json={"avatar_url": avatar_url}, headers=auth_headers(payload["access_token"]))
+    assert response.status_code == 422
+
+
+def test_manager_avatar_profile_patch_rejects_empty_payload(client):
+    payload = signup_user(client, "avatar-empty")
+    response = client.patch("/auth/me", json={}, headers=auth_headers(payload["access_token"]))
+    assert response.status_code == 422
+
+
 def test_manager_name_update_rejects_blank_values_without_mutating_profile(client, db_session):
     payload = signup_user(client, "profile-blank")
     token = payload["access_token"]

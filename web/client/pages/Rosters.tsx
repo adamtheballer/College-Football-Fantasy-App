@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
 import { ClipboardList, Trophy, ArrowRight, Users, ShieldAlert } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -96,9 +97,7 @@ const TeamRosterCard = ({ team }: { team: Team }) => {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-md border border-cfb-border-subtle bg-cfb-surface-raised text-cfb-brand">
-                <Users className="h-4 w-4" />
-              </div>
+              <ManagerAvatar avatarUrl={team.owner_avatar_url} managerName={team.owner_name} size="md" />
               <div>
                 <h3 className="text-base font-black tracking-tight text-cfb-text-primary sm:text-lg">
                   {team.name}

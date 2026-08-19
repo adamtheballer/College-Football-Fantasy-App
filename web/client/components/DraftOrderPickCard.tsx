@@ -2,9 +2,11 @@ import { Bot } from "lucide-react";
 
 import { getDraftedPlayerLastName, getDraftManagerInitials } from "@/lib/draftOrderCarousel";
 import { cn } from "@/lib/utils";
+import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
 
 type DraftOrderPickCardProps = {
   managerName: string;
+  avatarUrl?: string | null;
   isCpu: boolean;
   round: number;
   roundPick: number;
@@ -18,6 +20,7 @@ type DraftOrderPickCardProps = {
  */
 export function DraftOrderPickCard({
   managerName,
+  avatarUrl,
   isCpu,
   round,
   roundPick,
@@ -39,7 +42,7 @@ export function DraftOrderPickCard({
           compact ? "h-6 w-6 rounded-full text-[8px]" : "h-8 w-8 rounded-lg text-[10px]",
         )}
       >
-        {isCpu ? <Bot className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} /> : initials}
+        {isCpu ? <Bot className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} /> : <ManagerAvatar avatarUrl={avatarUrl} managerName={managerName} size={compact ? "xs" : "sm"} className="border-0 bg-transparent text-amber-100" />}
       </span>
       <p className={cn("whitespace-nowrap font-black tabular-nums text-muted-foreground", compact ? "text-[9px]" : "text-[10px] uppercase tracking-[0.16em]")}>
         ({round}.{roundPick})

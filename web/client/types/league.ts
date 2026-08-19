@@ -55,6 +55,7 @@ export interface DraftOrderEntry {
   team_name: string;
   owner_user_id: number | null;
   owner_name: string | null;
+  owner_avatar_url?: string | null;
   draft_position: number | null;
 }
 
@@ -70,6 +71,8 @@ export interface LeagueMember {
   user_id: number;
   role: string;
   joined_at: string;
+  manager_name?: string | null;
+  manager_avatar_url?: string | null;
 }
 
 export interface LeagueListCurrentUserSummary {
@@ -89,6 +92,8 @@ export interface LeagueDetail {
   id: number;
   name: string;
   commissioner_user_id: number | null;
+  commissioner_name?: string | null;
+  commissioner_avatar_url?: string | null;
   season_year: number;
   max_teams: number;
   is_private: boolean;
@@ -109,6 +114,7 @@ export interface LeaguePreview {
   id: number;
   name: string;
   commissioner_name: string | null;
+  commissioner_avatar_url?: string | null;
   max_teams: number;
   member_count: number;
   is_private: boolean;
@@ -470,11 +476,13 @@ export interface LeagueSettingsTabResponse {
       team_id: number;
       team_name: string;
       manager_name: string | null;
+      manager_avatar_url?: string | null;
     };
     receiving_party: {
       team_id: number;
       team_name: string;
       manager_name: string | null;
+      manager_avatar_url?: string | null;
     };
     proposing_team_sends: Array<{
       player_id: number | null;

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   updateProfile: vi.fn(),
   setActiveLeagueId: vi.fn(),
-  user: { id: 7, firstName: "Adam", email: "adam@example.com", isAdmin: false },
+  user: { id: 7, firstName: "Adam", email: "adam@example.com", isAdmin: false, avatarUrl: null },
 }));
 
 vi.mock("@/hooks/use-auth", () => ({
@@ -64,7 +64,7 @@ describe("Settings beta preferences", () => {
   beforeEach(() => {
     localStorage.clear();
     state.updateProfile.mockReset();
-    state.updateProfile.mockResolvedValue({ id: 7, firstName: "Updated Adam" });
+    state.updateProfile.mockResolvedValue({ id: 7, firstName: "Updated Adam", avatarUrl: null });
   });
 
   it("shows the notification permission state without third-party theme controls", () => {
@@ -84,7 +84,18 @@ describe("Settings beta preferences", () => {
     fireEvent.change(screen.getByLabelText("Manager Name"), { target: { value: "Updated Adam" } });
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
-    await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith("Updated Adam"));
+    await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ firstName: "Updated Adam", avatarUrl: null }));
+  });
+
+  it("saves and removes a manager profile image URL through the same profile update", async () => {
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    fireEvent.change(screen.getByLabelText("Profile image URL (optional)"), { target: { value: "https://images.example.com/adam.jpg" } });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ firstName: "Adam", avatarUrl: "https://images.example.com/adam.jpg" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /remove picture/i }));
+    expect((screen.getByLabelText("Profile image URL (optional)") as HTMLInputElement).value).toBe("");
   });
 
   it("records an explicit replay request before returning to Home", () => {

@@ -344,6 +344,7 @@ def join_by_code(payload: JoinByCodeRequest, db: Session = Depends(get_db)) -> L
         id=league.id,
         name=league.name,
         commissioner_name=commissioner.first_name if commissioner else None,
+        commissioner_avatar_url=commissioner.avatar_url if commissioner else None,
         max_teams=league.max_teams,
         member_count=member_count,
         is_private=league.is_private,

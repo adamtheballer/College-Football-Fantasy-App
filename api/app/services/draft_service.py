@@ -264,6 +264,11 @@ def build_draft_room_state(db: Session, league: League, current_user: User) -> D
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league settings not found")
 
     teams = ordered_draft_teams(db, league.id)
+    owner_ids = {team.owner_user_id for team in teams if team.owner_user_id is not None}
+    avatars_by_owner_id = {
+        user.id: user.avatar_url
+        for user in db.query(User).filter(User.id.in_(owner_ids)).all()
+    } if owner_ids else {}
     picks_rows = (
         db.query(DraftPick, Team, Player)
         .join(Team, Team.id == DraftPick.team_id)
@@ -308,6 +313,7 @@ def build_draft_room_state(db: Session, league: League, current_user: User) -> D
                 name=team.name,
                 owner_user_id=team.owner_user_id,
                 owner_name=team.owner_name,
+                owner_avatar_url=avatars_by_owner_id.get(team.owner_user_id),
                 is_cpu=team.owner_user_id is None,
             )
             for team in teams

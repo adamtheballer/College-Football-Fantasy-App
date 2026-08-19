@@ -16,6 +16,7 @@ const user: User = {
   firstName: "Adam",
   email: "adam@example.com",
   isAdmin: false,
+  avatarUrl: null,
 };
 
 describe("app shell navigation helpers", () => {

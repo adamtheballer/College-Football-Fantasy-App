@@ -20,6 +20,7 @@ import { PasswordChangeForm } from "@/components/auth/PasswordChangeForm";
 import { useRuntimeCapabilities } from "@/components/RuntimeCompatibilityGate";
 import { SupportContactCard } from "@/components/support/SupportContactCard";
 import { NotificationSettingsPanel } from "@/components/NotificationSettingsPanel";
+import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
 
 const SettingsSection = ({ title, description, children, icon: Icon }: any) => (
   <Card className="group relative overflow-hidden rounded-3xl border-border/60 bg-card/40 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-md transition-all duration-700 hover:border-primary/20 sm:rounded-[2.5rem]">
@@ -103,17 +104,22 @@ export default function Settings() {
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [managerName, setManagerName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarPreviewError, setAvatarPreviewError] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setManagerName(user?.firstName ?? "");
+    setAvatarUrl(user?.avatarUrl ?? "");
+    setAvatarPreviewError(false);
     setProfileError(null);
   }, [user]);
 
   const handleSave = async () => {
     if (!user) return;
     const nextName = managerName.trim();
+    const nextAvatarUrl = avatarUrl.trim();
     if (!nextName) {
       setProfileError("Manager name is required.");
       setSaveState("error");
@@ -122,11 +128,11 @@ export default function Settings() {
     setSaveState("saving");
     setProfileError(null);
     try {
-      await updateProfile(nextName);
+      await updateProfile({ firstName: nextName, avatarUrl: nextAvatarUrl || null });
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 1500);
     } catch (error) {
-      setProfileError(error instanceof Error ? error.message : "Unable to save your manager name.");
+      setProfileError(error instanceof Error ? error.message : "Unable to save your profile picture. Your previous picture is still active.");
       setSaveState("error");
     }
   };
@@ -247,6 +253,39 @@ export default function Settings() {
               <p className="rounded-2xl border border-border bg-white/5 px-4 py-4 text-xs font-bold tracking-wider text-foreground">
                 {user.email}
               </p>
+            </div>
+          </div>
+          <div className="grid gap-5 rounded-2xl border border-border/70 bg-black/10 p-5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
+            <ManagerAvatar
+              avatarUrl={avatarUrl.trim() || null}
+              managerName={managerName}
+              size="xl"
+              eager
+              onImageError={() => setAvatarPreviewError(true)}
+              onImageLoad={() => setAvatarPreviewError(false)}
+            />
+            <div className="min-w-0 space-y-3">
+              <div>
+                <Label htmlFor="profile-image-url" className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Manager Profile Picture</Label>
+                <p className="mt-1 text-xs text-muted-foreground">Paste a public HTTPS image address. Image links up to 2,048 characters are supported.</p>
+              </div>
+              <Input
+                id="profile-image-url"
+                aria-label="Profile image URL (optional)"
+                type="url"
+                inputMode="url"
+                autoComplete="url"
+                maxLength={2048}
+                placeholder="https://example.com/profile-picture.jpg"
+                value={avatarUrl}
+                onChange={(event) => {
+                  setAvatarUrl(event.target.value);
+                  setAvatarPreviewError(false);
+                }}
+                className="h-12 rounded-xl border-border bg-white/5 px-4 text-sm text-foreground"
+              />
+              {avatarPreviewError ? <p role="alert" className="text-xs font-medium text-red-300">This image could not be loaded. Check that the address is public and uses HTTPS.</p> : null}
+              {(avatarUrl.trim() || user.avatarUrl) ? <Button type="button" variant="outline" className="h-10 rounded-xl border-border text-[10px] font-black uppercase tracking-[0.14em]" onClick={() => { setAvatarUrl(""); setAvatarPreviewError(false); }}>Remove Picture</Button> : null}
             </div>
           </div>
           {profileError ? <p role="alert" className="text-sm font-semibold text-red-300">{profileError}</p> : null}

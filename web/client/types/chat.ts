@@ -4,6 +4,7 @@ export interface ChatParticipant {
   user_id: number;
   joined_at: string;
   display_name: string;
+  avatar_url?: string | null;
   fantasy_team_name: string | null;
 }
 
@@ -45,6 +46,7 @@ export interface ChatMessage {
   created_at: string;
   updated_at: string;
   sender_display_name: string | null;
+  sender_avatar_url?: string | null;
   sender_fantasy_team_name: string | null;
   reply_to_message: {
     id: number;

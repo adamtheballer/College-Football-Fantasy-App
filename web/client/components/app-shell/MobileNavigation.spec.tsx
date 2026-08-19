@@ -15,6 +15,7 @@ const user: User = {
   firstName: "Adam",
   email: "adam@example.com",
   isAdmin: false,
+  avatarUrl: null,
 };
 
 const renderNavigation = (onSignOut = vi.fn()) => {
