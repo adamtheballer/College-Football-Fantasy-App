@@ -153,7 +153,7 @@ function displayedProbabilityPair(
   return { my, opponent: Math.round((100 - my + Number.EPSILON) * 10) / 10 };
 }
 
-export function freshnessText(data: LeagueMatchupTabResponse | undefined) {
+export function freshnessText(data: LeagueMatchupTabResponse | undefined): string | null {
   const freshness = data?.live_scoring_freshness;
   if (freshness?.state === "fresh") {
     const age = freshness.data_age_seconds;
@@ -171,7 +171,9 @@ export function freshnessText(data: LeagueMatchupTabResponse | undefined) {
   if (label === "Final") return "This matchup is final unless a controlled correction is applied.";
   if (label === "Delayed") return "Provider data is delayed. Do not treat the score as fully current.";
   if (label === "Unavailable") return "Provider data is unavailable. Existing scores should not be replaced by false zeroes.";
-  return "Projected matchup values are shown until live scoring begins.";
+  // Pregame projections are already communicated by the scoreboard and each
+  // player row. Do not add a redundant explanatory callout.
+  return null;
 }
 
 function MatchupTeamSummary({
@@ -412,9 +414,11 @@ export default function LeagueMatchup() {
             />
           </div>
 
-          <p role="status" className={`mx-3 mt-3 rounded-lg border px-3 py-2 text-[11px] font-semibold sm:mx-5 ${scoringFreshnessTone}`}>
-            {scoringFreshnessMessage}
-          </p>
+          {scoringFreshnessMessage ? (
+            <p role="status" className={`mx-3 mt-3 rounded-lg border px-3 py-2 text-[11px] font-semibold sm:mx-5 ${scoringFreshnessTone}`}>
+              {scoringFreshnessMessage}
+            </p>
+          ) : null}
 
           <div className="mx-3 mt-3 rounded-full bg-cfb-surface px-4 py-2 sm:mx-5"><p className="text-sm font-black text-cfb-text-primary">Starters</p></div>
           <div className="mt-2"><SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={parsedLeagueId} scoringStatus={data.status} /></div>

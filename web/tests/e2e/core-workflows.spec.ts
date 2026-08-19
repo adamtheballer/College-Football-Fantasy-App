@@ -1599,6 +1599,8 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("133.1 - 137.0")).toHaveCount(0);
     await expect(page.getByLabel("Projected 133.1")).toBeVisible();
     await expect(page.getByLabel("Projected 137.0")).toBeVisible();
+    await expect(page.getByText("Projected matchup values are shown until live scoring begins.")).toHaveCount(0);
+    await expect(page.getByRole("status")).toHaveCount(0);
     await expect(page.getByText("48.1%", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("51.9%", { exact: true }).first()).toBeVisible();
     await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toHaveAttribute("style", /width: 48\.05%/);
