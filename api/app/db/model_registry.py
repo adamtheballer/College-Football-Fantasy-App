@@ -31,6 +31,7 @@ def ensure_models_registered() -> None:
         league_invite,
         league_member,
         league_player_event,
+        league_rivalry,
         league_message,
         league_scoring_migration,
         league_settings,

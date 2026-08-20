@@ -173,6 +173,7 @@ def build_matchup_summary(
         projected_points_against=opponent_team.projected_total,
         win_probability_for=my_team.win_probability,
         win_probability_against=opponent_team.win_probability,
+        is_rivalry_matchup=bool(matchup_view.rivalry and matchup_view.rivalry.is_rivalry_matchup),
     )
 
 
@@ -213,6 +214,7 @@ def build_league_list_current_user_summary(
         projected_points_against=matchup.projected_points_against if matchup else None,
         win_probability_for=matchup.win_probability_for if matchup else None,
         win_probability_against=matchup.win_probability_against if matchup else None,
+        is_rivalry_matchup=matchup.is_rivalry_matchup if matchup else False,
     )
 
 

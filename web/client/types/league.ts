@@ -86,6 +86,7 @@ export interface LeagueListCurrentUserSummary {
   projected_points_against?: number | null;
   win_probability_for?: number | null;
   win_probability_against?: number | null;
+  is_rivalry_matchup?: boolean;
 }
 
 export interface LeagueDetail {
@@ -352,7 +353,14 @@ export interface LeagueMatchupTabResponse {
   provider_snapshot_at?: string | null;
   next_refresh_at?: string | null;
   message?: string | null;
+  rivalry?: RivalryMatchup | null;
 }
+
+export interface RivalrySeries { wins: number; losses: number; ties: number; last_meeting?: string | null; }
+export interface RivalryMatchup { is_rivalry_matchup: boolean; rivalry_id?: number | null; opponent_team_id?: number | null; opponent_team_name?: string | null; series?: RivalrySeries | null; }
+export interface RivalryCandidate { team_id: number; team_name: string; manager_user_id: number; manager_name: string; manager_avatar_url?: string | null; }
+export interface RivalryInvite { id: number; league_id: number; sender_team_id: number; sender_team_name: string; sender_manager_name: string; sender_manager_avatar_url?: string | null; recipient_team_id: number; recipient_team_name: string; recipient_manager_name: string; recipient_manager_avatar_url?: string | null; status: string; expires_at: string; created_at: string; }
+export interface LeagueRivalryView { eligible: boolean; rivalry?: { id: number; opponent_team_id: number; opponent_team_name: string; opponent_manager_name: string; opponent_manager_avatar_url?: string | null; accepted_at: string; status: string } | null; outgoing_invite?: RivalryInvite | null; incoming_invites: RivalryInvite[]; candidates: RivalryCandidate[]; }
 
 export interface LeagueScheduleRow {
   matchup_id: number;

@@ -64,6 +64,7 @@ from collegefootballfantasy_api.app.services.player_pool_filters import canonica
 from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
 from collegefootballfantasy_api.app.services.roster_slots import CanonicalRosterSlot, build_team_roster_slots
 from collegefootballfantasy_api.app.services.waiver_service import serialize_claims, waiver_window_state
+from collegefootballfantasy_api.app.services.league_rivalry import matchup_rivalry_context
 
 DEFAULT_ROSTER_SLOTS = {
     "QB": 1,
@@ -892,6 +893,7 @@ def build_matchup_tab_view(
         provider_snapshot_at=provider_snapshot_at,
         next_refresh_at=(provider_snapshot_at + timedelta(seconds=180)) if provider_snapshot_at else None,
         message=None,
+        rivalry=matchup_rivalry_context(db, league, primary_team, opponent),
     )
 
 

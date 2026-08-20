@@ -98,6 +98,34 @@ def _event(
 # The alpha event matrix.  Every producer must enqueue one of these events;
 # gameplay services never call providers directly.
 NOTIFICATION_EVENTS: dict[str, NotificationEventDefinition] = {
+    "RIVAL_INVITE_RECEIVED": _event(
+        "RIVAL_INVITE_RECEIVED", "RIVALRY", "rivalry invitation", "invited manager only",
+        "permanent rivalry invite committed", "New rivalry invitation",
+        "A league manager invited you to make the rivalry permanent.", "league",
+        "rival_invite:{rivalry_invite_id}:{recipient_user_id}", "league_activity_alerts", "league_activity_alerts",
+        privacy_scope=NotificationScope.LEAGUE_MEMBER,
+    ),
+    "RIVALRY_OFFICIAL": _event(
+        "RIVALRY_OFFICIAL", "RIVALRY", "rivalry acceptance", "both rival managers",
+        "mutual rivalry bindings committed", "Rivalry official",
+        "Your permanent rivalry is now official.", "league",
+        "rivalry_official:{rivalry_id}:{recipient_user_id}", "league_activity_alerts", "league_activity_alerts",
+        privacy_scope=NotificationScope.LEAGUE_MEMBER,
+    ),
+    "RIVAL_INVITE_DECLINED": _event(
+        "RIVAL_INVITE_DECLINED", "RIVALRY", "rivalry invitation", "inviting manager only",
+        "rivalry invite declined", "Rivalry invitation declined",
+        "Your rivalry invitation was declined.", "league",
+        "rival_declined:{rivalry_invite_id}:{recipient_user_id}", "league_activity_alerts", "league_activity_alerts",
+        privacy_scope=NotificationScope.LEAGUE_MEMBER,
+    ),
+    "RIVAL_WEEK_UPCOMING": _event(
+        "RIVAL_WEEK_UPCOMING", "RIVALRY", "matchup scheduler", "both rival managers",
+        "upcoming matchup is between accepted rivals", "Rival Week is coming",
+        "Your permanent rival matchup is next.", "matchup",
+        "rival_week_upcoming:{matchup_id}:{recipient_user_id}", "matchup_start_alerts", "matchup_start_alerts",
+        privacy_scope=NotificationScope.MATCHUP_PARTICIPANT,
+    ),
     "DRAFT_1H": _event(
         "DRAFT_1H", "DRAFT", "draft scheduling", "each eligible human manager",
         "official scheduled draft at least one hour away", "Your draft starts in 1 hour",

@@ -5,6 +5,8 @@ import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
 import { WinChanceBar } from "@/components/league/WinChanceMeter";
 import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
+import { RivalWeekPatch } from "@/components/league/RivalWeekPatch";
+import { RivalryControls } from "@/components/league/RivalryControls";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
 import { useLeagueDetail, useLeagueMatchupTab, useLeagueScoreboard } from "@/hooks/use-leagues";
@@ -382,6 +384,8 @@ export default function LeagueMatchup() {
         <LeagueTabs leagueId={parsedLeagueId} draftStatus={leagueQuery.data?.draft?.status} leagueStatus={leagueQuery.data?.status} />
       </div>
 
+      <div className="px-3 py-2 sm:px-5"><RivalryControls leagueId={parsedLeagueId} /></div>
+
       <MatchupRail
         matchups={scheduledMatchups}
         selectedMatchupId={activeMatchupId}
@@ -412,6 +416,7 @@ export default function LeagueMatchup() {
       ) : (
         <>
           <div>
+            <RivalWeekPatch rivalry={data.rivalry} leagueId={parsedLeagueId} matchupId={data.matchup_id} />
             <CompactMatchupScoreboard
               data={data}
               myTeam={myTeam}
