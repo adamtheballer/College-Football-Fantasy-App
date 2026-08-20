@@ -49,6 +49,13 @@ vi.mock("@/hooks/use-leagues", () => ({
     isError: false,
     refetch: vi.fn(),
   }),
+  useLeagueRivalry: () => ({ data: { eligible: false, incoming_invites: [], candidates: [] }, isLoading: false }),
+  useRivalryActions: () => ({
+    invite: { mutate: vi.fn(), isPending: false },
+    accept: { mutate: vi.fn(), isPending: false },
+    decline: { mutate: vi.fn(), isPending: false },
+    cancel: { mutate: vi.fn(), isPending: false },
+  }),
 }));
 
 import {
