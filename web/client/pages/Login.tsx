@@ -344,7 +344,7 @@ export default function Login() {
                 <p className="cfb-micro-label text-cfb-brand">
                   {mode === "signin" ? "Welcome back" : mode === "access" ? "Early Access Pro" : "Create your account"}
                 </p>
-                <h2 className="mt-2 text-4xl font-black uppercase italic tracking-[-0.04em] text-cfb-text-primary">
+                <h2 className="cfb-display-title mt-2 text-4xl italic text-cfb-text-primary">
                   {mode === "signin" ? "Sign in" : mode === "access" ? "Claim your free year" : "Create account"}
                 </h2>
                 <p className="mt-2 text-sm font-semibold text-cfb-text-secondary">

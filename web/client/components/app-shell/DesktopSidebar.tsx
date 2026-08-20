@@ -39,7 +39,7 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
               data-nav-item="true"
               data-nav-active={isActive ? "true" : "false"}
               className={cn(
-                "group relative flex min-h-[44px] w-full items-center gap-3 rounded-md border px-3 py-2 text-left font-sans text-sm font-semibold transition-colors duration-150",
+                "group relative flex min-h-[44px] w-full items-center gap-3 rounded-md border px-3 py-2 text-left font-ui text-sm font-bold uppercase tracking-[0.06em] transition-colors duration-150",
                 isSignOut
                   ? "border-transparent text-red-700 hover:border-cfb-danger/30 hover:bg-cfb-danger/[0.06] hover:text-red-800"
                   : isAuth

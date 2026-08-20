@@ -127,6 +127,11 @@ describe("league matchup scoreboard", () => {
 
     expect(screen.getByText("Week 1 matchup")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "My Team vs My Opponent" })).toBeTruthy();
+    expect(
+      screen
+        .queryAllByText("Projected", { exact: true })
+        .every((element) => element.classList.contains("sr-only")),
+    ).toBe(true);
     expect(screen.getByLabelText("Projected 111.2")).toBeTruthy();
     expect(screen.getByLabelText("Projected 106.4")).toBeTruthy();
     expect(screen.getAllByText("54.0%")).toHaveLength(2);

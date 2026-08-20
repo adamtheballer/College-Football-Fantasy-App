@@ -17,7 +17,7 @@ export function PageHeader({ eyebrow, title, description, actions, className }: 
       <div className="min-w-0">
         {eyebrow ? <p className="cfb-micro-label mb-2 text-cfb-brand">{eyebrow}</p> : null}
         <h1 className="cfb-display-title text-2xl sm:text-3xl">{title}</h1>
-        {description ? <p className="mt-2 max-w-2xl text-sm leading-6 text-cfb-text-secondary">{description}</p> : null}
+        {description ? <p className="cfb-body mt-2 max-w-2xl text-sm text-cfb-text-secondary">{description}</p> : null}
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap gap-2">{actions}</div> : null}
     </header>
