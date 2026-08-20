@@ -270,21 +270,21 @@ export function NotificationSettingsPanel() {
   };
 
   return (
-    <Card className="rounded-3xl border-border/60 bg-card/40 shadow-[0_20px_50px_rgba(0,0,0,0.22)] backdrop-blur-md">
-      <CardHeader className="border-b border-border/40 px-5 py-5 sm:px-8">
-        <CardTitle className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-foreground">
+    <Card className="rounded-lg border-border bg-card shadow-none">
+      <CardHeader className="border-b border-border px-4 py-4 sm:px-5">
+        <CardTitle className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.16em] text-foreground">
           <Bell className="h-4 w-4 text-primary" /> Notifications
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2 p-5 sm:p-8">
-        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-primary/15 bg-primary/[0.04] p-4 sm:flex-row sm:items-center sm:justify-between">
+      <CardContent className="space-y-2 p-4 sm:p-5">
+        <div className="mb-3 flex flex-col gap-3 rounded-md border border-border bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <p className="text-sm font-bold text-foreground">Push notifications</p>
             <p className="text-xs leading-relaxed text-muted-foreground">{permissionCopy[permission]}</p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
             {permission !== "granted" ? (
-              <Button onClick={() => void enablePush()} disabled={saving || preparingPush || permission === "denied" || permission === "unsupported" || permission === "unconfigured"} className="rounded-xl text-[10px] font-black uppercase tracking-[0.14em]">
+              <Button onClick={() => void enablePush()} disabled={saving || preparingPush || permission === "denied" || permission === "unsupported" || permission === "unconfigured"} className="h-9 rounded-md text-[10px] font-black uppercase tracking-[0.12em] shadow-none">
                 {saving ? "Checking permission…" : preparingPush ? "Preparing notifications…" : "Enable push notifications"}
               </Button>
             ) : null}
