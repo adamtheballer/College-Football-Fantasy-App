@@ -220,7 +220,7 @@ function MatchupTeamSummary({
         {team?.fantasy_team_name ?? "Team TBD"}
       </p>
       <p className="text-[9px] font-bold text-cfb-text-muted sm:text-[10px]">{team?.record ?? "0-0-0"}</p>
-      <p className="mt-0.5 font-display text-2xl font-black leading-none tracking-[-0.06em] text-cfb-text-primary sm:mt-1 sm:text-4xl">
+      <p className="cfb-score-value mt-0.5 text-2xl text-cfb-text-primary sm:mt-1 sm:text-4xl">
         {showActual ? formatMatchupPoints(team?.current_points ?? currentScore) : formatMatchupPoints(projected)}
       </p>
       <p aria-label={`Projected ${formatMatchupPoints(projected)}`} className="mt-0.5 text-[9px] font-bold text-cfb-text-muted">

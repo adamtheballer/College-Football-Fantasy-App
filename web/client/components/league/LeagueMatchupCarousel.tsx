@@ -225,14 +225,14 @@ export function LeagueMatchupCarousel({
               <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-y border-cfb-border-subtle py-3">
                 <div className="min-w-0">
                   <p className="truncate text-xs font-black text-cfb-text-primary">{summary?.team_name ?? "Your Team"}</p>
-                  <p className="mt-1 font-display text-2xl font-black tracking-[-0.06em] text-cfb-brand">
+                  <p className="cfb-score-value mt-1 text-2xl text-cfb-brand">
                     {formatPoints(summary?.projected_points_for)}
                   </p>
                 </div>
                 <span className="rounded-full border border-cfb-border-subtle bg-cfb-canvas px-2 py-1 text-[10px] font-black text-cfb-text-secondary">VS</span>
                 <div className="min-w-0 text-right">
                   <p className="truncate text-xs font-black text-cfb-text-primary">{summary?.opponent_team_name ?? "Opponent TBD"}</p>
-                  <p className="mt-1 font-display text-2xl font-black tracking-[-0.06em] text-cfb-pink">
+                  <p className="cfb-score-value mt-1 text-2xl text-cfb-pink">
                     {formatPoints(summary?.projected_points_against)}
                   </p>
                 </div>
