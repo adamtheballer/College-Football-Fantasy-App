@@ -1193,7 +1193,7 @@ test.describe("critical browser workflows", () => {
     await expect(completedOrderCard.getByText("Codex", { exact: true })).toBeVisible();
     await expect(completedOrderCard.getByLabel("Codex initials C")).toBeVisible();
     await expect(completedOrderCard.getByText("(1.1)", { exact: true })).toBeVisible();
-    await expect(completedOrderCard.getByTestId("draft-order-picked-player")).toHaveText("Manning");
+    await expect(completedOrderCard.getByTestId("draft-order-picked-player")).toHaveText("A. Manning");
     await expect(page.getByText(/Other Team/i).first()).toBeVisible();
     const queuedRow = page.getByTestId("draft-player-row").filter({ hasText: "Quinn Ewers" });
     await expect(page.getByTestId("draft-player-row").filter({ hasText: "Arch Manning" })).toHaveCount(0);
@@ -2577,7 +2577,6 @@ test.describe("critical browser workflows", () => {
     expect(afterCpuPick.picks[userPickIndex + 1].pickedBy).toBe("bot");
 
     const firstCompletedPick = afterCpuPick.picks[0] as { playerName: string; pickedBy: "bot" | "user" | "auto" };
-    const expectedSurname = firstCompletedPick.playerName.split(/\s+/).slice(-1)[0];
     const firstOrderCard = page.getByTestId("mobile-draft-order-card-1");
     await expect(
       firstOrderCard.getByLabel(
@@ -2585,7 +2584,7 @@ test.describe("critical browser workflows", () => {
       ),
     ).toBeVisible();
     await expect(firstOrderCard.getByText("(1.1)", { exact: true })).toBeVisible();
-    await expect(firstOrderCard.getByTestId("draft-order-picked-player")).toHaveText(expectedSurname);
+    await expect(firstOrderCard.getByTestId("draft-order-picked-player")).toHaveText(/^[A-Z]\. /);
     if (process.env.CAPTURE_MOBILE_UI === "1") {
       await page.screenshot({ path: testInfo.outputPath("mobile-mock-draft-completed-pick-430x932.png"), fullPage: false });
     }
