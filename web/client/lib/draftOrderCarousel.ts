@@ -37,7 +37,10 @@ export const getDraftedPlayerLastName = (fullName: string | null | undefined) =>
       ? surnameEnd - 1
       : surnameEnd;
 
-  return parts.slice(surnameStart, hasSuffix ? undefined : surnameEnd + 1).join(" ");
+  const surname = parts.slice(surnameStart, hasSuffix ? undefined : surnameEnd + 1).join(" ");
+  const firstInitial = parts[0].replace(/\./g, "").charAt(0).toUpperCase();
+
+  return firstInitial ? `${firstInitial}. ${surname}` : surname;
 };
 
 /** Shows a compact, stable avatar for human managers when no image is supplied. */

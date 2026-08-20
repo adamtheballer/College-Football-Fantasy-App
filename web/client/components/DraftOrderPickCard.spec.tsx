@@ -9,10 +9,11 @@ import { getDraftedPlayerLastName, getDraftManagerInitials } from "@/lib/draftOr
 describe("draft order pick card", () => {
   afterEach(cleanup);
 
-  it("keeps suffixes and multi-word surnames in the compact completed-pick label", () => {
-    expect(getDraftedPlayerLastName("Marvin Harrison Jr.")).toBe("Harrison Jr.");
-    expect(getDraftedPlayerLastName("Amon-Ra St. Brown")).toBe("St. Brown");
-    expect(getDraftedPlayerLastName("KJ Duff")).toBe("Duff");
+  it("uses a first initial while keeping suffixes and multi-word surnames", () => {
+    expect(getDraftedPlayerLastName("Cam Coleman")).toBe("C. Coleman");
+    expect(getDraftedPlayerLastName("Marvin Harrison Jr.")).toBe("M. Harrison Jr.");
+    expect(getDraftedPlayerLastName("Amon-Ra St. Brown")).toBe("A. St. Brown");
+    expect(getDraftedPlayerLastName("KJ Duff")).toBe("K. Duff");
   });
 
   it("uses manager initials for a real draft card and reveals the completed pick", () => {
@@ -21,7 +22,7 @@ describe("draft order pick card", () => {
     expect(screen.getByText("Adam Bajdechi")).toBeTruthy();
     expect(screen.getByLabelText("Adam Bajdechi initials AB").textContent).toBe("AB");
     expect(screen.getByText("(1.2)")).toBeTruthy();
-    expect(screen.getByTestId("draft-order-picked-player").textContent).toBe("Smith");
+    expect(screen.getByTestId("draft-order-picked-player").textContent).toBe("J. Smith");
     expect(getDraftManagerInitials("Adam Bajdechi")).toBe("AB");
     expect(getDraftManagerInitials("Codex")).toBe("C");
   });
