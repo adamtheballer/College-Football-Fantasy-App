@@ -136,6 +136,8 @@ describe("league matchup scoreboard", () => {
     expect(screen.getByText("Opening Week")).toBeTruthy();
     expect(screen.getByText("Week 1 matchup")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "My Team vs My Opponent" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "League matchups" })).toBeNull();
+    expect(screen.getByLabelText("Matchup 1 of 2. Swipe left or right to view another matchup.")).toBeTruthy();
     expect(
       screen
         .queryAllByText("Projected", { exact: true })
@@ -151,15 +153,12 @@ describe("league matchup scoreboard", () => {
     expect(screen.getAllByAltText("My Opponent profile picture").every((image) => image.getAttribute("src") === "https://images.example.com/my-opponent.jpg")).toBe(true);
   });
 
-  it("lets a member swipe or tap through same-league matchups through the canonical detail query", () => {
+  it("lets a member swipe through same-league matchups from the scorecard", () => {
     render(createElement(LeagueMatchup));
 
-    expect(screen.getByRole("region", { name: "League matchups" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "View My Opponent at My Team" }).getAttribute("aria-pressed")).toBe("true");
-    const otherMatchup = screen.getByRole("button", { name: "View League Mate Two at League Mate One" });
-    expect(otherMatchup).toBeTruthy();
-
-    fireEvent.click(otherMatchup);
+    const swipeSurface = screen.getByTestId("matchup-swipe-surface");
+    fireEvent.touchStart(swipeSurface, { touches: [{ clientX: 240 }] });
+    fireEvent.touchEnd(swipeSurface, { changedTouches: [{ clientX: 120 }] });
 
     expect(routerMocks.setSearchParams).toHaveBeenCalledTimes(1);
     const nextParams = routerMocks.setSearchParams.mock.calls[0][0] as URLSearchParams;
