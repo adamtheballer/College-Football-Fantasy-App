@@ -1,5 +1,5 @@
 /** @import must precede all other statements */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700&family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,800;1,900&family=Barlow+Semi+Condensed:ital,wght@0,500;0,600;0,700;0,800;0,900;1,700;1,800;1,900&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -170,8 +170,20 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background font-sans text-foreground;
     background: hsl(var(--background-canvas));
+  }
+
+  h1 {
+    @apply font-display;
+  }
+
+  :where(h2, h3, h4, h5, h6, button, [role="button"], label, th) {
+    @apply font-ui;
+  }
+
+  :where(input, textarea) {
+    @apply font-sans;
   }
 
   /*
@@ -243,15 +255,35 @@
   }
 
   .cfb-micro-label {
-    @apply text-[11px] font-semibold tracking-normal text-cfb-text-muted;
+    @apply font-ui text-[11px] font-bold uppercase tracking-[0.08em] text-cfb-text-muted;
   }
 
   .cfb-section-title {
-    @apply text-foreground font-bold tracking-tight leading-[1.15];
+    @apply font-ui text-foreground font-extrabold tracking-[-0.01em] leading-[1.05];
   }
 
   .cfb-display-title {
-    @apply font-display text-foreground font-black tracking-[-0.035em] leading-[1.1];
+    @apply font-display text-foreground font-black uppercase tracking-[-0.03em] leading-[0.95];
+  }
+
+  .cfb-body {
+    @apply font-sans font-normal normal-case tracking-normal leading-relaxed;
+  }
+
+  .cfb-ui-text {
+    @apply font-ui font-semibold normal-case tracking-normal;
+  }
+
+  .cfb-stat-value {
+    @apply font-display font-extrabold leading-none tracking-[-0.03em] tabular-nums;
+  }
+
+  :where(.tabular-nums) {
+    @apply font-display;
+  }
+
+  .cfb-button-label {
+    @apply font-ui font-bold tracking-[0.04em];
   }
 
   .cfb-yard-lines { background-image: none; }

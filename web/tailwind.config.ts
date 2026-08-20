@@ -94,13 +94,23 @@ export default {
       },
       fontFamily: {
         display: [
-          "Inter",
+          "Barlow Condensed",
+          "Barlow Semi Condensed",
+          "Arial Narrow",
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
+        ui: [
+          "Barlow Semi Condensed",
+          "Barlow",
+          "Arial Narrow",
           "ui-sans-serif",
           "system-ui",
           "sans-serif",
         ],
         sans: [
-          "Inter",
+          "Barlow",
           "ui-sans-serif",
           "system-ui",
           "sans-serif",
