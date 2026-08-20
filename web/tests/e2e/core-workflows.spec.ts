@@ -2389,6 +2389,9 @@ test.describe("critical browser workflows", () => {
   });
 
   test("single-player mock draft stays local and resets without real roster mutation", async ({ page }, testInfo) => {
+    // A random user slot can require seven two-second bot turns before the
+    // user's pick, in addition to the responsive-layout checks below.
+    test.setTimeout(45_000);
     await seedAuthenticatedSession(page);
 
     const blockedMutations: string[] = [];
