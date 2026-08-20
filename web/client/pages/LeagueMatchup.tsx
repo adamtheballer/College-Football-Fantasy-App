@@ -5,6 +5,7 @@ import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
 import { WinChanceBar } from "@/components/league/WinChanceMeter";
 import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
+import { OpeningWeekPatch } from "@/components/league/OpeningWeekPatch";
 import { RivalWeekPatch } from "@/components/league/RivalWeekPatch";
 import { RivalryControls } from "@/components/league/RivalryControls";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
@@ -407,6 +408,7 @@ export default function LeagueMatchup() {
       ) : (
         <>
           <div>
+            <OpeningWeekPatch week={displayWeek} />
             <RivalWeekPatch rivalry={data.rivalry} leagueId={parsedLeagueId} matchupId={data.matchup_id} />
             <CompactMatchupScoreboard
               data={data}
