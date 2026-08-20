@@ -207,13 +207,43 @@ def cancel_invite(db: Session, league: League, invite_id: int, user: User) -> No
     invite.status, invite.responded_at = "CANCELED", _now(); db.commit()
 
 
-def matchup_rivalry_context(db: Session, league: League, primary_team: Team | None, opponent: Team | None) -> RivalryMatchupRead | None:
-    if not primary_team or not opponent:
+def matchup_rivalry_context(
+    db: Session,
+    league: League,
+    matchup: Matchup | None,
+    primary_team: Team | None,
+    opponent: Team | None,
+) -> RivalryMatchupRead | None:
+    """Return Rival Week context only for rivals' final scheduled meeting.
+
+    Rivalries stay permanent, but the branded Rival Week moment is seasonal:
+    the first meeting is a normal matchup for early bragging rights and the
+    final scheduled meeting gets the patch and one-time celebration.  The
+    server makes this decision from the canonical schedule so the browser
+    cannot accidentally decorate an earlier matchup.
+    """
+    if not matchup or not primary_team or not opponent:
         return None
     binding = db.query(LeagueRivalryBinding).filter(LeagueRivalryBinding.league_id == league.id, LeagueRivalryBinding.team_id == primary_team.id).one_or_none()
     if not binding: return None
     rivalry = db.get(LeagueRivalry, binding.rivalry_id)
     if not rivalry or rivalry.status != ACTIVE or opponent.id not in (rivalry.team_a_id, rivalry.team_b_id): return None
+    final_scheduled_meeting_id = (
+        db.query(Matchup.id)
+        .filter(
+            Matchup.league_id == league.id,
+            Matchup.season == matchup.season,
+            or_(
+                and_(Matchup.home_team_id == primary_team.id, Matchup.away_team_id == opponent.id),
+                and_(Matchup.home_team_id == opponent.id, Matchup.away_team_id == primary_team.id),
+            ),
+        )
+        .order_by(Matchup.week.desc(), Matchup.id.desc())
+        .limit(1)
+        .scalar()
+    )
+    if final_scheduled_meeting_id != matchup.id:
+        return None
     wins = losses = ties = 0; last = None
     rows = db.query(Matchup).filter(Matchup.league_id == league.id, Matchup.status.in_(("final", "completed", "stat_corrected", "corrected")), or_(and_(Matchup.home_team_id == primary_team.id, Matchup.away_team_id == opponent.id), and_(Matchup.home_team_id == opponent.id, Matchup.away_team_id == primary_team.id))).order_by(Matchup.season.desc(), Matchup.week.desc(), Matchup.id.desc()).all()
     for row in rows:
