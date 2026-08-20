@@ -266,6 +266,15 @@
     @apply font-display text-foreground font-black uppercase tracking-[-0.03em] leading-[0.95];
   }
 
+  /*
+   * Matchup totals need to stay clear at a glance on narrow phone viewports.
+   * Keep the condensed display face for headings, but use the wider UI face
+   * at a restrained weight for score numerals so digits do not run together.
+   */
+  .cfb-score-value {
+    @apply font-sans font-semibold tabular-nums tracking-[-0.025em] leading-none;
+  }
+
   .cfb-body {
     @apply font-sans font-normal normal-case tracking-normal leading-relaxed;
   }
