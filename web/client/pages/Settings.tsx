@@ -24,20 +24,19 @@ import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
 import { prepareProfileImage } from "@/lib/profileImage";
 
 const SettingsSection = ({ title, description, children, icon: Icon }: any) => (
-  <Card className="group relative overflow-hidden rounded-3xl border-border/60 bg-card/40 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-md transition-all duration-700 hover:border-primary/20 sm:rounded-[2.5rem]">
-    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-primary/10 transition-colors" />
-    <CardHeader className="relative z-10 border-b border-border/40 bg-gradient-to-br from-white/5 to-transparent px-5 pt-5 sm:px-10 sm:pt-10">
+  <Card className="overflow-hidden rounded-lg border-border bg-card shadow-none">
+    <CardHeader className="border-b border-border px-4 py-4 sm:px-5">
       <div className="flex items-start gap-3 sm:items-center sm:gap-6">
-        <div className="rounded-2xl bg-primary/10 p-3 text-primary shadow-[0_0_20px_rgba(var(--primary),0.1)] transition-all duration-300 group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground sm:p-4">
-          <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+        <div className="rounded-md bg-primary/10 p-2 text-primary">
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
         <div className="min-w-0 space-y-1">
-          <CardTitle className="text-[10px] font-black uppercase tracking-[0.22em] text-primary sm:tracking-[0.3em]">{title}</CardTitle>
-          <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60 sm:text-[11px] sm:tracking-widest">{description}</p>
+          <CardTitle className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">{title}</CardTitle>
+          <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{description}</p>
         </div>
       </div>
     </CardHeader>
-    <CardContent className="relative z-10 space-y-6 p-5 sm:space-y-8 sm:p-10">
+    <CardContent className="space-y-5 p-4 sm:p-5">
       {children}
     </CardContent>
   </Card>
@@ -71,7 +70,7 @@ const PolicyLinks = ({
           href={link.href}
           target={link.external ? "_blank" : undefined}
           rel={link.external ? "noreferrer" : undefined}
-          className="rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
+          className="rounded-md border border-border bg-muted/30 px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-primary hover:bg-muted"
         >
           {link.label}
         </a>
@@ -83,8 +82,8 @@ const PolicyLinks = ({
 const SettingItem = ({ label, description, children }: any) => (
   <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-10">
     <div className="min-w-0 space-y-1">
-      <Label className="text-sm font-black italic uppercase tracking-tight text-foreground">{label}</Label>
-      {description && <p className="text-[11px] font-medium leading-relaxed text-muted-foreground/60">{description}</p>}
+      <Label className="text-sm font-bold text-foreground">{label}</Label>
+      {description && <p className="text-[11px] font-medium leading-relaxed text-muted-foreground">{description}</p>}
     </div>
     <div className="w-full shrink-0 sm:w-auto">
       {children}
@@ -235,9 +234,9 @@ export default function Settings() {
 
   if (!user) {
     return (
-      <div className="mx-auto max-w-4xl space-y-8 animate-in fade-in slide-in-from-bottom-4 pb-24 pt-6 duration-1000 sm:space-y-12 sm:pb-20 sm:pt-12">
-        <div className="space-y-6 border-b border-border/40 pb-12">
-          <h1 className="text-5xl font-black uppercase italic tracking-tight text-foreground sm:text-7xl">
+      <div className="mx-auto max-w-4xl space-y-6 pb-24 pt-6 sm:pb-20 sm:pt-10">
+        <div className="space-y-3 border-b border-border pb-6">
+          <h1 className="cfb-display-title text-3xl text-foreground sm:text-4xl">
             Settings
           </h1>
           <p className="max-w-2xl text-lg font-medium leading-relaxed text-muted-foreground sm:text-xl">
@@ -255,7 +254,7 @@ export default function Settings() {
               Account and league preferences are available after you sign in.
             </p>
             <Button
-              className="h-12 rounded-2xl bg-primary px-7 text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground"
+              className="h-10 rounded-md bg-primary px-5 text-[10px] font-black uppercase tracking-[0.14em] text-primary-foreground shadow-none"
               onClick={() => navigate("/login", { state: { from: "/settings" } })}
             >
               Sign In To Manage Settings
@@ -279,15 +278,15 @@ export default function Settings() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 animate-in fade-in slide-in-from-bottom-4 pb-24 duration-1000 sm:space-y-12 sm:pb-20">
+    <div className="mx-auto max-w-4xl space-y-6 pb-24 sm:pb-20">
       {/* Header Section */}
-      <div className="relative space-y-4 border-b border-border/40 pb-7 pt-6 sm:space-y-6 sm:pb-12 sm:pt-12">
+      <div className="space-y-3 border-b border-border pb-6 pt-6 sm:pt-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="bg-gradient-to-br from-white via-white to-primary/40 bg-clip-text text-4xl font-black italic uppercase tracking-tight text-transparent sm:text-6xl lg:text-7xl">
+          <h1 className="cfb-display-title text-3xl text-foreground sm:text-4xl">
             Settings
           </h1>
           <Button
-            className="h-12 w-full rounded-2xl bg-primary px-6 text-[10px] font-black uppercase tracking-[0.18em] text-primary-foreground shadow-[0_10px_30px_rgba(var(--primary),0.2)] transition-all duration-300 hover:scale-[1.02] sm:h-14 sm:w-auto sm:px-10 sm:tracking-[0.2em] sm:hover:scale-105"
+            className="h-10 w-full rounded-md bg-primary px-5 text-[10px] font-black uppercase tracking-[0.14em] text-primary-foreground shadow-none sm:w-auto"
             onClick={handleSave}
             disabled={saveState === "saving" || photoState === "saving"}
           >
@@ -295,37 +294,37 @@ export default function Settings() {
             {saveState === "saving" ? "Saving..." : saveState === "saved" ? "Saved" : "Save Changes"}
           </Button>
         </div>
-        <p className="max-w-2xl text-base font-medium leading-relaxed text-muted-foreground sm:text-xl">
+        <p className="max-w-2xl text-sm font-medium leading-relaxed text-muted-foreground sm:text-base">
           Update your manager profile and choose which league opens first across the app.
         </p>
       </div>
 
-      <div className="space-y-12">
+      <div className="space-y-6">
         {/* PROFILE SECTION */}
         <SettingsSection 
           title="Account Profile" 
           description="Your active manager identity"
           icon={User}
         >
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-10">
-            <div className="space-y-4">
-              <Label className="text-[10px] font-black tracking-[0.2em] text-muted-foreground uppercase opacity-60">Manager Name</Label>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black tracking-[0.14em] text-muted-foreground uppercase">Manager Name</Label>
               <Input
                 aria-label="Manager Name"
                 value={managerName}
                 maxLength={100}
                 onChange={(event) => setManagerName(event.target.value)}
-                className="h-12 rounded-2xl border-border bg-white/5 px-4 text-sm font-bold tracking-wide text-foreground"
+                className="h-10 rounded-md border-border bg-background px-3 text-sm font-semibold text-foreground"
               />
             </div>
-            <div className="space-y-4">
-              <Label className="text-[10px] font-black tracking-[0.2em] text-muted-foreground uppercase opacity-60">Email Address</Label>
-              <p className="rounded-2xl border border-border bg-white/5 px-4 py-4 text-xs font-bold tracking-wider text-foreground">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black tracking-[0.14em] text-muted-foreground uppercase">Email Address</Label>
+              <p className="rounded-md border border-border bg-background px-3 py-3 text-xs font-semibold text-foreground">
                 {user.email}
               </p>
             </div>
           </div>
-          <div className="grid gap-5 rounded-2xl border border-border/70 bg-black/10 p-5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
+          <div className="grid gap-4 rounded-lg border border-border bg-muted/20 p-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
             <ManagerAvatar
               key={pendingAvatarUrl ?? (avatarUrl.trim() || "manager-avatar-initials")}
               avatarUrl={pendingAvatarUrl ?? (avatarUrl.trim() || null)}
@@ -349,13 +348,13 @@ export default function Settings() {
                 onChange={handlePhotoChosen}
               />
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" className="h-10 rounded-xl border-border text-[10px] font-black uppercase tracking-[0.14em]" onClick={() => photoInputRef.current?.click()} disabled={photoState !== "idle"}>
+                <Button type="button" variant="outline" className="h-9 rounded-md border-border text-[10px] font-black uppercase tracking-[0.12em]" onClick={() => photoInputRef.current?.click()} disabled={photoState !== "idle"}>
                   <ImagePlus className="mr-2 h-4 w-4" />
                   {photoState === "preparing" ? "Preparing..." : "Choose Photo"}
                 </Button>
-                {pendingAvatarUrl ? <Button type="button" className="h-10 rounded-xl px-4 text-[10px] font-black uppercase tracking-[0.14em]" onClick={handleConfirmPhoto} disabled={photoState !== "idle"}>Confirm Photo</Button> : null}
-                {pendingAvatarUrl ? <Button type="button" variant="ghost" className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.14em]" onClick={() => { setPendingAvatarUrl(null); setPendingAvatarName(null); setAvatarPreviewError(false); }} disabled={photoState !== "idle"}>Cancel</Button> : null}
-                {(avatarUrl.trim() || user.avatarUrl) && !pendingAvatarUrl ? <Button type="button" variant="outline" className="h-10 rounded-xl border-border text-[10px] font-black uppercase tracking-[0.14em]" onClick={handleRemovePhoto} disabled={photoState !== "idle"}>Remove Picture</Button> : null}
+                {pendingAvatarUrl ? <Button type="button" className="h-9 rounded-md px-4 text-[10px] font-black uppercase tracking-[0.12em]" onClick={handleConfirmPhoto} disabled={photoState !== "idle"}>Confirm Photo</Button> : null}
+                {pendingAvatarUrl ? <Button type="button" variant="ghost" className="h-9 rounded-md text-[10px] font-black uppercase tracking-[0.12em]" onClick={() => { setPendingAvatarUrl(null); setPendingAvatarName(null); setAvatarPreviewError(false); }} disabled={photoState !== "idle"}>Cancel</Button> : null}
+                {(avatarUrl.trim() || user.avatarUrl) && !pendingAvatarUrl ? <Button type="button" variant="outline" className="h-9 rounded-md border-border text-[10px] font-black uppercase tracking-[0.12em]" onClick={handleRemovePhoto} disabled={photoState !== "idle"}>Remove Picture</Button> : null}
               </div>
               {pendingAvatarUrl ? <p className="text-xs font-medium text-primary">{pendingAvatarName ?? "Selected photo"} is ready. Tap Confirm Photo to update your profile picture.</p> : null}
               {avatarPreviewError ? <p role="alert" className="text-xs font-medium text-red-300">This image could not be loaded. Choose a different photo.</p> : null}
@@ -376,7 +375,7 @@ export default function Settings() {
                     setPendingAvatarName(null);
                     setAvatarPreviewError(false);
                   }}
-                  className="mt-3 h-12 rounded-xl border-border bg-white/5 px-4 text-sm text-foreground"
+                  className="mt-3 h-10 rounded-md border-border bg-background px-3 text-sm text-foreground"
                 />
               </details>
             </div>
@@ -390,7 +389,7 @@ export default function Settings() {
           description="Customize your viewing experience"
           icon={Sliders}
         >
-          <div className="space-y-8">
+          <div className="space-y-5">
             <SettingItem 
               label="Default Active League"
               description="Choose which league opens first across roster/waiver/watchlist views"
@@ -399,7 +398,7 @@ export default function Settings() {
                 value={activeLeagueId ? String(activeLeagueId) : ""}
                 onValueChange={(value) => setActiveLeagueId(Number(value))}
               >
-                <SelectTrigger className="h-12 w-full rounded-2xl border-border bg-white/5 text-xs font-bold uppercase tracking-wider transition-all focus:border-primary/40 focus:ring-primary/20 sm:h-14 sm:w-60">
+                <SelectTrigger className="h-10 w-full rounded-md border-border bg-background text-xs font-semibold sm:w-60">
                   <SelectValue placeholder="Select league" />
                 </SelectTrigger>
                 <SelectContent className="bg-[#0A0C10] border-border rounded-2xl">
@@ -422,7 +421,7 @@ export default function Settings() {
             >
               <Button
                 variant="outline"
-                className="h-12 px-6 rounded-2xl border-primary/20 bg-primary/5 text-[10px] font-black uppercase tracking-[0.2em] text-primary hover:bg-primary/10"
+                className="h-10 rounded-md border-border bg-muted/30 px-5 text-[10px] font-black uppercase tracking-[0.14em] text-primary hover:bg-muted"
                 onClick={handleReplayGuide}
                 disabled={!user}
               >
@@ -440,8 +439,8 @@ export default function Settings() {
           description="Keep your account safe and secure"
           icon={Shield}
         >
-          <div className="space-y-8">
-            <div className="rounded-3xl border border-primary/15 bg-primary/[0.04] p-6">
+          <div className="space-y-5">
+            <div className="rounded-lg border border-border bg-muted/20 p-4">
               <h3 className="text-sm font-black uppercase tracking-[0.16em] text-foreground">Change Password</h3>
               <p className="mt-2 text-sm font-medium text-muted-foreground">
                 Enter your current password, then choose a new password. You will be signed out on every device.
@@ -455,7 +454,7 @@ export default function Settings() {
             </div>
             <PolicyLinks privacyPolicyUrl={privacyPolicyUrl} termsUrl={termsUrl} providerDisclosureUrl={providerDisclosureUrl} supportEmail={supportEmail} />
 
-            <div className="flex justify-center pt-8">
+            <div className="flex justify-center pt-3">
                <Button type="button" variant="ghost" onClick={() => void handleLogoutAll()} className="text-muted-foreground hover:text-red-400 gap-3 text-[11px] font-black uppercase tracking-[0.2em]">
                   <LogOut className="w-4 h-4" />
                   Sign Out of All Devices
