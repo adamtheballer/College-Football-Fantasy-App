@@ -55,7 +55,7 @@ const positionTone = (position?: string | null) => {
         border: "border-blue-300/45",
         bg: "bg-blue-400/10",
         text: "text-blue-100",
-        glow: "shadow-[0_0_26px_rgba(96,165,250,0.18)]",
+        glow: "",
         dot: "bg-blue-300",
       };
     case "RB":
@@ -63,7 +63,7 @@ const positionTone = (position?: string | null) => {
         border: "border-emerald-300/45",
         bg: "bg-emerald-400/10",
         text: "text-emerald-100",
-        glow: "shadow-[0_0_26px_rgba(52,211,153,0.18)]",
+        glow: "",
         dot: "bg-emerald-300",
       };
     case "WR":
@@ -71,7 +71,7 @@ const positionTone = (position?: string | null) => {
         border: "border-violet-300/45",
         bg: "bg-violet-400/10",
         text: "text-violet-100",
-        glow: "shadow-[0_0_26px_rgba(167,139,250,0.18)]",
+        glow: "",
         dot: "bg-violet-300",
       };
     case "TE":
@@ -79,7 +79,7 @@ const positionTone = (position?: string | null) => {
         border: "border-amber-300/45",
         bg: "bg-amber-400/10",
         text: "text-amber-100",
-        glow: "shadow-[0_0_26px_rgba(251,191,36,0.16)]",
+        glow: "",
         dot: "bg-amber-300",
       };
     case "K":
@@ -87,7 +87,7 @@ const positionTone = (position?: string | null) => {
         border: "border-sky-300/45",
         bg: "bg-sky-400/10",
         text: "text-sky-100",
-        glow: "shadow-[0_0_26px_rgba(56,189,248,0.18)]",
+        glow: "",
         dot: "bg-sky-300",
       };
     default:
@@ -95,7 +95,7 @@ const positionTone = (position?: string | null) => {
         border: "border-slate-300/25",
         bg: "bg-white/5",
         text: "text-slate-100",
-        glow: "shadow-[0_0_20px_rgba(148,163,184,0.10)]",
+        glow: "",
         dot: "bg-slate-400",
       };
   }
@@ -478,35 +478,34 @@ export default function LeagueWaivers() {
           </div>
         </DialogContent>
       </Dialog>
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[460px] rounded-[3rem] bg-[radial-gradient(circle_at_20%_8%,rgba(56,189,248,0.2),transparent_32%),radial-gradient(circle_at_72%_0%,rgba(99,102,241,0.18),transparent_38%),radial-gradient(circle_at_50%_30%,rgba(14,165,233,0.12),transparent_42%)] blur-2xl" />
       <div className="space-y-3 sm:space-y-4">
-        <p className="text-[11px] font-black uppercase tracking-[0.24em] text-sky-300">
+        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cfb-brand">
           League Players
         </p>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-2xl font-black italic text-slate-50 sm:text-4xl">Available Players</h1>
-            <p className="mt-1.5 max-w-2xl text-sm text-slate-400 sm:mt-2">
+            <h1 className="cfb-display-title text-3xl text-cfb-text-primary sm:text-4xl">Available Players</h1>
+            <p className="mt-1.5 max-w-2xl text-sm text-cfb-text-secondary sm:mt-2">
               {isFreeAgentPhase
                 ? "This week’s waivers have cleared. Remaining unrostered players are instant adds with no FAAB or priority; each player locks at their own kickoff."
                 : `Waiver bids are open until ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}. After processing, remaining unrostered players become instant adds until their own kickoff.`}
             </p>
           </div>
-          <p className="text-xs font-bold text-slate-400 sm:hidden">
+          <p className="text-xs font-semibold text-cfb-text-secondary sm:hidden">
             {players.length} available · Top proj {topProjection?.toFixed(1) ?? "—"} · {waiverData?.claims.length ?? 0} claims
           </p>
-          <div className="hidden grid-cols-3 gap-3 sm:grid sm:min-w-[430px]">
-            <div className="rounded-[1.25rem] border border-sky-300/20 bg-sky-400/10 p-4 shadow-[0_0_34px_rgba(56,189,248,0.12)]">
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Available</p>
-              <p className="mt-1 text-2xl font-black text-sky-100">{players.length}</p>
+          <div className="hidden overflow-hidden rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised sm:grid sm:min-w-[390px] sm:grid-cols-3">
+            <div className="px-4 py-3">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">Available</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-cfb-text-primary">{players.length}</p>
             </div>
-            <div className="rounded-[1.25rem] border border-emerald-300/20 bg-emerald-400/10 p-4 shadow-[0_0_34px_rgba(52,211,153,0.10)]">
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Top Proj</p>
-              <p className="mt-1 text-2xl font-black text-emerald-100">{topProjection?.toFixed(1) ?? "—"}</p>
+            <div className="border-x border-cfb-border-subtle px-4 py-3">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">Top proj</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-cfb-text-primary">{topProjection?.toFixed(1) ?? "—"}</p>
             </div>
-            <div className="rounded-[1.25rem] border border-violet-300/20 bg-violet-400/10 p-4 shadow-[0_0_34px_rgba(167,139,250,0.10)]">
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Claims</p>
-              <p className="mt-1 text-2xl font-black text-violet-100">{waiverData?.claims.length ?? 0}</p>
+            <div className="px-4 py-3">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">Claims</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-cfb-text-primary">{waiverData?.claims.length ?? 0}</p>
             </div>
           </div>
         </div>
@@ -517,14 +516,14 @@ export default function LeagueWaivers() {
         />
       </div>
 
-      <section data-testid="league-player-board" className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(13,23,39,0.96),rgba(16,30,52,0.9)_48%,rgba(15,23,42,0.96))] shadow-[0_24px_90px_rgba(14,165,233,0.12)]">
-        <div className="border-b border-sky-300/10 px-4 py-4 sm:px-5 sm:py-5">
+      <section data-testid="league-player-board" className="overflow-hidden rounded-lg border border-cfb-border-subtle bg-cfb-surface">
+        <div className="border-b border-cfb-border-subtle px-4 py-4 sm:px-5">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <h2 className="text-[11px] font-black uppercase tracking-[0.22em] text-sky-300">
+              <h2 className="text-[11px] font-black uppercase tracking-[0.18em] text-cfb-brand">
                 Available Players
               </h2>
-              <p className="mt-1.5 text-xs font-semibold leading-5 text-slate-500 sm:mt-2">
+              <p className="mt-1.5 text-xs font-semibold leading-5 text-cfb-text-secondary sm:mt-2">
                 {isFreeAgentPhase
                   ? "Waivers cleared for this week. Add eligible players immediately; no bid or priority is used."
                   : `Claims process at ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}. Eligible players become instant adds only after the clear.`}
@@ -532,12 +531,12 @@ export default function LeagueWaivers() {
             </div>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               <div className="relative w-full sm:min-w-[280px]">
-                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-sky-200/45" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" />
                 <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search players, schools..."
-                  className="h-12 rounded-2xl border-sky-300/15 bg-slate-950/55 pl-11 text-sm font-bold text-slate-50 placeholder:text-slate-500 focus:border-sky-300/45 focus:ring-sky-300/20"
+                  className="h-10 rounded-md border-cfb-border-subtle bg-cfb-canvas pl-10 text-sm font-semibold text-cfb-text-primary placeholder:text-cfb-text-muted focus:border-cfb-brand/60 focus:ring-cfb-brand/20"
                 />
               </div>
               <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -550,10 +549,10 @@ export default function LeagueWaivers() {
                       type="button"
                       onClick={() => setPosition(item)}
                       className={[
-                        "shrink-0 rounded-xl border px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.16em] transition-all duration-200 sm:rounded-2xl sm:px-4 sm:py-3",
+                        "h-10 shrink-0 rounded-md border px-3 text-[10px] font-black uppercase tracking-[0.12em] transition-colors",
                         active
-                          ? `${tone.border} ${tone.bg} ${tone.text} ${tone.glow}`
-                          : "border-white/10 bg-white/[0.04] text-slate-400 hover:border-sky-300/25 hover:bg-sky-300/[0.07] hover:text-slate-100",
+                          ? "border-cfb-brand/60 bg-cfb-brand/10 text-cfb-brand"
+                          : "border-cfb-border-subtle bg-cfb-surface-raised text-cfb-text-secondary hover:border-cfb-border-strong hover:text-cfb-text-primary",
                       ].join(" ")}
                     >
                       {item}
@@ -579,7 +578,7 @@ export default function LeagueWaivers() {
           </p>
         ) : (
           <>
-            <div className="divide-y divide-sky-300/10 sm:hidden">
+            <div className="divide-y divide-cfb-border-subtle sm:hidden">
             {filteredPlayers.map((player) => {
               const tone = positionTone(player.position);
               const projectionLabel = waiverProjectionLabel(
@@ -600,30 +599,30 @@ export default function LeagueWaivers() {
                       setSelectedPlayer(player);
                     }
                   }}
-                  className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-sky-300/[0.045] focus:outline-none focus-visible:bg-sky-300/[0.065]"
+                  className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-cfb-surface-hover focus:outline-none focus-visible:bg-cfb-surface-hover"
                   data-testid={`waiver-mobile-player-row-${player.id}`}
                 >
                   <span
                     data-testid={`waiver-mobile-rank-${player.id}`}
-                    className="min-w-[2ch] text-right text-lg font-black italic tabular-nums text-slate-500"
+                    className="min-w-[2ch] text-right text-lg font-semibold tabular-nums text-cfb-text-muted"
                   >
                     {player.rank}
                   </span>
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
-                      <p className="truncate text-sm font-black text-slate-50">{player.name}</p>
+                      <p className="truncate text-sm font-bold text-cfb-text-primary">{player.name}</p>
                       <span className={`inline-flex shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.1em] ${tone.border} ${tone.bg} ${tone.text}`}>
                         {player.position ?? "-"}
                       </span>
                     </div>
-                    <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                    <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-[0.1em] text-cfb-text-muted">
                       {player.school ?? "School unavailable"}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <div className="text-right">
-                      <p className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-500">W{waiverData?.current_period?.week ?? 1}</p>
-                      <p className={`mt-0.5 text-base font-black tabular-nums ${projectionLabel === "BYE" ? "text-amber-200" : projectionLabel === "OUT" ? "text-rose-200" : "text-sky-100"}`}>
+                      <p className="text-[8px] font-black uppercase tracking-[0.1em] text-cfb-text-muted">W{waiverData?.current_period?.week ?? 1}</p>
+                      <p className={`mt-0.5 text-base font-semibold tabular-nums ${projectionLabel === "BYE" ? "text-amber-200" : projectionLabel === "OUT" ? "text-rose-200" : "text-cfb-text-primary"}`}>
                         {projectionLabel}
                       </p>
                     </div>
@@ -636,7 +635,7 @@ export default function LeagueWaivers() {
                         void handleWatchPlayer(player.id);
                       }}
                       disabled={createWatchlist.isPending || toggleWatchlistPlayer.isPending || watchlistsQuery.isError}
-                      className="h-9 w-9 rounded-xl border-sky-300/20 bg-sky-300/[0.06] p-0 text-sky-100 hover:border-sky-200/45 hover:bg-sky-300/15"
+                      className="h-9 w-9 rounded-md border-cfb-border-subtle bg-cfb-surface-raised p-0 text-cfb-text-secondary hover:border-cfb-border-strong hover:bg-cfb-surface-hover hover:text-cfb-text-primary"
                     >
                       <Sparkles className="h-4 w-4" />
                     </Button>
@@ -647,7 +646,7 @@ export default function LeagueWaivers() {
                         event.stopPropagation();
                         openClaimDialog(player);
                       }}
-                      className="h-9 rounded-xl bg-sky-300 px-3 text-[9px] font-black uppercase tracking-[0.1em] text-slate-950 shadow-none hover:bg-sky-200 disabled:opacity-50"
+                      className="h-9 rounded-md bg-cfb-brand px-3 text-[9px] font-black uppercase tracking-[0.1em] text-cfb-canvas shadow-none hover:bg-cfb-brand-hover disabled:opacity-50"
                     >
                       {claimable ? (player.availability_state === "free_agent" ? "Add" : "Claim") : "Locked"}
                     </Button>
@@ -658,19 +657,19 @@ export default function LeagueWaivers() {
             </div>
             <div className="hidden overflow-x-auto sm:block">
             <table className="min-w-[980px] w-full table-fixed text-left">
-              <thead className="border-b border-sky-300/10 bg-slate-950/35">
-                <tr className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                  <th className="w-[7rem] min-w-[7rem] whitespace-nowrap px-5 py-4 text-right">RK</th>
-                  <th className="px-4 py-4">Player</th>
-                  <th className="w-44 px-4 py-4">School</th>
-                  <th className="w-24 px-4 py-4">POS</th>
-                  <th className="w-32 px-4 py-4 text-right">
+              <thead className="border-b border-cfb-border-subtle bg-cfb-surface-raised">
+                <tr className="text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
+                  <th className="w-[7rem] min-w-[7rem] whitespace-nowrap px-5 py-3 text-right">RK</th>
+                  <th className="px-4 py-3">Player</th>
+                  <th className="w-44 px-4 py-3">School</th>
+                  <th className="w-24 px-4 py-3">POS</th>
+                  <th className="w-32 px-4 py-3 text-right">
                     Week {waiverData?.current_period?.week ?? 1} Proj
                   </th>
-                  <th className="w-56 px-5 py-4 text-right">Action</th>
+                  <th className="w-56 px-5 py-3 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-sky-300/10">
+              <tbody className="divide-y divide-cfb-border-subtle">
                 {filteredPlayers.map((player) => {
                   const tone = positionTone(player.position);
                   const projected = player.weekly_projected_fantasy_points;
@@ -688,42 +687,42 @@ export default function LeagueWaivers() {
                           setSelectedPlayer(player);
                         }
                       }}
-                      className="group cursor-pointer text-sm text-slate-200 transition-colors hover:bg-sky-300/[0.045] focus:outline-none focus-visible:bg-sky-300/[0.065]"
+                      className="group cursor-pointer text-sm text-cfb-text-secondary transition-colors hover:bg-cfb-surface-hover focus:outline-none focus-visible:bg-cfb-surface-hover"
                     >
-                      <td className="w-[7rem] min-w-[7rem] whitespace-nowrap px-5 py-4 text-right align-middle">
+                      <td className="w-[7rem] min-w-[7rem] whitespace-nowrap px-5 py-3 text-right align-middle">
                         <span
                           data-testid={`waiver-rank-${player.id}`}
-                          className="inline-flex min-w-[4ch] justify-end whitespace-nowrap text-xl font-black italic tabular-nums text-slate-500 transition-colors group-hover:text-sky-200"
+                          className="inline-flex min-w-[4ch] justify-end whitespace-nowrap text-lg font-semibold tabular-nums text-cfb-text-muted transition-colors group-hover:text-cfb-text-primary"
                         >
                           {player.rank}
                         </span>
                       </td>
-                      <td className="px-4 py-4 align-middle">
+                      <td className="px-4 py-3 align-middle">
                         <div className="min-w-0">
-                          <p className="truncate text-base font-black text-slate-50 transition-colors group-hover:text-sky-50">
+                          <p className="truncate text-base font-bold text-cfb-text-primary transition-colors">
                             {player.name}
                           </p>
-                          <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                          <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
                             Available player
                           </p>
                         </div>
                       </td>
-                      <td className="px-4 py-4 align-middle text-sm font-bold text-slate-400">
+                      <td className="px-4 py-3 align-middle text-sm font-semibold text-cfb-text-secondary">
                         {player.school ?? "-"}
                       </td>
-                      <td className="px-4 py-4 align-middle">
+                      <td className="px-4 py-3 align-middle">
                         <span
-                          className={`inline-flex min-w-14 items-center justify-center rounded-xl border px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] ${tone.border} ${tone.bg} ${tone.text}`}
+                          className={`inline-flex min-w-12 items-center justify-center rounded-md border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] ${tone.border} ${tone.bg} ${tone.text}`}
                         >
                           {player.position ?? "-"}
                         </span>
                       </td>
-                      <td className="px-4 py-4 text-right align-middle">
-                        <span className={`text-lg font-black tabular-nums ${projectionLabel === "BYE" ? "text-amber-200" : projectionLabel === "OUT" ? "text-rose-200" : "text-sky-100"}`}>
+                      <td className="px-4 py-3 text-right align-middle">
+                        <span className={`text-lg font-semibold tabular-nums ${projectionLabel === "BYE" ? "text-amber-200" : projectionLabel === "OUT" ? "text-rose-200" : "text-cfb-text-primary"}`}>
                           {projectionLabel}
                         </span>
                       </td>
-                      <td className="px-5 py-4 align-middle">
+                      <td className="px-5 py-3 align-middle">
                         <div className="flex items-center justify-end gap-2">
                           <Button
                             type="button"
@@ -737,7 +736,7 @@ export default function LeagueWaivers() {
                               toggleWatchlistPlayer.isPending ||
                               watchlistsQuery.isError
                             }
-                            className="h-10 rounded-xl border-sky-300/20 bg-sky-300/[0.06] px-3 text-[10px] font-black uppercase tracking-[0.14em] text-sky-100 transition-all hover:border-sky-200/45 hover:bg-sky-300/15"
+                            className="h-9 rounded-md border-cfb-border-subtle bg-cfb-surface-raised px-3 text-[10px] font-black uppercase tracking-[0.1em] text-cfb-text-secondary transition-colors hover:border-cfb-border-strong hover:bg-cfb-surface-hover hover:text-cfb-text-primary"
                           >
                             <Sparkles className="mr-2 h-3.5 w-3.5" />
                             {watchedPlayerIds.has(player.id) ? "Watching" : "Watch"}
@@ -749,7 +748,7 @@ export default function LeagueWaivers() {
                               event.stopPropagation();
                               openClaimDialog(player);
                             }}
-                            className="h-10 rounded-xl bg-sky-300 px-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-950 shadow-none hover:bg-sky-200 disabled:opacity-50"
+                            className="h-9 rounded-md bg-cfb-brand px-3 text-[10px] font-black uppercase tracking-[0.1em] text-cfb-canvas shadow-none hover:bg-cfb-brand-hover disabled:opacity-50"
                           >
                             <UserPlus className="mr-2 h-3.5 w-3.5" />
                             {claimable
@@ -771,35 +770,35 @@ export default function LeagueWaivers() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-5">
+          <div className="rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised p-4">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-300">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cfb-brand">
                 Waiver Claims
               </p>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
                 {String(waiverData?.waiver_rules.waiver_type ?? "waivers")}
               </p>
             </div>
             {(waiverData?.claims ?? []).length === 0 ? (
-              <p className="mt-4 text-sm font-semibold text-slate-500">
+              <p className="mt-4 text-sm font-medium text-cfb-text-muted">
                 No active or recent waiver claims for your team.
               </p>
             ) : (
               <div className="mt-4 space-y-3">
                 {waiverData?.claims.map((claim) => (
-                  <div key={claim.id} className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                  <div key={claim.id} className="rounded-md border border-cfb-border-subtle bg-cfb-canvas p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-black text-slate-50">{claim.add_player_name}</p>
-                        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                        <p className="text-sm font-semibold text-cfb-text-primary">{claim.add_player_name}</p>
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb-text-muted">
                           {claim.drop_player_name ? `Drop ${claim.drop_player_name}` : "No drop selected"}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-sky-200">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-cfb-brand">
                           {claim.status}
                         </p>
-                        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb-text-muted">
                           {waiverData?.waiver_rules.waiver_type === "faab" ? `FAAB $${claim.faab_bid}` : `Order ${claim.preference_order}`}
                         </p>
                       </div>
@@ -809,7 +808,7 @@ export default function LeagueWaivers() {
                         {claim.failure_reason}
                       </p>
                     ) : null}
-                    <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                    <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb-text-muted">
                       {claim.status.toLowerCase() === "pending"
                         ? `Order ${claim.preference_order} · Processes ${formatProcessTime(claim.process_after, waiverData?.waiver_rules.timezone)}`
                         : `Updated ${formatProcessTime(claim.processed_at, waiverData?.waiver_rules.timezone)}`}
@@ -819,7 +818,7 @@ export default function LeagueWaivers() {
                         <Button
                           type="button"
                           variant="outline"
-                          className="h-9 rounded-xl border-sky-300/25 px-3 text-[9px] font-black uppercase tracking-[0.14em] text-sky-100 hover:bg-sky-500/10"
+                          className="h-8 rounded-md border-cfb-border-strong px-3 text-[9px] font-black uppercase tracking-[0.14em] text-cfb-text-primary hover:bg-cfb-surface-hover"
                           disabled={editWaiverClaim.isPending}
                           onClick={() => openEditClaimDialog(claim)}
                         >
@@ -828,7 +827,7 @@ export default function LeagueWaivers() {
                         <Button
                           type="button"
                           variant="outline"
-                          className="h-9 rounded-xl border-white/15 px-2.5 text-slate-200 hover:bg-white/10"
+                          className="h-8 rounded-md border-cfb-border-subtle px-2.5 text-cfb-text-secondary hover:bg-cfb-surface-hover"
                           disabled={reorderWaiverClaims.isPending || claim.preference_order <= 1}
                           onClick={() => void moveClaim(claim.id, -1)}
                           aria-label={`Move ${claim.add_player_name} claim up`}
@@ -838,7 +837,7 @@ export default function LeagueWaivers() {
                         <Button
                           type="button"
                           variant="outline"
-                          className="h-9 rounded-xl border-white/15 px-2.5 text-slate-200 hover:bg-white/10"
+                          className="h-8 rounded-md border-cfb-border-subtle px-2.5 text-cfb-text-secondary hover:bg-cfb-surface-hover"
                           disabled={reorderWaiverClaims.isPending}
                           onClick={() => void moveClaim(claim.id, 1)}
                           aria-label={`Move ${claim.add_player_name} claim down`}
@@ -848,7 +847,7 @@ export default function LeagueWaivers() {
                         <Button
                           type="button"
                           variant="outline"
-                          className="h-9 rounded-xl border-red-300/25 px-3 text-[9px] font-black uppercase tracking-[0.14em] text-red-100 hover:bg-red-500/10"
+                          className="h-8 rounded-md border-red-400/30 px-3 text-[9px] font-black uppercase tracking-[0.14em] text-red-200 hover:bg-red-500/10"
                           disabled={cancelWaiverClaim.isPending}
                           onClick={() => void cancelClaim(claim.id)}
                         >
@@ -861,20 +860,20 @@ export default function LeagueWaivers() {
               </div>
             )}
           </div>
-          <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-5">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">
+          <div className="rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cfb-text-primary">
               Drop Candidates
             </p>
             {(waiverData?.roster ?? []).length === 0 ? (
-              <p className="mt-4 text-sm font-semibold text-slate-500">
+              <p className="mt-4 text-sm font-medium text-cfb-text-muted">
                 No roster entries loaded for your team.
               </p>
             ) : (
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {waiverData?.roster.map((entry) => (
-                  <div key={entry.roster_entry_id} className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                    <p className="truncate text-sm font-black text-slate-50">{entry.player_name}</p>
-                    <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                  <div key={entry.roster_entry_id} className="rounded-md border border-cfb-border-subtle bg-cfb-canvas p-3">
+                    <p className="truncate text-sm font-semibold text-cfb-text-primary">{entry.player_name}</p>
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb-text-muted">
                       {entry.position ?? "-"} · {entry.school ?? "-"} · {entry.slot}
                     </p>
                   </div>
@@ -884,28 +883,28 @@ export default function LeagueWaivers() {
           </div>
       </section>
 
-      <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-5">
+      <section className="rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised p-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cfb-text-primary">
               {waiverData?.waiver_rules.waiver_type === "faab"
                 ? `Top FAAB Bids — Week ${waiverData?.results_period?.week ?? "Recent"}`
                 : `Successful Waiver Claims — Week ${waiverData?.results_period?.week ?? "Recent"}`}
             </p>
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Completed only</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cfb-text-muted">Completed only</p>
           </div>
           {(waiverData?.results ?? []).length === 0 ? (
-            <p className="mt-4 text-sm font-semibold text-slate-500">No completed waiver awards yet.</p>
+            <p className="mt-4 text-sm font-medium text-cfb-text-muted">No completed waiver awards yet.</p>
           ) : (
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {waiverData?.results.map((claim) => (
-                <div key={claim.id} className="rounded-2xl border border-amber-300/15 bg-amber-300/[0.04] p-4">
-                  <p className="text-sm font-black text-slate-50">{claim.add_player_name}</p>
-                  <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                <div key={claim.id} className="rounded-md border border-cfb-border-subtle bg-cfb-canvas p-3">
+                  <p className="text-sm font-semibold text-cfb-text-primary">{claim.add_player_name}</p>
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb-text-secondary">
                     {waiverData?.waiver_rules.waiver_type === "faab"
                       ? `Won for $${claim.winning_bid ?? claim.faab_bid} FAAB`
                       : `Priority #${claim.prior_priority ?? "—"} → #${claim.resulting_priority ?? "—"}`}
                   </p>
-                  <p className="mt-2 text-xs font-semibold text-slate-500">
+                  <p className="mt-2 text-xs font-medium text-cfb-text-muted">
                     Processed {formatProcessTime(claim.processed_at, waiverData?.waiver_rules.timezone)}
                   </p>
                 </div>
@@ -918,22 +917,21 @@ export default function LeagueWaivers() {
         {positions
           .filter((item) => item !== "ALL")
           .map((item) => {
-            const tone = positionTone(item);
             return (
               <button
                 key={item}
                 type="button"
                 onClick={() => setPosition(item)}
-                className={`group rounded-[1.35rem] border ${tone.border} ${tone.bg} p-5 text-left transition-all duration-200 hover:-translate-y-1 ${tone.glow}`}
+                className="rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised p-3 text-left transition-colors hover:border-cfb-border-strong hover:bg-cfb-surface-hover"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className={`text-[10px] font-black uppercase tracking-[0.22em] ${tone.text}`}>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cfb-text-secondary">
                     {item} Pool
                   </p>
-                  <Zap className={`h-4 w-4 ${tone.text} transition-transform group-hover:rotate-12 group-hover:scale-110`} />
+                  <Zap className="h-3.5 w-3.5 text-cfb-text-muted" />
                 </div>
-                <p className="mt-2 text-3xl font-black text-slate-50">{positionCounts[item] ?? 0}</p>
-                <p className="mt-2 text-xs font-bold text-slate-500">Available in this league only</p>
+                <p className="mt-2 text-xl font-semibold tabular-nums text-cfb-text-primary">{positionCounts[item] ?? 0}</p>
+                <p className="mt-1 text-xs font-medium text-cfb-text-muted">Available in this league only</p>
               </button>
             );
           })}
