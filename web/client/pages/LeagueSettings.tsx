@@ -259,7 +259,7 @@ export default function LeagueSettings() {
       ) : null}
 
       <section className="overflow-x-auto rounded-xl border border-cfb-border-subtle bg-cfb-surface p-1.5">
-        <div className="grid min-w-[580px] grid-cols-6 gap-1" role="tablist" aria-label="League settings sections">
+        <div className="grid min-w-[580px] grid-cols-6 gap-1" aria-label="League settings sections">
           {panels.map((panel) => {
             const Icon = panel.icon;
             const active = activePanel === panel.id;
@@ -267,8 +267,7 @@ export default function LeagueSettings() {
               <button
                 key={panel.id}
                 type="button"
-                role="tab"
-                aria-selected={active}
+                aria-pressed={active}
                 onClick={() => setActivePanel(panel.id)}
                 className={[
                   "flex h-10 items-center justify-center gap-1.5 rounded-lg px-2 text-center text-[9px] font-black uppercase tracking-[0.12em] transition-colors",

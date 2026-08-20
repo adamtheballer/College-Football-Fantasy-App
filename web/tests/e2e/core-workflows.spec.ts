@@ -1643,15 +1643,10 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("Next", { exact: true })).toHaveCount(0);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    const matchupRail = page.getByLabel("Swipe through league matchups");
-    await expect(matchupRail).toBeVisible();
-    expect(await matchupRail.evaluate((element) => element.scrollWidth > element.clientWidth)).toBeTruthy();
-    expect(
-      await matchupRail.evaluate((element) => {
-        element.scrollLeft = 80;
-        return element.scrollLeft;
-      }),
-    ).toBeGreaterThan(0);
+    const swipeSurface = page.getByTestId("matchup-swipe-surface");
+    await expect(swipeSurface).toBeVisible();
+    await expect(page.getByLabel("Matchup 1 of 2. Swipe left or right to view another matchup.")).toBeVisible();
+    await expect(page.getByLabel("Swipe through league matchups")).toHaveCount(0);
     const appViewport = page.locator("[data-app-viewport='true']");
     const appScroll = page.locator("main[data-app-scroll='true']");
     await expect(appViewport).toHaveCSS("overflow-x", "clip");
@@ -1719,7 +1714,8 @@ test.describe("critical browser workflows", () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.reload();
     await expect(page.getByText("48.1%", { exact: true }).first()).toBeVisible();
-    await page.getByRole("button", { name: "View League Mate Two at League Mate One" }).click();
+    await swipeSurface.dispatchEvent("touchstart", { touches: [{ identifier: 1, clientX: 280 }] });
+    await swipeSurface.dispatchEvent("touchend", { changedTouches: [{ identifier: 1, clientX: 120 }] });
     await expect(page.getByText("70.0%", { exact: true }).first()).toBeVisible();
     await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toHaveAttribute("style", /width: 70%/);
 
