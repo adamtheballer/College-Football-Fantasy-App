@@ -44,6 +44,7 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueWorkspaceRead,
     JoinByCodeRequest,
 )
+from collegefootballfantasy_api.app.schemas.rivalry import LeagueRivalryViewRead, RivalryInviteCreate, RivalryInviteRead
 from collegefootballfantasy_api.app.services.draft_service import (
     build_draft_room_state,
     create_real_draft_pick,
@@ -72,8 +73,54 @@ from collegefootballfantasy_api.app.services.league_roster_matchup import (
     build_settings_view,
 )
 from collegefootballfantasy_api.app.services.scoring_service import run_league_scoring_recalculation
+from collegefootballfantasy_api.app.services.league_rivalry import cancel_invite, create_invite, get_rivalry_view, respond_to_invite
 
 router = APIRouter()
+
+
+@router.get("/{league_id}/rivalry", response_model=LeagueRivalryViewRead)
+def get_league_rivalry_endpoint(
+    league_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
+) -> LeagueRivalryViewRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return get_rivalry_view(db, league, current_user)
+
+
+@router.post("/{league_id}/rivalry/invites", response_model=RivalryInviteRead, status_code=status.HTTP_201_CREATED)
+def create_league_rivalry_invite_endpoint(
+    league_id: int, payload: RivalryInviteCreate, db: Session = Depends(get_db), current_user: User = Depends(require_verified_user),
+) -> RivalryInviteRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return create_invite(db, league, current_user, payload.recipient_team_id)
+
+
+@router.post("/{league_id}/rivalry/invites/{invite_id}/accept", response_model=LeagueRivalryViewRead)
+def accept_league_rivalry_invite_endpoint(
+    league_id: int, invite_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_verified_user),
+) -> LeagueRivalryViewRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return respond_to_invite(db, league, invite_id, current_user, accept=True)
+
+
+@router.post("/{league_id}/rivalry/invites/{invite_id}/decline", response_model=LeagueRivalryViewRead)
+def decline_league_rivalry_invite_endpoint(
+    league_id: int, invite_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_verified_user),
+) -> LeagueRivalryViewRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return respond_to_invite(db, league, invite_id, current_user, accept=False)
+
+
+@router.delete("/{league_id}/rivalry/invites/{invite_id}", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_league_rivalry_invite_endpoint(
+    league_id: int, invite_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_verified_user),
+) -> None:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    cancel_invite(db, league, invite_id, current_user)
 @router.post("", response_model=LeagueCreateResponse, status_code=status.HTTP_201_CREATED)
 def create_league_endpoint(
     payload: LeagueCreateRequest,

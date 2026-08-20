@@ -5,6 +5,8 @@ import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
 import { WinChanceBar } from "@/components/league/WinChanceMeter";
 import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
+import { RivalWeekPatch } from "@/components/league/RivalWeekPatch";
+import { RivalryControls } from "@/components/league/RivalryControls";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
 import { useLeagueDetail, useLeagueMatchupTab, useLeagueScoreboard } from "@/hooks/use-leagues";
@@ -243,23 +245,13 @@ function CompactMatchupScoreboard({
 }) {
   const winChance = displayedProbabilityPair(myTeam?.win_probability, opponentTeam?.win_probability);
   const myTeamIsLeading = Boolean(winChance && winChance.my >= winChance.opponent);
-  const statusLabel = formatMatchupStatus(data.status);
 
   return (
     <section className="border-b border-cfb-border-subtle bg-cfb-surface-raised/50 px-3 py-3 sm:px-5 sm:py-4">
       <h2 className="sr-only">
         {myTeam?.fantasy_team_name ?? "Your team"} vs {opponentTeam?.fantasy_team_name ?? "Opponent"}
       </h2>
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-cfb-brand">Week {displayWeek} matchup</p>
-        </div>
-        <span className="rounded-full border border-cfb-border-subtle bg-cfb-canvas/70 px-3 py-1 text-[10px] font-black uppercase tracking-[0.15em] text-cfb-text-secondary">
-          {statusLabel}
-        </span>
-      </div>
-
-      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-5">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-5">
         <MatchupTeamSummary
           team={myTeam}
           accent="brand"
@@ -269,7 +261,8 @@ function CompactMatchupScoreboard({
         />
 
         <div className="flex min-w-[80px] flex-col items-center text-center">
-          <span className="text-[8px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Win chance</span>
+          <span className="font-ui text-[8px] font-bold uppercase tracking-[0.06em] text-cfb-brand">Week {displayWeek} matchup</span>
+          <span className="mt-0.5 font-ui text-[8px] font-bold uppercase tracking-[0.06em] text-cfb-text-muted">Win chance</span>
           <div className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-[10px] font-black tabular-nums sm:text-xs">
             <span className={myTeamIsLeading ? "text-emerald-300" : "text-red-300"}>
               {winChance ? `${winChance.my.toFixed(1)}%` : "—"}
@@ -382,6 +375,8 @@ export default function LeagueMatchup() {
         <LeagueTabs leagueId={parsedLeagueId} draftStatus={leagueQuery.data?.draft?.status} leagueStatus={leagueQuery.data?.status} />
       </div>
 
+      <div className="px-3 py-2 sm:px-5"><RivalryControls leagueId={parsedLeagueId} /></div>
+
       <MatchupRail
         matchups={scheduledMatchups}
         selectedMatchupId={activeMatchupId}
@@ -412,6 +407,7 @@ export default function LeagueMatchup() {
       ) : (
         <>
           <div>
+            <RivalWeekPatch rivalry={data.rivalry} leagueId={parsedLeagueId} matchupId={data.matchup_id} />
             <CompactMatchupScoreboard
               data={data}
               myTeam={myTeam}

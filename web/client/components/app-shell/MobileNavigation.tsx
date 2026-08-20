@@ -50,7 +50,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
                 to={item.path}
                 aria-label={item.badge ? `${item.name}: ${item.badge} unread chat messages` : item.name}
                 className={cn(
-                  "relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[11px] font-semibold leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent",
+                  "font-ui relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[11px] font-bold uppercase tracking-[0.04em] leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent",
                   isActive
                     ? "bg-cfb-brand/[0.12] text-cfb-text-primary after:bg-cfb-brand"
                     : "text-cfb-text-muted hover:bg-cfb-surface-hover/70 hover:text-cfb-text-primary",
@@ -79,7 +79,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
             aria-expanded={isMoreOpen}
             onClick={() => setIsMoreOpen(true)}
             className={cn(
-              "relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[11px] font-semibold leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent",
+              "font-ui relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[11px] font-bold uppercase tracking-[0.04em] leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent",
               isMoreActive
                 ? "bg-cfb-brand/[0.12] text-cfb-text-primary after:bg-cfb-brand"
                 : "text-cfb-text-muted hover:bg-cfb-surface-hover/70 hover:text-cfb-text-primary",
@@ -116,7 +116,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
                     to={item.path}
                     data-mobile-nav-item={navDomId(item.name)}
                     className={cn(
-                      "flex min-h-[52px] items-center gap-4 rounded-md border px-4 py-3 text-sm font-semibold transition-colors",
+                      "font-ui flex min-h-[52px] items-center gap-4 rounded-md border px-4 py-3 text-sm font-bold uppercase tracking-[0.05em] transition-colors",
                       isActive
                         ? "border-cfb-brand/40 bg-cfb-brand/[0.10] text-cfb-text-primary"
                         : "border-transparent text-cfb-text-secondary hover:border-cfb-border-subtle hover:bg-cfb-surface-hover/70 hover:text-cfb-text-primary",
@@ -145,7 +145,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
                 setIsMoreOpen(false);
                 onSignOut();
               }}
-              className="flex min-h-[52px] w-full items-center gap-4 rounded-md border border-cfb-danger/25 bg-cfb-danger/[0.06] px-4 py-3 text-left text-sm font-semibold text-red-700 transition hover:bg-cfb-danger/[0.10]"
+              className="font-ui flex min-h-[52px] w-full items-center gap-4 rounded-md border border-cfb-danger/25 bg-cfb-danger/[0.06] px-4 py-3 text-left text-sm font-bold uppercase tracking-[0.05em] text-red-700 transition hover:bg-cfb-danger/[0.10]"
             >
               <LogOut className="h-4 w-4" aria-hidden="true" />
               {displayNavName(signOutItem.name)}

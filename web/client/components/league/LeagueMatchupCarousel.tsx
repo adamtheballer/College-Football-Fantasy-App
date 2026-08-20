@@ -217,6 +217,7 @@ export function LeagueMatchupCarousel({
                   <p className="mt-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">
                     {formatRecord(league)} · {hasMatchup ? `Week ${summary?.matchup_week ?? 1}` : "Schedule pending"}
                   </p>
+                  {summary?.is_rivalry_matchup ? <p className="mt-1 text-[9px] font-black uppercase tracking-[0.16em] text-amber-200">Rival Week</p> : null}
                 </div>
                 <ChevronRight className="h-4 w-4 shrink-0 text-cfb-brand" aria-hidden="true" />
               </div>

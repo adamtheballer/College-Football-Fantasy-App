@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from collegefootballfantasy_api.app.schemas.waiver import WaiverClaimRead, WaiverDropCandidateRead
+from collegefootballfantasy_api.app.schemas.rivalry import RivalryMatchupRead
 
 
 def _validate_iana_timezone(value: str) -> str:
@@ -379,6 +380,7 @@ class LeagueListCurrentUserSummaryRead(BaseModel):
     projected_points_against: float | None = None
     win_probability_for: float | None = None
     win_probability_against: float | None = None
+    is_rivalry_matchup: bool = False
 
 
 class LeagueDetailRead(BaseModel):
@@ -432,6 +434,7 @@ class LeagueWorkspaceMatchupSummaryRead(BaseModel):
     projected_points_against: float | None = None
     win_probability_for: float | None = None
     win_probability_against: float | None = None
+    is_rivalry_matchup: bool = False
 
 
 class LeagueWorkspaceStandingSummaryRead(BaseModel):
@@ -667,6 +670,7 @@ class LeagueMatchupTabRead(BaseModel):
     next_refresh_at: datetime | None = None
     message: str | None = None
     user_team: MatchupTeamRead | None = None
+    rivalry: RivalryMatchupRead | None = None
 
 
 class LeagueWaiverPlayerRead(BaseModel):

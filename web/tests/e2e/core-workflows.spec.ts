@@ -62,6 +62,29 @@ const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]
 };
 
 test.describe("critical browser workflows", () => {
+  test("the public auth screen keeps the Barlow hierarchy readable without narrow-screen overflow", async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto("/login");
+
+    const signInHeading = page.getByRole("heading", { name: /^Sign in$/i });
+    await expect(signInHeading).toBeVisible();
+
+    const typography = await signInHeading.evaluate((heading) => ({
+      bodyFamily: getComputedStyle(document.body).fontFamily,
+      headingFamily: getComputedStyle(heading).fontFamily,
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth,
+    }));
+
+    expect(typography.bodyFamily).toContain("Barlow");
+    expect(typography.headingFamily).toContain("Barlow Condensed");
+    expect(typography.documentWidth).toBeLessThanOrEqual(typography.viewportWidth);
+
+    if (process.env.CAPTURE_MOBILE_UI === "1") {
+      await page.screenshot({ path: testInfo.outputPath("login-typography-320x568.png"), fullPage: false });
+    }
+  });
+
   test("Saturday Pick 6 dashboard action opens the contest instead of league creation", async ({ page }) => {
     await seedAuthenticatedSession(page);
     await page.route("**/leagues?**", async (route) => {
@@ -1600,6 +1623,8 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByLabel("Projected 133.1")).toBeVisible();
     await expect(page.getByLabel("Projected 137.0")).toBeVisible();
     await expect(page.getByText("Projected matchup values are shown until live scoring begins.")).toHaveCount(0);
+    await expect(page.getByText("Week 1 matchup", { exact: true })).toBeVisible();
+    await expect(page.locator(".rounded-full").filter({ hasText: /^Projected$/ })).toHaveCount(0);
     await expect(page.getByRole("status")).toHaveCount(0);
     await expect(page.getByText("48.1%", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("51.9%", { exact: true }).first()).toBeVisible();
