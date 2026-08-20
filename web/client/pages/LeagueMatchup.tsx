@@ -1,10 +1,12 @@
 import { Bell, MessageCircle, ShieldAlert } from "lucide-react";
+import { useRef } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
 import { WinChanceBar } from "@/components/league/WinChanceMeter";
 import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
+import { OpeningWeekPatch } from "@/components/league/OpeningWeekPatch";
 import { RivalWeekPatch } from "@/components/league/RivalWeekPatch";
 import { RivalryControls } from "@/components/league/RivalryControls";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
@@ -71,78 +73,6 @@ function teamInitials(name: string | null | undefined) {
     .map((word) => word[0]?.toUpperCase() ?? "")
     .join("");
   return letters || "TM";
-}
-
-function MatchupRail({
-  matchups,
-  selectedMatchupId,
-  isLoading,
-  onSelect,
-}: {
-  matchups: LeagueScoreboardRow[];
-  selectedMatchupId: number | undefined;
-  isLoading: boolean;
-  onSelect: (matchupId: number) => void;
-}) {
-  if (!isLoading && matchups.length === 0) return null;
-
-  return (
-    <section aria-label="League matchups" className="border-y border-cfb-border-subtle bg-cfb-surface/75">
-      <div
-        aria-label="Swipe through league matchups"
-        className="flex min-w-0 max-w-full snap-x snap-mandatory items-center gap-2 overflow-x-auto overscroll-x-contain px-3 py-2.5 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-4"
-      >
-        <span className="inline-flex min-h-10 shrink-0 items-center rounded-full border border-cfb-border-subtle bg-cfb-canvas px-3 text-[10px] font-black uppercase tracking-[0.12em] text-cfb-text-secondary">
-          League scores
-        </span>
-        {isLoading ? Array.from({ length: 3 }, (_, index) => (
-          <div key={index} className="h-[62px] min-w-[184px] animate-pulse rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised" />
-        )) : matchups.map((matchup) => {
-          const selected = matchup.matchup_id === selectedMatchupId;
-          const status = formatMatchupStatus(matchup.status);
-          return (
-            <button
-              key={matchup.matchup_id}
-              type="button"
-              aria-label={`View ${matchup.away_team_name} at ${matchup.home_team_name}`}
-              aria-pressed={selected}
-              onClick={() => onSelect(matchup.matchup_id)}
-              className={`snap-start shrink-0 rounded-full border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 ${
-                selected
-                  ? "border-cfb-brand/80 bg-cfb-brand/[0.12] text-cfb-text-primary"
-                  : "border-cfb-border-subtle bg-cfb-surface-raised text-cfb-text-secondary hover:border-cfb-border-strong hover:bg-cfb-surface-hover"
-              }`}
-            >
-              <div className="flex min-w-[210px] items-center gap-2">
-                <ManagerAvatar
-                  avatarUrl={matchup.away_owner_avatar_url}
-                  managerName={matchup.away_team_name}
-                  size="sm"
-                  className="border-cfb-brand/45 bg-cfb-brand/[0.08] text-cfb-brand"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-black leading-4">{matchup.away_team_name}</p>
-                  <p className="truncate text-[10px] font-bold text-cfb-text-muted">{formatMatchupPoints(matchup.away_score)}</p>
-                </div>
-                <span className="text-[11px] font-black text-cfb-text-muted">@</span>
-                <div className="min-w-0 flex-1 text-right">
-                  <p className="truncate text-[11px] font-black leading-4">{matchup.home_team_name}</p>
-                  <p className="truncate text-[10px] font-bold text-cfb-text-muted">{formatMatchupPoints(matchup.home_score)}</p>
-                </div>
-                <ManagerAvatar
-                  avatarUrl={matchup.home_owner_avatar_url}
-                  managerName={matchup.home_team_name}
-                  size="sm"
-                  className="border-cfb-pink/45 bg-cfb-pink/[0.08] text-cfb-pink"
-                />
-              </div>
-              <span className="sr-only">{status}</span>
-            </button>
-          );
-        })}
-      </div>
-    </section>
-  );
 }
 
 function displayedProbabilityPair(
@@ -236,21 +166,41 @@ function CompactMatchupScoreboard({
   opponentTeam,
   displayWeek,
   scoreRow,
+  matchupIndex,
+  matchupCount,
 }: {
   data: LeagueMatchupTabResponse;
   myTeam: LeagueMatchupTeam | null;
   opponentTeam: LeagueMatchupTeam | null;
   displayWeek: number;
   scoreRow?: LeagueScoreboardRow;
+  matchupIndex: number;
+  matchupCount: number;
 }) {
   const winChance = displayedProbabilityPair(myTeam?.win_probability, opponentTeam?.win_probability);
   const myTeamIsLeading = Boolean(winChance && winChance.my >= winChance.opponent);
 
   return (
-    <section className="border-b border-cfb-border-subtle bg-cfb-surface-raised/50 px-3 py-3 sm:px-5 sm:py-4">
+    <section className="relative border-b border-cfb-border-subtle bg-cfb-surface-raised/50 px-3 pb-3 pt-6 sm:px-5 sm:pb-4 sm:pt-7">
       <h2 className="sr-only">
         {myTeam?.fantasy_team_name ?? "Your team"} vs {opponentTeam?.fantasy_team_name ?? "Opponent"}
       </h2>
+      {matchupCount > 1 ? (
+        <div
+          aria-label={`Matchup ${matchupIndex + 1} of ${matchupCount}. Swipe left or right to view another matchup.`}
+          className="absolute right-3 top-2 flex items-center gap-1 sm:right-5"
+        >
+          {Array.from({ length: matchupCount }, (_, index) => (
+            <span
+              key={index}
+              aria-hidden="true"
+              className={`h-1.5 rounded-full transition-[width,background-color] ${
+                index === matchupIndex ? "w-3 bg-cfb-brand" : "w-1.5 bg-cfb-border-strong"
+              }`}
+            />
+          ))}
+        </div>
+      ) : null}
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-5">
         <MatchupTeamSummary
           team={myTeam}
@@ -320,6 +270,8 @@ export default function LeagueMatchup() {
   const scheduledMatchups = scoreboardQuery.data?.data ?? [];
   const activeMatchupId = selectedMatchupId ?? data?.matchup_id;
   const activeScoreRow = scheduledMatchups.find((matchup) => matchup.matchup_id === activeMatchupId);
+  const activeMatchupIndex = Math.max(0, scheduledMatchups.findIndex((matchup) => matchup.matchup_id === activeMatchupId));
+  const swipeStartX = useRef<number | null>(null);
   const scoringFreshnessMessage = freshnessText(data);
   const scoringFreshnessTone = data?.live_scoring_freshness?.state === "fresh"
     ? "border-emerald-300/20 bg-emerald-300/[0.06] text-emerald-100"
@@ -332,6 +284,11 @@ export default function LeagueMatchup() {
     if (matchupId) next.set("matchup", String(matchupId));
     else next.delete("matchup");
     setSearchParams(next);
+  };
+  const selectAdjacentMatchup = (direction: -1 | 1) => {
+    if (scheduledMatchups.length < 2) return;
+    const nextIndex = (activeMatchupIndex + direction + scheduledMatchups.length) % scheduledMatchups.length;
+    updateSelection(displayWeek, scheduledMatchups[nextIndex]?.matchup_id);
   };
 
   if (leagueQuery.isLoading) {
@@ -377,13 +334,6 @@ export default function LeagueMatchup() {
 
       <div className="px-3 py-2 sm:px-5"><RivalryControls leagueId={parsedLeagueId} /></div>
 
-      <MatchupRail
-        matchups={scheduledMatchups}
-        selectedMatchupId={activeMatchupId}
-        isLoading={scoreboardQuery.isLoading}
-        onSelect={(matchupId) => updateSelection(displayWeek, matchupId)}
-      />
-
       {matchupQuery.isError ? (
         <ErrorState
           title="Unable to load matchup"
@@ -406,7 +356,23 @@ export default function LeagueMatchup() {
         />
       ) : (
         <>
-          <div>
+          <div
+            data-testid="matchup-swipe-surface"
+            onTouchStart={(event) => {
+              swipeStartX.current = event.touches[0]?.clientX ?? null;
+            }}
+            onTouchEnd={(event) => {
+              const startX = swipeStartX.current;
+              swipeStartX.current = null;
+              const endX = event.changedTouches[0]?.clientX;
+              if (startX === null || typeof endX !== "number" || Math.abs(endX - startX) < 48) return;
+              selectAdjacentMatchup(endX < startX ? 1 : -1);
+            }}
+            onTouchCancel={() => {
+              swipeStartX.current = null;
+            }}
+          >
+            <OpeningWeekPatch week={displayWeek} />
             <RivalWeekPatch rivalry={data.rivalry} leagueId={parsedLeagueId} matchupId={data.matchup_id} />
             <CompactMatchupScoreboard
               data={data}
@@ -414,6 +380,8 @@ export default function LeagueMatchup() {
               opponentTeam={opponentTeam}
               displayWeek={displayWeek}
               scoreRow={activeScoreRow}
+              matchupIndex={activeMatchupIndex}
+              matchupCount={scheduledMatchups.length}
             />
           </div>
 
