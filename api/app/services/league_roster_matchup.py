@@ -893,7 +893,7 @@ def build_matchup_tab_view(
         provider_snapshot_at=provider_snapshot_at,
         next_refresh_at=(provider_snapshot_at + timedelta(seconds=180)) if provider_snapshot_at else None,
         message=None,
-        rivalry=matchup_rivalry_context(db, league, primary_team, opponent),
+        rivalry=matchup_rivalry_context(db, league, matchup, primary_team, opponent),
     )
 
 
