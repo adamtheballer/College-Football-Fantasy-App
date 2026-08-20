@@ -56,7 +56,7 @@ def test_rivalry_invites_require_completed_draft_and_expire_lazily(client):
     assert view.status_code == 200 and view.json()["outgoing_invite"] is None
 
 
-def test_only_the_final_scheduled_rival_meeting_gets_rival_week_context(client):
+def test_first_and_final_scheduled_rival_meetings_get_rival_week_context(client):
     league, sender_token, recipient_token = _completed_two_manager_league(client)
     candidate = client.get(f"/leagues/{league['id']}/rivalry", headers=auth_headers(recipient_token)).json()["candidates"][0]
     invite = client.post(
@@ -74,6 +74,7 @@ def test_only_the_final_scheduled_rival_meeting_gets_rival_week_context(client):
         db.add_all(
             [
                 Matchup(league_id=league["id"], season=2026, week=2, home_team_id=teams[0].id, away_team_id=teams[1].id, status="projected"),
+                Matchup(league_id=league["id"], season=2026, week=7, home_team_id=teams[0].id, away_team_id=teams[1].id, status="projected"),
                 Matchup(league_id=league["id"], season=2026, week=12, home_team_id=teams[1].id, away_team_id=teams[0].id, status="projected"),
             ]
         )
@@ -81,7 +82,11 @@ def test_only_the_final_scheduled_rival_meeting_gets_rival_week_context(client):
 
     first_meeting = client.get(f"/leagues/{league['id']}/matchup?week=2", headers=auth_headers(sender_token))
     assert first_meeting.status_code == 200
-    assert first_meeting.json()["rivalry"] is None
+    assert first_meeting.json()["rivalry"]["is_rivalry_matchup"] is True
+
+    middle_meeting = client.get(f"/leagues/{league['id']}/matchup?week=7", headers=auth_headers(sender_token))
+    assert middle_meeting.status_code == 200
+    assert middle_meeting.json()["rivalry"] is None
 
     final_meeting = client.get(f"/leagues/{league['id']}/matchup?week=12", headers=auth_headers(sender_token))
     assert final_meeting.status_code == 200

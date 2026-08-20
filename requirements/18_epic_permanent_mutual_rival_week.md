@@ -2,7 +2,7 @@
 
 ## Summary
 
-Managers may form one mutually accepted, permanent rivalry per league after the draft completes. Rivalries are social metadata only: they never change scoring, projections, scheduling, standings, playoffs, waivers, trades, or draft behavior. Teams still play one canonical matchup per week. Their first scheduled meeting remains a normal game for early bragging rights; only their final scheduled meeting in a season receives Rival Week context and presentation.
+Managers may form one mutually accepted, permanent rivalry per league after the draft completes. Rivalries are social metadata only: they never change scoring, projections, scheduling, standings, playoffs, waivers, trades, or draft behavior. Teams still play one canonical matchup per week. Their first and final scheduled meetings each receive Rival Week context and presentation; any middle meetings remain normal games.
 
 ## In Scope
 
@@ -23,7 +23,7 @@ Managers may form one mutually accepted, permanent rivalry per league after the 
 
 - As a drafted-league manager, I can invite an eligible human league mate after acknowledging that acceptance is permanent.
 - As a recipient, I can review the permanent consequences before accepting, declining, or ignoring an invitation.
-- As a rival, I see Rival Week only for the final scheduled meeting with my rival that season; earlier meetings remain normal matchups.
+- As a rival, I see Rival Week for the first and final scheduled meetings with my rival that season; any middle meetings remain normal matchups.
 - As a league manager, I retain my accepted rival across future seasons of the same league.
 
 ## API
@@ -48,7 +48,7 @@ Managers may form one mutually accepted, permanent rivalry per league after the 
 - Acceptance invalidates competing pending invitations involving either accepted team.
 - Rivalries persist across league seasons and derive their record from canonical finalized matchups only.
 - Rival Week never changes scheduling, score, projection, standings, or lineup behavior.
-- Rival Week presentation is original, accessible, responsive, reduced-motion-safe, and only appears for the final scheduled rivalry matchup of the season.
+- Rival Week presentation is original, accessible, responsive, reduced-motion-safe, and appears only for the first and final scheduled rivalry matchups of the season.
 
 ## Tracking
 
