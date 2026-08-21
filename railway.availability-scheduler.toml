@@ -1,0 +1,11 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.api"
+
+[deploy]
+# Railway evaluates cron in UTC. The script itself runs only at 10 AM America/New_York,
+# making this safe across the EST/EDT transition.
+cronSchedule = "0 14,15 * * *"
+startCommand = "cd /app && exec env PYTHONPATH=/app uv run python scripts/sync_official_availability_reports.py --season 2026 --only-local-hour 10"
+restartPolicyType = "NEVER"
+restartPolicyMaxRetries = 0
