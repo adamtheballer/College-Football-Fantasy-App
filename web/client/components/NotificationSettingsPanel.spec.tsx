@@ -34,12 +34,31 @@ import { NotificationSettingsPanel } from "./NotificationSettingsPanel";
 
 const preferences = {
   push_enabled: false, email_enabled: false, draft_alerts: true, injury_alerts: false,
+  injury_alert_scope: "ALL" as const,
   usage_alerts: false, waiver_alerts: true, projection_alerts: false,
   lineup_reminders: true, trade_alerts: true, chat_alerts: true, matchup_results: true,
   matchup_start_alerts: true, matchup_result_alerts: true, big_play_alerts: false,
   long_rush_alerts: false, long_reception_alerts: false, long_pass_alerts: false,
   quiet_hours_start: null, quiet_hours_end: null, timezone: "America/New_York",
 };
+
+const leaguePreference = (league_id: number, league_name: string, injury_alerts = true) => ({
+  league_id,
+  league_name,
+  enabled: true,
+  injury_alerts,
+  big_play_alerts: false,
+  projection_alerts: true,
+  draft_alerts: true,
+  trade_alerts: true,
+  waiver_alerts: true,
+  matchup_start_alerts: true,
+  matchup_result_alerts: true,
+  lineup_reminders: true,
+  long_rush_alerts: false,
+  long_reception_alerts: false,
+  long_pass_alerts: false,
+});
 
 afterEach(() => {
   cleanup();
@@ -83,6 +102,28 @@ describe("NotificationSettingsPanel async lifecycle", () => {
     expect(group.textContent).toContain("40+ yard receptions");
     expect(group.textContent).toContain("40+ yard completed passes");
     expect(screen.queryByLabelText("Touchdowns notifications")).toBeNull();
+  });
+
+  it("shows a compact injury-league selector only for selected-league coverage", async () => {
+    const leagueOne = leaguePreference(11, "Saturday League");
+    const leagueTwo = leaguePreference(12, "Friends League", false);
+    api.get.mockResolvedValueOnce({ ...preferences, injury_alerts: true, injury_alert_scope: "SELECTED" }).mockResolvedValueOnce({ data: [leagueOne, leagueTwo] });
+    api.post.mockResolvedValueOnce({ data: [{ ...leagueOne, injury_alerts: false }, leagueTwo] });
+    render(<NotificationSettingsPanel />);
+
+    expect(await screen.findByText("Selected leagues")).toBeTruthy();
+    expect(screen.getByLabelText("Saturday League injury updates")).toBeTruthy();
+    expect(screen.getByLabelText("Friends League injury updates")).toBeTruthy();
+    expect(screen.queryByText("League notifications")).toBeNull();
+    expect(screen.queryByLabelText("Saturday League Drafts")).toBeNull();
+
+    fireEvent.click(screen.getByLabelText("Saturday League injury updates"));
+    expect(api.post).toHaveBeenCalledWith(
+      "/notifications/league-preferences",
+      { items: [{ ...leagueOne, injury_alerts: false }, leagueTwo] },
+      undefined,
+      expect.any(AbortSignal),
+    );
   });
 
   it("aborts a delayed preference update on unmount without reporting an async error", async () => {

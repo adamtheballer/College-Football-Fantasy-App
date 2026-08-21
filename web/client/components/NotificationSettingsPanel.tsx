@@ -85,22 +85,6 @@ const longPlayRows: Array<{ key: "long_rush_alerts" | "long_reception_alerts" | 
   { key: "long_pass_alerts", label: "Long passes", description: "40+ yard completed passes." },
 ];
 
-type LeagueToggleKey = "injury_alerts" | "draft_alerts" | "trade_alerts" | "waiver_alerts" | "matchup_start_alerts" | "matchup_result_alerts" | "lineup_reminders" | "big_play_alerts" | "long_rush_alerts" | "long_reception_alerts" | "long_pass_alerts";
-
-const leagueRows: Array<{ key: LeagueToggleKey; label: string }> = [
-  { key: "injury_alerts", label: "Injury updates" },
-  { key: "draft_alerts", label: "Drafts" },
-  { key: "trade_alerts", label: "Trades" },
-  { key: "waiver_alerts", label: "Waivers" },
-  { key: "matchup_start_alerts", label: "Starts" },
-  { key: "matchup_result_alerts", label: "Results" },
-  { key: "lineup_reminders", label: "Lineup" },
-  { key: "big_play_alerts", label: "Big plays" },
-  { key: "long_rush_alerts", label: "Long rushes" },
-  { key: "long_reception_alerts", label: "Long receptions" },
-  { key: "long_pass_alerts", label: "Long passes" },
-];
-
 const permissionCopy: Record<BrowserPushState, string> = {
   default: "Get alerts for drafts, trades, waivers, and important fantasy updates.",
   granted: "Push notifications are enabled for this browser.",
@@ -306,6 +290,32 @@ export function NotificationSettingsPanel() {
               <option value="SELECTED">Only selected leagues below</option>
             </select>
           </label>
+          {preferences.injury_alerts && preferences.injury_alert_scope === "SELECTED" ? (
+            <div className="mt-3 border-t border-border/35 pt-3">
+              <p className="text-xs font-bold text-foreground">Selected leagues</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Choose the leagues where a rostered player&apos;s injury status should alert you.</p>
+              {leaguePreferences?.length ? (
+                <div className="mt-2 divide-y divide-border/35 rounded-md border border-border/45">
+                  {leaguePreferences.map((league) => {
+                    const leagueName = league.league_name ?? `League ${league.league_id}`;
+                    return (
+                      <div key={league.league_id} className="flex items-center justify-between gap-4 px-3 py-2.5">
+                        <span className="min-w-0 truncate text-sm font-semibold text-foreground">{leagueName}</span>
+                        <Switch
+                          checked={league.injury_alerts}
+                          disabled={saving}
+                          onCheckedChange={(injury_alerts) => void saveLeaguePreference({ ...league, injury_alerts, enabled: injury_alerts ? true : league.enabled })}
+                          aria-label={`${leagueName} injury updates`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">Join a league to choose injury alert coverage.</p>
+              )}
+            </div>
+          ) : null}
         </div> : null}
         {preferences ? rows.map((row) => (
           <div key={row.key} className="flex items-center justify-between gap-5 border-b border-border/35 py-3 last:border-0">
@@ -343,20 +353,6 @@ export function NotificationSettingsPanel() {
             <label className="block max-w-sm text-xs text-muted-foreground">Timezone (IANA name)<Input aria-label="Notification timezone" value={preferences.timezone} onChange={(event) => setPreferences({ ...preferences, timezone: event.target.value })} onBlur={(event) => void save({ ...preferences, timezone: event.currentTarget.value })} placeholder="America/New_York" /></label>
             <p className="text-[11px] text-muted-foreground">Use your local timezone (currently {preferences.timezone}) for quiet hours.</p>
           </div>
-          {leaguePreferences?.length ? <div className="space-y-2 border-b border-border/35 py-4">
-            <div><p className="text-sm font-bold text-foreground">League notifications</p><p className="text-xs text-muted-foreground">Mute a league without changing your global preferences.</p></div>
-            {leaguePreferences.map((league) => (
-              <div key={league.league_id} className="space-y-3 rounded-xl border border-border/45 px-3 py-3">
-                <div className="flex items-center justify-between gap-4">
-                  <span className="min-w-0"><span className="block truncate text-sm font-semibold text-foreground">{league.league_name ?? `League ${league.league_id}`}</span><span className="text-[11px] text-muted-foreground">Fine-tune the categories for this league.</span></span>
-                  <Switch checked={league.enabled} disabled={saving} onCheckedChange={(enabled) => void saveLeaguePreference({ ...league, enabled })} aria-label={`${league.league_name ?? "League"} notifications`} />
-                </div>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3">
-                  {leagueRows.map((row) => <label key={String(row.key)} className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground"><span>{row.label}</span><Switch checked={Boolean(league[row.key])} disabled={saving || !league.enabled} onCheckedChange={(checked) => void saveLeaguePreference({ ...league, [row.key]: checked })} aria-label={`${league.league_name ?? "League"} ${row.label}`} /></label>)}
-                </div>
-              </div>
-            ))}
-          </div> : null}
         </> : null}
         <p className="flex gap-2 pt-3 text-xs leading-relaxed text-muted-foreground"><Info className="mt-0.5 h-4 w-4 shrink-0" /> In-app notification history is retained even when push or email is turned off.</p>
         {message ? <p role="alert" className="text-sm text-red-300">{message}</p> : null}
