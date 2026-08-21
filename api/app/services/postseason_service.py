@@ -40,12 +40,20 @@ from collegefootballfantasy_api.app.services.postseason_topology import (
     format_summary,
     required_rounds,
 )
+from collegefootballfantasy_api.app.services.power4 import is_power4_school, list_power4_teams
 from collegefootballfantasy_api.app.services.notification_service import queue_notification_event
 
 
 FINAL_MATCHUP_STATUSES = frozenset({"final", "completed", "stat_corrected"})
 STARTED_MATCHUP_STATUSES = frozenset({"live", "in_progress", *FINAL_MATCHUP_STATUSES})
 POSTSEASON_STATUSES = frozenset({"PLANNED", "SEEDING_PENDING", "LOCKED", "ACTIVE", "FINALIZING", "COMPLETED", "REVIEW_REQUIRED"})
+# Conference-championship week contains only a small subset of Power Four
+# teams. A fantasy championship must not depend on it. The final usable week
+# is therefore the latest imported slate on which a broad majority of P4
+# schools play; a 70% threshold keeps normal individual byes from moving the
+# season backward while clearly excluding the championship-only slate.
+BROAD_POWER4_SLATE_SHARE = 0.70
+CONSERVATIVE_FANTASY_SEASON_END_WEEK = 14
 
 
 @dataclass(frozen=True)
@@ -79,21 +87,34 @@ def validate_playoff_team_count(*, playoff_teams: int, max_teams: int) -> int:
     return playoff_teams
 
 
-def approved_season_end_week(db: Session, season: int) -> int:
-    """Use imported, approved CFB schedule coverage, with a conservative fallback.
+def approved_fantasy_season_end_week(db: Session, season: int) -> int:
+    """Return the final broad Power Four slate eligible for fantasy scoring.
 
-    No browser or caller hardcodes a postseason start.  The scheduler relies on
-    this same source so a future imported season can carry a different number
-    of usable fantasy weeks.
+    This is intentionally *not* the latest CFB game week. Conference
+    championships occur after most fantasy-relevant P4 schools have stopped
+    playing, so treating their week as a normal fantasy week would incorrectly
+    zero much of every roster. The imported schedule remains authoritative;
+    the fallback only applies while a complete approved schedule is absent.
     """
-    max_week = db.query(func.max(TeamSchedule.week)).filter(TeamSchedule.season == season).scalar()
-    return max(1, int(max_week or 15))
+    rows = db.query(TeamSchedule.team_name, TeamSchedule.week).filter(
+        TeamSchedule.season == season,
+        TeamSchedule.is_bye.is_(False),
+        TeamSchedule.location != "bye",
+    ).all()
+    active_by_week: dict[int, set[str]] = defaultdict(set)
+    for team_name, week in rows:
+        if is_power4_school(team_name):
+            active_by_week[int(week)].add(team_name)
+    power4_count = len(list_power4_teams())
+    minimum_active_teams = max(1, int(power4_count * BROAD_POWER4_SLATE_SHARE))
+    broad_weeks = [week for week, teams in active_by_week.items() if len(teams) >= minimum_active_teams]
+    return max(broad_weeks) if broad_weeks else CONSERVATIVE_FANTASY_SEASON_END_WEEK
 
 
 def postseason_calendar(db: Session, league: League, playoff_teams: int) -> dict[str, int]:
     validate_playoff_team_count(playoff_teams=playoff_teams, max_teams=league.max_teams)
     rounds = required_rounds(playoff_teams)
-    final_week = approved_season_end_week(db, league.season_year)
+    final_week = approved_fantasy_season_end_week(db, league.season_year)
     regular_end = final_week - rounds
     if regular_end < 1:
         raise ValueError("approved season calendar does not have enough weeks for this playoff format")

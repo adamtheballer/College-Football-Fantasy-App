@@ -20,7 +20,7 @@ from collegefootballfantasy_api.app.models.trade_offer_item import TradeOfferIte
 from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
-from collegefootballfantasy_api.app.services.league_schedule import REGULAR_SEASON_WEEKS, ensure_league_schedule
+from collegefootballfantasy_api.app.services.league_schedule import ensure_league_schedule
 from collegefootballfantasy_api.app.services.scoring_service import normalize_scoring_rules
 from collegefootballfantasy_api.app.services.draft_service import process_expired_draft_picks_once
 from collegefootballfantasy_api.app.core.config import settings
@@ -450,7 +450,7 @@ def test_schedule_generation_rejects_legacy_odd_team_count(client, db_session):
         ensure_league_schedule(db_session, league_row)
 
 
-def test_schedule_generation_creates_and_backfills_a_fair_13_week_regular_season(client, db_session):
+def test_schedule_generation_creates_and_backfills_a_fair_regular_season_before_playoffs(client, db_session):
     token = create_user_and_token(client, "schedule-fairness")
     league = create_league(client, token, name="Fair Schedule League", max_teams=4)
     league_row = db_session.get(League, league["id"])
@@ -468,8 +468,12 @@ def test_schedule_generation_creates_and_backfills_a_fair_13_week_regular_season
     team_ids = {team.id for team in teams}
     assert len(team_ids) == 4
 
-    assert ensure_league_schedule(db_session, league_row, regular_season_weeks=12) == 24
-    assert ensure_league_schedule(db_session, league_row) == 2
+    # A four-team postseason uses Weeks 13-14; regular-season scheduling must
+    # stop at the final broad CFB slate rather than spilling into
+    # conference-championship week.
+    regular_season_weeks = 12
+    assert ensure_league_schedule(db_session, league_row, regular_season_weeks=regular_season_weeks) == 24
+    assert ensure_league_schedule(db_session, league_row) == 0
     db_session.flush()
 
     matchups = (
@@ -478,11 +482,11 @@ def test_schedule_generation_creates_and_backfills_a_fair_13_week_regular_season
         .order_by(Matchup.week.asc(), Matchup.id.asc())
         .all()
     )
-    assert len(matchups) == (len(team_ids) // 2) * REGULAR_SEASON_WEEKS
-    assert {matchup.week for matchup in matchups} == set(range(1, REGULAR_SEASON_WEEKS + 1))
+    assert len(matchups) == (len(team_ids) // 2) * regular_season_weeks
+    assert {matchup.week for matchup in matchups} == set(range(1, regular_season_weeks + 1))
 
     matchup_counts_by_pair: dict[tuple[int, int], int] = {}
-    for week in range(1, REGULAR_SEASON_WEEKS + 1):
+    for week in range(1, regular_season_weeks + 1):
         weekly_matchups = [matchup for matchup in matchups if matchup.week == week]
         assert len(weekly_matchups) == len(team_ids) // 2
         assert {team_id for matchup in weekly_matchups for team_id in (matchup.home_team_id, matchup.away_team_id)} == team_ids

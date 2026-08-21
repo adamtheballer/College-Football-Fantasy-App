@@ -5,18 +5,47 @@ from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings, PostseasonBracket, PostseasonFinalStanding, PostseasonMatchup
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.api.routes.insights import _championships_by_user
 from collegefootballfantasy_api.app.schemas.postseason import PostseasonBracketRead
 from collegefootballfantasy_api.app.services.postseason_service import (
     calculate_final_standings,
     advance_postseason_state,
+    approved_fantasy_season_end_week,
     lock_postseason_seeds,
     materialize_ready_postseason_matchups,
+    postseason_calendar,
     refresh_postseason_activity,
     resolve_postseason_matchup,
     serialize_postseason,
 )
+from collegefootballfantasy_api.app.services.power4 import list_power4_teams
+
+
+def test_fantasy_calendar_excludes_conference_championship_only_week(db_session):
+    """Week 15 can contain title games, but it cannot become a fantasy week.
+
+    A full Week 14 P4 slate is eligible; a handful of Week 15 conference
+    championship participants is deliberately insufficient coverage.
+    """
+    teams = list_power4_teams()
+    db_session.add_all(
+        [TeamSchedule(team_name=team, season=2026, week=14, location="home", is_bye=False) for team in teams]
+        + [TeamSchedule(team_name=team, season=2026, week=15, location="neutral", is_bye=False) for team in teams[:8]]
+    )
+    db_session.commit()
+
+    assert approved_fantasy_season_end_week(db_session, 2026) == 14
+
+
+def test_fantasy_playoffs_finish_on_the_last_broad_cfb_slate_by_format(db_session):
+    expected_regular_weeks = {2: 13, 4: 12, 6: 11, 8: 11}
+    for playoff_teams, expected_regular_end in expected_regular_weeks.items():
+        league = League(name=f"Calendar {playoff_teams}", season_year=2026, max_teams=playoff_teams)
+        calendar = postseason_calendar(db_session, league, playoff_teams)
+        assert calendar["regular_season_end_week"] == expected_regular_end
+        assert calendar["championship_week"] == 14
 
 
 def _four_team_league(db_session):
