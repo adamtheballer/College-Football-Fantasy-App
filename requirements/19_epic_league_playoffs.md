@@ -12,13 +12,19 @@ second scoring path.
 
 - Supported playoff team counts are exactly `2`, `4`, `6`, and `8`, never more
   than the league's team count.
-- Week 14 is the fantasy championship week. The application verifies from the
-  imported schedule that **every canonical Power Four school** has a scheduled
-  game in Week 14 and explicitly excludes conference-championship-only Week
-  15. Once an approved P4 schedule is imported, a missing Week 14 game is a
-  blocking readiness error—not a best-effort approximation. It reserves the
-  necessary final weeks and schedules only the remaining regular-season weeks.
-  Existing started/final matchups are never rewritten or deleted.
+- The season calendar is derived only from a versioned, sealed schedule
+  artifact—not an imported database row, mutable Sheet, or live provider
+  response. Its eligible universe is ACC, Big Ten, Big 12, SEC, and Notre
+  Dame. The calendar accepts only contiguous weeks where every eligible school
+  has one verified non-BYE regular game; it excludes cancelled,
+  conference-championship, bowl, and CFP rows and fails closed on missing or
+  contradictory evidence.
+- For the approved 2026 policy: two-team championships use Week 13; four-team
+  playoffs use Weeks 12–13; six- and eight-team playoffs use Weeks 11–13.
+  The derived calendar is snapshotted with its policy version, source identity,
+  revision, SHA-256, and format version when a league plan is created. Existing
+  leagues are never silently rewritten, and started/final matchups are never
+  deleted.
 - Seeding uses the canonical regular-season standings snapshot: win percentage,
   points for, unambiguous head-to-head, lower points against, then a persisted
   audited deterministic draw. Seeds lock only after every required regular
@@ -36,6 +42,9 @@ second scoring path.
 - Migration readiness, CI, Docker boot, real-stack E2E, and shadow
   certification derive the one repository Alembic head dynamically; none may
   hardcode an expected revision.
+- League postseason snapshots preserve regular-season start/end,
+  playoff/championship weeks, round count, calendar policy version, and sealed
+  schedule provenance so historical season results remain reproducible.
 - Seeds may rebuild before the first playoff kickoff after a regular-season
   correction; after kickoff, the field and seed order are immutable.
 - Exact final-score playoff ties advance the higher original seed under the
@@ -105,8 +114,10 @@ second scoring path.
   ordinary matchup page.
 - Six-team byes are rendered as byes, not empty matchup cards. Placement and
   final standing views stay distinct from championship routing.
-- League settings show the chosen team count, round count, higher-seed tie rule,
-  format preview before lock, and a clear lock explanation afterwards.
+- League settings and the postseason view show the derived regular-season end,
+  playoff start, championship week, round count, higher-seed tie rule, and a
+  clear lock explanation. The format can regenerate only before the first
+  regular-season matchup starts.
 - Matchup pages render server-derived postseason context; championship receives
   an original app-owned gold treatment. Existing rivalry context may coexist but
   cannot alter postseason scoring.
@@ -115,6 +126,9 @@ second scoring path.
 
 - Add a dry-run-first `scripts/audit_postseason_readiness.py`; mutations require
   `--apply` and may not delete started/final matchups.
+- Add `scripts/certify_season_calendar.py`, which produces JSON and Markdown
+  evidence from the sealed source and blocks release when the source or full
+  coverage proof is unavailable.
 - Add structured, identifier-only lifecycle events and deterministic
   notification keys for seeds, bye, matchup, advance, and champion events.
 - Add migration safety tests: current-head upgrade, downgrade, upgrade, fresh

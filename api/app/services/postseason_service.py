@@ -29,7 +29,6 @@ from collegefootballfantasy_api.app.models.postseason import (
 )
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
-from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.postseason_topology import (
     FIXED_BRACKET_FORMAT_VERSION,
@@ -40,21 +39,13 @@ from collegefootballfantasy_api.app.services.postseason_topology import (
     format_summary,
     required_rounds,
 )
-from collegefootballfantasy_api.app.services.power4 import canonical_school_name, is_power4_school, list_power4_teams
 from collegefootballfantasy_api.app.services.notification_service import queue_notification_event
+from collegefootballfantasy_api.app.services.season_calendar import calendar_for_season
 
 
 FINAL_MATCHUP_STATUSES = frozenset({"final", "completed", "stat_corrected"})
 STARTED_MATCHUP_STATUSES = frozenset({"live", "in_progress", *FINAL_MATCHUP_STATUSES})
 POSTSEASON_STATUSES = frozenset({"PLANNED", "SEEDING_PENDING", "LOCKED", "ACTIVE", "FINALIZING", "COMPLETED", "REVIEW_REQUIRED"})
-# Conference-championship week contains only a small subset of Power Four
-# teams. A fantasy championship must not depend on it. For the current app
-# calendar the final usable week is Week 14, and that week is eligible only if
-# *every* canonical P4 school has a game. A partial imported schedule never
-# gets treated as evidence that the missing schools are safe to start.
-FANTASY_CHAMPIONSHIP_WEEK = 14
-
-
 @dataclass(frozen=True)
 class RankedTeam:
     team: Team
@@ -87,51 +78,35 @@ def validate_playoff_team_count(*, playoff_teams: int, max_teams: int) -> int:
 
 
 def approved_fantasy_season_end_week(db: Session, season: int) -> int:
-    """Return Week 14 only when every Power Four school is eligible to score.
+    """Compatibility read of the latest certified broad slate.
 
-    This is intentionally *not* the latest CFB game week. Conference
-    championships occur after most fantasy-relevant P4 schools have stopped
-    playing, so treating their week as a normal fantasy week would incorrectly
-    zero much of every roster. The imported schedule remains authoritative. A
-    fallback is allowed only before *any* P4 schedule rows have been imported;
-    once imported data exists, a missing Week 14 game for even one P4 school is
-    a blocking error.
+    ``db`` remains in this public function signature so existing callers do
+    not accidentally substitute their imported schedule rows. It is never
+    read: only the sealed release artifact may set postseason timing.
     """
-    rows = db.query(TeamSchedule.team_name, TeamSchedule.week, TeamSchedule.is_bye, TeamSchedule.location).filter(
-        TeamSchedule.season == season,
-    ).all()
-    expected_schools = set(list_power4_teams())
-    active_by_week: dict[int, set[str]] = defaultdict(set)
-    imported_power4_rows = 0
-    for team_name, week, is_bye, location in rows:
-        if is_power4_school(team_name):
-            imported_power4_rows += 1
-            canonical = canonical_school_name(team_name)
-            if canonical and not is_bye and location != "bye":
-                active_by_week[int(week)].add(canonical)
-    if active_by_week.get(FANTASY_CHAMPIONSHIP_WEEK, set()) == expected_schools:
-        return FANTASY_CHAMPIONSHIP_WEEK
-    if imported_power4_rows:
-        raise ValueError(
-            "approved P4 schedule does not show every P4 school playing in Week 14"
-        )
-    return FANTASY_CHAMPIONSHIP_WEEK
+
+    del db
+    # Both three-round formats exercise the longest currently supported
+    # window, which identifies the final certified championship slate.
+    return calendar_for_season(season, 8).championship_week
 
 
-def postseason_calendar(db: Session, league: League, playoff_teams: int) -> dict[str, int]:
+def postseason_calendar(db: Session, league: League, playoff_teams: int) -> dict[str, int | str]:
     validate_playoff_team_count(playoff_teams=playoff_teams, max_teams=league.max_teams)
-    rounds = required_rounds(playoff_teams)
-    final_week = approved_fantasy_season_end_week(db, league.season_year)
-    regular_end = final_week - rounds
-    if regular_end < 1:
-        raise ValueError("approved season calendar does not have enough weeks for this playoff format")
+    del db
+    calendar = calendar_for_season(league.season_year, playoff_teams)
     return {
-        "regular_season_start_week": 1,
-        "regular_season_end_week": regular_end,
-        "playoff_start_week": regular_end + 1,
-        "championship_week": final_week,
-        "rounds": rounds,
-        "season_end_week": final_week,
+        "regular_season_start_week": calendar.regular_season_start_week,
+        "regular_season_end_week": calendar.regular_season_end_week,
+        "playoff_start_week": calendar.playoff_start_week,
+        "championship_week": calendar.championship_week,
+        "rounds": calendar.max_rounds,
+        "season_end_week": calendar.championship_week,
+        "calendar_policy_version": calendar.calendar_policy_version,
+        "calendar_source_identity": calendar.source_identity,
+        "calendar_source_revision": calendar.source_revision,
+        "calendar_source_sha256": calendar.source_sha256,
+        "calendar_source_format_version": calendar.source_format_version,
     }
 
 
@@ -140,13 +115,13 @@ def get_or_create_postseason_settings(db: Session, league: League) -> LeaguePost
         LeaguePostseasonSettings.league_id == league.id,
         LeaguePostseasonSettings.season == league.season_year,
     ).one_or_none()
-    league_settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).one_or_none()
-    playoff_teams = validate_playoff_team_count(
-        playoff_teams=int((league_settings.playoff_teams if league_settings else 4) or 4),
-        max_teams=league.max_teams,
-    )
-    calendar = postseason_calendar(db, league, playoff_teams)
     if settings_row is None:
+        league_settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).one_or_none()
+        playoff_teams = validate_playoff_team_count(
+            playoff_teams=int((league_settings.playoff_teams if league_settings else 4) or 4),
+            max_teams=league.max_teams,
+        )
+        calendar = postseason_calendar(db, league, playoff_teams)
         settings_row = LeaguePostseasonSettings(
             league_id=league.id,
             season=league.season_year,
@@ -157,9 +132,50 @@ def get_or_create_postseason_settings(db: Session, league: League) -> LeaguePost
             regular_season_end_week=calendar["regular_season_end_week"],
             playoff_start_week=calendar["playoff_start_week"],
             championship_week=calendar["championship_week"],
+            calendar_policy_version=calendar["calendar_policy_version"],
+            calendar_source_identity=calendar["calendar_source_identity"],
+            calendar_source_revision=calendar["calendar_source_revision"],
+            calendar_source_sha256=calendar["calendar_source_sha256"],
+            calendar_source_format_version=calendar["calendar_source_format_version"],
         )
         db.add(settings_row)
         db.flush()
+    return settings_row
+
+
+def refresh_postseason_settings_calendar(
+    db: Session,
+    league: League,
+    *,
+    playoff_teams: int,
+) -> LeaguePostseasonSettings:
+    """Replace a planned calendar only before any league competition starts.
+
+    This is deliberately the one regeneration path used by the commissioner
+    settings mutation. Existing and started leagues retain their stored source
+    provenance and are handled by the dry-run audit rather than being rewritten.
+    """
+
+    calendar = postseason_calendar(db, league, playoff_teams)
+    settings_row = db.query(LeaguePostseasonSettings).filter(
+        LeaguePostseasonSettings.league_id == league.id,
+        LeaguePostseasonSettings.season == league.season_year,
+    ).one_or_none()
+    if settings_row is None:
+        return get_or_create_postseason_settings(db, league)
+    settings_row.playoff_team_count = playoff_teams
+    settings_row.championship_bracket_size = playoff_teams
+    settings_row.regular_season_start_week = calendar["regular_season_start_week"]
+    settings_row.regular_season_end_week = calendar["regular_season_end_week"]
+    settings_row.playoff_start_week = calendar["playoff_start_week"]
+    settings_row.championship_week = calendar["championship_week"]
+    settings_row.calendar_policy_version = calendar["calendar_policy_version"]
+    settings_row.calendar_source_identity = calendar["calendar_source_identity"]
+    settings_row.calendar_source_revision = calendar["calendar_source_revision"]
+    settings_row.calendar_source_sha256 = calendar["calendar_source_sha256"]
+    settings_row.calendar_source_format_version = calendar["calendar_source_format_version"]
+    db.add(settings_row)
+    db.flush()
     return settings_row
 
 
@@ -398,7 +414,13 @@ def lock_postseason_seeds(db: Session, league: League, *, now: datetime | None =
             league_id=league.id, season=league.season_year, bracket_type="CHAMPIONSHIP", status="LOCKED",
             total_teams=plan.playoff_team_count, total_rounds=plan.championship_week - plan.playoff_start_week + 1,
             regular_season_start_week=plan.regular_season_start_week, regular_season_end_week=plan.regular_season_end_week,
-            playoff_start_week=plan.playoff_start_week, max_rounds=required_rounds(plan.playoff_team_count),
+            playoff_start_week=plan.playoff_start_week, championship_week=plan.championship_week,
+            max_rounds=required_rounds(plan.playoff_team_count),
+            calendar_policy_version=plan.calendar_policy_version,
+            calendar_source_identity=plan.calendar_source_identity,
+            calendar_source_revision=plan.calendar_source_revision,
+            calendar_source_sha256=plan.calendar_source_sha256,
+            calendar_source_format_version=plan.calendar_source_format_version,
             format_version=FIXED_BRACKET_FORMAT_VERSION, tiebreaker_policy=HIGHER_SEED_TIEBREAKER,
             generated_at=now, seeds_locked_at=now,
         )
@@ -717,6 +739,12 @@ def serialize_postseason(db: Session, league: League) -> dict:
             "league_id": league.id, "season": league.season_year, "status": "SEEDING_PENDING" if regular_season_is_complete(db, league, plan.regular_season_end_week) else "PLANNED",
             "is_preview": True, "playoff_teams": plan.playoff_team_count,
             "regular_season_end_week": plan.regular_season_end_week, "playoff_start_week": plan.playoff_start_week,
+            "championship_week": plan.championship_week, "max_rounds": required_rounds(plan.playoff_team_count),
+            "calendar_policy_version": plan.calendar_policy_version,
+            "calendar_source_identity": plan.calendar_source_identity,
+            "calendar_source_revision": plan.calendar_source_revision,
+            "calendar_source_sha256": plan.calendar_source_sha256,
+            "calendar_source_format_version": plan.calendar_source_format_version,
             "format_version": FIXED_BRACKET_FORMAT_VERSION, "tiebreaker_policy": HIGHER_SEED_TIEBREAKER,
             "format_summary": preview["format_summary"], "playoff_cut_line": plan.playoff_team_count,
             "seeds": [
@@ -767,6 +795,12 @@ def serialize_postseason(db: Session, league: League) -> dict:
         "league_id": league.id, "season": bracket.season, "status": bracket.status, "is_preview": False,
         "playoff_teams": bracket.total_teams, "regular_season_end_week": bracket.regular_season_end_week,
         "playoff_start_week": bracket.playoff_start_week, "format_version": bracket.format_version,
+        "championship_week": bracket.championship_week, "max_rounds": bracket.max_rounds,
+        "calendar_policy_version": bracket.calendar_policy_version,
+        "calendar_source_identity": bracket.calendar_source_identity,
+        "calendar_source_revision": bracket.calendar_source_revision,
+        "calendar_source_sha256": bracket.calendar_source_sha256,
+        "calendar_source_format_version": bracket.calendar_source_format_version,
         "tiebreaker_policy": bracket.tiebreaker_policy, "format_summary": format_summary(bracket.total_teams),
         "seeds_locked_at": bracket.seeds_locked_at, "review_reason": bracket.review_reason, "seeds": seed_reads,
         "playoff_cut_line": bracket.total_teams, "champion": _team_read(teams.get(champion.team_id), users) if champion else None,

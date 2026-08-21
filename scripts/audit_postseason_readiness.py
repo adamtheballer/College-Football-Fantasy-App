@@ -23,8 +23,20 @@ from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSet
 from collegefootballfantasy_api.app.services.postseason_service import get_or_create_postseason_settings, postseason_calendar
 
 
+def _plan_fields(plan: dict) -> dict:
+    return {
+        key: plan[key]
+        for key in (
+            "regular_season_start_week", "regular_season_end_week", "playoff_start_week", "championship_week",
+            "rounds", "calendar_policy_version", "calendar_source_identity", "calendar_source_revision",
+            "calendar_source_sha256", "calendar_source_format_version",
+        )
+        if key in plan
+    }
+
+
 def audit(*, apply: bool = False) -> dict:
-    report: dict[str, list[dict]] = {"ready": [], "review_required": [], "created": []}
+    report: dict[str, list[dict]] = {"ready": [], "review_required": [], "created": [], "calendar_blocked": []}
     with SessionLocal() as db:
         for league in db.query(League).order_by(League.id).all():
             existing = db.query(LeaguePostseasonSettings).filter(
@@ -32,23 +44,22 @@ def audit(*, apply: bool = False) -> dict:
                 LeaguePostseasonSettings.season == league.season_year,
             ).one_or_none()
             try:
-                # ``get_or_create`` is only used in explicit apply mode; dry
-                # run computes the expected reservation without a write.
-                if existing is None and not apply:
-                    from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
+                from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 
-                    settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).one_or_none()
-                    plan = postseason_calendar(db, league, int(settings.playoff_teams if settings else 4))
-                else:
-                    plan_row = existing or get_or_create_postseason_settings(db, league)
-                    plan = {"regular_season_end_week": plan_row.regular_season_end_week, "playoff_start_week": plan_row.playoff_start_week}
+                settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).one_or_none()
+                expected_plan = postseason_calendar(db, league, int(settings.playoff_teams if settings else 4))
+                # ``get_or_create`` is only used in explicit apply mode. The
+                # dry run always reports its expected reservation without a
+                # write, including for existing historical plans.
+                if existing is None and apply:
+                    get_or_create_postseason_settings(db, league)
             except ValueError as exc:
-                report["review_required"].append({"league_id": league.id, "reason": str(exc)})
+                report["calendar_blocked"].append({"league_id": league.id, "reason": str(exc)})
                 continue
             occupied = db.query(Matchup).filter(
                 Matchup.league_id == league.id,
                 Matchup.season == league.season_year,
-                Matchup.week >= plan["playoff_start_week"],
+                Matchup.week >= expected_plan["playoff_start_week"],
             ).all()
             started = [row.id for row in occupied if (row.status or "").lower() in {"live", "in_progress", "final", "completed", "stat_corrected"}]
             if started:
@@ -61,7 +72,22 @@ def audit(*, apply: bool = False) -> dict:
                     "matchup_ids": [row.id for row in occupied],
                 })
                 continue
-            item = {"league_id": league.id, **plan}
+            item = {
+                "league_id": league.id,
+                "season": league.season_year,
+                "expected_calendar": _plan_fields(expected_plan),
+                "current_calendar": ({
+                    "regular_season_start_week": existing.regular_season_start_week,
+                    "regular_season_end_week": existing.regular_season_end_week,
+                    "playoff_start_week": existing.playoff_start_week,
+                    "championship_week": existing.championship_week,
+                    "calendar_policy_version": existing.calendar_policy_version,
+                    "calendar_source_identity": existing.calendar_source_identity,
+                    "calendar_source_revision": existing.calendar_source_revision,
+                    "calendar_source_sha256": existing.calendar_source_sha256,
+                    "calendar_source_format_version": existing.calendar_source_format_version,
+                } if existing else None),
+            }
             if existing is None and apply:
                 report["created"].append(item)
             else:

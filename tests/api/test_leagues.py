@@ -10,6 +10,7 @@ from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
@@ -659,6 +660,46 @@ def test_settings_view_shows_every_team_at_zero_zero_before_scoring(client, db_s
         (row["team_id"], row["wins"], row["losses"], row["ties"])
         for row in payload["standings"]
     } == {(team.id, 0, 0, 0) for team in teams}
+    assert payload["postseason_calendar"] is None
+
+
+def test_settings_view_exposes_only_a_persisted_certified_postseason_calendar(client, db_session):
+    owner_token = create_user_and_token(client, "calendar-settings-owner")
+    league = create_league(client, owner_token, name="Certified calendar settings", max_teams=2)
+    db_session.add(
+        LeaguePostseasonSettings(
+            league_id=league["id"],
+            season=2026,
+            regular_season_start_week=1,
+            regular_season_end_week=12,
+            playoff_start_week=13,
+            championship_week=13,
+            playoff_team_count=2,
+            calendar_policy_version="P4_FULL_COVERAGE_V2",
+            calendar_source_identity="approved-2026-snapshot",
+            calendar_source_revision="release-1",
+            calendar_source_sha256="a" * 64,
+            calendar_source_format_version="SEALED_CFB_SCHEDULE_V1",
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/leagues/{league['id']}/settings-view", headers=auth_headers(owner_token))
+
+    assert response.status_code == 200
+    assert response.json()["postseason_calendar"] == {
+        "regular_season_start_week": 1,
+        "regular_season_end_week": 12,
+        "playoff_start_week": 13,
+        "championship_week": 13,
+        "playoff_teams": 2,
+        "max_rounds": 1,
+        "calendar_policy_version": "P4_FULL_COVERAGE_V2",
+        "source_identity": "approved-2026-snapshot",
+        "source_revision": "release-1",
+        "source_sha256": "a" * 64,
+        "source_format_version": "SEALED_CFB_SCHEDULE_V1",
+    }
 
 
 def test_commissioner_can_rotate_and_revoke_invite(client, db_session):

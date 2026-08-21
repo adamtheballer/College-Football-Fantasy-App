@@ -7,14 +7,12 @@ from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings, PostseasonBracket, PostseasonFinalStanding, PostseasonMatchup
 from collegefootballfantasy_api.app.models.team import Team
-from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.api.routes.insights import _championships_by_user
 from collegefootballfantasy_api.app.schemas.postseason import PostseasonBracketRead
 from collegefootballfantasy_api.app.services.postseason_service import (
     calculate_final_standings,
     advance_postseason_state,
-    approved_fantasy_season_end_week,
     lock_postseason_seeds,
     materialize_ready_postseason_matchups,
     postseason_calendar,
@@ -22,70 +20,49 @@ from collegefootballfantasy_api.app.services.postseason_service import (
     resolve_postseason_matchup,
     serialize_postseason,
 )
-from collegefootballfantasy_api.app.services.power4 import list_power4_teams
-
-
-def test_fantasy_calendar_excludes_conference_championship_only_week(db_session):
-    """Week 15 can contain title games, but it cannot become a fantasy week.
-
-    A full Week 14 P4 slate is eligible; a handful of Week 15 conference
-    championship participants is deliberately insufficient coverage.
-    """
-    teams = list_power4_teams()
-    db_session.add_all(
-        [TeamSchedule(team_name=team, season=2026, week=14, location="home", is_bye=False) for team in teams]
-        + [TeamSchedule(team_name=team, season=2026, week=15, location="neutral", is_bye=False) for team in teams[:8]]
-    )
-    db_session.commit()
-
-    assert approved_fantasy_season_end_week(db_session, 2026) == 14
-
-
-def test_fantasy_calendar_refuses_an_incomplete_imported_p4_final_slate(db_session):
-    teams = list_power4_teams()
-    db_session.add_all(
-        [TeamSchedule(team_name=team, season=2026, week=14, location="home", is_bye=False) for team in teams[:-1]]
-        + [TeamSchedule(team_name=teams[-1], season=2026, week=14, location="bye", is_bye=True)]
-    )
-    db_session.commit()
-
-    with pytest.raises(ValueError, match="Week 14"):
-        approved_fantasy_season_end_week(db_session, 2026)
-
-
-def test_fantasy_calendar_never_substitutes_an_earlier_complete_week_for_week_14(db_session):
-    teams = list_power4_teams()
-    db_session.add_all(
-        [TeamSchedule(team_name=team, season=2026, week=13, location="home", is_bye=False) for team in teams]
-        + [TeamSchedule(team_name=team, season=2026, week=14, location="home", is_bye=False) for team in teams[:-1]]
-        + [TeamSchedule(team_name=teams[-1], season=2026, week=14, location="bye", is_bye=True)]
-    )
-    db_session.commit()
-
-    with pytest.raises(ValueError, match="Week 14"):
-        approved_fantasy_season_end_week(db_session, 2026)
-
-
-def test_lifecycle_skips_only_leagues_with_an_incomplete_p4_calendar(db_session):
+def test_lifecycle_skips_only_leagues_when_the_sealed_calendar_is_unavailable(monkeypatch, db_session):
     league = League(name="Calendar blocked", season_year=2026, max_teams=2, status="post_draft")
     db_session.add(league); db_session.flush()
     db_session.add(LeagueSettings(
         league_id=league.id, playoff_teams=2, scoring_json={}, roster_slots_json={}, waiver_type="faab",
         trade_review_type="none", superflex_enabled=False, kicker_enabled=True, defense_enabled=False,
     ))
-    db_session.add(TeamSchedule(team_name="Texas", season=2026, week=14, location="home", is_bye=False))
     db_session.commit()
+
+    from collegefootballfantasy_api.app.services.season_calendar import SeasonCalendarCoverageError
+    import collegefootballfantasy_api.app.services.postseason_service as postseason_service
+
+    def unavailable(*_args, **_kwargs):
+        raise SeasonCalendarCoverageError("sealed 2026 schedule snapshot is unavailable; calendar certification is blocked")
+
+    monkeypatch.setattr(postseason_service, "calendar_for_season", unavailable)
 
     assert advance_postseason_state(db_session)["calendar_blocked"] == 1
 
 
-def test_fantasy_playoffs_finish_on_the_last_broad_cfb_slate_by_format(db_session):
-    expected_regular_weeks = {2: 13, 4: 12, 6: 11, 8: 11}
+def test_postseason_calendar_delegates_to_the_certified_calendar(monkeypatch, db_session):
+    expected_regular_weeks = {2: 12, 4: 11, 6: 10, 8: 10}
+    from collegefootballfantasy_api.app.services.season_calendar import CertifiedSeasonCalendar
+
+    def fixture_calendar(season, team_count):
+        rounds = {2: 1, 4: 2, 6: 3, 8: 3}[team_count]
+        championship = 13
+        start = championship - rounds + 1
+        return CertifiedSeasonCalendar(
+            season=season, playoff_team_count=team_count, regular_season_start_week=1,
+            regular_season_end_week=start - 1, playoff_start_week=start, championship_week=championship,
+            max_rounds=rounds, calendar_policy_version="test", source_identity="test", source_revision="test",
+            source_sha256="0" * 64, source_format_version="test",
+        )
+
+    import collegefootballfantasy_api.app.services.postseason_service as postseason_service
+
+    monkeypatch.setattr(postseason_service, "calendar_for_season", fixture_calendar)
     for playoff_teams, expected_regular_end in expected_regular_weeks.items():
         league = League(name=f"Calendar {playoff_teams}", season_year=2026, max_teams=playoff_teams)
         calendar = postseason_calendar(db_session, league, playoff_teams)
         assert calendar["regular_season_end_week"] == expected_regular_end
-        assert calendar["championship_week"] == 14
+        assert calendar["championship_week"] == 13
 
 
 def _four_team_league(db_session):

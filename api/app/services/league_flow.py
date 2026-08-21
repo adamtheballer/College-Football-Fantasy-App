@@ -472,6 +472,7 @@ def update_league_settings(
     if bracket and bracket.status in {"LOCKED", "ACTIVE", "FINALIZING", "COMPLETED", "REVIEW_REQUIRED"} and payload.playoff_teams != settings_row.playoff_teams:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="playoff settings are locked for this season")
     playoff_count_changed = payload.playoff_teams != settings_row.playoff_teams
+    existing_matchups = []
     if playoff_count_changed:
         existing_matchups = db.query(Matchup).filter(
             Matchup.league_id == league.id,
@@ -486,11 +487,6 @@ def update_league_settings(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="playoff settings lock once the first regular-season matchup starts",
             )
-        # This is the sole safe regeneration path: a commissioner changed the
-        # bracket before competition started, so the old projected schedule is
-        # discarded and rebuilt with the newly reserved playoff weeks.
-        for matchup in existing_matchups:
-            db.delete(matchup)
     settings_row.playoff_teams = payload.playoff_teams
     settings_row.waiver_type = payload.waiver_type
     if payload.waiver_period_hours is not None:
@@ -521,10 +517,22 @@ def update_league_settings(
     settings_row.defense_enabled = payload.defense_enabled
     db.add(settings_row)
     if playoff_count_changed:
-        from collegefootballfantasy_api.app.services.league_schedule import ensure_league_schedule
+        from collegefootballfantasy_api.app.services.postseason_service import refresh_postseason_settings_calendar
+        from collegefootballfantasy_api.app.services.season_calendar import SeasonCalendarCoverageError
 
         db.flush()
-        ensure_league_schedule(db, league)
+        if existing_matchups:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="playoff format cannot change after a regular-season schedule exists; review the calendar audit first",
+            )
+        try:
+            refresh_postseason_settings_calendar(db, league, playoff_teams=payload.playoff_teams)
+        except SeasonCalendarCoverageError:
+            # Preserve the commissioner's selection while refusing to create
+            # unproven schedule rows. Once certification is available, draft
+            # finalization is the only path that creates the calendar.
+            pass
     db.commit()
     return get_league_detail(db, league, viewer=current_user)
 

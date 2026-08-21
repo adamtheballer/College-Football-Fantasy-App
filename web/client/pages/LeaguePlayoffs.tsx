@@ -69,6 +69,12 @@ export default function LeaguePlayoffs() {
       </header>
       <LeagueTabs leagueId={parsedLeagueId} draftStatus={leagueQuery.data.draft?.status} leagueStatus={leagueQuery.data.status} />
 
+      <section className="grid gap-px overflow-hidden rounded-xl border border-cfb-border-subtle bg-cfb-border-subtle sm:grid-cols-3">
+        <div className="bg-cfb-surface px-4 py-3"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-cfb-text-muted">Regular season</p><p className="mt-1 text-sm font-black text-cfb-text-primary">Weeks 1–{data.regular_season_end_week}</p></div>
+        <div className="bg-cfb-surface px-4 py-3"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-cfb-text-muted">Playoffs</p><p className="mt-1 text-sm font-black text-cfb-text-primary">Weeks {data.playoff_start_week}–{data.championship_week}</p></div>
+        <div className="bg-cfb-surface px-4 py-3"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-cfb-text-muted">Format</p><p className="mt-1 text-sm font-black text-cfb-text-primary">{data.playoff_teams} teams · {data.max_rounds} rounds</p></div>
+      </section>
+
       {data.status === "REVIEW_REQUIRED" ? <div className="rounded-xl border border-amber-300/40 bg-amber-300/10 p-4 text-sm text-amber-100">Postseason result requires review after a scoring correction. {data.review_reason}</div> : null}
       {championship ? <section className="rounded-xl border border-amber-300/45 bg-amber-300/[0.06] p-4"><div className="flex items-center gap-3"><Trophy className="h-5 w-5 text-amber-200" /><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-100">{data.season} league champion</p><p className="mt-1 text-lg font-black text-cfb-text-primary">{championship.team_name}</p></div></div></section> : null}
 

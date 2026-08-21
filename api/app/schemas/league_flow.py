@@ -795,6 +795,7 @@ class LeagueSettingsViewRead(BaseModel):
     league_id: int
     league_name: str
     league_info: dict
+    postseason_calendar: dict[str, int | str] | None = None
     invite: LeagueInviteSettingsRead | None = None
     members: list[LeagueMemberRead]
     teams: list[LeagueWorkspaceTeamRead]

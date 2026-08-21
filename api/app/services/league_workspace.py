@@ -222,13 +222,25 @@ def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspace
     # The standings UI and playoff qualification intentionally consume the
     # exact same deterministic ranker.  That prevents a visual ordering from
     # disagreeing with the seed snapshot on a tied record.
-    from collegefootballfantasy_api.app.services.postseason_service import (
-        get_or_create_postseason_settings,
-        rank_regular_season,
-    )
+    from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings
+    from collegefootballfantasy_api.app.services.postseason_service import rank_regular_season
 
-    plan = get_or_create_postseason_settings(db, league)
-    ranked = rank_regular_season(db, league, plan.regular_season_end_week)
+    # Ordinary standings/list reads must never create a postseason plan or
+    # turn a missing sealed calendar artifact into an application-wide outage.
+    # Once a safe plan exists it remains the authority for the playoff cut;
+    # otherwise rank every currently scheduled regular matchup and let the
+    # dedicated postseason endpoint surface its explicit certification state.
+    plan = db.query(LeaguePostseasonSettings).filter(
+        LeaguePostseasonSettings.league_id == league.id,
+        LeaguePostseasonSettings.season == league.season_year,
+    ).one_or_none()
+    through_week = plan.regular_season_end_week if plan else (
+        db.query(func.max(Matchup.week)).filter(
+            Matchup.league_id == league.id,
+            Matchup.season == league.season_year,
+        ).scalar() or 0
+    )
+    ranked = rank_regular_season(db, league, through_week)
     return [
         LeagueWorkspaceStandingSummaryRead(
             team_id=item.team.id,

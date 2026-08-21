@@ -1,4 +1,4 @@
-from collegefootballfantasy_api.app.models.postseason import PostseasonFinalStanding, PostseasonMatchup
+from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings, PostseasonBracket, PostseasonFinalStanding, PostseasonMatchup
 
 
 def test_postseason_orm_declares_every_migration_created_index_and_constraint():
@@ -21,3 +21,18 @@ def test_postseason_orm_declares_every_migration_created_index_and_constraint():
         "uq_postseason_final_standing_bracket_team",
         "uq_postseason_final_standing_bracket_place",
     }
+
+
+def test_postseason_orm_preserves_calendar_provenance_snapshots():
+    settings_columns = set(LeaguePostseasonSettings.__table__.columns.keys())
+    bracket_columns = set(PostseasonBracket.__table__.columns.keys())
+
+    expected = {
+        "calendar_policy_version",
+        "calendar_source_identity",
+        "calendar_source_revision",
+        "calendar_source_sha256",
+        "calendar_source_format_version",
+    }
+    assert expected <= settings_columns
+    assert expected | {"championship_week"} <= bracket_columns

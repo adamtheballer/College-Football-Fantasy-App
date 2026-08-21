@@ -857,6 +857,17 @@ def test_delayed_trade_updates_its_finalized_chat_card_after_processing(client, 
         "is_cfb_game_week_active",
         lambda *_args, **_kwargs: game_week_active["value"],
     )
+    # A game-week trade is deferred only when an included player has started
+    # or kicks off within 24 hours. Keep this chat lifecycle test aligned with
+    # that rule instead of assuming every Tuesday--Saturday trade is locked.
+    monkeypatch.setattr(
+        trade_service,
+        "game_starts_for_players",
+        lambda _db, *, player_ids, **_kwargs: {
+            player_id: datetime.now(timezone.utc) + timedelta(hours=2)
+            for player_id in player_ids
+        },
+    )
     proposing_token = create_user_and_token(client, "chat-pending-a")
     receiving_token = create_user_and_token(client, "chat-pending-b")
     league = create_league(client, proposing_token, "chat-pending", review_type="none")

@@ -16,6 +16,17 @@ depends_on = None
 
 def upgrade() -> None:
     op.alter_column("league_postseason_settings", "reseeding_enabled", existing_type=sa.Boolean(), server_default=sa.false())
+    # Calendar provenance is snapshotted with each league plan. It records the
+    # sealed schedule artifact that certified the date reservation, rather than
+    # trusting mutable imported rows or a live provider response later.
+    for column in (
+        sa.Column("calendar_policy_version", sa.String(length=48), nullable=False, server_default="P4_FULL_COVERAGE_V2"),
+        sa.Column("calendar_source_identity", sa.String(length=256), nullable=False, server_default="UNSET"),
+        sa.Column("calendar_source_revision", sa.String(length=128), nullable=False, server_default="UNSET"),
+        sa.Column("calendar_source_sha256", sa.String(length=64), nullable=False, server_default="UNSET"),
+        sa.Column("calendar_source_format_version", sa.String(length=48), nullable=False, server_default="SEALED_CFB_SCHEDULE_V1"),
+    ):
+        op.add_column("league_postseason_settings", column)
 
     op.drop_constraint("uq_postseason_bracket_league_season_type", "postseason_brackets", type_="unique")
     op.create_unique_constraint("uq_postseason_bracket_league_season", "postseason_brackets", ["league_id", "season"])
@@ -23,7 +34,13 @@ def upgrade() -> None:
         ("regular_season_start_week", sa.Column("regular_season_start_week", sa.Integer(), nullable=False, server_default="1")),
         ("regular_season_end_week", sa.Column("regular_season_end_week", sa.Integer(), nullable=False, server_default="10")),
         ("playoff_start_week", sa.Column("playoff_start_week", sa.Integer(), nullable=False, server_default="11")),
+        ("championship_week", sa.Column("championship_week", sa.Integer(), nullable=False, server_default="13")),
         ("max_rounds", sa.Column("max_rounds", sa.Integer(), nullable=False, server_default="1")),
+        ("calendar_policy_version", sa.Column("calendar_policy_version", sa.String(length=48), nullable=False, server_default="P4_FULL_COVERAGE_V2")),
+        ("calendar_source_identity", sa.Column("calendar_source_identity", sa.String(length=256), nullable=False, server_default="UNSET")),
+        ("calendar_source_revision", sa.Column("calendar_source_revision", sa.String(length=128), nullable=False, server_default="UNSET")),
+        ("calendar_source_sha256", sa.Column("calendar_source_sha256", sa.String(length=64), nullable=False, server_default="UNSET")),
+        ("calendar_source_format_version", sa.Column("calendar_source_format_version", sa.String(length=48), nullable=False, server_default="SEALED_CFB_SCHEDULE_V1")),
         ("format_version", sa.Column("format_version", sa.String(length=32), nullable=False, server_default="FIXED_BRACKET_V1")),
         ("tiebreaker_policy", sa.Column("tiebreaker_policy", sa.String(length=48), nullable=False, server_default="HIGHER_SEED_V1")),
         ("lifecycle_version", sa.Column("lifecycle_version", sa.Integer(), nullable=False, server_default="1")),
@@ -80,8 +97,10 @@ def downgrade() -> None:
     for name in ("loser_team_id", "winner_team_id", "next_loser_slot", "next_loser_matchup_id", "next_winner_slot", "next_winner_matchup_id", "bracket_path", "matchup_type"):
         op.drop_column("postseason_matchups", name)
     op.drop_column("postseason_entries", "tiebreak_draw_key")
-    for name in ("review_metadata_json", "review_reason", "first_kickoff_at", "seeds_locked_at", "lifecycle_version", "tiebreaker_policy", "format_version", "max_rounds", "playoff_start_week", "regular_season_end_week", "regular_season_start_week"):
+    for name in ("review_metadata_json", "review_reason", "first_kickoff_at", "seeds_locked_at", "lifecycle_version", "tiebreaker_policy", "format_version", "calendar_source_format_version", "calendar_source_sha256", "calendar_source_revision", "calendar_source_identity", "calendar_policy_version", "max_rounds", "championship_week", "playoff_start_week", "regular_season_end_week", "regular_season_start_week"):
         op.drop_column("postseason_brackets", name)
+    for name in ("calendar_source_format_version", "calendar_source_sha256", "calendar_source_revision", "calendar_source_identity", "calendar_policy_version"):
+        op.drop_column("league_postseason_settings", name)
     op.drop_constraint("uq_postseason_bracket_league_season", "postseason_brackets", type_="unique")
     op.create_unique_constraint("uq_postseason_bracket_league_season_type", "postseason_brackets", ["league_id", "season", "bracket_type"])
     op.alter_column("league_postseason_settings", "reseeding_enabled", existing_type=sa.Boolean(), server_default=sa.true())

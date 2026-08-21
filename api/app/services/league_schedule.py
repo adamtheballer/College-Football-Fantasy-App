@@ -45,10 +45,6 @@ def ensure_league_schedule(
     # A draft finalization can stage matchups and invoke this again before the
     # transaction commits. Flush first so schedule generation stays idempotent.
     db.flush()
-    if regular_season_weeks is None:
-        from collegefootballfantasy_api.app.services.postseason_service import get_or_create_postseason_settings
-
-        regular_season_weeks = get_or_create_postseason_settings(db, league).regular_season_end_week
     teams = (
         db.query(Team)
         .filter(Team.league_id == league.id)
@@ -65,6 +61,23 @@ def ensure_league_schedule(
         .filter(Matchup.league_id == league.id, Matchup.season == league.season_year)
         .all()
     )
+    if regular_season_weeks is None:
+        from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings
+        from collegefootballfantasy_api.app.services.postseason_service import get_or_create_postseason_settings
+
+        persisted_plan = db.query(LeaguePostseasonSettings).filter(
+            LeaguePostseasonSettings.league_id == league.id,
+            LeaguePostseasonSettings.season == league.season_year,
+        ).one_or_none()
+        if persisted_plan is not None:
+            regular_season_weeks = persisted_plan.regular_season_end_week
+        elif existing_matchups:
+            # Historical or manually staged schedules are audit-only until an
+            # explicit, safe migration is approved. Never rewrite them merely
+            # because a view or finalization call observed the league.
+            return 0
+        else:
+            regular_season_weeks = get_or_create_postseason_settings(db, league).regular_season_end_week
     matchups_per_week = len(teams) // 2
     existing_by_week: dict[int, list[Matchup]] = {}
     for matchup in existing_matchups:

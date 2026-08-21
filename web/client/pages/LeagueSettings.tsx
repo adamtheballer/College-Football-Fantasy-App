@@ -180,8 +180,9 @@ export default function LeagueSettings() {
     ([key]) => key !== "waiver_type" && key !== "trade_review_type"
   );
   const leagueInfo = data?.league_info ?? {};
-  const playoffTeams = leagueQuery.data?.settings.playoff_teams;
-  const playoffRounds = playoffTeams === 2 ? 1 : playoffTeams === 4 ? 2 : playoffTeams ? 3 : null;
+  const certifiedCalendar = data?.postseason_calendar;
+  const playoffTeams = certifiedCalendar?.playoff_teams ?? leagueQuery.data?.settings.playoff_teams;
+  const playoffRounds = certifiedCalendar?.max_rounds ?? (playoffTeams === 2 ? 1 : playoffTeams === 4 ? 2 : playoffTeams ? 3 : null);
 
   const copyInviteValue = async (field: "code" | "link", value?: string | null) => {
     if (!value) return;
@@ -227,9 +228,15 @@ export default function LeagueSettings() {
             <p className="mt-1.5 max-w-3xl text-sm text-cfb-text-secondary">
               League-specific standings, point system, schedules, manager rosters, trade history, and draft results.
             </p>
-            <p className="mt-2 text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
-              Playoffs · {playoffTeams ?? "—"} teams · {playoffRounds ?? "—"} rounds · higher seed advances ties
-            </p>
+            {certifiedCalendar ? (
+              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
+                Regular season · Weeks {certifiedCalendar.regular_season_start_week}–{certifiedCalendar.regular_season_end_week} · Playoffs · Weeks {certifiedCalendar.playoff_start_week}–{certifiedCalendar.championship_week} · {playoffTeams} teams · {playoffRounds} rounds
+              </p>
+            ) : (
+              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
+                Playoffs · {playoffTeams ?? "—"} teams · {playoffRounds ?? "—"} rounds · calendar locks with the certified season schedule
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-3 gap-2 sm:min-w-[360px]">
             <div className="rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised px-3 py-2.5">

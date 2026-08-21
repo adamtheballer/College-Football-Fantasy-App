@@ -1152,7 +1152,18 @@ def build_waivers_view(
 
 
 def build_settings_view(db: Session, league: League, user: User) -> LeagueSettingsViewRead:
+    from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings
+    from collegefootballfantasy_api.app.services.postseason_topology import required_rounds
+
     settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
+    postseason_settings = (
+        db.query(LeaguePostseasonSettings)
+        .filter(
+            LeaguePostseasonSettings.league_id == league.id,
+            LeaguePostseasonSettings.season == league.season_year,
+        )
+        .one_or_none()
+    )
     members = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).all()
     teams = db.query(Team).filter(Team.league_id == league.id).order_by(Team.id.asc()).all()
     teams_by_id = {team.id: team for team in teams}
@@ -1289,6 +1300,23 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
             "is_private": league.is_private,
             "commissioner_user_id": league.commissioner_user_id,
         },
+        postseason_calendar=(
+            {
+                "regular_season_start_week": postseason_settings.regular_season_start_week,
+                "regular_season_end_week": postseason_settings.regular_season_end_week,
+                "playoff_start_week": postseason_settings.playoff_start_week,
+                "championship_week": postseason_settings.championship_week,
+                "playoff_teams": postseason_settings.playoff_team_count,
+                "max_rounds": required_rounds(postseason_settings.playoff_team_count),
+                "calendar_policy_version": postseason_settings.calendar_policy_version,
+                "source_identity": postseason_settings.calendar_source_identity,
+                "source_revision": postseason_settings.calendar_source_revision,
+                "source_sha256": postseason_settings.calendar_source_sha256,
+                "source_format_version": postseason_settings.calendar_source_format_version,
+            }
+            if postseason_settings is not None
+            else None
+        ),
         invite=invite,
         members=[LeagueMemberRead.model_validate(member) for member in members],
         teams=[

@@ -63,6 +63,13 @@ class PostseasonRead(BaseModel):
     playoff_teams: int
     regular_season_end_week: int
     playoff_start_week: int
+    championship_week: int
+    max_rounds: int
+    calendar_policy_version: str
+    calendar_source_identity: str
+    calendar_source_revision: str
+    calendar_source_sha256: str
+    calendar_source_format_version: str
     current_fantasy_week: int | None = None
     format_version: str
     tiebreaker_policy: str

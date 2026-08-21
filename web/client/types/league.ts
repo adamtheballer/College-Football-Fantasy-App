@@ -421,6 +421,13 @@ export interface LeaguePostseasonResponse {
   playoff_teams: number;
   regular_season_end_week: number;
   playoff_start_week: number;
+  championship_week: number;
+  max_rounds: number;
+  calendar_policy_version: string;
+  calendar_source_identity: string;
+  calendar_source_revision: string;
+  calendar_source_sha256: string;
+  calendar_source_format_version: string;
   format_version: string;
   tiebreaker_policy: string;
   format_summary: string;
@@ -540,6 +547,19 @@ export interface LeagueSettingsTabResponse {
   league_id: number;
   league_name: string;
   league_info: Record<string, string | number | boolean | null>;
+  postseason_calendar?: {
+    regular_season_start_week: number;
+    regular_season_end_week: number;
+    playoff_start_week: number;
+    championship_week: number;
+    playoff_teams: number;
+    max_rounds: number;
+    calendar_policy_version: string;
+    source_identity: string;
+    source_revision: string;
+    source_sha256: string;
+    source_format_version: string;
+  } | null;
   invite?: {
     code: string;
     link: string;

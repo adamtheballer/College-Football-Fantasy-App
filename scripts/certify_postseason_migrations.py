@@ -156,6 +156,24 @@ def _assert_post_0102_schema(database_url: str) -> None:
             assert {
                 "ix_postseason_matchups_fantasy_matchup",
             } <= _index_names(connection, "postseason_matchups")
+            bracket_columns = set(
+                connection.execute(
+                    text("SELECT column_name FROM information_schema.columns WHERE table_name = 'postseason_brackets'")
+                ).scalars()
+            )
+            settings_columns = set(
+                connection.execute(
+                    text("SELECT column_name FROM information_schema.columns WHERE table_name = 'league_postseason_settings'")
+                ).scalars()
+            )
+            assert {
+                "championship_week", "calendar_policy_version", "calendar_source_identity",
+                "calendar_source_revision", "calendar_source_sha256", "calendar_source_format_version",
+            } <= bracket_columns
+            assert {
+                "calendar_policy_version", "calendar_source_identity", "calendar_source_revision",
+                "calendar_source_sha256", "calendar_source_format_version",
+            } <= settings_columns
             assert {
                 "ix_postseason_final_standings_bracket",
             } <= _index_names(connection, "postseason_final_standings")
