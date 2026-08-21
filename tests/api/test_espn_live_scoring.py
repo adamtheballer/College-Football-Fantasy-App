@@ -176,7 +176,7 @@ def _synthetic_live_matchup(db_session, *, at):
                 roster_slots_json={"QB": 1, "WR": 1, "BENCH": 2},
             ),
             RosterEntry(league_id=league.id, team_id=home.id, player_id=arch.id, slot="QB", status="active"),
-            RosterEntry(league_id=league.id, team_id=home.id, player_id=wingo.id, slot="WR", status="active"),
+            RosterEntry(league_id=league.id, team_id=away.id, player_id=wingo.id, slot="WR", status="active"),
             Matchup(
                 league_id=league.id,
                 season=2026,
@@ -294,7 +294,7 @@ def test_synthetic_three_minute_drill_updates_matchup_then_finalizes_downstream_
         league_id=league.id, player_id=arch.id, season=2026, week=1
     ).one().fantasy_points
     assert second_score > first_score
-    assert db_session.query(Matchup).filter_by(league_id=league.id, season=2026, week=1).one().status != "final"
+    assert db_session.query(Matchup).filter_by(league_id=league.id, season=2026, week=1).one().status == "live"
 
     _make_public_promotion_ready(db_session, at=NOW + timedelta(seconds=360))
     final = _run_summary(
