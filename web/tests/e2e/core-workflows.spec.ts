@@ -2567,19 +2567,35 @@ test.describe("critical browser workflows", () => {
     expect(userPickIndex).toBe(beforeUserPick.userTeamId - 1);
     expect(afterUserPick.picks[userPickIndex].pickedBy).toBe("user");
 
-    await expect
-      .poll(() => page.evaluate((index) => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}").picks?.[index + 1]?.pickedBy ?? null, userPickIndex), {
-        // The bot decision itself is two seconds, but allow a full draft
-        // timer for a browser under containerized CI to process its interval
-        // and persist the follow-up pick.
-        timeout: 15_000,
-      })
-      .toBe("bot");
+    const nextOverallPick = afterUserPick.currentPick;
+    const teamCount = afterUserPick.teams.length;
+    const nextRound = Math.floor((nextOverallPick - 1) / teamCount);
+    const nextPickInRound = ((nextOverallPick - 1) % teamCount) + 1;
+    const nextTeamId = nextRound % 2 === 0
+      ? nextPickInRound
+      : teamCount - nextPickInRound + 1;
+    const nextTeam = afterUserPick.teams.find((team: { id: number }) => team.id === nextTeamId);
 
-    const afterCpuPick = await page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}"));
-    expect(afterCpuPick.picks[userPickIndex + 1].pickedBy).toBe("bot");
+    // A user drafting at the end of an odd-numbered round legitimately owns
+    // the next pick too when the snake reverses. Otherwise, verify that the
+    // following computer manager makes its scheduled local pick.
+    let afterFollowingTurn = afterUserPick;
+    if (nextTeam?.managerType === "bot") {
+      await expect
+        .poll(() => page.evaluate((index) => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}").picks?.[index + 1]?.pickedBy ?? null, userPickIndex), {
+          // The bot decision itself is two seconds, but allow a full draft
+          // timer for a browser under containerized CI to process its interval
+          // and persist the follow-up pick.
+          timeout: 15_000,
+        })
+        .toBe("bot");
+      afterFollowingTurn = await page.evaluate(() => JSON.parse(window.localStorage.getItem("cfb_single_player_mock_draft") ?? "{}"));
+      expect(afterFollowingTurn.picks[userPickIndex + 1].pickedBy).toBe("bot");
+    } else {
+      expect(nextTeam?.id).toBe(afterUserPick.userTeamId);
+    }
 
-    const firstCompletedPick = afterCpuPick.picks[0] as { playerName: string; pickedBy: "bot" | "user" | "auto" };
+    const firstCompletedPick = afterFollowingTurn.picks[0] as { playerName: string; pickedBy: "bot" | "user" | "auto" };
     const firstOrderCard = page.getByTestId("mobile-draft-order-card-1");
     await expect(
       firstOrderCard.getByLabel(
