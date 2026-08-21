@@ -5,7 +5,7 @@ import pytest
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.matchup import Matchup
-from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings, PostseasonBracket, PostseasonFinalStanding, PostseasonMatchup
+from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings, PostseasonBracket, PostseasonEntry, PostseasonFinalStanding, PostseasonMatchup
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.api.routes.insights import _championships_by_user
@@ -179,6 +179,36 @@ def test_two_six_and_eight_team_formats_materialize_only_canonical_games_and_fin
         assert [row.final_place for row in final_rows] == list(range(1, team_count + 1))
         assert any(row.wins > 0 for row in final_rows)
         assert all(node.fantasy_matchup_id for node in db_session.query(PostseasonMatchup).filter_by(bracket_id=bracket.id))
+
+
+@pytest.mark.parametrize("playoff_team_count", [2, 4, 6, 8])
+def test_fourteen_team_league_seeds_each_supported_playoff_bracket(playoff_team_count, db_session):
+    league = League(name=f"14-team {playoff_team_count}-playoff league", season_year=2026, max_teams=14, status="post_draft")
+    db_session.add(league); db_session.flush()
+    db_session.add(LeagueSettings(
+        league_id=league.id, playoff_teams=playoff_team_count, scoring_json={}, roster_slots_json={}, waiver_type="faab",
+        trade_review_type="none", superflex_enabled=False, kicker_enabled=True, defense_enabled=False,
+    ))
+    teams = [Team(league_id=league.id, name=f"Team {index}") for index in range(1, 15)]
+    db_session.add_all(teams); db_session.flush()
+    rounds = {2: 1, 4: 2, 6: 3, 8: 3}[playoff_team_count]
+    db_session.add(LeaguePostseasonSettings(
+        league_id=league.id, season=2026, regular_season_start_week=1, regular_season_end_week=1,
+        playoff_start_week=2, championship_week=rounds + 1, playoff_team_count=playoff_team_count,
+        championship_bracket_size=playoff_team_count, reseeding_enabled=False,
+    ))
+    for index in range(7):
+        db_session.add(Matchup(
+            league_id=league.id, season=2026, week=1, home_team_id=teams[index].id, away_team_id=teams[-(index + 1)].id,
+            home_score=200 - index, away_score=100 - index, status="final",
+        ))
+    db_session.commit()
+
+    bracket = lock_postseason_seeds(db_session, league)
+    entries = db_session.query(PostseasonEntry).filter_by(bracket_id=bracket.id).order_by(PostseasonEntry.bracket_seed).all()
+    assert bracket.total_teams == playoff_team_count
+    assert [entry.bracket_seed for entry in entries] == list(range(1, playoff_team_count + 1))
+    assert [entry.regular_season_rank for entry in entries] == list(range(1, playoff_team_count + 1))
 
 
 def test_bracket_does_not_activate_until_a_linked_canonical_game_starts(db_session):

@@ -28,7 +28,7 @@ import { LeagueCreateResponse } from "@/types/league";
 
 const steps = ["Basics", "Settings", "Draft", "Review"] as const;
 
-const leagueSizes = [4, 6, 8, 10, 12, 14, 16];
+export const leagueSizes = [4, 6, 8, 10, 12, 14];
 const playoffOptions = [2, 4, 6, 8];
 const MIN_DRAFT_LEAD_TIME_MS = 5 * 60 * 1000;
 const waiverOptions = [
@@ -635,7 +635,10 @@ function CreateLeagueForm() {
                       className={inputClass}
                     />
                   </Field>
-                  <Field label="League size">
+                  <Field
+                    label="League size"
+                    helper={basics.max_teams === 14 ? "14-team leagues use a balanced partial round robin before the selected playoff bracket." : undefined}
+                  >
                     <Select
                       value={String(basics.max_teams)}
                       onValueChange={(value) => updateLeagueSize(Number(value))}

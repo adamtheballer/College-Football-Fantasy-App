@@ -7,6 +7,10 @@ from collegefootballfantasy_api.app.schemas.waiver import WaiverClaimRead, Waive
 from collegefootballfantasy_api.app.schemas.rivalry import RivalryMatchupRead
 
 
+MIN_LEAGUE_TEAM_COUNT = 2
+MAX_LEAGUE_TEAM_COUNT = 14
+
+
 def _validate_iana_timezone(value: str) -> str:
     normalized = value.strip()
     if not normalized:
@@ -29,8 +33,10 @@ class LeagueBasics(BaseModel):
     @field_validator("max_teams")
     @classmethod
     def validate_even_manager_count(cls, value: int) -> int:
-        if value < 2 or value % 2 != 0:
-            raise ValueError("max_teams must be an even number of at least 2")
+        if value < MIN_LEAGUE_TEAM_COUNT or value > MAX_LEAGUE_TEAM_COUNT or value % 2 != 0:
+            raise ValueError(
+                f"max_teams must be an even number between {MIN_LEAGUE_TEAM_COUNT} and {MAX_LEAGUE_TEAM_COUNT}"
+            )
         return value
 
 

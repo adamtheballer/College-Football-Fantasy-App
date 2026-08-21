@@ -103,6 +103,32 @@ def test_create_and_list_leagues(client):
     assert data["data"][0]["draft"]["draft_type"] == "snake"
 
 
+def test_create_league_allows_fourteen_teams_but_rejects_larger_sizes(client):
+    token = create_user_and_token(client, "league-cap")
+    created = create_league(client, token, name="Fourteen Team League", max_teams=14)
+    assert created["max_teams"] == 14
+
+    draft_time = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=7)
+    oversized = client.post(
+        "/leagues",
+        json={
+            "basics": {"name": "Too Many Teams", "season_year": 2026, "max_teams": 16, "is_private": True},
+            "settings": {
+                "scoring_json": {"ppr": 1}, "roster_slots_json": {"QB": 1}, "playoff_teams": 4,
+                "waiver_type": "faab", "trade_review_type": "commissioner", "superflex_enabled": False,
+                "kicker_enabled": True, "defense_enabled": False,
+            },
+            "draft": {
+                "draft_datetime_utc": draft_time.isoformat(), "timezone": "America/New_York",
+                "draft_type": "snake", "pick_timer_seconds": 90,
+            },
+        },
+        headers=auth_headers(token),
+    )
+    assert oversized.status_code == 422
+    assert "between 2 and 14" in str(oversized.json()["detail"])
+
+
 def test_beta_scoring_requires_acknowledgment_locks_snapshot_and_enforces_flat_kicker_policy(client, monkeypatch):
     monkeypatch.setattr(settings, "beta_scoring_lock_enabled", True)
     token = create_user_and_token(client, "beta-scoring-lock")
@@ -497,6 +523,40 @@ def test_schedule_generation_creates_and_backfills_a_fair_regular_season_before_
 
     assert len(matchup_counts_by_pair) == 6
     assert max(matchup_counts_by_pair.values()) - min(matchup_counts_by_pair.values()) <= 1
+
+
+@pytest.mark.parametrize("regular_season_weeks", [10, 11, 12])
+def test_fourteen_team_schedule_is_balanced_without_repeated_opponents_before_playoffs(client, db_session, regular_season_weeks):
+    token = create_user_and_token(client, f"fourteen-schedule-{regular_season_weeks}")
+    league = create_league(client, token, name=f"14 Team Schedule {regular_season_weeks}", max_teams=14)
+    league_row = db_session.get(League, league["id"])
+    assert league_row is not None
+    db_session.add_all([Team(league_id=league_row.id, name=f"Team {index}") for index in range(2, 15)])
+    db_session.commit()
+
+    teams = db_session.query(Team).filter(Team.league_id == league_row.id).order_by(Team.id.asc()).all()
+    assert len(teams) == 14
+    assert ensure_league_schedule(db_session, league_row, regular_season_weeks=regular_season_weeks) == 7 * regular_season_weeks
+    db_session.flush()
+
+    matchups = db_session.query(Matchup).filter(
+        Matchup.league_id == league_row.id,
+        Matchup.season == league_row.season_year,
+    ).all()
+    opponents_by_team = {team.id: set() for team in teams}
+    pairs: set[tuple[int, int]] = set()
+    for week in range(1, regular_season_weeks + 1):
+        weekly = [matchup for matchup in matchups if matchup.week == week]
+        assert len(weekly) == 7
+        assert {team_id for matchup in weekly for team_id in (matchup.home_team_id, matchup.away_team_id)} == set(opponents_by_team)
+        for matchup in weekly:
+            pair = tuple(sorted((matchup.home_team_id, matchup.away_team_id)))
+            assert pair not in pairs
+            pairs.add(pair)
+            opponents_by_team[matchup.home_team_id].add(matchup.away_team_id)
+            opponents_by_team[matchup.away_team_id].add(matchup.home_team_id)
+
+    assert all(len(opponents) == regular_season_weeks for opponents in opponents_by_team.values())
 
 
 def test_create_invite_join_assigns_one_team_per_user_and_enforces_max_teams(client, db_session):
