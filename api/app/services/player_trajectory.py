@@ -9,7 +9,9 @@ from collegefootballfantasy_api.app.crud.projection import current_published_pro
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.player_trade_value import PlayerTradeValue
+from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.player_trajectory import (
@@ -93,6 +95,46 @@ def _league_scoring_rules(db: Session, league_id: int | None) -> dict | None:
     return settings.scoring_json if settings and settings.scoring_json else None
 
 
+def _actual_points_by_week(
+    db: Session,
+    *,
+    player_id: int,
+    season: int,
+    league_id: int | None,
+) -> dict[int, float]:
+    """Read only canonical, already-calculated fantasy totals.
+
+    Actual points are league-scoring specific.  Without a league context, only
+    provider rows that already carry an explicit fantasy total can be shown;
+    the endpoint never guesses a scoring system for a standalone player card.
+    """
+    if league_id is not None:
+        return {
+            row.week: round(float(row.fantasy_points), 1)
+            for row in db.query(PlayerWeekScore)
+            .filter(
+                PlayerWeekScore.player_id == player_id,
+                PlayerWeekScore.league_id == league_id,
+                PlayerWeekScore.season == season,
+                PlayerWeekScore.week.in_(WEEKS),
+            )
+            .all()
+        }
+    points: dict[int, float] = {}
+    for row in db.query(PlayerStat).filter(
+        PlayerStat.player_id == player_id,
+        PlayerStat.season == season,
+        PlayerStat.week.in_(WEEKS),
+    ):
+        stats = row.stats or {}
+        for key in ("fantasy_points", "fantasyPoints", "fpts"):
+            value = stats.get(key)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                points[row.week] = round(float(value), 1)
+                break
+    return points
+
+
 def _estimated_value(db: Session, player: Player, season_projection: float) -> float:
     pool = db.query(Player).filter(func.upper(Player.position) == player.position.upper()).all()
     season_values = sorted(float(row.sheet_projected_season_points) for row in pool if row.sheet_projected_season_points is not None)
@@ -137,6 +179,12 @@ def build_player_trajectory(
         for week in WEEKS
     }
     published_by_week = {week: row for week, row in published_by_week.items() if row is not None}
+    actual_by_week = _actual_points_by_week(
+        db,
+        player_id=player.id,
+        season=season,
+        league_id=league_id,
+    )
     season_projection = _season_projection(db, player)
     # A season total is metadata only. It is never divided, repeated, or
     # emitted as a weekly graph point; this series is canonical weekly data.
@@ -145,9 +193,19 @@ def build_player_trajectory(
         schedule = schedule_by_week.get(week)
         if schedule and (schedule.is_bye or schedule.location == "bye"):
             projection.append(PlayerProjectionTrajectoryPointRead(week=week, points=None, source="bye", projection_status="BYE"))
-        elif week in published_by_week:
-            row = published_by_week[week]
-            projection.append(PlayerProjectionTrajectoryPointRead(week=week, points=round(_points_for_projection(player, row, scoring_rules), 1), source="published", projection_status=row.projection_status, projection_version=row.projection_version, published_at=row.updated_at))
+        elif week in published_by_week or week in actual_by_week:
+            row = published_by_week.get(week)
+            projection.append(
+                PlayerProjectionTrajectoryPointRead(
+                    week=week,
+                    points=round(_points_for_projection(player, row, scoring_rules), 1) if row else None,
+                    actual_points=actual_by_week.get(week),
+                    source="published" if row else "actual",
+                    projection_status=row.projection_status if row else "ACTUAL_ONLY",
+                    projection_version=row.projection_version if row else None,
+                    published_at=row.updated_at if row else None,
+                )
+            )
 
     published_values = {
         row.week: row

@@ -3,7 +3,10 @@ import re
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.domain.scoring_engine import calculate_score
 from collegefootballfantasy_api.app.models.game import Game
+from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
@@ -67,13 +70,24 @@ def _fantasy_points(stats: dict) -> float | None:
     return None
 
 
-def _stat_read(stat: PlayerGameStat | PlayerStat | None) -> PlayerGameLogStatRead | None:
+def _stat_read(
+    stat: PlayerGameStat | PlayerStat | None,
+    *,
+    position: str,
+    scoring_rules: dict | None,
+) -> PlayerGameLogStatRead | None:
     if stat is None:
         return None
+    fantasy_points = _fantasy_points(stat.stats)
+    if fantasy_points is None and scoring_rules is not None:
+        # Canonical provider stats may still use source field names such as
+        # PassingYards.  calculate_score normalizes them before applying the
+        # selected league's scoring rules.
+        fantasy_points = calculate_score(stat.stats or {}, position, scoring_rules).total
     return PlayerGameLogStatRead(
         source=stat.source,
         stats=stat.stats,
-        fantasy_points=_fantasy_points(stat.stats),
+        fantasy_points=fantasy_points,
         updated_at=stat.updated_at,
     )
 
@@ -120,7 +134,23 @@ def _stat_status(schedule: TeamSchedule, game: Game | None, stat: PlayerGameStat
     return "active" if stat is not None else "scheduled"
 
 
-def build_player_game_log(db: Session, player: Player, *, season: int) -> PlayerGameLogRead:
+def _league_scoring_rules(db: Session, league_id: int | None) -> dict | None:
+    if league_id is None:
+        return None
+    if db.get(League, league_id) is None:
+        raise ValueError("league not found")
+    settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league_id).one_or_none()
+    return settings.scoring_json if settings and settings.scoring_json else {}
+
+
+def build_player_game_log(
+    db: Session,
+    player: Player,
+    *,
+    season: int,
+    league_id: int | None = None,
+) -> PlayerGameLogRead:
+    scoring_rules = _league_scoring_rules(db, league_id)
     if not _team_schedule_table_exists(db):
         return PlayerGameLogRead(
             player_id=player.id,
@@ -175,7 +205,7 @@ def build_player_game_log(db: Session, player: Player, *, season: int) -> Player
         game = games_by_id.get(schedule.game_id) if schedule.game_id is not None else None
         game_stat = stats_by_game.get(schedule.game_id) if schedule.game_id is not None else None
         stat = game_stat or stats_by_week.get(schedule.week)
-        stat_read = _stat_read(stat)
+        stat_read = _stat_read(stat, position=player.position, scoring_rules=scoring_rules)
         rows.append(
             PlayerGameLogRowRead(
                 schedule_id=schedule.id,

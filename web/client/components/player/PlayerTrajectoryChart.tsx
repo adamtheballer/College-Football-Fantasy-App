@@ -1,6 +1,7 @@
 type TrajectoryPoint = {
   week: number;
   value: number | null;
+  actualValue?: number | null;
   source?: "preseason" | "current" | "published" | "actual" | "bye";
 };
 
@@ -34,14 +35,21 @@ export function PlayerTrajectoryChart({
   const y = (value: number) => PADDING.top + (1 - Math.min(finiteValue(value), yMax) / yMax) * plotHeight;
   // Do not visually bridge weeks that have not produced a published snapshot.
   // A preseason card therefore renders one Week 0 dot, not a fictitious line.
-  const numericPoints = ordered.filter((point): point is TrajectoryPoint & { value: number } => typeof point.value === "number" && Number.isFinite(point.value));
+  const numericPoints = ordered.filter((point): point is TrajectoryPoint & { value: number } => point.source !== "actual" && typeof point.value === "number" && Number.isFinite(point.value));
+  const actualPoints = ordered.flatMap((point) => {
+    const value = point.source === "actual" ? point.value : point.actualValue;
+    return typeof value === "number" && Number.isFinite(value)
+      ? [{ ...point, value, source: "actual" as const }]
+      : [];
+  });
   const connectedLine = numericPoints.reduce((path, point, index) => {
     const previous = numericPoints[index - 1];
     const command = previous && point.week === previous.week + 1 ? "L" : "M";
     return `${path}${command}${x(point.week)} ${y(point.value)} `;
   }, "");
   const hasConnectedWeeks = numericPoints.some((point, index) => index > 0 && point.week === numericPoints[index - 1].week + 1);
-  const peak = numericPoints.reduce((best, point) => point.value > best.value ? point : best, numericPoints[0] ?? { week: 0, value: 0 });
+  const plottedPoints = [...numericPoints, ...actualPoints];
+  const peak = plottedPoints.reduce((best, point) => point.value > best.value ? point : best, plottedPoints[0] ?? { week: 0, value: 0 });
   const isPreseasonOnly = ordered.length === 1 && ordered[0]?.week === 0;
   const isCurrentProjectionOnly = isPreseasonOnly && ordered[0]?.source === "current";
   const isProjection = seriesKind === "projection";
@@ -98,10 +106,22 @@ export function PlayerTrajectoryChart({
             Week
           </text>
           {hasConnectedWeeks ? <path d={connectedLine} fill="none" stroke="#5ee7ff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" /> : null}
-          {ordered.map((point) => (
-            <g key={point.week}>
+          {numericPoints.map((point) => (
+            <g key={`baseline-${point.week}`}>
               <title>{pointLabel(point)}: {point.source === "bye" || point.value === null ? "BYE" : valueFormatter(point.value)}</title>
               {point.source === "bye" || point.value === null ? <text x={x(point.week)} y={y(0) - 8} textAnchor="middle" fill="rgba(226,232,240,0.62)" fontSize="9" fontWeight="800">BYE</text> : <circle cx={x(point.week)} cy={y(point.value)} r="6" fill={pointColor(point)} stroke="#08111f" strokeWidth="3" />}
+            </g>
+          ))}
+          {ordered.filter((point) => point.source === "bye").map((point) => (
+            <g key={`empty-${point.week}`}>
+              <title>{pointLabel(point)}: BYE</title>
+              <text x={x(point.week)} y={y(0) - 8} textAnchor="middle" fill="rgba(226,232,240,0.62)" fontSize="9" fontWeight="800">BYE</text>
+            </g>
+          ))}
+          {actualPoints.map((point) => (
+            <g key={`actual-${point.week}`}>
+              <title>{pointLabel(point)}: {valueFormatter(point.value)}</title>
+              <circle cx={x(point.week)} cy={y(point.value)} r="6" fill="#2f80ff" stroke="#08111f" strokeWidth="3" />
             </g>
           ))}
         </svg>

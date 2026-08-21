@@ -7,6 +7,7 @@ import pytest
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
@@ -17,8 +18,10 @@ from collegefootballfantasy_api.app.models.provider_identity import PlayerProvid
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbeat
+from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.services.espn_stats_sync import UnresolvedKickerDistanceError, normalize_espn_summary_player_stats
 from collegefootballfantasy_api.app.services.espn_live_scoring import (
     MIN_GAME_POLL_INTERVAL_SECONDS,
@@ -152,6 +155,66 @@ def _make_public_promotion_ready(db_session, *, at):
     db_session.commit()
 
 
+def _synthetic_live_matchup(db_session, *, at):
+    """Create an in-memory-only league used by the three-minute drill."""
+
+    arch, wingo = _verified_players(db_session)
+    _make_public_promotion_ready(db_session, at=at)
+    game = db_session.query(Game).filter_by(external_id="401", season=2026, week=1).one()
+    league = League(name="Synthetic live-scoring drill", season_year=2026, max_teams=2, status="post_draft")
+    db_session.add(league)
+    db_session.flush()
+    home = Team(league_id=league.id, name="Synthetic Home")
+    away = Team(league_id=league.id, name="Synthetic Away")
+    db_session.add_all([home, away])
+    db_session.flush()
+    db_session.add_all(
+        [
+            LeagueSettings(
+                league_id=league.id,
+                scoring_json={"pass_yards": 0.04, "pass_tds": 4, "receptions": 1},
+                roster_slots_json={"QB": 1, "WR": 1, "BENCH": 2},
+            ),
+            RosterEntry(league_id=league.id, team_id=home.id, player_id=arch.id, slot="QB", status="active"),
+            RosterEntry(league_id=league.id, team_id=away.id, player_id=wingo.id, slot="WR", status="active"),
+            Matchup(
+                league_id=league.id,
+                season=2026,
+                week=1,
+                home_team_id=home.id,
+                away_team_id=away.id,
+                status="scheduled",
+            ),
+            TeamSchedule(
+                team_name="Texas",
+                season=2026,
+                week=1,
+                game_id=game.id,
+                opponent_name="Ohio State",
+                location="home",
+                is_bye=False,
+                kickoff_at=at,
+                neutral_site=False,
+                conference_game=False,
+                date_confirmed=True,
+            ),
+            TeamSchedule(
+                team_name="Texas",
+                season=2026,
+                week=2,
+                opponent_name="Next Opponent",
+                location="away",
+                is_bye=False,
+                neutral_site=False,
+                conference_game=False,
+                date_confirmed=True,
+            ),
+        ]
+    )
+    db_session.commit()
+    return league, arch, wingo
+
+
 def test_shadow_cycle_uses_one_per_game_lease_and_never_promotes_public_scores(db_session):
     _verified_players(db_session)
     client = FakeLiveESPN()
@@ -192,6 +255,64 @@ def test_enabled_cycle_fails_closed_before_public_promotion_when_preflight_is_no
         )
 
     assert db_session.query(PlayerStat).count() == 0
+
+
+def test_synthetic_three_minute_drill_updates_matchup_then_finalizes_downstream_outlook(db_session):
+    """Exercise the production pipeline with disposable fake ESPN payloads.
+
+    The test database is torn down by the test fixture, so none of the fake
+    game, player stats, matchup points, projections, or values can reach a
+    real league.
+    """
+
+    league, arch, _wingo = _synthetic_live_matchup(db_session, at=NOW)
+
+    first = run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="enabled",
+        client=FakeLiveESPN(summary=_summary_at(period=1, clock="10:00", pass_yards=80)),
+        now=NOW,
+        relevant_team_names={"texas"},
+    )
+    assert first.promoted_rows == 2
+    first_score = db_session.query(PlayerWeekScore).filter_by(
+        league_id=league.id, player_id=arch.id, season=2026, week=1
+    ).one().fantasy_points
+    assert db_session.query(WeeklyProjection).filter_by(season=2026, week=2).count() == 0
+
+    _make_public_promotion_ready(db_session, at=NOW + timedelta(seconds=180))
+    second = _run_summary(
+        db_session,
+        summary=_summary_at(period=2, clock="12:00", pass_yards=180),
+        at=NOW + timedelta(seconds=180),
+        mode="enabled",
+    )
+    assert second.promoted_rows == 2
+    second_score = db_session.query(PlayerWeekScore).filter_by(
+        league_id=league.id, player_id=arch.id, season=2026, week=1
+    ).one().fantasy_points
+    assert second_score > first_score
+    assert db_session.query(Matchup).filter_by(league_id=league.id, season=2026, week=1).one().status == "live"
+
+    _make_public_promotion_ready(db_session, at=NOW + timedelta(seconds=360))
+    final = _run_summary(
+        db_session,
+        summary=_final_summary(pass_yards=300),
+        at=NOW + timedelta(seconds=360),
+        mode="enabled",
+    )
+    assert final.promoted_rows == 2
+    matchup = db_session.query(Matchup).filter_by(league_id=league.id, season=2026, week=1).one()
+    assert matchup.status == "final"
+    assert matchup.home_score > second_score
+    assert db_session.query(WeeklyProjection).filter_by(
+        player_id=arch.id,
+        season=2026,
+        week=2,
+        projection_version="MIDWEEK",
+    ).count() == 1
 
 
 def test_accepted_snapshot_queues_only_new_verified_long_play_alerts(db_session, monkeypatch):
