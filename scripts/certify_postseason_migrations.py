@@ -144,7 +144,8 @@ def _assert_post_0102_schema(database_url: str) -> None:
                 text(
                     "INSERT INTO postseason_brackets "
                     "(id, league_id, season, bracket_type, status, total_teams, total_rounds) "
-                    "VALUES (2, 1, 2027, 'CHAMPIONSHIP', 'PLANNED', 4, 2)"
+                    "VALUES (2, 1, 2027, 'CHAMPIONSHIP', 'PLANNED', 4, 2) "
+                    "ON CONFLICT DO NOTHING"
                 )
             )
             bracket_seasons = connection.execute(
