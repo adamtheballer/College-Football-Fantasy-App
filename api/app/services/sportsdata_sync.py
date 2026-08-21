@@ -123,7 +123,7 @@ def _availability_multiplier(status: str) -> tuple[float, float]:
     if status in {"OUT", "IR"}:
         return 0.0, 0.0
     if status == "QUESTIONABLE":
-        return 0.5, 0.5
+        return 0.7, 0.7
     return 1.0, 1.0
 
 

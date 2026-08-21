@@ -10,6 +10,7 @@ from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_availability_event import PlayerAvailabilityEvent
 from collegefootballfantasy_api.app.models.player_news_event import PlayerNewsEvent
 from collegefootballfantasy_api.app.services.sportsdata_sync import (
+    _availability_multiplier,
     _official_availability_status,
     _upsert_official_availability_rows,
 )
@@ -67,6 +68,10 @@ def test_official_ir_policy_requires_an_explicit_four_week_minimum():
     assert _official_availability_status("Out", "at least four weeks") == "IR"
     assert _official_availability_status("Out for season", None) == "IR"
     assert _official_availability_status("Questionable", None) == "QUESTIONABLE"
+
+
+def test_questionable_availability_retains_seventy_percent_of_projection():
+    assert _availability_multiplier("QUESTIONABLE") == (0.7, 0.7)
 
 
 def test_browser_renderer_uses_an_injected_public_document_for_a_js_shell():
@@ -156,8 +161,8 @@ def test_player_card_exposes_official_availability_news(client, db_session):
             season=2026,
             week=1,
             status="QUESTIONABLE",
-            probability_active=0.5,
-            availability_multiplier=0.5,
+            probability_active=0.7,
+            availability_multiplier=0.7,
             source="official_sec_availability_report",
             source_url="https://www.secsports.com/fbreports",
             content_hash="card-news-test",
