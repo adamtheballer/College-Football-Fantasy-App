@@ -23,10 +23,10 @@ import { CURRENT_VALUE_RATING_LABEL, formatCurrentValueRating } from "./PlayerCa
 describe("PlayerCardModal helpers", () => {
   it("always shows the History tab, with league context controlling its contents", () => {
     expect(visiblePlayerCardTabs(false).map((tab) => tab.label)).toEqual([
-      "Summary", "Stats", "Game Log", "Alerts", "Projections", "History", "Value",
+      "News", "Summary", "Stats", "Game Log", "Alerts", "Projections", "History", "Value",
     ]);
     expect(visiblePlayerCardTabs(true).map((tab) => tab.label)).toEqual([
-      "Summary", "Stats", "Game Log", "Alerts", "Projections", "History", "Value",
+      "News", "Summary", "Stats", "Game Log", "Alerts", "Projections", "History", "Value",
     ]);
   });
   it("uses position-specific Game Log columns and full school names", () => {
