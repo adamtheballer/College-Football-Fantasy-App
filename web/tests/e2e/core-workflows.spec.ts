@@ -2348,7 +2348,7 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/trade");
-    await expect(page.getByRole("heading", { name: "Your roster" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your roster", level: 1 })).toBeVisible();
     await expect(page.getByText("Codex Team").first()).toBeVisible();
     await expect(page.getByRole("button", { name: /^Next$/i })).toBeVisible();
 
