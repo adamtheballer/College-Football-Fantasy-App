@@ -356,9 +356,9 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
 
 
 def test_weekly_waiver_clear_opens_instant_adds_only_for_that_game_week(client, db_session, monkeypatch):
-    """A completed Tuesday run opens free agency for its week, not permanently."""
+    """A completed Sunday run opens free agency for its week, not permanently."""
 
-    cleared_at = datetime(2026, 8, 25, 13, 0, tzinfo=timezone.utc)
+    cleared_at = datetime(2026, 8, 23, 13, 0, tzinfo=timezone.utc)
     monkeypatch.setattr(waiver_service, "_now", lambda: cleared_at)
     token = create_user_and_token(client, "weekly-free-agency")
     league = create_league(client, token)
@@ -369,7 +369,7 @@ def test_weekly_waiver_clear_opens_instant_adds_only_for_that_game_week(client, 
             league_id=league["id"],
             season=2026,
             week=1,
-            window_key="2026-week-1-tuesday-clear",
+            window_key="2026-week-1-sunday-clear",
             opens_at=cleared_at - timedelta(days=1),
             closes_at=cleared_at,
             processes_at=cleared_at,

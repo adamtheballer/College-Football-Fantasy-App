@@ -287,7 +287,7 @@ def test_create_league_enforces_standard_beta_roster_and_managed_processing(clie
     assert settings["waiver_type"] == "priority"
     assert settings["trade_review_type"] == "commissioner"
     assert settings["waiver_period_hours"] == 24
-    assert settings["waiver_processing_weekday"] == 1
+    assert settings["waiver_processing_weekday"] == 6
     assert settings["waiver_processing_hour"] == 8
     assert settings["waiver_timezone"] == "America/New_York"
     assert settings["faab_starting_budget"] == 100

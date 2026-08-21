@@ -89,7 +89,7 @@ const standardRosterSummary = "QB 1 · RB 2 · WR 2 · TE 1 · FLEX 1 · K 1 · 
 const standardBetaScoringSummary = "Standard PPR · 3-point field goals · 1-point extra points";
 const managedWaiverSchedule = {
   waiver_period_hours: 24,
-  waiver_processing_weekday: 1,
+  waiver_processing_weekday: 6,
   waiver_processing_hour: 8,
   waiver_timezone: "America/New_York",
   faab_starting_budget: 100,

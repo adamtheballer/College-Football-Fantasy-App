@@ -79,7 +79,7 @@ describe("CreateLeague beta defaults", () => {
               BENCH: 5,
               IR: 1,
             },
-            waiver_processing_weekday: 1,
+            waiver_processing_weekday: 6,
             waiver_processing_hour: 8,
             waiver_timezone: "America/New_York",
           }),

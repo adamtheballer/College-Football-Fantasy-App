@@ -41,7 +41,7 @@ class LeagueSettingsInput(BaseModel):
     waiver_type: str
     waiver_period_hours: int = 24
     waiver_processing_weekday: int = Field(
-        default=1,
+        default=6,
         validation_alias=AliasChoices("waiver_processing_weekday", "waiver_process_day"),
     )
     waiver_processing_hour: int = Field(

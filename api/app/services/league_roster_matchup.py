@@ -1138,7 +1138,7 @@ def build_waivers_view(
             "faab_budget": settings.faab_starting_budget if settings else 100,
             "allow_zero_faab_bids": settings.allow_zero_faab_bids if settings else True,
             "reveal_all_waiver_bids": settings.reveal_all_waiver_bids if settings else False,
-            "processing_weekday": settings.waiver_processing_weekday if settings else 1,
+            "processing_weekday": settings.waiver_processing_weekday if settings else 6,
             "processing_hour": settings.waiver_processing_hour if settings else 8,
             "timezone": settings.waiver_timezone if settings else "America/New_York",
             "post_drop_waiver_hours": settings.post_drop_waiver_hours if settings else 24,

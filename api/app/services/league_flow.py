@@ -54,7 +54,7 @@ FIXED_ROSTER_SLOTS = {
 # roster or a different processing window.
 BETA_LEAGUE_CREATION_DEFAULTS = {
     "waiver_period_hours": 24,
-    "waiver_processing_weekday": 1,
+    "waiver_processing_weekday": 6,
     "waiver_processing_hour": 8,
     "waiver_timezone": "America/New_York",
     "faab_starting_budget": 100,

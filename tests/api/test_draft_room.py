@@ -1406,22 +1406,22 @@ def test_calendar_week_increments_during_season():
     assert calendar_cfb_week(2026, datetime(2026, 9, 8, tzinfo=timezone.utc)) >= 3
 
 
-def test_cfb_week_clock_uses_thursday_to_sunday_game_window():
-    thursday = datetime(2026, 9, 3, 16, 0, tzinfo=timezone.utc)
-    monday = datetime(2026, 9, 7, 4, 1, tzinfo=timezone.utc)
+def test_cfb_week_clock_uses_tuesday_to_saturday_game_window():
+    tuesday = datetime(2026, 9, 1, 16, 0, tzinfo=timezone.utc)
+    sunday = datetime(2026, 9, 6, 4, 1, tzinfo=timezone.utc)
 
-    assert is_cfb_game_week_active(thursday, "America/New_York") is True
-    assert is_cfb_game_week_active(monday, "America/New_York") is False
+    assert is_cfb_game_week_active(tuesday, "America/New_York") is True
+    assert is_cfb_game_week_active(sunday, "America/New_York") is False
 
-    state = current_cfb_week_state(2026, thursday, "America/New_York")
+    state = current_cfb_week_state(2026, tuesday, "America/New_York")
     assert state.week == 3
     assert state.game_week_active is True
 
 
 def test_trade_process_time_never_lands_inside_game_week():
-    wednesday = datetime(2026, 9, 2, 20, 30, tzinfo=timezone.utc)
-    thursday = datetime(2026, 9, 3, 20, 30, tzinfo=timezone.utc)
-    monday_open = datetime(2026, 9, 7, 4, 0, tzinfo=timezone.utc)
+    tuesday = datetime(2026, 9, 1, 20, 30, tzinfo=timezone.utc)
+    saturday = datetime(2026, 9, 5, 20, 30, tzinfo=timezone.utc)
+    sunday_open = datetime(2026, 9, 6, 4, 0, tzinfo=timezone.utc)
 
-    assert next_cfb_trade_process_time(wednesday, "America/New_York") == monday_open
-    assert next_cfb_trade_process_time(thursday, "America/New_York") == monday_open
+    assert next_cfb_trade_process_time(tuesday, "America/New_York") == sunday_open
+    assert next_cfb_trade_process_time(saturday, "America/New_York") == sunday_open

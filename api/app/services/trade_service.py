@@ -43,7 +43,7 @@ from collegefootballfantasy_api.app.services.league_weeks import (
 )
 from collegefootballfantasy_api.app.services.notification_service import queue_notification_event
 from collegefootballfantasy_api.app.services.notification_events import canonical_event_type
-from collegefootballfantasy_api.app.services.player_lock_service import locked_player_ids
+from collegefootballfantasy_api.app.services.player_lock_service import game_starts_for_players
 from collegefootballfantasy_api.app.services.roster_legality import (
     assign_best_roster_slot_for_position,
     normalize_roster_slot_limits,
@@ -301,20 +301,29 @@ def _validate_offer_ownership(db: Session, offer: TradeOffer) -> None:
     _validate_player_ownership(db, offer.league_id, offer.receiving_team_id, receiving_ids)
 
 
-def _validate_no_locked_players(db: Session, league: League, offer: TradeOffer, now: datetime | None = None) -> None:
+def _trade_requires_sunday_processing(db: Session, league: League, offer: TradeOffer, now: datetime) -> bool:
+    """Return whether this trade must settle in the next Sunday window.
+
+    Tuesday--Saturday trades can execute immediately only while every involved
+    player is more than 24 hours from kickoff. A started or near-kickoff game
+    queues the accepted trade for Sunday rather than rejecting it. Sunday and
+    Monday are deliberately safe settlement days for completed-game players.
+    """
+    timezone_name = _trade_timezone(db, league.id)
+    if not is_cfb_game_week_active(now, timezone_name):
+        return False
     player_ids = _player_ids_for_offer(offer)
     if not player_ids:
-        return
-    week_state = current_cfb_week_state(league.season_year, now or _utcnow(), _trade_timezone(db, league.id))
-    locked = locked_player_ids(
+        return False
+    week_state = current_cfb_week_state(league.season_year, now, timezone_name)
+    starts = game_starts_for_players(
         db,
         player_ids=player_ids,
         season=league.season_year,
         week=week_state.week,
-        now=now or _utcnow(),
     )
-    if locked:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="locked player cannot be traded")
+    processing_cutoff = _as_utc(now) + timedelta(hours=24)
+    return any(start is not None and start <= processing_cutoff for start in starts.values())
 
 
 def _roster_slot_limits(db: Session, league_id: int) -> tuple[dict[str, int], bool]:
@@ -654,7 +663,6 @@ def create_trade_offer(db: Session, league: League, current_user: User, payload:
                 proposing=proposing,
                 receiving=receiving,
             )
-            _validate_no_locked_players(db, league, offer, now)
             _plan_roster_swap(db, offer)
             create_trade_private_chat_message(db, offer, event_status="proposed")
     except IntegrityError:
@@ -688,7 +696,6 @@ def _complete_accepted_trade(
     review_reason: str | None = None,
 ) -> None:
     _validate_offer_ownership(db, offer)
-    _validate_no_locked_players(db, league, offer, now)
     _process_roster_swap(db, offer, actor_user_id=actor_user_id)
     offer.status = TRADE_STATUS_PROCESSED
     offer.accepted_at = offer.accepted_at or now
@@ -714,13 +721,11 @@ def accept_trade_offer(db: Session, league: League, trade_id: int, current_user:
     _proposing, receiving = _offer_participants(db, offer)
     _require_team_owner(receiving, current_user)
     _validate_offer_ownership(db, offer)
-    _validate_no_locked_players(db, league, offer, now)
-
     if _trade_requires_commissioner(db, league.id):
         offer.status = TRADE_STATUS_COMMISSIONER_REVIEW
         offer.accepted_at = now
         body = "Trade accepted and sent to commissioner review."
-    elif is_cfb_game_week_active(now, _trade_timezone(db, league.id)):
+    elif _trade_requires_sunday_processing(db, league, offer, now):
         offer.status = TRADE_STATUS_ACCEPTED_PENDING
         offer.accepted_at = now
         offer.process_after = next_cfb_trade_process_time(now, _trade_timezone(db, league.id))
@@ -762,8 +767,7 @@ def commissioner_approve_trade(db: Session, league: League, trade_id: int, curre
     _validate_offer_ownership(db, offer)
     now = _utcnow()
     _ensure_trade_deadline_open(db, league, now)
-    _validate_no_locked_players(db, league, offer, now)
-    if is_cfb_game_week_active(now, _trade_timezone(db, league.id)):
+    if _trade_requires_sunday_processing(db, league, offer, now):
         offer.status = TRADE_STATUS_ACCEPTED_PENDING
         offer.accepted_at = offer.accepted_at or now
         offer.process_after = next_cfb_trade_process_time(now, _trade_timezone(db, league.id))
@@ -883,7 +887,6 @@ def counter_trade_offer(
                 receiving=counter_receiving,
                 countered_from_trade_id=offer.id,
             )
-            _validate_no_locked_players(db, league, replacement, now)
             _plan_roster_swap(db, replacement)
             offer.status = TRADE_STATUS_COUNTERED
             _add_review(db, offer, "countered", current_user.id, payload.message)
@@ -998,7 +1001,6 @@ def process_trade_offers_once(db: Session, now: datetime | None = None) -> dict[
             with db.begin_nested():
                 _ensure_trade_deadline_open(db, league, current)
                 _validate_offer_ownership(db, offer)
-                _validate_no_locked_players(db, league, offer, current)
                 _complete_accepted_trade(
                     db,
                     league=league,

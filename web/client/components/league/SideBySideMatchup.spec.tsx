@@ -128,6 +128,18 @@ describe("SideBySideMatchup", () => {
     expect(screen.queryByText("22.7")).toBeNull();
   });
 
+  it("marks finalized player games with a compact lock in the mobile matchup", () => {
+    const finalMyTeam = {
+      ...myTeam,
+      roster: [{ ...myTeam.roster[0], live_game_state: "final" as const, current_fantasy_points: 18.5 }],
+    };
+
+    render(<SideBySideMatchup myTeam={finalMyTeam} opponentTeam={opponentTeam} scoringStatus="final" />);
+
+    expect(screen.getByLabelText("Game final")).toBeTruthy();
+    expect(screen.getByText("18.5")).toBeTruthy();
+  });
+
   it("keeps bench rows collapsed until a user chooses to inspect them", () => {
     const { container } = render(<SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} />);
 
