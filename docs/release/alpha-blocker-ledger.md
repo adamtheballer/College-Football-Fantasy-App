@@ -1,31 +1,34 @@
-# Alpha Final-Hardening Blocker Ledger
+# Alpha Final Certification Blocker Ledger
 
-Baseline: `48153f7f9854efc27095d52d0efe629d751f8789` (`main`)
+Certification started from `main` at `14a1a95f2eea6aeb84b25dc9d3d48fe817e81556` on 2026-08-21.
 
-This ledger is intentionally evidence-driven. An item is **VERIFIED** only after
-the associated workflow has passed; a passing compile or unit test alone is
-not sufficient.
+An entry is **VERIFIED** only when the named workflow completed against the
+release candidate. A unit test alone is not sufficient for a production-like
+claim. This file contains no production writes, migrations, or deploys.
 
-| Priority | System | Problem | Root Cause | Fix | Test | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| P0 | Baseline / release integrity | Final alpha baseline, open PRs, migrations, runtime flags, and deployment configuration required a combined audit. | Release work landed through several feature PRs. | Audited `48153f7`, excluded every stale/unsafe open PR, and validated one Alembic head plus clean migration downgrade/re-upgrade. | Git/PR/config/Alembic inventory; disposable PostgreSQL migration test. | VERIFIED |
-| P0 | Real multiplayer draft | End-to-end concurrent draft behavior must be revalidated from the current main baseline. | High-integrity workflow; prior tests alone are not release evidence. | No defect found. | Real stack: signed-in two-manager timeout/auto-pick lifecycle passed; full backend suite passed. | VERIFIED |
-| P0 | Player locking / roster integrity | Kickoff-boundary and direct-request enforcement must be verified against canonical kickoff timestamps. | A UI restriction is insufficient without server authority. | No defect found. | `test_player_lock_service.py` plus full backend suite: 706 passed. | VERIFIED |
-| P0 | Waivers / trades / scoring | Cross-user mutations and scoring idempotency require final integrity verification. | These workflows alter canonical league state. | No defect found. | Targeted scoring/waiver/trade suite: 185 passed; real stack private-chat/trade isolation passed. | VERIFIED |
-| P1 | Auth / manager profile | Session lifecycle and avatar propagation need current-build regression verification. | Past profile-photo fixes touched cache and client state. | Hardened unsafe post-login redirect. | Auth session tests, Login unit regressions, full frontend suite (304), and real-stack signup/session workflow passed. | VERIFIED |
-| P1 | Official availability | Daily P4 import and player/alert propagation need source, idempotency, and schedule verification. | Provider availability depends on official reports and production data timing. | No local defect found. | Official-report parser/import tests passed in the targeted 185-test suite and full backend suite. | VERIFIED |
-| P1 | Mobile / navigation / error states | Required alpha routes need viewport and browser-console coverage. | Prior UI work spanned several independent routes. | No local defect found. | 24 browser E2E passed (3 intentional real-stack-only skips); full frontend suite passed. | VERIFIED |
-| P2 | Auth redirect safety | Login trusted arbitrary browser history state as a post-login destination. | The value was not constrained to a same-app path. | Reject absolute, protocol-relative, and backslash paths; preserve only same-app destinations. | `Login.spec.ts`: 10 passed; full frontend suite: 304 passed; typecheck/build passed. | VERIFIED |
-| External | App Store compliance | Public privacy policy, terms, and data-provider disclosure URLs are unset in production. | Owner-controlled legal content and hosting are not present. | Await owner-provided approved URLs. | Production runtime health confirms URLs. | EXTERNAL BLOCKER |
-| External | Production data verification | A real official availability report and live game feed must be observed after their providers publish. | Cannot manufacture provider data or a live game. | Monitor scheduled run and live operational data after availability. | Production operational smoke test. | EXTERNAL BLOCKER |
-| P2 | Development dependency advisories | `npm audit` reports five development-only advisories through test/build tooling. | Upstream dependency chain includes non-breaking patch gaps and a React Router major-version upgrade path. | No alpha runtime dependency advisory exists; defer major dependency upgrade to a separate post-alpha compatibility PR. | `npm audit --omit=dev --json`: 0 production advisories. | DEFERRED |
+| Priority | Feature | Root cause | Fix | Regression evidence | Status |
+| --- | --- | --- | --- | --- | --- |
+| P0 | Public legal routes | Hiding provider-disclosure navigation also removed its direct public route, violating the legal-page availability contract. | Restored `/provider-disclosure` as a public route without returning it to user-facing navigation. | `core-workflows.spec.ts`: direct public-policy route test passed; full browser E2E passed 25/25. | VERIFIED |
+| P1 | Trade browser workflow | The test still asserted a retired linear “Analyze” flow after the approved roster → opponent → review builder replaced it. | Rewrote the E2E test to select each roster, review the trade, and assert the submitted payload. | Targeted trade E2E passed; full browser E2E passed 25/25. | VERIFIED |
+| P0 | Live-scoring deployment contract | `deployments.yaml` still documented scoring as disabled and the scoring worker as omitted, while production runtime reports `SCORING_MODE=enabled` and expects provider polling. | Declared the explicit ESPN enabled mode, provider polling, durable scoring worker, and required live-scoring environment names. | `test_deployment_manifest.py`, config/health/worker/live-scoring regressions: 95 passed. | FIXED — pending final RC CI |
+| P0 | Disposable PostgreSQL certification locally | Docker Desktop cannot read the local `postgres:16` image blob (`containerd … input/output error`), so a fresh local stack cannot start. | No application change is appropriate; restart Docker Desktop and re-pull the image. Do not purge Docker data without explicit approval. | Local `run_real_stack_e2e.sh` stops before application startup. GitHub-hosted checks remain the independent clean-environment evidence. | EXTERNAL BLOCKER |
+| P0 | Fresh/upgrade/downgrade migration rehearsal | No local PostgreSQL is reachable after the Docker image-store failure. | Await healthy disposable PostgreSQL; then run fresh upgrade, upgrade-path, downgrade/re-upgrade, `alembic check`, API and all workers. | Static migration inventory has one head: `0103_sunday_waivers`; database parity cannot be claimed locally. | EXTERNAL BLOCKER |
+| P0 | Full multi-user golden path | The repository has real-stack auth, draft and chat/trade E2E coverage, but no single five-user end-to-end scenario covering the complete 32-step release path. | Add/run the explicit golden-path suite in a healthy disposable stack. | Existing real-stack tests are intentionally separate and do not prove the full sequence. | OPEN |
+| P0 | Live scoring operational replay | Unit/fixture coverage proves snapshot ordering, corrections, restarts, projections and final refreshes, but the full real worker pipeline must be replayed in a disposable PostgreSQL stack. | Run controlled fixture replay through API + ESPN worker after Docker recovery. | `test_espn_live_scoring.py`, `test_live_projection.py`, and `test_weekly_outlook_refresh.py` pass in unit scope. | OPEN |
+| P1 | App Store/TestFlight path | Apple Developer Program enrollment is pending; Xcode cannot issue the required provisioning profile until Apple activates the membership. | Complete/await Apple enrollment; use the existing bundle identifier and TestFlight-test the native shell, photo picker and push registration. | Apple Developer account status shows Pending. | EXTERNAL BLOCKER |
+| P1 | Real live-game observation | No official live game has occurred during certification. | Observe the first real game without seeding or mutating production data. | This is an operational verification, not a synthetic test substitute. | PENDING EXTERNAL GAME |
 
-## Final local evidence
+## Completed local evidence
 
-- Backend: **706 passed** in 58.45s.
-- Focused P0 backend workflows: **185 passed** in 24.38s.
-- Frontend unit/component: **304 passed** across 69 files.
-- Browser E2E: **24 passed**, with **3 intentional real-stack-only skips**.
-- Docker Compose clean boot + real-stack browser workflows: **3 passed** (signup/session, two-manager draft lifecycle, private chat/trade isolation).
-- Frontend typecheck and production build: passed.
-- Production dependency audit: **0 vulnerabilities**.
+- Backend: **789 passed** (14 deprecation/SQLAlchemy warnings).
+- Frontend: typecheck passed; Vitest **320 passed** across 73 files; production build passed.
+- Browser E2E: **25 passed, 3 skipped**. The skips are real-stack-only files, guarded by `REAL_STACK_E2E=1` and not assertion weakening.
+- Focused deployment + live-scoring regression suite: **95 passed**.
+- Candidate PR #161 before the final deployment-contract commit: CI verify, disposable PostgreSQL shadow stack, Docker clean boot, and real-stack E2E all passed. The candidate must be pushed and those checks must pass again after the new commit before certification can advance.
+
+## External recovery steps
+
+1. Quit and relaunch Docker Desktop.
+2. Run `docker pull postgres:16`.
+3. Re-run `COMPOSE_PROJECT_NAME=cff_alpha_rc ./scripts/run_real_stack_e2e.sh` and the migration/replay exercises against that disposable project.
+4. Do not use Docker Desktop **Clean / Purge data** unless the owner explicitly approves its destructive effect.
