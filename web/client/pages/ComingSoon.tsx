@@ -29,7 +29,7 @@ export default function ComingSoon() {
   return (
     <div className="mx-auto max-w-5xl space-y-7 pb-20 pt-5">
       <section className="relative overflow-hidden rounded-[2rem] border border-cfb-brand/35 bg-cfb-surface-raised p-7 shadow-[0_0_52px_rgba(37,99,235,0.12)] sm:p-10">
-        <div aria-hidden="true" className="absolute -right-16 -top-20 h-56 w-80 rotate-[-18deg] rounded-full bg-cfb-pink/20 blur-3xl" />
+        <div aria-hidden="true" className="absolute -right-16 -top-20 h-56 w-80 rotate-[-18deg] rounded-full bg-cfb-crimson/20 blur-3xl" />
         <div className="relative max-w-2xl">
           <p className="cfb-micro-label text-cfb-brand">College Football Fantasy</p>
           <h1 className="mt-3 cfb-display-title text-4xl sm:text-5xl">Coming Soon</h1>

@@ -232,7 +232,7 @@ export function LeagueMatchupCarousel({
                 <span className="rounded-full border border-cfb-border-subtle bg-cfb-canvas px-2 py-1 text-[10px] font-black text-cfb-text-secondary">VS</span>
                 <div className="min-w-0 text-right">
                   <p className="truncate text-xs font-black text-cfb-text-primary">{summary?.opponent_team_name ?? "Opponent TBD"}</p>
-                  <p className="cfb-score-value mt-1 text-2xl text-cfb-pink">
+                  <p className="cfb-score-value mt-1 text-2xl text-cfb-crimson">
                     {formatPoints(summary?.projected_points_against)}
                   </p>
                 </div>

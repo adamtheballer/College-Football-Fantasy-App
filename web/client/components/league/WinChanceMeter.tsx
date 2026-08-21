@@ -15,13 +15,13 @@ export function WinChanceBar({
   opponentPercent,
   className = "",
   testIdPrefix = "win-chance",
-  opponentColorClassName = "bg-cfb-pink",
+  opponentColorClassName = "bg-cfb-crimson",
 }: {
   myPercent?: number | null;
   opponentPercent?: number | null;
   className?: string;
   testIdPrefix?: string;
-  /** Keep the shared meter pink by default; matchup pages use their crimson opponent identity. */
+  /** Use the shared crimson opponent identity; matchup pages preserve the same accent. */
   opponentColorClassName?: string;
 }) {
   const hasWinChance =

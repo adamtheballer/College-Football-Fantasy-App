@@ -294,7 +294,7 @@ export default function Login() {
 
   return (
     <main className="relative mx-auto grid min-h-[calc(100vh-8rem)] w-full max-w-7xl items-center gap-6 overflow-hidden px-4 py-8 sm:px-6 lg:grid-cols-[1.02fr_0.98fr] lg:px-8">
-      <div aria-hidden="true" className="pointer-events-none absolute -left-20 top-10 h-32 w-96 rotate-[-18deg] rounded-full bg-gradient-to-r from-cfb-pink/35 via-cfb-brand/30 to-transparent blur-2xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute -left-20 top-10 h-32 w-96 rotate-[-18deg] rounded-full bg-gradient-to-r from-cfb-crimson/35 via-cfb-brand/30 to-transparent blur-2xl" />
       <div aria-hidden="true" className="pointer-events-none absolute -right-24 top-24 h-32 w-[30rem] rotate-[-16deg] rounded-full bg-gradient-to-r from-transparent via-cfb-cyan/30 to-cfb-gold/24 blur-2xl" />
       <div aria-hidden="true" className="pointer-events-none absolute bottom-8 left-20 h-24 w-[26rem] rotate-[-10deg] rounded-full bg-gradient-to-r from-cfb-gold/24 via-cfb-brand/18 to-transparent blur-2xl" />
 
@@ -355,7 +355,7 @@ export default function Login() {
       <section className="relative mx-auto w-full max-w-[520px]">
         <SurfaceCard variant="raised" padding="none" className="relative overflow-hidden">
           <PlaybookDecor className="opacity-25" />
-          <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-cfb-cyan via-cfb-gold to-cfb-pink" />
+          <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-cfb-cyan via-cfb-gold to-cfb-crimson" />
 
           <div className="relative space-y-8 p-6 sm:p-8">
             <div className="space-y-4 text-center">
