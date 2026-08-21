@@ -74,6 +74,37 @@ def test_questionable_availability_retains_seventy_percent_of_projection():
     assert _availability_multiplier("QUESTIONABLE") == (0.7, 0.7)
 
 
+def test_unchanged_questionable_report_repairs_an_older_cached_multiplier(db_session):
+    player = Player(name="Questionable Cache", school="Auburn", position="WR")
+    db_session.add(player)
+    db_session.commit()
+    row = {
+        "player_name": "Questionable Cache",
+        "team_name": "Auburn",
+        "position": "WR",
+        "status": "Questionable",
+        "injury": "Shoulder",
+        "return_timeline": None,
+        "practice_level": "Limited",
+        "notes": "Official report",
+        "conference": "SEC",
+        "source_url": "https://www.secsports.com/fbreports",
+    }
+    _upsert_official_availability_rows(db_session, season=2026, week=1, rows=[row])
+    event = db_session.query(PlayerAvailabilityEvent).filter_by(player_id=player.id).one()
+    event.probability_active = 0.5
+    event.availability_multiplier = 0.5
+    db_session.commit()
+
+    changes = _upsert_official_availability_rows(db_session, season=2026, week=1, rows=[row])
+
+    repaired = db_session.query(PlayerAvailabilityEvent).filter_by(player_id=player.id).one()
+    assert changes["unchanged"] == 1
+    assert db_session.query(PlayerAvailabilityEvent).filter_by(player_id=player.id).count() == 1
+    assert repaired.probability_active == 0.7
+    assert repaired.availability_multiplier == 0.7
+
+
 def test_browser_renderer_uses_an_injected_public_document_for_a_js_shell():
     source = ConferenceReportSource("SEC", "https://www.secsports.com/fbreports")
     client = ConferenceAvailabilityReportClient(

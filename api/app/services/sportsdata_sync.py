@@ -544,6 +544,7 @@ def _upsert_official_availability_rows(
 
         status = _official_availability_status(row.get("status"), row.get("return_timeline"))
         content_hash = _availability_hash(row, status)
+        probability_active, multiplier = _availability_multiplier(status)
         existing = current_injuries.get(player.id)
         semantic_change = (
             existing is None
@@ -575,10 +576,36 @@ def _upsert_official_availability_rows(
             db.add(existing)
             updated += 1
         else:
+            # A policy multiplier may change without the official report row
+            # changing. Repair the current-week cache in place without emitting
+            # duplicate news or notifications for an unchanged availability
+            # report.
+            availability_event = (
+                db.query(PlayerAvailabilityEvent)
+                .filter(
+                    PlayerAvailabilityEvent.player_id == player.id,
+                    PlayerAvailabilityEvent.season == season,
+                    PlayerAvailabilityEvent.week == week,
+                    PlayerAvailabilityEvent.content_hash == content_hash,
+                )
+                .order_by(PlayerAvailabilityEvent.id.desc())
+                .first()
+            )
+            if availability_event is not None:
+                availability_event.probability_active = probability_active
+                availability_event.availability_multiplier = multiplier
+                db.add(availability_event)
+            context = db.query(PlayerWeeklyContext).filter(
+                PlayerWeeklyContext.player_id == player.id,
+                PlayerWeeklyContext.season == season,
+                PlayerWeeklyContext.week == week,
+            ).first()
+            if context is not None:
+                context.availability_multiplier = multiplier
+                db.add(context)
             unchanged += 1
             continue
 
-        probability_active, multiplier = _availability_multiplier(status)
         notes = " • ".join(
             value for value in (
                 row.get("injury"), row.get("practice_level"), row.get("return_timeline"), row.get("notes")
