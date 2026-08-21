@@ -142,7 +142,7 @@ function MatchupTeamSummary({
           className={`sm:h-10 sm:w-10 sm:text-sm ${
             isBrand
               ? "border-cfb-brand/80 bg-cfb-brand/10 text-cfb-brand"
-              : "border-[#C12B3A]/80 bg-[#C12B3A]/10 text-[#F16270]"
+              : "border-[#C12B3A]/80 bg-cfb-surface-raised text-cfb-text-primary"
           }`}
         />
       </div>
@@ -150,7 +150,7 @@ function MatchupTeamSummary({
         {team?.fantasy_team_name ?? "Team TBD"}
       </p>
       <p className="text-[9px] font-bold text-cfb-text-muted sm:text-[10px]">{team?.record ?? "0-0-0"}</p>
-      <p className={`cfb-score-value mt-0.5 text-2xl sm:mt-1 sm:text-4xl ${isBrand ? "text-cfb-text-primary" : "text-[#F16270]"}`}>
+      <p className="cfb-score-value mt-0.5 text-2xl text-cfb-text-primary sm:mt-1 sm:text-4xl">
         {showActual ? formatMatchupPoints(team?.current_points ?? currentScore) : formatMatchupPoints(projected)}
       </p>
       <p aria-label={`Projected ${formatMatchupPoints(projected)}`} className="mt-0.5 text-[9px] font-bold text-cfb-text-muted">

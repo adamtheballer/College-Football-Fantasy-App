@@ -85,7 +85,7 @@ describe("SideBySideMatchup", () => {
       "grid-cols-[2.75rem_minmax(0,1fr)]",
     );
     expect(starters.querySelector('[data-mobile-matchup-player="right"]')?.className).toContain("text-left");
-    expect(screen.getByText("22.7").parentElement?.className).toContain("text-[#F16270]");
+    expect(screen.getByText("22.7").parentElement?.className).toContain("text-cfb-text-primary");
     expect(starters.querySelector('[data-mobile-matchup-player="left"]')?.className).toContain(
       "grid-cols-[minmax(0,1fr)_2.75rem]",
     );
