@@ -2348,26 +2348,29 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/trade");
-    await expect(page.getByRole("heading", { name: /Trade Builder/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your roster" })).toBeVisible();
     await expect(page.getByText("Codex Team").first()).toBeVisible();
-    await expect(page.getByText("Rival Team").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: /^Analyze Trade$/i })).toBeDisabled();
+    await expect(page.getByRole("button", { name: /^Next$/i })).toBeVisible();
 
     await page.getByRole("button", { name: /Arch Manning/i }).click();
-    await page.getByRole("button", { name: /Rival QB/i }).click();
-    await expect(page.getByRole("button", { name: /^Analyze Trade$/i })).toBeEnabled();
-    await page.getByRole("button", { name: /Analyze Trade/i }).click();
+    await page.getByRole("combobox").click();
+    await page.getByRole("option", { name: "Rival Team" }).click();
+    await page.getByRole("button", { name: /^Next$/i }).click();
 
-    const reviewDialog = page.getByRole("dialog", { name: /Review Trade Offer/i });
-    await expect(reviewDialog).toBeVisible();
-    await expect(reviewDialog.getByText("Strong Loss")).toBeVisible();
-    await expect(reviewDialog.getByText("-6.00")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Rival Team", level: 1 })).toBeVisible();
+    await page.getByRole("button", { name: /Rival QB/i }).click();
+    await expect(page.getByRole("button", { name: /^Review trade$/i }).last()).toBeEnabled();
+    await page.getByRole("button", { name: /^Review trade$/i }).last().click();
+
+    await expect(page.getByRole("heading", { name: "Review trade" })).toBeVisible();
+    await expect(page.getByText("Strong Loss")).toBeVisible();
+    await expect(page.getByText("-6.00")).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
-    await expect(reviewDialog.getByRole("button", { name: "Close" })).toBeVisible();
-    const mobileDialogBox = await reviewDialog.boundingBox();
-    expect(mobileDialogBox).not.toBeNull();
-    if (mobileDialogBox) {
-      expect(mobileDialogBox.height).toBeLessThanOrEqual(844 - 24);
+    const reviewPanel = page.getByRole("heading", { name: "Review trade" }).locator("xpath=ancestor::section[1]");
+    const mobilePanelBox = await reviewPanel.boundingBox();
+    expect(mobilePanelBox).not.toBeNull();
+    if (mobilePanelBox) {
+      expect(mobilePanelBox.width).toBeLessThanOrEqual(390);
     }
     await expect.poll(() => analyzePayload).not.toBeNull();
     expect(analyzePayload).toMatchObject({
@@ -2379,8 +2382,8 @@ test.describe("critical browser workflows", () => {
       league_size: 2,
     });
 
-    await expect(reviewDialog.getByRole("button", { name: /^Send Final Trade$/i })).toBeEnabled();
-    await reviewDialog.getByRole("button", { name: /^Send Final Trade$/i }).click();
+    await expect(page.getByRole("button", { name: /^Send trade$/i })).toBeEnabled();
+    await page.getByRole("button", { name: /^Send trade$/i }).click();
     await expect.poll(() => proposalPayload).not.toBeNull();
     expect(proposalPayload).toMatchObject({
       proposing_team_id: 11,
