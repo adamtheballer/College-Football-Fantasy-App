@@ -271,10 +271,10 @@ def main() -> None:
     ensure_models_registered()
     with SessionLocal() as db:
         revision = db.execute(text("select version_num from alembic_version")).scalar_one_or_none()
-        if revision != "0099_permanent_rivalries":
+        if revision != "0101_injury_notification_scope":
             raise SystemExit(
                 "Refusing readiness audit: database must be migrated to "
-                "0099_permanent_rivalries before its player/game identity data can be certified."
+                "0101_injury_notification_scope before its player/game identity data can be certified."
             )
         report = build_readiness_report(db, season=args.season, event_fixture=args.event_fixture)
     rendered = json.dumps(report, indent=2, sort_keys=True)
