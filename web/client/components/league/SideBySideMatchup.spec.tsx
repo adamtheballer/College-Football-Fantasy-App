@@ -89,6 +89,7 @@ describe("SideBySideMatchup", () => {
     expect(starters.querySelector('[data-mobile-matchup-player="left"]')?.className).toContain(
       "grid-cols-[minmax(0,1fr)_2.75rem]",
     );
+    expect(screen.getByText("24.1").parentElement?.className).toContain("text-cfb-text-primary");
     expect(starters.querySelector("[data-mobile-slot-rail]")).toBeTruthy();
     expect(starters.querySelector("[data-mobile-slot-column]")?.className).not.toContain("border-x");
   });

@@ -165,7 +165,7 @@ function CompactMatchupPlayer({
           {gameTime}
         </p>
       </div>
-      <span className="self-center text-right text-[11px] font-black tabular-nums text-cfb-brand"><span className="block">{points}</span>{liveDetail ? <span className="block text-[8px] font-semibold text-cfb-text-muted">{liveDetail}</span> : null}</span>
+      <span className="self-center text-right text-[11px] font-black tabular-nums text-cfb-text-primary"><span className="block">{points}</span>{liveDetail ? <span className="block text-[8px] font-semibold text-cfb-text-muted">{liveDetail}</span> : null}</span>
     </>
   );
 
