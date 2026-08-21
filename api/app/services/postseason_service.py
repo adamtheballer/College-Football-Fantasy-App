@@ -48,11 +48,11 @@ FINAL_MATCHUP_STATUSES = frozenset({"final", "completed", "stat_corrected"})
 STARTED_MATCHUP_STATUSES = frozenset({"live", "in_progress", *FINAL_MATCHUP_STATUSES})
 POSTSEASON_STATUSES = frozenset({"PLANNED", "SEEDING_PENDING", "LOCKED", "ACTIVE", "FINALIZING", "COMPLETED", "REVIEW_REQUIRED"})
 # Conference-championship week contains only a small subset of Power Four
-# teams. A fantasy championship must not depend on it. The final usable week
-# is therefore the latest imported slate on which *every* canonical P4 school
-# has a game. A partial imported schedule never gets treated as evidence that
-# the missing schools are safe to start.
-CONSERVATIVE_FANTASY_SEASON_END_WEEK = 14
+# teams. A fantasy championship must not depend on it. For the current app
+# calendar the final usable week is Week 14, and that week is eligible only if
+# *every* canonical P4 school has a game. A partial imported schedule never
+# gets treated as evidence that the missing schools are safe to start.
+FANTASY_CHAMPIONSHIP_WEEK = 14
 
 
 @dataclass(frozen=True)
@@ -87,14 +87,15 @@ def validate_playoff_team_count(*, playoff_teams: int, max_teams: int) -> int:
 
 
 def approved_fantasy_season_end_week(db: Session, season: int) -> int:
-    """Return the final all-Power Four slate eligible for fantasy scoring.
+    """Return Week 14 only when every Power Four school is eligible to score.
 
     This is intentionally *not* the latest CFB game week. Conference
     championships occur after most fantasy-relevant P4 schools have stopped
     playing, so treating their week as a normal fantasy week would incorrectly
     zero much of every roster. The imported schedule remains authoritative. A
     fallback is allowed only before *any* P4 schedule rows have been imported;
-    once imported data exists, an incomplete final slate is a blocking error.
+    once imported data exists, a missing Week 14 game for even one P4 school is
+    a blocking error.
     """
     rows = db.query(TeamSchedule.team_name, TeamSchedule.week, TeamSchedule.is_bye, TeamSchedule.location).filter(
         TeamSchedule.season == season,
@@ -108,14 +109,13 @@ def approved_fantasy_season_end_week(db: Session, season: int) -> int:
             canonical = canonical_school_name(team_name)
             if canonical and not is_bye and location != "bye":
                 active_by_week[int(week)].add(canonical)
-    complete_weeks = [week for week, schools in active_by_week.items() if schools == expected_schools]
-    if complete_weeks:
-        return max(complete_weeks)
+    if active_by_week.get(FANTASY_CHAMPIONSHIP_WEEK, set()) == expected_schools:
+        return FANTASY_CHAMPIONSHIP_WEEK
     if imported_power4_rows:
         raise ValueError(
-            "approved P4 schedule does not contain a final week where every P4 school has a game"
+            "approved P4 schedule does not show every P4 school playing in Week 14"
         )
-    return CONSERVATIVE_FANTASY_SEASON_END_WEEK
+    return FANTASY_CHAMPIONSHIP_WEEK
 
 
 def postseason_calendar(db: Session, league: League, playoff_teams: int) -> dict[str, int]:

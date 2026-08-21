@@ -49,7 +49,20 @@ def test_fantasy_calendar_refuses_an_incomplete_imported_p4_final_slate(db_sessi
     )
     db_session.commit()
 
-    with pytest.raises(ValueError, match="every P4 school has a game"):
+    with pytest.raises(ValueError, match="Week 14"):
+        approved_fantasy_season_end_week(db_session, 2026)
+
+
+def test_fantasy_calendar_never_substitutes_an_earlier_complete_week_for_week_14(db_session):
+    teams = list_power4_teams()
+    db_session.add_all(
+        [TeamSchedule(team_name=team, season=2026, week=13, location="home", is_bye=False) for team in teams]
+        + [TeamSchedule(team_name=team, season=2026, week=14, location="home", is_bye=False) for team in teams[:-1]]
+        + [TeamSchedule(team_name=teams[-1], season=2026, week=14, location="bye", is_bye=True)]
+    )
+    db_session.commit()
+
+    with pytest.raises(ValueError, match="Week 14"):
         approved_fantasy_season_end_week(db_session, 2026)
 
 
