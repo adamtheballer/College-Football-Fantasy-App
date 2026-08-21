@@ -10,6 +10,7 @@ from collegefootballfantasy_api.app.services.season_calendar import (
     SeasonCalendarCoverageError,
     SealedScheduleRow,
     SealedScheduleSnapshot,
+    calendar_for_season,
     certification_report,
     certify_season_calendar,
 )
@@ -88,3 +89,16 @@ def test_certification_report_exposes_provenance_and_selected_windows():
         "6": {"playoff_start_week": 11, "championship_week": 13, "regular_season_end_week": 10, "rounds": 3},
         "8": {"playoff_start_week": 11, "championship_week": 13, "regular_season_end_week": 10, "rounds": 3},
     }
+
+
+@pytest.mark.parametrize(
+    ("playoff_teams", "regular_end", "playoff_start"),
+    [(2, 12, 13), (4, 11, 12), (6, 10, 11), (8, 10, 11)],
+)
+def test_checked_in_2026_schedule_snapshot_certifies_the_release_calendar(playoff_teams, regular_end, playoff_start):
+    calendar = calendar_for_season(2026, playoff_teams)
+
+    assert calendar.regular_season_end_week == regular_end
+    assert calendar.playoff_start_week == playoff_start
+    assert calendar.championship_week == 13
+    assert calendar.source_revision == "Google Drive revision 4 (2026-08-09T18:05:55.387Z)"
