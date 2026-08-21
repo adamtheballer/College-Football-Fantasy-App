@@ -57,7 +57,7 @@ export default function PrivacyPolicy() {
           College Football Fantasy uses infrastructure providers to host and deliver the web application and API, including Vercel
           for the web application and Railway for application hosting. These providers may process information as needed to run,
           secure, and support the service. Sports-information sources may also provide player, schedule, score, and availability
-          information; see the Provider Disclosure for more detail.
+          information.
         </p>
         <p>
           College Football Fantasy does not sell personal information in the ordinary sense of exchanging it for money.

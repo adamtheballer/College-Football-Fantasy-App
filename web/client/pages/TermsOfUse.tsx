@@ -1,5 +1,3 @@
-import { Link } from "react-router-dom";
-
 import { LegalDocumentLayout, LegalList, LegalSection } from "@/components/legal/LegalDocumentLayout";
 
 export default function TermsOfUse() {
@@ -72,7 +70,7 @@ export default function TermsOfUse() {
       <LegalSection title="Third-Party Information">
         <p>
           Sports and player information may come from third-party or official sources and can change, be corrected, be delayed,
-          or be incomplete. Read the <Link className="font-semibold text-cfb-brand underline underline-offset-4 hover:text-cfb-cyan" to="/provider-disclosure">Provider Disclosure</Link> for information about current data sources and how the service uses them.
+          or be incomplete.
         </p>
       </LegalSection>
 
