@@ -22,6 +22,7 @@ import { SupportContactCard } from "@/components/support/SupportContactCard";
 import { NotificationSettingsPanel } from "@/components/NotificationSettingsPanel";
 import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
 import { prepareProfileImage } from "@/lib/profileImage";
+import { isExternalLegalHref, resolveLegalDocumentHref } from "@/lib/legal-links";
 
 const SettingsSection = ({ title, description, children, icon: Icon }: any) => (
   <Card className="overflow-hidden rounded-lg border-border bg-card shadow-none">
@@ -53,14 +54,16 @@ const PolicyLinks = ({
   providerDisclosureUrl?: string | null;
   supportEmail?: string | null;
 }) => {
-  const links = [
-    privacyPolicyUrl ? { href: privacyPolicyUrl, label: "Privacy Policy", external: true } : null,
-    termsUrl ? { href: termsUrl, label: "Terms", external: true } : null,
-    providerDisclosureUrl ? { href: providerDisclosureUrl, label: "Provider Disclosure", external: true } : null,
+  type PolicyLink = { href: string; label: string; external?: boolean };
+  const linkCandidates: Array<PolicyLink | null> = [
+    { href: resolveLegalDocumentHref(privacyPolicyUrl, "privacy"), label: "Privacy Policy" },
+    { href: resolveLegalDocumentHref(termsUrl, "terms"), label: "Terms" },
+    { href: resolveLegalDocumentHref(providerDisclosureUrl, "providerDisclosure"), label: "Provider Disclosure" },
     supportEmail ? { href: `mailto:${supportEmail}`, label: "Contact Support", external: false } : null,
-  ].filter((link): link is { href: string; label: string; external: boolean } => link !== null);
-
-  if (!links.length) return null;
+  ];
+  const links = linkCandidates
+    .filter((link): link is PolicyLink => link !== null)
+    .map((link) => ({ ...link, external: link.external ?? isExternalLegalHref(link.href) }));
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -262,7 +265,7 @@ export default function Settings() {
           </div>
         </SettingsSection>
 
-        {privacyPolicyUrl || termsUrl || providerDisclosureUrl || supportEmail ? <section id="support" className="scroll-mt-8">
+        <section id="support" className="scroll-mt-8">
           <SettingsSection
             title="Support & Policies"
             description="Helpful links and account resources"
@@ -272,7 +275,6 @@ export default function Settings() {
           <PolicyLinks privacyPolicyUrl={privacyPolicyUrl} termsUrl={termsUrl} providerDisclosureUrl={providerDisclosureUrl} supportEmail={supportEmail} />
           </SettingsSection>
         </section>
-        : null}
       </div>
     );
   }
