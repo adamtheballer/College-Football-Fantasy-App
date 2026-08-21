@@ -148,15 +148,19 @@ environments:
       requires_api_readiness: true
       release_check: curl --fail --show-error --silent ${PUBLIC_API_BASE_URL}/health/ready
     scoring:
-      # Public beta intentionally has no live provider polling or scoring processor.
-      mode: disabled
-      provider_polling: false
-      worker_deployed: false
+      # Alpha live scoring is an explicit ESPN deployment capability. The
+      # service configuration must enable both the durable per-game scheduler
+      # and its three-minute cache cadence; do not infer either from the
+      # presence of a provider credential.
+      mode: enabled
+      provider: espn
+      provider_polling: true
+      worker_deployed: true
     workers:
       scoring_processor:
-        enabled: false
+        enabled: true
         command: PYTHONPATH=. uv run python scripts/run_espn_scoring_worker.py
-        note: Omitted for public beta. Enable only after ESPN shadow validation; the worker resolves verified schedule windows and durable per-game leases itself.
+        note: Required durable ESPN per-game scheduler. It polls only verified, relevant games and enforces the configured 180-second live cadence.
       lifecycle_processor:
         enabled: true
         command: PYTHONPATH=. uv run python scripts/run_lifecycle_worker.py
@@ -182,6 +186,8 @@ environments:
       - EMAIL_ENABLED
       - PUSH_NOTIFICATIONS_ENABLED
       - SCORING_MODE
+      - SCORING_PROVIDER
+      - SCORING_WORKER_INTERVAL_LIVE_SECONDS
     optional_env:
       - EMAIL_DELIVERY_MODE
       - PUSH_PROVIDER
