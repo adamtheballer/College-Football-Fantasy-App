@@ -62,6 +62,40 @@ const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]
 };
 
 test.describe("critical browser workflows", () => {
+  test("public policy routes load anonymously by direct URL and remain readable after refresh on mobile", async ({ page }) => {
+    const documents = [
+      { path: "/privacy", heading: "Privacy Policy", title: "Privacy Policy | College Football Fantasy" },
+      { path: "/terms", heading: "Terms of Use", title: "Terms of Use | College Football Fantasy" },
+      { path: "/provider-disclosure", heading: "Provider & Data Disclosure", title: "Provider & Data Disclosure | College Football Fantasy" },
+    ];
+
+    for (const viewport of [
+      { width: 320, height: 568 },
+      { width: 375, height: 667 },
+      { width: 390, height: 844 },
+      { width: 430, height: 932 },
+    ]) {
+      await page.setViewportSize(viewport);
+      for (const document of documents) {
+        const apiRequests: string[] = [];
+        const listener = (request: { url: () => string }) => {
+          if (request.url().includes("/api/")) apiRequests.push(request.url());
+        };
+        page.on("request", listener);
+        await page.goto(document.path);
+        await expect(page.getByRole("heading", { name: document.heading })).toBeVisible();
+        await expect(page).toHaveTitle(document.title);
+        await expect(page.getByText("Verifying release runtime…")).toHaveCount(0);
+        await expect(page.getByRole("link", { name: "Back to College Football Fantasy" })).toBeVisible();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBeTruthy();
+        expect(apiRequests).toEqual([]);
+        await page.reload();
+        await expect(page.getByRole("heading", { name: document.heading })).toBeVisible();
+        page.off("request", listener);
+      }
+    }
+  });
+
   test("the public auth screen keeps the Barlow hierarchy readable without narrow-screen overflow", async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.goto("/login");
