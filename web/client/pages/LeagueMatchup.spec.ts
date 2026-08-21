@@ -132,6 +132,7 @@ describe("league matchup scoreboard", () => {
   it("renders the mobile scoreboard with truthful pregame scores, projections, and win chances", () => {
     render(createElement(LeagueMatchup));
 
+    expect(screen.getByTestId("league-matchup-page").className).toContain("max-w-none");
     expect(screen.getByTestId("opening-week-patch")).toBeTruthy();
     expect(screen.getByText("Opening Week")).toBeTruthy();
     expect(screen.getByText("Week 1 matchup")).toBeTruthy();
