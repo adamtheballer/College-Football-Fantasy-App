@@ -40,7 +40,7 @@ from collegefootballfantasy_api.app.services.postseason_topology import (
     format_summary,
     required_rounds,
 )
-from collegefootballfantasy_api.app.services.power4 import is_power4_school, list_power4_teams
+from collegefootballfantasy_api.app.services.power4 import canonical_school_name, is_power4_school, list_power4_teams
 from collegefootballfantasy_api.app.services.notification_service import queue_notification_event
 
 
@@ -49,10 +49,9 @@ STARTED_MATCHUP_STATUSES = frozenset({"live", "in_progress", *FINAL_MATCHUP_STAT
 POSTSEASON_STATUSES = frozenset({"PLANNED", "SEEDING_PENDING", "LOCKED", "ACTIVE", "FINALIZING", "COMPLETED", "REVIEW_REQUIRED"})
 # Conference-championship week contains only a small subset of Power Four
 # teams. A fantasy championship must not depend on it. The final usable week
-# is therefore the latest imported slate on which a broad majority of P4
-# schools play; a 70% threshold keeps normal individual byes from moving the
-# season backward while clearly excluding the championship-only slate.
-BROAD_POWER4_SLATE_SHARE = 0.70
+# is therefore the latest imported slate on which *every* canonical P4 school
+# has a game. A partial imported schedule never gets treated as evidence that
+# the missing schools are safe to start.
 CONSERVATIVE_FANTASY_SEASON_END_WEEK = 14
 
 
@@ -88,27 +87,35 @@ def validate_playoff_team_count(*, playoff_teams: int, max_teams: int) -> int:
 
 
 def approved_fantasy_season_end_week(db: Session, season: int) -> int:
-    """Return the final broad Power Four slate eligible for fantasy scoring.
+    """Return the final all-Power Four slate eligible for fantasy scoring.
 
     This is intentionally *not* the latest CFB game week. Conference
     championships occur after most fantasy-relevant P4 schools have stopped
     playing, so treating their week as a normal fantasy week would incorrectly
-    zero much of every roster. The imported schedule remains authoritative;
-    the fallback only applies while a complete approved schedule is absent.
+    zero much of every roster. The imported schedule remains authoritative. A
+    fallback is allowed only before *any* P4 schedule rows have been imported;
+    once imported data exists, an incomplete final slate is a blocking error.
     """
-    rows = db.query(TeamSchedule.team_name, TeamSchedule.week).filter(
+    rows = db.query(TeamSchedule.team_name, TeamSchedule.week, TeamSchedule.is_bye, TeamSchedule.location).filter(
         TeamSchedule.season == season,
-        TeamSchedule.is_bye.is_(False),
-        TeamSchedule.location != "bye",
     ).all()
+    expected_schools = set(list_power4_teams())
     active_by_week: dict[int, set[str]] = defaultdict(set)
-    for team_name, week in rows:
+    imported_power4_rows = 0
+    for team_name, week, is_bye, location in rows:
         if is_power4_school(team_name):
-            active_by_week[int(week)].add(team_name)
-    power4_count = len(list_power4_teams())
-    minimum_active_teams = max(1, int(power4_count * BROAD_POWER4_SLATE_SHARE))
-    broad_weeks = [week for week, teams in active_by_week.items() if len(teams) >= minimum_active_teams]
-    return max(broad_weeks) if broad_weeks else CONSERVATIVE_FANTASY_SEASON_END_WEEK
+            imported_power4_rows += 1
+            canonical = canonical_school_name(team_name)
+            if canonical and not is_bye and location != "bye":
+                active_by_week[int(week)].add(canonical)
+    complete_weeks = [week for week, schools in active_by_week.items() if schools == expected_schools]
+    if complete_weeks:
+        return max(complete_weeks)
+    if imported_power4_rows:
+        raise ValueError(
+            "approved P4 schedule does not contain a final week where every P4 school has a game"
+        )
+    return CONSERVATIVE_FANTASY_SEASON_END_WEEK
 
 
 def postseason_calendar(db: Session, league: League, playoff_teams: int) -> dict[str, int]:
@@ -637,9 +644,16 @@ def calculate_final_standings(db: Session, bracket: PostseasonBracket, *, now: d
 
 def advance_postseason_state(db: Session, *, now: datetime | None = None) -> dict[str, int]:
     """Existing lifecycle worker entrypoint; safe to repeat after restarts."""
-    result = {"planned": 0, "seeded": 0, "advanced": 0, "materialized": 0, "completed": 0, "review_required": 0}
+    result = {"planned": 0, "seeded": 0, "advanced": 0, "materialized": 0, "completed": 0, "review_required": 0, "calendar_blocked": 0}
     for league in db.query(League).filter(League.status.in_(("post_draft", "regular_season", "postseason", "completed"))).all():
-        plan = get_or_create_postseason_settings(db, league)
+        try:
+            plan = get_or_create_postseason_settings(db, league)
+        except ValueError:
+            # A partial P4 schedule must block that league's postseason, but
+            # never prevent the shared lifecycle worker from advancing other
+            # leagues in the same run.
+            result["calendar_blocked"] += 1
+            continue
         bracket = db.query(PostseasonBracket).filter(PostseasonBracket.league_id == league.id, PostseasonBracket.season == league.season_year).one_or_none()
         if bracket is None:
             result["planned"] += 1

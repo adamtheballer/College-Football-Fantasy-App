@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+import pytest
+
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.matchup import Matchup
@@ -37,6 +39,31 @@ def test_fantasy_calendar_excludes_conference_championship_only_week(db_session)
     db_session.commit()
 
     assert approved_fantasy_season_end_week(db_session, 2026) == 14
+
+
+def test_fantasy_calendar_refuses_an_incomplete_imported_p4_final_slate(db_session):
+    teams = list_power4_teams()
+    db_session.add_all(
+        [TeamSchedule(team_name=team, season=2026, week=14, location="home", is_bye=False) for team in teams[:-1]]
+        + [TeamSchedule(team_name=teams[-1], season=2026, week=14, location="bye", is_bye=True)]
+    )
+    db_session.commit()
+
+    with pytest.raises(ValueError, match="every P4 school has a game"):
+        approved_fantasy_season_end_week(db_session, 2026)
+
+
+def test_lifecycle_skips_only_leagues_with_an_incomplete_p4_calendar(db_session):
+    league = League(name="Calendar blocked", season_year=2026, max_teams=2, status="post_draft")
+    db_session.add(league); db_session.flush()
+    db_session.add(LeagueSettings(
+        league_id=league.id, playoff_teams=2, scoring_json={}, roster_slots_json={}, waiver_type="faab",
+        trade_review_type="none", superflex_enabled=False, kicker_enabled=True, defense_enabled=False,
+    ))
+    db_session.add(TeamSchedule(team_name="Texas", season=2026, week=14, location="home", is_bye=False))
+    db_session.commit()
+
+    assert advance_postseason_state(db_session)["calendar_blocked"] == 1
 
 
 def test_fantasy_playoffs_finish_on_the_last_broad_cfb_slate_by_format(db_session):

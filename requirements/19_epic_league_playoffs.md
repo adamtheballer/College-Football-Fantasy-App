@@ -13,10 +13,12 @@ second scoring path.
 - Supported playoff team counts are exactly `2`, `4`, `6`, and `8`, never more
   than the league's team count.
 - The application derives the usable fantasy calendar at runtime from the last
-  broad Power Four slate, explicitly excluding conference-championship-only
-  weeks. It reserves the necessary final weeks and schedules only the
-  remaining regular-season weeks. Existing started/final matchups are never
-  rewritten or deleted.
+  slate on which **every canonical Power Four school** has a scheduled game,
+  explicitly excluding conference-championship-only weeks. Once an approved
+  P4 schedule is imported, an incomplete final slate is a blocking readiness
+  error—not a best-effort approximation. It reserves the necessary final weeks
+  and schedules only the remaining regular-season weeks. Existing
+  started/final matchups are never rewritten or deleted.
 - Seeding uses the canonical regular-season standings snapshot: win percentage,
   points for, unambiguous head-to-head, lower points against, then a persisted
   audited deterministic draw. Seeds lock only after every required regular
