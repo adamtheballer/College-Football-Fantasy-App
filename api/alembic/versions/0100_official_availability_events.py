@@ -1,6 +1,6 @@
 """Track official availability-source provenance and event idempotency.
 
-Revision ID: 0100_official_availability_events
+Revision ID: 0100_official_avail
 Revises: 0099_permanent_rivalries
 """
 
@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from alembic import op
 
 
-revision = "0100_official_availability_events"
+revision = "0100_official_avail"
 down_revision = "0099_permanent_rivalries"
 branch_labels = None
 depends_on = None
