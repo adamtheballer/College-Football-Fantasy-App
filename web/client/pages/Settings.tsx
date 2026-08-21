@@ -46,19 +46,16 @@ const SettingsSection = ({ title, description, children, icon: Icon }: any) => (
 const PolicyLinks = ({
   privacyPolicyUrl,
   termsUrl,
-  providerDisclosureUrl,
   supportEmail,
 }: {
   privacyPolicyUrl?: string | null;
   termsUrl?: string | null;
-  providerDisclosureUrl?: string | null;
   supportEmail?: string | null;
 }) => {
   type PolicyLink = { href: string; label: string; external?: boolean };
   const linkCandidates: Array<PolicyLink | null> = [
     { href: resolveLegalDocumentHref(privacyPolicyUrl, "privacy"), label: "Privacy Policy" },
     { href: resolveLegalDocumentHref(termsUrl, "terms"), label: "Terms" },
-    { href: resolveLegalDocumentHref(providerDisclosureUrl, "providerDisclosure"), label: "Provider Disclosure" },
     supportEmail ? { href: `mailto:${supportEmail}`, label: "Contact Support", external: false } : null,
   ];
   const links = linkCandidates
@@ -100,7 +97,6 @@ export default function Settings() {
   const {
     privacy_policy_url: privacyPolicyUrl,
     terms_url: termsUrl,
-    provider_disclosure_url: providerDisclosureUrl,
     support_email: supportEmail,
   } = useRuntimeCapabilities();
   const { data: leagues = [] } = useLeagues(50, Boolean(user));
@@ -272,7 +268,7 @@ export default function Settings() {
             icon={Shield}
           >
           <SupportContactCard />
-          <PolicyLinks privacyPolicyUrl={privacyPolicyUrl} termsUrl={termsUrl} providerDisclosureUrl={providerDisclosureUrl} supportEmail={supportEmail} />
+          <PolicyLinks privacyPolicyUrl={privacyPolicyUrl} termsUrl={termsUrl} supportEmail={supportEmail} />
           </SettingsSection>
         </section>
       </div>
@@ -454,7 +450,7 @@ export default function Settings() {
                 />
               </div>
             </div>
-            <PolicyLinks privacyPolicyUrl={privacyPolicyUrl} termsUrl={termsUrl} providerDisclosureUrl={providerDisclosureUrl} supportEmail={supportEmail} />
+            <PolicyLinks privacyPolicyUrl={privacyPolicyUrl} termsUrl={termsUrl} supportEmail={supportEmail} />
 
             <div className="flex justify-center pt-3">
                <Button type="button" variant="ghost" onClick={() => void handleLogoutAll()} className="text-muted-foreground hover:text-red-400 gap-3 text-[11px] font-black uppercase tracking-[0.2em]">
