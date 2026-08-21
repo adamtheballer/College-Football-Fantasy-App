@@ -144,7 +144,7 @@ describe("Settings beta preferences", () => {
 
     expect(screen.getByRole("link", { name: "Privacy Policy" }).getAttribute("href")).toBe("/privacy");
     expect(screen.getByRole("link", { name: "Terms" }).getAttribute("href")).toBe("/terms");
-    expect(screen.getByRole("link", { name: "Provider Disclosure" }).getAttribute("href")).toBe("/provider-disclosure");
+    expect(screen.queryByRole("link", { name: /provider disclosure/i })).toBeNull();
   });
 
   it("uses a configured runtime policy URL when available", () => {

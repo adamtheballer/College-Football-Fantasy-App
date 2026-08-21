@@ -8,6 +8,7 @@ from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
+from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings
@@ -22,6 +23,7 @@ from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.services.league_schedule import ensure_league_schedule
+from collegefootballfantasy_api.app.services.postseason_service import get_or_create_postseason_settings
 from collegefootballfantasy_api.app.services.scoring_service import normalize_scoring_rules
 from collegefootballfantasy_api.app.services.draft_service import process_expired_draft_picks_once
 from collegefootballfantasy_api.app.core.config import settings
@@ -557,6 +559,47 @@ def test_fourteen_team_schedule_is_balanced_without_repeated_opponents_before_pl
             opponents_by_team[matchup.away_team_id].add(matchup.home_team_id)
 
     assert all(len(opponents) == regular_season_weeks for opponents in opponents_by_team.values())
+
+
+@pytest.mark.parametrize(
+    ("team_count", "playoff_teams"),
+    [
+        (4, 2), (4, 4),
+        (6, 2), (6, 4), (6, 6),
+        (8, 2), (8, 4), (8, 6), (8, 8),
+        (10, 2), (10, 4), (10, 6), (10, 8),
+        (12, 2), (12, 4), (12, 6), (12, 8),
+        (14, 2), (14, 4), (14, 6), (14, 8),
+    ],
+)
+def test_every_alpha_league_size_and_playoff_field_generates_only_regular_season_matchups(db_session, team_count, playoff_teams):
+    league = League(name=f"{team_count}-{playoff_teams} alpha schedule", season_year=2026, max_teams=team_count)
+    db_session.add(league); db_session.flush()
+    db_session.add(LeagueSettings(
+        league_id=league.id, playoff_teams=playoff_teams, scoring_json={}, roster_slots_json={}, waiver_type="faab",
+        trade_review_type="none", superflex_enabled=False, kicker_enabled=True, defense_enabled=False,
+    ))
+    teams = [Team(league_id=league.id, name=f"Team {index}") for index in range(1, team_count + 1)]
+    db_session.add_all(teams); db_session.flush()
+
+    plan = get_or_create_postseason_settings(db_session, league)
+    assert ensure_league_schedule(db_session, league) == (team_count // 2) * plan.regular_season_end_week
+    db_session.flush()
+    matchups = db_session.query(Matchup).filter_by(league_id=league.id, season=2026).all()
+
+    assert {matchup.week for matchup in matchups} == set(range(1, plan.regular_season_end_week + 1))
+    assert all(matchup.week < plan.playoff_start_week for matchup in matchups)
+    first_round_robin_weeks = min(plan.regular_season_end_week, team_count - 1)
+    pairs: set[tuple[int, int]] = set()
+    for week in range(1, plan.regular_season_end_week + 1):
+        weekly = [matchup for matchup in matchups if matchup.week == week]
+        assert len(weekly) == team_count // 2
+        assert {team_id for matchup in weekly for team_id in (matchup.home_team_id, matchup.away_team_id)} == {team.id for team in teams}
+        if week <= first_round_robin_weeks:
+            for matchup in weekly:
+                pair = tuple(sorted((matchup.home_team_id, matchup.away_team_id)))
+                assert pair not in pairs
+                pairs.add(pair)
 
 
 def test_create_invite_join_assigns_one_team_per_user_and_enforces_max_teams(client, db_session):
