@@ -23,6 +23,19 @@ second scoring path.
   points for, unambiguous head-to-head, lower points against, then a persisted
   audited deterministic draw. Seeds lock only after every required regular
   season matchup is final/corrected.
+
+### Postseason history and schema invariants
+
+- A permanent bracket is unique by `(league_id, season)`. New final-standing
+  writes always have a valid `bracket_id` and are unique by both
+  `(bracket_id, team_id)` and `(bracket_id, final_place)`.
+- Pre-canonical historical rows may have nullable `bracket_id`. Their legacy
+  `(league_id, season, team_id)` and `(league_id, season, final_place)` unique
+  constraints remain intentionally so PostgreSQL's nullable unique semantics
+  cannot permit duplicate unlinked history.
+- Migration readiness, CI, Docker boot, real-stack E2E, and shadow
+  certification derive the one repository Alembic head dynamically; none may
+  hardcode an expected revision.
 - Seeds may rebuild before the first playoff kickoff after a regular-season
   correction; after kickoff, the field and seed order are immutable.
 - Exact final-score playoff ties advance the higher original seed under the

@@ -102,6 +102,7 @@ class PostseasonMatchup(TimestampMixin, Base):
         UniqueConstraint("round_id", "slot_number", name="uq_postseason_matchup_round_slot"),
         UniqueConstraint("fantasy_matchup_id", name="uq_postseason_matchup_matchup"),
         Index("ix_postseason_matchups_bracket", "bracket_id"),
+        Index("ix_postseason_matchups_fantasy_matchup", "fantasy_matchup_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -133,8 +134,15 @@ class PostseasonMatchup(TimestampMixin, Base):
 class PostseasonFinalStanding(TimestampMixin, Base):
     __tablename__ = "postseason_final_standings"
     __table_args__ = (
+        # Historical rows can legitimately have a nullable bracket ID. Retain
+        # the pre-canonical league/season uniqueness guards for those rows;
+        # all new service writes additionally satisfy the bracket-scoped
+        # canonical constraints below.
+        UniqueConstraint("league_id", "season", "team_id", name="uq_postseason_final_standing_team"),
+        UniqueConstraint("league_id", "season", "final_place", name="uq_postseason_final_standing_place"),
         UniqueConstraint("bracket_id", "team_id", name="uq_postseason_final_standing_bracket_team"),
         UniqueConstraint("bracket_id", "final_place", name="uq_postseason_final_standing_bracket_place"),
+        Index("ix_postseason_final_standings_bracket", "bracket_id", "final_place"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
