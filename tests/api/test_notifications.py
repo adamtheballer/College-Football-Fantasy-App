@@ -250,7 +250,7 @@ def test_draft_reschedule_cancels_old_notification_attempts_and_queues_new_ones(
     response = client.patch(
         f"/leagues/{league['id']}/draft",
         json={
-            "draft_datetime_utc": "2026-08-20T18:00:00Z",
+                "draft_datetime_utc": "2030-08-20T18:00:00Z",
             "timezone": "America/Los_Angeles",
             "draft_type": "snake",
             "pick_timer_seconds": 120,

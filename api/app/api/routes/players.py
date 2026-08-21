@@ -13,11 +13,13 @@ from collegefootballfantasy_api.app.integrations.espn import ESPNClient
 from collegefootballfantasy_api.app.integrations.sportsdata import SportsDataClient
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_news_event import PlayerNewsEvent
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.player import (
     PlayerCardAboutRead,
     PlayerCardInjuryRead,
+    PlayerCardNewsRead,
     PlayerCardRead,
     PlayerSeasonOutlookRead,
     PlayerCardStatRowRead,
@@ -353,6 +355,13 @@ def get_player_card_endpoint(
         .order_by(Injury.season.desc(), Injury.week.desc(), Injury.updated_at.desc())
         .all()
     )
+    news_rows = (
+        db.query(PlayerNewsEvent)
+        .filter(PlayerNewsEvent.player_id == player.id)
+        .order_by(PlayerNewsEvent.published_at.desc(), PlayerNewsEvent.id.desc())
+        .limit(25)
+        .all()
+    )
     stat_rows = (
         db.query(PlayerStat)
         .filter(PlayerStat.player_id == player.id)
@@ -401,6 +410,37 @@ def get_player_card_endpoint(
                 updated_at=row.updated_at,
             )
             for row in injury_rows
+        ],
+        recent_news=[
+            PlayerCardNewsRead(
+                id=row.id,
+                event_type=row.event_type,
+                status=(
+                    next(
+                        (
+                            injury.status
+                            for injury in injury_rows
+                            if injury.season == row.season and injury.week == row.week
+                        ),
+                        None,
+                    )
+                ),
+                detail=row.notes,
+                source=row.source,
+                source_url=row.source_url,
+                published_at=row.published_at,
+                return_timeline=(
+                    next(
+                        (
+                            injury.return_timeline
+                            for injury in injury_rows
+                            if injury.season == row.season and injury.week == row.week
+                        ),
+                        None,
+                    )
+                ),
+            )
+            for row in news_rows
         ],
         season_stats=[
             PlayerCardStatRowRead(

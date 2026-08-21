@@ -10,6 +10,7 @@ from collegefootballfantasy_api.app.core.config import settings as app_settings
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.game import Game
+from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
@@ -355,6 +356,25 @@ def _rosters_for_teams(db: Session, team_ids: set[int]) -> dict[int, list[Roster
     return rosters
 
 
+def _injury_status_by_player(
+    db: Session, *, season: int, week: int, player_ids: set[int]
+) -> dict[int, str]:
+    if not player_ids:
+        return {}
+    rows = (
+        db.query(Injury)
+        .filter(Injury.season == season, Injury.week == week, Injury.player_id.in_(player_ids))
+        .order_by(Injury.updated_at.desc(), Injury.id.desc())
+        .all()
+    )
+    statuses: dict[int, str] = {}
+    for row in rows:
+        normalized = (row.status or "").upper()
+        if row.player_id not in statuses and normalized in {"QUESTIONABLE", "OUT", "IR"}:
+            statuses[row.player_id] = normalized
+    return statuses
+
+
 def _serialize_roster_entry(
     roster_slot: CanonicalRosterSlot,
     league: League,
@@ -368,6 +388,7 @@ def _serialize_roster_entry(
     live_game: LiveGameContext | None = None,
     live_projection: LivePlayerProjection | None = None,
     scoring_rules: dict | None = None,
+    injury_status: str | None = None,
 ) -> RosterTabEntryRead:
     entry = roster_slot.entry
     projected = float(projection.fantasy_points) if projection and projection.fantasy_points is not None else None
@@ -407,6 +428,7 @@ def _serialize_roster_entry(
         slot_index=roster_slot.slot_index,
         display_label=roster_slot.display_label,
         roster_slot=roster_slot.slot_type,
+        injury_status=injury_status,
         status=entry.status if entry else "EMPTY",
         is_starter=roster_slot.is_starter,
         is_ir=roster_slot.is_ir,
@@ -485,6 +507,9 @@ def _serialize_team_roster(
     )
     current_time = datetime.now(timezone.utc)
     slots = build_team_roster_slots(team.id, _slot_limits(db, league), entries)
+    injury_statuses = _injury_status_by_player(
+        db, season=league.season_year, week=week, player_ids=player_ids
+    )
     return [
         _serialize_roster_entry(
             roster_slot,
@@ -498,6 +523,7 @@ def _serialize_team_roster(
             live_game=live_games.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             live_projection=live_projection_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             scoring_rules=settings.scoring_json if settings else {},
+            injury_status=injury_statuses.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             is_locked=(
                 roster_slot.entry is not None
                 and game_starts.get(roster_slot.entry.player_id) is not None
@@ -543,6 +569,9 @@ def _serialize_team_rosters(
     )
     current_time = datetime.now(timezone.utc)
     slot_limits = _slot_limits(db, league)
+    injury_statuses = _injury_status_by_player(
+        db, season=league.season_year, week=week, player_ids=player_ids
+    )
     return {
         team_id: [
             _serialize_roster_entry(
@@ -557,6 +586,7 @@ def _serialize_team_rosters(
                 live_game=live_games.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 live_projection=live_projection_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 scoring_rules=settings.scoring_json if settings else {},
+                injury_status=injury_statuses.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 is_locked=(
                     roster_slot.entry is not None
                     and game_starts.get(roster_slot.entry.player_id) is not None

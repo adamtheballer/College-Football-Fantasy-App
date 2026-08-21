@@ -23,6 +23,7 @@ from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.matchup import Matchup
+from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.notification import (
     NotificationDeliveryAttempt,
@@ -236,6 +237,7 @@ def get_notification_preferences(db: Session, current_user_id: int) -> Notificat
         email_enabled=prefs.email_enabled,
         draft_alerts=prefs.draft_alerts,
         injury_alerts=prefs.injury_alerts,
+        injury_alert_scope=(prefs.injury_alert_scope or "ALL").upper(),
         # Retain this legacy API property for already-installed clients, but
         # never reactivate a standalone touchdown alert.
         touchdown_alerts=False,
@@ -270,6 +272,7 @@ def update_notification_preferences(
     # product notification type; retain the storage field only for clients
     # built before this release.
     payload.touchdown_alerts = False
+    payload.injury_alert_scope = payload.injury_alert_scope.upper()
     if not payload.big_play_alerts:
         payload.long_rush_alerts = False
         payload.long_reception_alerts = False
@@ -300,6 +303,66 @@ def list_user_alerts(db: Session, current_user_id: int, limit: int = 50) -> Noti
     )
     unread_count = db.query(func.count(NotificationLog.id)).filter(user_filter, NotificationLog.read_at.is_(None)).scalar() or 0
     return NotificationList(data=[_serialize_log(row) for row in rows], total=len(rows), unread_count=int(unread_count))
+
+
+def log_official_injury_update(
+    db: Session,
+    *,
+    player: Player,
+    season: int,
+    week: int,
+    status: str,
+    content_hash: str,
+    source_url: str | None,
+    detail: str | None,
+) -> int:
+    """Write one deduplicated alert for each rostered, opted-in manager."""
+    roster_rows = (
+        db.query(Team.owner_user_id, Team.league_id)
+        .join(RosterEntry, RosterEntry.team_id == Team.id)
+        .filter(RosterEntry.player_id == player.id, Team.owner_user_id.is_not(None))
+        .distinct()
+        .all()
+    )
+    created = 0
+    for user_id, league_id in roster_rows:
+        if user_id is None or league_id is None:
+            continue
+        global_prefs = db.query(NotificationPreference).filter(NotificationPreference.user_id == user_id).one_or_none()
+        if global_prefs is not None and not global_prefs.injury_alerts:
+            continue
+        if global_prefs is not None and (global_prefs.injury_alert_scope or "ALL").upper() == "SELECTED":
+            league_pref = (
+                db.query(NotificationLeaguePreference)
+                .filter(NotificationLeaguePreference.user_id == user_id, NotificationLeaguePreference.league_id == league_id)
+                .one_or_none()
+            )
+            if not _league_pref_allows("INJURY", "INJURY", league_pref):
+                continue
+        event_key = f"official-injury:{user_id}:{league_id}:{player.id}:{content_hash}"
+        if db.query(NotificationLog.id).filter(NotificationLog.event_key == event_key).first():
+            continue
+        status_label = "IR" if status == "IR" else ("Out" if status == "OUT" else "Questionable" if status == "QUESTIONABLE" else "Available")
+        db.add(
+            NotificationLog(
+                user_id=user_id,
+                user_key=legacy_user_key(user_id),
+                league_id=league_id,
+                category="INJURY",
+                scope="direct_user",
+                event_key=event_key,
+                alert_type="INJURY",
+                title=f"{player.name}: {status_label}",
+                body=detail or f"Official availability report lists {player.name} as {status_label}.",
+                payload={
+                    "player_id": player.id, "league_id": league_id, "season": season, "week": week,
+                    "status": status, "content_hash": content_hash, "source_url": source_url,
+                },
+                sent_at=utcnow(),
+            )
+        )
+        created += 1
+    return created
 
 
 def mark_notification_read(db: Session, *, current_user_id: int, notification_id: int, read: bool = True) -> NotificationRead | None:

@@ -105,11 +105,23 @@ class PlayerSeasonOutlookRead(BaseModel):
     review_status: str
 
 
+class PlayerCardNewsRead(BaseModel):
+    id: int
+    event_type: str
+    status: str | None = None
+    detail: str | None = None
+    source: str
+    source_url: str | None = None
+    published_at: datetime | None = None
+    return_timeline: str | None = None
+
+
 class PlayerCardRead(BaseModel):
     player: PlayerRead
     about: PlayerCardAboutRead
     current_injury_status: str | None = None
     injuries: list[PlayerCardInjuryRead]
+    recent_news: list[PlayerCardNewsRead] = []
     season_stats: list[PlayerCardStatRowRead]
     season_outlook: PlayerSeasonOutlookRead | None = None
     historical_stats: PlayerHistoricalStatsResponse | None = None

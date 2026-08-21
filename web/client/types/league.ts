@@ -247,6 +247,7 @@ export interface LeagueRosterPlayer {
   slot_index?: number;
   display_label?: string;
   roster_slot?: string | null;
+  injury_status?: "QUESTIONABLE" | "OUT" | "IR" | string | null;
   status?: string;
   acquisition_type?: string;
   draft_pick_id?: number | null;

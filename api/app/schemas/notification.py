@@ -33,6 +33,7 @@ class NotificationPreferences(BaseModel):
     email_enabled: bool = True
     draft_alerts: bool = True
     injury_alerts: bool = True
+    injury_alert_scope: Literal["ALL", "SELECTED"] = "ALL"
     touchdown_alerts: bool = False
     usage_alerts: bool = True
     waiver_alerts: bool = True

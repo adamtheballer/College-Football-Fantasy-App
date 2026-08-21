@@ -14,6 +14,7 @@ type Preferences = {
   email_enabled: boolean;
   draft_alerts: boolean;
   injury_alerts: boolean;
+  injury_alert_scope: "ALL" | "SELECTED";
   usage_alerts: boolean;
   waiver_alerts: boolean;
   projection_alerts: boolean;
@@ -84,9 +85,10 @@ const longPlayRows: Array<{ key: "long_rush_alerts" | "long_reception_alerts" | 
   { key: "long_pass_alerts", label: "Long passes", description: "40+ yard completed passes." },
 ];
 
-type LeagueToggleKey = "draft_alerts" | "trade_alerts" | "waiver_alerts" | "matchup_start_alerts" | "matchup_result_alerts" | "lineup_reminders" | "big_play_alerts" | "long_rush_alerts" | "long_reception_alerts" | "long_pass_alerts";
+type LeagueToggleKey = "injury_alerts" | "draft_alerts" | "trade_alerts" | "waiver_alerts" | "matchup_start_alerts" | "matchup_result_alerts" | "lineup_reminders" | "big_play_alerts" | "long_rush_alerts" | "long_reception_alerts" | "long_pass_alerts";
 
 const leagueRows: Array<{ key: LeagueToggleKey; label: string }> = [
+  { key: "injury_alerts", label: "Injury updates" },
   { key: "draft_alerts", label: "Drafts" },
   { key: "trade_alerts", label: "Trades" },
   { key: "waiver_alerts", label: "Waivers" },
@@ -293,6 +295,18 @@ export function NotificationSettingsPanel() {
             </span>
           </div>
         </div>
+        {preferences ? <div className="border-b border-border/35 py-3">
+          <div className="flex items-center justify-between gap-5">
+            <div><p className="text-sm font-bold text-foreground">Injury Updates</p><p className="text-xs text-muted-foreground">Official availability changes for players on your roster.</p></div>
+            <Switch checked={preferences.injury_alerts} disabled={saving} onCheckedChange={(injury_alerts) => void save({ ...preferences, injury_alerts })} aria-label="Injury Updates notifications" />
+          </div>
+          <label className="mt-3 block text-xs text-muted-foreground">Alert coverage
+            <select value={preferences.injury_alert_scope} disabled={saving || !preferences.injury_alerts} onChange={(event) => void save({ ...preferences, injury_alert_scope: event.target.value as "ALL" | "SELECTED" })} className="mt-1 block h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground sm:max-w-sm">
+              <option value="ALL">All my leagues</option>
+              <option value="SELECTED">Only selected leagues below</option>
+            </select>
+          </label>
+        </div> : null}
         {preferences ? rows.map((row) => (
           <div key={row.key} className="flex items-center justify-between gap-5 border-b border-border/35 py-3 last:border-0">
             <div><p className="text-sm font-bold text-foreground">{row.label}</p><p className="text-xs text-muted-foreground">{row.description}</p></div>

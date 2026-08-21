@@ -14,7 +14,12 @@ ENV PYTHONPATH=/app \
     GIT_SHA=${CFF_GIT_SHA} \
     GIT_BRANCH=${CFF_GIT_BRANCH}
 
-RUN pip install --no-cache-dir uv
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y chromium ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir uv
+
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium
 
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen

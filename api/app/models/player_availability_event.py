@@ -24,6 +24,8 @@ class PlayerAvailabilityEvent(TimestampMixin, Base):
     availability_multiplier: Mapped[float] = mapped_column(Float, default=0.75)
     snap_limit: Mapped[float | None] = mapped_column(Float, nullable=True)
     source: Mapped[str] = mapped_column(String(200))
+    source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_reliability: Mapped[float] = mapped_column(Float, default=0.5)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     effective_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
