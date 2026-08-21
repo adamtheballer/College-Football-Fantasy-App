@@ -12,6 +12,7 @@ import { LeagueMatchupCarousel } from "@/components/league/LeagueMatchupCarousel
 import { formatDisplayedProbabilityPair } from "@/components/league/WinChanceMeter";
 import { Button } from "@/components/ui/button";
 import { PositionBadge, StatusBadge, SurfaceCard } from "@/components/fantasy";
+import { PublicLegalLinks } from "@/components/legal/PublicLegalLinks";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
 import { useLeagueWorkspace, useLeagues } from "@/hooks/use-leagues";
@@ -130,6 +131,11 @@ function GuestHome() {
           <SurfaceCard key={item.title} padding="compact"><p className="cfb-micro-label text-cfb-brand">0{index + 1}</p><h2 className="mt-2 text-base font-bold">{item.title}</h2><p className="mt-2 text-sm leading-6 text-cfb-text-secondary">{item.detail}</p></SurfaceCard>
         ))}
       </section>
+
+      <footer className="border-t border-cfb-border-subtle pt-5 text-center text-sm text-cfb-text-muted">
+        <p>© 2026 College Football Fantasy</p>
+        <PublicLegalLinks className="mt-3" />
+      </footer>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { setPendingGuide } from "@/lib/onboarding";
 import { ApiError, apiUnavailableMessage } from "@/lib/api";
 import { PASSWORD_POLICY_MESSAGE, passwordMeetsPolicy, passwordPolicyChecks } from "@/lib/password-policy";
+import { PublicLegalLinks } from "@/components/legal/PublicLegalLinks";
 import { clearBetaAccessReservation, getBetaAccessReservation } from "@/lib/beta-access";
 import {
   Trophy,
@@ -321,6 +322,9 @@ export default function Signup() {
               <Zap className="h-3.5 w-3.5 text-amber-200" />
               <span className="text-[8px] font-black uppercase tracking-widest">Live Scoring</span>
             </div>
+          </div>
+          <div className="mt-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-200/55 [@media(max-height:760px)]:hidden">
+            <PublicLegalLinks />
           </div>
         </div>
       </div>

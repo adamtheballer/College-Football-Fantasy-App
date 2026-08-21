@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { PlaybookDecor, SurfaceCard } from "@/components/fantasy";
+import { PublicLegalLinks } from "@/components/legal/PublicLegalLinks";
 import { useRuntimeCapabilities } from "@/components/RuntimeCompatibilityGate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -464,6 +465,9 @@ export default function Login() {
             {mode === "signin" ? <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[10px] font-bold uppercase tracking-widest text-cfb-text-secondary"><button type="button" onClick={() => selectMode("signup")}>Don&apos;t have an account?<span className="ml-1 font-black text-cfb-gold hover:text-yellow-100">Create one</span></button>{betaAccessEnabled ? <button type="button" onClick={() => selectMode("access")}>Have a code?<span className="ml-1 font-black text-cfb-cyan hover:text-cyan-100">Claim Pro</span></button> : null}</div> : <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[10px] font-bold uppercase tracking-widest text-cfb-text-secondary"><button type="button" onClick={() => selectMode("signin")}>Already have an account?<span className="ml-1 font-black text-cfb-gold hover:text-yellow-100">Sign in</span></button>{mode === "signup" && betaAccessEnabled ? <button type="button" onClick={() => selectMode("access")}>Have a code?<span className="ml-1 font-black text-cfb-cyan hover:text-cyan-100">Claim Pro</span></button> : null}</div>}
           </div>
         </SurfaceCard>
+        <div className="mt-5 text-center text-[11px] font-semibold text-cfb-text-muted">
+          <PublicLegalLinks />
+        </div>
       </section>
 
       <Dialog open={Boolean(createdPassword)} onOpenChange={(open) => { if (!open) finishSignup(); }}>

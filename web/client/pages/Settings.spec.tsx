@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   updateProfile: vi.fn(),
   setActiveLeagueId: vi.fn(),
   prepareProfileImage: vi.fn(),
+  runtimeCapabilities: {},
   user: { id: 7, firstName: "Adam", email: "adam@example.com", isAdmin: false, avatarUrl: null },
 }));
 
@@ -29,7 +30,7 @@ vi.mock("@/hooks/use-active-league", () => ({
 }));
 
 vi.mock("@/components/RuntimeCompatibilityGate", () => ({
-  useRuntimeCapabilities: () => ({}),
+  useRuntimeCapabilities: () => state.runtimeCapabilities,
 }));
 
 vi.mock("@/components/auth/PasswordChangeForm", () => ({
@@ -71,6 +72,7 @@ describe("Settings beta preferences", () => {
     state.updateProfile.mockReset();
     state.updateProfile.mockResolvedValue({ id: 7, firstName: "Updated Adam", avatarUrl: null });
     state.prepareProfileImage.mockReset();
+    state.runtimeCapabilities = {};
   });
 
   it("shows the notification permission state without third-party theme controls", () => {
@@ -135,5 +137,22 @@ describe("Settings beta preferences", () => {
     fireEvent.click(screen.getByRole("button", { name: /start guide again/i }));
 
     expect(localStorage.getItem("cfb_pending_guide_7")).toBe("true");
+  });
+
+  it("keeps policy links available with internal fallbacks until runtime URLs are configured", () => {
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    expect(screen.getByRole("link", { name: "Privacy Policy" }).getAttribute("href")).toBe("/privacy");
+    expect(screen.getByRole("link", { name: "Terms" }).getAttribute("href")).toBe("/terms");
+    expect(screen.getByRole("link", { name: "Provider Disclosure" }).getAttribute("href")).toBe("/provider-disclosure");
+  });
+
+  it("uses a configured runtime policy URL when available", () => {
+    state.runtimeCapabilities = { privacy_policy_url: "https://collegefantasyfootball.org/privacy" };
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    const privacyLink = screen.getByRole("link", { name: "Privacy Policy" });
+    expect(privacyLink.getAttribute("href")).toBe("https://collegefantasyfootball.org/privacy");
+    expect(privacyLink.getAttribute("target")).toBe("_blank");
   });
 });
