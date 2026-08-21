@@ -15,11 +15,14 @@ export function WinChanceBar({
   opponentPercent,
   className = "",
   testIdPrefix = "win-chance",
+  opponentColorClassName = "bg-cfb-pink",
 }: {
   myPercent?: number | null;
   opponentPercent?: number | null;
   className?: string;
   testIdPrefix?: string;
+  /** Keep the shared meter pink by default; matchup pages use their crimson opponent identity. */
+  opponentColorClassName?: string;
 }) {
   const hasWinChance =
     validProbability(myPercent) &&
@@ -45,7 +48,7 @@ export function WinChanceBar({
         style={{ width: `${leftProbability}%` }}
       />
       <div
-        className="h-full shrink-0 bg-cfb-pink transition-[width] duration-500"
+        className={`h-full shrink-0 transition-[width] duration-500 ${opponentColorClassName}`}
         data-testid={`${testIdPrefix}-right-bar`}
         style={{ width: `${rightProbability}%` }}
       />

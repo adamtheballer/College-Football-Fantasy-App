@@ -123,7 +123,7 @@ function MatchupTeamSummary({
   currentScore,
 }: {
   team: LeagueMatchupTeam | null;
-  accent: "brand" | "pink";
+  accent: "brand" | "crimson";
   align: "left" | "right";
   status: string;
   currentScore?: number | null;
@@ -142,7 +142,7 @@ function MatchupTeamSummary({
           className={`sm:h-10 sm:w-10 sm:text-sm ${
             isBrand
               ? "border-cfb-brand/80 bg-cfb-brand/10 text-cfb-brand"
-              : "border-cfb-pink/80 bg-cfb-pink/10 text-cfb-pink"
+              : "border-[#C12B3A]/80 bg-[#C12B3A]/10 text-[#F16270]"
           }`}
         />
       </div>
@@ -150,7 +150,7 @@ function MatchupTeamSummary({
         {team?.fantasy_team_name ?? "Team TBD"}
       </p>
       <p className="text-[9px] font-bold text-cfb-text-muted sm:text-[10px]">{team?.record ?? "0-0-0"}</p>
-      <p className="cfb-score-value mt-0.5 text-2xl text-cfb-text-primary sm:mt-1 sm:text-4xl">
+      <p className={`cfb-score-value mt-0.5 text-2xl sm:mt-1 sm:text-4xl ${isBrand ? "text-cfb-text-primary" : "text-[#F16270]"}`}>
         {showActual ? formatMatchupPoints(team?.current_points ?? currentScore) : formatMatchupPoints(projected)}
       </p>
       <p aria-label={`Projected ${formatMatchupPoints(projected)}`} className="mt-0.5 text-[9px] font-bold text-cfb-text-muted">
@@ -226,7 +226,7 @@ function CompactMatchupScoreboard({
 
         <MatchupTeamSummary
           team={opponentTeam}
-          accent="pink"
+          accent="crimson"
           align="right"
           status={data.status ?? "projected"}
           currentScore={scoreRow?.away_score}
@@ -235,7 +235,7 @@ function CompactMatchupScoreboard({
 
       <div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-t border-cfb-border-subtle pt-2 text-[9px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
         <span>{winChance ? `${winChance.my.toFixed(1)}%` : "—"}</span>
-        {winChance ? <WinChanceBar myPercent={myTeam?.win_probability} opponentPercent={opponentTeam?.win_probability} className="h-2" testIdPrefix="scoreboard-win-chance" /> : <span className="text-center normal-case tracking-normal">Win Probability available after lineups are set</span>}
+        {winChance ? <WinChanceBar myPercent={myTeam?.win_probability} opponentPercent={opponentTeam?.win_probability} className="h-2" testIdPrefix="scoreboard-win-chance" opponentColorClassName="bg-[#B42335]" /> : <span className="text-center normal-case tracking-normal">Win Probability available after lineups are set</span>}
         <span>{winChance ? `${winChance.opponent.toFixed(1)}%` : "—"}</span>
       </div>
     </section>
