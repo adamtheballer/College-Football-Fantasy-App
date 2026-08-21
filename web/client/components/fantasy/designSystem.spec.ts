@@ -49,7 +49,7 @@ describe("fantasy design system variants", () => {
     expect(Object.keys(statCardToneClasses)).toEqual([
       "neutral",
       "brand",
-      "pink",
+      "crimson",
       "gold",
       "success",
       "danger",

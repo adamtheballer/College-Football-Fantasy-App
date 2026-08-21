@@ -43,11 +43,11 @@ export const statCardToneClasses = {
     value: "text-cfb-text-primary",
     accent: "bg-cfb-brand",
   },
-  pink: {
-    frame: "border-cfb-pink/30 bg-cfb-pink/[0.06]",
-    label: "text-cfb-pink",
+  crimson: {
+    frame: "border-cfb-crimson/30 bg-cfb-crimson/[0.06]",
+    label: "text-cfb-crimson",
     value: "text-cfb-text-primary",
-    accent: "bg-cfb-pink",
+    accent: "bg-cfb-crimson",
   },
   gold: {
     frame: "border-cfb-gold/30 bg-cfb-gold/[0.06]",
@@ -107,7 +107,7 @@ export const positionBadgeClasses = {
   WR: "border-violet-300/60 bg-violet-50 text-violet-800",
   TE: "border-amber-300/60 bg-amber-50 text-amber-800",
   K: "border-cyan-300/60 bg-cyan-50 text-cyan-800",
-  FLEX: "border-pink-300/60 bg-pink-50 text-pink-800",
+  FLEX: "border-cfb-crimson/60 bg-cfb-crimson/[0.08] text-cfb-crimson",
   DST: "border-slate-300/60 bg-slate-50 text-slate-700",
   DEFAULT: "border-cfb-border-subtle bg-cfb-surface-raised/75 text-cfb-text-secondary",
 } as const;

@@ -15,13 +15,13 @@ export function WinChanceBar({
   opponentPercent,
   className = "",
   testIdPrefix = "win-chance",
-  opponentColorClassName = "bg-cfb-pink",
+  opponentColorClassName = "bg-cfb-crimson",
 }: {
   myPercent?: number | null;
   opponentPercent?: number | null;
   className?: string;
   testIdPrefix?: string;
-  /** Keep the shared meter pink by default; matchup pages use their crimson opponent identity. */
+  /** Use the shared crimson opponent identity; matchup pages preserve the same accent. */
   opponentColorClassName?: string;
 }) {
   const hasWinChance =
@@ -94,7 +94,7 @@ export function WinChanceMeter({
         <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-3 text-[10px] font-black uppercase tracking-[0.18em] text-cfb-text-muted">
           <div className="text-left">
             <p>My Projection</p>
-            <p className="mt-1 text-base font-black tracking-normal text-cfb-brand">{formattedMyProjection}</p>
+            <p className="mt-1 text-base font-black tracking-normal text-cfb-text-primary">{formattedMyProjection}</p>
           </div>
           <div className="text-center">
             <p>Win Chance</p>
@@ -106,7 +106,7 @@ export function WinChanceMeter({
           </div>
           <div className="text-right">
             <p>Their Projection</p>
-            <p className="mt-1 text-base font-black tracking-normal text-cfb-pink">{formattedOpponentProjection}</p>
+            <p className="mt-1 text-base font-black tracking-normal text-cfb-text-primary">{formattedOpponentProjection}</p>
           </div>
         </div>
       ) : (

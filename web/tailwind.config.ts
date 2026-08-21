@@ -32,7 +32,7 @@ export default {
           "text-muted": "hsl(var(--text-muted))",
           brand: "hsl(var(--brand-primary))",
           "brand-hover": "hsl(var(--brand-primary-hover))",
-          pink: "hsl(var(--accent-pink))",
+          crimson: "hsl(var(--accent-crimson))",
           gold: "hsl(var(--accent-gold))",
           cyan: "hsl(var(--accent-cyan))",
           success: "hsl(var(--success))",
