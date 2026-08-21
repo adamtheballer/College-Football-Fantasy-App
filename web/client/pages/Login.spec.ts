@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { ApiError } from "@/lib/api";
-import { initialLoginMode, loginErrorMessage, loginPathForMode, shouldHoldAuthEntry } from "./Login";
+import {
+  initialLoginMode,
+  loginErrorMessage,
+  loginPathForMode,
+  safeAuthRedirectTarget,
+  shouldHoldAuthEntry,
+} from "./Login";
 import { isAuthFlowRoute } from "@/components/app-shell/navigation";
 
 describe("loginErrorMessage", () => {
@@ -40,6 +46,21 @@ describe("reset password route", () => {
   it("uses the direct reset route instead of the retired token confirmation route", () => {
     expect(isAuthFlowRoute("/reset-password")).toBe(true);
     expect(isAuthFlowRoute("/password-reset/confirm")).toBe(false);
+  });
+});
+
+describe("post-login redirect safety", () => {
+  it("preserves valid in-app destinations", () => {
+    expect(safeAuthRedirectTarget("/league/42/matchup?week=1#starters")).toBe(
+      "/league/42/matchup?week=1#starters",
+    );
+  });
+
+  it("rejects absolute, protocol-relative, and backslash redirect attempts", () => {
+    expect(safeAuthRedirectTarget("https://example.com")).toBe("/");
+    expect(safeAuthRedirectTarget("//example.com")).toBe("/");
+    expect(safeAuthRedirectTarget("/\\\\example.com")).toBe("/");
+    expect(safeAuthRedirectTarget(null)).toBe("/");
   });
 });
 

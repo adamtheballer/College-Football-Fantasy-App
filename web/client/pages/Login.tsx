@@ -98,6 +98,29 @@ export const initialLoginMode = (flow: string | null, earlyAccessProEnabled: boo
 export const loginPathForMode = (mode: LoginMode) =>
   mode === "signin" ? "/login" : mode === "signup" ? "/login?flow=signup" : "/login?flow=pro";
 
+/**
+ * Protected routes place a same-app pathname in history state before sending a
+ * visitor to sign in. Treat that state as untrusted on the way back so a
+ * modified browser history entry can never become an external redirect.
+ */
+export const safeAuthRedirectTarget = (value: unknown): string => {
+  if (typeof value !== "string") return "/";
+
+  const candidate = value.trim();
+  if (!candidate.startsWith("/") || candidate.startsWith("//") || candidate.includes("\\")) {
+    return "/";
+  }
+
+  try {
+    const parsed = new URL(candidate, "https://cfbfantasy.local");
+    return parsed.origin === "https://cfbfantasy.local"
+      ? `${parsed.pathname}${parsed.search}${parsed.hash}`
+      : "/";
+  } catch {
+    return "/";
+  }
+};
+
 export const shouldHoldAuthEntry = (
   isBootstrapping: boolean,
   isLoggedIn: boolean,
@@ -109,13 +132,11 @@ export default function Login() {
   const location = useLocation();
   const { login, signup, isBootstrapping, isLoggedIn } = useAuth();
   const { email_enabled: emailEnabled } = useRuntimeCapabilities();
-  const redirectTarget =
-    typeof location.state === "object" &&
-    location.state &&
-    "from" in location.state &&
-    typeof location.state.from === "string"
+  const redirectTarget = safeAuthRedirectTarget(
+    typeof location.state === "object" && location.state && "from" in location.state
       ? location.state.from
-      : "/";
+      : undefined,
+  );
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
