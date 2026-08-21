@@ -3,7 +3,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { formatDisplayedProbabilityPair, WinChanceMeter } from "./WinChanceMeter";
+import { formatDisplayedProbabilityPair, WinChanceBar, WinChanceMeter } from "./WinChanceMeter";
 
 afterEach(cleanup);
 
@@ -32,5 +32,11 @@ describe("WinChanceMeter", () => {
 
     expect(screen.getByText("Win chance unavailable")).toBeTruthy();
     expect(screen.queryByTestId("win-chance-left-bar")).toBeNull();
+  });
+
+  it("allows matchup pages to use their crimson opponent identity without changing the default meter", () => {
+    render(<WinChanceBar myPercent={45} opponentPercent={55} opponentColorClassName="bg-[#B42335]" testIdPrefix="crimson" />);
+
+    expect(screen.getByTestId("crimson-right-bar").className).toContain("bg-[#B42335]");
   });
 });

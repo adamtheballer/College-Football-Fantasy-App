@@ -127,6 +127,7 @@ export function RosterSlotTable({
   showPositionColumn = true,
   tone = "default",
   pointMode = "projected",
+  pointValueClassName,
   leagueId,
   ownedRosterActions,
 }: {
@@ -136,6 +137,8 @@ export function RosterSlotTable({
   showPositionColumn?: boolean;
   tone?: RosterSlotTableTone;
   pointMode?: RosterPointMode;
+  /** Team-specific point accent for read-only matchup tables. */
+  pointValueClassName?: string;
   leagueId?: number | string;
   ownedRosterActions?: OwnedRosterActions;
 }) {
@@ -333,7 +336,7 @@ export function RosterSlotTable({
                   <span className={cn("hidden font-black md:block", style.text)}>{position}</span>
                 ) : null}
                 <span className="hidden text-cfb-text-muted md:block">{isRealPlayer ? player.opponent ?? "TBD" : "—"}</span>
-                <span className={cn("flex flex-col items-end text-right font-black tabular-nums", style.text)}>
+                <span className={cn("flex flex-col items-end text-right font-black tabular-nums", pointValueClassName ?? style.text)}>
                   <span className="text-[8px] uppercase tracking-[0.12em] text-cfb-text-muted md:hidden">{pointMode === "live" ? "Live" : "Proj"}</span>
                   <span>{pointValue}</span>
                   {liveDetail ? <span className="text-[9px] font-semibold text-cfb-text-muted">{liveDetail}</span> : null}
