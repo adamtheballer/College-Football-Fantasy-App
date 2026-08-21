@@ -13,6 +13,7 @@ class PlayerAvailabilityEvent(TimestampMixin, Base):
     __table_args__ = (
         Index("ix_player_availability_events_player_season_week", "player_id", "season", "week"),
         Index("ix_player_availability_events_effective_window", "season", "effective_from_week", "effective_until_week"),
+        Index("ix_player_availability_events_content_hash", "content_hash"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
