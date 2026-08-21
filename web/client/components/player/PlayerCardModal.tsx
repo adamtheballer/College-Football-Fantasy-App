@@ -43,8 +43,8 @@ type HistoricalStatTableRow = {
   value: number | string | null;
 };
 const tabConfig: Array<{ id: PlayerCardTab; label: string; icon: typeof Info }> = [
-  { id: "news", label: "News", icon: Newspaper },
   { id: "summary", label: "Summary", icon: Info },
+  { id: "news", label: "News", icon: Newspaper },
   { id: "stats", label: "Stats", icon: BarChart3 },
   { id: "game-log", label: "Game Log", icon: CalendarDays },
   { id: "alerts", label: "Alerts", icon: AlertTriangle },
