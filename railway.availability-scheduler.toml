@@ -8,4 +8,4 @@ dockerfilePath = "Dockerfile.api"
 cronSchedule = "0 14,15 * * *"
 startCommand = "cd /app && exec env PYTHONPATH=/app uv run python scripts/sync_official_availability_reports.py --season 2026 --only-local-hour 10"
 restartPolicyType = "NEVER"
-restartPolicyMaxRetries = 0
+restartPolicyMaxRetries = 1
