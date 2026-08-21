@@ -68,6 +68,13 @@ class LeagueSettingsInput(BaseModel):
     kicker_enabled: bool
     defense_enabled: bool
 
+    @field_validator("playoff_teams")
+    @classmethod
+    def validate_playoff_teams(cls, value: int) -> int:
+        if value not in {2, 4, 6, 8}:
+            raise ValueError("playoff_teams must be one of 2, 4, 6, or 8")
+        return value
+
     @field_validator("waiver_period_hours")
     @classmethod
     def validate_waiver_period_hours(cls, value: int) -> int:
@@ -273,6 +280,13 @@ class LeagueSettingsUpdate(BaseModel):
     superflex_enabled: bool
     kicker_enabled: bool
     defense_enabled: bool
+
+    @field_validator("playoff_teams")
+    @classmethod
+    def validate_playoff_teams(cls, value: int) -> int:
+        if value not in {2, 4, 6, 8}:
+            raise ValueError("playoff_teams must be one of 2, 4, 6, or 8")
+        return value
 
     @field_validator("waiver_period_hours")
     @classmethod
@@ -655,6 +669,13 @@ class LiveScoringFreshnessRead(BaseModel):
     relevant_game_count: int = 0
 
 
+class PostseasonMatchupContextRead(BaseModel):
+    bracket_id: int
+    matchup_type: str
+    bracket_path: str | None = None
+    status: str
+
+
 class LeagueMatchupTabRead(BaseModel):
     league_id: int
     season: int
@@ -673,6 +694,7 @@ class LeagueMatchupTabRead(BaseModel):
     message: str | None = None
     user_team: MatchupTeamRead | None = None
     rivalry: RivalryMatchupRead | None = None
+    postseason: PostseasonMatchupContextRead | None = None
 
 
 class LeagueWaiverPlayerRead(BaseModel):

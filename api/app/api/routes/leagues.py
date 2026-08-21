@@ -45,6 +45,7 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     JoinByCodeRequest,
 )
 from collegefootballfantasy_api.app.schemas.rivalry import LeagueRivalryViewRead, RivalryInviteCreate, RivalryInviteRead
+from collegefootballfantasy_api.app.schemas.postseason import PostseasonBracketRead, PostseasonRead
 from collegefootballfantasy_api.app.services.draft_service import (
     build_draft_room_state,
     create_real_draft_pick,
@@ -74,8 +75,31 @@ from collegefootballfantasy_api.app.services.league_roster_matchup import (
 )
 from collegefootballfantasy_api.app.services.scoring_service import run_league_scoring_recalculation
 from collegefootballfantasy_api.app.services.league_rivalry import cancel_invite, create_invite, get_rivalry_view, respond_to_invite
+from collegefootballfantasy_api.app.services.postseason_service import serialize_postseason
 
 router = APIRouter()
+
+
+@router.get("/{league_id}/postseason", response_model=PostseasonRead)
+def get_league_postseason_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> PostseasonRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return PostseasonRead.model_validate(serialize_postseason(db, league))
+
+
+@router.get("/{league_id}/postseason/bracket", response_model=PostseasonBracketRead)
+def get_league_postseason_bracket_endpoint(
+    league_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> PostseasonBracketRead:
+    league = get_league_or_404(db, league_id)
+    require_league_member(db, league.id, current_user)
+    return PostseasonBracketRead.model_validate(serialize_postseason(db, league))
 
 
 @router.get("/{league_id}/rivalry", response_model=LeagueRivalryViewRead)

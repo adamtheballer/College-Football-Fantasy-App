@@ -65,7 +65,7 @@ def create_league(client, token: str, name: str = "Test League", max_teams: int 
         "settings": {
             "scoring_json": {"ppr": 1},
             "roster_slots_json": {"QB": 1},
-            "playoff_teams": 4,
+            "playoff_teams": 2 if max_teams == 2 else 4,
             "waiver_type": "faab",
             "trade_review_type": "commissioner",
             "superflex_enabled": False,

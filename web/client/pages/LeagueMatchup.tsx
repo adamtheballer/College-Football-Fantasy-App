@@ -374,6 +374,12 @@ export default function LeagueMatchup() {
           >
             <OpeningWeekPatch week={displayWeek} />
             <RivalWeekPatch rivalry={data.rivalry} leagueId={parsedLeagueId} matchupId={data.matchup_id} />
+            {data.postseason ? (
+              <div className="mx-3 mt-2 flex items-center justify-between border-y border-amber-300/30 bg-amber-300/[0.06] px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-amber-100 sm:mx-5">
+                <span>{data.postseason.matchup_type.replace(/_/g, " ")}</span>
+                <span className="text-amber-100/70">Playoffs</span>
+              </div>
+            ) : null}
             <CompactMatchupScoreboard
               data={data}
               myTeam={myTeam}

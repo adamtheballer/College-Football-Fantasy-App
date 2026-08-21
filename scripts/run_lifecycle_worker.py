@@ -18,6 +18,7 @@ from collegefootballfantasy_api.app.services.saturday_pick_service import refres
 from collegefootballfantasy_api.app.services.trade_service import expire_trade_offers_once, process_trade_offers_once
 from collegefootballfantasy_api.app.services.waiver_service import process_waiver_claims_once
 from collegefootballfantasy_api.app.services.worker_health import record_worker_heartbeat
+from collegefootballfantasy_api.app.services.postseason_service import advance_postseason_state
 
 logger = logging.getLogger("collegefootballfantasy_api.lifecycle_worker")
 
@@ -42,6 +43,7 @@ def run_once() -> dict[str, dict[str, int]]:
             "waivers": process_waiver_claims_once(db),
             "expired_trades": expire_trade_offers_once(db),
             "trades": process_trade_offers_once(db),
+            "postseason": advance_postseason_state(db),
         }
 
 

@@ -355,6 +355,82 @@ export interface LeagueMatchupTabResponse {
   next_refresh_at?: string | null;
   message?: string | null;
   rivalry?: RivalryMatchup | null;
+  postseason?: {
+    bracket_id: number;
+    matchup_type: string;
+    bracket_path?: string | null;
+    status: string;
+  } | null;
+}
+
+export interface PostseasonTeam {
+  team_id: number;
+  team_name: string;
+  manager_name?: string | null;
+  manager_avatar_url?: string | null;
+}
+
+export interface PostseasonSeed extends PostseasonTeam {
+  seed: number;
+  regular_season_rank: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  points_for: number;
+  tiebreaker_explanation?: string | null;
+}
+
+export interface PostseasonMatchup {
+  id: number;
+  round_number: number;
+  week: number;
+  matchup_type: string;
+  bracket_path?: string | null;
+  status: string;
+  fantasy_matchup_id?: number | null;
+  team_a?: PostseasonTeam | null;
+  team_b?: PostseasonTeam | null;
+  team_a_seed?: number | null;
+  team_b_seed?: number | null;
+  team_a_score?: number | null;
+  team_b_score?: number | null;
+  winner_team_id?: number | null;
+  loser_team_id?: number | null;
+  tiebreaker_used?: string | null;
+}
+
+export interface PostseasonRound {
+  round_number: number;
+  week: number;
+  status: string;
+  matchups: PostseasonMatchup[];
+}
+
+export interface PostseasonFinalStanding extends PostseasonTeam {
+  final_place: number;
+  regular_season_rank: number;
+  playoff_seed?: number | null;
+  postseason_result: string;
+}
+
+export interface LeaguePostseasonResponse {
+  league_id: number;
+  season: number;
+  status: string;
+  is_preview: boolean;
+  playoff_teams: number;
+  regular_season_end_week: number;
+  playoff_start_week: number;
+  format_version: string;
+  tiebreaker_policy: string;
+  format_summary: string;
+  seeds_locked_at?: string | null;
+  champion?: PostseasonTeam | null;
+  review_reason?: string | null;
+  seeds: PostseasonSeed[];
+  playoff_cut_line?: number | null;
+  rounds?: PostseasonRound[];
+  final_standings?: PostseasonFinalStanding[];
 }
 
 export interface RivalrySeries { wins: number; losses: number; ties: number; last_meeting?: string | null; }

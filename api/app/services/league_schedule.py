@@ -5,6 +5,9 @@ from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.team import Team
 
 
+# Retained as a compatibility fallback for callers that explicitly select a
+# duration. New league schedules derive the approved season calendar and
+# reserve the correct number of postseason weeks.
 REGULAR_SEASON_WEEKS = 13
 
 
@@ -37,11 +40,15 @@ def generate_round_robin_weeks(team_ids: list[int], weeks: int) -> list[list[tup
 def ensure_league_schedule(
     db: Session,
     league: League,
-    regular_season_weeks: int = REGULAR_SEASON_WEEKS,
+    regular_season_weeks: int | None = None,
 ) -> int:
     # A draft finalization can stage matchups and invoke this again before the
     # transaction commits. Flush first so schedule generation stays idempotent.
     db.flush()
+    if regular_season_weeks is None:
+        from collegefootballfantasy_api.app.services.postseason_service import get_or_create_postseason_settings
+
+        regular_season_weeks = get_or_create_postseason_settings(db, league).regular_season_end_week
     teams = (
         db.query(Team)
         .filter(Team.league_id == league.id)
@@ -62,6 +69,22 @@ def ensure_league_schedule(
     existing_by_week: dict[int, list[Matchup]] = {}
     for matchup in existing_matchups:
         existing_by_week.setdefault(matchup.week, []).append(matchup)
+
+    # Never silently delete or repurpose an old regular-season row. A legacy
+    # schedule extending into newly reserved playoff weeks needs an explicit
+    # readiness review before a bracket can safely materialize there.
+    reserved_rows = [
+        matchup
+        for week, matchups in existing_by_week.items()
+        if week > regular_season_weeks
+        for matchup in matchups
+        if (matchup.status or "").lower() not in {"final", "completed", "stat_corrected"}
+    ]
+    if reserved_rows:
+        raise ValueError(
+            "existing future matchups occupy reserved postseason week(s): "
+            + ", ".join(str(row.week) for row in sorted(reserved_rows, key=lambda row: (row.week, row.id)))
+        )
 
     invalid_weeks = [
         week

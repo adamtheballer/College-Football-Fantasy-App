@@ -180,6 +180,8 @@ export default function LeagueSettings() {
     ([key]) => key !== "waiver_type" && key !== "trade_review_type"
   );
   const leagueInfo = data?.league_info ?? {};
+  const playoffTeams = leagueQuery.data?.settings.playoff_teams;
+  const playoffRounds = playoffTeams === 2 ? 1 : playoffTeams === 4 ? 2 : playoffTeams ? 3 : null;
 
   const copyInviteValue = async (field: "code" | "link", value?: string | null) => {
     if (!value) return;
@@ -224,6 +226,9 @@ export default function LeagueSettings() {
             </h1>
             <p className="mt-1.5 max-w-3xl text-sm text-cfb-text-secondary">
               League-specific standings, point system, schedules, manager rosters, trade history, and draft results.
+            </p>
+            <p className="mt-2 text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
+              Playoffs · {playoffTeams ?? "—"} teams · {playoffRounds ?? "—"} rounds · higher seed advances ties
             </p>
           </div>
           <div className="grid grid-cols-3 gap-2 sm:min-w-[360px]">

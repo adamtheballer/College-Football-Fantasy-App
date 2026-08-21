@@ -20,6 +20,7 @@ from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_waiver_availability import PlayerWaiverAvailability
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
+from collegefootballfantasy_api.app.models.postseason import PostseasonMatchup
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.standing import Standing
@@ -36,6 +37,7 @@ from collegefootballfantasy_api.app.crud.projection import current_published_pro
 from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueMatchupTabRead,
     LiveScoringFreshnessRead,
+    PostseasonMatchupContextRead,
     LeagueInviteSettingsRead,
     LeagueMemberRead,
     LeagueRosterTabRead,
@@ -768,9 +770,11 @@ def build_matchup_tab_view(
             relevant_game_count=freshness.relevant_game_count,
         )
     viewer_team = _owned_team(db, league, user)
+    postseason_node: PostseasonMatchup | None = None
     if matchup_id is not None:
-        matchup = (
-            db.query(Matchup)
+        matchup_result = (
+            db.query(Matchup, PostseasonMatchup)
+            .outerjoin(PostseasonMatchup, PostseasonMatchup.fantasy_matchup_id == Matchup.id)
             .filter(
                 Matchup.id == matchup_id,
                 Matchup.league_id == league.id,
@@ -779,12 +783,14 @@ def build_matchup_tab_view(
             )
             .first()
         )
+        matchup, postseason_node = matchup_result if matchup_result else (None, None)
         primary_team = db.get(Team, matchup.home_team_id) if matchup else None
         opponent = db.get(Team, matchup.away_team_id) if matchup else None
     else:
         primary_team = viewer_team
-        matchup = (
-            db.query(Matchup)
+        matchup_result = (
+            db.query(Matchup, PostseasonMatchup)
+            .outerjoin(PostseasonMatchup, PostseasonMatchup.fantasy_matchup_id == Matchup.id)
             .filter(
                 Matchup.league_id == league.id,
                 Matchup.season == league.season_year,
@@ -795,6 +801,7 @@ def build_matchup_tab_view(
             if primary_team
             else None
         )
+        matchup, postseason_node = matchup_result if matchup_result else (None, None)
         opponent_id = (
             matchup.away_team_id if matchup and matchup.home_team_id == primary_team.id else matchup.home_team_id
             if matchup and primary_team
@@ -843,6 +850,17 @@ def build_matchup_tab_view(
             live_scoring_freshness=freshness_read,
             message="No matchup generated yet.",
         )
+
+    postseason_context = (
+        PostseasonMatchupContextRead(
+            bracket_id=postseason_node.bracket_id,
+            matchup_type=postseason_node.matchup_type,
+            bracket_path=postseason_node.bracket_path,
+            status=postseason_node.status,
+        )
+        if postseason_node is not None
+        else None
+    )
 
     roster_by_team = _serialize_team_rosters(
         db,
@@ -924,6 +942,7 @@ def build_matchup_tab_view(
         next_refresh_at=(provider_snapshot_at + timedelta(seconds=180)) if provider_snapshot_at else None,
         message=None,
         rivalry=matchup_rivalry_context(db, league, matchup, primary_team, opponent),
+        postseason=postseason_context,
     )
 
 

@@ -433,6 +433,24 @@ def _upsert_standing(
 
 
 def recalculate_standings_for_week(db: Session, league_id: int, season: int, week: int) -> int:
+    # Standings are regular-season records. Postseason canonical Matchup rows
+    # deliberately share the scoring engine but must not alter seed snapshots,
+    # regular records, or playoff-picture ordering.
+    league = db.get(League, league_id)
+    if league is not None:
+        from collegefootballfantasy_api.app.services.postseason_service import get_or_create_postseason_settings
+
+        # Older imported/test leagues can have fewer than two teams and cannot
+        # possibly opt into one of the supported 2/4/6/8-team brackets.  They
+        # must remain scoreable; simply do not apply a postseason reservation
+        # until the commissioner has a valid league size and settings.
+        try:
+            regular_season_end_week = get_or_create_postseason_settings(db, league).regular_season_end_week
+        except ValueError:
+            regular_season_end_week = week
+        through_week = min(week, regular_season_end_week)
+    else:
+        through_week = week
     teams = db.query(Team).filter(Team.league_id == league_id).all()
     records = {
         team.id: {"wins": 0, "losses": 0, "ties": 0, "points_for": 0.0, "points_against": 0.0}
@@ -440,7 +458,7 @@ def recalculate_standings_for_week(db: Session, league_id: int, season: int, wee
     }
     final_matchups = (
         db.query(Matchup)
-        .filter(Matchup.league_id == league_id, Matchup.season == season, Matchup.week <= week)
+        .filter(Matchup.league_id == league_id, Matchup.season == season, Matchup.week <= through_week)
         .all()
     )
     for matchup in final_matchups:
@@ -469,7 +487,7 @@ def recalculate_standings_for_week(db: Session, league_id: int, season: int, wee
             league_id,
             team_id,
             season,
-            week,
+            through_week,
             int(record["wins"]),
             int(record["losses"]),
             int(record["ties"]),

@@ -17,6 +17,7 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
+from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.league_flow import (
@@ -266,6 +267,12 @@ def create_league(
     payload.basics.icon_url = moderate_user_url(
         db, actor_user_id=current_user.id, field_name="league_icon_url", value=payload.basics.icon_url
     )
+    from collegefootballfantasy_api.app.services.postseason_service import validate_playoff_team_count
+
+    try:
+        validate_playoff_team_count(playoff_teams=payload.settings.playoff_teams, max_teams=payload.basics.max_teams)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     payload.settings = normalize_roster_settings(
         apply_beta_league_creation_defaults(payload.settings),
         enforce_beta_kicker_scoring=settings.beta_scoring_lock_enabled,
@@ -434,6 +441,13 @@ def update_league_settings(
     payload: LeagueSettingsUpdate,
     current_user: User,
 ) -> LeagueDetailRead:
+    from collegefootballfantasy_api.app.models.postseason import PostseasonBracket
+    from collegefootballfantasy_api.app.services.postseason_service import validate_playoff_team_count
+
+    try:
+        validate_playoff_team_count(playoff_teams=payload.playoff_teams, max_teams=league.max_teams)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
     if not settings_row:
         settings_row = LeagueSettings(league_id=league.id)
@@ -451,6 +465,32 @@ def update_league_settings(
         )
     settings_row.scoring_json = payload.scoring_json
     settings_row.roster_slots_json = payload.roster_slots_json
+    bracket = db.query(PostseasonBracket).filter(
+        PostseasonBracket.league_id == league.id,
+        PostseasonBracket.season == league.season_year,
+    ).one_or_none()
+    if bracket and bracket.status in {"LOCKED", "ACTIVE", "FINALIZING", "COMPLETED", "REVIEW_REQUIRED"} and payload.playoff_teams != settings_row.playoff_teams:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="playoff settings are locked for this season")
+    playoff_count_changed = payload.playoff_teams != settings_row.playoff_teams
+    if playoff_count_changed:
+        existing_matchups = db.query(Matchup).filter(
+            Matchup.league_id == league.id,
+            Matchup.season == league.season_year,
+        ).all()
+        has_started_competition = any(
+            (matchup.status or "").lower() in {"live", "in_progress", "final", "completed", "stat_corrected"}
+            for matchup in existing_matchups
+        )
+        if has_started_competition:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="playoff settings lock once the first regular-season matchup starts",
+            )
+        # This is the sole safe regeneration path: a commissioner changed the
+        # bracket before competition started, so the old projected schedule is
+        # discarded and rebuilt with the newly reserved playoff weeks.
+        for matchup in existing_matchups:
+            db.delete(matchup)
     settings_row.playoff_teams = payload.playoff_teams
     settings_row.waiver_type = payload.waiver_type
     if payload.waiver_period_hours is not None:
@@ -480,6 +520,11 @@ def update_league_settings(
     settings_row.kicker_enabled = payload.kicker_enabled
     settings_row.defense_enabled = payload.defense_enabled
     db.add(settings_row)
+    if playoff_count_changed:
+        from collegefootballfantasy_api.app.services.league_schedule import ensure_league_schedule
+
+        db.flush()
+        ensure_league_schedule(db, league)
     db.commit()
     return get_league_detail(db, league, viewer=current_user)
 
