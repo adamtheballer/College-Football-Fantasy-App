@@ -1,17 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRightLeft,
   Check,
-  ChevronRight,
-  Search,
   ShieldAlert,
   Users,
 } from "lucide-react";
@@ -146,14 +139,6 @@ type TradeRow = {
   school: string;
   slot: string;
   projectedPoints?: number;
-};
-
-const POS_STYLES: Record<string, string> = {
-  QB: "bg-blue-500/20 border-blue-400/30 text-blue-300",
-  RB: "bg-emerald-500/20 border-emerald-400/30 text-emerald-300",
-  WR: "bg-violet-500/20 border-violet-400/30 text-violet-300",
-  TE: "bg-amber-500/20 border-amber-400/30 text-amber-300",
-  K: "bg-cyan-500/20 border-cyan-400/30 text-cyan-300",
 };
 
 export const formatTradeError = (error: unknown, fallback: string) => {
@@ -316,39 +301,28 @@ const TradeList = ({
   selectedIds: Set<number>;
   onToggle: (playerId: number) => void;
 }) => {
-  const isGiving = direction === "give";
-  const selectionClasses = isGiving
-    ? "border-rose-300/40 bg-rose-500/10 shadow-[0_12px_35px_rgba(244,63,94,0.08)]"
-    : "border-emerald-300/40 bg-emerald-500/10 shadow-[0_12px_35px_rgba(16,185,129,0.08)]";
-  const accentClasses = isGiving
-    ? "border-rose-300/25 bg-rose-500/10 text-rose-100"
-    : "border-emerald-300/25 bg-emerald-500/10 text-emerald-100";
+  const selectedCount = selectedIds.size;
 
   if (!rows.length) {
     return (
-      <Card className="overflow-hidden rounded-[2rem] border border-white/10 bg-card/40">
-        <CardHeader className="border-b border-white/10 bg-white/[0.02]">
+      <Card className="overflow-hidden rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised">
+        <CardHeader className="border-b border-cfb-border-subtle px-5 py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
             <div className="min-w-0">
-              <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] text-foreground">
+              <CardTitle className="text-sm font-black text-foreground">
                 {title}
               </CardTitle>
-              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
+              <p className="mt-1 text-xs font-medium text-muted-foreground">
                 {subtitle}
               </p>
             </div>
-            <span
-              className={cn(
-                "w-fit shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em]",
-                accentClasses,
-              )}
-            >
-              {isGiving ? "You send" : "You receive"}
+            <span className="w-fit shrink-0 whitespace-nowrap rounded-md border border-cfb-border-subtle bg-cfb-surface px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+              {direction === "give" ? "Select to send" : "Select to receive"}
             </span>
           </div>
         </CardHeader>
-        <CardContent className="pb-8">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+        <CardContent className="p-5">
+          <p className="text-sm text-muted-foreground">
             No offensive players found on this roster.
           </p>
         </CardContent>
@@ -357,28 +331,26 @@ const TradeList = ({
   }
 
   return (
-    <Card className="overflow-hidden rounded-[2rem] border border-white/10 bg-card/40">
-      <CardHeader className="border-b border-white/10 bg-white/[0.02]">
+    <Card className="overflow-hidden rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised">
+      <CardHeader className="border-b border-cfb-border-subtle px-5 py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="min-w-0">
-            <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] text-foreground">
+            <CardTitle className="text-lg font-black text-foreground">
               {title}
             </CardTitle>
-            <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
-              {subtitle}
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
           </div>
-          <span
-            className={cn(
-              "w-fit shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em]",
-              accentClasses,
-            )}
-          >
-            {selectedIds.size} chosen
+          <span className="w-fit shrink-0 whitespace-nowrap rounded-md border border-cfb-border-subtle bg-cfb-surface px-2.5 py-1 text-[11px] font-bold tabular-nums text-foreground">
+            {selectedCount} selected
           </span>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3 p-4">
+      <div className="hidden grid-cols-[4.5rem_minmax(0,1fr)_7rem] border-b border-cfb-border-subtle bg-cfb-surface px-5 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground md:grid">
+        <span>Slot</span>
+        <span>Player</span>
+        <span className="text-right">Projection</span>
+      </div>
+      <CardContent className="p-0">
         {rows.map((row) => {
           const selected = selectedIds.has(row.playerId);
           return (
@@ -388,41 +360,32 @@ const TradeList = ({
               onClick={() => onToggle(row.playerId)}
               aria-pressed={selected}
               className={cn(
-                "group w-full rounded-2xl border px-4 py-3 text-left transition-all duration-200",
+                "grid w-full grid-cols-[4rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-cfb-border-subtle px-5 py-3.5 text-left transition-colors last:border-b-0 md:grid-cols-[4.5rem_minmax(0,1fr)_7rem]",
                 selected
-                  ? selectionClasses
-                  : "border-white/10 bg-white/[0.03] hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.055]",
+                  ? "border-l-2 border-l-cfb-brand bg-cfb-brand/10"
+                  : "border-l-2 border-l-transparent hover:bg-cfb-surface",
               )}
             >
-              <div className="flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-black italic uppercase tracking-tight text-foreground">
-                    {row.name}
-                  </p>
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">
-                    {row.school} • {row.slot}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {selected ? (
-                    <span
-                      className={cn(
-                        "grid h-7 w-7 place-items-center rounded-full border",
-                        accentClasses,
-                      )}
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                    </span>
-                  ) : null}
-                  <span
-                    className={cn(
-                      "rounded-xl border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]",
-                      POS_STYLES[row.position] ?? POS_STYLES.QB,
-                    )}
-                  >
-                    {row.position}
+              <span className="w-fit rounded-md border border-cfb-border-subtle bg-cfb-surface px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+                {row.slot}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-black text-foreground">
+                  {row.name}
+                </p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {row.position} · {row.school || "School unavailable"}
+                </p>
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <span className="hidden text-sm font-black tabular-nums text-foreground md:block">
+                  {row.projectedPoints?.toFixed(1) ?? "—"}
+                </span>
+                {selected ? (
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-cfb-brand text-cfb-surface">
+                    <Check className="h-3.5 w-3.5" />
                   </span>
-                </div>
+                ) : null}
               </div>
             </button>
           );
@@ -431,6 +394,8 @@ const TradeList = ({
     </Card>
   );
 };
+
+type TradeBuilderStep = "mine" | "opponent" | "review";
 
 export default function Trade() {
   const {
@@ -490,14 +455,13 @@ export default function Trade() {
   const [opponentTeamId, setOpponentTeamId] = useState<number | null>(null);
   const [giveIds, setGiveIds] = useState<number[]>([]);
   const [receiveIds, setReceiveIds] = useState<number[]>([]);
-  const [playerSearch, setPlayerSearch] = useState("");
+  const [builderStep, setBuilderStep] = useState<TradeBuilderStep>("mine");
   const [analysis, setAnalysis] = useState<TradeAnalyzeResult | null>(null);
   const [analysisSignature, setAnalysisSignature] = useState<string | null>(
     null,
   );
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isAnalysisReviewOpen, setIsAnalysisReviewOpen] = useState(false);
   const [tradeMessage, setTradeMessage] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -593,36 +557,6 @@ export default function Trade() {
     () => theirRows.filter((row) => receiveSet.has(row.playerId)),
     [receiveSet, theirRows],
   );
-  const liveGiveValue = useMemo(
-    () =>
-      selectedGiveRows.reduce(
-        (sum, row) => sum + (row.projectedPoints ?? 0),
-        0,
-      ),
-    [selectedGiveRows],
-  );
-  const liveReceiveValue = useMemo(
-    () =>
-      selectedReceiveRows.reduce(
-        (sum, row) => sum + (row.projectedPoints ?? 0),
-        0,
-      ),
-    [selectedReceiveRows],
-  );
-  const liveDelta = liveReceiveValue - liveGiveValue;
-  const partnerPlayerResults = useMemo(() => {
-    const query = playerSearch.trim().toLowerCase();
-    if (query.length < 2) return [];
-    return allLeagueRosterRows
-      .filter((row) => row.teamId !== ownedTeamId)
-      .filter((row) =>
-        [row.name, row.school, row.position, row.teamName ?? ""].some((value) =>
-          value.toLowerCase().includes(query),
-        ),
-      )
-      .slice(0, 8);
-  }, [allLeagueRosterRows, ownedTeamId, playerSearch]);
-
   useEffect(() => {
     const parsedPlayerId =
       playerIdParam && /^\d+$/.test(playerIdParam)
@@ -643,6 +577,7 @@ export default function Trade() {
           ? current
           : [...current, parsedPlayerId],
       );
+      setBuilderStep("opponent");
       return;
     }
     if (
@@ -686,7 +621,6 @@ export default function Trade() {
     setAnalysis(null);
     setAnalysisSignature(null);
     setAnalysisError(null);
-    setIsAnalysisReviewOpen(false);
     setSendError(null);
   }, [giveIds, receiveIds, opponentTeamId, leagueId]);
 
@@ -756,7 +690,7 @@ export default function Trade() {
       setTradeMessage("");
       setCounteringOfferId(null);
       pendingTradeRequest.current = null;
-      setIsAnalysisReviewOpen(false);
+      setBuilderStep("mine");
       setSendError(null);
       toast(
         getTradeOfferSentToast(
@@ -805,15 +739,6 @@ export default function Trade() {
   const selectOpponentTeam = (teamId: number) => {
     setOpponentTeamId(teamId);
     setReceiveIds([]);
-    setPlayerSearch("");
-  };
-
-  const selectTradeTargetPlayer = (row: TradeRow) => {
-    setOpponentTeamId(row.teamId);
-    setReceiveIds((current) =>
-      current.includes(row.playerId) ? current : [...current, row.playerId],
-    );
-    setPlayerSearch("");
   };
 
   const toggleGive = (playerId: number) => {
@@ -854,7 +779,7 @@ export default function Trade() {
       );
       setAnalysis(result);
       setAnalysisSignature(currentTradeSignature);
-      setIsAnalysisReviewOpen(true);
+      setBuilderStep("review");
     } catch (error) {
       setAnalysis(null);
       setAnalysisSignature(null);
@@ -880,6 +805,25 @@ export default function Trade() {
       selectedGiveRows.length &&
       selectedReceiveRows.length,
     );
+  const selectionComplete = Boolean(
+    league &&
+    workspace &&
+    opponentTeamId &&
+    selectedGiveRows.length &&
+    selectedReceiveRows.length,
+  );
+
+  const returnToPreviousTradeStep = () => {
+    if (builderStep === "review") {
+      setBuilderStep("opponent");
+      return;
+    }
+    if (builderStep === "opponent") {
+      setBuilderStep("mine");
+      return;
+    }
+    navigate(`/league/${leagueId}`);
+  };
 
   const handleSendTrade = () => {
     if (!sendEnabled) {
@@ -917,6 +861,7 @@ export default function Trade() {
     setTradeMessage(`Counter to trade #${offer.id}`);
     setCounteringOfferId(offer.id);
     setSendError(null);
+    setBuilderStep("mine");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -942,391 +887,292 @@ export default function Trade() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-16 pt-8">
-      <div className="relative overflow-hidden rounded-[2.25rem] border border-sky-300/20 bg-[radial-gradient(circle_at_88%_8%,rgba(56,189,248,0.18),transparent_30%),radial-gradient(circle_at_10%_100%,rgba(168,85,247,0.15),transparent_34%),rgba(9,20,37,0.9)] px-6 py-7 shadow-[0_24px_75px_rgba(14,116,144,0.16)] sm:px-8">
-        <div className="absolute right-6 top-5 hidden h-28 w-28 rounded-full border border-sky-200/10 bg-sky-300/[0.035] sm:block" />
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl space-y-3">
-            <div className="flex items-center gap-3">
-              <span className="rounded-full border border-sky-200/25 bg-sky-300/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-sky-100">
-                Trade desk
-              </span>
-              <span className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">
-                Build · Analyze · Send
-              </span>
-            </div>
-            <h1 className="text-5xl font-black italic uppercase tracking-tight text-foreground sm:text-6xl">
-              Trade Builder
+      <section className="overflow-hidden rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised">
+        <div className="flex items-center justify-between gap-4 border-b border-cfb-border-subtle px-5 py-4 sm:px-6">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cfb-brand">
+              Trade builder
+            </p>
+            <h1 className="mt-1 text-2xl font-black text-foreground sm:text-3xl">
+              {builderStep === "mine"
+                ? "Your roster"
+                : builderStep === "opponent"
+                  ? (opponentTeam?.name ?? "Opponent roster")
+                  : "Review trade"}
             </h1>
-            <p className="max-w-xl text-sm font-semibold leading-6 text-slate-300/85">
-              {counteringOfferId
-                ? `Countering trade #${counteringOfferId}. Update either side, then run a fresh analysis.`
-                : "Build a clear offer, compare the current projection edge, and send only after a fresh review."}
-            </p>
           </div>
-          <Button
-            asChild
-            variant="outline"
-            className="h-11 shrink-0 rounded-2xl border-white/15 bg-white/[0.045] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10"
-          >
-            <Link to={`/league/${leagueId}`}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to League
-            </Link>
-          </Button>
-        </div>
-      </div>
-
-      <Card className="overflow-visible rounded-[2rem] border border-white/10 bg-card/40">
-        <CardHeader className="border-b border-white/10 bg-white/[0.02]">
-          <CardTitle className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-foreground">
-            <span className="grid h-7 w-7 place-items-center rounded-full border border-sky-300/30 bg-sky-300/10 text-[10px] text-sky-100">
-              1
-            </span>
-            Choose the matchup
-          </CardTitle>
-          <p className="pt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
-            Pick a manager, then add assets from each roster.
-          </p>
-        </CardHeader>
-        <CardContent className="grid gap-4 p-6 md:grid-cols-2">
-          <div className="space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-              Your Team
-            </p>
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-black uppercase tracking-[0.14em] text-foreground">
-              {ownedTeam?.name ??
-                (ownedTeamId ? "Your Team" : "No team found for this league")}
-            </div>
-          </div>
-          <div className="space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-              Trade Partner
-            </p>
-            <Select
-              value={opponentTeamId ? String(opponentTeamId) : ""}
-              onValueChange={(value) => selectOpponentTeam(Number(value))}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="h-10 border-cfb-border-subtle bg-cfb-surface px-3 text-xs font-bold"
+              onClick={returnToPreviousTradeStep}
             >
-              <SelectTrigger className="h-12 rounded-xl border-white/10 bg-white/[0.03] text-[10px] font-black uppercase tracking-[0.16em]">
-                <SelectValue placeholder="Select team" />
-              </SelectTrigger>
-              <SelectContent>
-                {opponentTeams.map((team: Team) => (
-                  <SelectItem key={team.id} value={String(team.id)}>
-                    {team.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              Back
+            </Button>
+            {builderStep === "mine" ? (
+              <Button
+                className="h-10 bg-cfb-brand px-4 text-xs font-black text-cfb-surface hover:bg-cfb-brand/90"
+                onClick={() => setBuilderStep("opponent")}
+              >
+                Next
+              </Button>
+            ) : null}
+            {builderStep === "opponent" ? (
+              <Button
+                className="h-10 bg-cfb-brand px-4 text-xs font-black text-cfb-surface hover:bg-cfb-brand/90"
+                disabled={!selectionComplete || isAnalyzing}
+                onClick={() =>
+                  analysisIsCurrent ? setBuilderStep("review") : handleAnalyze()
+                }
+              >
+                {isAnalyzing ? "Reviewing..." : "Review trade"}
+              </Button>
+            ) : null}
           </div>
-          <div className="space-y-2 md:col-span-2">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-              Trade for specific player
-            </p>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-sky-200/50" />
-              <input
-                value={playerSearch}
-                onChange={(event) => setPlayerSearch(event.target.value)}
-                placeholder="Search league rosters by player, school, position, or manager..."
-                className="h-12 w-full rounded-xl border border-white/10 bg-white/[0.03] pl-11 pr-4 text-sm font-bold text-foreground outline-none transition focus:border-sky-300/50 focus:ring-2 focus:ring-sky-300/15"
+        </div>
+
+        <div className="flex items-center gap-2 border-b border-cfb-border-subtle px-5 py-3 sm:px-6">
+          {(["mine", "opponent", "review"] as TradeBuilderStep[]).map(
+            (step, index) => (
+              <div key={step} className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    "grid h-5 w-5 place-items-center rounded-full border text-[10px] font-black",
+                    builderStep === step
+                      ? "border-cfb-brand bg-cfb-brand text-cfb-surface"
+                      : "border-cfb-border-subtle text-muted-foreground",
+                  )}
+                >
+                  {index + 1}
+                </span>
+                <span
+                  className={cn(
+                    "hidden text-[10px] font-black uppercase tracking-[0.12em] sm:block",
+                    builderStep === step
+                      ? "text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {step === "mine"
+                    ? "Your roster"
+                    : step === "opponent"
+                      ? "Their roster"
+                      : "Review"}
+                </span>
+                {index < 2 ? (
+                  <span className="h-px w-5 bg-cfb-border-subtle" />
+                ) : null}
+              </div>
+            ),
+          )}
+        </div>
+
+        <div className="p-4 sm:p-6">
+          {builderStep === "mine" ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 rounded-xl border border-cfb-border-subtle bg-cfb-surface p-4 md:grid-cols-[minmax(0,1fr)_minmax(15rem,0.7fr)]">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                    Sending from
+                  </p>
+                  <p className="mt-1 text-base font-black text-foreground">
+                    {ownedTeam?.name ?? "Your team"}
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                    Trade partner
+                  </p>
+                  <Select
+                    value={opponentTeamId ? String(opponentTeamId) : ""}
+                    onValueChange={(value) => selectOpponentTeam(Number(value))}
+                  >
+                    <SelectTrigger className="h-10 border-cfb-border-subtle bg-cfb-surface text-sm font-bold">
+                      <SelectValue placeholder="Select team" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {opponentTeams.map((team: Team) => (
+                        <SelectItem key={team.id} value={String(team.id)}>
+                          {team.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <TradeList
+                title={ownedTeam?.name ?? "Your roster"}
+                subtitle={
+                  myRosterLoading
+                    ? "Loading roster..."
+                    : "Tap each player you want to send."
+                }
+                direction="give"
+                rows={resolvedMyRows}
+                selectedIds={giveSet}
+                onToggle={toggleGive}
               />
-              {partnerPlayerResults.length > 0 ? (
-                <div className="absolute z-20 mt-2 max-h-80 w-full overflow-auto rounded-2xl border border-sky-300/20 bg-[#071120]/95 p-2 shadow-[0_22px_80px_rgba(56,189,248,0.18)] backdrop-blur-xl">
-                  {partnerPlayerResults.map((row) => (
-                    <button
-                      key={`${row.teamId}-${row.rosterEntryId}`}
-                      type="button"
-                      onClick={() => selectTradeTargetPlayer(row)}
-                      className="flex w-full items-center justify-between gap-4 rounded-xl px-3 py-3 text-left transition hover:bg-sky-300/10"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-black text-foreground">
-                          {row.name}
-                        </p>
-                        <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-                          {row.school} •{" "}
-                          {row.teamName ??
-                            teams.find((team) => team.id === row.teamId)
-                              ?.name ??
-                            "Manager"}
-                        </p>
-                      </div>
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-xl border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]",
-                          POS_STYLES[row.position] ?? POS_STYLES.QB,
-                        )}
-                      >
-                        {row.position}
-                      </span>
-                    </button>
-                  ))}
+              {myRosterError ? (
+                <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+                  <ShieldAlert className="h-4 w-4 shrink-0" />
+                  {formatTradeError(
+                    myRosterError,
+                    "Unable to load your roster.",
+                  )}
                 </div>
               ) : null}
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_4.5rem_minmax(0,1fr)] xl:items-stretch">
-        <TradeList
-          title="Players You Give"
-          subtitle={
-            myRosterLoading ? "Loading roster..." : "Select one or more players"
-          }
-          direction="give"
-          rows={resolvedMyRows}
-          selectedIds={giveSet}
-          onToggle={toggleGive}
-        />
-        <div className="hidden xl:flex xl:items-center xl:justify-center">
-          <div className="grid h-14 w-14 place-items-center rounded-full border border-sky-300/25 bg-sky-300/10 text-sky-100 shadow-[0_12px_35px_rgba(56,189,248,0.15)]">
-            <ArrowRightLeft className="h-5 w-5" />
-          </div>
-        </div>
-        <TradeList
-          title={`Players You Receive${opponentTeam ? ` (${opponentTeam.name})` : ""}`}
-          subtitle={
-            theirRosterLoading
-              ? "Loading roster..."
-              : "Select one or more players"
-          }
-          direction="receive"
-          rows={theirRows}
-          selectedIds={receiveSet}
-          onToggle={toggleReceive}
-        />
-      </div>
-
-      {(myRosterError || theirRosterError) && (
-        <Card className="rounded-[2rem] border border-red-400/30 bg-red-500/10">
-          <CardContent className="flex items-center gap-3 p-6 text-sm text-red-200">
-            <ShieldAlert className="h-5 w-5" />
-            {formatTradeError(
-              myRosterError || theirRosterError,
-              "Unable to load one or more rosters. Please retry or switch leagues.",
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      <Card className="overflow-hidden rounded-[2rem] border border-sky-300/20 bg-[linear-gradient(135deg,rgba(14,31,54,0.92),rgba(8,18,35,0.92))] shadow-[0_22px_70px_rgba(8,47,73,0.14)]">
-        <CardHeader className="flex flex-row items-center justify-between border-b border-white/10 bg-white/[0.02]">
-          <div>
-            <CardTitle className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-foreground">
-              <span className="grid h-7 w-7 place-items-center rounded-full border border-sky-300/30 bg-sky-300/10 text-sky-100">
-                2
-              </span>
-              Trade snapshot
-            </CardTitle>
-            <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
-              Projection context before you send
-            </p>
-          </div>
-          <Button
-            className="h-10 rounded-xl bg-gradient-to-r from-sky-300 to-blue-500 px-4 text-[10px] font-black uppercase tracking-[0.18em] text-slate-950 shadow-[0_10px_30px_rgba(59,130,246,0.25)] hover:from-sky-200 hover:to-blue-400"
-            disabled={
-              isAnalyzing ||
-              !giveIds.length ||
-              !receiveIds.length ||
-              !league ||
-              !workspace
-            }
-            onClick={() =>
-              analysisIsCurrent
-                ? setIsAnalysisReviewOpen(true)
-                : handleAnalyze()
-            }
-          >
-            {isAnalyzing
-              ? "Analyzing..."
-              : analysisIsCurrent
-                ? "Review Analysis"
-                : "Analyze Trade"}
-            {!isAnalyzing && <ChevronRight className="ml-2 h-4 w-4" />}
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-6 p-6">
-          <div className="grid gap-4 lg:grid-cols-[1fr_auto_1fr] lg:items-stretch">
-            <div className="rounded-2xl border border-rose-300/20 bg-rose-500/[0.075] p-5">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-100">
-                You send
-              </p>
-              <p className="mt-3 text-4xl font-black italic tabular-nums text-foreground">
-                {liveGiveValue.toFixed(1)}
-              </p>
-              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-rose-100/65">
-                {giveIds.length} asset{giveIds.length === 1 ? "" : "s"} selected
-              </p>
-            </div>
-            <div className="hidden lg:flex lg:items-center">
-              <div className="grid h-12 w-12 place-items-center rounded-full border border-sky-300/20 bg-sky-300/10 text-sky-100">
-                <ArrowRightLeft className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/[0.075] p-5">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">
-                You receive
-              </p>
-              <p className="mt-3 text-4xl font-black italic tabular-nums text-foreground">
-                {liveReceiveValue.toFixed(1)}
-              </p>
-              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/65">
-                {receiveIds.length} asset{receiveIds.length === 1 ? "" : "s"}{" "}
-                selected
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/10 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                Live projection edge
-              </p>
-              <p className="mt-1 text-xs font-semibold text-muted-foreground">
-                A quick comparison only — the formal review uses the trade
-                analyzer.
-              </p>
-            </div>
-            <p
-              className={cn(
-                "text-3xl font-black italic tabular-nums",
-                liveDelta > 0
-                  ? "text-emerald-300"
-                  : liveDelta < 0
-                    ? "text-rose-300"
-                    : "text-foreground",
-              )}
-            >
-              {liveDelta >= 0 ? "+" : ""}
-              {liveDelta.toFixed(1)}
-            </p>
-          </div>
-
-          {analysisError && (
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-300">
-              {analysisError}
-            </p>
-          )}
-
-          {analysisIsCurrent ? (
-            <div className="rounded-2xl border border-emerald-300/25 bg-emerald-500/10 p-5">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">
-                Analysis ready. Review the final trade before sending it.
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-                Select players from both sides, then run analysis to see value
-                differential.
-              </p>
-            </div>
-          )}
-          <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-2">
-              <p className="text-xs font-bold text-muted-foreground">
-                Run analysis after every selection change. Sending is locked
-                until the current offer has a fresh analysis.
-              </p>
-              <textarea
-                value={tradeMessage}
-                onChange={(event) => setTradeMessage(event.target.value)}
-                placeholder="Optional message to the other manager..."
-                className="min-h-20 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-bold text-foreground outline-none transition focus:border-sky-300/50 focus:ring-2 focus:ring-sky-300/15 sm:w-[28rem]"
+          {builderStep === "opponent" ? (
+            <div className="space-y-4">
+              <TradeList
+                title={opponentTeam?.name ?? "Opponent roster"}
+                subtitle={
+                  theirRosterLoading
+                    ? "Loading roster..."
+                    : "Tap each player you want to receive."
+                }
+                direction="receive"
+                rows={theirRows}
+                selectedIds={receiveSet}
+                onToggle={toggleReceive}
               />
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-cfb-border-subtle bg-cfb-surface px-4 py-3">
+                <p className="text-sm text-muted-foreground">
+                  {giveIds.length} sending · {receiveIds.length} receiving
+                </p>
+                <Button
+                  className="bg-cfb-brand text-xs font-black text-cfb-surface hover:bg-cfb-brand/90"
+                  disabled={!selectionComplete || isAnalyzing}
+                  onClick={() =>
+                    analysisIsCurrent
+                      ? setBuilderStep("review")
+                      : handleAnalyze()
+                  }
+                >
+                  {isAnalyzing ? "Reviewing..." : "Review trade"}
+                </Button>
+              </div>
+              {analysisError ? (
+                <p className="text-sm font-semibold text-red-300">
+                  {analysisError}
+                </p>
+              ) : null}
+              {theirRosterError ? (
+                <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+                  <ShieldAlert className="h-4 w-4 shrink-0" />
+                  {formatTradeError(
+                    theirRosterError,
+                    "Unable to load this roster.",
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {builderStep === "review" ? (
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-[1fr_auto_1fr] md:items-stretch">
+                <section className="rounded-xl border border-cfb-border-subtle bg-cfb-surface">
+                  <div className="border-b border-cfb-border-subtle px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                      You send
+                    </p>
+                    <p className="mt-1 text-2xl font-black tabular-nums text-foreground">
+                      {analysis?.give_value?.toFixed(2) ?? "—"}
+                    </p>
+                  </div>
+                  <div className="divide-y divide-cfb-border-subtle">
+                    {selectedGiveRows.map((row) => (
+                      <div key={row.playerId} className="px-4 py-3">
+                        <p className="font-black text-foreground">{row.name}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {row.position} · {row.school || "School unavailable"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                <div className="hidden items-center justify-center md:flex">
+                  <ArrowRightLeft className="h-5 w-5 text-cfb-brand" />
+                </div>
+                <section className="rounded-xl border border-cfb-border-subtle bg-cfb-surface">
+                  <div className="border-b border-cfb-border-subtle px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                      You receive
+                    </p>
+                    <p className="mt-1 text-2xl font-black tabular-nums text-foreground">
+                      {analysis?.receive_value?.toFixed(2) ?? "—"}
+                    </p>
+                  </div>
+                  <div className="divide-y divide-cfb-border-subtle">
+                    {selectedReceiveRows.map((row) => (
+                      <div key={row.playerId} className="px-4 py-3">
+                        <p className="font-black text-foreground">{row.name}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {row.position} · {row.school || "School unavailable"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+              <div className="flex flex-col gap-3 rounded-xl border border-cfb-border-subtle bg-cfb-surface p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                    Trade verdict
+                  </p>
+                  <p className="mt-1 text-lg font-black text-foreground">
+                    {analysis?.verdict ?? "Analysis unavailable"}
+                  </p>
+                </div>
+                <p className="text-2xl font-black tabular-nums text-foreground">
+                  {analysis?.delta === null || analysis?.delta === undefined
+                    ? "—"
+                    : `${analysis.delta >= 0 ? "+" : ""}${analysis.delta.toFixed(2)}`}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                  Note to manager (optional)
+                </label>
+                <textarea
+                  value={tradeMessage}
+                  onChange={(event) => setTradeMessage(event.target.value)}
+                  placeholder="Add a short note to this trade offer..."
+                  className="min-h-24 w-full rounded-xl border border-cfb-border-subtle bg-cfb-surface px-4 py-3 text-sm text-foreground outline-none focus:border-cfb-brand"
+                />
+              </div>
               {sendError ? (
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-red-300">
+                <p className="text-sm font-semibold text-red-300">
                   {sendError}
                 </p>
               ) : null}
+              <div className="flex flex-wrap justify-end gap-3 border-t border-cfb-border-subtle pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setBuilderStep("opponent")}
+                >
+                  Keep editing
+                </Button>
+                <Button
+                  className="bg-cfb-brand text-cfb-surface hover:bg-cfb-brand/90"
+                  disabled={!sendEnabled}
+                  onClick={handleSendTrade}
+                >
+                  {createOfferMutation.isPending
+                    ? "Sending..."
+                    : counteringOfferId
+                      ? "Send counter"
+                      : "Send trade"}
+                </Button>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Dialog
-        open={isAnalysisReviewOpen}
-        onOpenChange={setIsAnalysisReviewOpen}
-      >
-        <DialogContent className="max-w-2xl border-cfb-brand/30 bg-[#081321] text-foreground">
-          <DialogHeader>
-            <DialogTitle className="pr-10 text-2xl font-black uppercase italic tracking-tight sm:text-3xl">
-              Review Trade Offer
-            </DialogTitle>
-            <DialogDescription className="text-sm font-semibold leading-6 text-muted-foreground">
-              Review the selected players and the current trade outlook before
-              sending the offer.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl border border-red-300/20 bg-red-500/10 p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-100">
-                You send
-              </p>
-              <p className="mt-2 text-2xl font-black tabular-nums">
-                {analysis?.give_value?.toFixed(2) ?? "N/A"}
-              </p>
-              <p className="mt-3 text-xs font-semibold leading-5 text-muted-foreground">
-                {selectedGiveRows.map((row) => row.name).join(", ") ||
-                  "No players selected"}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/10 p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-100">
-                You receive
-              </p>
-              <p className="mt-2 text-2xl font-black tabular-nums">
-                {analysis?.receive_value?.toFixed(2) ?? "N/A"}
-              </p>
-              <p className="mt-3 text-xs font-semibold leading-5 text-muted-foreground">
-                {selectedReceiveRows.map((row) => row.name).join(", ") ||
-                  "No players selected"}
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-              Trade verdict
-            </p>
-            <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-              <p className="text-2xl font-black text-primary">
-                {analysis?.verdict ?? "Analysis unavailable"}
-              </p>
-              <p
-                className={cn(
-                  "text-xl font-black tabular-nums",
-                  (analysis?.delta ?? 0) >= 0
-                    ? "text-emerald-300"
-                    : "text-red-300",
-                )}
-              >
-                {analysis?.delta === null || analysis?.delta === undefined
-                  ? "N/A"
-                  : `${analysis.delta >= 0 ? "+" : ""}${analysis.delta.toFixed(2)}`}
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-3 sm:gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setIsAnalysisReviewOpen(false)}
-            >
-              Keep Editing
-            </Button>
-            <Button disabled={!sendEnabled} onClick={handleSendTrade}>
-              {createOfferMutation.isPending
-                ? "Sending..."
-                : counteringOfferId
-                  ? "Send Final Counter"
-                  : "Send Final Trade"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          ) : null}
+        </div>
+      </section>
 
       <Dialog
         open={isTradeOfferRoute}
