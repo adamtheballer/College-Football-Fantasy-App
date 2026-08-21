@@ -1,28 +1,39 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
+from hashlib import sha256
+import re
 from typing import Any
 
+import httpx
 from sqlalchemy import and_, case, select
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.core.config import settings
-from collegefootballfantasy_api.app.integrations.rotowire import RotowireClient
+from collegefootballfantasy_api.app.integrations.conference_availability_reports import (
+    ConferenceAvailabilityReportClient,
+    ConferenceReportUnavailable,
+    report_source_for,
+)
 from collegefootballfantasy_api.app.integrations.sportsdata import SportsDataClient
 from collegefootballfantasy_api.app.models.cfb_standing_snapshot import CFBStandingSnapshot
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_availability_event import PlayerAvailabilityEvent
+from collegefootballfantasy_api.app.models.player_news_event import PlayerNewsEvent
+from collegefootballfantasy_api.app.models.player_weekly_context import PlayerWeeklyContext
+from collegefootballfantasy_api.app.services.notification_service import log_official_injury_update
 from collegefootballfantasy_api.app.services.power4 import (
     conference_for_school,
     list_power4_teams,
+    normalize_school,
     resolve_power4_school,
 )
 from collegefootballfantasy_api.app.services.provider_identity import (
     upsert_player_provider_mapping,
     upsert_team_provider_mapping,
 )
-from collegefootballfantasy_api.app.services.injury_status import normalize_injury_status
 
 _OFFENSE_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 
@@ -49,7 +60,80 @@ def _pick_int(row: dict[str, Any], *keys: str) -> int | None:
 
 
 def _normalize_status(raw_status: str | None) -> str:
-    return normalize_injury_status(raw_status)
+    status = (raw_status or "FULL").upper()
+    if any(
+        token in status
+        for token in ("OUT FOR SEASON", "SEASON ENDING", "SEASON-ENDING", "SEASON END", "LOST FOR THE SEASON")
+    ):
+        return "OUT_FOR_SEASON"
+    if "OUT" in status:
+        return "OUT"
+    if "DOUBTFUL" in status:
+        return "DOUBTFUL"
+    if "QUESTION" in status or "GTD" in status or "GAME-TIME" in status:
+        return "QUESTIONABLE"
+    if "PROBABLE" in status:
+        return "PROBABLE"
+    return "FULL"
+
+
+_NUMBER_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+}
+
+
+def _timeline_indicates_four_or_more_weeks(timeline: str | None) -> bool:
+    """Apply the product's IR threshold only when a report is explicit."""
+    text = (timeline or "").lower().strip()
+    if not text:
+        return False
+    if any(phrase in text for phrase in ("out for season", "season-ending", "season ending", "lost for the season")):
+        return True
+    if re.search(r"(?:at least|minimum of|more than)\s+(?:4|four)\s+(?:weeks?|wks?|games?)", text):
+        return True
+    numeric_range = re.search(r"\b(\d+)\s*(?:-|to)\s*(\d+)\s*(?:weeks?|wks?|games?)\b", text)
+    if numeric_range:
+        return int(numeric_range.group(1)) >= 4
+    numeric_duration = re.search(r"\b(\d+)\s*(?:weeks?|wks?|games?)\b", text)
+    if numeric_duration:
+        return int(numeric_duration.group(1)) >= 4
+    for word, value in _NUMBER_WORDS.items():
+        if re.search(rf"\b{word}\s*(?:weeks?|wks?|games?)\b", text):
+            return value >= 4
+    return bool(re.search(r"\b(?:one|1)\s+month\b", text))
+
+
+def _official_availability_status(raw_status: str | None, timeline: str | None) -> str:
+    raw = (raw_status or "").upper()
+    if "IR" in raw or "INJURED RESERVE" in raw:
+        return "IR"
+    if _timeline_indicates_four_or_more_weeks(f"{raw} {timeline or ''}"):
+        return "IR"
+    if "OUT" in raw:
+        return "OUT"
+    if "DOUBTFUL" in raw or "QUESTION" in raw or "GAME-TIME" in raw:
+        return "QUESTIONABLE"
+    if "AVAILABLE" in raw or "ACTIVE" in raw or "PROBABLE" in raw:
+        return "FULL"
+    return "FULL"
+
+
+def _availability_multiplier(status: str) -> tuple[float, float]:
+    if status in {"OUT", "IR"}:
+        return 0.0, 0.0
+    if status == "QUESTIONABLE":
+        return 0.5, 0.5
+    return 1.0, 1.0
+
+
+def _availability_hash(row: dict[str, str | None], status: str) -> str:
+    values = (
+        row.get("player_name"), row.get("team_name"), row.get("position"), status,
+        row.get("injury"), row.get("return_timeline"), row.get("practice_level"),
+        row.get("notes"), row.get("source_url"),
+    )
+    return sha256("\x1f".join(value or "" for value in values).encode()).hexdigest()
 
 
 def _parse_datetime(value: str | None) -> datetime | None:
@@ -424,6 +508,126 @@ def _upsert_power4_injuries(
     return {"created": created, "updated": updated, "removed": removed}
 
 
+def _upsert_official_availability_rows(
+    db: Session,
+    *,
+    season: int,
+    week: int,
+    rows: list[dict[str, str | None]],
+) -> dict[str, int]:
+    """Persist only exact, in-product P4 player matches from official reports."""
+    eligible_players = db.query(Player).filter(Player.position.in_(sorted(_OFFENSE_POSITIONS))).all()
+    players_by_identity = {
+        (normalize_school(player.name), normalize_school(player.school)): player
+        for player in eligible_players
+        if conference_for_school(player.school or "")
+    }
+    current_injuries = {
+        injury.player_id: injury
+        for injury in db.query(Injury).filter(Injury.season == season, Injury.week == week).all()
+    }
+    created = updated = unchanged = skipped = events_created = 0
+
+    for row in rows:
+        school = resolve_power4_school(row.get("team_name") or "")
+        source_position = (row.get("position") or "").upper().strip()
+        if not school or (source_position and source_position not in _OFFENSE_POSITIONS):
+            skipped += 1
+            continue
+        player = players_by_identity.get((normalize_school(row.get("player_name") or ""), normalize_school(school)))
+        if player is None or player.position.upper() not in _OFFENSE_POSITIONS:
+            skipped += 1
+            continue
+        if source_position and source_position != player.position.upper():
+            skipped += 1
+            continue
+
+        status = _official_availability_status(row.get("status"), row.get("return_timeline"))
+        content_hash = _availability_hash(row, status)
+        existing = current_injuries.get(player.id)
+        semantic_change = (
+            existing is None
+            or existing.status != status
+            or existing.injury != row.get("injury")
+            or existing.return_timeline != row.get("return_timeline")
+            or existing.practice_level != row.get("practice_level")
+            or existing.notes != row.get("notes")
+        )
+        if existing is None:
+            existing = Injury(
+                player_id=player.id, season=season, week=week, status=status,
+                injury=row.get("injury"), return_timeline=row.get("return_timeline"),
+                practice_level=row.get("practice_level"),
+                is_game_time_decision=status == "QUESTIONABLE",
+                is_returning=status == "FULL", notes=row.get("notes"),
+            )
+            db.add(existing)
+            current_injuries[player.id] = existing
+            created += 1
+        elif semantic_change:
+            existing.status = status
+            existing.injury = row.get("injury")
+            existing.return_timeline = row.get("return_timeline")
+            existing.practice_level = row.get("practice_level")
+            existing.is_game_time_decision = status == "QUESTIONABLE"
+            existing.is_returning = status == "FULL"
+            existing.notes = row.get("notes")
+            db.add(existing)
+            updated += 1
+        else:
+            unchanged += 1
+            continue
+
+        probability_active, multiplier = _availability_multiplier(status)
+        notes = " • ".join(
+            value for value in (
+                row.get("injury"), row.get("practice_level"), row.get("return_timeline"), row.get("notes")
+            ) if value
+        ) or None
+        event = PlayerAvailabilityEvent(
+            player_id=player.id, season=season, week=week, status=status,
+            probability_active=probability_active, availability_multiplier=multiplier,
+            source=f"official_{row.get('conference', 'conference').lower()}_availability_report",
+            source_url=row.get("source_url"), content_hash=content_hash,
+            source_reliability=1.0, published_at=datetime.now(timezone.utc),
+            effective_from_week=week, reviewed=True, notes=notes,
+        )
+        db.add(event)
+        db.flush()
+        db.add(
+            PlayerNewsEvent(
+                player_id=player.id, season=season, week=week, event_type="AVAILABILITY",
+                source=event.source, source_url=event.source_url, content_hash=content_hash,
+                source_reliability=1.0, published_at=event.published_at,
+                effective_from_week=week, reviewed=True,
+                notes=event.notes or f"Official status: {status}",
+            )
+        )
+        context = db.query(PlayerWeeklyContext).filter(
+            PlayerWeeklyContext.player_id == player.id,
+            PlayerWeeklyContext.season == season,
+            PlayerWeeklyContext.week == week,
+        ).first()
+        if context is not None:
+            context.availability_status = status
+            context.availability_multiplier = multiplier
+            context.availability_event_id = event.id
+            context.reviewed = True
+            context.change_reason = f"official conference availability report: {status}"
+            db.add(context)
+        log_official_injury_update(
+            db, player=player, season=season, week=week, status=status,
+            content_hash=content_hash, source_url=row.get("source_url"), detail=event.notes,
+        )
+        events_created += 1
+
+    db.flush()
+    return {
+        "created": created, "updated": updated, "unchanged": unchanged,
+        "skipped": skipped, "events_created": events_created,
+    }
+
+
 def sync_power4_injuries(
     db: Session,
     *,
@@ -431,36 +635,27 @@ def sync_power4_injuries(
     week: int,
     conference: str | None = None,
 ) -> dict[str, int | str]:
-    source = "sportsdata"
-    provider_error: str | None = None
-
-    normalized_rows: list[dict[str, str | None]] = []
-    if settings.sportsdata_enabled:
+    """Sync public official conference reports; RotoWire is never a fallback."""
+    conferences = [conference.upper().replace(" ", "")] if conference else ["SEC", "ACC", "BIG12", "BIG10"]
+    client = ConferenceAvailabilityReportClient()
+    source_rows: list[dict[str, str | None]] = []
+    unavailable: list[str] = []
+    for conference_key in conferences:
+        source = report_source_for(conference_key)
         try:
-            provider_rows = SportsDataClient().get_injuries(season=season)
-            normalized_rows = _normalize_injury_rows_for_ingest(provider_rows, source="sportsdata")
-        except Exception as exc:  # pragma: no cover - provider network failures are environment-specific
-            provider_error = str(exc)
-
-    if not normalized_rows:
-        source = "rotowire"
-        fallback_rows = RotowireClient().get_injuries()
-        normalized_rows = _normalize_injury_rows_for_ingest(fallback_rows, source="rotowire")
-
-    changes = _upsert_power4_injuries(
-        db,
-        season=season,
-        week=week,
-        conference=conference,
-        rows=normalized_rows,
-    )
+            source_rows.extend(client.get_rows(source))
+        except (httpx.HTTPError, ConferenceReportUnavailable) as exc:
+            unavailable.append(f"{conference_key}: {exc}")
+    if unavailable and len(unavailable) == len(conferences) and not source_rows:
+        raise RuntimeError("; ".join(unavailable))
+    changes = _upsert_official_availability_rows(db, season=season, week=week, rows=source_rows)
     result: dict[str, int | str] = {
         **changes,
-        "source": source,
-        "rows_seen": len(normalized_rows),
+        "source": "official_conference_reports",
+        "rows_seen": len(source_rows),
     }
-    if provider_error:
-        result["provider_error"] = provider_error
+    if unavailable:
+        result["provider_error"] = "; ".join(unavailable)
     return result
 
 

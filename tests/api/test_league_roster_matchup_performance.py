@@ -46,10 +46,11 @@ def test_matchup_tab_uses_a_bounded_number_of_selects(client, db_session):
     assert response.opponent_team is not None
     assert len(response.my_roster) == 8
     assert len(response.opponent_roster) == 8
-    # Player-level live scoring and the server-authoritative permanent-rival
-    # lookup are each one bounded query, never one query per roster slot.
+    # Player-level live scoring, official availability, and the
+    # server-authoritative permanent-rival lookup are each one bounded query,
+    # never one query per roster slot.
     # Keep this cap tight so the matchup view cannot regress into an N+1 read.
-    assert select_count <= 10
+    assert select_count <= 11
 
 
 def test_matchup_tab_exposes_persisted_player_scores_without_falling_back_to_projections(client, db_session):

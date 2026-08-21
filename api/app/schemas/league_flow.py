@@ -560,6 +560,8 @@ class RosterTabEntryRead(BaseModel):
     slot_index: int
     display_label: str
     roster_slot: str | None = None
+    # Real-world report status; `status` remains the fantasy roster state.
+    injury_status: str | None = None
     status: str
     is_starter: bool
     is_ir: bool

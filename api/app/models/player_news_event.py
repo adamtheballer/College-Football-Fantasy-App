@@ -13,6 +13,7 @@ class PlayerNewsEvent(TimestampMixin, Base):
     __table_args__ = (
         Index("ix_player_news_events_player_season_week", "player_id", "season", "week"),
         Index("ix_player_news_events_effective_window", "season", "effective_from_week", "effective_until_week"),
+        Index("ix_player_news_events_content_hash", "content_hash"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -26,6 +27,8 @@ class PlayerNewsEvent(TimestampMixin, Base):
     usage_direction: Mapped[str | None] = mapped_column(String(20), nullable=True)
     role_score_delta: Mapped[float] = mapped_column(Float, default=0.0)
     source: Mapped[str] = mapped_column(String(200))
+    source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_reliability: Mapped[float] = mapped_column(Float, default=0.5)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     effective_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

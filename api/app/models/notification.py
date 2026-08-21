@@ -52,6 +52,9 @@ class NotificationPreference(TimestampMixin, Base):
     email_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     draft_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
     injury_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
+    injury_alert_scope: Mapped[str] = mapped_column(
+        String(20), default="ALL", server_default="ALL", nullable=False
+    )
     touchdown_alerts: Mapped[bool] = mapped_column(Boolean, default=False)
     usage_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
     waiver_alerts: Mapped[bool] = mapped_column(Boolean, default=True)

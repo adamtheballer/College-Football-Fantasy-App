@@ -300,7 +300,12 @@ export function RosterSlotTable({
                   <span className={cn("hidden h-2.5 w-2.5 rounded-full md:block", style.dot)} />
                 </span>
                 <span className="flex min-w-0 flex-col gap-1">
-                  <span className="truncate font-black text-cfb-text-primary">{isRealPlayer ? player.player_name : "N/A"}</span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    {player.injury_status === "QUESTIONABLE" ? <span aria-label="Questionable" className="text-xs font-black text-amber-300">Q</span> : null}
+                    {player.injury_status === "OUT" ? <span aria-label="Out" className="text-xs font-black text-red-400">O</span> : null}
+                    {player.injury_status === "IR" ? <span aria-label="Injured reserve" className="text-[10px] font-black text-red-400">IR</span> : null}
+                    <span className="truncate font-black text-cfb-text-primary">{isRealPlayer ? player.player_name : "N/A"}</span>
+                  </span>
                   <span
                     className={cn(
                       "hidden w-fit shrink-0 whitespace-nowrap rounded-md border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] md:inline-flex",

@@ -86,6 +86,12 @@ afterEach(() => cleanup());
 
 describe("DraftLobby rescheduling", () => {
   it("keeps countdown values and unit labels inside four compact mobile timer cards", () => {
+    state.league = makeLeague({
+      draft: {
+        ...makeLeague().draft,
+        draft_datetime_utc: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      },
+    });
     renderLobby();
 
     const countdownUnits = screen.getByTestId("draft-countdown-units");

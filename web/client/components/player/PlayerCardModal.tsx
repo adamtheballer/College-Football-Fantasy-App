@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, AlertTriangle, BarChart3, CalendarDays, History, Info, Loader2 } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, CalendarDays, History, Info, Loader2, Newspaper } from "lucide-react";
 
 import { useLeaguePlayerHistory, usePlayerGameLog, usePlayerTradeValues, usePlayerTrajectory, type PlayerCardResponse } from "@/hooks/use-players";
 import {
@@ -14,7 +14,7 @@ import type { PlayerStats } from "@/types/player";
 import { PlayerCardHeader, resolvePlayerCardStatus } from "./PlayerCardHeader";
 import { PlayerTrajectoryChart } from "./PlayerTrajectoryChart";
 
-type PlayerCardTab = "summary" | "stats" | "game-log" | "alerts" | "projections" | "history" | "value";
+type PlayerCardTab = "news" | "summary" | "stats" | "game-log" | "alerts" | "projections" | "history" | "value";
 
 export type PlayerCardModalPlayer = {
   id: number;
@@ -43,6 +43,7 @@ type HistoricalStatTableRow = {
   value: number | string | null;
 };
 const tabConfig: Array<{ id: PlayerCardTab; label: string; icon: typeof Info }> = [
+  { id: "news", label: "News", icon: Newspaper },
   { id: "summary", label: "Summary", icon: Info },
   { id: "stats", label: "Stats", icon: BarChart3 },
   { id: "game-log", label: "Game Log", icon: CalendarDays },
@@ -507,6 +508,30 @@ export function PlayerCardModal({
                 </button>
               ) : null}
             </div>
+          ) : activeTab === "news" ? (
+            <section className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 sm:rounded-3xl sm:p-5">
+              <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Recent news</p>
+              {card?.recent_news?.length ? (
+                <div className="mt-3 space-y-2">
+                  {card.recent_news.map((item) => (
+                    <article key={item.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-black text-white">{item.status ?? item.event_type}</p>
+                        <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/45">{item.source}</p>
+                      </div>
+                      <p className="mt-1 text-xs font-semibold leading-5 text-white/70">
+                        {[item.detail, item.return_timeline].filter(Boolean).join(" • ") || "Official update"}
+                      </p>
+                      {item.source_url ? (
+                        <a href={item.source_url} target="_blank" rel="noreferrer" className={cn("mt-2 inline-block text-[10px] font-black uppercase tracking-[0.14em]", palette.accent)}>View source</a>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3 text-sm font-semibold text-white/55">No verified recent news is available.</p>
+              )}
+            </section>
           ) : activeTab === "summary" ? (
             <div className="w-full">
               <section className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 sm:rounded-3xl sm:p-5">

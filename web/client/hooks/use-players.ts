@@ -219,6 +219,16 @@ export function usePlayerTrajectory(
 export type PlayerCardResponse = {
   player: BackendPlayerRead;
   current_injury_status?: string | null;
+  recent_news?: Array<{
+    id: number;
+    event_type: string;
+    status?: string | null;
+    detail?: string | null;
+    source: string;
+    source_url?: string | null;
+    published_at?: string | null;
+    return_timeline?: string | null;
+  }>;
   season_outlook?: {
     season_year: number;
     outlook_type: string;
