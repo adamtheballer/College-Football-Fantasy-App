@@ -41,6 +41,9 @@ const Trade = lazyWithRouteRecovery(() => import("./pages/Trade"));
 const AdminScoring = lazyWithRouteRecovery(() => import("./pages/AdminScoring"));
 const ComingSoon = lazyWithRouteRecovery(() => import("./pages/ComingSoon"));
 const SaturdayPick6 = lazyWithRouteRecovery(() => import("./pages/SaturdayPick6"));
+const PrivacyPolicy = lazyWithRouteRecovery(() => import("./pages/PrivacyPolicy"));
+const TermsOfUse = lazyWithRouteRecovery(() => import("./pages/TermsOfUse"));
+const ProviderDisclosure = lazyWithRouteRecovery(() => import("./pages/ProviderDisclosure"));
 
 const NON_RETRYABLE_STATUSES = new Set([401, 403, 404]);
 
@@ -68,17 +71,15 @@ const RouteFallback = () => (
   </div>
 );
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <RuntimeCompatibilityGate>
+const ApplicationRoutes = () => (
+  <RuntimeCompatibilityGate>
     <AuthProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
         <AppErrorBoundary>
-          <BrowserRouter>
-            <Layout>
-              <Suspense fallback={<RouteFallback />}>
+          <Layout>
+            <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/leagues" element={<Leagues />} />
@@ -209,13 +210,31 @@ const App = () => (
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
-              </Suspense>
-            </Layout>
-          </BrowserRouter>
+            </Suspense>
+          </Layout>
         </AppErrorBoundary>
       </TooltipProvider>
     </AuthProvider>
-    </RuntimeCompatibilityGate>
+  </RuntimeCompatibilityGate>
+);
+
+// Policy documents must remain readable in a fresh, logged-out browser even
+// if the authenticated app's API runtime is unavailable or mid-deployment.
+// Keep these first-party routes outside the auth provider, app shell, and
+// runtime compatibility gate instead of letting a release diagnostic block a
+// required public document.
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfUse />} />
+          <Route path="/provider-disclosure" element={<ProviderDisclosure />} />
+          <Route path="*" element={<ApplicationRoutes />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 
