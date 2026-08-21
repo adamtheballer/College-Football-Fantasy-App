@@ -7,7 +7,8 @@ The injury/status importer uses only these public conference report pages:
 - ACC: `https://theacc.com/sports/2025/8/28/availability-reporting-football.aspx`
 - Big Ten: `https://bigten.org/fb/availability-reports/`
 
-Create a Railway Cron service with the production API variables and this
+Create a Railway Cron service with the production API variables and select
+`railway.availability-scheduler.toml` as its Railway config file. It runs this
 command:
 
 ```sh
