@@ -1,4 +1,6 @@
 from collegefootballfantasy_api.app.models.game import Game
+from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
@@ -176,3 +178,56 @@ def test_player_game_log_handles_schedule_table_not_yet_migrated(client, db_sess
     assert response.status_code == 200
     assert response.json()["games"] == []
     assert response.json()["message"] == "The 2026 team schedule is not available yet."
+
+
+def test_player_game_log_calculates_final_points_with_the_selected_league_rules(client, db_session):
+    player = Player(name="League Scored Quarterback", position="QB", school="Texas")
+    league = League(name="Game Log Rules League", season_year=2026)
+    db_session.add_all([player, league])
+    db_session.flush()
+    db_session.add_all(
+        [
+            LeagueSettings(
+                league_id=league.id,
+                    scoring_json={"pass_yards": 0.04, "pass_tds": 4},
+            ),
+            TeamSchedule(
+                team_name="Texas",
+                season=2026,
+                week=1,
+                opponent_name="Ohio State",
+                location="home",
+                is_bye=False,
+                neutral_site=False,
+                conference_game=False,
+                date_confirmed=True,
+            ),
+            PlayerStat(
+                player_id=player.id,
+                season=2026,
+                week=1,
+                source="verified_boxscore",
+                stats={"PassingYards": 250, "PassingTouchdowns": 2},
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/players/{player.id}/game-log",
+        params={"season": 2026, "league_id": league.id},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["games"][0]["stats"]["fantasy_points"] == 18.0
+
+
+def test_player_game_log_rejects_unknown_league_context(client, db_session):
+    player = Player(name="Known Game Log Player", position="WR", school="Texas")
+    db_session.add(player)
+    db_session.commit()
+
+    response = client.get(f"/players/{player.id}/game-log", params={"league_id": 999})
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "league not found"

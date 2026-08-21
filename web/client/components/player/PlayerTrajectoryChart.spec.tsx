@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { PlayerTrajectoryChart } from "./PlayerTrajectoryChart";
 
-const renderChart = (points: Array<{ week: number; value: number | null; source: "preseason" | "current" | "published" | "actual" | "bye" }>) =>
+const renderChart = (points: Array<{ week: number; value: number | null; actualValue?: number | null; source: "preseason" | "current" | "published" | "actual" | "bye" }>) =>
   render(
     <PlayerTrajectoryChart
       ariaLabel="Projection trajectory"
@@ -48,6 +48,15 @@ describe("PlayerTrajectoryChart", () => {
     const chart = screen.getByRole("img", { name: "Projection trajectory" });
     expect(chart.querySelectorAll("circle[fill='#2f80ff']")).toHaveLength(1);
     expect(chart.querySelector("title")?.textContent).toContain("actual fantasy points");
+  });
+
+  it("keeps the published pregame point and the final total visible for the same week", () => {
+    renderChart([{ week: 1, value: 18.4, actualValue: 25.2, source: "published" }]);
+
+    const chart = screen.getByRole("img", { name: "Projection trajectory" });
+    expect(chart.querySelectorAll("circle[fill='#ffffff']")).toHaveLength(1);
+    expect(chart.querySelectorAll("circle[fill='#2f80ff']")).toHaveLength(1);
+    expect(chart.querySelectorAll("title")[1]?.textContent).toContain("actual fantasy points");
   });
 
   it("keeps the value-history legend separate from the weekly points semantics", () => {

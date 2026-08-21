@@ -356,7 +356,7 @@ export function PlayerCardModal({
   const hasLeagueContext = typeof leagueId === "number" && Number.isFinite(leagueId) && leagueId > 0;
   const position = (card?.about.position ?? player.position ?? "").toUpperCase();
   const playerStatus = resolvePlayerCardStatus(card, player.status);
-  const gameLogQuery = usePlayerGameLog(player.id, 2026, activeTab === "game-log");
+  const gameLogQuery = usePlayerGameLog(player.id, 2026, leagueId, activeTab === "game-log");
   const historyQuery = useLeaguePlayerHistory(leagueId ?? undefined, player.id, activeTab === "history" && hasLeagueContext);
   const valueQuery = usePlayerTradeValues(player.id, 2026);
   const trajectoryQuery = usePlayerTrajectory(
@@ -693,7 +693,7 @@ export function PlayerCardModal({
                     </thead>
                     <tbody className="divide-y divide-white/10">
                       {gameLogQuery.data.games.map((row) => {
-                        const stats = row.stats?.stats;
+                        const stats = row.stats ? { ...row.stats.stats, fantasy_points: row.stats.fantasy_points } : undefined;
                         return (
                           <tr key={row.schedule_id} className="text-sm font-bold text-white/75">
                             <td className="px-4 py-4 font-black tabular-nums text-white">{row.week}</td>
@@ -719,7 +719,7 @@ export function PlayerCardModal({
                 </div>
                 <div className="mt-5 space-y-3 md:hidden">
                   {gameLogQuery.data.games.map((row) => {
-                    const stats = row.stats?.stats;
+                    const stats = row.stats ? { ...row.stats.stats, fantasy_points: row.stats.fantasy_points } : undefined;
                     return (
                       <article key={row.schedule_id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
                         <div className="flex items-start justify-between gap-3">
@@ -796,7 +796,7 @@ export function PlayerCardModal({
                     ) : null}
                     <PlayerTrajectoryChart
                       ariaLabel={`${player.name} projected fantasy points by week`}
-                      points={trajectoryQuery.data.projection.map((point) => ({ ...point, value: point.points }))}
+                      points={trajectoryQuery.data.projection.map((point) => ({ ...point, value: point.points, actualValue: point.actual_points }))}
                       yLabel="Points"
                       yMax={30}
                       valueFormatter={(value) => `${value.toFixed(1)} pts`}

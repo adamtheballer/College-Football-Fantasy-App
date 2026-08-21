@@ -164,7 +164,7 @@ export type PlayerTrajectoryResponse = {
   player_id: number;
   season: number;
   league_id?: number | null;
-  projection: Array<{ week: number; points: number | null; source: "published" | "bye"; projection_status: string; projection_version?: string | null; published_at?: string | null }>;
+  projection: Array<{ week: number; points: number | null; actual_points?: number | null; source: "published" | "actual" | "bye"; projection_status: string; projection_version?: string | null; published_at?: string | null }>;
   value: Array<{ week: number; value: number; source: "preseason" | "published" }>;
   preseason_projection_points?: number | null;
 };
@@ -755,12 +755,20 @@ export function usePlayerCard(playerId?: number | null, enabled = true) {
   });
 }
 
-export function usePlayerGameLog(playerId?: number | null, season = 2026, enabled = true) {
+export function usePlayerGameLog(
+  playerId?: number | null,
+  season = 2026,
+  leagueId?: number | null,
+  enabled = true,
+) {
   return useQuery({
-    queryKey: ["player-game-log", playerId, season],
+    queryKey: ["player-game-log", playerId, season, leagueId ?? null],
     enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
     staleTime: 60_000,
-    queryFn: () => apiGet<PlayerGameLogResponse>(`/players/${playerId}/game-log`, { season }),
+    queryFn: () => apiGet<PlayerGameLogResponse>(`/players/${playerId}/game-log`, {
+      season,
+      ...(typeof leagueId === "number" && Number.isFinite(leagueId) ? { league_id: leagueId } : {}),
+    }),
   });
 }
 

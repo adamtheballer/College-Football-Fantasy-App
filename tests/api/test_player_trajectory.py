@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.models.player_trade_value import PlayerTradeValue
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
@@ -75,10 +76,48 @@ def test_player_trajectory_uses_published_weekly_rows_without_converting_a_seaso
     assert body["projection"][0]["points"] == 14.0
     assert body["projection"][0]["source"] == "published"
     assert body["projection"][0]["projection_version"] == "FINAL"
-    assert body["projection"][1] == {"week": 2, "points": None, "source": "bye", "projection_status": "BYE", "projection_version": None, "published_at": None}
+    assert body["projection"][1] == {"week": 2, "points": None, "actual_points": None, "source": "bye", "projection_status": "BYE", "projection_version": None, "published_at": None}
     assert body["value"][0]["source"] == "preseason"
     assert all(0 <= point["value"] <= 100 for point in body["value"])
     assert all(point["points"] is None or point["points"] >= 0 for point in body["projection"])
+
+
+def test_player_trajectory_overlays_canonical_league_actuals_on_the_pregame_baseline(client, db_session):
+    player = Player(name="Actual Overlay Runner", position="RB", school="Texas", raw_cfb27_rating=90)
+    league = League(name="Actual Overlay League", season_year=2026)
+    db_session.add_all([player, league])
+    db_session.flush()
+    db_session.add_all(
+        [
+            TeamSchedule(team_name="Texas", season=2026, week=1, opponent_name="Ohio State", location="home", is_bye=False),
+            WeeklyProjection(player_id=player.id, season=2026, week=1, is_published=True, fantasy_points=16.4),
+            PlayerWeekScore(
+                league_id=league.id,
+                player_id=player.id,
+                season=2026,
+                week=1,
+                fantasy_points=24.6,
+                status="final",
+                breakdown_json={},
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(f"/players/{player.id}/trajectory", params={"season": 2026, "league_id": league.id})
+
+    assert response.status_code == 200
+    assert response.json()["projection"] == [
+        {
+            "week": 1,
+            "points": 16.4,
+            "actual_points": 24.6,
+            "source": "published",
+            "projection_status": "ACTIVE",
+            "projection_version": "FINAL",
+            "published_at": response.json()["projection"][0]["published_at"],
+        }
+    ]
 
 
 def test_player_trajectory_includes_a_published_weekly_snapshot_without_a_wall_clock_gate(client, db_session):

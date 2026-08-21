@@ -465,12 +465,16 @@ def get_player_card_endpoint(
 def get_player_game_log_endpoint(
     player_id: int,
     season: int = Query(2026, ge=2000, le=2100),
+    league_id: int | None = Query(default=None, ge=1),
     db: Session = Depends(get_db),
 ) -> PlayerGameLogRead:
     player = get_player(db, player_id)
     if not player:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="player not found")
-    return build_player_game_log(db, player, season=season)
+    try:
+        return build_player_game_log(db, player, season=season, league_id=league_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.get("/{player_id}/historical-stats", response_model=PlayerHistoricalStatsResponse)
