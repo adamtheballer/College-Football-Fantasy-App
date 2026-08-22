@@ -162,6 +162,19 @@ def test_production_rejects_localhost_cors_origin():
         )
 
 
+def test_production_allows_only_the_explicit_capacitor_native_origin():
+    settings = make_settings(
+        environment="production",
+        jwt_secret_key="safe-production-secret",
+        cors_origins="https://app.example.com,capacitor://localhost",
+        cors_origin_regex=None,
+        refresh_cookie_secure=True,
+        **production_required_settings(),
+    )
+
+    assert settings.allowed_cors_origins[-1] == "capacitor://localhost"
+
+
 def test_production_rejects_wildcard_cors_origin():
     with pytest.raises(ValidationError, match="cannot contain '\\*'"):
         make_settings(

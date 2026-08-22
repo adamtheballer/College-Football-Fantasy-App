@@ -18,6 +18,10 @@ DEFAULT_CORS_ORIGINS = (
     "http://127.0.0.1:8080"
 )
 DEFAULT_CORS_ORIGIN_REGEX = r"https?://(localhost|127\.0\.0\.1):[0-9]+"
+# A Capacitor production build loads its bundled React assets from this fixed
+# origin. It is intentionally an exact allow-list entry—not a localhost
+# exception—so native clients can reach the API without widening browser CORS.
+TRUSTED_NATIVE_CORS_ORIGINS = frozenset({"capacitor://localhost"})
 
 
 class Settings(BaseSettings):
@@ -339,7 +343,10 @@ class Settings(BaseSettings):
         if any(origin == "*" for origin in self.allowed_cors_origins):
             raise ValueError("CORS_ORIGINS cannot contain '*' when ENVIRONMENT=production")
 
-        if any(self._is_local_origin(origin) for origin in self.allowed_cors_origins):
+        if any(
+            self._is_local_origin(origin) and origin not in TRUSTED_NATIVE_CORS_ORIGINS
+            for origin in self.allowed_cors_origins
+        ):
             raise ValueError("CORS_ORIGINS cannot contain localhost origins when ENVIRONMENT=production")
 
         if self.cors_origin_regex == DEFAULT_CORS_ORIGIN_REGEX:
