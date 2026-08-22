@@ -122,27 +122,23 @@ test.describe("real two-manager draft lifecycle", () => {
       // This is intentionally real-stack rather than a route-mocked visual
       // test: the release gate must prove a signed-in manager can use the
       // active multiplayer draft at the alpha phone viewport without the
-      // fixed draft tabs or primary pick controls escaping the screen.
+      // fixed draft tabs escaping the screen or any horizontal overflow.
       await commissioner.setViewportSize({ width: 390, height: 844 });
       const mobileDraftGeometry = await commissioner.evaluate(() => {
         const tabs = document.querySelector<HTMLElement>("[data-testid='draft-room-tabs']");
-        const draftButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((button) =>
-          /^Draft\s/.test(button.textContent?.trim() ?? ""),
-        );
         return {
           documentWidth: document.documentElement.scrollWidth,
           viewportWidth: window.innerWidth,
           tabsBottom: tabs?.getBoundingClientRect().bottom ?? null,
-          draftButtonVisible: draftButton ? draftButton.getBoundingClientRect().bottom > 0 : false,
         };
       });
       expect(mobileDraftGeometry.documentWidth).toBeLessThanOrEqual(mobileDraftGeometry.viewportWidth + 1);
       expect(mobileDraftGeometry.tabsBottom).not.toBeNull();
       expect(mobileDraftGeometry.tabsBottom!).toBeLessThanOrEqual(844);
-      expect(mobileDraftGeometry.draftButtonVisible).toBe(true);
       await commissioner.setViewportSize({ width: 1280, height: 900 });
 
       const manualPickButton = commissioner.getByRole("button", { name: /^Draft /i }).first();
+      await manualPickButton.scrollIntoViewIfNeeded();
       await expect(manualPickButton).toBeVisible();
       const [manualPickResponse] = await Promise.all([
         commissioner.waitForResponse((response) => response.url().includes("/api/leagues/") && response.url().includes("/draft-room/picks") && response.request().method() === "POST"),

@@ -521,11 +521,26 @@ def run_league_scoring_recalculation(
     week: int,
     provider: str = "manual",
 ) -> ScoringSummary:
-    # A scoring run is auditable only when it belongs to an existing league.
-    # Validate before inserting the run so PostgreSQL's foreign-key constraint
-    # cannot leave the caller with a failed transaction for an invalid ID.
+    # PostgreSQL correctly prevents an audit row from referencing a missing
+    # league. Preserve the failed administrative attempt as a global run
+    # instead of leaving the session in a failed transaction or losing the
+    # operational evidence entirely.
     if league_id is not None and not db.get(League, league_id):
-        raise ValueError(f"league {league_id} not found")
+        message = f"league {league_id} not found"
+        db.add(
+            ScoringRun(
+                league_id=None,
+                season=season,
+                week=week,
+                provider=provider,
+                status="failed",
+                started_at=_now(),
+                completed_at=_now(),
+                error_message=message,
+            )
+        )
+        db.commit()
+        raise ValueError(message)
 
     run = ScoringRun(
         league_id=league_id,
