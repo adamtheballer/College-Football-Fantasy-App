@@ -59,6 +59,7 @@ describe("AppShell scroll ownership", () => {
     expect(scrollArea?.className).toContain("touch-pan-y");
     expect(container.firstElementChild?.className).toContain("flex-col");
     expect(container.firstElementChild?.className).toContain("overflow-clip");
+    expect(container.firstElementChild?.className).toContain("pt-[env(safe-area-inset-top)]");
     expect(scrollArea?.className).not.toMatch(/(^|\s)h-full(\s|$)/);
   });
 
