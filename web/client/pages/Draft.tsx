@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ClipboardList, Grid3X3, History, LocateFixed, Loader2, Lock, Search, ShieldAlert, Trophy, Users } from "lucide-react";
@@ -225,6 +225,7 @@ export default function Draft() {
   const pickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
   const mobileCarouselRef = useRef<HTMLDivElement | null>(null);
   const mobilePickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
+  const [mobileCarouselInset, setMobileCarouselInset] = useState(0);
   const draftStartIntroAudioRef = useRef<HTMLAudioElement | null>(null);
   const playedDraftStartCueKeysRef = useRef<Set<string>>(new Set());
   const previousDraftStartIntroStateRef = useRef<DraftStartIntroState | null>(null);
@@ -543,6 +544,31 @@ export default function Draft() {
     : isTransition
       ? Math.min(totalPicks, Math.max(1, draftRoom?.picks.length + 1))
       : currentPick;
+  useLayoutEffect(() => {
+    if (displayPick < FIRST_CENTERED_DRAFT_PICK) {
+      setMobileCarouselInset(0);
+      return;
+    }
+
+    const updateInset = () => {
+      const rail = mobileCarouselRef.current;
+      const activeCard = mobilePickRefs.current.get(displayPick);
+      if (!rail || !activeCard) return;
+
+      const railStyle = window.getComputedStyle(rail);
+      const horizontalRailPadding =
+        Number.parseFloat(railStyle.paddingLeft) + Number.parseFloat(railStyle.paddingRight);
+      const nextInset = Math.max(0, (rail.clientWidth - horizontalRailPadding - activeCard.offsetWidth) / 2);
+      setMobileCarouselInset((currentInset) =>
+        Math.abs(currentInset - nextInset) < 0.5 ? currentInset : nextInset
+      );
+    };
+
+    updateInset();
+    window.addEventListener("resize", updateInset);
+    return () => window.removeEventListener("resize", updateInset);
+  }, [displayPick]);
+
   const totalRounds = Math.max(1, Math.ceil(totalPicks / Math.max(1, previewTeams.length)));
   const currentSlot = draftOrderPicks.find((slot) => slot.overallPick === displayPick);
   const draftProgressLabel = `Round ${currentSlot?.round ?? draftRoom?.current_round ?? 1} of ${totalRounds} · Pick ${displayPick} of ${totalPicks}`;
@@ -611,10 +637,10 @@ export default function Draft() {
     if (!displayPick || completed) return;
 
     const frame = window.requestAnimationFrame(() => {
-      centerDraftCarouselOnPick(displayPick, displayPick >= 3 ? "smooth" : "auto");
+      centerDraftCarouselOnPick(displayPick, "auto");
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [centerDraftCarouselOnPick, completed, displayPick]);
+  }, [centerDraftCarouselOnPick, completed, displayPick, mobileCarouselInset]);
 
   const makePick = async (player: DraftPlayer) => {
     if (!isLeagueFull) {
@@ -1082,10 +1108,12 @@ export default function Draft() {
             className="overflow-x-auto overscroll-x-contain scroll-smooth snap-x px-2 py-2 touch-pan-x"
           >
             <div
-              className={cn(
-                "flex min-w-max gap-1.5 pr-[calc(50%-2.6rem)]",
-                displayPick >= FIRST_CENTERED_DRAFT_PICK && "pl-[calc(50%-2.075rem)]",
-              )}
+              className="flex min-w-max gap-1.5"
+              style={
+                displayPick >= FIRST_CENTERED_DRAFT_PICK
+                  ? { paddingInline: mobileCarouselInset }
+                  : undefined
+              }
             >
               {draftOrderPicks.map((slot) => {
                 const isCurrent = !completed && slot.overallPick === displayPick;

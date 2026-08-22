@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, ClipboardList, LocateFixed, Loader2, RefreshCcw, Search, Trophy } from "lucide-react";
 
@@ -123,6 +123,7 @@ export default function SinglePlayerMockDraftRoom() {
   const pickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
   const mobileCarouselRef = useRef<HTMLDivElement | null>(null);
   const mobilePickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
+  const [mobileCarouselInset, setMobileCarouselInset] = useState(0);
   const { data: playersPayload, isLoading, isError, error: playerPoolError } = useDraftPlayerPool({
     limit: 200,
     fetchAll: true,
@@ -257,10 +258,10 @@ export default function SinglePlayerMockDraftRoom() {
   useEffect(() => {
     if (draftState.status === "complete") return;
     const frame = window.requestAnimationFrame(() => {
-      centerDraftCarouselOnPick(draftState.currentPick, draftState.currentPick >= 3 ? "smooth" : "auto");
+      centerDraftCarouselOnPick(draftState.currentPick, "auto");
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [centerDraftCarouselOnPick, draftState.currentPick, draftState.status]);
+  }, [centerDraftCarouselOnPick, draftState.currentPick, draftState.status, mobileCarouselInset]);
 
   const currentTeam = getCurrentTeam(draftState);
   const userDraftBoardTeam = useMemo(
@@ -362,6 +363,31 @@ export default function SinglePlayerMockDraftRoom() {
       }),
     [draftState.picks, draftState.teams, teamCount, totalPicks]
   );
+
+  useLayoutEffect(() => {
+    if (draftState.currentPick < FIRST_CENTERED_DRAFT_PICK) {
+      setMobileCarouselInset(0);
+      return;
+    }
+
+    const updateInset = () => {
+      const rail = mobileCarouselRef.current;
+      const activeCard = mobilePickRefs.current.get(draftState.currentPick);
+      if (!rail || !activeCard) return;
+
+      const railStyle = window.getComputedStyle(rail);
+      const horizontalRailPadding =
+        Number.parseFloat(railStyle.paddingLeft) + Number.parseFloat(railStyle.paddingRight);
+      const nextInset = Math.max(0, (rail.clientWidth - horizontalRailPadding - activeCard.offsetWidth) / 2);
+      setMobileCarouselInset((currentInset) =>
+        Math.abs(currentInset - nextInset) < 0.5 ? currentInset : nextInset
+      );
+    };
+
+    updateInset();
+    window.addEventListener("resize", updateInset);
+    return () => window.removeEventListener("resize", updateInset);
+  }, [draftState.currentPick]);
 
   const resetDraft = () => {
     const freshDraft = createRandomSinglePlayerMockDraft(Date.now(), mockSettings);
@@ -865,10 +891,12 @@ export default function SinglePlayerMockDraftRoom() {
             className="overflow-x-auto overscroll-x-contain scroll-smooth snap-x px-2 py-2 touch-pan-x"
           >
             <div
-              className={cn(
-                "flex min-w-max gap-1.5 pr-[calc(50%-2.6rem)]",
-                draftState.currentPick >= FIRST_CENTERED_DRAFT_PICK && "pl-[calc(50%-2.075rem)]",
-              )}
+              className="flex min-w-max gap-1.5"
+              style={
+                draftState.currentPick >= FIRST_CENTERED_DRAFT_PICK
+                  ? { paddingInline: mobileCarouselInset }
+                  : undefined
+              }
             >
               {draftOrderPicks.map((slot) => {
                 const isCurrent = draftState.status !== "complete" && slot.overallPick === draftState.currentPick;
