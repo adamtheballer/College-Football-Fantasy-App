@@ -141,7 +141,10 @@ test.describe("real two-manager draft lifecycle", () => {
       await manualPickButton.scrollIntoViewIfNeeded();
       await expect(manualPickButton).toBeVisible();
       const [manualPickResponse] = await Promise.all([
-        commissioner.waitForResponse((response) => response.url().includes("/api/leagues/") && response.url().includes("/draft-room/picks") && response.request().method() === "POST"),
+        // The production route is `/draft-picks`.  Waiting for the obsolete
+        // `/draft-room/picks` path makes this assertion run until the overall
+        // test timeout even though the browser already submitted the pick.
+        commissioner.waitForResponse((response) => response.url().includes("/api/leagues/") && response.url().includes("/draft-picks") && response.request().method() === "POST"),
         manualPickButton.click(),
       ]);
       expect(manualPickResponse.status()).toBe(201);
