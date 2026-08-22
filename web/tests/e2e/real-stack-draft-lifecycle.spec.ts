@@ -91,9 +91,10 @@ test.describe("real two-manager draft lifecycle", () => {
           draft_datetime_utc: new Date(Date.now() - 60_000).toISOString(),
           timezone: "America/New_York",
           draft_type: "snake",
-          // Six seconds leaves the browser test enough time to prove the
-          // manual-pick path before the lifecycle worker advances the clock.
-          pick_timer_seconds: 6,
+          // Use the supported minimum.  A shorter fixture clock can expire
+          // while a slower CI browser performs the mobile-layout assertions,
+          // turning the first intended manual pick into an auto-pick race.
+          pick_timer_seconds: 15,
         },
       });
       expect(createResponse.status).toBe(201);
