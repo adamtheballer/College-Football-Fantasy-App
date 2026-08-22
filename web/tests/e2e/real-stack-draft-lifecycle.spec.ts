@@ -91,9 +91,9 @@ test.describe("real two-manager draft lifecycle", () => {
           draft_datetime_utc: new Date(Date.now() - 60_000).toISOString(),
           timezone: "America/New_York",
           draft_type: "snake",
-          // Three seconds leaves the browser test enough time to prove the
+          // Six seconds leaves the browser test enough time to prove the
           // manual-pick path before the lifecycle worker advances the clock.
-          pick_timer_seconds: 3,
+          pick_timer_seconds: 6,
         },
       });
       expect(createResponse.status).toBe(201);
@@ -119,28 +119,11 @@ test.describe("real two-manager draft lifecycle", () => {
       await expect(commissioner.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
       await expect(manager.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
 
-      const manualPickButton = commissioner.getByRole("button", { name: /^Draft /i }).first();
-      await expect(manualPickButton).toBeVisible();
-      const [manualPickResponse] = await Promise.all([
-        commissioner.waitForResponse((response) => response.url().includes("/api/leagues/") && response.url().includes("/draft-room/picks") && response.request().method() === "POST"),
-        manualPickButton.click(),
-      ]);
-      expect(manualPickResponse.status()).toBe(201);
-
-      // Queues are intentionally client-local, but this is still a live
-      // browser assertion that the second signed-in manager can queue a
-      // backend player while waiting for their turn.
-      const queueButton = manager.getByRole("button", { name: /^Queue /i }).first();
-      await expect(queueButton).toBeVisible({ timeout: 15_000 });
-      await queueButton.click();
-      await expect(manager.getByRole("button", { name: /^Remove .+ from queue$/i }).first()).toBeVisible();
-
       // This is intentionally real-stack rather than a route-mocked visual
       // test: the release gate must prove a signed-in manager can use the
       // active multiplayer draft at the alpha phone viewport without the
       // fixed draft tabs or primary pick controls escaping the screen.
       await commissioner.setViewportSize({ width: 390, height: 844 });
-      await expect(commissioner.getByText("Pick Timer")).toBeVisible();
       const mobileDraftGeometry = await commissioner.evaluate(() => {
         const tabs = document.querySelector<HTMLElement>("[data-testid='draft-room-tabs']");
         const draftButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((button) =>
@@ -158,6 +141,22 @@ test.describe("real two-manager draft lifecycle", () => {
       expect(mobileDraftGeometry.tabsBottom!).toBeLessThanOrEqual(844);
       expect(mobileDraftGeometry.draftButtonVisible).toBe(true);
       await commissioner.setViewportSize({ width: 1280, height: 900 });
+
+      const manualPickButton = commissioner.getByRole("button", { name: /^Draft /i }).first();
+      await expect(manualPickButton).toBeVisible();
+      const [manualPickResponse] = await Promise.all([
+        commissioner.waitForResponse((response) => response.url().includes("/api/leagues/") && response.url().includes("/draft-room/picks") && response.request().method() === "POST"),
+        manualPickButton.click(),
+      ]);
+      expect(manualPickResponse.status()).toBe(201);
+
+      // Queues are intentionally client-local, but this is still a live
+      // browser assertion that the second signed-in manager can queue a
+      // backend player while waiting for their turn.
+      const queueButton = manager.getByRole("button", { name: /^Queue /i }).first();
+      await expect(queueButton).toBeVisible({ timeout: 15_000 });
+      await queueButton.click();
+      await expect(manager.getByRole("button", { name: /^Remove .+ from queue$/i }).first()).toBeVisible();
 
       await expect.poll(async () => {
         const room = await realApi<{ picks: Array<{ auto_pick: boolean }> }>(commissioner, `/leagues/${leagueId}/draft-room`);
