@@ -118,6 +118,23 @@ test.describe("real two-manager draft lifecycle", () => {
       }).toMatchObject({ status: "on_clock", current_pick: 1 });
 
       await expect(commissioner.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
+      // Submit the deliberate manual opening pick before any visual work.
+      // The draft must be on-clock to cover its live UI, but a slower CI
+      // browser can otherwise spend the entire supported 15-second fixture
+      // window resizing and measuring the viewport, converting this intended
+      // manual pick into an auto-pick before the click is attempted.
+      const manualPickButton = commissioner.getByRole("button", { name: /^Draft /i }).first();
+      await manualPickButton.scrollIntoViewIfNeeded();
+      await expect(manualPickButton).toBeVisible();
+      const [manualPickResponse] = await Promise.all([
+        // The production route is `/draft-picks`.  Waiting for the obsolete
+        // `/draft-room/picks` path makes this assertion run until the overall
+        // test timeout even though the browser already submitted the pick.
+        commissioner.waitForResponse((response) => response.url().includes("/api/leagues/") && response.url().includes("/draft-picks") && response.request().method() === "POST"),
+        manualPickButton.click(),
+      ]);
+      expect(manualPickResponse.status()).toBe(201);
+
       await expect(manager.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
 
       // This is intentionally real-stack rather than a route-mocked visual
@@ -137,18 +154,6 @@ test.describe("real two-manager draft lifecycle", () => {
       expect(mobileDraftGeometry.tabsBottom).not.toBeNull();
       expect(mobileDraftGeometry.tabsBottom!).toBeLessThanOrEqual(844);
       await commissioner.setViewportSize({ width: 1280, height: 900 });
-
-      const manualPickButton = commissioner.getByRole("button", { name: /^Draft /i }).first();
-      await manualPickButton.scrollIntoViewIfNeeded();
-      await expect(manualPickButton).toBeVisible();
-      const [manualPickResponse] = await Promise.all([
-        // The production route is `/draft-picks`.  Waiting for the obsolete
-        // `/draft-room/picks` path makes this assertion run until the overall
-        // test timeout even though the browser already submitted the pick.
-        commissioner.waitForResponse((response) => response.url().includes("/api/leagues/") && response.url().includes("/draft-picks") && response.request().method() === "POST"),
-        manualPickButton.click(),
-      ]);
-      expect(manualPickResponse.status()).toBe(201);
 
       // Queues are intentionally client-local, but this is still a live
       // browser assertion that the second signed-in manager can queue a
