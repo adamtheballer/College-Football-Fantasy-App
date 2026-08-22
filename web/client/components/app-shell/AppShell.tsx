@@ -54,7 +54,7 @@ export function AppShell({
     <div
       data-app-viewport="true"
       className={cn(
-        "isolate relative flex h-[100dvh] min-h-0 max-w-full flex-col overflow-clip bg-cfb-canvas font-sans text-cfb-text-primary selection:bg-cfb-brand/20 selection:text-cfb-text-primary lg:h-screen lg:flex-row",
+        "isolate relative flex h-[100dvh] min-h-0 max-w-full flex-col overflow-clip bg-cfb-canvas pt-[env(safe-area-inset-top)] font-sans text-cfb-text-primary selection:bg-cfb-brand/20 selection:text-cfb-text-primary lg:h-screen lg:flex-row lg:pt-0",
       )}
     >
       {!hideFloatingActions ? <FloatingQuickActions /> : null}

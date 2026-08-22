@@ -219,89 +219,39 @@ def build_league_list_current_user_summary(
 
 
 def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspaceStandingSummaryRead]:
-    latest_week = (
-        db.query(func.max(Standing.week))
-        .filter(Standing.league_id == league.id, Standing.season == league.season_year)
-        .scalar()
-    )
-    if latest_week is not None:
-        standings_rows = (
-            db.query(Standing, Team)
-            .join(Team, Team.id == Standing.team_id)
-            .filter(
-                Standing.league_id == league.id,
-                Standing.season == league.season_year,
-                Standing.week == latest_week,
-            )
-            .all()
-        )
-        ordered_rows = sorted(
-            standings_rows,
-            key=lambda row: (-row[0].wins, row[0].losses, -row[0].points_for, row[1].name),
-        )
-        return [
-            LeagueWorkspaceStandingSummaryRead(
-                team_id=standing.team_id,
-                team_name=team.name,
-                wins=standing.wins,
-                losses=standing.losses,
-                ties=standing.ties,
-                points_for=standing.points_for,
-                rank=index,
-            )
-            for index, (standing, team) in enumerate(ordered_rows, start=1)
-        ]
+    # The standings UI and playoff qualification intentionally consume the
+    # exact same deterministic ranker.  That prevents a visual ordering from
+    # disagreeing with the seed snapshot on a tied record.
+    from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings
+    from collegefootballfantasy_api.app.services.postseason_service import rank_regular_season
 
-    teams = db.query(Team).filter(Team.league_id == league.id).all()
-    team_stats = {
-        team.id: {
-            "team": team,
-            "wins": 0,
-            "losses": 0,
-            "ties": 0,
-            "points_for": 0.0,
-        }
-        for team in teams
-    }
-    matchup_rows = (
-        db.query(Matchup)
-        .filter(Matchup.league_id == league.id, Matchup.season == league.season_year)
-        .all()
+    # Ordinary standings/list reads must never create a postseason plan or
+    # turn a missing sealed calendar artifact into an application-wide outage.
+    # Once a safe plan exists it remains the authority for the playoff cut;
+    # otherwise rank every currently scheduled regular matchup and let the
+    # dedicated postseason endpoint surface its explicit certification state.
+    plan = db.query(LeaguePostseasonSettings).filter(
+        LeaguePostseasonSettings.league_id == league.id,
+        LeaguePostseasonSettings.season == league.season_year,
+    ).one_or_none()
+    through_week = plan.regular_season_end_week if plan else (
+        db.query(func.max(Matchup.week)).filter(
+            Matchup.league_id == league.id,
+            Matchup.season == league.season_year,
+        ).scalar() or 0
     )
-    for matchup in matchup_rows:
-        home_stats = team_stats.get(matchup.home_team_id)
-        away_stats = team_stats.get(matchup.away_team_id)
-        if not home_stats or not away_stats:
-            continue
-        home_stats["points_for"] += float(matchup.home_score or 0.0)
-        away_stats["points_for"] += float(matchup.away_score or 0.0)
-        if matchup.status != "final":
-            continue
-        if matchup.home_score > matchup.away_score:
-            home_stats["wins"] += 1
-            away_stats["losses"] += 1
-        elif matchup.home_score < matchup.away_score:
-            away_stats["wins"] += 1
-            home_stats["losses"] += 1
-        else:
-            home_stats["ties"] += 1
-            away_stats["ties"] += 1
-
-    ordered_rows = sorted(
-        team_stats.values(),
-        key=lambda row: (-row["wins"], row["losses"], -row["points_for"], row["team"].name),
-    )
+    ranked = rank_regular_season(db, league, through_week)
     return [
         LeagueWorkspaceStandingSummaryRead(
-            team_id=row["team"].id,
-            team_name=row["team"].name,
-            wins=int(row["wins"]),
-            losses=int(row["losses"]),
-            ties=int(row["ties"]),
-            points_for=float(row["points_for"]),
-            rank=index,
+            team_id=item.team.id,
+            team_name=item.team.name,
+            wins=item.wins,
+            losses=item.losses,
+            ties=item.ties,
+            points_for=item.points_for,
+            rank=item.rank,
         )
-        for index, row in enumerate(ordered_rows, start=1)
+        for item in ranked
     ]
 
 

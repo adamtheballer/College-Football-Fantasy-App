@@ -3,6 +3,7 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.core.config import settings
@@ -17,6 +18,7 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
+from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.league_flow import (
@@ -53,7 +55,7 @@ FIXED_ROSTER_SLOTS = {
 # roster or a different processing window.
 BETA_LEAGUE_CREATION_DEFAULTS = {
     "waiver_period_hours": 24,
-    "waiver_processing_weekday": 1,
+    "waiver_processing_weekday": 6,
     "waiver_processing_hour": 8,
     "waiver_timezone": "America/New_York",
     "faab_starting_budget": 100,
@@ -266,6 +268,12 @@ def create_league(
     payload.basics.icon_url = moderate_user_url(
         db, actor_user_id=current_user.id, field_name="league_icon_url", value=payload.basics.icon_url
     )
+    from collegefootballfantasy_api.app.services.postseason_service import validate_playoff_team_count
+
+    try:
+        validate_playoff_team_count(playoff_teams=payload.settings.playoff_teams, max_teams=payload.basics.max_teams)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     payload.settings = normalize_roster_settings(
         apply_beta_league_creation_defaults(payload.settings),
         enforce_beta_kicker_scoring=settings.beta_scoring_lock_enabled,
@@ -372,6 +380,14 @@ def create_league(
 
 
 def join_league(db: Session, league: League, current_user: User) -> LeagueDetailRead:
+    # The membership count is a capacity invariant, not advisory UI state.
+    # Lock the single league row before reading it so two final-seat requests
+    # cannot both observe the same available slot and overfill the league.
+    # PostgreSQL releases the lock only after this transaction commits or rolls
+    # back; the second request then re-counts committed memberships.
+    league = db.execute(
+        select(League).where(League.id == league.id).with_for_update()
+    ).scalar_one()
     existing = (
         db.query(LeagueMember)
         .filter(LeagueMember.league_id == league.id, LeagueMember.user_id == current_user.id)
@@ -434,6 +450,13 @@ def update_league_settings(
     payload: LeagueSettingsUpdate,
     current_user: User,
 ) -> LeagueDetailRead:
+    from collegefootballfantasy_api.app.models.postseason import PostseasonBracket
+    from collegefootballfantasy_api.app.services.postseason_service import validate_playoff_team_count
+
+    try:
+        validate_playoff_team_count(playoff_teams=payload.playoff_teams, max_teams=league.max_teams)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     settings_row = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
     if not settings_row:
         settings_row = LeagueSettings(league_id=league.id)
@@ -451,6 +474,28 @@ def update_league_settings(
         )
     settings_row.scoring_json = payload.scoring_json
     settings_row.roster_slots_json = payload.roster_slots_json
+    bracket = db.query(PostseasonBracket).filter(
+        PostseasonBracket.league_id == league.id,
+        PostseasonBracket.season == league.season_year,
+    ).one_or_none()
+    if bracket and bracket.status in {"LOCKED", "ACTIVE", "FINALIZING", "COMPLETED", "REVIEW_REQUIRED"} and payload.playoff_teams != settings_row.playoff_teams:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="playoff settings are locked for this season")
+    playoff_count_changed = payload.playoff_teams != settings_row.playoff_teams
+    existing_matchups = []
+    if playoff_count_changed:
+        existing_matchups = db.query(Matchup).filter(
+            Matchup.league_id == league.id,
+            Matchup.season == league.season_year,
+        ).all()
+        has_started_competition = any(
+            (matchup.status or "").lower() in {"live", "in_progress", "final", "completed", "stat_corrected"}
+            for matchup in existing_matchups
+        )
+        if has_started_competition:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="playoff settings lock once the first regular-season matchup starts",
+            )
     settings_row.playoff_teams = payload.playoff_teams
     settings_row.waiver_type = payload.waiver_type
     if payload.waiver_period_hours is not None:
@@ -480,6 +525,23 @@ def update_league_settings(
     settings_row.kicker_enabled = payload.kicker_enabled
     settings_row.defense_enabled = payload.defense_enabled
     db.add(settings_row)
+    if playoff_count_changed:
+        from collegefootballfantasy_api.app.services.postseason_service import refresh_postseason_settings_calendar
+        from collegefootballfantasy_api.app.services.season_calendar import SeasonCalendarCoverageError
+
+        db.flush()
+        if existing_matchups:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="playoff format cannot change after a regular-season schedule exists; review the calendar audit first",
+            )
+        try:
+            refresh_postseason_settings_calendar(db, league, playoff_teams=payload.playoff_teams)
+        except SeasonCalendarCoverageError:
+            # Preserve the commissioner's selection while refusing to create
+            # unproven schedule rows. Once certification is available, draft
+            # finalization is the only path that creates the calendar.
+            pass
     db.commit()
     return get_league_detail(db, league, viewer=current_user)
 

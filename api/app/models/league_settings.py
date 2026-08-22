@@ -28,8 +28,8 @@ class LeagueSettings(TimestampMixin, Base):
     playoff_teams: Mapped[int] = mapped_column(Integer, default=4)
     waiver_type: Mapped[str] = mapped_column(String(50), nullable=False, default="faab")
     waiver_period_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24)
-    # Python weekday: Monday=0, Tuesday=1. Tuesday begins each CFB fantasy week.
-    waiver_processing_weekday: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # Python weekday: Monday=0, Sunday=6. Sunday is the weekly waiver clear.
+    waiver_processing_weekday: Mapped[int] = mapped_column(Integer, nullable=False, default=6)
     waiver_processing_hour: Mapped[int] = mapped_column(Integer, nullable=False, default=8)
     waiver_timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="America/New_York")
     next_waiver_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

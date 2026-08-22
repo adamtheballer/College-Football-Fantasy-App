@@ -19,6 +19,13 @@ class DynastyCareerResponse(BaseModel):
     total_points_scored: float
     years_played: int
     dynasty_power_rating: float
+    playoff_appearances: int = 0
+    championship_appearances: int = 0
+    runner_up_finishes: int = 0
+    third_place_finishes: int = 0
+    top_three_finishes: int = 0
+    postseason_wins: int = 0
+    postseason_losses: int = 0
 
 
 class RivalryRow(BaseModel):
@@ -50,4 +57,3 @@ class UserAnalyticsRow(BaseModel):
 class UserAnalyticsList(BaseModel):
     data: list[UserAnalyticsRow]
     total: int
-

@@ -1,4 +1,5 @@
 import { apiPost } from "@/lib/api";
+import { Capacitor } from "@capacitor/core";
 
 type OneSignalClient = {
   init: (options: Record<string, unknown>) => Promise<void>;
@@ -11,6 +12,26 @@ type OneSignalClient = {
       addEventListener?: (
         event: "change",
         listener: (event: { current?: { id?: string | null } }) => void,
+      ) => void;
+    };
+  };
+};
+
+type NativeOneSignalClient = {
+  initialize: (appId: string) => Promise<void>;
+  login: (externalId: string) => Promise<void>;
+  logout: () => Promise<void>;
+  Notifications: {
+    hasPermission: () => Promise<boolean>;
+    requestPermission: (fallbackToSettings?: boolean) => Promise<boolean>;
+    canRequestPermission: () => Promise<boolean>;
+  };
+  User: {
+    pushSubscription: {
+      getIdAsync: () => Promise<string | null>;
+      addEventListener?: (
+        event: "change",
+        listener: (event: { current?: { id?: string } }) => void,
       ) => void;
     };
   };
@@ -30,6 +51,9 @@ let initialized = false;
 let readyClient: OneSignalClient | null = null;
 let activePushUserId: number | null = null;
 let observedPushClient: OneSignalClient | null = null;
+let nativeLoader: Promise<NativeOneSignalClient> | null = null;
+let nativeInitialized = false;
+let observedNativePushClient: NativeOneSignalClient | null = null;
 let registeredSubscriptionKey: string | null = null;
 let registrationInFlight: Promise<void> | null = null;
 let registrationInFlightKey: string | null = null;
@@ -43,8 +67,30 @@ const isIosHomeScreenWebApp = (): boolean => {
   return navigatorWithStandalone.standalone === true || window.matchMedia?.("(display-mode: standalone)").matches === true;
 };
 
+const isNativeApp = (): boolean => Capacitor.isNativePlatform();
+
+const loadNativeOneSignal = async (): Promise<NativeOneSignalClient> => {
+  if (!nativeLoader) {
+    nativeLoader = import("@onesignal/capacitor-plugin").then((module) => module.default as NativeOneSignalClient);
+  }
+  return nativeLoader;
+};
+
+const withNativeOneSignal = async <T>(callback: (client: NativeOneSignalClient) => Promise<T>): Promise<T> => {
+  if (!appId) throw new Error("Push notifications are not configured for this app.");
+  const client = await loadNativeOneSignal();
+  if (!nativeInitialized) {
+    await client.initialize(appId);
+    nativeInitialized = true;
+  }
+  return callback(client);
+};
+
 export const getBrowserPushState = (): BrowserPushState => {
   if (!appId) return "unconfigured";
+  // Native permission is asynchronous. The settings panel resolves it after
+  // mount; default here keeps its first render deterministic and web-safe.
+  if (isNativeApp()) return "default";
   if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
     return "unsupported";
   }
@@ -53,6 +99,16 @@ export const getBrowserPushState = (): BrowserPushState => {
   // expose the generic browser APIs but cannot complete a usable push setup.
   if (!isIosHomeScreenWebApp()) return "unsupported";
   return Notification.permission;
+};
+
+export const resolvePushState = async (): Promise<BrowserPushState> => {
+  if (!isNativeApp()) return getBrowserPushState();
+  if (!appId) return "unconfigured";
+  try {
+    return (await withNativeOneSignal((client) => client.Notifications.hasPermission())) ? "granted" : "default";
+  } catch {
+    return "unsupported";
+  }
 };
 
 const loadSdk = () => {
@@ -102,7 +158,11 @@ const withOneSignal = async <T>(callback: (client: OneSignalClient) => Promise<T
 
 const stableExternalId = (userId: number) => `cfb_user:${userId}`;
 
-const registerPushSubscription = async (userId: number, subscriptionId: string | null | undefined): Promise<void> => {
+const registerPushSubscription = async (
+  userId: number,
+  subscriptionId: string | null | undefined,
+  platform: "web" | "ios" = "web",
+): Promise<void> => {
   if (!subscriptionId) return;
   const key = `${userId}:${subscriptionId}`;
   if (registeredSubscriptionKey === key) return;
@@ -111,7 +171,7 @@ const registerPushSubscription = async (userId: number, subscriptionId: string |
   registrationInFlightKey = key;
   registrationInFlight = apiPost("/notifications/tokens", {
     subscription_id: subscriptionId,
-    platform: "web",
+    platform,
     provider: "onesignal",
   })
     .then(() => {
@@ -124,6 +184,20 @@ const registerPushSubscription = async (userId: number, subscriptionId: string |
       }
     });
   return registrationInFlight;
+};
+
+const observeNativePushSubscription = (client: NativeOneSignalClient, userId: number) => {
+  activePushUserId = userId;
+  if (observedNativePushClient === client || !client.User.pushSubscription.addEventListener) return;
+
+  observedNativePushClient = client;
+  client.User.pushSubscription.addEventListener("change", (event) => {
+    const currentUserId = activePushUserId;
+    if (currentUserId === null) return;
+    void registerPushSubscription(currentUserId, event.current?.id, "ios").catch(() => {
+      // A later foreground launch retries registration from the authoritative SDK state.
+    });
+  });
 };
 
 const observePushSubscription = (client: OneSignalClient, userId: number) => {
@@ -149,6 +223,17 @@ const observePushSubscription = (client: OneSignalClient, userId: number) => {
  * directly inside the button gesture, not after SDK loading or login awaits.
  */
 export const prepareBrowserPush = async (userId: number): Promise<void> => {
+  if (isNativeApp()) {
+    if (!appId) return;
+    await withNativeOneSignal(async (client) => {
+      await client.login(stableExternalId(userId));
+      observeNativePushSubscription(client, userId);
+      if (await client.Notifications.hasPermission()) {
+        await registerPushSubscription(userId, await client.User.pushSubscription.getIdAsync(), "ios");
+      }
+    });
+    return;
+  }
   const initialState = getBrowserPushState();
   if (initialState === "denied" || initialState === "unsupported" || initialState === "unconfigured") return;
   await withOneSignal(async (client) => {
@@ -158,6 +243,24 @@ export const prepareBrowserPush = async (userId: number): Promise<void> => {
 };
 
 export const enableBrowserPush = async (userId: number): Promise<BrowserPushState> => {
+  if (isNativeApp()) {
+    if (!appId) return "unconfigured";
+    try {
+      return await withNativeOneSignal(async (client) => {
+        activePushUserId = userId;
+        await client.login(stableExternalId(userId));
+        observeNativePushSubscription(client, userId);
+        const granted = await client.Notifications.hasPermission() || await client.Notifications.requestPermission(false);
+        if (granted) {
+          await registerPushSubscription(userId, await client.User.pushSubscription.getIdAsync(), "ios");
+          return "granted";
+        }
+        return (await client.Notifications.canRequestPermission()) ? "default" : "denied";
+      });
+    } catch {
+      return "unsupported";
+    }
+  }
   const initialState = getBrowserPushState();
   if (initialState === "denied" || initialState === "unsupported" || initialState === "unconfigured") return initialState;
   const client = readyClient;
@@ -203,6 +306,17 @@ export const clearBrowserPushIdentity = (): void => {
     } catch {
       // Local logout and provider cleanup must remain best effort when the
       // API is unavailable; the active row remains protected until detach.
+    }
+    if (isNativeApp()) {
+      if (!appId) return;
+      try {
+        await withNativeOneSignal(async (client) => {
+          await client.logout();
+        });
+      } catch {
+        // Native identity cleanup remains best effort during local logout.
+      }
+      return;
     }
     if (getBrowserPushState() !== "granted") return;
     try {

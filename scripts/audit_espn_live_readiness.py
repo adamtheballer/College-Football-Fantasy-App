@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
 from collegefootballfantasy_api.app.db.session import SessionLocal
+from collegefootballfantasy_api.app.services.readiness import get_canonical_alembic_head
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
@@ -271,10 +272,11 @@ def main() -> None:
     ensure_models_registered()
     with SessionLocal() as db:
         revision = db.execute(text("select version_num from alembic_version")).scalar_one_or_none()
-        if revision != "0101_injury_notification_scope":
+        expected_revision = get_canonical_alembic_head()
+        if revision != expected_revision:
             raise SystemExit(
                 "Refusing readiness audit: database must be migrated to "
-                "0101_injury_notification_scope before its player/game identity data can be certified."
+                f"{expected_revision} before its player/game identity data can be certified."
             )
         report = build_readiness_report(db, season=args.season, event_fixture=args.event_fixture)
     rendered = json.dumps(report, indent=2, sort_keys=True)

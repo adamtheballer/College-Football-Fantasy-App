@@ -117,6 +117,18 @@ describe("RosterSlotTable", () => {
     expect(liveProjectionDetail(liveReceiver)).toBe("Proj 16.7");
   });
 
+  it("marks a finalized player game with a compact lock", () => {
+    const finalReceiver = {
+      ...projectedReceiver,
+      live_game_state: "final" as const,
+      current_fantasy_points: 17.8,
+    };
+    render(<RosterSlotTable title="Starters" players={[finalReceiver]} pointMode="live" />);
+
+    expect(screen.getByLabelText("Game final")).toBeTruthy();
+    expect(screen.getByText("17.8")).toBeTruthy();
+  });
+
   it("preserves stale live values and explicitly labels the delayed data", () => {
     const staleReceiver = {
       ...projectedReceiver,

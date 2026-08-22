@@ -1,21 +1,28 @@
-# Alpha Open-PR Audit
+# Alpha Open Pull Request Audit
 
-Audited against `main` at `48153f7f9854efc27095d52d0efe629d751f8789` on 2026-08-21.
+Baseline inspected: `main` at `14a1a95f2eea6aeb84b25dc9d3d48fe817e81556` on 2026-08-21.
 
-None of the open pull requests is safe to merge into the final hardening
-branch. They remain open for historical review only; this audit does not
-close, merge, or otherwise modify them.
+The release candidate is the single integration point. Older draft pull requests
+must not be merged merely because they contain a passing historical check.
 
-| PR | Classification | Reason | Alpha disposition |
-| --- | --- | --- | --- |
-| [#116](https://github.com/adamtheballer/College-Football-Fantasy-App/pull/116) | STALE / OPTIONAL | Draft-only ESPN identity import utility and test; current scoring and identity implementation landed later. | Do not merge. Re-evaluate as a narrowly scoped post-alpha data-quality change. |
-| [#91](https://github.com/adamtheballer/College-Football-Fantasy-App/pull/91) | SUPERSEDED | Earlier ESPN schedule-authority change predates the current durable scoring worker and verified schedule-window path. | Do not merge. |
-| [#71](https://github.com/adamtheballer/College-Football-Fantasy-App/pull/71) | UNSAFE / SUPERSEDED | Carries an obsolete career/rivalry implementation and a conflicting `0091` migration lineage. Current career and rivalry work is already on `main`. | Do not merge. |
-| [#70](https://github.com/adamtheballer/College-Football-Fantasy-App/pull/70) | UNSAFE / SUPERSEDED | Earlier ESPN shadow-scoring stack includes obsolete migrations and duplicate scoring paths. | Do not merge. |
-| [#69](https://github.com/adamtheballer/College-Football-Fantasy-App/pull/69) | UNSAFE / SUPERSEDED | Earlier production scoring hardening also contains obsolete `0091`/`0092` migrations and duplicate scoring implementation. | Do not merge. |
-| [#67](https://github.com/adamtheballer/College-Football-Fantasy-App/pull/67) | OPTIONAL / STALE | Vercel analytics is not an alpha launch requirement; GitHub reports a diff too large for safe last-minute incorporation. | Do not merge. |
-| [#45](https://github.com/adamtheballer/College-Football-Fantasy-App/pull/45) | STALE / RISKY | Older auth-entry navigation changes predate the current session and profile updates. | Do not merge. |
-| [#35](https://github.com/adamtheballer/College-Football-Fantasy-App/pull/35) | STALE / RISKY | Old beta shell, deployment, and navigation work overlaps later UI and runtime releases. | Do not merge. |
-| [#31](https://github.com/adamtheballer/College-Football-Fantasy-App/pull/31) | SUPERSEDED | Public-home UI predates current mobile shell and app routing. | Do not merge. |
-| [#29](https://github.com/adamtheballer/College-Football-Fantasy-App/pull/29) | OPTIONAL | Controlled player enrichment is not required to safely release current data; it needs a separate source-data audit. | Do not merge. |
-| [#23](https://github.com/adamtheballer/College-Football-Fantasy-App/pull/23) | STALE / RISKY | Old release diagnostics/configuration overlaps current runtime provenance and deployment contracts. | Do not merge. |
+| PR | Classification | Release disposition |
+| --- | --- | --- |
+| #161 — Final alpha certification | ALPHA REQUIRED | Canonical draft RC. It contains the current repaired implementation and is the only candidate for a future `main` merge. |
+| #160 — League playoffs | ALREADY INCLUDED | Its current approved work is already incorporated in the RC ancestry. The original `verify` failure is repaired in the RC, not by merging the stale PR head. |
+| #155 | ALREADY INCLUDED | Included by the RC ancestry; do not merge separately. |
+| #154 | SUPERSEDED | The intended provider-disclosure navigation removal remains, while the required public direct route was restored in the RC. |
+| #116 | STALE | Superseded by later current route, mobile, and certification work. |
+| #91 | SUPERSEDED | Later career/profile implementation is canonical. |
+| #71 | UNSAFE | Historical CI failures and stale integration assumptions make it unsuitable for release merge. |
+| #70 | UNSAFE | Historical CI failures and stale integration assumptions make it unsuitable for release merge. |
+| #69 | UNSAFE | Old migration/integration work must not be imported into the current Alembic chain. |
+| #45 | STALE | Historical test/runtime failure and later superseding work. |
+| #35 | STALE | Old work superseded by the current implementation. |
+| #31 | SUPERSEDED | Replaced by later canonical UI/workflow changes. |
+| #29 | OPTIONAL | Not alpha-required; defer until after the release freeze. |
+| #23 | STALE | Historical work no longer matches the current architecture. |
+
+After a successful RC merge and deployment verification, close or archive each
+non-canonical draft with a link to the merged RC. This avoids accidentally
+reintroducing retired implementations of live scoring, Rival Week, profile
+state, navigation, or player enrichment.

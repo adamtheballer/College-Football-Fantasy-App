@@ -22,6 +22,8 @@ def test_production_manifest_covers_runtime_startup_requirements():
         "REFRESH_COOKIE_SECURE",
         "EMAIL_ENABLED",
         "SCORING_MODE",
+        "SCORING_PROVIDER",
+        "SCORING_WORKER_INTERVAL_LIVE_SECONDS",
     }.issubset(required_env)
 
     safety_gates = production["safety_gates"]
@@ -59,8 +61,11 @@ def test_production_manifest_starts_required_lifecycle_workers_before_promotion(
     ]
     assert production["release_source"]["canonical_id_owner"] == "application_database_players_id"
     assert production["release_source"]["source_snapshot_directory"] == "reports/source-imports/2026"
-    assert production["scoring"]["mode"] == "disabled"
-    assert production["scoring"]["provider_polling"] is False
-    assert production["scoring"]["worker_deployed"] is False
-    assert production["workers"]["scoring_processor"]["enabled"] is False
+    assert production["scoring"] == {
+        "mode": "enabled",
+        "provider": "espn",
+        "provider_polling": True,
+        "worker_deployed": True,
+    }
+    assert production["workers"]["scoring_processor"]["enabled"] is True
     assert production["workers"]["lifecycle_processor"]["enabled"] is True

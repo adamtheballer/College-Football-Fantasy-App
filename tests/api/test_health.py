@@ -2,6 +2,8 @@
 import subprocess
 import sys
 
+import collegefootballfantasy_api.app.services.readiness as readiness_service
+import pytest
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import text
@@ -11,6 +13,7 @@ from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.services.readiness import (
     DEFAULT_ALEMBIC_INI,
     check_alembic_readiness,
+    get_canonical_alembic_head,
     get_alembic_heads,
 )
 
@@ -28,6 +31,27 @@ def test_all_alembic_revisions_fit_the_legacy_version_column():
     oversized = [revision.revision for revision in script.walk_revisions() if len(revision.revision) > 32]
 
     assert oversized == []
+
+
+def test_canonical_alembic_head_matches_the_only_repository_head():
+    heads = get_alembic_heads()
+
+    assert len(heads) == 1
+    assert get_canonical_alembic_head() == heads[0]
+
+
+def test_canonical_alembic_head_fails_closed_for_ambiguous_history(monkeypatch):
+    monkeypatch.setattr(readiness_service, "get_alembic_heads", lambda _path: ["branch_a", "branch_b"])
+
+    with pytest.raises(ValueError, match="multiple heads"):
+        get_canonical_alembic_head()
+
+
+def test_canonical_alembic_head_fails_closed_for_missing_history(monkeypatch):
+    monkeypatch.setattr(readiness_service, "get_alembic_heads", lambda _path: [])
+
+    with pytest.raises(ValueError, match="no heads"):
+        get_canonical_alembic_head()
 
 
 def test_health(client):
@@ -209,3 +233,15 @@ def test_check_alembic_head_script_passes_and_fails(tmp_path):
 
     assert failed.returncode == 1
     assert '"migrations": "out_of_date"' in failed.stdout
+
+
+def test_current_alembic_head_script_prints_the_repository_head():
+    result = subprocess.run(
+        [sys.executable, "scripts/current_alembic_head.py"],
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout.strip() == get_canonical_alembic_head()

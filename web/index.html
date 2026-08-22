@@ -2,7 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Capacitor renders beneath the iPhone status bar. `viewport-fit=cover`
+      exposes the native safe-area insets so the shared app shell can reserve
+      that space for every route instead of letting the first header render
+      behind the system UI.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>College Fantasy Football</title>

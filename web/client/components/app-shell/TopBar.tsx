@@ -13,7 +13,7 @@ export function TopBar({ isLoggedIn, user }: TopBarProps) {
   return (
     <header
       id="app-header"
-      className="sticky top-0 z-[120] border-b border-cfb-border-subtle bg-cfb-sidebar px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-3 lg:px-8"
+      className="sticky top-0 z-[120] border-b border-cfb-border-subtle bg-cfb-sidebar px-4 py-3 sm:px-6 lg:px-8"
     >
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">

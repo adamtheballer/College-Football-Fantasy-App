@@ -18,9 +18,10 @@ describe("LeagueTabs", () => {
 
     const labels = screen.getAllByRole("link").map((link) => link.textContent);
 
-    expect(labels).toEqual(["Roster", "Matchup", "Players", "Watchlist", "League"]);
+    expect(labels).toEqual(["Roster", "Matchup", "Players", "Playoffs", "Watchlist", "League"]);
     expect(screen.getByRole("link", { name: "Players" }).getAttribute("href")).toBe("/league/42/waivers");
     expect(screen.getByRole("link", { name: "Watchlist" }).getAttribute("href")).toBe("/league/42/watchlist");
+    expect(screen.getByRole("link", { name: "Playoffs" }).getAttribute("href")).toBe("/league/42/playoffs");
     expect(screen.getByRole("link", { name: "League" }).getAttribute("href")).toBe("/league/42/settings");
     expect(screen.queryByRole("link", { name: "Waivers" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Settings" })).toBeNull();

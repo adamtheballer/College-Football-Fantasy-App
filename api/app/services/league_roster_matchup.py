@@ -20,6 +20,7 @@ from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_waiver_availability import PlayerWaiverAvailability
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
+from collegefootballfantasy_api.app.models.postseason import PostseasonMatchup
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.standing import Standing
@@ -36,6 +37,7 @@ from collegefootballfantasy_api.app.crud.projection import current_published_pro
 from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueMatchupTabRead,
     LiveScoringFreshnessRead,
+    PostseasonMatchupContextRead,
     LeagueInviteSettingsRead,
     LeagueMemberRead,
     LeagueRosterTabRead,
@@ -768,9 +770,11 @@ def build_matchup_tab_view(
             relevant_game_count=freshness.relevant_game_count,
         )
     viewer_team = _owned_team(db, league, user)
+    postseason_node: PostseasonMatchup | None = None
     if matchup_id is not None:
-        matchup = (
-            db.query(Matchup)
+        matchup_result = (
+            db.query(Matchup, PostseasonMatchup)
+            .outerjoin(PostseasonMatchup, PostseasonMatchup.fantasy_matchup_id == Matchup.id)
             .filter(
                 Matchup.id == matchup_id,
                 Matchup.league_id == league.id,
@@ -779,12 +783,14 @@ def build_matchup_tab_view(
             )
             .first()
         )
+        matchup, postseason_node = matchup_result if matchup_result else (None, None)
         primary_team = db.get(Team, matchup.home_team_id) if matchup else None
         opponent = db.get(Team, matchup.away_team_id) if matchup else None
     else:
         primary_team = viewer_team
-        matchup = (
-            db.query(Matchup)
+        matchup_result = (
+            db.query(Matchup, PostseasonMatchup)
+            .outerjoin(PostseasonMatchup, PostseasonMatchup.fantasy_matchup_id == Matchup.id)
             .filter(
                 Matchup.league_id == league.id,
                 Matchup.season == league.season_year,
@@ -795,6 +801,7 @@ def build_matchup_tab_view(
             if primary_team
             else None
         )
+        matchup, postseason_node = matchup_result if matchup_result else (None, None)
         opponent_id = (
             matchup.away_team_id if matchup and matchup.home_team_id == primary_team.id else matchup.home_team_id
             if matchup and primary_team
@@ -843,6 +850,17 @@ def build_matchup_tab_view(
             live_scoring_freshness=freshness_read,
             message="No matchup generated yet.",
         )
+
+    postseason_context = (
+        PostseasonMatchupContextRead(
+            bracket_id=postseason_node.bracket_id,
+            matchup_type=postseason_node.matchup_type,
+            bracket_path=postseason_node.bracket_path,
+            status=postseason_node.status,
+        )
+        if postseason_node is not None
+        else None
+    )
 
     roster_by_team = _serialize_team_rosters(
         db,
@@ -924,6 +942,7 @@ def build_matchup_tab_view(
         next_refresh_at=(provider_snapshot_at + timedelta(seconds=180)) if provider_snapshot_at else None,
         message=None,
         rivalry=matchup_rivalry_context(db, league, matchup, primary_team, opponent),
+        postseason=postseason_context,
     )
 
 
@@ -1119,7 +1138,7 @@ def build_waivers_view(
             "faab_budget": settings.faab_starting_budget if settings else 100,
             "allow_zero_faab_bids": settings.allow_zero_faab_bids if settings else True,
             "reveal_all_waiver_bids": settings.reveal_all_waiver_bids if settings else False,
-            "processing_weekday": settings.waiver_processing_weekday if settings else 1,
+            "processing_weekday": settings.waiver_processing_weekday if settings else 6,
             "processing_hour": settings.waiver_processing_hour if settings else 8,
             "timezone": settings.waiver_timezone if settings else "America/New_York",
             "post_drop_waiver_hours": settings.post_drop_waiver_hours if settings else 24,
@@ -1133,7 +1152,18 @@ def build_waivers_view(
 
 
 def build_settings_view(db: Session, league: League, user: User) -> LeagueSettingsViewRead:
+    from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings
+    from collegefootballfantasy_api.app.services.postseason_topology import required_rounds
+
     settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
+    postseason_settings = (
+        db.query(LeaguePostseasonSettings)
+        .filter(
+            LeaguePostseasonSettings.league_id == league.id,
+            LeaguePostseasonSettings.season == league.season_year,
+        )
+        .one_or_none()
+    )
     members = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).all()
     teams = db.query(Team).filter(Team.league_id == league.id).order_by(Team.id.asc()).all()
     teams_by_id = {team.id: team for team in teams}
@@ -1270,6 +1300,23 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
             "is_private": league.is_private,
             "commissioner_user_id": league.commissioner_user_id,
         },
+        postseason_calendar=(
+            {
+                "regular_season_start_week": postseason_settings.regular_season_start_week,
+                "regular_season_end_week": postseason_settings.regular_season_end_week,
+                "playoff_start_week": postseason_settings.playoff_start_week,
+                "championship_week": postseason_settings.championship_week,
+                "playoff_teams": postseason_settings.playoff_team_count,
+                "max_rounds": required_rounds(postseason_settings.playoff_team_count),
+                "calendar_policy_version": postseason_settings.calendar_policy_version,
+                "source_identity": postseason_settings.calendar_source_identity,
+                "source_revision": postseason_settings.calendar_source_revision,
+                "source_sha256": postseason_settings.calendar_source_sha256,
+                "source_format_version": postseason_settings.calendar_source_format_version,
+            }
+            if postseason_settings is not None
+            else None
+        ),
         invite=invite,
         members=[LeagueMemberRead.model_validate(member) for member in members],
         teams=[

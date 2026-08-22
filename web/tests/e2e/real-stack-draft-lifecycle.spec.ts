@@ -57,7 +57,7 @@ test.describe("real two-manager draft lifecycle", () => {
   test.skip(!realStackEnabled, "Run through npm run test:e2e:real against the isolated Compose stack.");
   test.setTimeout(220_000);
 
-  test("enforces the standard beta roster and keeps two signed-in managers synchronized through timeout auto-picks", async ({ browser }) => {
+  test("enforces the standard beta roster and keeps two signed-in managers synchronized through manual picks, queues, and timeout auto-picks", async ({ browser }) => {
     const commissionerContext = await browser.newContext();
     const managerContext = await browser.newContext();
     const commissioner = await commissionerContext.newPage();
@@ -91,7 +91,9 @@ test.describe("real two-manager draft lifecycle", () => {
           draft_datetime_utc: new Date(Date.now() - 60_000).toISOString(),
           timezone: "America/New_York",
           draft_type: "snake",
-          pick_timer_seconds: 1,
+          // Leave enough time for the deliberately human opening pick while
+          // still exercising the production timeout worker twice below.
+          pick_timer_seconds: 30,
         },
       });
       expect(createResponse.status).toBe(201);
@@ -114,8 +116,61 @@ test.describe("real two-manager draft lifecycle", () => {
         return room.body;
       }).toMatchObject({ status: "on_clock", current_pick: 1 });
 
-      await expect(commissioner.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
+      const openingRoom = await realApi<{
+        status: string;
+        current_pick: number;
+        current_team_id: number | null;
+        user_team_id: number | null;
+      }>(commissioner, `/leagues/${leagueId}/draft-room`);
+      expect(openingRoom.status).toBe(200);
+      expect(openingRoom.body).toMatchObject({ status: "on_clock", current_pick: 1 });
+
+      const openingPicker = openingRoom.body.current_team_id === openingRoom.body.user_team_id ? commissioner : manager;
+      await expect(openingPicker.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
+      // Submit the deliberate manual opening pick before any visual work.
+      // The draft must be on-clock to cover its live UI.  The opening order is
+      // random, so the test must act through the browser context that owns the
+      // active team rather than assuming the commissioner holds pick one.
+      const manualPickButton = openingPicker.getByRole("button", { name: /^Draft /i }).first();
+      await manualPickButton.scrollIntoViewIfNeeded();
+      await expect(manualPickButton).toBeVisible();
+      await expect(manualPickButton).toBeEnabled();
+      const [manualPickResponse] = await Promise.all([
+        // The production route is `/draft-picks`.  Waiting for the obsolete
+        // `/draft-room/picks` path makes this assertion run until the overall
+        // test timeout even though the browser already submitted the pick.
+        openingPicker.waitForResponse((response) => response.url().includes("/api/leagues/") && response.url().includes("/draft-picks") && response.request().method() === "POST"),
+        manualPickButton.click(),
+      ]);
+      expect(manualPickResponse.status()).toBe(201);
+
       await expect(manager.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
+
+      // This is intentionally real-stack rather than a route-mocked visual
+      // test: the release gate must prove a signed-in manager can use the
+      // active multiplayer draft at the alpha phone viewport without the
+      // fixed draft tabs escaping the screen or any horizontal overflow.
+      await commissioner.setViewportSize({ width: 390, height: 844 });
+      const mobileDraftGeometry = await commissioner.evaluate(() => {
+        const tabs = document.querySelector<HTMLElement>("[data-testid='draft-room-tabs']");
+        return {
+          documentWidth: document.documentElement.scrollWidth,
+          viewportWidth: window.innerWidth,
+          tabsBottom: tabs?.getBoundingClientRect().bottom ?? null,
+        };
+      });
+      expect(mobileDraftGeometry.documentWidth).toBeLessThanOrEqual(mobileDraftGeometry.viewportWidth + 1);
+      expect(mobileDraftGeometry.tabsBottom).not.toBeNull();
+      expect(mobileDraftGeometry.tabsBottom!).toBeLessThanOrEqual(844);
+      await commissioner.setViewportSize({ width: 1280, height: 900 });
+
+      // Queues are intentionally client-local, but this is still a live
+      // browser assertion that the second signed-in manager can queue a
+      // backend player while waiting for their turn.
+      const queueButton = manager.getByRole("button", { name: /^Queue /i }).first();
+      await expect(queueButton).toBeVisible({ timeout: 15_000 });
+      await queueButton.click();
+      await expect(manager.getByRole("button", { name: /^Remove .+ from queue$/i }).first()).toBeVisible();
 
       await expect.poll(async () => {
         const room = await realApi<{ picks: Array<{ auto_pick: boolean }> }>(commissioner, `/leagues/${leagueId}/draft-room`);
@@ -142,14 +197,16 @@ test.describe("real two-manager draft lifecycle", () => {
         BENCH: 5,
         IR: 1,
       });
-      // The lifecycle worker can legitimately advance another one-second turn
-      // while the two browser contexts fetch their snapshots. The contract is
-      // that both managers observe the same unique sequence after at least two
-      // timeout picks, not that network timing freezes the sequence at two.
-      expect(room.body.picks.length).toBeGreaterThanOrEqual(2);
+      // The lifecycle worker can legitimately advance another three-second
+      // turn while the two browser contexts fetch their snapshots. The
+      // contract is that both managers observe the same unique sequence after
+      // a manual pick and at least two timeout picks, not that network timing
+      // freezes the sequence at an exact count.
+      expect(room.body.picks.length).toBeGreaterThanOrEqual(3);
       expect(managerRoom.body.picks.map((pick) => pick.player_id)).toEqual(room.body.picks.map((pick) => pick.player_id));
       expect(new Set(room.body.picks.map((pick) => pick.player_id)).size).toBe(room.body.picks.length);
-      expect(room.body.picks.every((pick) => pick.auto_pick)).toBe(true);
+      expect(room.body.picks[0]?.auto_pick).toBe(false);
+      expect(room.body.picks.filter((pick) => pick.auto_pick).length).toBeGreaterThanOrEqual(2);
     } finally {
       await commissionerContext.close();
       await managerContext.close();

@@ -8,6 +8,7 @@ import type {
   LeagueCreateResponse,
   LeagueListResponse,
   LeagueMatchupTabResponse,
+  LeaguePostseasonResponse,
   LeagueNewsResponse,
   LeaguePowerRankingResponse,
   LeagueRosterTabResponse,
@@ -224,6 +225,26 @@ export function useLeagueMatchupTab(
       return 30_000;
     },
     refetchIntervalInBackground: true,
+  });
+}
+
+export function useLeaguePostseason(leagueId?: number, enabled = true) {
+  return useQuery({
+    queryKey: ["league", leagueId, "postseason"],
+    enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
+    staleTime: 60_000,
+    retry: (failureCount, error) => !(error instanceof ApiError && [401, 403, 404].includes(error.status)) && failureCount < 2,
+    queryFn: () => apiGet<LeaguePostseasonResponse>(`/leagues/${leagueId}/postseason`),
+  });
+}
+
+export function useLeaguePostseasonBracket(leagueId?: number, enabled = true) {
+  return useQuery({
+    queryKey: ["league", leagueId, "postseason", "bracket"],
+    enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
+    staleTime: 60_000,
+    retry: (failureCount, error) => !(error instanceof ApiError && [401, 403, 404].includes(error.status)) && failureCount < 2,
+    queryFn: () => apiGet<LeaguePostseasonResponse>(`/leagues/${leagueId}/postseason/bracket`),
   });
 }
 

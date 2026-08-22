@@ -56,6 +56,9 @@ jobs:
       - name: Verify Alembic metadata has no drift
         run: PYTHONPATH=. uv run alembic -c api/alembic.ini check
 
+      - name: Certify PostgreSQL postseason migration compatibility
+        run: PYTHONPATH=. uv run python scripts/certify_postseason_migrations.py
+
       - name: Run backend tests
         run: PYTHONPATH=. uv run pytest -q tests
 
@@ -107,12 +110,13 @@ jobs:
       - name: Verify API and web readiness
         run: |
           expected_sha="$(git rev-parse HEAD)"
+          expected_alembic_head="$(docker compose -p cff_ci exec -T api env PYTHONPATH=/app uv run python scripts/current_alembic_head.py)"
           for attempt in $(seq 1 30); do
             ready="$(curl --fail --silent http://127.0.0.1:8080/api/health/ready || true)"
             runtime="$(curl --fail --silent http://127.0.0.1:8080/api/health/runtime || true)"
             if curl --fail --silent --head http://127.0.0.1:8080 >/dev/null && \
               jq -e '.status == "ready"' <<<"$ready" >/dev/null && \
-              jq -e --arg sha "$expected_sha" '.git_sha == $sha and .alembic_revision == "0101_injury_notification_scope" and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' <<<"$runtime" >/dev/null; then
+              jq -e --arg sha "$expected_sha" --arg revision "$expected_alembic_head" '.git_sha == $sha and .alembic_revision == $revision and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' <<<"$runtime" >/dev/null; then
               exit 0
             fi
             sleep 5

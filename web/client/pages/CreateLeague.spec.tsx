@@ -18,7 +18,7 @@ vi.mock("@/lib/api", () => ({
   getStoredAccessToken: () => "test-access-token",
 }));
 
-import CreateLeague from "./CreateLeague";
+import CreateLeague, { leagueSizes } from "./CreateLeague";
 
 const renderPage = () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -42,6 +42,11 @@ describe("CreateLeague beta defaults", () => {
   });
 
   afterEach(cleanup);
+
+  it("offers 14 teams as the alpha maximum", () => {
+    expect(leagueSizes).toEqual([4, 6, 8, 10, 12, 14]);
+    expect(leagueSizes).not.toContain(16);
+  });
 
   it("shows only playoffs, waiver system, and trade review on the settings step", () => {
     renderPage();
@@ -79,7 +84,7 @@ describe("CreateLeague beta defaults", () => {
               BENCH: 5,
               IR: 1,
             },
-            waiver_processing_weekday: 1,
+            waiver_processing_weekday: 6,
             waiver_processing_hour: 8,
             waiver_timezone: "America/New_York",
           }),

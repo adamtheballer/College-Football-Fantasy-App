@@ -28,7 +28,7 @@ import { LeagueCreateResponse } from "@/types/league";
 
 const steps = ["Basics", "Settings", "Draft", "Review"] as const;
 
-const leagueSizes = [4, 6, 8, 10, 12, 14, 16];
+export const leagueSizes = [4, 6, 8, 10, 12, 14];
 const playoffOptions = [2, 4, 6, 8];
 const MIN_DRAFT_LEAD_TIME_MS = 5 * 60 * 1000;
 const waiverOptions = [
@@ -89,7 +89,7 @@ const standardRosterSummary = "QB 1 · RB 2 · WR 2 · TE 1 · FLEX 1 · K 1 · 
 const standardBetaScoringSummary = "Standard PPR · 3-point field goals · 1-point extra points";
 const managedWaiverSchedule = {
   waiver_period_hours: 24,
-  waiver_processing_weekday: 1,
+  waiver_processing_weekday: 6,
   waiver_processing_hour: 8,
   waiver_timezone: "America/New_York",
   faab_starting_budget: 100,
@@ -635,7 +635,10 @@ function CreateLeagueForm() {
                       className={inputClass}
                     />
                   </Field>
-                  <Field label="League size">
+                  <Field
+                    label="League size"
+                    helper={basics.max_teams === 14 ? "14-team leagues use a balanced partial round robin before the selected playoff bracket." : undefined}
+                  >
                     <Select
                       value={String(basics.max_teams)}
                       onValueChange={(value) => updateLeagueSize(Number(value))}

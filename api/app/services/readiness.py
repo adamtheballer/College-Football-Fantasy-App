@@ -47,12 +47,22 @@ def get_alembic_heads(alembic_ini_path: Path | str = DEFAULT_ALEMBIC_INI) -> lis
     return sorted(script.get_heads())
 
 
+def get_canonical_alembic_head(alembic_ini_path: Path | str = DEFAULT_ALEMBIC_INI) -> str:
+    """Return the sole repository head or fail closed for ambiguous history."""
+    heads = get_alembic_heads(alembic_ini_path)
+    if not heads:
+        raise ValueError("repository Alembic history has no heads")
+    if len(heads) != 1:
+        raise ValueError(f"repository Alembic history has multiple heads: {', '.join(heads)}")
+    return heads[0]
+
+
 def check_alembic_readiness(
     db: Session,
     *,
     alembic_ini_path: Path | str = DEFAULT_ALEMBIC_INI,
 ) -> AlembicReadiness:
-    expected_revisions = get_alembic_heads(alembic_ini_path)
+    expected_revisions = [get_canonical_alembic_head(alembic_ini_path)]
     try:
         db.execute(text("SELECT 1"))
     except SQLAlchemyError:

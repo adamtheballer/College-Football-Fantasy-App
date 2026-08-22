@@ -12,6 +12,7 @@ from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.notification import NotificationLog
+from collegefootballfantasy_api.app.models.postseason import PostseasonFinalStanding
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.insights import (
@@ -44,6 +45,7 @@ def _build_user_matchup_stats(db: Session) -> dict[int, dict[str, float | int]]:
             Matchup.week,
             Matchup.home_score,
             Matchup.away_score,
+            Matchup.status,
             home_team.owner_user_id.label("home_user_id"),
             away_team.owner_user_id.label("away_user_id"),
         )
@@ -64,6 +66,8 @@ def _build_user_matchup_stats(db: Session) -> dict[int, dict[str, float | int]]:
         home_user_id = row.home_user_id
         away_user_id = row.away_user_id
         if not home_user_id or not away_user_id or home_user_id == away_user_id:
+            continue
+        if (row.status or "").lower() not in {"final", "completed", "stat_corrected"}:
             continue
 
         home_score = float(row.home_score or 0.0)
@@ -88,36 +92,71 @@ def _build_user_matchup_stats(db: Session) -> dict[int, dict[str, float | int]]:
 
 
 def _championships_by_user(db: Session) -> dict[int, int]:
-    home_team = aliased(Team)
-    away_team = aliased(Team)
+    """Use completed playoff standings, never cumulative season points.
+
+    A championship is a persisted final postseason placement.  Summing every
+    matchup score can crown an unrelated regular-season points leader, which
+    is especially wrong now that playoff games use canonical Matchup rows.
+    """
     rows = (
         db.query(
-            Matchup.league_id,
-            Matchup.season,
-            Matchup.home_score,
-            Matchup.away_score,
-            home_team.owner_user_id.label("home_user_id"),
-            away_team.owner_user_id.label("away_user_id"),
+            Team.owner_user_id,
         )
-        .join(home_team, home_team.id == Matchup.home_team_id)
-        .join(away_team, away_team.id == Matchup.away_team_id)
+        .select_from(PostseasonFinalStanding)
+        .join(Team, Team.id == PostseasonFinalStanding.team_id)
+        .filter(
+            PostseasonFinalStanding.bracket_id.is_not(None),
+            PostseasonFinalStanding.final_place == 1,
+        )
         .all()
     )
-    points_by_league_season: dict[tuple[int, int], dict[int, float]] = defaultdict(lambda: defaultdict(float))
-    for row in rows:
-        key = (row.league_id, row.season)
-        if row.home_user_id:
-            points_by_league_season[key][row.home_user_id] += float(row.home_score or 0.0)
-        if row.away_user_id:
-            points_by_league_season[key][row.away_user_id] += float(row.away_score or 0.0)
-
     championships: dict[int, int] = defaultdict(int)
-    for _key, score_map in points_by_league_season.items():
-        if not score_map:
-            continue
-        winner_id = max(score_map.items(), key=lambda item: item[1])[0]
-        championships[winner_id] += 1
+    for (owner_user_id,) in rows:
+        if owner_user_id:
+            championships[owner_user_id] += 1
     return championships
+
+
+def _postseason_career_by_user(db: Session) -> dict[int, dict[str, int]]:
+    rows = (
+        db.query(
+            Team.owner_user_id,
+            PostseasonFinalStanding.final_place,
+            PostseasonFinalStanding.wins,
+            PostseasonFinalStanding.losses,
+        )
+        .select_from(PostseasonFinalStanding)
+        .join(Team, Team.id == PostseasonFinalStanding.team_id)
+        .filter(PostseasonFinalStanding.bracket_id.is_not(None))
+        .all()
+    )
+    values: dict[int, dict[str, int]] = defaultdict(
+        lambda: {
+            "playoff_appearances": 0,
+            "championship_appearances": 0,
+            "runner_up_finishes": 0,
+            "third_place_finishes": 0,
+            "top_three_finishes": 0,
+            "postseason_wins": 0,
+            "postseason_losses": 0,
+        }
+    )
+    for owner_user_id, final_place, wins, losses in rows:
+        if owner_user_id is None:
+            continue
+        record = values[owner_user_id]
+        record["playoff_appearances"] += 1
+        record["postseason_wins"] += int(wins or 0)
+        record["postseason_losses"] += int(losses or 0)
+        if final_place in {1, 2}:
+            record["championship_appearances"] += 1
+        if final_place == 2:
+            record["runner_up_finishes"] += 1
+        if final_place == 3:
+            record["third_place_finishes"] += 1
+        if final_place <= 3:
+            record["top_three_finishes"] += 1
+    return values
 
 
 def _dynasty_power(
@@ -259,6 +298,7 @@ def get_dynasty_career(
         .count()
     )
     championships = _championships_by_user(db).get(current_user.id, 0)
+    postseason = _postseason_career_by_user(db).get(current_user.id, {})
     trades_completed = (
         db.query(NotificationLog)
         .filter(
@@ -288,6 +328,13 @@ def get_dynasty_career(
         total_points_scored=round(points_for, 2),
         years_played=years_played,
         dynasty_power_rating=power,
+        playoff_appearances=int(postseason.get("playoff_appearances", 0)),
+        championship_appearances=int(postseason.get("championship_appearances", 0)),
+        runner_up_finishes=int(postseason.get("runner_up_finishes", 0)),
+        third_place_finishes=int(postseason.get("third_place_finishes", 0)),
+        top_three_finishes=int(postseason.get("top_three_finishes", 0)),
+        postseason_wins=int(postseason.get("postseason_wins", 0)),
+        postseason_losses=int(postseason.get("postseason_losses", 0)),
     )
 
 

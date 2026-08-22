@@ -8,8 +8,10 @@ from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_invite import LeagueInvite
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
+from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
@@ -20,7 +22,8 @@ from collegefootballfantasy_api.app.models.trade_offer_item import TradeOfferIte
 from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
-from collegefootballfantasy_api.app.services.league_schedule import REGULAR_SEASON_WEEKS, ensure_league_schedule
+from collegefootballfantasy_api.app.services.league_schedule import ensure_league_schedule
+from collegefootballfantasy_api.app.services.postseason_service import get_or_create_postseason_settings
 from collegefootballfantasy_api.app.services.scoring_service import normalize_scoring_rules
 from collegefootballfantasy_api.app.services.draft_service import process_expired_draft_picks_once
 from collegefootballfantasy_api.app.core.config import settings
@@ -65,7 +68,7 @@ def create_league(client, token: str, name: str = "Test League", max_teams: int 
         "settings": {
             "scoring_json": {"ppr": 1},
             "roster_slots_json": {"QB": 1},
-            "playoff_teams": 4,
+            "playoff_teams": 2 if max_teams == 2 else 4,
             "waiver_type": "faab",
             "trade_review_type": "commissioner",
             "superflex_enabled": False,
@@ -100,6 +103,32 @@ def test_create_and_list_leagues(client):
     assert data["data"][0]["max_teams"] == created["max_teams"]
     assert len(data["data"][0]["members"]) == 1
     assert data["data"][0]["draft"]["draft_type"] == "snake"
+
+
+def test_create_league_allows_fourteen_teams_but_rejects_larger_sizes(client):
+    token = create_user_and_token(client, "league-cap")
+    created = create_league(client, token, name="Fourteen Team League", max_teams=14)
+    assert created["max_teams"] == 14
+
+    draft_time = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=7)
+    oversized = client.post(
+        "/leagues",
+        json={
+            "basics": {"name": "Too Many Teams", "season_year": 2026, "max_teams": 16, "is_private": True},
+            "settings": {
+                "scoring_json": {"ppr": 1}, "roster_slots_json": {"QB": 1}, "playoff_teams": 4,
+                "waiver_type": "faab", "trade_review_type": "commissioner", "superflex_enabled": False,
+                "kicker_enabled": True, "defense_enabled": False,
+            },
+            "draft": {
+                "draft_datetime_utc": draft_time.isoformat(), "timezone": "America/New_York",
+                "draft_type": "snake", "pick_timer_seconds": 90,
+            },
+        },
+        headers=auth_headers(token),
+    )
+    assert oversized.status_code == 422
+    assert "between 2 and 14" in str(oversized.json()["detail"])
 
 
 def test_beta_scoring_requires_acknowledgment_locks_snapshot_and_enforces_flat_kicker_policy(client, monkeypatch):
@@ -287,7 +316,7 @@ def test_create_league_enforces_standard_beta_roster_and_managed_processing(clie
     assert settings["waiver_type"] == "priority"
     assert settings["trade_review_type"] == "commissioner"
     assert settings["waiver_period_hours"] == 24
-    assert settings["waiver_processing_weekday"] == 1
+    assert settings["waiver_processing_weekday"] == 6
     assert settings["waiver_processing_hour"] == 8
     assert settings["waiver_timezone"] == "America/New_York"
     assert settings["faab_starting_budget"] == 100
@@ -450,7 +479,7 @@ def test_schedule_generation_rejects_legacy_odd_team_count(client, db_session):
         ensure_league_schedule(db_session, league_row)
 
 
-def test_schedule_generation_creates_and_backfills_a_fair_13_week_regular_season(client, db_session):
+def test_schedule_generation_creates_and_backfills_a_fair_regular_season_before_playoffs(client, db_session):
     token = create_user_and_token(client, "schedule-fairness")
     league = create_league(client, token, name="Fair Schedule League", max_teams=4)
     league_row = db_session.get(League, league["id"])
@@ -468,8 +497,12 @@ def test_schedule_generation_creates_and_backfills_a_fair_13_week_regular_season
     team_ids = {team.id for team in teams}
     assert len(team_ids) == 4
 
-    assert ensure_league_schedule(db_session, league_row, regular_season_weeks=12) == 24
-    assert ensure_league_schedule(db_session, league_row) == 2
+    # A four-team postseason uses Weeks 13-14; regular-season scheduling must
+    # stop at the final broad CFB slate rather than spilling into
+    # conference-championship week.
+    regular_season_weeks = 12
+    assert ensure_league_schedule(db_session, league_row, regular_season_weeks=regular_season_weeks) == 24
+    assert ensure_league_schedule(db_session, league_row) == 0
     db_session.flush()
 
     matchups = (
@@ -478,11 +511,11 @@ def test_schedule_generation_creates_and_backfills_a_fair_13_week_regular_season
         .order_by(Matchup.week.asc(), Matchup.id.asc())
         .all()
     )
-    assert len(matchups) == (len(team_ids) // 2) * REGULAR_SEASON_WEEKS
-    assert {matchup.week for matchup in matchups} == set(range(1, REGULAR_SEASON_WEEKS + 1))
+    assert len(matchups) == (len(team_ids) // 2) * regular_season_weeks
+    assert {matchup.week for matchup in matchups} == set(range(1, regular_season_weeks + 1))
 
     matchup_counts_by_pair: dict[tuple[int, int], int] = {}
-    for week in range(1, REGULAR_SEASON_WEEKS + 1):
+    for week in range(1, regular_season_weeks + 1):
         weekly_matchups = [matchup for matchup in matchups if matchup.week == week]
         assert len(weekly_matchups) == len(team_ids) // 2
         assert {team_id for matchup in weekly_matchups for team_id in (matchup.home_team_id, matchup.away_team_id)} == team_ids
@@ -492,6 +525,81 @@ def test_schedule_generation_creates_and_backfills_a_fair_13_week_regular_season
 
     assert len(matchup_counts_by_pair) == 6
     assert max(matchup_counts_by_pair.values()) - min(matchup_counts_by_pair.values()) <= 1
+
+
+@pytest.mark.parametrize("regular_season_weeks", [10, 11, 12])
+def test_fourteen_team_schedule_is_balanced_without_repeated_opponents_before_playoffs(client, db_session, regular_season_weeks):
+    token = create_user_and_token(client, f"fourteen-schedule-{regular_season_weeks}")
+    league = create_league(client, token, name=f"14 Team Schedule {regular_season_weeks}", max_teams=14)
+    league_row = db_session.get(League, league["id"])
+    assert league_row is not None
+    db_session.add_all([Team(league_id=league_row.id, name=f"Team {index}") for index in range(2, 15)])
+    db_session.commit()
+
+    teams = db_session.query(Team).filter(Team.league_id == league_row.id).order_by(Team.id.asc()).all()
+    assert len(teams) == 14
+    assert ensure_league_schedule(db_session, league_row, regular_season_weeks=regular_season_weeks) == 7 * regular_season_weeks
+    db_session.flush()
+
+    matchups = db_session.query(Matchup).filter(
+        Matchup.league_id == league_row.id,
+        Matchup.season == league_row.season_year,
+    ).all()
+    opponents_by_team = {team.id: set() for team in teams}
+    pairs: set[tuple[int, int]] = set()
+    for week in range(1, regular_season_weeks + 1):
+        weekly = [matchup for matchup in matchups if matchup.week == week]
+        assert len(weekly) == 7
+        assert {team_id for matchup in weekly for team_id in (matchup.home_team_id, matchup.away_team_id)} == set(opponents_by_team)
+        for matchup in weekly:
+            pair = tuple(sorted((matchup.home_team_id, matchup.away_team_id)))
+            assert pair not in pairs
+            pairs.add(pair)
+            opponents_by_team[matchup.home_team_id].add(matchup.away_team_id)
+            opponents_by_team[matchup.away_team_id].add(matchup.home_team_id)
+
+    assert all(len(opponents) == regular_season_weeks for opponents in opponents_by_team.values())
+
+
+@pytest.mark.parametrize(
+    ("team_count", "playoff_teams"),
+    [
+        (4, 2), (4, 4),
+        (6, 2), (6, 4), (6, 6),
+        (8, 2), (8, 4), (8, 6), (8, 8),
+        (10, 2), (10, 4), (10, 6), (10, 8),
+        (12, 2), (12, 4), (12, 6), (12, 8),
+        (14, 2), (14, 4), (14, 6), (14, 8),
+    ],
+)
+def test_every_alpha_league_size_and_playoff_field_generates_only_regular_season_matchups(db_session, team_count, playoff_teams):
+    league = League(name=f"{team_count}-{playoff_teams} alpha schedule", season_year=2026, max_teams=team_count)
+    db_session.add(league); db_session.flush()
+    db_session.add(LeagueSettings(
+        league_id=league.id, playoff_teams=playoff_teams, scoring_json={}, roster_slots_json={}, waiver_type="faab",
+        trade_review_type="none", superflex_enabled=False, kicker_enabled=True, defense_enabled=False,
+    ))
+    teams = [Team(league_id=league.id, name=f"Team {index}") for index in range(1, team_count + 1)]
+    db_session.add_all(teams); db_session.flush()
+
+    plan = get_or_create_postseason_settings(db_session, league)
+    assert ensure_league_schedule(db_session, league) == (team_count // 2) * plan.regular_season_end_week
+    db_session.flush()
+    matchups = db_session.query(Matchup).filter_by(league_id=league.id, season=2026).all()
+
+    assert {matchup.week for matchup in matchups} == set(range(1, plan.regular_season_end_week + 1))
+    assert all(matchup.week < plan.playoff_start_week for matchup in matchups)
+    first_round_robin_weeks = min(plan.regular_season_end_week, team_count - 1)
+    pairs: set[tuple[int, int]] = set()
+    for week in range(1, plan.regular_season_end_week + 1):
+        weekly = [matchup for matchup in matchups if matchup.week == week]
+        assert len(weekly) == team_count // 2
+        assert {team_id for matchup in weekly for team_id in (matchup.home_team_id, matchup.away_team_id)} == {team.id for team in teams}
+        if week <= first_round_robin_weeks:
+            for matchup in weekly:
+                pair = tuple(sorted((matchup.home_team_id, matchup.away_team_id)))
+                assert pair not in pairs
+                pairs.add(pair)
 
 
 def test_create_invite_join_assigns_one_team_per_user_and_enforces_max_teams(client, db_session):
@@ -569,6 +677,19 @@ def test_create_invite_join_assigns_one_team_per_user_and_enforces_max_teams(cli
     assert db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id == owner.id).count() == 1
     assert db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id == member.id).count() == 1
     assert db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id == third.id).count() == 0
+
+
+def test_join_flow_serializes_capacity_checks_with_a_league_row_lock():
+    """The PostgreSQL E2E final-seat race is the behavioral regression proof.
+
+    SQLite does not implement row-level ``FOR UPDATE`` locks, so this focused
+    unit assertion protects the SQLAlchemy contract while the disposable
+    PostgreSQL browser job proves the actual concurrent behavior.
+    """
+    from collegefootballfantasy_api.app.services import league_flow
+
+    source = league_flow.join_league.__code__.co_names
+    assert "with_for_update" in source
 
 
 def test_commissioner_settings_show_active_invite_until_draft_completion(client, db_session):
@@ -655,6 +776,46 @@ def test_settings_view_shows_every_team_at_zero_zero_before_scoring(client, db_s
         (row["team_id"], row["wins"], row["losses"], row["ties"])
         for row in payload["standings"]
     } == {(team.id, 0, 0, 0) for team in teams}
+    assert payload["postseason_calendar"] is None
+
+
+def test_settings_view_exposes_only_a_persisted_certified_postseason_calendar(client, db_session):
+    owner_token = create_user_and_token(client, "calendar-settings-owner")
+    league = create_league(client, owner_token, name="Certified calendar settings", max_teams=2)
+    db_session.add(
+        LeaguePostseasonSettings(
+            league_id=league["id"],
+            season=2026,
+            regular_season_start_week=1,
+            regular_season_end_week=12,
+            playoff_start_week=13,
+            championship_week=13,
+            playoff_team_count=2,
+            calendar_policy_version="P4_FULL_COVERAGE_V2",
+            calendar_source_identity="approved-2026-snapshot",
+            calendar_source_revision="release-1",
+            calendar_source_sha256="a" * 64,
+            calendar_source_format_version="SEALED_CFB_SCHEDULE_V1",
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/leagues/{league['id']}/settings-view", headers=auth_headers(owner_token))
+
+    assert response.status_code == 200
+    assert response.json()["postseason_calendar"] == {
+        "regular_season_start_week": 1,
+        "regular_season_end_week": 12,
+        "playoff_start_week": 13,
+        "championship_week": 13,
+        "playoff_teams": 2,
+        "max_rounds": 1,
+        "calendar_policy_version": "P4_FULL_COVERAGE_V2",
+        "source_identity": "approved-2026-snapshot",
+        "source_revision": "release-1",
+        "source_sha256": "a" * 64,
+        "source_format_version": "SEALED_CFB_SCHEDULE_V1",
+    }
 
 
 def test_commissioner_can_rotate_and_revoke_invite(client, db_session):

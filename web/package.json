@@ -6,12 +6,15 @@
     "dev": "bash ../scripts/dev.sh",
     "dev:vite": "vite",
     "build": "vite build",
+    "build:ios": "VITE_API_BASE_URL=https://api.collegefantasyfootball.org npm run build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest --run --exclude '**/tests/e2e/**' --maxWorkers=1",
     "test:e2e": "playwright test",
     "test:e2e:real": "REAL_STACK_E2E=1 playwright test tests/e2e/real-stack-*.spec.ts",
     "test:live-draft": "node scripts/verify-live-draft.mjs",
     "verify:runtime": "node scripts/verify-runtime-proxy.mjs",
+    "ios:sync": "npm run build:ios && ONESIGNAL_DISABLE_LOCATION=true cap sync ios",
+    "ios:open": "cap open ios",
     "format.fix": "prettier --write .",
     "typecheck:app": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
@@ -19,6 +22,8 @@
     "typecheck": "npm run typecheck:app && npm run typecheck:test && npm run typecheck:vite"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
     "@hookform/resolvers": "^5.2.1",
     "@playwright/test": "^1.59.1",
     "@radix-ui/react-accordion": "^1.2.11",
@@ -93,5 +98,9 @@
     "vite": "^7.1.2",
     "vitest": "^3.2.4"
   },
-  "packageManager": "npm@10.9.3"
+  "packageManager": "npm@10.9.3",
+  "dependencies": {
+    "@capacitor/core": "^8.5.0",
+    "@onesignal/capacitor-plugin": "^1.1.8"
+  }
 }

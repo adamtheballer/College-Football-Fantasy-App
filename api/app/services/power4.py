@@ -85,6 +85,11 @@ CANONICAL_POWER4_TEAMS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+# Notre Dame is independent, but it is intentionally included in the fantasy
+# calendar universe alongside the four power conferences.  It must not be
+# folded into ACC membership for conference-specific reporting.
+PLAYOFF_ELIGIBLE_INDEPENDENTS: tuple[str, ...] = ("Notre Dame",)
+
 SCHOOL_ALIASES: dict[str, str] = {
     "Louisiana State": "LSU",
     "Mississippi": "Ole Miss",
@@ -134,6 +139,8 @@ SCHOOL_ALIASES: dict[str, str] = {
     "UNC": "North Carolina",
     "VT": "Virginia Tech",
     "BC": "Boston College",
+    "Notre Dame Fighting Irish": "Notre Dame",
+    "ND": "Notre Dame",
 }
 
 NORMALIZED_TO_CONFERENCE: dict[str, str] = {}
@@ -143,10 +150,14 @@ for conference, schools in CANONICAL_POWER4_TEAMS.items():
         normalized = normalize_school(school)
         NORMALIZED_TO_CONFERENCE[normalized] = conference
         NORMALIZED_TO_CANONICAL[normalized] = school
+for school in PLAYOFF_ELIGIBLE_INDEPENDENTS:
+    NORMALIZED_TO_CANONICAL[normalize_school(school)] = school
 for alias, canonical in SCHOOL_ALIASES.items():
     normalized = normalize_school(alias)
     canonical_normalized = normalize_school(canonical)
-    NORMALIZED_TO_CONFERENCE[normalized] = NORMALIZED_TO_CONFERENCE[canonical_normalized]
+    conference = NORMALIZED_TO_CONFERENCE.get(canonical_normalized)
+    if conference:
+        NORMALIZED_TO_CONFERENCE[normalized] = conference
     NORMALIZED_TO_CANONICAL[normalized] = canonical
 
 
@@ -197,3 +208,9 @@ def list_power4_teams(conference: str | None = None) -> list[str]:
     for teams in CANONICAL_POWER4_TEAMS.values():
         all_teams.extend(teams)
     return sorted(all_teams)
+
+
+def list_playoff_eligible_schools() -> list[str]:
+    """P4 plus Notre Dame, the explicitly approved fantasy calendar universe."""
+
+    return sorted([*list_power4_teams(), *PLAYOFF_ELIGIBLE_INDEPENDENTS])

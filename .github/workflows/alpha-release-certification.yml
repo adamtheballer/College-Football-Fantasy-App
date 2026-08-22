@@ -1,0 +1,77 @@
+name: Alpha Release Certification
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  alpha-postgres-rehearsal:
+    name: alpha-postgres-rehearsal
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: cff_alpha_release
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cff_alpha_release"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/cff_alpha_release
+      PYTHONPATH: .
+      JWT_SECRET_KEY: alpha-release-ci-only-secret
+      ENVIRONMENT: e2e
+      CFF_ALPHA_DISPOSABLE_CERTIFICATION: "1"
+      SCORING_PROVIDER: espn
+      SCORING_MODE: shadow
+      SPORTSDATA_ENABLED: "false"
+      LIVE_PLAYER_NOTIFICATIONS_ENABLED: "false"
+      EMAIL_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install repository-frozen dependencies
+        run: uv sync --frozen
+      - name: Fresh migration, head, and metadata parity
+        run: |
+          uv run alembic -c api/alembic.ini upgrade head
+          expected_head="$(PYTHONPATH=. uv run python scripts/current_alembic_head.py)"
+          test "$expected_head" = "0103_sunday_waivers"
+          test "$(uv run alembic -c api/alembic.ini heads | awk '{print $1}')" = "$expected_head"
+          PYTHONPATH=. uv run python scripts/check_alembic_head.py
+          PYTHONPATH=. uv run alembic -c api/alembic.ini check
+      - name: API readiness on migrated PostgreSQL
+        run: |
+          PYTHONPATH=. uv run uvicorn collegefootballfantasy_api.app.main:app --host 127.0.0.1 --port 8000 >/tmp/cff-alpha-api.log 2>&1 &
+          echo $! > /tmp/cff-alpha-api.pid
+          for attempt in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/health/ready && exit 0 || sleep 1; done
+          cat /tmp/cff-alpha-api.log
+          exit 1
+      - name: Fresh, existing-schema, reversal, and worker boot rehearsal
+        run: PYTHONPATH=. uv run python scripts/certify_alpha_postgres_rehearsal.py
+      - name: Recorded scoring replay, correction, duplicate, restart, and outlook regression
+        run: >-
+          CFF_TEST_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/cff_alpha_release
+          PYTHONPATH=. uv run pytest -q
+          tests/api/test_espn_live_scoring.py
+          tests/api/test_live_scoring_recalc.py
+          tests/api/test_live_projection.py
+          tests/api/test_weekly_outlook_refresh.py
+      - name: Clean shutdown
+        if: always()
+        run: test -f /tmp/cff-alpha-api.pid && kill "$(cat /tmp/cff-alpha-api.pid)" || true
+
+  alpha-multi-user-golden-path:
+    name: alpha-multi-user-golden-path
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Six signed-in users, concurrent final-seat admission, draft, trade, chat and session persistence
+        run: ./scripts/run_real_stack_e2e.sh

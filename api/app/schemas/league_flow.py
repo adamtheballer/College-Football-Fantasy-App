@@ -7,6 +7,10 @@ from collegefootballfantasy_api.app.schemas.waiver import WaiverClaimRead, Waive
 from collegefootballfantasy_api.app.schemas.rivalry import RivalryMatchupRead
 
 
+MIN_LEAGUE_TEAM_COUNT = 2
+MAX_LEAGUE_TEAM_COUNT = 14
+
+
 def _validate_iana_timezone(value: str) -> str:
     normalized = value.strip()
     if not normalized:
@@ -29,8 +33,10 @@ class LeagueBasics(BaseModel):
     @field_validator("max_teams")
     @classmethod
     def validate_even_manager_count(cls, value: int) -> int:
-        if value < 2 or value % 2 != 0:
-            raise ValueError("max_teams must be an even number of at least 2")
+        if value < MIN_LEAGUE_TEAM_COUNT or value > MAX_LEAGUE_TEAM_COUNT or value % 2 != 0:
+            raise ValueError(
+                f"max_teams must be an even number between {MIN_LEAGUE_TEAM_COUNT} and {MAX_LEAGUE_TEAM_COUNT}"
+            )
         return value
 
 
@@ -41,7 +47,7 @@ class LeagueSettingsInput(BaseModel):
     waiver_type: str
     waiver_period_hours: int = 24
     waiver_processing_weekday: int = Field(
-        default=1,
+        default=6,
         validation_alias=AliasChoices("waiver_processing_weekday", "waiver_process_day"),
     )
     waiver_processing_hour: int = Field(
@@ -67,6 +73,13 @@ class LeagueSettingsInput(BaseModel):
     superflex_enabled: bool
     kicker_enabled: bool
     defense_enabled: bool
+
+    @field_validator("playoff_teams")
+    @classmethod
+    def validate_playoff_teams(cls, value: int) -> int:
+        if value not in {2, 4, 6, 8}:
+            raise ValueError("playoff_teams must be one of 2, 4, 6, or 8")
+        return value
 
     @field_validator("waiver_period_hours")
     @classmethod
@@ -273,6 +286,13 @@ class LeagueSettingsUpdate(BaseModel):
     superflex_enabled: bool
     kicker_enabled: bool
     defense_enabled: bool
+
+    @field_validator("playoff_teams")
+    @classmethod
+    def validate_playoff_teams(cls, value: int) -> int:
+        if value not in {2, 4, 6, 8}:
+            raise ValueError("playoff_teams must be one of 2, 4, 6, or 8")
+        return value
 
     @field_validator("waiver_period_hours")
     @classmethod
@@ -655,6 +675,13 @@ class LiveScoringFreshnessRead(BaseModel):
     relevant_game_count: int = 0
 
 
+class PostseasonMatchupContextRead(BaseModel):
+    bracket_id: int
+    matchup_type: str
+    bracket_path: str | None = None
+    status: str
+
+
 class LeagueMatchupTabRead(BaseModel):
     league_id: int
     season: int
@@ -673,6 +700,7 @@ class LeagueMatchupTabRead(BaseModel):
     message: str | None = None
     user_team: MatchupTeamRead | None = None
     rivalry: RivalryMatchupRead | None = None
+    postseason: PostseasonMatchupContextRead | None = None
 
 
 class LeagueWaiverPlayerRead(BaseModel):
@@ -773,6 +801,7 @@ class LeagueSettingsViewRead(BaseModel):
     league_id: int
     league_name: str
     league_info: dict
+    postseason_calendar: dict[str, int | str] | None = None
     invite: LeagueInviteSettingsRead | None = None
     members: list[LeagueMemberRead]
     teams: list[LeagueWorkspaceTeamRead]

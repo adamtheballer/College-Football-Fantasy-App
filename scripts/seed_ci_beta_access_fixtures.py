@@ -29,6 +29,13 @@ FIXTURES = (
     ("ci-e2e-beta-manager", "ci-beta-manager@example.test", "EARLY-CI1236"),
     ("ci-e2e-beta-trade-proposer", "ci-beta-trade-proposer@example.test", "EARLY-CI1237"),
     ("ci-e2e-beta-trade-recipient", "ci-beta-trade-recipient@example.test", "EARLY-CI1238"),
+    ("ci-e2e-beta-six-manager-1", "ci-beta-six-manager-1@example.test", "EARLY-CI1239"),
+    ("ci-e2e-beta-six-manager-2", "ci-beta-six-manager-2@example.test", "EARLY-CI1240"),
+    ("ci-e2e-beta-six-manager-3", "ci-beta-six-manager-3@example.test", "EARLY-CI1241"),
+    ("ci-e2e-beta-six-manager-4", "ci-beta-six-manager-4@example.test", "EARLY-CI1242"),
+    ("ci-e2e-beta-six-manager-5", "ci-beta-six-manager-5@example.test", "EARLY-CI1243"),
+    ("ci-e2e-beta-six-manager-6", "ci-beta-six-manager-6@example.test", "EARLY-CI1244"),
+    ("ci-e2e-beta-six-manager-commissioner", "ci-beta-six-manager-commissioner@example.test", "EARLY-CI1245"),
 )
 CI_ADMIN_EMAIL = "ci-e2e-admin@example.test"
 CI_ADMIN_PASSWORD = "E2E-Only-Admin-Pass-2026!"

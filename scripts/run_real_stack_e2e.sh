@@ -84,8 +84,9 @@ done
 
 ready_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/ready")"
 runtime_payload="$(curl --fail --show-error --silent "${web_origin}/api/health/runtime")"
+expected_alembic_head="$(docker compose exec -T api env PYTHONPATH=/app uv run python scripts/current_alembic_head.py)"
 jq -e '.status == "ready"' <<<"$ready_payload" >/dev/null
-jq -e --arg sha "$CFF_GIT_SHA" '.git_sha == $sha and .alembic_revision == "0101_injury_notification_scope" and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' <<<"$runtime_payload" >/dev/null
+jq -e --arg sha "$CFF_GIT_SHA" --arg revision "$expected_alembic_head" '.git_sha == $sha and .alembic_revision == $revision and .scoring_mode == "disabled" and .sportsdata_enabled == false and .provider_polling_expected == false and .email_enabled == false' <<<"$runtime_payload" >/dev/null
 curl --fail --show-error --silent --head "${web_origin}" >/dev/null
 
 # This command runs only after Compose created a fresh disposable database.

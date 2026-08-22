@@ -6,6 +6,7 @@ const tabs = [
   { label: "Roster", path: "roster" },
   { label: "Matchup", path: "matchup" },
   { label: "Players", path: "waivers" },
+  { label: "Playoffs", path: "playoffs" },
   { label: "Watchlist", path: "watchlist" },
   { label: "League", path: "settings" },
 ];

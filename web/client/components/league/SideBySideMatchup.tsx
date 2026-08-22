@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Lock } from "lucide-react";
 
 import { RosterSlotTable, type RosterPointMode, formatRosterPointValue, liveProjectionDetail } from "@/components/league/RosterSlotTable";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
@@ -50,6 +51,9 @@ const pointModeForMatchupStatus = (status?: string | null): RosterPointMode =>
   ["live", "final", "stat_corrected", "corrected", "delayed"].includes((status ?? "").toLowerCase())
     ? "live"
     : "projected";
+
+const playerGameIsFinal = (player?: LeagueRosterPlayer) =>
+  ["final", "post"].includes((player?.live_game_state ?? "").toLowerCase());
 
 export const compactMatchupPlayerName = (name?: string | null) => {
   const parts = name?.trim().split(/\s+/).filter(Boolean) ?? [];
@@ -107,6 +111,7 @@ function CompactMatchupPlayer({
   const hasPlayer = Boolean(player?.player_id && player.player_name);
   const points = compactPointValue(player, pointMode);
   const liveDetail = player ? liveProjectionDetail(player) : null;
+  const isFinalGame = playerGameIsFinal(player);
   const playerName = hasPlayer ? compactMatchupPlayerName(player?.player_name) : "No starter set";
   const gameMatchup = hasPlayer ? formatPlayerGameMatchup(player) : "Set a starter in your roster";
   const gameTime = hasPlayer ? formatPlayerGameTime(player) : "Kickoff TBD";
@@ -127,8 +132,9 @@ function CompactMatchupPlayer({
       <>
         <span className="self-center text-left text-[11px] font-black tabular-nums text-cfb-text-primary"><span className="block">{points}</span>{liveDetail ? <span className="block text-[8px] font-semibold text-cfb-text-muted">{liveDetail}</span> : null}</span>
         <div className="min-w-0">
-          <p className={`truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
-            {playerName}
+          <p className={`flex min-w-0 items-center gap-1 truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
+            <span className="truncate">{playerName}</span>
+            {isFinalGame ? <Lock aria-label="Game final" className="h-2.5 w-2.5 shrink-0 text-cfb-text-muted" /> : null}
           </p>
           <p data-player-game-matchup className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
             {gameMatchup}
@@ -155,8 +161,9 @@ function CompactMatchupPlayer({
   const content = (
     <>
       <div className="min-w-0">
-        <p className={`truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
-          {playerName}
+        <p className={`flex min-w-0 items-center gap-1 truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
+          <span className="truncate">{playerName}</span>
+          {isFinalGame ? <Lock aria-label="Game final" className="h-2.5 w-2.5 shrink-0 text-cfb-text-muted" /> : null}
         </p>
         <p data-player-game-matchup className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
           {gameMatchup}

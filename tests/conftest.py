@@ -1,4 +1,5 @@
 from collections.abc import Generator
+import os
 
 import pytest
 from fastapi.testclient import TestClient
@@ -39,6 +40,7 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     player_season_outlook,
     player_stat,
     player_week_score,
+    postseason,
     player_waiver_availability,
     provider_identity,
     provider_game_poll,
@@ -67,13 +69,55 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
 )
 from collegefootballfantasy_api.app.models.user import User
 
-TEST_DATABASE_URL = "sqlite://"
-engine = create_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
+# Most tests deliberately use an in-memory database for speed.  The alpha
+# release workflow opts into a disposable PostgreSQL service for the scoring
+# replay suite so its worker and persistence semantics are proven on the same
+# database family used in production.  This is intentionally test-only: a
+# non-empty value is supplied solely by GitHub Actions.
+TEST_DATABASE_URL = os.getenv("CFF_TEST_DATABASE_URL", "sqlite://")
+engine_options = {}
+if TEST_DATABASE_URL.startswith("sqlite"):
+    engine_options = {
+        "connect_args": {"check_same_thread": False},
+        "poolclass": StaticPool,
+    }
+engine = create_engine(TEST_DATABASE_URL, **engine_options)
 TestingSessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+
+
+@pytest.fixture(autouse=True)
+def certified_calendar_for_workflow_tests(monkeypatch: pytest.MonkeyPatch):
+    """Inject deterministic certification for workflow tests only.
+
+    Production intentionally has no fabricated 2026 schedule artifact. Tests
+    exercising draft completion and postseason lifecycles use this explicit
+    in-memory dependency; source-validation tests use the real file path.
+    """
+    from collegefootballfantasy_api.app.services.season_calendar import CertifiedSeasonCalendar
+    import collegefootballfantasy_api.app.services.postseason_service as postseason_service
+
+    rounds_by_size = {2: 1, 4: 2, 6: 3, 8: 3}
+
+    def fixture_calendar(season: int, playoff_team_count: int) -> CertifiedSeasonCalendar:
+        rounds = rounds_by_size[playoff_team_count]
+        championship_week = 13
+        playoff_start_week = championship_week - rounds + 1
+        return CertifiedSeasonCalendar(
+            season=season,
+            playoff_team_count=playoff_team_count,
+            regular_season_start_week=1,
+            regular_season_end_week=playoff_start_week - 1,
+            playoff_start_week=playoff_start_week,
+            championship_week=championship_week,
+            max_rounds=rounds,
+            calendar_policy_version="test-sealed-calendar",
+            source_identity="test-fixture",
+            source_revision="test-fixture-v1",
+            source_sha256="0" * 64,
+            source_format_version="test-sealed-schedule-v1",
+        )
+
+    monkeypatch.setattr(postseason_service, "calendar_for_season", fixture_calendar)
 
 
 def override_get_db() -> Generator[Session, None, None]:

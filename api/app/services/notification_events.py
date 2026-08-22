@@ -230,6 +230,30 @@ NOTIFICATION_EVENTS: dict[str, NotificationEventDefinition] = {
         "Set your lineup", "Your Week {week} matchup starts soon.", "matchup",
         "lineup_reminder:{matchup_id}:{recipient_user_id}:{kickoff_revision}", "lineup_reminders", "lineup_reminders",
     ),
+    "POSTSEASON_SEEDS_LOCKED": _event(
+        "POSTSEASON_SEEDS_LOCKED", "POSTSEASON", "postseason lifecycle", "qualified manager only",
+        "canonical regular-season seed snapshot locked", "Playoffs are set", "Your playoff seed is locked.", "league",
+        "postseason:seeded:{bracket_id}:{recipient_user_id}", "matchup_result_alerts", "matchup_result_alerts",
+        privacy_scope=NotificationScope.LEAGUE_MEMBER,
+    ),
+    "POSTSEASON_MATCHUP_SET": _event(
+        "POSTSEASON_MATCHUP_SET", "POSTSEASON", "postseason lifecycle", "playoff participant only",
+        "canonical playoff matchup materialized", "Playoff matchup set", "Your next playoff matchup is ready.", "matchup",
+        "postseason:matchup:{postseason_matchup_id}:{recipient_user_id}", "matchup_result_alerts", "matchup_result_alerts",
+        privacy_scope=NotificationScope.MATCHUP_PARTICIPANT,
+    ),
+    "POSTSEASON_ADVANCED": _event(
+        "POSTSEASON_ADVANCED", "POSTSEASON", "postseason lifecycle", "advancing manager only",
+        "canonical postseason matchup finalized", "You’re moving on", "You advanced in the postseason.", "matchup",
+        "postseason:advance:{postseason_matchup_id}:{recipient_user_id}", "matchup_result_alerts", "matchup_result_alerts",
+        privacy_scope=NotificationScope.MATCHUP_PARTICIPANT,
+    ),
+    "POSTSEASON_CHAMPION": _event(
+        "POSTSEASON_CHAMPION", "POSTSEASON", "postseason lifecycle", "champion only",
+        "canonical championship and final standings committed", "League champion", "You won the league championship.", "league",
+        "postseason:champion:{bracket_id}:{recipient_user_id}", "matchup_result_alerts", "matchup_result_alerts",
+        privacy_scope=NotificationScope.LEAGUE_MEMBER,
+    ),
     # ``big_play_alerts`` is a master preference, not its own push event.
     # A recipient chooses which of the three long-play event types below can
     # pass through that master gate.

@@ -29,6 +29,12 @@ export const isDraftRoomRoute = (pathname: string) =>
 
 export const isCreateLeagueRoute = (pathname: string) => pathname === "/leagues/create";
 
+// Matchups own their internal safe-area spacing so the scoreboard and lineup
+// tables can use the full available width on phones and beside the desktop
+// sidebar. Keeping the route check here makes that shell behavior explicit.
+export const isLeagueMatchupRoute = (pathname: string) =>
+  /^\/league\/[^/]+\/matchup$/.test(pathname);
+
 export const isSaturdayPick6Route = (pathname: string) => pathname === "/saturday-pick-6";
 
 export const isAuthFlowRoute = (pathname: string) =>

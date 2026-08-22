@@ -39,6 +39,10 @@ describe("LeagueMatchupCarousel", () => {
     expect(screen.getByText("127.6")).toBeTruthy();
     expect(screen.getByText("55.2% / 44.8%")).toBeTruthy();
     expect(screen.getByLabelText("Swipe through your league matchups").className).toContain("overflow-x-auto");
+    // Cards size from the rail rather than from 100vw. The latter exceeds a
+    // padded native shell and clips the card's far border in Capacitor.
+    expect(screen.getByTestId("league-carousel-card-17-0").className).toContain("w-full");
+    expect(screen.getByTestId("league-carousel-card-17-0").className).not.toContain("100vw");
     expect(screen.getByTestId("league-carousel-pagination").getAttribute("aria-label")).toBe("Showing league 1 of 1");
   });
 

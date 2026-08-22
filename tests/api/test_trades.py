@@ -708,7 +708,7 @@ def test_accept_no_review_trade_processes_roster_swap_and_writes_chat(client, db
     )
 
 
-def test_due_trade_worker_waits_until_monday_reset(client, db_session):
+def test_due_trade_worker_waits_until_sunday_reset(client, db_session):
     proposing_token = create_user_and_token(client, "worker-a")
     receiving_token = create_user_and_token(client, "worker-b")
     league = create_league(client, proposing_token, "worker", review_type="none")
@@ -736,7 +736,7 @@ def test_due_trade_worker_waits_until_monday_reset(client, db_session):
 
     result = process_trade_offers_once(
         db_session,
-        now=datetime(2026, 9, 7, 4, 1, tzinfo=timezone.utc),
+        now=datetime(2026, 9, 6, 4, 1, tzinfo=timezone.utc),
     )
 
     assert result == {"processed": 1, "failed": 0}
@@ -856,6 +856,17 @@ def test_delayed_trade_updates_its_finalized_chat_card_after_processing(client, 
         trade_service,
         "is_cfb_game_week_active",
         lambda *_args, **_kwargs: game_week_active["value"],
+    )
+    # A game-week trade is deferred only when an included player has started
+    # or kicks off within 24 hours. Keep this chat lifecycle test aligned with
+    # that rule instead of assuming every Tuesday--Saturday trade is locked.
+    monkeypatch.setattr(
+        trade_service,
+        "game_starts_for_players",
+        lambda _db, *, player_ids, **_kwargs: {
+            player_id: datetime.now(timezone.utc) + timedelta(hours=2)
+            for player_id in player_ids
+        },
     )
     proposing_token = create_user_and_token(client, "chat-pending-a")
     receiving_token = create_user_and_token(client, "chat-pending-b")
@@ -1013,7 +1024,7 @@ def test_trade_reject_cancel_counter_and_veto_endpoints(client, db_session):
     assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{vetoed['id']}:vetoed").one()
 
 
-def test_locked_player_cannot_be_traded(client, db_session):
+def test_started_player_trade_is_accepted_pending_until_sunday(client, db_session, monkeypatch):
     proposing_token = create_user_and_token(client, "locked-a")
     receiving_token = create_user_and_token(client, "locked-b")
     league = create_league(client, proposing_token, "locked", review_type="none")
@@ -1021,24 +1032,107 @@ def test_locked_player_cannot_be_traded(client, db_session):
     seed = seed_trade_rosters(db_session, league["id"])
     from collegefootballfantasy_api.app.models.game import Game
 
+    current = datetime(2026, 9, 2, 16, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(trade_service, "_utcnow", lambda: current)
     db_session.add(
         Game(
             season=2026,
-            week=1,
+            week=3,
             season_type="regular",
-            start_date=datetime.now(timezone.utc) - timedelta(hours=1),
+            start_date=current - timedelta(hours=1),
             home_team=seed["give"].school,
             away_team="Opponent",
         )
     )
     db_session.commit()
-    response = client.post(
+    created = client.post(
         f"/leagues/{league['id']}/trades",
         json=trade_offer_payload(seed),
         headers=auth_headers(proposing_token),
     )
-    assert response.status_code == 409
-    assert response.json()["detail"] == "locked player cannot be traded"
+    assert created.status_code == 201
+
+    response = client.post(
+        f"/leagues/{league['id']}/trades/{created.json()['id']}/accept",
+        json={},
+        headers=auth_headers(receiving_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "accepted_pending"
+    assert response.json()["process_after"].startswith("2026-09-06T04:00:00")
+
+
+def test_trade_processes_immediately_when_all_players_are_more_than_24_hours_from_kickoff(client, db_session, monkeypatch):
+    proposing_token = create_user_and_token(client, "safe-window-a")
+    receiving_token = create_user_and_token(client, "safe-window-b")
+    league = create_league(client, proposing_token, "safe-window", review_type="none")
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+    current = datetime(2026, 9, 2, 16, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(trade_service, "_utcnow", lambda: current)
+    db_session.add(
+        Game(
+            season=2026,
+            week=3,
+            season_type="regular",
+            start_date=current + timedelta(hours=24, minutes=1),
+            home_team=seed["give"].school,
+            away_team="Opponent",
+        )
+    )
+    db_session.commit()
+    created = client.post(
+        f"/leagues/{league['id']}/trades",
+        json=trade_offer_payload(seed),
+        headers=auth_headers(proposing_token),
+    )
+    assert created.status_code == 201
+
+    response = client.post(
+        f"/leagues/{league['id']}/trades/{created.json()['id']}/accept",
+        json={},
+        headers=auth_headers(receiving_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "processed"
+
+
+def test_trade_with_player_kicking_off_within_24_hours_waits_until_sunday(client, db_session, monkeypatch):
+    proposing_token = create_user_and_token(client, "near-kickoff-a")
+    receiving_token = create_user_and_token(client, "near-kickoff-b")
+    league = create_league(client, proposing_token, "near-kickoff", review_type="none")
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+    current = datetime(2026, 9, 2, 16, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(trade_service, "_utcnow", lambda: current)
+    db_session.add(
+        Game(
+            season=2026,
+            week=3,
+            season_type="regular",
+            start_date=current + timedelta(hours=23, minutes=59),
+            home_team=seed["give"].school,
+            away_team="Opponent",
+        )
+    )
+    db_session.commit()
+    created = client.post(
+        f"/leagues/{league['id']}/trades",
+        json=trade_offer_payload(seed),
+        headers=auth_headers(proposing_token),
+    )
+    assert created.status_code == 201
+
+    response = client.post(
+        f"/leagues/{league['id']}/trades/{created.json()['id']}/accept",
+        json={},
+        headers=auth_headers(receiving_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "accepted_pending"
 
 
 def test_expired_trade_cannot_be_accepted(client, db_session):

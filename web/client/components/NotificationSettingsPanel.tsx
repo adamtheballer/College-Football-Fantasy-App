@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet, apiPost } from "@/lib/api";
-import { enableBrowserPush, getBrowserPushState, prepareBrowserPush, type BrowserPushState } from "@/lib/push-notifications";
+import { enableBrowserPush, getBrowserPushState, prepareBrowserPush, resolvePushState, type BrowserPushState } from "@/lib/push-notifications";
 
 type Preferences = {
   push_enabled: boolean;
@@ -121,6 +121,16 @@ export function NotificationSettingsPanel() {
   const mountedRef = useRef(false);
   const requestGenerationRef = useRef(0);
   const requestControllersRef = useRef(new Set<AbortController>());
+
+  useEffect(() => {
+    let active = true;
+    void resolvePushState().then((nextPermission) => {
+      if (active) setPermission(nextPermission);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;

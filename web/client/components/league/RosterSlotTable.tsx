@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Lock } from "lucide-react";
 
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { usePlayerCard } from "@/hooks/use-players";
@@ -308,6 +309,7 @@ export function RosterSlotTable({
                     {player.injury_status === "OUT" ? <span aria-label="Out" className="text-xs font-black text-red-400">O</span> : null}
                     {player.injury_status === "IR" ? <span aria-label="Injured reserve" className="text-[10px] font-black text-red-400">IR</span> : null}
                     <span className="truncate font-black text-cfb-text-primary">{isRealPlayer ? player.player_name : "N/A"}</span>
+                    {isFinalGame ? <Lock aria-label="Game final" className="h-3 w-3 shrink-0 text-cfb-text-muted" /> : null}
                   </span>
                   <span
                     className={cn(

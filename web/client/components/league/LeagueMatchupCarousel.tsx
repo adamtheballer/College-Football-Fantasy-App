@@ -204,7 +204,7 @@ export function LeagueMatchupCarousel({
                 else cardRefs.current.delete(index);
               }}
               onClick={() => onOpenLeague(league.id)}
-              className={`w-[min(21rem,calc(100vw-2.5rem))] shrink-0 snap-start rounded-2xl border p-4 text-left shadow-[0_14px_34px_rgba(2,6,23,0.28)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 sm:w-[22rem] ${
+              className={`w-full min-w-0 shrink-0 snap-start rounded-2xl border p-4 text-left shadow-[0_14px_34px_rgba(2,6,23,0.28)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 sm:w-[22rem] ${
                 active
                   ? "border-cfb-brand/70 bg-cfb-surface-raised"
                   : "border-cfb-border-subtle bg-cfb-surface-raised/90 hover:border-cfb-brand/45 hover:bg-cfb-surface-hover"

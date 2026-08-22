@@ -59,6 +59,7 @@ describe("AppShell scroll ownership", () => {
     expect(scrollArea?.className).toContain("touch-pan-y");
     expect(container.firstElementChild?.className).toContain("flex-col");
     expect(container.firstElementChild?.className).toContain("overflow-clip");
+    expect(container.firstElementChild?.className).toContain("pt-[env(safe-area-inset-top)]");
     expect(scrollArea?.className).not.toMatch(/(^|\s)h-full(\s|$)/);
   });
 
@@ -86,6 +87,17 @@ describe("AppShell scroll ownership", () => {
 
     expect(scrollArea?.getAttribute("data-scroll-owner")).toBe("page");
     expect(scrollArea?.className).toContain("overflow-y-auto");
+  });
+
+  it("removes the shell gutter for pages that provide their own safe spacing", () => {
+    const { container } = renderShell({
+      compactContent: true,
+      fixedViewport: false,
+    });
+
+    const content = container.querySelector("main[data-app-scroll='true'] > div");
+    expect(content?.className).toContain("p-0");
+    expect(content?.className).not.toContain("px-4");
   });
 
   it("shows the Early Access header only on the home route", () => {
