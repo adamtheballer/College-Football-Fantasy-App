@@ -40,7 +40,7 @@ export function DraftRoomVisuals() {
 }
 
 export const draftMattePanelClass =
-  "rounded-[1.75rem] border border-cfb-border-subtle bg-cfb-surface-raised shadow-[0_14px_34px_rgba(0,0,0,0.28)]";
+  "border-y border-cfb-border-subtle bg-cfb-surface-raised shadow-none sm:rounded-[1.75rem] sm:border sm:shadow-[0_14px_34px_rgba(0,0,0,0.28)]";
 
 export const draftMatteControlClass =
   "border-cfb-border-subtle bg-cfb-surface text-cfb-text-primary shadow-[0_8px_20px_rgba(0,0,0,0.22)]";

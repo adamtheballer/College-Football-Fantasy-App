@@ -737,8 +737,8 @@ export default function SinglePlayerMockDraftRoom() {
     <div data-draft-room="mock" className="relative min-h-[100dvh] overflow-x-clip text-foreground">
       <DraftRoomVisuals />
 
-      <div className="relative mx-auto flex min-h-0 w-full max-w-[1800px] flex-1 flex-col space-y-2 px-3 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] pt-[max(0.5rem,env(safe-area-inset-top))] sm:block sm:space-y-6 sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+7.5rem)] sm:pt-4 md:px-6 md:pb-28">
-        <div className="relative z-20 flex h-12 shrink-0 items-center gap-2 rounded-xl border border-white/12 bg-[#0b121a]/92 px-2 shadow-[0_8px_20px_rgba(2,6,23,0.28)] sm:hidden">
+      <div className="relative flex min-h-0 w-full flex-1 flex-col space-y-2 pb-[5.75rem] pt-[max(0.5rem,env(safe-area-inset-top))] sm:mx-auto sm:block sm:max-w-[1800px] sm:space-y-6 sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+7.5rem)] sm:pt-4 md:px-6 md:pb-28">
+        <div className="relative z-20 flex h-12 shrink-0 items-center gap-2 border-y border-white/12 bg-[#0b121a]/92 px-3 shadow-none sm:hidden">
           <Button
             type="button"
             variant="outline"
@@ -1021,8 +1021,8 @@ export default function SinglePlayerMockDraftRoom() {
         </div>
       ) : null}
 
-      <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-cfb-border-subtle bg-cfb-surface-raised/96 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.26)] backdrop-blur-xl sm:pointer-events-none sm:inset-x-auto sm:bottom-3 sm:left-1/2 sm:flex sm:w-[min(100vw-3rem,60rem)] sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">
-        <div className={cn("grid w-full grid-cols-5 overflow-hidden rounded-xl sm:pointer-events-auto sm:mx-auto sm:rounded-2xl", draftMatteControlClass)}>
+      <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-cfb-border-subtle bg-cfb-surface-raised/96 p-0 shadow-[0_-8px_24px_rgba(0,0,0,0.26)] backdrop-blur-xl sm:pointer-events-none sm:inset-x-auto sm:bottom-3 sm:left-1/2 sm:flex sm:w-[min(100vw-3rem,60rem)] sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">
+        <div className={cn("grid w-full grid-cols-5 overflow-hidden sm:pointer-events-auto sm:mx-auto sm:rounded-2xl", draftMatteControlClass)}>
           {MOCK_TABS.map((tab) => (
             <button
               key={tab.value}
