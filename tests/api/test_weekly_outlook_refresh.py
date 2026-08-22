@@ -107,6 +107,9 @@ def test_post_final_refresh_preserves_a_locked_next_week_projection(db_session):
         )
         .one()
     )
-    assert locked.locked_at == locked_at.replace(tzinfo=None)
+    assert locked.locked_at is not None
+    # SQLite returns naive datetimes while PostgreSQL retains UTC tzinfo for
+    # this timezone-aware column. The stored instant must be identical.
+    assert locked.locked_at.replace(tzinfo=timezone.utc) == locked_at
     assert locked.fantasy_points == 17.3
     assert locked.baseline_source == "locked_live_game"

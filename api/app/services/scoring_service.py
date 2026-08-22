@@ -521,6 +521,12 @@ def run_league_scoring_recalculation(
     week: int,
     provider: str = "manual",
 ) -> ScoringSummary:
+    # A scoring run is auditable only when it belongs to an existing league.
+    # Validate before inserting the run so PostgreSQL's foreign-key constraint
+    # cannot leave the caller with a failed transaction for an invalid ID.
+    if league_id is not None and not db.get(League, league_id):
+        raise ValueError(f"league {league_id} not found")
+
     run = ScoringRun(
         league_id=league_id,
         season=season,
@@ -534,8 +540,6 @@ def run_league_scoring_recalculation(
     try:
         with db.begin_nested():
             if league_id is not None:
-                if not db.get(League, league_id):
-                    raise ValueError(f"league {league_id} not found")
                 summary = recalculate_league_week_scores(db, league_id, season, week)
             else:
                 summary = ScoringSummary(0, 0, 0, 0)

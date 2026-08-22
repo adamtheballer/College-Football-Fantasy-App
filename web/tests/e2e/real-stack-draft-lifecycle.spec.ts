@@ -57,7 +57,7 @@ test.describe("real two-manager draft lifecycle", () => {
   test.skip(!realStackEnabled, "Run through npm run test:e2e:real against the isolated Compose stack.");
   test.setTimeout(220_000);
 
-  test("enforces the standard beta roster and keeps two signed-in managers synchronized through timeout auto-picks", async ({ browser }) => {
+  test("enforces the standard beta roster and keeps two signed-in managers synchronized through manual picks, queues, and timeout auto-picks", async ({ browser }) => {
     const commissionerContext = await browser.newContext();
     const managerContext = await browser.newContext();
     const commissioner = await commissionerContext.newPage();
@@ -91,7 +91,9 @@ test.describe("real two-manager draft lifecycle", () => {
           draft_datetime_utc: new Date(Date.now() - 60_000).toISOString(),
           timezone: "America/New_York",
           draft_type: "snake",
-          pick_timer_seconds: 1,
+          // Three seconds leaves the browser test enough time to prove the
+          // manual-pick path before the lifecycle worker advances the clock.
+          pick_timer_seconds: 3,
         },
       });
       expect(createResponse.status).toBe(201);
@@ -116,6 +118,22 @@ test.describe("real two-manager draft lifecycle", () => {
 
       await expect(commissioner.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
       await expect(manager.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
+
+      const manualPickButton = commissioner.getByRole("button", { name: /^Draft /i }).first();
+      await expect(manualPickButton).toBeVisible();
+      const [manualPickResponse] = await Promise.all([
+        commissioner.waitForResponse((response) => response.url().includes("/api/leagues/") && response.url().includes("/draft-room/picks") && response.request().method() === "POST"),
+        manualPickButton.click(),
+      ]);
+      expect(manualPickResponse.status()).toBe(201);
+
+      // Queues are intentionally client-local, but this is still a live
+      // browser assertion that the second signed-in manager can queue a
+      // backend player while waiting for their turn.
+      const queueButton = manager.getByRole("button", { name: /^Queue /i }).first();
+      await expect(queueButton).toBeVisible({ timeout: 15_000 });
+      await queueButton.click();
+      await expect(manager.getByRole("button", { name: /^Remove .+ from queue$/i }).first()).toBeVisible();
 
       // This is intentionally real-stack rather than a route-mocked visual
       // test: the release gate must prove a signed-in manager can use the
@@ -166,14 +184,16 @@ test.describe("real two-manager draft lifecycle", () => {
         BENCH: 5,
         IR: 1,
       });
-      // The lifecycle worker can legitimately advance another one-second turn
-      // while the two browser contexts fetch their snapshots. The contract is
-      // that both managers observe the same unique sequence after at least two
-      // timeout picks, not that network timing freezes the sequence at two.
-      expect(room.body.picks.length).toBeGreaterThanOrEqual(2);
+      // The lifecycle worker can legitimately advance another three-second
+      // turn while the two browser contexts fetch their snapshots. The
+      // contract is that both managers observe the same unique sequence after
+      // a manual pick and at least two timeout picks, not that network timing
+      // freezes the sequence at an exact count.
+      expect(room.body.picks.length).toBeGreaterThanOrEqual(3);
       expect(managerRoom.body.picks.map((pick) => pick.player_id)).toEqual(room.body.picks.map((pick) => pick.player_id));
       expect(new Set(room.body.picks.map((pick) => pick.player_id)).size).toBe(room.body.picks.length);
-      expect(room.body.picks.every((pick) => pick.auto_pick)).toBe(true);
+      expect(room.body.picks[0]?.auto_pick).toBe(false);
+      expect(room.body.picks.filter((pick) => pick.auto_pick).length).toBeGreaterThanOrEqual(2);
     } finally {
       await commissionerContext.close();
       await managerContext.close();

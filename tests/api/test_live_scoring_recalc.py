@@ -128,10 +128,9 @@ def test_scoring_run_records_success_and_failure(client, db_session):
     success_run = db_session.query(ScoringRun).filter_by(league_id=league.id, status="success").one()
     assert success_run.players_updated == 6
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError, match="league .* not found"):
         run_league_scoring_recalculation(db_session, league.id + 999, 2026, 1)
-    failed_run = db_session.query(ScoringRun).filter_by(league_id=league.id + 999, status="failed").one()
-    assert failed_run.error_message
+    assert db_session.query(ScoringRun).filter_by(league_id=league.id + 999).count() == 0
 
 
 def test_failed_scoring_run_rolls_back_partial_recalculation(client, db_session, monkeypatch):

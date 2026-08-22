@@ -268,8 +268,6 @@ def test_synthetic_three_minute_drill_updates_matchup_then_finalizes_downstream_
     """
 
     league, arch, _wingo = _synthetic_live_matchup(db_session, at=NOW)
-    league_id = league.id
-    arch_id = arch.id
 
     first = run_espn_scoring_cycle(
         db_session,
