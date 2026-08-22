@@ -202,6 +202,22 @@
     overscroll-behavior-x: none;
   }
 
+  /*
+   * Native iOS can expose a zero CSS env(safe-area-inset-top) while its
+   * status bar still overlays the Capacitor webview. Reserve the iPhone
+   * status area only for that native shell; browser pages continue to use
+   * their normal viewport without an artificial top gutter.
+   */
+  .cfb-app-viewport {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  @media (max-width: 1023px) {
+    .cfb-app-viewport[data-native-shell="true"] {
+      padding-top: max(env(safe-area-inset-top, 0px), 59px);
+    }
+  }
+
   :focus-visible {
     outline: 2px solid hsl(var(--brand-primary));
     outline-offset: 3px;

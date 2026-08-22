@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Capacitor } from "@capacitor/core";
 
 import { FloatingQuickActions } from "@/components/FloatingQuickActions";
 import type { User } from "@/hooks/use-auth";
@@ -40,6 +41,11 @@ export function AppShell({
   mainScrollRef,
 }: AppShellProps) {
   const mobileNavItems = getMobileNavItems(navItems);
+  // Capacitor's iOS webview can report a zero CSS safe-area inset even while
+  // the native status bar overlays the page. Keep that platform-specific
+  // fallback on the shared viewport so every route begins below the status
+  // area instead of requiring page-by-page top padding.
+  const isNativeShell = Capacitor.isNativePlatform();
   // The Early Access lockup and manager greeting are home-dashboard context,
   // not global navigation. Keeping them off data-heavy league routes returns
   // meaningful vertical space on phones without removing the persistent nav.
@@ -53,8 +59,9 @@ export function AppShell({
   return (
     <div
       data-app-viewport="true"
+      data-native-shell={isNativeShell ? "true" : undefined}
       className={cn(
-        "isolate relative flex h-[100dvh] min-h-0 max-w-full flex-col overflow-clip bg-cfb-canvas pt-[env(safe-area-inset-top)] font-sans text-cfb-text-primary selection:bg-cfb-brand/20 selection:text-cfb-text-primary lg:h-screen lg:flex-row lg:pt-0",
+        "cfb-app-viewport isolate relative flex h-[100dvh] min-h-0 w-full max-w-full flex-col overflow-clip bg-cfb-canvas font-sans text-cfb-text-primary selection:bg-cfb-brand/20 selection:text-cfb-text-primary lg:h-screen lg:flex-row lg:pt-0",
       )}
     >
       {!hideFloatingActions ? <FloatingQuickActions /> : null}
