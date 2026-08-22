@@ -29,6 +29,10 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
   const isMoreActive = drawerItems.some(
     (item) => item.path === pathname && !items.some((mobileItem) => mobileItem.name === item.name),
   );
+  // Guests have three destinations; signed-in managers have four. Include the
+  // More button in the grid calculation so neither state leaves a blank mobile
+  // slot or packs the tabs unevenly to one side.
+  const visibleItemCount = items.length + 1;
 
   return (
     <Sheet open={isMoreOpen} onOpenChange={setIsMoreOpen}>
@@ -39,7 +43,11 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
           isMoreOpen && "pointer-events-none opacity-0",
         )}
       >
-        <div className="grid grid-cols-5 gap-0.5">
+        <div
+          data-mobile-nav-grid="true"
+          className="grid gap-0.5"
+          style={{ gridTemplateColumns: `repeat(${visibleItemCount}, minmax(0, 1fr))` }}
+        >
           {items.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.path;

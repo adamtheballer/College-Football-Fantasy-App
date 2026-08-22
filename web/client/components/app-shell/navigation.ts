@@ -51,9 +51,9 @@ export const getShellNavItems = (
 ): ShellNavItem[] => {
   if (!isLoggedIn) {
     return [
+      { name: "SIGN IN", path: "/login", icon: LogIn, kind: "auth" },
       { name: "LEAGUES", path: "/leagues", icon: Trophy },
       { name: "SETTINGS", path: "/settings", icon: Settings },
-      { name: "SIGN IN", path: "/login", icon: LogIn, kind: "auth" },
     ];
   }
 

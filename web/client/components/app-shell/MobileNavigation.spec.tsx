@@ -35,6 +35,20 @@ const renderNavigation = (onSignOut = vi.fn()) => {
   };
 };
 
+const renderGuestNavigation = () => {
+  const allItems = getShellNavItems(null, false);
+  return render(
+    <MemoryRouter initialEntries={["/login"]}>
+      <MobileNavigation
+        items={getMobileNavItems(allItems)}
+        allItems={allItems}
+        pathname="/login"
+        onSignOut={vi.fn()}
+      />
+    </MemoryRouter>,
+  );
+};
+
 describe("MobileNavigation", () => {
   it("keeps four tap-friendly primary destinations visible and opens the full sidebar in More", () => {
     renderNavigation();
@@ -78,5 +92,18 @@ describe("MobileNavigation", () => {
     for (const label of ["Home", "Leagues", "Chats", "Draft", "More"]) {
       expect(screen.getByText(label).className).toContain("whitespace-nowrap");
     }
+  });
+
+  it("evenly distributes the guest tabs and places Sign In first", () => {
+    renderGuestNavigation();
+
+    const navigation = screen.getByRole("navigation", { name: "Primary mobile navigation" });
+    const grid = navigation.querySelector('[data-mobile-nav-grid="true"]');
+    expect((grid as HTMLDivElement | null)?.style.gridTemplateColumns).toBe("repeat(4, minmax(0, 1fr))");
+    expect(screen.getAllByRole("link").slice(0, 3).map((link) => link.getAttribute("aria-label"))).toEqual([
+      "SIGN IN",
+      "LEAGUES",
+      "SETTINGS",
+    ]);
   });
 });
