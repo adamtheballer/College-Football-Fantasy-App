@@ -19,7 +19,7 @@ DEFAULT_CORS_ORIGINS = (
 )
 DEFAULT_CORS_ORIGIN_REGEX = r"https?://(localhost|127\.0\.0\.1):[0-9]+"
 # A Capacitor production build loads its bundled React assets from this fixed
-# origin.  It is intentionally an exact allow-list entry—not a localhost
+# origin. It is intentionally an exact allow-list entry—not a localhost
 # exception—so native clients can reach the API without widening browser CORS.
 TRUSTED_NATIVE_CORS_ORIGINS = frozenset({"capacitor://localhost"})
 
