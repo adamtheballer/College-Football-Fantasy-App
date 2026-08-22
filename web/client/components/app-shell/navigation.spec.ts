@@ -35,15 +35,19 @@ describe("app shell navigation helpers", () => {
     expect(isAuthFlowRoute("/league/1/roster")).toBe(false);
   });
 
-  it("omits the misleading home destination from guest navigation and includes sign-in", () => {
+  it("puts sign-in first for guests and omits the misleading home destination", () => {
     const items = getShellNavItems(null, false);
 
     expect(items.map((item) => item.name)).toEqual([
+      "SIGN IN",
       "LEAGUES",
       "SETTINGS",
-      "SIGN IN",
     ]);
-    expect(getMobileNavItems(items).map((item) => item.name)).not.toContain("HOME");
+    expect(getMobileNavItems(items).map((item) => item.name)).toEqual([
+      "SIGN IN",
+      "LEAGUES",
+      "SETTINGS",
+    ]);
   });
 
   it("includes admin scoring only for admin users", () => {
