@@ -541,10 +541,10 @@ describe("single-player mock draft engine", () => {
     );
   });
 
-  it("centers carousel picks from pick four onward and keeps early picks at start", () => {
+  it("centers carousel picks from pick three onward and keeps the first two at start", () => {
     expect(
       getCenteredDraftCarouselScrollLeft({
-        overallPick: 3,
+        overallPick: 2,
         cardOffsetLeft: 400,
         cardWidth: 180,
         containerWidth: 600,
@@ -553,12 +553,12 @@ describe("single-player mock draft engine", () => {
 
     expect(
       getCenteredDraftCarouselScrollLeft({
-        overallPick: 4,
-        cardOffsetLeft: 720,
+        overallPick: 3,
+        cardOffsetLeft: 400,
         cardWidth: 180,
         containerWidth: 600,
       })
-    ).toBe(510);
+    ).toBe(190);
   });
 
   it("only marks the timer dangerous in the last ten seconds of live picks", () => {

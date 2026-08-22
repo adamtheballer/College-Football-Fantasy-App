@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, ClipboardList, LocateFixed, Loader2, RefreshCcw, Search, Trophy } from "lucide-react";
 
@@ -13,6 +13,7 @@ import { useDraftPlayerPool, usePlayerCard, usePlayerDetail } from "@/hooks/use-
 import { buildDraftBoard, type DraftPlayer } from "@/lib/draftRankings";
 import { formatDraftProjection } from "@/lib/draft-projections";
 import { mergeMockDraftMasterBoardPlayers } from "@/lib/mockDraftMasterBoard";
+import { FIRST_CENTERED_DRAFT_PICK } from "@/lib/draftOrderCarousel";
 import {
   advanceSinglePlayerMockDraft,
   buildMockRoster,
@@ -120,6 +121,9 @@ export default function SinglePlayerMockDraftRoom() {
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const pickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
+  const mobileCarouselRef = useRef<HTMLDivElement | null>(null);
+  const mobilePickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
+  const [mobileCarouselInset, setMobileCarouselInset] = useState(0);
   const { data: playersPayload, isLoading, isError, error: playerPoolError } = useDraftPlayerPool({
     limit: 200,
     fetchAll: true,
@@ -228,10 +232,12 @@ export default function SinglePlayerMockDraftRoom() {
       ) => {
         const activeCard = cards.get(overallPick);
         if (!container || !activeCard) return;
+        const containerBox = container.getBoundingClientRect();
+        const cardBox = activeCard.getBoundingClientRect();
         container.scrollTo({
           left: getCenteredDraftCarouselScrollLeft({
             overallPick,
-            cardOffsetLeft: activeCard.offsetLeft,
+            cardOffsetLeft: cardBox.left - containerBox.left + container.scrollLeft,
             cardWidth: activeCard.offsetWidth,
             containerWidth: container.clientWidth,
           }),
@@ -240,6 +246,7 @@ export default function SinglePlayerMockDraftRoom() {
       };
 
       center(carouselRef.current, pickRefs.current);
+      center(mobileCarouselRef.current, mobilePickRefs.current);
     },
     []
   );
@@ -251,10 +258,10 @@ export default function SinglePlayerMockDraftRoom() {
   useEffect(() => {
     if (draftState.status === "complete") return;
     const frame = window.requestAnimationFrame(() => {
-      centerDraftCarouselOnPick(draftState.currentPick, draftState.currentPick >= 4 ? "smooth" : "auto");
+      centerDraftCarouselOnPick(draftState.currentPick, "auto");
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [centerDraftCarouselOnPick, draftState.currentPick, draftState.status]);
+  }, [centerDraftCarouselOnPick, draftState.currentPick, draftState.status, mobileCarouselInset]);
 
   const currentTeam = getCurrentTeam(draftState);
   const userDraftBoardTeam = useMemo(
@@ -356,6 +363,31 @@ export default function SinglePlayerMockDraftRoom() {
       }),
     [draftState.picks, draftState.teams, teamCount, totalPicks]
   );
+
+  useLayoutEffect(() => {
+    if (draftState.currentPick < FIRST_CENTERED_DRAFT_PICK) {
+      setMobileCarouselInset(0);
+      return;
+    }
+
+    const updateInset = () => {
+      const rail = mobileCarouselRef.current;
+      const activeCard = mobilePickRefs.current.get(draftState.currentPick);
+      if (!rail || !activeCard) return;
+
+      const railStyle = window.getComputedStyle(rail);
+      const horizontalRailPadding =
+        Number.parseFloat(railStyle.paddingLeft) + Number.parseFloat(railStyle.paddingRight);
+      const nextInset = Math.max(0, (rail.clientWidth - horizontalRailPadding - activeCard.offsetWidth) / 2);
+      setMobileCarouselInset((currentInset) =>
+        Math.abs(currentInset - nextInset) < 0.5 ? currentInset : nextInset
+      );
+    };
+
+    updateInset();
+    window.addEventListener("resize", updateInset);
+    return () => window.removeEventListener("resize", updateInset);
+  }, [draftState.currentPick]);
 
   const resetDraft = () => {
     const freshDraft = createRandomSinglePlayerMockDraft(Date.now(), mockSettings);
@@ -853,17 +885,45 @@ export default function SinglePlayerMockDraftRoom() {
             <p className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">{draftState.currentPick} / {totalPicks}</p>
           </div>
           <div
+            ref={mobileCarouselRef}
             data-testid="mobile-draft-order-scroll"
             aria-label="Draft order; swipe horizontally to view every pick and future rounds"
             className="overflow-x-auto overscroll-x-contain scroll-smooth snap-x px-2 py-2 touch-pan-x"
           >
-            <div className="flex min-w-max gap-1.5">
+            <div
+              className="flex min-w-max gap-1.5"
+              style={
+                draftState.currentPick >= FIRST_CENTERED_DRAFT_PICK
+                  ? { paddingInline: mobileCarouselInset }
+                  : undefined
+              }
+            >
               {draftOrderPicks.map((slot) => {
                 const isCurrent = draftState.status !== "complete" && slot.overallPick === draftState.currentPick;
                 const isUser = slot.teamId === draftState.userTeamId;
                 const managerName = isUser ? "You" : slot.team?.name ?? "Bot";
                 return (
-                  <div key={slot.overallPick} data-testid={`mobile-draft-order-card-${slot.overallPick}`} aria-current={isCurrent ? "step" : undefined} className={cn("flex w-[4.15rem] shrink-0 snap-start flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}>
+                  <div
+                    key={slot.overallPick}
+                    ref={(node) => {
+                      if (node) {
+                        mobilePickRefs.current.set(slot.overallPick, node);
+                      } else {
+                        mobilePickRefs.current.delete(slot.overallPick);
+                      }
+                    }}
+                    data-testid={`mobile-draft-order-card-${slot.overallPick}`}
+                    aria-current={isCurrent ? "step" : undefined}
+                    className={cn("relative flex w-[4.15rem] shrink-0 snap-start flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}
+                  >
+                    {isCurrent && draftState.currentPick >= FIRST_CENTERED_DRAFT_PICK ? (
+                      <div
+                        aria-label="Current pick scope"
+                        className="absolute -top-2 left-1/2 z-10 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-amber-100/70 bg-[#0b121a] text-amber-100 shadow-[0_0_14px_rgba(251,191,36,0.30)]"
+                      >
+                        <LocateFixed className="h-3 w-3" />
+                      </div>
+                    ) : null}
                     <DraftOrderPickCard
                       compact
                       managerName={managerName}
@@ -899,7 +959,13 @@ export default function SinglePlayerMockDraftRoom() {
               <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">{totalPicks - draftedCount} Unlocked</p>
             </div>
           </div>
-          <div ref={carouselRef} className="flex gap-2 overflow-x-auto px-4 py-3 scroll-smooth snap-x">
+          <div
+            ref={carouselRef}
+            className={cn(
+              "flex gap-2 overflow-x-auto px-4 py-3 pr-[calc(50%-5.5rem)] scroll-smooth snap-x",
+              draftState.currentPick >= FIRST_CENTERED_DRAFT_PICK && "pl-[calc(50%-4.4375rem)]",
+            )}
+          >
             {draftOrderPicks.map((slot) => {
               const isCurrent = draftState.status !== "complete" && slot.overallPick === draftState.currentPick;
               const isUser = slot.teamId === draftState.userTeamId;
@@ -926,7 +992,7 @@ export default function SinglePlayerMockDraftRoom() {
                     isLocked && "opacity-80"
                   )}
                 >
-                  {isCurrent ? (
+                  {isCurrent && draftState.currentPick >= FIRST_CENTERED_DRAFT_PICK ? (
                     <div
                       aria-label="Current pick"
                       className="absolute -top-3 left-1/2 z-10 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border border-amber-100/70 bg-[#0b121a] text-amber-100 shadow-[0_0_18px_rgba(251,191,36,0.30)]"

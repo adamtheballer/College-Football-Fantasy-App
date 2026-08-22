@@ -6,11 +6,11 @@ import {
 } from "./draftOrderCarousel";
 
 describe("draft order carousel", () => {
-  it("keeps the first three picks at the start of the rail", () => {
-    expect(FIRST_CENTERED_DRAFT_PICK).toBe(4);
+  it("keeps the first two picks at the start of the rail", () => {
+    expect(FIRST_CENTERED_DRAFT_PICK).toBe(3);
     expect(
       getCenteredDraftOrderScrollLeft({
-        overallPick: 3,
+        overallPick: 2,
         cardOffsetLeft: 400,
         cardWidth: 180,
         containerWidth: 600,
@@ -18,14 +18,14 @@ describe("draft order carousel", () => {
     ).toBe(0);
   });
 
-  it("centers the active manager from pick four onward", () => {
+  it("centers the active manager from the third pick onward", () => {
     expect(
       getCenteredDraftOrderScrollLeft({
-        overallPick: 4,
-        cardOffsetLeft: 720,
+        overallPick: 3,
+        cardOffsetLeft: 400,
         cardWidth: 180,
         containerWidth: 600,
       }),
-    ).toBe(510);
+    ).toBe(190);
   });
 });
