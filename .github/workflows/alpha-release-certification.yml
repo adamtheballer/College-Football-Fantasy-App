@@ -58,6 +58,7 @@ jobs:
         run: PYTHONPATH=. uv run python scripts/certify_alpha_postgres_rehearsal.py
       - name: Recorded scoring replay, correction, duplicate, restart, and outlook regression
         run: >-
+          CFF_TEST_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/cff_alpha_release
           PYTHONPATH=. uv run pytest -q
           tests/api/test_espn_live_scoring.py
           tests/api/test_live_scoring_recalc.py

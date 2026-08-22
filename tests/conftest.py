@@ -1,4 +1,5 @@
 from collections.abc import Generator
+import os
 
 import pytest
 from fastapi.testclient import TestClient
@@ -68,12 +69,19 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
 )
 from collegefootballfantasy_api.app.models.user import User
 
-TEST_DATABASE_URL = "sqlite://"
-engine = create_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
+# Most tests deliberately use an in-memory database for speed.  The alpha
+# release workflow opts into a disposable PostgreSQL service for the scoring
+# replay suite so its worker and persistence semantics are proven on the same
+# database family used in production.  This is intentionally test-only: a
+# non-empty value is supplied solely by GitHub Actions.
+TEST_DATABASE_URL = os.getenv("CFF_TEST_DATABASE_URL", "sqlite://")
+engine_options = {}
+if TEST_DATABASE_URL.startswith("sqlite"):
+    engine_options = {
+        "connect_args": {"check_same_thread": False},
+        "poolclass": StaticPool,
+    }
+engine = create_engine(TEST_DATABASE_URL, **engine_options)
 TestingSessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 

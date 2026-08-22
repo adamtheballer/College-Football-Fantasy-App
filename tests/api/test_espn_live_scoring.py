@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 import pytest
+from sqlalchemy.orm import sessionmaker
 
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.game import Game
@@ -37,6 +38,7 @@ from collegefootballfantasy_api.app.services.espn_live_scoring import (
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.integrations.espn import ESPNProviderResponse
 from collegefootballfantasy_api.app.services.live_scoring_readiness import PublicScoringPreflightError
+import scripts.run_espn_scoring_worker as scoring_worker
 from tests.api.scoring_helpers import create_scoring_fixture
 from tests.api.test_espn_boxscores import espn_summary_payload
 
@@ -266,6 +268,8 @@ def test_synthetic_three_minute_drill_updates_matchup_then_finalizes_downstream_
     """
 
     league, arch, _wingo = _synthetic_live_matchup(db_session, at=NOW)
+    league_id = league.id
+    arch_id = arch.id
 
     first = run_espn_scoring_cycle(
         db_session,
@@ -309,6 +313,82 @@ def test_synthetic_three_minute_drill_updates_matchup_then_finalizes_downstream_
     assert matchup.home_score > second_score
     assert db_session.query(WeeklyProjection).filter_by(
         player_id=arch.id,
+        season=2026,
+        week=2,
+        projection_version="MIDWEEK",
+    ).count() == 1
+
+
+def test_recorded_replay_runs_through_worker_entrypoint_and_survives_restart(db_session, monkeypatch):
+    """Exercise the real worker entrypoint with deterministic ESPN snapshots.
+
+    The alpha workflow runs this suite against disposable PostgreSQL.  The
+    test replaces only the external HTTP adapter with recorded payloads; all
+    schedule resolution, durable poll leases, snapshot persistence, scoring,
+    finality, worker heartbeats, and downstream outlook work stay on the
+    actual worker path.
+    """
+
+    league, arch, _wingo = _synthetic_live_matchup(db_session, at=NOW)
+    league_id = league.id
+    arch_id = arch.id
+    worker_sessions = sessionmaker(bind=db_session.get_bind(), autocommit=False, autoflush=False)
+    monkeypatch.setattr(scoring_worker, "SessionLocal", worker_sessions)
+    monkeypatch.setattr(settings, "scoring_mode", "enabled")
+    monkeypatch.setattr(settings, "scoring_provider", "espn")
+
+    first = scoring_worker.run_iteration(
+        now=NOW,
+        client=FakeLiveESPN(summary=_summary_at(period=1, clock="10:00", pass_yards=80)),
+    )
+    assert first is not None
+    assert first.promoted_rows == 2
+
+    # Simulate a process restart: run_iteration opens a fresh session and must
+    # resume from persisted poll/snapshot state rather than in-memory state.
+    _make_public_promotion_ready(db_session, at=NOW + timedelta(seconds=180))
+    _poll_due(db_session, at=NOW + timedelta(seconds=180))
+    db_session.expunge_all()
+    second = scoring_worker.run_iteration(
+        now=NOW + timedelta(seconds=180),
+        client=FakeLiveESPN(summary=_summary_at(period=2, clock="12:00", pass_yards=180)),
+    )
+    assert second is not None
+    assert second.promoted_rows == 2
+
+    _make_public_promotion_ready(db_session, at=NOW + timedelta(seconds=360))
+    _poll_due(db_session, at=NOW + timedelta(seconds=360))
+    final = scoring_worker.run_iteration(
+        now=NOW + timedelta(seconds=360),
+        client=FakeLiveESPN(summary=_final_summary(pass_yards=300)),
+    )
+    assert final is not None
+    assert final.promoted_rows == 2
+
+    # A replayed final payload is persisted for auditability but cannot score
+    # the player or finalize the matchup a second time.
+    _poll_due(db_session, at=NOW + timedelta(seconds=540))
+    duplicate = scoring_worker.run_iteration(
+        now=NOW + timedelta(seconds=540),
+        client=FakeLiveESPN(summary=_final_summary(pass_yards=300)),
+    )
+    assert duplicate is not None
+    assert duplicate.promoted_rows == 0
+
+    db_session.expire_all()
+    matchup = db_session.query(Matchup).filter_by(league_id=league_id, season=2026, week=1).one()
+    score = db_session.query(PlayerWeekScore).filter_by(
+        league_id=league_id,
+        player_id=arch_id,
+        season=2026,
+        week=1,
+    ).one()
+    heartbeat = db_session.query(WorkerHeartbeat).filter_by(worker_name="espn_scoring_processor").one()
+    assert matchup.status == "final"
+    assert score.fantasy_points == 31.4
+    assert heartbeat.status == "healthy"
+    assert db_session.query(WeeklyProjection).filter_by(
+        player_id=arch_id,
         season=2026,
         week=2,
         projection_version="MIDWEEK",
