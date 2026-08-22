@@ -91,10 +91,9 @@ test.describe("real two-manager draft lifecycle", () => {
           draft_datetime_utc: new Date(Date.now() - 60_000).toISOString(),
           timezone: "America/New_York",
           draft_type: "snake",
-          // Use the supported minimum.  A shorter fixture clock can expire
-          // while a slower CI browser performs the mobile-layout assertions,
-          // turning the first intended manual pick into an auto-pick race.
-          pick_timer_seconds: 15,
+          // Leave enough time for the deliberately human opening pick while
+          // still exercising the production timeout worker twice below.
+          pick_timer_seconds: 30,
         },
       });
       expect(createResponse.status).toBe(201);
@@ -117,20 +116,30 @@ test.describe("real two-manager draft lifecycle", () => {
         return room.body;
       }).toMatchObject({ status: "on_clock", current_pick: 1 });
 
-      await expect(commissioner.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
+      const openingRoom = await realApi<{
+        status: string;
+        current_pick: number;
+        current_team_id: number | null;
+        user_team_id: number | null;
+      }>(commissioner, `/leagues/${leagueId}/draft-room`);
+      expect(openingRoom.status).toBe(200);
+      expect(openingRoom.body).toMatchObject({ status: "on_clock", current_pick: 1 });
+
+      const openingPicker = openingRoom.body.current_team_id === openingRoom.body.user_team_id ? commissioner : manager;
+      await expect(openingPicker.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
       // Submit the deliberate manual opening pick before any visual work.
-      // The draft must be on-clock to cover its live UI, but a slower CI
-      // browser can otherwise spend the entire supported 15-second fixture
-      // window resizing and measuring the viewport, converting this intended
-      // manual pick into an auto-pick before the click is attempted.
-      const manualPickButton = commissioner.getByRole("button", { name: /^Draft /i }).first();
+      // The draft must be on-clock to cover its live UI.  The opening order is
+      // random, so the test must act through the browser context that owns the
+      // active team rather than assuming the commissioner holds pick one.
+      const manualPickButton = openingPicker.getByRole("button", { name: /^Draft /i }).first();
       await manualPickButton.scrollIntoViewIfNeeded();
       await expect(manualPickButton).toBeVisible();
+      await expect(manualPickButton).toBeEnabled();
       const [manualPickResponse] = await Promise.all([
         // The production route is `/draft-picks`.  Waiting for the obsolete
         // `/draft-room/picks` path makes this assertion run until the overall
         // test timeout even though the browser already submitted the pick.
-        commissioner.waitForResponse((response) => response.url().includes("/api/leagues/") && response.url().includes("/draft-picks") && response.request().method() === "POST"),
+        openingPicker.waitForResponse((response) => response.url().includes("/api/leagues/") && response.url().includes("/draft-picks") && response.request().method() === "POST"),
         manualPickButton.click(),
       ]);
       expect(manualPickResponse.status()).toBe(201);
