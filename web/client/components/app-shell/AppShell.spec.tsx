@@ -4,9 +4,20 @@ import * as React from "react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const platform = vi.hoisted(() => ({ native: false }));
+
+vi.mock("@capacitor/core", () => ({
+  Capacitor: {
+    isNativePlatform: () => platform.native,
+  },
+}));
+
 import { AppShell, shouldShowHomeHeader } from "./AppShell";
 
-afterEach(cleanup);
+afterEach(() => {
+  platform.native = false;
+  cleanup();
+});
 
 function renderShell({
   compactContent,
@@ -59,8 +70,18 @@ describe("AppShell scroll ownership", () => {
     expect(scrollArea?.className).toContain("touch-pan-y");
     expect(container.firstElementChild?.className).toContain("flex-col");
     expect(container.firstElementChild?.className).toContain("overflow-clip");
-    expect(container.firstElementChild?.className).toContain("pt-[env(safe-area-inset-top)]");
+    expect(container.firstElementChild?.className).toContain("cfb-app-viewport");
     expect(scrollArea?.className).not.toMatch(/(^|\s)h-full(\s|$)/);
+  });
+
+  it("marks Capacitor shells so the shared CSS reserves the native status area", () => {
+    platform.native = true;
+    const { container } = renderShell({
+      compactContent: false,
+      fixedViewport: false,
+    });
+
+    expect(container.firstElementChild?.getAttribute("data-native-shell")).toBe("true");
   });
 
   it("contains draft rooms without mutating the document scroll lock", () => {
