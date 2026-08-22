@@ -679,6 +679,19 @@ def test_create_invite_join_assigns_one_team_per_user_and_enforces_max_teams(cli
     assert db_session.query(Team).filter(Team.league_id == league["id"], Team.owner_user_id == third.id).count() == 0
 
 
+def test_join_flow_serializes_capacity_checks_with_a_league_row_lock():
+    """The PostgreSQL E2E final-seat race is the behavioral regression proof.
+
+    SQLite does not implement row-level ``FOR UPDATE`` locks, so this focused
+    unit assertion protects the SQLAlchemy contract while the disposable
+    PostgreSQL browser job proves the actual concurrent behavior.
+    """
+    from collegefootballfantasy_api.app.services import league_flow
+
+    source = league_flow.join_league.__code__.co_names
+    assert "with_for_update" in source
+
+
 def test_commissioner_settings_show_active_invite_until_draft_completion(client, db_session):
     owner_token = create_user_and_token(client, "settings-invite-owner")
     create_response = client.post(

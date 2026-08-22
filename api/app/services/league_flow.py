@@ -3,6 +3,7 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.core.config import settings
@@ -379,6 +380,14 @@ def create_league(
 
 
 def join_league(db: Session, league: League, current_user: User) -> LeagueDetailRead:
+    # The membership count is a capacity invariant, not advisory UI state.
+    # Lock the single league row before reading it so two final-seat requests
+    # cannot both observe the same available slot and overfill the league.
+    # PostgreSQL releases the lock only after this transaction commits or rolls
+    # back; the second request then re-counts committed memberships.
+    league = db.execute(
+        select(League).where(League.id == league.id).with_for_update()
+    ).scalar_one()
     existing = (
         db.query(LeagueMember)
         .filter(LeagueMember.league_id == league.id, LeagueMember.user_id == current_user.id)
