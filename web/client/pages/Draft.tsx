@@ -17,7 +17,7 @@ import { useDraftPlayerPool, usePlayerCard } from "@/hooks/use-players";
 import { ApiError } from "@/lib/api";
 import { buildDraftBoard, type DraftConfig, type DraftPlayer } from "@/lib/draftRankings";
 import { formatDraftProjection } from "@/lib/draft-projections";
-import { getCenteredDraftOrderScrollLeft } from "@/lib/draftOrderCarousel";
+import { FIRST_CENTERED_DRAFT_PICK, getCenteredDraftOrderScrollLeft } from "@/lib/draftOrderCarousel";
 import {
   DRAFT_START_INTRO_AUDIO_URL,
   didFirstLiveDraftPickStart,
@@ -584,10 +584,12 @@ export default function Draft() {
       ) => {
         const activeCard = cards.get(overallPick);
         if (!container || !activeCard) return;
+        const containerBox = container.getBoundingClientRect();
+        const cardBox = activeCard.getBoundingClientRect();
         container.scrollTo({
           left: getCenteredDraftOrderScrollLeft({
             overallPick,
-            cardOffsetLeft: activeCard.offsetLeft,
+            cardOffsetLeft: cardBox.left - containerBox.left + container.scrollLeft,
             cardWidth: activeCard.offsetWidth,
             containerWidth: container.clientWidth,
           }),
@@ -609,7 +611,7 @@ export default function Draft() {
     if (!displayPick || completed) return;
 
     const frame = window.requestAnimationFrame(() => {
-      centerDraftCarouselOnPick(displayPick, displayPick >= 4 ? "smooth" : "auto");
+      centerDraftCarouselOnPick(displayPick, displayPick >= 3 ? "smooth" : "auto");
     });
     return () => window.cancelAnimationFrame(frame);
   }, [centerDraftCarouselOnPick, completed, displayPick]);
@@ -1079,7 +1081,12 @@ export default function Draft() {
             aria-label="Draft order; swipe horizontally to view every pick and future rounds"
             className="overflow-x-auto overscroll-x-contain scroll-smooth snap-x px-2 py-2 touch-pan-x"
           >
-            <div className="flex min-w-max gap-1.5">
+            <div
+              className={cn(
+                "flex min-w-max gap-1.5 pr-[calc(50%-2.6rem)]",
+                displayPick >= FIRST_CENTERED_DRAFT_PICK && "pl-[calc(50%-2.075rem)]",
+              )}
+            >
               {draftOrderPicks.map((slot) => {
                 const isCurrent = !completed && slot.overallPick === displayPick;
                 const isUser = slot.team?.id === draftRoom.user_team_id;
@@ -1096,8 +1103,16 @@ export default function Draft() {
                     }}
                     data-testid={`mobile-draft-order-card-${slot.overallPick}`}
                     aria-current={isCurrent ? "step" : undefined}
-                    className={cn("flex w-[4.15rem] shrink-0 snap-start flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}
+                    className={cn("relative flex w-[4.15rem] shrink-0 snap-start flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}
                   >
+                    {isCurrent && displayPick >= FIRST_CENTERED_DRAFT_PICK ? (
+                      <div
+                        aria-label="Current pick scope"
+                        className="absolute -top-2 left-1/2 z-10 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-amber-100/70 bg-[#0b121a] text-amber-100 shadow-[0_0_14px_rgba(251,191,36,0.30)]"
+                      >
+                        <LocateFixed className="h-3 w-3" />
+                      </div>
+                    ) : null}
                     <DraftOrderPickCard
                       compact
                       managerName={managerName}
@@ -1141,7 +1156,13 @@ export default function Draft() {
               </p>
             </div>
           </div>
-          <div ref={carouselRef} className="flex gap-2 overflow-x-auto px-4 py-3 scroll-smooth snap-x">
+          <div
+            ref={carouselRef}
+            className={cn(
+              "flex gap-2 overflow-x-auto px-4 py-3 pr-[calc(50%-5.5rem)] scroll-smooth snap-x",
+              displayPick >= FIRST_CENTERED_DRAFT_PICK && "pl-[calc(50%-4.4375rem)]",
+            )}
+          >
             {draftOrderPicks.map((slot) => {
               const isCurrent = !completed && slot.overallPick === displayPick;
               const isUser = slot.team?.id === draftRoom.user_team_id;

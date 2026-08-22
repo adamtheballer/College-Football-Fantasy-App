@@ -1,4 +1,6 @@
-export const FIRST_CENTERED_DRAFT_PICK = 4;
+// Picks one and two begin naturally at the left edge. From the third pick on,
+// keep the manager who is on the clock in the center of the draft rail.
+export const FIRST_CENTERED_DRAFT_PICK = 3;
 
 export type DraftOrderCarouselScrollInput = {
   overallPick: number;
