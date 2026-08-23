@@ -144,20 +144,6 @@ test.describe("real two-manager draft lifecycle", () => {
       ]);
       expect(manualPickResponse.status()).toBe(201);
 
-      await expect(manager.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
-
-      const manualPickButton = commissioner.getByRole("button", { name: /^Draft /i }).first();
-      await manualPickButton.scrollIntoViewIfNeeded();
-      await expect(manualPickButton).toBeVisible();
-      const [manualPickResponse] = await Promise.all([
-        // The production route is `/draft-picks`.  Waiting for the obsolete
-        // `/draft-room/picks` path makes this assertion run until the overall
-        // test timeout even though the browser already submitted the pick.
-        commissioner.waitForResponse((response) => response.url().includes("/api/leagues/") && response.url().includes("/draft-picks") && response.request().method() === "POST"),
-        manualPickButton.click(),
-      ]);
-      expect(manualPickResponse.status()).toBe(201);
-
       // Submit the intended first manual pick before the slower visual
       // viewport checks. The fixture's 15-second real draft clock must test
       // subsequent timeout picks, not race CI rendering before pick one.
@@ -192,7 +178,6 @@ test.describe("real two-manager draft lifecycle", () => {
           .getByRole("button", { name: /^Remove .+ from queue$/i })
           .first()
       ).toBeVisible();
-
       await expect.poll(async () => {
         const room = await realApi<{ picks: Array<{ auto_pick: boolean }> }>(commissioner, `/leagues/${leagueId}/draft-room`);
         return room.body.picks.filter((pick) => pick.auto_pick).length;
