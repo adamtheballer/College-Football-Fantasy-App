@@ -143,6 +143,28 @@ def test_signed_in_manager_can_update_only_their_own_display_name(client, db_ses
     assert db_session.get(User, payload["user"]["id"]).first_name == "Updated Manager"
 
 
+def test_manager_name_is_limited_to_fifty_characters_at_signup_and_profile_update(client, db_session):
+    too_long_name = "M" * 51
+    signup = client.post(
+        "/auth/signup",
+        json={
+            "first_name": too_long_name,
+            "email": "too-long-manager@example.com",
+            "password": STRONG_PASSWORD,
+        },
+    )
+    assert signup.status_code == 422
+
+    payload = signup_user(client, "fifty-character-manager")
+    response = client.patch(
+        "/auth/me",
+        json={"first_name": too_long_name},
+        headers=auth_headers(payload["access_token"]),
+    )
+    assert response.status_code == 422
+    assert db_session.get(User, payload["user"]["id"]).first_name == "Coachfifty-character-manager"
+
+
 def test_profile_name_update_propagates_to_all_owned_league_teams(client, db_session):
     payload = signup_user(client, "profile-owner")
     user_id = payload["user"]["id"]
@@ -537,6 +559,8 @@ def test_email_password_reset_is_single_use_and_revokes_all_credentials(client, 
     assert requested.status_code == unknown.status_code == 202
     assert requested.json() == unknown.json() == {"success": True, "message": "If an account exists for that email, a password reset link has been sent."}
     row = db_session.query(AuthActionToken).filter(AuthActionToken.user_id == signup_payload["user"]["id"]).one()
+    assert row.created_at is not None
+    assert row.updated_at is not None
     raw_token = token_for_delivery(row)
     assert raw_token not in row.token_hash
     assert db_session.query(SecurityEmailOutbox).count() == 1

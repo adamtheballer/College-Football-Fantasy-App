@@ -186,6 +186,7 @@ export default function Signup() {
                         placeholder="Enter your first name"
                         className="h-11 rounded-2xl border-cyan-200/10 bg-white/10 pl-12 text-base font-bold text-white placeholder:text-slate-300/40 transition-all focus:border-cyan-200/50 focus:ring-cyan-300/25 sm:h-12 sm:text-sm [@media(max-height:760px)]:h-10"
                         value={firstName}
+                        maxLength={50}
                         onChange={(e) => setFirstName(e.target.value)}
                         required
                       />

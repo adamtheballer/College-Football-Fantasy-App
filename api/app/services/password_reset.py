@@ -124,6 +124,11 @@ def create_reset_request(db: Session, *, user: User, request: Request) -> AuthAc
         expires_at=now + timedelta(minutes=settings.auth_password_reset_ttl_minutes),
         request_ip_hash=_safe_hash(request_ip(request), "security-ip"),
         user_agent=_safe_hash(request.headers.get("user-agent"), "security-user-agent"),
+        # 0021 created this table before timestamp defaults were standardized.
+        # Set both values explicitly so reset delivery stays available on every
+        # upgraded database while 0105 repairs the database defaults.
+        created_at=now,
+        updated_at=now,
     )
     db.add(token_row)
     db.flush()

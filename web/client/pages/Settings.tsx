@@ -135,6 +135,11 @@ export default function Settings() {
       setSaveState("error");
       return;
     }
+    if (nextName.length > 50) {
+      setProfileError("Manager name must be 50 characters or fewer.");
+      setSaveState("error");
+      return;
+    }
     setSaveState("saving");
     setProfileError(null);
     try {
@@ -331,7 +336,7 @@ export default function Settings() {
               <Input
                 aria-label="Manager Name"
                 value={managerName}
-                maxLength={100}
+                maxLength={50}
                 onChange={(event) => setManagerName(event.target.value)}
                 className="h-10 rounded-md border-border bg-background px-3 text-sm font-semibold text-foreground"
               />
