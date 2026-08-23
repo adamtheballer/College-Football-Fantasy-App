@@ -144,10 +144,12 @@ test.describe("real two-manager draft lifecycle", () => {
       ]);
       expect(manualPickResponse.status()).toBe(201);
 
-      // Submit the intended first manual pick before the slower visual
-      // viewport checks. The fixture's 15-second real draft clock must test
-      // subsequent timeout picks, not race CI rendering before pick one.
-      // This remains a real-stack browser assertion, not a route mock.
+      await expect(manager.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
+
+      // This is intentionally real-stack rather than a route-mocked visual
+      // test: the release gate must prove a signed-in manager can use the
+      // active multiplayer draft at the alpha phone viewport without the
+      // fixed draft tabs escaping the screen or any horizontal overflow.
       await commissioner.setViewportSize({ width: 390, height: 844 });
       const mobileDraftGeometry = await commissioner.evaluate(() => {
         const tabs = document.querySelector<HTMLElement>("[data-testid='draft-room-tabs']");
@@ -178,6 +180,7 @@ test.describe("real two-manager draft lifecycle", () => {
           .getByRole("button", { name: /^Remove .+ from queue$/i })
           .first()
       ).toBeVisible();
+
       await expect.poll(async () => {
         const room = await realApi<{ picks: Array<{ auto_pick: boolean }> }>(commissioner, `/leagues/${leagueId}/draft-room`);
         return room.body.picks.filter((pick) => pick.auto_pick).length;
