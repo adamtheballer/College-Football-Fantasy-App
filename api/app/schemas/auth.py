@@ -212,22 +212,23 @@ class PasswordResetRequest(BaseModel):
         return normalize_email(value)
 
 
+class PasswordResetValidate(BaseModel):
+    token: str = Field(min_length=1, max_length=512)
+
+
+class PasswordResetValidateResponse(BaseModel):
+    valid: bool
+
+
 class PasswordResetConfirm(BaseModel):
-    token: str
-    new_password: str
+    token: str = Field(min_length=1, max_length=512)
+    new_password: str = Field(max_length=128)
+    confirm_password: str = Field(max_length=128)
 
-    @field_validator("token")
-    @classmethod
-    def validate_token(cls, value: str) -> str:
-        normalized = value.strip()
-        if not normalized:
-            raise ValueError("token is required")
-        return normalized
 
-    @field_validator("new_password")
-    @classmethod
-    def validate_new_password(cls, value: str) -> str:
-        return validate_password_strength(value)
+class PasswordResetCompleteResponse(BaseModel):
+    status: str = "password_reset_complete"
+    sessions_revoked: bool = True
 
 
 class PasswordChangeFields(BaseModel):

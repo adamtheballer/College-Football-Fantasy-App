@@ -10,6 +10,8 @@ from collegefootballfantasy_api.app.models import (
     application_instance,
     auth_action_token,
     auth_rate_limit_event,
+    security_audit_event,
+    security_email_outbox,
     chat,
     cfb_standing_snapshot,
     college_team,

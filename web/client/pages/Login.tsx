@@ -132,7 +132,10 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, signup, isBootstrapping, isLoggedIn } = useAuth();
-  const { email_enabled: emailEnabled } = useRuntimeCapabilities();
+  const {
+    email_enabled: emailEnabled,
+    password_reset_enabled: passwordResetEnabled,
+  } = useRuntimeCapabilities();
   const redirectTarget = safeAuthRedirectTarget(
     typeof location.state === "object" && location.state && "from" in location.state
       ? location.state.from
@@ -393,8 +396,8 @@ export default function Login() {
                 <div className="space-y-2">
                   <span className="flex items-center justify-between px-3">
                     <label htmlFor="login-password" className="text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Password</label>
-                    {emailEnabled ? (
-                      <Link to="/reset-password" className="text-[9px] font-black uppercase tracking-widest text-cfb-gold transition hover:text-yellow-100">Reset password</Link>
+                    {emailEnabled && passwordResetEnabled ? (
+                      <Link to="/forgot-password" className="text-[9px] font-black uppercase tracking-widest text-cfb-gold transition hover:text-yellow-100">Forgot password?</Link>
                     ) : null}
                   </span>
                   <span className="group relative block">

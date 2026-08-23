@@ -82,6 +82,10 @@ type AuthContextValue = {
     newPassword: string,
     confirmNewPassword: string,
   ) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  requestPasswordResetForCurrentUser: () => Promise<void>;
+  validatePasswordReset: (token: string) => Promise<boolean>;
+  confirmPasswordReset: (token: string, newPassword: string, confirmPassword: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string, confirmNewPassword: string) => Promise<void>;
   listSessions: () => Promise<AuthSession[]>;
   revokeSession: (sessionId: number) => Promise<void>;
@@ -324,6 +328,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearPasswordChangeAuth();
   }, [clearPasswordChangeAuth]);
 
+  const requestPasswordReset = useCallback(async (email: string) => {
+    await apiPost("/auth/password-reset/request", { email });
+  }, []);
+
+  const requestPasswordResetForCurrentUser = useCallback(async () => {
+    await apiPost("/auth/password-reset/request-for-current-user", {});
+  }, []);
+
+  const validatePasswordReset = useCallback(async (token: string) => {
+    const response = await apiPost<{ valid: boolean }>("/auth/password-reset/validate", { token });
+    return response.valid === true;
+  }, []);
+
+  const confirmPasswordReset = useCallback(async (token: string, newPassword: string, confirmPassword: string) => {
+    await apiPost("/auth/password-reset/confirm", {
+      token,
+      new_password: newPassword,
+      confirm_password: confirmPassword,
+    });
+    clearPasswordChangeAuth();
+  }, [clearPasswordChangeAuth]);
+
   const changePassword = useCallback(async (
     currentPassword: string,
     newPassword: string,
@@ -363,6 +389,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateProfile,
       logout,
       resetPasswordWithCurrentPassword,
+      requestPasswordReset,
+      requestPasswordResetForCurrentUser,
+      validatePasswordReset,
+      confirmPasswordReset,
       changePassword,
       listSessions,
       revokeSession,
@@ -372,15 +402,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [
       changePassword,
+      confirmPasswordReset,
       isBootstrapping,
       listSessions,
       login,
       logout,
       logoutAll,
       resetPasswordWithCurrentPassword,
+      requestPasswordReset,
+      requestPasswordResetForCurrentUser,
       revokeSession,
       signup,
       updateProfile,
+      validatePasswordReset,
       user,
     ]
   );

@@ -18,6 +18,7 @@ DEFAULT_CORS_ORIGINS = (
     "http://127.0.0.1:8080"
 )
 DEFAULT_CORS_ORIGIN_REGEX = r"https?://(localhost|127\.0\.0\.1):[0-9]+"
+DEFAULT_PASSWORD_RESET_TOKEN_SECRET = "change-me-password-reset-token-secret"
 # A Capacitor production build loads its bundled React assets from this fixed
 # origin.  It is intentionally an exact allow-list entry—not a localhost
 # exception—so native clients can reach the API without widening browser CORS.
@@ -43,6 +44,7 @@ class Settings(BaseSettings):
     projection_dataset_version: str = "unknown"
     cfb27_rating_dataset_version: str = "unknown"
     ui_base_url: str = "http://localhost:5173"
+    public_web_url: str | None = None
     cors_origins: str = DEFAULT_CORS_ORIGINS
     cors_origin_regex: str | None = DEFAULT_CORS_ORIGIN_REGEX
     cfbd_api_key: str | None = None
@@ -129,6 +131,13 @@ class Settings(BaseSettings):
     refresh_cookie_domain: str | None = None
     allow_legacy_api_token_auth: bool = False
     auth_password_reset_ttl_minutes: int = 30
+    password_reset_enabled: bool = False
+    password_reset_token_secret: str = DEFAULT_PASSWORD_RESET_TOKEN_SECRET
+    password_reset_request_cooldown_seconds: int = 60
+    password_reset_max_per_email_per_hour: int = 5
+    password_reset_max_per_ip_per_hour: int = 20
+    password_reset_confirm_rate_limit: int = 10
+    password_reset_email_max_attempts: int = 5
     auth_failed_login_limit: int = 5
     auth_failed_login_window_minutes: int = 15
     auth_lockout_minutes: int = 15
@@ -376,6 +385,14 @@ class Settings(BaseSettings):
                     raise ValueError("RESEND_API_KEY and RESEND_FROM are required when EMAIL_DELIVERY_MODE=resend")
             else:
                 raise ValueError("EMAIL_DELIVERY_MODE must be smtp or resend when EMAIL_ENABLED=true in production")
+
+        if self.password_reset_enabled:
+            if not self.email_enabled:
+                raise ValueError("EMAIL_ENABLED must be true when PASSWORD_RESET_ENABLED=true in production")
+            if not self.public_web_url or not self.public_web_url.startswith("https://"):
+                raise ValueError("PUBLIC_WEB_URL must be an HTTPS URL when PASSWORD_RESET_ENABLED=true in production")
+            if self.password_reset_token_secret == DEFAULT_PASSWORD_RESET_TOKEN_SECRET:
+                raise ValueError("PASSWORD_RESET_TOKEN_SECRET must be configured when PASSWORD_RESET_ENABLED=true in production")
 
         if self.push_notifications_enabled and self.push_provider != "onesignal":
             raise ValueError("PUSH_PROVIDER must be onesignal when PUSH_NOTIFICATIONS_ENABLED=true in production")
