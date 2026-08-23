@@ -23,6 +23,7 @@ from collegefootballfantasy_api.app.core.security import (
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.models.beta_access import BetaAccessCode
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
+from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.auth import (
     AuthMessageResponse,
@@ -216,6 +217,14 @@ def update_current_user_profile(
             value=payload.first_name,
             required=True,
         ) or current_user.first_name
+        # League, draft, roster, and matchup read models use the team's stored
+        # owner name. Keep that denormalized display value in sync so a saved
+        # profile name applies everywhere without waiting for a later league
+        # update or requiring the manager to sign in again.
+        db.query(Team).filter(Team.owner_user_id == current_user.id).update(
+            {Team.owner_name: current_user.first_name},
+            synchronize_session=False,
+        )
     if "avatar_url" in fields_set:
         current_user.avatar_url = payload.avatar_url
     db.add(current_user)

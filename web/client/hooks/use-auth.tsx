@@ -285,6 +285,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ["leagues"] }),
       queryClient.invalidateQueries({ queryKey: ["league"] }),
       queryClient.invalidateQueries({ queryKey: ["draft-room"] }),
+      queryClient.invalidateQueries({ queryKey: ["team"] }),
       queryClient.invalidateQueries({ queryKey: ["chat"] }),
     ]);
     return nextUser;
