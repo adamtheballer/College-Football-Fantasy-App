@@ -39,6 +39,13 @@ def test_public_web_image_serves_the_built_spa_behind_a_same_origin_api_proxy():
     assert 'PLAYER_HEADSHOTS_ENABLED: "${PLAYER_HEADSHOTS_ENABLED:-false}"' in compose
     assert 'SPORTSDATA_ENABLED: "${SPORTSDATA_ENABLED:-false}"' in compose
     assert 'EMAIL_ENABLED: "${EMAIL_ENABLED:-false}"' in compose
+    assert 'PASSWORD_RESET_ENABLED: "${PASSWORD_RESET_ENABLED:-false}"' in compose
+    assert 'PASSWORD_RESET_TOKEN_SECRET: "${PASSWORD_RESET_TOKEN_SECRET:-change-me-password-reset-token-secret}"' in compose
+    assert 'PUBLIC_WEB_URL: "${PUBLIC_WEB_URL:-}"' in compose
+    assert 'RESEND_FROM: "${RESEND_FROM:-}"' in compose
+    assert 'SMTP_FROM_EMAIL: "${SMTP_FROM_EMAIL:-}"' in compose
+    assert 'location = /.well-known/apple-app-site-association' in nginx
+    assert 'default_type application/json;' in nginx
     db_service = re.search(r"^  db:\n(?P<body>.*?)(?=^  [a-z_]+:)", compose, flags=re.MULTILINE | re.DOTALL)
     assert db_service is not None
     assert "restart: unless-stopped" in db_service.group("body")

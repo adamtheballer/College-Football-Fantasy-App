@@ -1,7 +1,18 @@
 [build]
   command = "npm run build"
   publish = "dist/spa"
-  
+
+[[headers]]
+  for = "/.well-known/apple-app-site-association"
+  [headers.values]
+    Content-Type = "application/json"
+    Cache-Control = "public, max-age=300, must-revalidate"
+
+[[redirects]]
+  from = "/.well-known/apple-app-site-association"
+  to = "/.well-known/apple-app-site-association"
+  status = 200
+
 [[redirects]]
   force = true
   from = "/*"

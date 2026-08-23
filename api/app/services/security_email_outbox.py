@@ -54,6 +54,7 @@ def _message(row: SecurityEmailOutbox, user: User, token_row: AuthActionToken | 
         body=text,
         html_body=html,
         message_id=f"<security-email-{row.idempotency_key}@collegefantasyfootball.org>",
+        idempotency_key=row.idempotency_key,
     )
 
 
