@@ -17,14 +17,16 @@ import { useDraftPlayerPool, usePlayerCard } from "@/hooks/use-players";
 import { ApiError } from "@/lib/api";
 import { buildDraftBoard, type DraftConfig, type DraftPlayer } from "@/lib/draftRankings";
 import { formatDraftProjection } from "@/lib/draft-projections";
-import { FIRST_CENTERED_DRAFT_PICK, getCenteredDraftOrderScrollLeft } from "@/lib/draftOrderCarousel";
 import {
-  DRAFT_START_INTRO_AUDIO_URL,
-  didFirstLiveDraftPickStart,
-  getDraftStartIntroCueKey,
-  isFirstLiveDraftPick,
-  type DraftStartIntroState,
-} from "@/lib/draftStartIntro";
+  DRAFT_AUDIO_URLS,
+  getDraftAudioCueKey,
+  shouldPlayDraftStartCue,
+  shouldPlayUserCountdownCue,
+  shouldPlayUserFirstPickCue,
+  type DraftAudioCue,
+  type DraftAudioState,
+} from "@/lib/draftAudioCues";
+import { FIRST_CENTERED_DRAFT_PICK, getCenteredDraftOrderScrollLeft } from "@/lib/draftOrderCarousel";
 import { isTerminalDraftStatus } from "@/lib/draftStatus";
 import { filterDraftablePlayers, getLegalPositionsForRoster } from "@/lib/rosterLegality";
 import { cn } from "@/lib/utils";
@@ -207,6 +209,20 @@ const formatTimer = (seconds: number) => {
   return `${mins}:${String(secs).padStart(2, "0")}`;
 };
 
+const toDraftAudioState = (
+  room: Pick<
+    DraftRoom,
+    "draft_id" | "status" | "current_pick" | "current_pick_started_at" | "current_team_id" | "user_team_id"
+  >,
+): DraftAudioState => ({
+  draftId: room.draft_id,
+  status: room.status,
+  currentPick: room.current_pick,
+  currentPickStartedAt: room.current_pick_started_at,
+  currentTeamId: room.current_team_id,
+  userTeamId: room.user_team_id,
+});
+
 export default function Draft() {
   const { leagueId } = useParams();
   const navigate = useNavigate();
@@ -226,9 +242,9 @@ export default function Draft() {
   const mobileCarouselRef = useRef<HTMLDivElement | null>(null);
   const mobilePickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
   const [mobileCarouselInset, setMobileCarouselInset] = useState(0);
-  const draftStartIntroAudioRef = useRef<HTMLAudioElement | null>(null);
-  const playedDraftStartCueKeysRef = useRef<Set<string>>(new Set());
-  const previousDraftStartIntroStateRef = useRef<DraftStartIntroState | null>(null);
+  const draftAudioRefs = useRef<Partial<Record<DraftAudioCue, HTMLAudioElement>>>({});
+  const playedDraftAudioCueKeysRef = useRef<Set<string>>(new Set());
+  const previousDraftAudioStateRef = useRef<DraftAudioState | null>(null);
 
   const parsedLeagueId =
     leagueId && !Number.isNaN(Number(leagueId)) ? Number(leagueId) : undefined;
@@ -243,21 +259,13 @@ export default function Draft() {
   const pickMutation = useDraftPick(parsedLeagueId);
   const startDraftMutation = useStartDraft(parsedLeagueId);
 
-  const playDraftStartIntro = useCallback((room: Pick<DraftRoom, "draft_id" | "status" | "current_pick" | "current_pick_started_at">) => {
-    const state = {
-      draftId: room.draft_id,
-      status: room.status,
-      currentPick: room.current_pick,
-      currentPickStartedAt: room.current_pick_started_at,
-    };
-    if (!isFirstLiveDraftPick(state)) return;
-
-    const cueKey = getDraftStartIntroCueKey(state);
-    if (playedDraftStartCueKeysRef.current.has(cueKey)) return;
+  const playDraftAudioCue = useCallback((cue: DraftAudioCue, state: DraftAudioState) => {
+    const cueKey = getDraftAudioCueKey(cue, state);
+    if (playedDraftAudioCueKeysRef.current.has(cueKey)) return;
 
     try {
       if (window.sessionStorage.getItem(cueKey) === "played") {
-        playedDraftStartCueKeysRef.current.add(cueKey);
+        playedDraftAudioCueKeysRef.current.add(cueKey);
         return;
       }
     } catch {
@@ -265,9 +273,16 @@ export default function Draft() {
       // prevents rerender and polling replays for this visit.
     }
 
-    playedDraftStartCueKeysRef.current.add(cueKey);
-    const audio = draftStartIntroAudioRef.current ?? new Audio(DRAFT_START_INTRO_AUDIO_URL);
-    draftStartIntroAudioRef.current = audio;
+    playedDraftAudioCueKeysRef.current.add(cueKey);
+    // A pick can change quickly. Never let a late user turn or ten-second
+    // warning layer on top of another draft cue.
+    for (const activeAudio of Object.values(draftAudioRefs.current)) {
+      activeAudio?.pause();
+      if (activeAudio) activeAudio.currentTime = 0;
+    }
+
+    const audio = draftAudioRefs.current[cue] ?? new Audio(DRAFT_AUDIO_URLS[cue]);
+    draftAudioRefs.current[cue] = audio;
     audio.currentTime = 0;
     audio.preload = "auto";
 
@@ -287,15 +302,25 @@ export default function Draft() {
     );
   }, []);
 
+  const playDraftStartCue = useCallback(
+    (room: Pick<DraftRoom, "draft_id" | "status" | "current_pick" | "current_pick_started_at" | "current_team_id" | "user_team_id">) => {
+      const state = toDraftAudioState(room);
+      if (state.currentPick === 1 && state.status?.trim().toLowerCase() === "on_clock") {
+        playDraftAudioCue("start", state);
+      }
+    },
+    [playDraftAudioCue],
+  );
+
   const startDraft = useCallback(() => {
     setLocalError(null);
     startDraftMutation.mutate(undefined, {
       // This comes from the start endpoint after the server has created the
       // first-pick deadline, so the commissioner never hears the cue for a
       // failed or mock-draft start.
-      onSuccess: playDraftStartIntro,
+      onSuccess: playDraftStartCue,
     });
-  }, [playDraftStartIntro, startDraftMutation]);
+  }, [playDraftStartCue, startDraftMutation]);
 
   const viewFinalRoster = useCallback(async () => {
     if (!parsedLeagueId) return;
@@ -330,26 +355,27 @@ export default function Draft() {
 
   useEffect(() => {
     if (!draftRoom) return;
-    const currentState: DraftStartIntroState = {
-      draftId: draftRoom.draft_id,
-      status: draftRoom.status,
-      currentPick: draftRoom.current_pick,
-      currentPickStartedAt: draftRoom.current_pick_started_at,
-    };
-    const previousState = previousDraftStartIntroStateRef.current;
-    previousDraftStartIntroStateRef.current = currentState;
+    const currentState = toDraftAudioState(draftRoom);
+    const previousState = previousDraftAudioStateRef.current;
+    previousDraftAudioStateRef.current = currentState;
+    const completedUserPickCount = draftRoom.picks.filter((pick) => pick.team_id === draftRoom.user_team_id).length;
 
-    // A page opened or reconnected after the clock began must not replay the
-    // intro. Only an observed server transition to the first timer can play.
-    if (didFirstLiveDraftPickStart(previousState, currentState)) {
-      playDraftStartIntro(draftRoom);
+    // A page opened or reconnected after the clock began must not replay a
+    // cue. Only an observed, server-confirmed new timer can play one.
+    if (shouldPlayDraftStartCue(previousState, currentState)) {
+      playDraftAudioCue("start", currentState);
+    } else if (shouldPlayUserFirstPickCue({ previous: previousState, current: currentState, completedUserPickCount })) {
+      playDraftAudioCue("userFirstPick", currentState);
     }
   }, [
     draftRoom?.current_pick,
     draftRoom?.current_pick_started_at,
+    draftRoom?.current_team_id,
     draftRoom?.draft_id,
+    draftRoom?.picks,
     draftRoom?.status,
-    playDraftStartIntro,
+    draftRoom?.user_team_id,
+    playDraftAudioCue,
   ]);
   const serverNowAtFetchMs = draftRoom?.server_time ? Date.parse(draftRoom.server_time) : Number.NaN;
   const countdownDeadline = isPreDraft
@@ -368,6 +394,31 @@ export default function Draft() {
     Number.isFinite(countdownDeadlineMs)
       ? Math.max(0, Math.ceil((countdownDeadlineMs - adjustedNowMs) / 1000))
       : draftRoom?.seconds_remaining ?? 0;
+  useEffect(() => {
+    if (!draftRoom) return;
+    const currentState = toDraftAudioState(draftRoom);
+    if (shouldPlayUserCountdownCue({ current: currentState, secondsRemaining })) {
+      playDraftAudioCue("userCountdown", currentState);
+    }
+  }, [
+    draftRoom?.current_pick,
+    draftRoom?.current_pick_started_at,
+    draftRoom?.current_team_id,
+    draftRoom?.draft_id,
+    draftRoom?.status,
+    draftRoom?.user_team_id,
+    playDraftAudioCue,
+    secondsRemaining,
+  ]);
+  useEffect(
+    () => () => {
+      for (const audio of Object.values(draftAudioRefs.current)) {
+        audio?.pause();
+        if (audio) audio.currentTime = 0;
+      }
+    },
+    [],
+  );
   const timerDanger = isDraftActive && secondsRemaining > 0 && secondsRemaining <= 10;
   const leagueSize = Math.max(league?.max_teams ?? draftRoom?.teams.length ?? 12, draftRoom?.teams.length ?? 0, 1);
 
