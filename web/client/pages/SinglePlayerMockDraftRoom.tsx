@@ -914,12 +914,21 @@ export default function SinglePlayerMockDraftRoom() {
                     }}
                     data-testid={`mobile-draft-order-card-${slot.overallPick}`}
                     aria-current={isCurrent ? "step" : undefined}
-                    className={cn("relative flex w-[4.15rem] shrink-0 snap-start flex-col items-center rounded-lg border px-1 py-1.5 text-center", isCurrent ? "border-amber-200/70 bg-amber-300/12 text-amber-100" : isUser ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/[0.025] text-muted-foreground")}
+                    className={cn(
+                      "relative flex w-[4.15rem] shrink-0 flex-col items-center rounded-lg border px-1 py-1.5 text-center",
+                      slot.overallPick >= FIRST_CENTERED_DRAFT_PICK ? "snap-center" : "snap-start",
+                      isCurrent
+                        ? "border-amber-200/70 bg-amber-300/12 text-amber-100"
+                        : isUser
+                          ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100"
+                          : "border-white/10 bg-white/[0.025] text-muted-foreground"
+                    )}
                   >
                     {isCurrent && draftState.currentPick >= FIRST_CENTERED_DRAFT_PICK ? (
                       <div
+                        role="status"
                         aria-label="Current pick scope"
-                        className="absolute -top-2 left-1/2 z-10 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-amber-100/70 bg-[#0b121a] text-amber-100 shadow-[0_0_14px_rgba(251,191,36,0.30)]"
+                        className="absolute top-1 left-1/2 z-10 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-amber-100/70 bg-[#0b121a] text-amber-100 shadow-[0_0_14px_rgba(251,191,36,0.30)]"
                       >
                         <LocateFixed className="h-3 w-3" />
                       </div>
