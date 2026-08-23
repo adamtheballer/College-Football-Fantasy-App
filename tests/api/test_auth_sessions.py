@@ -55,6 +55,42 @@ def test_signup_returns_ready_to_use_account_and_refresh_cookie(client, db_sessi
     assert user.email_verified_at is not None
 
 
+def test_native_signup_uses_cross_site_refresh_cookie_for_capacitor(monkeypatch, client):
+    """A Capacitor app is cross-site to the production API after login."""
+
+    monkeypatch.setattr(settings, "refresh_cookie_secure", True)
+    response = client.post(
+        "/auth/signup",
+        headers={"Origin": "capacitor://localhost"},
+        json={
+            "first_name": "Native Coach",
+            "email": "native-cookie@example.com",
+            "password": STRONG_PASSWORD,
+        },
+    )
+
+    assert response.status_code == 201
+    cookie = response.headers["set-cookie"].lower()
+    assert "secure" in cookie
+    assert "samesite=none" in cookie
+
+
+def test_web_signup_keeps_configured_refresh_cookie_policy(monkeypatch, client):
+    monkeypatch.setattr(settings, "refresh_cookie_secure", True)
+    response = client.post(
+        "/auth/signup",
+        headers={"Origin": "https://collegefantasyfootball.org"},
+        json={
+            "first_name": "Web Coach",
+            "email": "web-cookie@example.com",
+            "password": STRONG_PASSWORD,
+        },
+    )
+
+    assert response.status_code == 201
+    assert "samesite=lax" in response.headers["set-cookie"].lower()
+
+
 def test_legacy_unverified_account_is_not_blocked_while_verification_is_disabled():
     user = User(
         first_name="Legacy",

@@ -1,4 +1,13 @@
-const resolveDefaultApiBase = () => {
+export const resolveDefaultApiBase = (
+  protocol = typeof window === "undefined" ? "" : window.location.protocol
+) => {
+  // Capacitor serves the bundle from capacitor://localhost, which has no
+  // reverse proxy for /api. A native build must talk to the production API
+  // directly even if it was built without VITE_API_BASE_URL.
+  if (protocol === "capacitor:") {
+    return "https://api.collegefantasyfootball.org";
+  }
+
   // The public web server proxies FastAPI under its own origin at `/api`.
   // Keeping this relative avoids silently selecting a stale host-port API
   // when the beta runtime deliberately exposes only the web port.
