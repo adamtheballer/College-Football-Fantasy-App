@@ -146,10 +146,22 @@ test.describe("real two-manager draft lifecycle", () => {
 
       await expect(manager.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
 
-      // This is intentionally real-stack rather than a route-mocked visual
-      // test: the release gate must prove a signed-in manager can use the
-      // active multiplayer draft at the alpha phone viewport without the
-      // fixed draft tabs escaping the screen or any horizontal overflow.
+      const manualPickButton = commissioner.getByRole("button", { name: /^Draft /i }).first();
+      await manualPickButton.scrollIntoViewIfNeeded();
+      await expect(manualPickButton).toBeVisible();
+      const [manualPickResponse] = await Promise.all([
+        // The production route is `/draft-picks`.  Waiting for the obsolete
+        // `/draft-room/picks` path makes this assertion run until the overall
+        // test timeout even though the browser already submitted the pick.
+        commissioner.waitForResponse((response) => response.url().includes("/api/leagues/") && response.url().includes("/draft-picks") && response.request().method() === "POST"),
+        manualPickButton.click(),
+      ]);
+      expect(manualPickResponse.status()).toBe(201);
+
+      // Submit the intended first manual pick before the slower visual
+      // viewport checks. The fixture's 15-second real draft clock must test
+      // subsequent timeout picks, not race CI rendering before pick one.
+      // This remains a real-stack browser assertion, not a route mock.
       await commissioner.setViewportSize({ width: 390, height: 844 });
       const mobileDraftGeometry = await commissioner.evaluate(() => {
         const tabs = document.querySelector<HTMLElement>("[data-testid='draft-room-tabs']");

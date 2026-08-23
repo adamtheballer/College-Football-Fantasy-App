@@ -60,7 +60,9 @@ def test_health(client):
     assert response.json() == {"status": "ok"}
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["x-frame-options"] == "DENY"
-    assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+    # Reset URLs carry a high-value one-time secret in their query string.
+    # Never allow a browser to include it in a navigation referrer.
+    assert response.headers["referrer-policy"] == "no-referrer"
     assert response.headers["x-request-id"]
     assert response.headers["x-cff-process-instance"]
 
