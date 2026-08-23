@@ -49,10 +49,13 @@ def enforce_auth_rate_limit(
     request: Request,
     limit: int,
     window_minutes: int | None = None,
+    window_seconds: int | None = None,
     include_ip: bool = True,
 ) -> None:
     now = utcnow()
-    window_start = now - timedelta(minutes=window_minutes or settings.auth_rate_limit_window_minutes)
+    window_start = now - timedelta(
+        seconds=window_seconds if window_seconds is not None else (window_minutes or settings.auth_rate_limit_window_minutes) * 60
+    )
     identifier_hash = _safe_hash(identifier)
     ip_hash = _safe_hash(request_ip(request))
 

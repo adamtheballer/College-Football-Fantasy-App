@@ -22,6 +22,7 @@ const Settings = lazyWithRouteRecovery(() => import("./pages/Settings"));
 const ReportBug = lazyWithRouteRecovery(() => import("./pages/ReportBug"));
 const Login = lazyWithRouteRecovery(() => import("./pages/Login"));
 const ResetPassword = lazyWithRouteRecovery(() => import("./pages/ResetPassword"));
+const ForgotPassword = lazyWithRouteRecovery(() => import("./pages/ForgotPassword"));
 const CreateLeague = lazyWithRouteRecovery(() => import("./pages/CreateLeague"));
 const JoinLeague = lazyWithRouteRecovery(() => import("./pages/JoinLeague"));
 const LeagueMatchup = lazyWithRouteRecovery(() => import("./pages/LeagueMatchup"));
@@ -217,6 +218,7 @@ const ApplicationRoutes = () => (
                 <Route path="/beta-access" element={<Navigate to="/login?flow=pro" replace />} />
                 <Route path="/signup" element={<Navigate to="/login?flow=signup" replace />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

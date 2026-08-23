@@ -1,5 +1,8 @@
 import { createRoot, Root } from "react-dom/client";
 import App from "./App";
+import { registerNativeDeepLinks } from "./lib/native-deep-links";
+
+void registerNativeDeepLinks();
 
 const container = document.getElementById("root");
 if (container) {

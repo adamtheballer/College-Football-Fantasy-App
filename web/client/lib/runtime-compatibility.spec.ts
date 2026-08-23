@@ -25,6 +25,8 @@ const runtime = (overrides: Partial<RuntimeIdentity> = {}): RuntimeIdentity => (
   scoring_mode: "disabled",
   sportsdata_enabled: false,
   email_enabled: false,
+  password_reset_enabled: false,
+  password_reset_email_configured: false,
   ...overrides,
 });
 

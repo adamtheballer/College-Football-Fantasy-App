@@ -15,21 +15,13 @@ class EmailPayload:
     to_email: str
     subject: str
     body: str
+    html_body: str | None = None
+    message_id: str | None = None
 
 
 class EmailService:
     def send(self, payload: EmailPayload) -> None:
         raise NotImplementedError
-
-    def send_password_reset(self, email: str, token: str) -> None:
-        link = f"{settings.ui_base_url.rstrip('/')}/password-reset/confirm?token={token}"
-        self.send(
-            EmailPayload(
-                to_email=email,
-                subject="Reset your CFB Fantasy password",
-                body=f"Reset your password: {link}",
-            )
-        )
 
 
 class ConsoleEmailService(EmailService):
@@ -55,7 +47,11 @@ class SmtpEmailService(EmailService):
         message["From"] = settings.smtp_from_email
         message["To"] = payload.to_email
         message["Subject"] = payload.subject
+        if payload.message_id:
+            message["Message-ID"] = payload.message_id
         message.set_content(payload.body)
+        if payload.html_body:
+            message.add_alternative(payload.html_body, subtype="html")
 
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as client:
             if settings.smtp_use_tls:

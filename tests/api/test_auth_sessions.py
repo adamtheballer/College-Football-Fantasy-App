@@ -14,6 +14,10 @@ from collegefootballfantasy_api.app.core.security import (
     verify_password,
 )
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
+from collegefootballfantasy_api.app.models.auth_action_token import AuthActionToken
+from collegefootballfantasy_api.app.models.security_email_outbox import SecurityEmailOutbox
+from collegefootballfantasy_api.app.services.password_reset import token_for_delivery
+from collegefootballfantasy_api.app.services.security_email_outbox import process_security_email_outbox_once
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.email_service import ConsoleEmailService, EmailPayload, get_email_service
 from collegefootballfantasy_api.app.services import password_change
@@ -448,9 +452,38 @@ def test_password_change_rate_limit(client):
         settings.auth_password_change_rate_limit = original_limit
 
 
-def test_legacy_token_password_reset_routes_are_disabled(client):
-    assert client.post("/auth/password-reset/request", json={"email": "coach@example.com"}).status_code == 404
-    assert client.post("/auth/password-reset/confirm", json={"token": "unused", "new_password": STRONG_PASSWORD}).status_code == 404
+def test_email_password_reset_is_single_use_and_revokes_all_credentials(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "password_reset_enabled", True)
+    monkeypatch.setattr(settings, "email_enabled", True)
+    monkeypatch.setattr(settings, "public_web_url", "https://collegefantasyfootball.org")
+    monkeypatch.setattr(settings, "password_reset_token_secret", "test-password-reset-secret-at-least-32-chars")
+    signup_payload = signup_user(client, "email-reset")
+    old_access_token = signup_payload["access_token"]
+    client.post("/auth/login", json={"email": "coach-email-reset@example.com", "password": STRONG_PASSWORD})
+
+    requested = client.post("/auth/password-reset/request", json={"email": "COACH-EMAIL-RESET@example.com"})
+    unknown = client.post("/auth/password-reset/request", json={"email": "unknown-reset@example.com"})
+    assert requested.status_code == unknown.status_code == 202
+    assert requested.json() == unknown.json() == {"success": True, "message": "If an account exists for that email, a password reset link has been sent."}
+    row = db_session.query(AuthActionToken).filter(AuthActionToken.user_id == signup_payload["user"]["id"]).one()
+    raw_token = token_for_delivery(row)
+    assert raw_token not in row.token_hash
+    assert db_session.query(SecurityEmailOutbox).count() == 1
+    assert client.post("/auth/password-reset/validate", json={"token": raw_token}).json() == {"valid": True}
+    mismatch = client.post("/auth/password-reset/confirm", json={"token": raw_token, "new_password": "ReplacementPass123!", "confirm_password": "DifferentPass123!"})
+    assert mismatch.status_code == 422
+    db_session.expire_all()
+    assert db_session.get(AuthActionToken, row.id).consumed_at is None
+
+    complete = client.post("/auth/password-reset/confirm", json={"token": raw_token, "new_password": "ReplacementPass123!", "confirm_password": "ReplacementPass123!"})
+    assert complete.status_code == 200
+    assert complete.json() == {"status": "password_reset_complete", "sessions_revoked": True}
+    assert client.post("/auth/password-reset/confirm", json={"token": raw_token, "new_password": "AnotherPass123!", "confirm_password": "AnotherPass123!"}).status_code == 400
+    assert client.get("/auth/me", headers=auth_headers(old_access_token)).status_code == 401
+    assert client.post("/auth/login", json={"email": "coach-email-reset@example.com", "password": STRONG_PASSWORD}).status_code == 401
+    assert client.post("/auth/login", json={"email": "coach-email-reset@example.com", "password": "ReplacementPass123!"}).status_code == 200
+    result = process_security_email_outbox_once(db_session)
+    assert result["delivered"] == 2
 
 
 def test_login_with_missing_user_returns_invalid_credentials(client):

@@ -394,7 +394,7 @@ export default function Login() {
                   <span className="flex items-center justify-between px-3">
                     <label htmlFor="login-password" className="text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Password</label>
                     {emailEnabled ? (
-                      <Link to="/reset-password" className="text-[9px] font-black uppercase tracking-widest text-cfb-gold transition hover:text-yellow-100">Reset password</Link>
+                      <Link to="/forgot-password" className="text-[9px] font-black uppercase tracking-widest text-cfb-gold transition hover:text-yellow-100">Forgot password?</Link>
                     ) : null}
                   </span>
                   <span className="group relative block">
