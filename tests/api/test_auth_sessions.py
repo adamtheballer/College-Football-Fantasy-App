@@ -469,6 +469,13 @@ def test_email_password_reset_is_single_use_and_revokes_all_credentials(client, 
     raw_token = token_for_delivery(row)
     assert raw_token not in row.token_hash
     assert db_session.query(SecurityEmailOutbox).count() == 1
+    assert process_security_email_outbox_once(db_session)["delivered"] == 1
+    monkeypatch.setattr(settings, "password_reset_request_cooldown_seconds", 0)
+    assert client.post("/auth/password-reset/request", json={"email": "coach-email-reset@example.com"}).status_code == 202
+    db_session.expire_all()
+    assert client.post("/auth/password-reset/validate", json={"token": raw_token}).json() == {"valid": False}
+    row = db_session.query(AuthActionToken).filter(AuthActionToken.user_id == signup_payload["user"]["id"], AuthActionToken.revoked_at.is_(None)).one()
+    raw_token = token_for_delivery(row)
     assert client.post("/auth/password-reset/validate", json={"token": raw_token}).json() == {"valid": True}
     mismatch = client.post("/auth/password-reset/confirm", json={"token": raw_token, "new_password": "ReplacementPass123!", "confirm_password": "DifferentPass123!"})
     assert mismatch.status_code == 422
@@ -483,7 +490,7 @@ def test_email_password_reset_is_single_use_and_revokes_all_credentials(client, 
     assert client.post("/auth/login", json={"email": "coach-email-reset@example.com", "password": STRONG_PASSWORD}).status_code == 401
     assert client.post("/auth/login", json={"email": "coach-email-reset@example.com", "password": "ReplacementPass123!"}).status_code == 200
     result = process_security_email_outbox_once(db_session)
-    assert result["delivered"] == 2
+    assert result["delivered"] == 1
 
 
 def test_login_with_missing_user_returns_invalid_credentials(client):

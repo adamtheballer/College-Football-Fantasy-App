@@ -13,7 +13,7 @@ from collegefootballfantasy_api.app.models.auth_action_token import AuthActionTo
 from collegefootballfantasy_api.app.models.security_audit_event import SecurityAuditEvent
 from collegefootballfantasy_api.app.models.security_email_outbox import SecurityEmailOutbox
 from collegefootballfantasy_api.app.models.user import User
-from collegefootballfantasy_api.app.services.auth_security import utcnow
+from collegefootballfantasy_api.app.services.auth_security import ensure_aware, utcnow
 from collegefootballfantasy_api.app.services.email_service import EmailPayload, get_email_service
 from collegefootballfantasy_api.app.services.password_reset import token_for_delivery
 
@@ -101,6 +101,16 @@ def process_security_email_outbox_once(db: Session, limit: int = 20) -> dict[str
             token_row = db.get(AuthActionToken, row.auth_action_token_id) if row.auth_action_token_id else None
             if user is None:
                 raise RuntimeError("security email recipient no longer exists")
+            if row.message_type == "password_reset" and (
+                token_row is None
+                or token_row.consumed_at is not None
+                or token_row.revoked_at is not None
+                or ensure_aware(token_row.expires_at) <= utcnow()
+            ):
+                row.status = "cancelled"
+                row.lease_expires_at = None
+                db.commit()
+                continue
             get_email_service().send(_message(row, user, token_row))
             row.status = "delivered"
             row.delivered_at = utcnow()

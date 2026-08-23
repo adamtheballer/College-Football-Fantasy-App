@@ -91,12 +91,27 @@ def _queue_email(db: Session, *, user_id: int, message_type: str, token_id: int 
 def create_reset_request(db: Session, *, user: User, request: Request) -> AuthActionToken:
     """Create a reset request. The emailed token is never persisted."""
     now = utcnow()
+    superseded_token_ids = [
+        row_id
+        for (row_id,) in db.query(AuthActionToken.id).filter(
+            AuthActionToken.user_id == user.id,
+            AuthActionToken.token_type == PASSWORD_RESET_TOKEN,
+            AuthActionToken.consumed_at.is_(None),
+            AuthActionToken.revoked_at.is_(None),
+        ).all()
+    ]
     db.query(AuthActionToken).filter(
         AuthActionToken.user_id == user.id,
         AuthActionToken.token_type == PASSWORD_RESET_TOKEN,
         AuthActionToken.consumed_at.is_(None),
         AuthActionToken.revoked_at.is_(None),
     ).update({"revoked_at": now, "revoke_reason": "superseded"}, synchronize_session=False)
+    if superseded_token_ids:
+        # A delayed worker must not send an already-invalidated reset link.
+        db.query(SecurityEmailOutbox).filter(
+            SecurityEmailOutbox.auth_action_token_id.in_(superseded_token_ids),
+            SecurityEmailOutbox.status.in_(("pending", "sending")),
+        ).update({"status": "cancelled", "lease_expires_at": None}, synchronize_session=False)
 
     request_id = _request_id()
     raw_token = _token_for_request(request_id)
