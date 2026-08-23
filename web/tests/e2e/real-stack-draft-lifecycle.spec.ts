@@ -120,6 +120,15 @@ test.describe("real two-manager draft lifecycle", () => {
       await expect(commissioner.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
       await expect(manager.getByText("Pick Timer")).toBeVisible({ timeout: 15_000 });
 
+      // Queue while the manager is guaranteed to be waiting.  Once the
+      // commissioner's manual pick lands, the fifteen-second production
+      // clock can hand the next pick to this manager at any moment, which
+      // correctly replaces Queue/Queued controls with Draft controls.
+      const queueButton = manager.getByRole("button", { name: /^Queue /i }).first();
+      await expect(queueButton).toBeVisible({ timeout: 15_000 });
+      await queueButton.click();
+      await expect(manager.getByRole("button", { name: /^Remove .+ from queue$/i }).first()).toBeVisible();
+
       const manualPickButton = commissioner.getByRole("button", { name: /^Draft /i }).first();
       await manualPickButton.scrollIntoViewIfNeeded();
       await expect(manualPickButton).toBeVisible();
@@ -149,14 +158,6 @@ test.describe("real two-manager draft lifecycle", () => {
       expect(mobileDraftGeometry.tabsBottom).not.toBeNull();
       expect(mobileDraftGeometry.tabsBottom!).toBeLessThanOrEqual(844);
       await commissioner.setViewportSize({ width: 1280, height: 900 });
-
-      // Queues are intentionally client-local, but this is still a live
-      // browser assertion that the second signed-in manager can queue a
-      // backend player while waiting for their turn.
-      const queueButton = manager.getByRole("button", { name: /^Queue /i }).first();
-      await expect(queueButton).toBeVisible({ timeout: 15_000 });
-      await queueButton.click();
-      await expect(manager.getByRole("button", { name: /^Remove .+ from queue$/i }).first()).toBeVisible();
 
       await expect.poll(async () => {
         const room = await realApi<{ picks: Array<{ auto_pick: boolean }> }>(commissioner, `/leagues/${leagueId}/draft-room`);
