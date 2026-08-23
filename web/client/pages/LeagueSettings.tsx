@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowRightLeft,
   CalendarDays,
@@ -16,18 +16,21 @@ import {
 } from "lucide-react";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
+import { PostseasonBracketPanel } from "@/components/league/PostseasonBracketPanel";
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
 import { ErrorState } from "@/components/states";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useLeagueDetail, useLeagueSettingsTab } from "@/hooks/use-leagues";
+import { useLeagueDetail, useLeaguePostseasonBracket, useLeagueSettingsTab } from "@/hooks/use-leagues";
+import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import { getLeagueScheduleWeeks } from "@/lib/leagueSchedule";
 import { tradeOfferPath } from "@/lib/trade-links";
 import type { LeagueRosterPlayer, LeagueSettingsTabResponse } from "@/types/league";
 
-type SettingsPanel = "standings" | "scoring" | "schedule" | "rosters" | "trades" | "draft";
+type SettingsPanel = "standings" | "playoffs" | "scoring" | "schedule" | "rosters" | "trades" | "draft";
 
 const panels: Array<{ id: SettingsPanel; label: string; icon: typeof Trophy }> = [
   { id: "standings", label: "Standings", icon: Trophy },
+  { id: "playoffs", label: "Playoffs", icon: Trophy },
   { id: "scoring", label: "Point System", icon: Settings2 },
   { id: "schedule", label: "Schedules", icon: CalendarDays },
   { id: "rosters", label: "Manager Rosters", icon: Users },
@@ -130,12 +133,15 @@ export const formatTradeAssets = (assets: Array<{ name: string; position: string
 export default function LeagueSettings() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
-  const [activePanel, setActivePanel] = useState<SettingsPanel>("standings");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activePanel, setActivePanel] = useState<SettingsPanel>(() => searchParams.get("section") === "playoffs" ? "playoffs" : "standings");
   const [selectedRosterTeam, setSelectedRosterTeam] = useState<string>("");
   const [selectedScheduleWeek, setSelectedScheduleWeek] = useState<number | null>(null);
   const [copiedInviteField, setCopiedInviteField] = useState<"code" | "link" | null>(null);
   const leagueQuery = useLeagueDetail(parsedLeagueId);
   const settingsQuery = useLeagueSettingsTab(parsedLeagueId);
+  const postDraft = isLeaguePostDraft({ draftStatus: leagueQuery.data?.draft?.status, leagueStatus: leagueQuery.data?.status });
+  const postseasonQuery = useLeaguePostseasonBracket(parsedLeagueId, activePanel === "playoffs" && postDraft);
   const data = settingsQuery.data;
   const tradeHistory = data?.trade_history ?? [];
   const rosterGroups = useMemo(() => groupRostersByTeam(data?.rosters ?? []), [data?.rosters]);
@@ -184,6 +190,20 @@ export default function LeagueSettings() {
   const playoffTeams = certifiedCalendar?.playoff_teams ?? leagueQuery.data?.settings.playoff_teams;
   const playoffRounds = certifiedCalendar?.max_rounds ?? (playoffTeams === 2 ? 1 : playoffTeams === 4 ? 2 : playoffTeams ? 3 : null);
 
+  useEffect(() => {
+    if (searchParams.get("section") === "playoffs" && activePanel !== "playoffs") setActivePanel("playoffs");
+  }, [activePanel, searchParams]);
+
+  const selectPanel = (panel: SettingsPanel) => {
+    setActivePanel(panel);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (panel === "playoffs") next.set("section", "playoffs");
+      else next.delete("section");
+      return next;
+    }, { replace: true });
+  };
+
   const copyInviteValue = async (field: "code" | "link", value?: string | null) => {
     if (!value) return;
     await navigator.clipboard.writeText(value);
@@ -226,7 +246,7 @@ export default function LeagueSettings() {
               {data?.league_name ?? "League Settings"}
             </h1>
             <p className="mt-1.5 max-w-3xl text-sm text-cfb-text-secondary">
-              League-specific standings, point system, schedules, manager rosters, trade history, and draft results.
+              League-specific standings, playoff picture, point system, schedules, manager rosters, trade history, and draft results.
             </p>
             {certifiedCalendar ? (
               <p className="mt-2 text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
@@ -271,7 +291,7 @@ export default function LeagueSettings() {
       ) : null}
 
       <section className="overflow-x-auto rounded-xl border border-cfb-border-subtle bg-cfb-surface p-1.5">
-        <div className="grid min-w-[580px] grid-cols-6 gap-1" aria-label="League settings sections">
+        <div className="grid min-w-[680px] grid-cols-7 gap-1" aria-label="League settings sections">
           {panels.map((panel) => {
             const Icon = panel.icon;
             const active = activePanel === panel.id;
@@ -280,7 +300,7 @@ export default function LeagueSettings() {
                 key={panel.id}
                 type="button"
                 aria-pressed={active}
-                onClick={() => setActivePanel(panel.id)}
+                onClick={() => selectPanel(panel.id)}
                 className={[
                   "flex h-10 items-center justify-center gap-1.5 rounded-lg px-2 text-center text-[9px] font-black uppercase tracking-[0.12em] transition-colors",
                   active
@@ -322,6 +342,13 @@ export default function LeagueSettings() {
               })}
             </div>
           )}
+        </section>
+      ) : null}
+
+      {activePanel === "playoffs" ? (
+        <section className="overflow-hidden rounded-xl border border-cfb-border-subtle bg-cfb-surface">
+          <PanelHeader title="Playoff Picture" subtitle="League playoff seeding, bracket, and final standings." icon={Trophy} />
+          {!postDraft ? <EmptyState message="The playoff picture becomes available after the draft." /> : postseasonQuery.isLoading ? <div className="p-5 text-sm font-bold text-cfb-text-secondary">Loading playoff picture...</div> : postseasonQuery.isError || !postseasonQuery.data ? <div className="p-5"><ErrorState title="Unable to load playoffs" message="The playoff picture could not be loaded." retryLabel="Try again" onRetry={() => void postseasonQuery.refetch()} /></div> : <PostseasonBracketPanel leagueId={parsedLeagueId} data={postseasonQuery.data} />}
         </section>
       ) : null}
 

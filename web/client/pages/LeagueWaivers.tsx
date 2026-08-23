@@ -480,7 +480,7 @@ export default function LeagueWaivers() {
       </Dialog>
       <div className="space-y-3 sm:space-y-4">
         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cfb-brand">
-          League Players
+          Waiver Wire
         </p>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>

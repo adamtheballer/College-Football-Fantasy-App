@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider } from "@/hooks/use-auth";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -28,7 +28,6 @@ const JoinLeague = lazyWithRouteRecovery(() => import("./pages/JoinLeague"));
 const LeagueMatchup = lazyWithRouteRecovery(() => import("./pages/LeagueMatchup"));
 const LeagueRoster = lazyWithRouteRecovery(() => import("./pages/LeagueRoster"));
 const LeagueSettings = lazyWithRouteRecovery(() => import("./pages/LeagueSettings"));
-const LeaguePlayoffs = lazyWithRouteRecovery(() => import("./pages/LeaguePlayoffs"));
 const LeagueWaivers = lazyWithRouteRecovery(() => import("./pages/LeagueWaivers"));
 const LeagueWatchlist = lazyWithRouteRecovery(() => import("./pages/LeagueWatchlist"));
 const DraftHome = lazyWithRouteRecovery(() => import("./pages/DraftHome"));
@@ -72,6 +71,11 @@ const RouteFallback = () => (
     <SkeletonState rows={5} label="Loading view" />
   </div>
 );
+
+const LegacyPlayoffsRedirect = () => {
+  const { leagueId } = useParams();
+  return <Navigate replace to={leagueId ? `/league/${leagueId}/settings?section=playoffs` : "/leagues"} />;
+};
 
 const ApplicationRoutes = () => (
   <RuntimeCompatibilityGate>
@@ -153,7 +157,7 @@ const ApplicationRoutes = () => (
                   path="/league/:leagueId/playoffs"
                   element={
                     <ProtectedRoute>
-                      <LeaguePlayoffs />
+                      <LegacyPlayoffsRedirect />
                     </ProtectedRoute>
                   }
                 />
