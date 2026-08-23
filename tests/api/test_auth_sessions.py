@@ -55,6 +55,7 @@ def test_signup_returns_ready_to_use_account_and_refresh_cookie(client, db_sessi
     assert payload["user"]["email"] == "coach-signup@example.com"
     assert payload["user"]["email_verified_at"] is not None
     assert settings.refresh_cookie_name in client.cookies
+    assert client.cookies.get(settings.refresh_presence_cookie_name) == "1"
     user = db_session.get(User, payload["user"]["id"])
     assert user is not None
     assert user.email_verified_at is not None
@@ -989,6 +990,7 @@ def test_refresh_rotates_and_revokes_previous_session(client, db_session):
     second_cookie = client.cookies.get(settings.refresh_cookie_name)
     assert second_cookie
     assert second_cookie != first_refresh_cookie
+    assert client.cookies.get(settings.refresh_presence_cookie_name) == "1"
 
     old_session = (
         db_session.query(RefreshSession)
@@ -1023,6 +1025,7 @@ def test_logout_revokes_session_and_clears_cookie(client, db_session):
     assert logout_response.status_code == 200
     assert logout_response.json()["success"] is True
     assert settings.refresh_cookie_name not in client.cookies
+    assert settings.refresh_presence_cookie_name not in client.cookies
 
     session_row = db_session.query(RefreshSession).first()
     assert session_row is not None

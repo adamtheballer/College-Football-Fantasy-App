@@ -131,12 +131,33 @@ def _set_refresh_cookie(response: Response, refresh_token: str, request: Request
         path="/",
         domain=settings.refresh_cookie_domain,
     )
+    # This contains no credential or user identifier. It merely lets the web
+    # client decide whether a silent refresh is worth attempting when browser
+    # storage was cleared but the HTTP-only refresh cookie is still valid.
+    response.set_cookie(
+        key=settings.refresh_presence_cookie_name,
+        value="1",
+        max_age=settings.refresh_token_ttl_days * 24 * 60 * 60,
+        httponly=False,
+        secure=settings.refresh_cookie_secure,
+        samesite=_refresh_cookie_samesite(request),
+        path="/",
+        domain=settings.refresh_cookie_domain,
+    )
 
 
 def _clear_refresh_cookie(response: Response, request: Request | None = None) -> None:
     response.delete_cookie(
         key=settings.refresh_cookie_name,
         httponly=True,
+        secure=settings.refresh_cookie_secure,
+        samesite=_refresh_cookie_samesite(request),
+        path="/",
+        domain=settings.refresh_cookie_domain,
+    )
+    response.delete_cookie(
+        key=settings.refresh_presence_cookie_name,
+        httponly=False,
         secure=settings.refresh_cookie_secure,
         samesite=_refresh_cookie_samesite(request),
         path="/",

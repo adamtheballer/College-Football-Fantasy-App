@@ -5,6 +5,7 @@ import {
   apiPut,
   buildApiUrl,
   clearAccessTokenSession,
+  restoreAccessTokenSession,
   resolveDefaultApiBase,
   storeAccessTokenSession,
 } from "./api";
@@ -185,6 +186,34 @@ describe("api client", () => {
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: "Bearer fresh-token" }),
       })
+    );
+  });
+
+  it("restores a secure refresh session even when browser storage has no access token", async () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal("window", {
+      dispatchEvent: vi.fn(),
+      location: { hostname: "localhost", protocol: "http:", origin: "http://localhost" },
+    });
+    vi.stubGlobal("localStorage", {
+      getItem: vi.fn((key: string) => storage.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => storage.set(key, value)),
+      removeItem: vi.fn((key: string) => storage.delete(key)),
+    });
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ access_token: "restored-token", access_token_expires_at: "2026-07-14T19:00:00Z" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(restoreAccessTokenSession()).resolves.toBe("refreshed");
+
+    expect(storage.get("cfb_access_token")).toBe("restored-token");
+    expect(storage.get("cfb_access_token_expires_at")).toBe("2026-07-14T19:00:00Z");
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/auth/refresh"),
+      expect.objectContaining({ credentials: "include", method: "POST" }),
     );
   });
 

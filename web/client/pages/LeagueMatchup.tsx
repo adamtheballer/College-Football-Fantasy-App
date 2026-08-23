@@ -13,6 +13,7 @@ import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
 import { useLeagueDetail, useLeagueMatchupTab, useLeagueScoreboard } from "@/hooks/use-leagues";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
+import { managerNameForAvatar, managerTeamName } from "@/lib/manager-team-name";
 import type { LeagueMatchupTabResponse, LeagueMatchupTeam, LeagueScoreboardRow } from "@/types/league";
 
 export function formatMatchupStatus(status: string | null | undefined) {
@@ -131,8 +132,8 @@ function MatchupTeamSummary({
   const isBrand = accent === "brand";
   const showActual = shouldShowMatchupScorePanels(status) && typeof currentScore === "number";
   const projected = teamTotal(team);
-  const managerName = team?.manager_name ?? team?.fantasy_team_name ?? "Team TBD";
-  const teamName = team?.fantasy_team_name;
+  const managerName = managerNameForAvatar(team, "Team TBD");
+  const teamLabel = managerTeamName(team, "Team TBD");
 
   return (
     <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
@@ -149,11 +150,8 @@ function MatchupTeamSummary({
         />
       </div>
       <p className="mt-0.5 truncate text-[11px] font-black text-cfb-text-primary sm:mt-1 sm:text-sm">
-        {managerName}
+        {teamLabel}
       </p>
-      {teamName && teamName !== managerName ? (
-        <p className="truncate text-[9px] font-bold text-cfb-text-muted sm:text-[10px]">{teamName}</p>
-      ) : null}
       <p className="text-[9px] font-bold text-cfb-text-muted sm:text-[10px]">{team?.record ?? "0-0-0"}</p>
       <p className="cfb-score-value mt-0.5 text-2xl text-cfb-text-primary sm:mt-1 sm:text-4xl">
         {showActual ? formatMatchupPoints(team?.current_points ?? currentScore) : formatMatchupPoints(projected)}
@@ -188,7 +186,7 @@ function CompactMatchupScoreboard({
   return (
     <section className="relative border-b border-cfb-border-subtle bg-cfb-surface-raised/50 px-3 pb-3 pt-6 sm:px-5 sm:pb-4 sm:pt-7">
       <h2 className="sr-only">
-        {myTeam?.fantasy_team_name ?? "Your team"} vs {opponentTeam?.fantasy_team_name ?? "Opponent"}
+        {managerTeamName(myTeam, "Your team")} vs {managerTeamName(opponentTeam, "Opponent")}
       </h2>
       {matchupCount > 1 ? (
         <div

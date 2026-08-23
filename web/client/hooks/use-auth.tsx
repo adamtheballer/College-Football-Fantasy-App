@@ -17,6 +17,9 @@ import {
   apiPost,
   clearAccessTokenSession,
   getStoredAccessToken,
+  hasSessionRestoreHint,
+  isStoredAccessTokenExpired,
+  restoreAccessTokenSession,
   storeAccessTokenSession,
 } from "@/lib/api";
 import { clearBrowserPushIdentity, syncBrowserPushIdentity } from "@/lib/push-notifications";
@@ -199,22 +202,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedToken = getStoredAccessToken();
     setUser(storedUser);
 
-    if (!storedUser && !storedToken) {
-      setIsBootstrapping(false);
-      return;
-    }
-
     let cancelled = false;
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 5000);
 
-    apiGet<UserReadPayload>("/auth/me", undefined, controller.signal)
-      .then((payload) => {
+    const restoreSession = async () => {
+      // The refresh token is intentionally HTTP-only, so it can survive an
+      // iOS/webview access-token cleanup. Try it first whenever the short
+      // access token is missing or expired; this restores a valid signed-in
+      // user without sending them back through the login screen.
+      const accessTokenNeedsRefresh = !storedToken || isStoredAccessTokenExpired();
+      const shouldAttemptRestore = accessTokenNeedsRefresh && (
+        Boolean(storedUser || storedToken) || hasSessionRestoreHint()
+      );
+
+      if (shouldAttemptRestore) {
+        const refreshResult = await restoreAccessTokenSession(controller.signal);
         if (cancelled) return;
+
+        if (refreshResult === "terminal_failure") {
+          clearStoredAuth();
+          setUser(null);
+          return;
+        }
+
+        // Keep a previously rendered user signed in during a temporary
+        // outage; refresh will be retried by the next authenticated request.
+        // Without a cached user there is nothing trustworthy to render.
+        if (refreshResult === "transient_failure") {
+          return;
+        }
+      }
+
+      if (accessTokenNeedsRefresh && !shouldAttemptRestore) return;
+
+      const payload = await apiGet<UserReadPayload>("/auth/me", undefined, controller.signal);
+      if (!cancelled) {
         const nextUser = mapUserPayload(payload);
         safeStorageSet(USER_STORAGE_KEY, JSON.stringify(nextUser));
         setUser(nextUser);
-      })
+      }
+    };
+
+    void restoreSession()
       .catch((error) => {
         if (cancelled) return;
         if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {

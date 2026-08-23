@@ -136,7 +136,7 @@ describe("league matchup scoreboard", () => {
     expect(screen.getByTestId("opening-week-patch")).toBeTruthy();
     expect(screen.getByText("Opening Week")).toBeTruthy();
     expect(screen.getByText("Week 1 matchup")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "My Team vs My Opponent" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Updated Adam's Team vs Taylor's Team" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: "League matchups" })).toBeNull();
     expect(screen.getByLabelText("Matchup 1 of 2. Swipe left or right to view another matchup.")).toBeTruthy();
     expect(
@@ -148,8 +148,10 @@ describe("league matchup scoreboard", () => {
     expect(screen.getByLabelText("Projected 106.4")).toBeTruthy();
     expect(screen.getAllByText("54.0%")).toHaveLength(2);
     expect(screen.getAllByText("46.0%")).toHaveLength(2);
-    expect(screen.getAllByText("Updated Adam").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Taylor").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Updated Adam's Team").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Taylor's Team").length).toBeGreaterThan(0);
+    expect(screen.queryByText("My Team", { exact: true })).toBeNull();
+    expect(screen.queryByText("My Opponent", { exact: true })).toBeNull();
     expect(screen.queryByRole("status")).toBeNull();
     expect(screen.queryByText("CFB Scores available once games begin")).toBeNull();
     expect(screen.getAllByAltText("Updated Adam profile picture").every((image) => image.getAttribute("src") === "https://images.example.com/my-team.jpg")).toBe(true);
