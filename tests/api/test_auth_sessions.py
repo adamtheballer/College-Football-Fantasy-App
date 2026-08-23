@@ -21,7 +21,8 @@ from collegefootballfantasy_api.app.models.security_email_outbox import Security
 from collegefootballfantasy_api.app.services.password_reset import token_for_delivery
 from collegefootballfantasy_api.app.services.security_email_outbox import process_security_email_outbox_once
 from collegefootballfantasy_api.app.models.user import User
-from collegefootballfantasy_api.app.services.email_service import ConsoleEmailService, EmailPayload, get_email_service
+from collegefootballfantasy_api.app.services import email_service
+from collegefootballfantasy_api.app.services.email_service import ConsoleEmailService, EmailPayload, ResendEmailService, get_email_service
 from collegefootballfantasy_api.app.services import password_change
 
 
@@ -846,6 +847,44 @@ def test_disabled_email_service_does_not_log_or_attempt_delivery(caplog, monkeyp
     logged = "\n".join(record.getMessage() for record in caplog.records)
     assert "coach@example.com" not in logged
     assert "sensitive-token" not in logged
+
+
+def test_resend_security_email_uses_html_and_a_stable_idempotency_key(monkeypatch):
+    monkeypatch.setattr(settings, "email_enabled", True)
+    monkeypatch.setattr(settings, "email_delivery_mode", "resend")
+    monkeypatch.setattr(settings, "resend_api_key", "resend-secret")
+    monkeypatch.setattr(settings, "resend_from", "College Fantasy <security@example.test>")
+    observed: dict[str, object] = {}
+
+    class Response:
+        status_code = 202
+
+    def post(*_args, **kwargs):
+        observed.update(kwargs)
+        return Response()
+
+    monkeypatch.setattr(email_service.httpx, "post", post)
+    service = get_email_service()
+    assert isinstance(service, ResendEmailService)
+    service.send(EmailPayload(
+        to_email="coach@example.test",
+        subject="Reset password",
+        body="Text reset link",
+        html_body="<a href=\"https://example.test/reset-password?token=opaque\">Reset</a>",
+        idempotency_key="security-email-123",
+    ))
+
+    assert observed["headers"] == {
+        "Authorization": "Bearer resend-secret",
+        "Idempotency-Key": "security-email-123",
+    }
+    assert observed["json"] == {
+        "from": "College Fantasy <security@example.test>",
+        "to": ["coach@example.test"],
+        "subject": "Reset password",
+        "text": "Text reset link",
+        "html": "<a href=\"https://example.test/reset-password?token=opaque\">Reset</a>",
+    }
 
 
 def test_local_dev_cors_allows_dynamic_vite_port(client):

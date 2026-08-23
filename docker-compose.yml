@@ -70,6 +70,18 @@ services:
       BETA_ACCESS_FAILED_CODE_LIMIT: "${BETA_ACCESS_FAILED_CODE_LIMIT:-5}"
       BETA_ACCESS_FAILED_IP_LIMIT: "${BETA_ACCESS_FAILED_IP_LIMIT:-10}"
       EMAIL_ENABLED: "${EMAIL_ENABLED:-false}"
+      EMAIL_DELIVERY_MODE: "${EMAIL_DELIVERY_MODE:-console}"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
+      RESEND_FROM: "${RESEND_FROM:-}"
+      SMTP_HOST: "${SMTP_HOST:-}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USERNAME: "${SMTP_USERNAME:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      SMTP_FROM_EMAIL: "${SMTP_FROM_EMAIL:-}"
+      SMTP_USE_TLS: "${SMTP_USE_TLS:-true}"
+      PUBLIC_WEB_URL: "${PUBLIC_WEB_URL:-}"
+      PASSWORD_RESET_ENABLED: "${PASSWORD_RESET_ENABLED:-false}"
+      PASSWORD_RESET_TOKEN_SECRET: "${PASSWORD_RESET_TOKEN_SECRET:-change-me-password-reset-token-secret}"
       # The real-stack E2E suite creates three isolated accounts from one container IP.
       # Keep production limits in deployment configuration; this only prevents test setup throttling.
       AUTH_SIGNUP_RATE_LIMIT: 20
@@ -154,6 +166,18 @@ services:
       SCORING_WORKER_INTERVAL_LIVE_SECONDS: "${SCORING_WORKER_INTERVAL_LIVE_SECONDS:-180}"
       SPORTSDATA_ENABLED: "${SPORTSDATA_ENABLED:-false}"
       EMAIL_ENABLED: "${EMAIL_ENABLED:-false}"
+      EMAIL_DELIVERY_MODE: "${EMAIL_DELIVERY_MODE:-console}"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
+      RESEND_FROM: "${RESEND_FROM:-}"
+      SMTP_HOST: "${SMTP_HOST:-}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USERNAME: "${SMTP_USERNAME:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      SMTP_FROM_EMAIL: "${SMTP_FROM_EMAIL:-}"
+      SMTP_USE_TLS: "${SMTP_USE_TLS:-true}"
+      PUBLIC_WEB_URL: "${PUBLIC_WEB_URL:-}"
+      PASSWORD_RESET_ENABLED: "${PASSWORD_RESET_ENABLED:-false}"
+      PASSWORD_RESET_TOKEN_SECRET: "${PASSWORD_RESET_TOKEN_SECRET:-change-me-password-reset-token-secret}"
       ESPN_HISTORICAL_STATS_ENABLED: "${ESPN_HISTORICAL_STATS_ENABLED:-true}"
     restart: unless-stopped
     depends_on:

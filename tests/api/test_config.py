@@ -295,6 +295,27 @@ def test_production_rejects_console_email_delivery():
         )
 
 
+def test_production_allows_resend_without_smtp_credentials():
+    required = production_required_settings()
+    required.update({
+        "email_delivery_mode": "resend",
+        "resend_api_key": "re_test_key",
+        "resend_from": "College Fantasy <security@example.com>",
+    })
+    required.pop("smtp_host")
+    required.pop("smtp_from_email")
+    settings = make_settings(
+        environment="production",
+        jwt_secret_key="safe-production-secret",
+        cors_origins="https://app.example.com",
+        cors_origin_regex=None,
+        refresh_cookie_secure=True,
+        **required,
+    )
+
+    assert settings.email_delivery_mode == "resend"
+
+
 def test_email_delivery_mode_rejects_unknown_value():
     with pytest.raises(ValidationError, match="EMAIL_DELIVERY_MODE must be one of"):
         make_settings(email_delivery_mode="mailgun")
