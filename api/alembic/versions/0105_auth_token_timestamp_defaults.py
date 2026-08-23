@@ -1,6 +1,6 @@
 """Repair timestamp defaults for durable authentication-action tokens.
 
-Revision ID: 0105_auth_action_token_timestamp_defaults
+Revision ID: 0105_auth_token_timestamp_defaults
 Revises: 0104_secure_password_reset
 """
 
@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from alembic import op
 
 
-revision = "0105_auth_action_token_timestamp_defaults"
+revision = "0105_auth_token_timestamp_defaults"
 down_revision = "0104_secure_password_reset"
 branch_labels = None
 depends_on = None
