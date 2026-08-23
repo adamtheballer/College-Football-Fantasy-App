@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { apiGet, apiPut, buildApiUrl, clearAccessTokenSession, storeAccessTokenSession } from "./api";
+import {
+  apiGet,
+  apiPut,
+  buildApiUrl,
+  clearAccessTokenSession,
+  resolveDefaultApiBase,
+  storeAccessTokenSession,
+} from "./api";
 
 const originalFetch = globalThis.fetch;
 
@@ -14,6 +21,11 @@ afterEach(() => {
 describe("api client", () => {
   it("builds runtime checks through the shared API base", () => {
     expect(buildApiUrl("/health/runtime")).toContain("/api/health/runtime");
+  });
+
+  it("uses the production API from a Capacitor bundle even without a build-time URL", () => {
+    expect(resolveDefaultApiBase("capacitor:")).toBe("https://api.collegefantasyfootball.org");
+    expect(resolveDefaultApiBase("https:")).toBe("/api");
   });
 
   it("notifies the auth provider when the access token session is cleared", () => {

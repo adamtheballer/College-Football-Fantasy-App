@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.api.deps import get_current_user
-from collegefootballfantasy_api.app.core.config import settings
+from collegefootballfantasy_api.app.core.config import TRUSTED_NATIVE_CORS_ORIGINS, settings
 from collegefootballfantasy_api.app.core.security import (
     create_access_token,
     generate_refresh_token,
@@ -89,25 +89,43 @@ def _unique_username(db: Session, desired: str) -> str:
         suffix += 1
 
 
-def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
+def _refresh_cookie_samesite(request: Request | None) -> str:
+    """Keep native Capacitor refresh sessions usable after access-token expiry.
+
+    The web app is same-site behind the Vercel /api proxy and keeps the
+    configured default. Capacitor is a separate ``capacitor://localhost``
+    origin, so production secure cookies must explicitly allow that trusted
+    cross-site request.
+    """
+
+    if (
+        request is not None
+        and settings.refresh_cookie_secure
+        and request.headers.get("origin") in TRUSTED_NATIVE_CORS_ORIGINS
+    ):
+        return "none"
+    return settings.refresh_cookie_samesite
+
+
+def _set_refresh_cookie(response: Response, refresh_token: str, request: Request | None = None) -> None:
     response.set_cookie(
         key=settings.refresh_cookie_name,
         value=refresh_token,
         max_age=settings.refresh_token_ttl_days * 24 * 60 * 60,
         httponly=True,
         secure=settings.refresh_cookie_secure,
-        samesite=settings.refresh_cookie_samesite,
+        samesite=_refresh_cookie_samesite(request),
         path="/",
         domain=settings.refresh_cookie_domain,
     )
 
 
-def _clear_refresh_cookie(response: Response) -> None:
+def _clear_refresh_cookie(response: Response, request: Request | None = None) -> None:
     response.delete_cookie(
         key=settings.refresh_cookie_name,
         httponly=True,
         secure=settings.refresh_cookie_secure,
-        samesite=settings.refresh_cookie_samesite,
+        samesite=_refresh_cookie_samesite(request),
         path="/",
         domain=settings.refresh_cookie_domain,
     )
@@ -187,7 +205,7 @@ def _complete_successful_login(
         email=user.email,
         auth_version=user.auth_version,
     )
-    _set_refresh_cookie(response, refresh_token)
+    _set_refresh_cookie(response, refresh_token, request)
     return AuthResponse(
         access_token=access_token,
         access_token_expires_at=access_expires_at,
@@ -306,7 +324,7 @@ def signup(payload: UserCreate, response: Response, request: Request, db: Sessio
         email=user.email,
         auth_version=user.auth_version,
     )
-    _set_refresh_cookie(response, refresh_token)
+    _set_refresh_cookie(response, refresh_token, request)
     return AuthResponse(
         access_token=access_token,
         access_token_expires_at=access_expires_at,
@@ -409,7 +427,7 @@ def refresh_session(response: Response, request: Request, db: Session = Depends(
         session.last_used_at = now
         db.add(session)
         db.commit()
-        _clear_refresh_cookie(response)
+        _clear_refresh_cookie(response, request)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="expired refresh token")
 
     user = db.get(User, session.user_id)
@@ -418,7 +436,7 @@ def refresh_session(response: Response, request: Request, db: Session = Depends(
         session.last_used_at = now
         db.add(session)
         db.commit()
-        _clear_refresh_cookie(response)
+        _clear_refresh_cookie(response, request)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid refresh token")
 
     session.revoked_at = now
@@ -439,7 +457,7 @@ def refresh_session(response: Response, request: Request, db: Session = Depends(
         email=user.email,
         auth_version=user.auth_version,
     )
-    _set_refresh_cookie(response, new_refresh_token)
+    _set_refresh_cookie(response, new_refresh_token, request)
     return RefreshResponse(access_token=access_token, access_token_expires_at=access_expires_at)
 
 
@@ -452,7 +470,7 @@ def logout(response: Response, request: Request, db: Session = Depends(get_db)) 
         session.last_used_at = now
         db.add(session)
         db.commit()
-    _clear_refresh_cookie(response)
+    _clear_refresh_cookie(response, request)
     return LogoutResponse(success=True)
 
 
@@ -512,7 +530,7 @@ def reset_password_with_current_password(
             detail="Unable to reset password right now.",
         ) from exc
 
-    _clear_refresh_cookie(response)
+    _clear_refresh_cookie(response, request)
     return AuthMessageResponse(message="password reset complete")
 
 
@@ -554,7 +572,7 @@ def change_password(
             detail="Unable to reset password right now.",
         ) from exc
 
-    _clear_refresh_cookie(response)
+    _clear_refresh_cookie(response, request)
     return AuthMessageResponse(message="password reset complete")
 
 
@@ -615,17 +633,18 @@ def revoke_session(
         db.add(session)
         db.commit()
     if current and current.id == session.id:
-        _clear_refresh_cookie(response)
+        _clear_refresh_cookie(response, request)
     return AuthMessageResponse(message="session revoked")
 
 
 @router.post("/logout-all", response_model=AuthMessageResponse)
 def logout_all(
     response: Response,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> AuthMessageResponse:
     revoke_user_sessions(db, user_id=current_user.id)
     db.commit()
-    _clear_refresh_cookie(response)
+    _clear_refresh_cookie(response, request)
     return AuthMessageResponse(message="all sessions revoked")
