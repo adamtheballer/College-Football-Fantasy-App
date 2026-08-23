@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appID": "84TV35F6T5.org.collegefantasyfootball.app",
+        "components": [
+          {
+            "/": "/reset-password",
+            "comment": "Allow password-reset links to open in the iOS app."
+          }
+        ]
+      }
+    ]
+  }
+}

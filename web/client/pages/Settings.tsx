@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useNavigate } from "react-router-dom";
+import { ApiError } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { restartGuide } from "@/lib/onboarding";
 import { useLeagues } from "@/hooks/use-leagues";
@@ -93,11 +94,13 @@ const SettingItem = ({ label, description, children }: any) => (
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { user, isBootstrapping, logoutAll, updateProfile } = useAuth();
+  const { user, isBootstrapping, logoutAll, updateProfile, requestPasswordResetForCurrentUser } = useAuth();
   const {
     privacy_policy_url: privacyPolicyUrl,
     terms_url: termsUrl,
     support_email: supportEmail,
+    password_reset_enabled: passwordResetEnabled,
+    password_reset_email_configured: passwordResetEmailConfigured,
   } = useRuntimeCapabilities();
   const { data: leagues = [] } = useLeagues(50, Boolean(user));
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
@@ -110,6 +113,7 @@ export default function Settings() {
   const [avatarPreviewError, setAvatarPreviewError] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
+  const [isSendingReset, setIsSendingReset] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -218,6 +222,23 @@ export default function Settings() {
       navigate("/login", { replace: true });
     } catch (error) {
       setSecurityMessage(error instanceof Error ? error.message : "Unable to sign out of all devices.");
+    }
+  };
+
+  const handlePasswordResetEmail = async () => {
+    if (!user || !passwordResetEnabled || !passwordResetEmailConfigured) return;
+    const [local, domain] = user.email.split("@");
+    const masked = `${local.slice(0, 1)}••••@${domain ?? ""}`;
+    if (!window.confirm(`RESET YOUR PASSWORD?\n\nWe will email a secure reset link to ${masked}. Completing the reset signs you out on every device.`)) return;
+    setIsSendingReset(true);
+    setSecurityMessage(null);
+    try {
+      await requestPasswordResetForCurrentUser();
+      setSecurityMessage("Reset email sent. The secure link expires in 30 minutes.");
+    } catch (error) {
+      setSecurityMessage(error instanceof ApiError && error.status === 429 ? "Too many reset requests. Please wait before trying again." : "Unable to send a reset email right now.");
+    } finally {
+      setIsSendingReset(false);
     }
   };
 
@@ -438,6 +459,7 @@ export default function Settings() {
           icon={Shield}
         >
           <div className="space-y-5">
+            {passwordResetEnabled && passwordResetEmailConfigured ? <div className="rounded-lg border border-primary/25 bg-primary/5 p-4"><h3 className="text-sm font-black uppercase tracking-[0.16em] text-foreground">Password reset by email</h3><p className="mt-2 text-sm font-medium text-muted-foreground">We’ll send a secure reset link to your account email. Completing the reset signs you out on every device.</p><Button type="button" className="mt-4 h-11 rounded-xl text-[10px] font-black uppercase tracking-widest" onClick={() => void handlePasswordResetEmail()} disabled={isSendingReset}>{isSendingReset ? "Sending…" : "Reset password by email"}</Button></div> : null}
             <div className="rounded-lg border border-border bg-muted/20 p-4">
               <h3 className="text-sm font-black uppercase tracking-[0.16em] text-foreground">Change Password</h3>
               <p className="mt-2 text-sm font-medium text-muted-foreground">

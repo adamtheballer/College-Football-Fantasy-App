@@ -13,6 +13,8 @@ export type RuntimeIdentity = {
   scoring_mode: string;
   sportsdata_enabled: boolean;
   email_enabled: boolean;
+  password_reset_enabled: boolean;
+  password_reset_email_configured: boolean;
   support_email?: string | null;
   privacy_policy_url?: string | null;
   terms_url?: string | null;

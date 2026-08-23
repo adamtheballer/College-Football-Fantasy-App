@@ -11,6 +11,7 @@ class AuthActionToken(TimestampMixin, Base):
     __table_args__ = (
         Index("ix_auth_action_tokens_user_type_consumed", "user_id", "token_type", "consumed_at"),
         Index("ix_auth_action_tokens_expires_at", "expires_at"),
+        Index("ix_auth_action_tokens_user_type_revoked", "user_id", "token_type", "revoked_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -20,7 +21,12 @@ class AuthActionToken(TimestampMixin, Base):
     email: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoke_reason: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String(96), unique=True, nullable=True)
     request_ip_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    completed_ip_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    completed_user_agent_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     user = relationship("User")
