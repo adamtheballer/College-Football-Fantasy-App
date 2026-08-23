@@ -131,13 +131,15 @@ function MatchupTeamSummary({
   const isBrand = accent === "brand";
   const showActual = shouldShowMatchupScorePanels(status) && typeof currentScore === "number";
   const projected = teamTotal(team);
+  const managerName = team?.manager_name ?? team?.fantasy_team_name ?? "Team TBD";
+  const teamName = team?.fantasy_team_name;
 
   return (
     <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
       <div className={`flex items-center ${align === "right" ? "justify-end" : "justify-start"}`}>
         <ManagerAvatar
           avatarUrl={team?.owner_avatar_url}
-          managerName={team?.fantasy_team_name}
+          managerName={managerName}
           size="sm"
           className={`sm:h-10 sm:w-10 sm:text-sm ${
             isBrand
@@ -147,8 +149,11 @@ function MatchupTeamSummary({
         />
       </div>
       <p className="mt-0.5 truncate text-[11px] font-black text-cfb-text-primary sm:mt-1 sm:text-sm">
-        {team?.fantasy_team_name ?? "Team TBD"}
+        {managerName}
       </p>
+      {teamName && teamName !== managerName ? (
+        <p className="truncate text-[9px] font-bold text-cfb-text-muted sm:text-[10px]">{teamName}</p>
+      ) : null}
       <p className="text-[9px] font-bold text-cfb-text-muted sm:text-[10px]">{team?.record ?? "0-0-0"}</p>
       <p className="cfb-score-value mt-0.5 text-2xl text-cfb-text-primary sm:mt-1 sm:text-4xl">
         {showActual ? formatMatchupPoints(team?.current_points ?? currentScore) : formatMatchupPoints(projected)}

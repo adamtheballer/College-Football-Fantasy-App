@@ -9,7 +9,7 @@ const state = vi.hoisted(() => ({
   setActiveLeagueId: vi.fn(),
   prepareProfileImage: vi.fn(),
   runtimeCapabilities: {},
-  user: { id: 7, firstName: "Adam", email: "adam@example.com", isAdmin: false, avatarUrl: null },
+  user: { id: 7, firstName: "Adam", email: "adam@example.com", isAdmin: false, avatarUrl: null, managerNameChangeAvailableAt: null },
 }));
 
 vi.mock("@/hooks/use-auth", () => ({
@@ -70,9 +70,10 @@ describe("Settings beta preferences", () => {
   beforeEach(() => {
     localStorage.clear();
     state.updateProfile.mockReset();
-    state.updateProfile.mockResolvedValue({ id: 7, firstName: "Updated Adam", avatarUrl: null });
+    state.updateProfile.mockResolvedValue({ id: 7, firstName: "Updated Adam", avatarUrl: null, managerNameChangeAvailableAt: null });
     state.prepareProfileImage.mockReset();
     state.runtimeCapabilities = {};
+    state.user = { id: 7, firstName: "Adam", email: "adam@example.com", isAdmin: false, avatarUrl: null, managerNameChangeAvailableAt: null };
   });
 
   it("shows the notification permission state without third-party theme controls", () => {
@@ -86,13 +87,37 @@ describe("Settings beta preferences", () => {
     expect(screen.queryByText(/espn/i)).toBeNull();
   });
 
-  it("saves the manager name through the self-only profile update flow", async () => {
+  it("confirms a manager-name change before saving it through the self-only profile update flow", async () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
     fireEvent.change(screen.getByLabelText("Manager Name"), { target: { value: "Updated Adam" } });
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
+    expect(state.updateProfile).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: /change manager name/i })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /confirm name change/i }));
     await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ firstName: "Updated Adam", avatarUrl: null }));
+  });
+
+  it("opens the same confirmation before saving a manager-name change with Enter", () => {
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    fireEvent.change(screen.getByLabelText("Manager Name"), { target: { value: "Updated Adam" } });
+    fireEvent.keyDown(screen.getByLabelText("Manager Name"), { key: "Enter" });
+
+    expect(screen.getByRole("heading", { name: /change manager name/i })).toBeTruthy();
+    expect(state.updateProfile).not.toHaveBeenCalled();
+  });
+
+  it("disables manager-name edits until the seven-day cooldown ends", () => {
+    state.user = {
+      ...state.user,
+      managerNameChangeAvailableAt: "2026-08-30T12:00:00Z",
+    };
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    expect(screen.getByLabelText("Manager Name").getAttribute("disabled")).not.toBeNull();
+    expect(screen.getByText(/name changes are available again on/i)).toBeTruthy();
   });
 
   it("limits the manager-name field to fifty characters", () => {

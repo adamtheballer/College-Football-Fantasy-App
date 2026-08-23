@@ -241,21 +241,32 @@ def update_current_user_profile(
 
     fields_set = payload.model_fields_set
     if "first_name" in fields_set:
-        current_user.first_name = moderate_user_text(
+        next_name = moderate_user_text(
             db,
             actor_user_id=current_user.id,
             field_name="manager_name",
             value=payload.first_name,
             required=True,
         ) or current_user.first_name
-        # League, draft, roster, and matchup read models use the team's stored
-        # owner name. Keep that denormalized display value in sync so a saved
-        # profile name applies everywhere without waiting for a later league
-        # update or requiring the manager to sign in again.
-        db.query(Team).filter(Team.owner_user_id == current_user.id).update(
-            {Team.owner_name: current_user.first_name},
-            synchronize_session=False,
-        )
+        if next_name != current_user.first_name:
+            now = utcnow()
+            available_at = current_user.manager_name_change_available_at
+            if available_at is not None and ensure_aware(available_at) > now:
+                seconds_remaining = max(1, int((ensure_aware(available_at) - now).total_seconds()))
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Manager name can only be changed once every 7 days.",
+                    headers={"Retry-After": str(seconds_remaining)},
+                )
+            current_user.first_name = next_name
+            current_user.manager_name_changed_at = now
+            # League, draft, roster, and matchup read models use the team's
+            # stored owner name. Keep that denormalized display value in sync
+            # so a saved profile name applies everywhere immediately.
+            db.query(Team).filter(Team.owner_user_id == current_user.id).update(
+                {Team.owner_name: current_user.first_name},
+                synchronize_session=False,
+            )
     if "avatar_url" in fields_set:
         current_user.avatar_url = payload.avatar_url
     db.add(current_user)

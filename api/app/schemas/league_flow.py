@@ -651,6 +651,7 @@ class MatchupTeamRead(BaseModel):
     win_probability: float | None = None
     fantasy_team_id: int
     fantasy_team_name: str
+    manager_name: str | None = None
     owner_avatar_url: str | None = None
     projected_total: float | None = None
     current_points: float | None = None

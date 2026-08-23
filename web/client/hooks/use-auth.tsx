@@ -27,6 +27,7 @@ export interface User {
   id: number;
   isAdmin: boolean;
   avatarUrl: string | null;
+  managerNameChangeAvailableAt?: string | null;
 }
 
 export type AuthSession = {
@@ -46,6 +47,7 @@ type AuthUserPayload = {
   is_admin?: boolean;
   avatar_url?: string | null;
   email_verified_at?: string | null;
+  manager_name_change_available_at?: string | null;
 };
 
 type AuthPayload = {
@@ -149,7 +151,12 @@ const loadStoredUser = (): User | null => {
       clearStoredAuth();
       return null;
     }
-    return { ...parsedUser, isAdmin: !!parsedUser.isAdmin, avatarUrl: parsedUser.avatarUrl ?? null };
+    return {
+      ...parsedUser,
+      isAdmin: !!parsedUser.isAdmin,
+      avatarUrl: parsedUser.avatarUrl ?? null,
+      managerNameChangeAvailableAt: parsedUser.managerNameChangeAvailableAt ?? null,
+    };
   } catch {
     clearStoredAuth();
     return null;
@@ -167,6 +174,7 @@ const mapUserPayload = (payload: AuthUserPayload): User => ({
   email: payload.email,
   isAdmin: !!payload.is_admin,
   avatarUrl: payload.avatar_url ?? null,
+  managerNameChangeAvailableAt: payload.manager_name_change_available_at ?? null,
 });
 
 const mapAuthPayload = (payload: AuthPayload): User => mapUserPayload(payload.user);
