@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LeagueMatchupTeam, LeagueRosterPlayer } from "@/types/league";
 
 vi.mock("@/components/league/RosterSlotTable", () => ({
-  RosterSlotTable: () => <div data-testid="desktop-roster-table" />,
+  RosterSlotTable: ({ title }: { title: string }) => <div data-testid="desktop-roster-table">{title}</div>,
   formatRosterPointValue: (player: LeagueRosterPlayer) => {
     const value = player.current_fantasy_points ?? player.live_points ?? player.projected_points;
     return typeof value === "number" ? value.toFixed(1) : "—";
@@ -51,6 +51,7 @@ const makePlayer = (id: number, name: string, slot: string, projection: number):
 const myTeam: LeagueMatchupTeam = {
   fantasy_team_id: 1,
   fantasy_team_name: "Adam's Team",
+  manager_name: "An1ski",
   record: "0-0-0",
   projected_total: 119.5,
   roster: [makePlayer(1, "Long Name Quarterback", "QB", 24.1), makePlayer(2, "Bench Running Back", "BENCH", 9.3)],
@@ -59,6 +60,7 @@ const myTeam: LeagueMatchupTeam = {
 const opponentTeam: LeagueMatchupTeam = {
   fantasy_team_id: 2,
   fantasy_team_name: "Guy's Team",
+  manager_name: "Mary",
   record: "0-0-0",
   projected_total: 115.2,
   roster: [makePlayer(10, "Opponent Quarterback", "QB", 22.7), makePlayer(11, "Opponent Bench", "BENCH", 8.8)],
@@ -146,5 +148,15 @@ describe("SideBySideMatchup", () => {
     expect(screen.getByText("Bench depth")).toBeTruthy();
     expect(screen.getByTestId("mobile-bench-lineup")).toBeTruthy();
     expect(container.querySelector("details")?.open).toBe(false);
+  });
+
+  it("uses the current manager-derived team name for desktop matchup tables", () => {
+    render(<SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} />);
+
+    expect(screen.getByText("An1ski's Team Starters")).toBeTruthy();
+    expect(screen.getByText("Mary's Team Starters")).toBeTruthy();
+    expect(screen.getByText("An1ski's Team Bench")).toBeTruthy();
+    expect(screen.getByText("Mary's Team Bench")).toBeTruthy();
+    expect(screen.queryByText("Adam's Team Starters")).toBeNull();
   });
 });

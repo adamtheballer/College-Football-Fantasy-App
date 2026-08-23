@@ -5,6 +5,7 @@ import { RosterSlotTable, type RosterPointMode, formatRosterPointValue, liveProj
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { SurfaceCard } from "@/components/fantasy";
 import { usePlayerCard } from "@/hooks/use-players";
+import { managerTeamName } from "@/lib/manager-team-name";
 import { formatProjectionDisplay } from "@/lib/projection-display";
 import type { LeagueMatchupTeam, LeagueRosterPlayer } from "@/types/league";
 
@@ -286,7 +287,7 @@ export function SideBySideMatchup({
         />
         <div className="hidden gap-5 md:grid xl:grid-cols-2">
           <RosterSlotTable
-            title={myTeam?.fantasy_team_name || "Your Starters"}
+            title={`${managerTeamName(myTeam, "Your Team")} Starters`}
             players={myStarters}
             emptyText="Your starters are empty or projections are unavailable."
             showPositionColumn={false}
@@ -294,7 +295,7 @@ export function SideBySideMatchup({
             leagueId={leagueId}
           />
           <RosterSlotTable
-            title={opponentTeam?.fantasy_team_name || "Opponent Starters"}
+            title={`${managerTeamName(opponentTeam, "Opponent")} Starters`}
             players={opponentStarters}
             emptyText="Opponent starters are pending."
             showPositionColumn={false}
@@ -331,7 +332,7 @@ export function SideBySideMatchup({
         </div>
         <div className="grid gap-5 xl:grid-cols-2">
           <RosterSlotTable
-            title={`${myTeam?.fantasy_team_name || "Your Team"} Bench`}
+            title={`${managerTeamName(myTeam, "Your Team")} Bench`}
             players={myReserves}
             emptyText="Your bench is empty."
             showPositionColumn={false}
@@ -340,7 +341,7 @@ export function SideBySideMatchup({
             leagueId={leagueId}
           />
           <RosterSlotTable
-            title={`${opponentTeam?.fantasy_team_name || "Opponent"} Bench`}
+            title={`${managerTeamName(opponentTeam, "Opponent")} Bench`}
             players={opponentReserves}
             emptyText="Opponent bench is pending."
             showPositionColumn={false}

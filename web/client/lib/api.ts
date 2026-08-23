@@ -136,7 +136,7 @@ type RefreshResult = "refreshed" | "terminal_failure" | "transient_failure";
 
 let inflightRefresh: Promise<RefreshResult> | null = null;
 
-const refreshAccessToken = async (): Promise<RefreshResult> => {
+export const restoreAccessTokenSession = async (signal?: AbortSignal): Promise<RefreshResult> => {
   if (inflightRefresh) {
     return inflightRefresh;
   }
@@ -145,6 +145,7 @@ const refreshAccessToken = async (): Promise<RefreshResult> => {
       const res = await fetch(buildApiUrl("/auth/refresh"), {
         method: "POST",
         credentials: "include",
+        signal,
       });
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) {
@@ -321,7 +322,7 @@ const apiRequest = async <T>({
   const canRefreshForPath =
     !path.startsWith("/auth/") || path === "/auth/me";
   if (res.status === 401 && retryOn401 && canRefreshForPath) {
-    const refreshResult = await refreshAccessToken();
+    const refreshResult = await restoreAccessTokenSession();
     if (refreshResult === "refreshed") {
       return apiRequest<T>({
         method,
