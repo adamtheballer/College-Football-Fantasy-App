@@ -95,6 +95,12 @@ describe("Settings beta preferences", () => {
     await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ firstName: "Updated Adam", avatarUrl: null }));
   });
 
+  it("limits the manager-name field to fifty characters", () => {
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    expect(screen.getByLabelText("Manager Name").getAttribute("maxLength")).toBe("50");
+  });
+
   it("keeps the image-address fallback available and removes it immediately", async () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
 

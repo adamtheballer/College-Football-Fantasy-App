@@ -36,7 +36,7 @@ def validate_password_strength(value: str) -> str:
 
 
 class UserCreate(BaseModel):
-    first_name: str = Field(min_length=1, max_length=100)
+    first_name: str = Field(min_length=1, max_length=50)
     email: str
     password: str
     username: Optional[str] = Field(default=None, max_length=80)
@@ -85,7 +85,7 @@ JPEG_DATA_URL_PREFIX = "data:image/jpeg;base64,"
 class UserProfileUpdate(BaseModel):
     """The limited, self-service profile fields supported during beta."""
 
-    first_name: str | None = Field(default=None, max_length=100)
+    first_name: str | None = Field(default=None, max_length=50)
     avatar_url: str | None = Field(default=None, max_length=MAX_AVATAR_DATA_URL_LENGTH)
 
     @field_validator("first_name")
