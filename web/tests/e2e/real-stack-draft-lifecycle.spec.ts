@@ -165,12 +165,21 @@ test.describe("real two-manager draft lifecycle", () => {
       await commissioner.setViewportSize({ width: 1280, height: 900 });
 
       // Queues are intentionally client-local, but this is still a live
-      // browser assertion that the second signed-in manager can queue a
-      // backend player while waiting for their turn.
-      const queueButton = manager.getByRole("button", { name: /^Queue /i }).first();
+      // browser assertion that the manager who made the opening pick can
+      // queue a backend player while waiting for pick three. The opening
+      // draft order is randomized, so this is not always the manager context.
+      const waitingPicker =
+        openingPicker === commissioner ? commissioner : manager;
+      const queueButton = waitingPicker
+        .getByRole("button", { name: /^Queue /i })
+        .first();
       await expect(queueButton).toBeVisible({ timeout: 15_000 });
       await queueButton.click();
-      await expect(manager.getByRole("button", { name: /^Remove .+ from queue$/i }).first()).toBeVisible();
+      await expect(
+        waitingPicker
+          .getByRole("button", { name: /^Remove .+ from queue$/i })
+          .first()
+      ).toBeVisible();
 
       await expect.poll(async () => {
         const room = await realApi<{ picks: Array<{ auto_pick: boolean }> }>(commissioner, `/leagues/${leagueId}/draft-room`);
