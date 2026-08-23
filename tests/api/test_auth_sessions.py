@@ -14,6 +14,8 @@ from collegefootballfantasy_api.app.core.security import (
     verify_password,
 )
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
+from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.email_service import ConsoleEmailService, EmailPayload, get_email_service
 from collegefootballfantasy_api.app.services import password_change
@@ -98,6 +100,38 @@ def test_signed_in_manager_can_update_only_their_own_display_name(client, db_ses
     assert response.json()["first_name"] == "Updated Manager"
     assert client.get("/auth/me", headers=auth_headers(token)).json()["first_name"] == "Updated Manager"
     assert db_session.get(User, payload["user"]["id"]).first_name == "Updated Manager"
+
+
+def test_profile_name_update_propagates_to_all_owned_league_teams(client, db_session):
+    payload = signup_user(client, "profile-owner")
+    user_id = payload["user"]["id"]
+    league = League(name="Profile owner league", commissioner_user_id=user_id)
+    db_session.add(league)
+    db_session.flush()
+    owned_team = Team(
+        league_id=league.id,
+        name="Coachprofile-owner's Team",
+        owner_name="Coachprofile-owner",
+        owner_user_id=user_id,
+    )
+    unassigned_team = Team(
+        league_id=league.id,
+        name="Unassigned Team",
+        owner_name="Unassigned",
+    )
+    db_session.add_all([owned_team, unassigned_team])
+    db_session.commit()
+
+    response = client.patch(
+        "/auth/me",
+        json={"first_name": "Updated Manager"},
+        headers=auth_headers(payload["access_token"]),
+    )
+
+    assert response.status_code == 200
+    db_session.expire_all()
+    assert db_session.get(Team, owned_team.id).owner_name == "Updated Manager"
+    assert db_session.get(Team, unassigned_team.id).owner_name == "Unassigned"
 
 
 def test_manager_avatar_profile_patch_preserves_omitted_fields_and_can_remove(client, db_session):
