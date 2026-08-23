@@ -1,6 +1,7 @@
 export const DRAFT_AUDIO_URLS = {
   start: "/audio/cfb-draft-start.wav",
   userFirstPick: "/audio/cfb-draft-user-first-pick.wav",
+  userLaterPick: "/audio/cfb-draft-user-later-picks.wav",
   userCountdown: "/audio/cfb-draft-user-countdown-10.wav",
 } as const;
 
@@ -69,6 +70,25 @@ export const shouldPlayUserFirstPickCue = ({
   isActiveUserPick(current) &&
   completedUserPickCount === 0 &&
   current.currentPick !== 1;
+
+/**
+ * This slot covers the user's personal selections #2 through #13. The count
+ * is the number already completed by that user when their new timer starts.
+ */
+export const shouldPlayUserLaterPickCue = ({
+  previous,
+  current,
+  completedUserPickCount,
+}: {
+  previous: DraftAudioState | null;
+  current: DraftAudioState;
+  completedUserPickCount: number;
+}) =>
+  previous !== null &&
+  didLivePickStart(previous, current) &&
+  isActiveUserPick(current) &&
+  completedUserPickCount >= 1 &&
+  completedUserPickCount <= 12;
 
 export const shouldPlayUserCountdownCue = ({
   current,

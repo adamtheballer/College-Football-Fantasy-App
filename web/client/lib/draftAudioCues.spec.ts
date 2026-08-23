@@ -7,6 +7,7 @@ import {
   shouldPlayDraftStartCue,
   shouldPlayUserCountdownCue,
   shouldPlayUserFirstPickCue,
+  shouldPlayUserLaterPickCue,
 } from "./draftAudioCues";
 
 const preDraft = {
@@ -29,6 +30,7 @@ describe("real-draft audio cues", () => {
     expect(DRAFT_AUDIO_URLS).toEqual({
       start: "/audio/cfb-draft-start.wav",
       userFirstPick: "/audio/cfb-draft-user-first-pick.wav",
+      userLaterPick: "/audio/cfb-draft-user-later-picks.wav",
       userCountdown: "/audio/cfb-draft-user-countdown-10.wav",
     });
   });
@@ -54,6 +56,19 @@ describe("real-draft audio cues", () => {
     expect(shouldPlayUserCountdownCue({ current: firstOverallPick, secondsRemaining: 10 })).toBe(true);
     expect(shouldPlayUserCountdownCue({ current: { ...firstOverallPick, currentTeamId: 8 }, secondsRemaining: 10 })).toBe(false);
     expect(shouldPlayUserCountdownCue({ current: firstOverallPick, secondsRemaining: 9 })).toBe(false);
+  });
+
+  it("plays the later-pick cue only for the user's selections #2 through #13", () => {
+    const userLaterPick = {
+      ...firstOverallPick,
+      currentPick: 14,
+      currentPickStartedAt: "2026-08-23T19:04:00Z",
+    };
+    expect(shouldPlayUserLaterPickCue({ previous: firstOverallPick, current: userLaterPick, completedUserPickCount: 1 })).toBe(true);
+    expect(shouldPlayUserLaterPickCue({ previous: firstOverallPick, current: userLaterPick, completedUserPickCount: 12 })).toBe(true);
+    expect(shouldPlayUserLaterPickCue({ previous: firstOverallPick, current: userLaterPick, completedUserPickCount: 0 })).toBe(false);
+    expect(shouldPlayUserLaterPickCue({ previous: firstOverallPick, current: userLaterPick, completedUserPickCount: 13 })).toBe(false);
+    expect(shouldPlayUserLaterPickCue({ previous: firstOverallPick, current: { ...userLaterPick, currentTeamId: 8 }, completedUserPickCount: 1 })).toBe(false);
   });
 
   it("keys each cue to the authoritative pick start so polling cannot replay it", () => {

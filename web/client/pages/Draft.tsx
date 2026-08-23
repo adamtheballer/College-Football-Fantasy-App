@@ -23,6 +23,7 @@ import {
   shouldPlayDraftStartCue,
   shouldPlayUserCountdownCue,
   shouldPlayUserFirstPickCue,
+  shouldPlayUserLaterPickCue,
   type DraftAudioCue,
   type DraftAudioState,
 } from "@/lib/draftAudioCues";
@@ -366,6 +367,8 @@ export default function Draft() {
       playDraftAudioCue("start", currentState);
     } else if (shouldPlayUserFirstPickCue({ previous: previousState, current: currentState, completedUserPickCount })) {
       playDraftAudioCue("userFirstPick", currentState);
+    } else if (shouldPlayUserLaterPickCue({ previous: previousState, current: currentState, completedUserPickCount })) {
+      playDraftAudioCue("userLaterPick", currentState);
     }
   }, [
     draftRoom?.current_pick,
