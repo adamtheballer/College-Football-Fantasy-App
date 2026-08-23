@@ -176,6 +176,7 @@ class UserRead(BaseModel):
     is_admin: bool = False
     created_at: datetime
     email_verified_at: datetime | None = None
+    manager_name_change_available_at: datetime | None = None
     # A redeemed Early Access code is stored on the user and can be honored by
     # the alpha subscription system without storing the raw code.
     early_access_pro_eligible: bool = False

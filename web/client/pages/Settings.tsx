@@ -22,6 +22,16 @@ import { useRuntimeCapabilities } from "@/components/RuntimeCompatibilityGate";
 import { SupportContactCard } from "@/components/support/SupportContactCard";
 import { NotificationSettingsPanel } from "@/components/NotificationSettingsPanel";
 import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { prepareProfileImage } from "@/lib/profileImage";
 import { isExternalLegalHref, resolveLegalDocumentHref } from "@/lib/legal-links";
 
@@ -112,6 +122,7 @@ export default function Settings() {
   const [photoState, setPhotoState] = useState<"idle" | "preparing" | "saving">("idle");
   const [avatarPreviewError, setAvatarPreviewError] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [pendingNameChange, setPendingNameChange] = useState<{ name: string; avatarUrl: string | null } | null>(null);
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
   const [isSendingReset, setIsSendingReset] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -126,10 +137,32 @@ export default function Settings() {
     setProfileError(null);
   }, [user]);
 
-  const handleSave = async () => {
+  const managerNameChangeAvailableAt = user?.managerNameChangeAvailableAt ?? null;
+  const managerNameCooldownActive = Boolean(
+    managerNameChangeAvailableAt && Number.isFinite(Date.parse(managerNameChangeAvailableAt)) && Date.parse(managerNameChangeAvailableAt) > Date.now(),
+  );
+  const managerNameAvailableDate = managerNameChangeAvailableAt
+    ? new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(managerNameChangeAvailableAt))
+    : null;
+
+  const saveProfile = async (nextName: string, nextAvatarUrl: string | null) => {
+    if (!user) return;
+    setSaveState("saving");
+    setProfileError(null);
+    try {
+      await updateProfile({ firstName: nextName, avatarUrl: nextAvatarUrl });
+      setSaveState("saved");
+      setTimeout(() => setSaveState("idle"), 1500);
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : "Unable to save your profile. Your previous settings are still active.");
+      setSaveState("error");
+    }
+  };
+
+  const handleSave = () => {
     if (!user) return;
     const nextName = managerName.trim();
-    const nextAvatarUrl = avatarUrl.trim();
+    const nextAvatarUrl = avatarUrl.trim() || null;
     if (!nextName) {
       setProfileError("Manager name is required.");
       setSaveState("error");
@@ -140,16 +173,18 @@ export default function Settings() {
       setSaveState("error");
       return;
     }
-    setSaveState("saving");
     setProfileError(null);
-    try {
-      await updateProfile({ firstName: nextName, avatarUrl: nextAvatarUrl || null });
-      setSaveState("saved");
-      setTimeout(() => setSaveState("idle"), 1500);
-    } catch (error) {
-      setProfileError(error instanceof Error ? error.message : "Unable to save your profile picture. Your previous picture is still active.");
+    const isNameChange = nextName !== user.firstName;
+    if (isNameChange && managerNameCooldownActive) {
+      setProfileError(`Manager name changes are available again on ${managerNameAvailableDate ?? "a later date"}.`);
       setSaveState("error");
+      return;
     }
+    if (isNameChange) {
+      setPendingNameChange({ name: nextName, avatarUrl: nextAvatarUrl });
+      return;
+    }
+    void saveProfile(nextName, nextAvatarUrl);
   };
 
   const handleReplayGuide = () => {
@@ -302,7 +337,8 @@ export default function Settings() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 pb-24 sm:pb-20">
+    <>
+      <div className="mx-auto max-w-4xl space-y-6 pb-24 sm:pb-20">
       {/* Header Section */}
       <div className="space-y-3 border-b border-border pb-6 pt-6 sm:pt-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -338,8 +374,20 @@ export default function Settings() {
                 value={managerName}
                 maxLength={50}
                 onChange={(event) => setManagerName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleSave();
+                  }
+                }}
+                disabled={managerNameCooldownActive}
                 className="h-10 rounded-md border-border bg-background px-3 text-sm font-semibold text-foreground"
               />
+              {managerNameCooldownActive ? (
+                <p className="text-xs font-medium text-muted-foreground">Name changes are available again on {managerNameAvailableDate}.</p>
+              ) : (
+                <p className="text-xs font-medium text-muted-foreground">You can change your manager name once every 7 days.</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label className="text-[10px] font-black tracking-[0.14em] text-muted-foreground uppercase">Email Address</Label>
@@ -489,6 +537,34 @@ export default function Settings() {
           </div>
         </SettingsSection>
       </div>
-    </div>
+      </div>
+      <AlertDialog
+        open={pendingNameChange !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingNameChange(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change manager name?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This updates your manager identity across league pages, including matchups. You can only change it once every 7 days.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep current name</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const change = pendingNameChange;
+                setPendingNameChange(null);
+                if (change) void saveProfile(change.name, change.avatarUrl);
+              }}
+            >
+              Confirm name change
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

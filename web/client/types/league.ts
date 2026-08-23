@@ -317,6 +317,7 @@ export interface LeagueMatchupTeam {
   name?: string;
   fantasy_team_id: number;
   fantasy_team_name: string;
+  manager_name?: string | null;
   owner_avatar_url?: string | null;
   record: string;
   projected_points?: number | null;

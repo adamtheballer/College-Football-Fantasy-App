@@ -44,6 +44,8 @@ def test_matchup_tab_uses_a_bounded_number_of_selects(client, db_session):
 
     assert response.my_team is not None
     assert response.opponent_team is not None
+    assert response.my_team.manager_name == home.owner_name
+    assert response.opponent_team.manager_name == away.owner_name
     assert len(response.my_roster) == 8
     assert len(response.opponent_roster) == 8
     # Player-level live scoring, official availability, and the

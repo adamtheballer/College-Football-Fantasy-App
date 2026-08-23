@@ -197,6 +197,34 @@ def test_profile_name_update_propagates_to_all_owned_league_teams(client, db_ses
     assert db_session.get(Team, unassigned_team.id).owner_name == "Unassigned"
 
 
+def test_profile_name_change_cooldown_is_server_enforced(client, db_session):
+    payload = signup_user(client, "name-cooldown")
+    headers = auth_headers(payload["access_token"])
+    user_id = payload["user"]["id"]
+
+    first_change = client.patch("/auth/me", json={"first_name": "First Updated Manager"}, headers=headers)
+
+    assert first_change.status_code == 200
+    assert first_change.json()["manager_name_change_available_at"] is not None
+
+    blocked_change = client.patch("/auth/me", json={"first_name": "Second Updated Manager"}, headers=headers)
+
+    assert blocked_change.status_code == 429
+    assert blocked_change.json()["detail"] == "Manager name can only be changed once every 7 days."
+    assert int(blocked_change.headers["retry-after"]) > 0
+    assert db_session.get(User, user_id).first_name == "First Updated Manager"
+
+    user = db_session.get(User, user_id)
+    assert user is not None
+    user.manager_name_changed_at = datetime.now(timezone.utc) - timedelta(days=7, seconds=1)
+    db_session.commit()
+
+    allowed_change = client.patch("/auth/me", json={"first_name": "Second Updated Manager"}, headers=headers)
+
+    assert allowed_change.status_code == 200
+    assert db_session.get(User, user_id).first_name == "Second Updated Manager"
+
+
 def test_manager_avatar_profile_patch_preserves_omitted_fields_and_can_remove(client, db_session):
     payload = signup_user(client, "avatar")
     token = payload["access_token"]
