@@ -40,7 +40,8 @@ export const isSaturdayPick6Route = (pathname: string) => pathname === "/saturda
 export const isAuthFlowRoute = (pathname: string) =>
   pathname === "/login" ||
   pathname === "/signup" ||
-  pathname === "/reset-password";
+  pathname === "/reset-password" ||
+  pathname === "/forgot-password";
 
 export const getShellNavItems = (
   user: User | null,

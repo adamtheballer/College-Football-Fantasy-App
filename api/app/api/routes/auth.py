@@ -31,6 +31,11 @@ from collegefootballfantasy_api.app.schemas.auth import (
     AuthenticatedPasswordChange,
     LogoutResponse,
     PasswordResetWithCurrentPassword,
+    PasswordResetCompleteResponse,
+    PasswordResetConfirm,
+    PasswordResetRequest,
+    PasswordResetValidate,
+    PasswordResetValidateResponse,
     RefreshResponse,
     SessionRead,
     SessionsResponse,
@@ -60,6 +65,14 @@ from collegefootballfantasy_api.app.services.password_change import (
     PasswordChangeCredentialError,
     PasswordChangeValidationError,
     change_user_password,
+)
+from collegefootballfantasy_api.app.services.password_reset import (
+    GENERIC_RESET_MESSAGE,
+    INVALID_RESET_TOKEN_MESSAGE,
+    complete_reset,
+    create_reset_request,
+    record_invalid_attempt,
+    validate_reset_token,
 )
 
 router = APIRouter()
@@ -472,6 +485,146 @@ def logout(response: Response, request: Request, db: Session = Depends(get_db)) 
         db.commit()
     _clear_refresh_cookie(response, request)
     return LogoutResponse(success=True)
+
+
+def _enforce_password_reset_request_limits(db: Session, *, email: str, request: Request) -> None:
+    enforce_auth_rate_limit(
+        db,
+        action="password_reset_email_cooldown",
+        identifier=email,
+        request=request,
+        limit=1,
+        window_seconds=settings.password_reset_request_cooldown_seconds,
+        include_ip=False,
+    )
+    enforce_auth_rate_limit(
+        db,
+        action="password_reset_email_hour",
+        identifier=email,
+        request=request,
+        limit=settings.password_reset_max_per_email_per_hour,
+        window_minutes=60,
+        include_ip=False,
+    )
+    enforce_auth_rate_limit(
+        db,
+        action="password_reset_ip_hour",
+        identifier=None,
+        request=request,
+        limit=settings.password_reset_max_per_ip_per_hour,
+        window_minutes=60,
+        include_ip=True,
+    )
+
+
+@router.post("/password-reset/request", response_model=AuthMessageResponse, status_code=status.HTTP_202_ACCEPTED)
+def request_password_reset(
+    payload: PasswordResetRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> AuthMessageResponse:
+    """Always return the same accepted response so email ownership stays private."""
+    if not settings.password_reset_enabled:
+        return AuthMessageResponse(message=GENERIC_RESET_MESSAGE)
+    try:
+        _enforce_password_reset_request_limits(db, email=payload.email, request=request)
+        user = _active_user_for_normalized_email(db, payload.email)
+        if user:
+            create_reset_request(db, user=user, request=request)
+        # Unknown accounts still perform a keyed digest operation to avoid a trivial timing split.
+        else:
+            validate_reset_token(db, "padding-token-for-enumeration-resistance")
+        db.commit()
+    except HTTPException:
+        db.commit()
+        raise
+    except Exception as exc:
+        db.rollback()
+        logger.exception("password_reset_request_failed")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Unable to process request") from exc
+    return AuthMessageResponse(message=GENERIC_RESET_MESSAGE)
+
+
+@router.post("/password-reset/request-for-current-user", response_model=AuthMessageResponse, status_code=status.HTTP_202_ACCEPTED)
+def request_password_reset_for_current_user(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> AuthMessageResponse:
+    if not settings.password_reset_enabled:
+        return AuthMessageResponse(message=GENERIC_RESET_MESSAGE)
+    try:
+        _enforce_password_reset_request_limits(db, email=current_user.email, request=request)
+        create_reset_request(db, user=current_user, request=request)
+        db.commit()
+    except HTTPException:
+        db.commit()
+        raise
+    except Exception as exc:
+        db.rollback()
+        logger.exception("password_reset_current_user_request_failed")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Unable to process request") from exc
+    return AuthMessageResponse(message=GENERIC_RESET_MESSAGE)
+
+
+@router.post("/password-reset/validate", response_model=PasswordResetValidateResponse)
+def validate_password_reset(
+    payload: PasswordResetValidate,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> PasswordResetValidateResponse:
+    try:
+        enforce_auth_rate_limit(
+            db,
+            action="password_reset_validate",
+            identifier=payload.token,
+            request=request,
+            limit=settings.password_reset_confirm_rate_limit,
+            window_minutes=15,
+        )
+        valid = settings.password_reset_enabled and validate_reset_token(db, payload.token) is not None
+        db.commit()
+        return PasswordResetValidateResponse(valid=valid)
+    except HTTPException:
+        db.commit()
+        return PasswordResetValidateResponse(valid=False)
+
+
+@router.post("/password-reset/confirm", response_model=PasswordResetCompleteResponse)
+def confirm_password_reset(
+    payload: PasswordResetConfirm,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> PasswordResetCompleteResponse:
+    try:
+        enforce_auth_rate_limit(
+            db,
+            action="password_reset_confirm",
+            identifier=payload.token,
+            request=request,
+            limit=settings.password_reset_confirm_rate_limit,
+            window_minutes=15,
+        )
+        if not settings.password_reset_enabled:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=INVALID_RESET_TOKEN_MESSAGE)
+        complete_reset(
+            db,
+            token=payload.token,
+            new_password=payload.new_password,
+            confirm_password=payload.confirm_password,
+            request=request,
+        )
+        db.commit()
+        return PasswordResetCompleteResponse()
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_400_BAD_REQUEST:
+            record_invalid_attempt(db, request=request)
+        db.commit()
+        raise
+    except Exception as exc:
+        db.rollback()
+        logger.exception("password_reset_confirm_failed")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Unable to reset password right now.") from exc
 
 
 def _active_user_for_normalized_email(db: Session, normalized_email: str) -> User | None:

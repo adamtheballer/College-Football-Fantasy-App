@@ -1,55 +1,54 @@
-import { Link, useNavigate } from "react-router-dom";
-import { ShieldCheck } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2, ShieldAlert } from "lucide-react";
 
-import { PasswordChangeForm } from "@/components/auth/PasswordChangeForm";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { SurfaceCard } from "@/components/fantasy";
-import { useRuntimeCapabilities } from "@/components/RuntimeCompatibilityGate";
+import { ApiError } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
+
+const passwordError = (password: string, confirm: string) => {
+  if (password.length < 12 || password.length > 128) return "Use 12 to 128 characters.";
+  if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) return "Include uppercase, lowercase, number, and special characters.";
+  if (password !== confirm) return "Passwords do not match.";
+  return null;
+};
 
 export default function ResetPassword() {
+  const location = useLocation();
   const navigate = useNavigate();
-  const { email_enabled: emailEnabled, support_email: supportEmail } = useRuntimeCapabilities();
+  const { validatePasswordReset, confirmPasswordReset } = useAuth();
+  const [token] = useState(() => new URLSearchParams(location.search).get("token") ?? "");
+  const [validity, setValidity] = useState<"checking" | "valid" | "invalid">("checking");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
 
-  if (!emailEnabled) {
-    return (
-      <main className="mx-auto flex min-h-[calc(100vh-8rem)] max-w-xl items-center px-4 py-8 sm:px-6">
-        <SurfaceCard variant="raised" padding="spacious" className="w-full text-center">
-          <p className="cfb-micro-label text-cfb-brand">Account security</p>
-          <h1 className="mt-3 text-3xl font-black uppercase italic tracking-tight text-cfb-text-primary">Email unavailable during beta</h1>
-          <p className="mt-4 text-sm font-semibold leading-6 text-cfb-text-secondary">
-            Password-recovery email is not enabled for this beta. Sign in with your current password to change it from Settings.
-          </p>
-          {supportEmail ? <a className="mt-5 inline-block text-sm font-bold text-cfb-gold hover:text-yellow-100" href={`mailto:${supportEmail}`}>Contact support</a> : null}
-          <button type="button" className="mt-6 block w-full text-sm font-black uppercase tracking-widest text-cfb-cyan" onClick={() => navigate("/login")}>Back to sign in</button>
-        </SurfaceCard>
-      </main>
-    );
-  }
+  useEffect(() => {
+    window.history.replaceState(null, "", "/reset-password");
+    if (!token) { setValidity("invalid"); return; }
+    void validatePasswordReset(token).then((valid) => setValidity(valid ? "valid" : "invalid")).catch(() => setValidity("invalid"));
+  }, [token, validatePasswordReset]);
 
-  return (
-    <main className="mx-auto flex min-h-[calc(100vh-8rem)] max-w-xl items-center px-4 py-8 sm:px-6">
-      <SurfaceCard variant="raised" padding="spacious" className="w-full">
-        <div className="mb-7 space-y-3 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-cfb-brand/15 text-cfb-cyan">
-            <ShieldCheck className="h-7 w-7" aria-hidden="true" />
-          </div>
-          <p className="cfb-micro-label text-cfb-brand">Account security</p>
-          <h1 className="text-3xl font-black uppercase italic tracking-tight text-cfb-text-primary">Reset Password</h1>
-          <p className="text-sm font-semibold leading-6 text-cfb-text-secondary">
-            To protect your account, enter your current password before choosing a new one.
-          </p>
-        </div>
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const validation = passwordError(password, confirm);
+    if (validation) { setError(validation); return; }
+    setSubmitting(true); setError(null);
+    try {
+      await confirmPasswordReset(token, password, confirm);
+      setPassword(""); setConfirm(""); setSuccess(true);
+    } catch (caught) {
+      setError(caught instanceof ApiError && caught.status === 400 ? "This reset link is invalid or expired." : "Unable to reset your password right now. Please retry.");
+    } finally { setSubmitting(false); }
+  };
 
-        <PasswordChangeForm
-          mode="reset"
-          onCancel={() => navigate("/login")}
-          onSuccess={() => navigate("/login", { replace: true, state: { passwordResetSuccess: true } })}
-        />
+  const field = (id: string, label: string, value: string, setValue: (value: string) => void, shown: boolean, setShown: (value: boolean) => void) => <label className="block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted" htmlFor={id}>{label}<span className="relative mt-2 block"><Input id={id} type={shown ? "text" : "password"} autoComplete="new-password" value={value} onChange={(event) => setValue(event.target.value)} className="h-14 rounded-2xl pr-12 text-base" required /><button type="button" aria-label={shown ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`} onClick={() => setShown(!shown)} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-cfb-text-muted">{shown ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span></label>;
 
-        <p className="mt-6 text-center text-sm font-medium text-cfb-text-secondary">
-          Can&apos;t remember your current password? Contact support for account recovery.
-          <Link to="/settings" className="ml-1 font-bold text-cfb-gold hover:text-yellow-100">Support options</Link>
-        </p>
-      </SurfaceCard>
-    </main>
-  );
+  return <main className="mx-auto flex min-h-[calc(100vh-8rem)] max-w-xl items-center px-4 py-8 sm:px-6"><SurfaceCard variant="raised" padding="spacious" className="w-full"><div className="text-center"><KeyRound className="mx-auto h-10 w-10 text-cfb-cyan" aria-hidden="true" /><p className="cfb-micro-label mt-4 text-cfb-brand">Account recovery</p><h1 className="mt-2 text-3xl font-black uppercase italic text-cfb-text-primary">{success ? "Password updated" : "Reset password"}</h1></div>{success ? <div className="mt-8 rounded-2xl border border-cfb-success/30 bg-cfb-success/10 p-5 text-center text-sm font-semibold text-emerald-50"><CheckCircle2 className="mx-auto h-8 w-8" /><p className="mt-3">Your password has been changed. You have been signed out on all devices.</p><Button className="mt-5" onClick={() => navigate("/login")}>Return to sign in</Button></div> : validity === "checking" ? <p role="status" className="mt-8 flex justify-center gap-2 text-sm text-cfb-text-secondary"><Loader2 className="h-4 w-4 animate-spin" />Validating reset link…</p> : validity === "invalid" ? <div className="mt-8 text-center"><ShieldAlert className="mx-auto h-8 w-8 text-red-300" /><h2 className="mt-3 text-lg font-black uppercase text-cfb-text-primary">This reset link is invalid or expired</h2><p className="mt-2 text-sm text-cfb-text-secondary">Request a new reset email to continue.</p><Link to="/forgot-password" className="mt-5 inline-block text-xs font-black uppercase tracking-widest text-cfb-cyan">Request new link</Link></div> : <form className="mt-8 space-y-5" onSubmit={submit}>{field("new-password", "New password", password, setPassword, showPassword, setShowPassword)}{field("confirm-password", "Confirm new password", confirm, setConfirm, showConfirm, setShowConfirm)}<p className="text-xs leading-5 text-cfb-text-secondary">12–128 characters, including uppercase, lowercase, a number, and a special character.</p>{error ? <p role="alert" className="text-sm font-semibold text-red-200">{error}</p> : null}<Button type="submit" className="h-14 w-full rounded-2xl" disabled={submitting}>{submitting ? "Creating password…" : "Create new password"}</Button></form>} {!success ? <Link to="/login" className="mt-6 block text-center text-xs font-black uppercase tracking-widest text-cfb-cyan">Back to sign in</Link> : null}</SurfaceCard></main>;
 }

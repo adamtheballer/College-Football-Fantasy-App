@@ -16,12 +16,12 @@ type GateState =
 
 export type RuntimeCapabilities = Pick<
   RuntimeIdentity,
-  "email_enabled" | "support_email" | "privacy_policy_url" | "terms_url" | "provider_disclosure_url"
+  "email_enabled" | "password_reset_enabled" | "password_reset_email_configured" | "support_email" | "privacy_policy_url" | "terms_url" | "provider_disclosure_url"
 >;
 
 // Treat capabilities as disabled until the API explicitly supplies them. This
 // prevents a failed runtime-config fetch from manufacturing a mail or legal link.
-const disabledCapabilities: RuntimeCapabilities = { email_enabled: false };
+const disabledCapabilities: RuntimeCapabilities = { email_enabled: false, password_reset_enabled: false, password_reset_email_configured: false };
 const RuntimeCapabilitiesContext = createContext<RuntimeCapabilities>(disabledCapabilities);
 
 export const useRuntimeCapabilities = () => useContext(RuntimeCapabilitiesContext);
@@ -44,6 +44,8 @@ const RuntimeCompatibilityGate = ({ children }: { children: ReactNode }) => {
         publishRuntimeDebugIdentity(runtime, deploymentSkew);
         setCapabilities({
           email_enabled: runtime.email_enabled === true,
+          password_reset_enabled: runtime.password_reset_enabled === true,
+          password_reset_email_configured: runtime.password_reset_email_configured === true,
           support_email: runtime.support_email || null,
           privacy_policy_url: runtime.privacy_policy_url || null,
           terms_url: runtime.terms_url || null,

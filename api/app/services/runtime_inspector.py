@@ -61,6 +61,8 @@ def build_public_runtime_identity(db: Session) -> RuntimeIdentityRead:
         worker_git_sha=settings.worker_git_sha,
         environment=settings.environment,
         email_enabled=settings.email_enabled,
+        password_reset_enabled=settings.password_reset_enabled,
+        password_reset_email_configured=settings.password_reset_enabled and settings.email_enabled,
         support_email=settings.support_email,
         privacy_policy_url=settings.privacy_policy_url,
         terms_url=settings.terms_url,

@@ -13,6 +13,8 @@ class RuntimeIdentityRead(BaseModel):
     worker_git_sha: str
     environment: str
     email_enabled: bool
+    password_reset_enabled: bool
+    password_reset_email_configured: bool
     support_email: str | None = None
     privacy_policy_url: str | None = None
     terms_url: str | None = None
