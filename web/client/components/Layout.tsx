@@ -115,12 +115,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         pathname={location.pathname}
         user={user}
         isLoggedIn={isLoggedIn}
-        hideChrome={isDraftRoomPage}
+        hideChrome={isDraftRoomPage || isAuthFlowPage}
         hideFloatingActions={
           isLoggedIn ||
           isDraftRoomPage ||
           isCreateLeaguePage ||
-          isSaturdayPick6Page
+          isSaturdayPick6Page ||
+          isAuthFlowPage
         }
         compactContent={isDraftRoomPage || isCreateLeaguePage}
         // Draft rooms use the same page-level scroll owner as every other
