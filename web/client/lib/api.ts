@@ -33,6 +33,8 @@ export const apiUnavailableMessage = () =>
 
 const ACCESS_TOKEN_STORAGE_KEY = "cfb_access_token";
 const ACCESS_TOKEN_EXPIRES_AT_STORAGE_KEY = "cfb_access_token_expires_at";
+const SESSION_RESTORE_HINT_STORAGE_KEY = "cfb_session_restore_hint";
+const SESSION_RESTORE_HINT_COOKIE_NAME = "cfb_session_present";
 const AUTH_CHANGED_EVENT = "cfb-auth-changed";
 export const API_REQUEST_TIMEOUT_MS = 15_000;
 
@@ -107,12 +109,20 @@ export const storeAccessTokenSession = (
 ) => {
   safeStorageSet(ACCESS_TOKEN_STORAGE_KEY, accessToken);
   safeStorageSet(ACCESS_TOKEN_EXPIRES_AT_STORAGE_KEY, accessTokenExpiresAt);
+  safeStorageSet(SESSION_RESTORE_HINT_STORAGE_KEY, "1");
 };
 
 export const clearAccessTokenSession = () => {
   safeStorageRemove(ACCESS_TOKEN_STORAGE_KEY);
   safeStorageRemove(ACCESS_TOKEN_EXPIRES_AT_STORAGE_KEY);
+  safeStorageRemove(SESSION_RESTORE_HINT_STORAGE_KEY);
   dispatchAuthChanged();
+};
+
+export const hasSessionRestoreHint = (): boolean => {
+  if (safeStorageGet(SESSION_RESTORE_HINT_STORAGE_KEY) === "1") return true;
+  if (typeof document === "undefined") return false;
+  return document.cookie.split(";").some((cookie) => cookie.trim() === `${SESSION_RESTORE_HINT_COOKIE_NAME}=1`);
 };
 
 export const isStoredAccessTokenExpired = (bufferMs = 0): boolean => {

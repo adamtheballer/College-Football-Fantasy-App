@@ -126,6 +126,7 @@ class Settings(BaseSettings):
     jwt_access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 14
     refresh_cookie_name: str = "cfb_refresh_token"
+    refresh_presence_cookie_name: str = "cfb_session_present"
     refresh_cookie_secure: bool = False
     refresh_cookie_samesite: str = "lax"
     refresh_cookie_domain: str | None = None

@@ -17,6 +17,7 @@ import {
   apiPost,
   clearAccessTokenSession,
   getStoredAccessToken,
+  hasSessionRestoreHint,
   isStoredAccessTokenExpired,
   restoreAccessTokenSession,
   storeAccessTokenSession,
@@ -210,7 +211,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // iOS/webview access-token cleanup. Try it first whenever the short
       // access token is missing or expired; this restores a valid signed-in
       // user without sending them back through the login screen.
-      if (!storedToken || isStoredAccessTokenExpired()) {
+      const accessTokenNeedsRefresh = !storedToken || isStoredAccessTokenExpired();
+      const shouldAttemptRestore = accessTokenNeedsRefresh && (
+        Boolean(storedUser || storedToken) || hasSessionRestoreHint()
+      );
+
+      if (shouldAttemptRestore) {
         const refreshResult = await restoreAccessTokenSession(controller.signal);
         if (cancelled) return;
 
@@ -227,6 +233,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
       }
+
+      if (accessTokenNeedsRefresh && !shouldAttemptRestore) return;
 
       const payload = await apiGet<UserReadPayload>("/auth/me", undefined, controller.signal);
       if (!cancelled) {
