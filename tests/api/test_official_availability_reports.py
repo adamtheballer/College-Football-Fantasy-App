@@ -9,6 +9,9 @@ from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_availability_event import PlayerAvailabilityEvent
 from collegefootballfantasy_api.app.models.player_news_event import PlayerNewsEvent
+from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
+from collegefootballfantasy_api.app.services.availability_corrections import MANUAL_VERIFIED_SOURCE
 from collegefootballfantasy_api.app.services.sportsdata_sync import (
     _availability_multiplier,
     _official_availability_status,
@@ -180,6 +183,65 @@ def test_official_sync_uses_ir_for_an_explicit_four_week_absence(db_session):
     }
     _upsert_official_availability_rows(db_session, season=2026, week=1, rows=[row])
     assert db_session.query(Injury).filter(Injury.player_id == player.id).one().status == "IR"
+
+
+def test_official_out_report_publishes_zero_projection_for_every_read_path(db_session):
+    player = Player(name="Projection Safety", school="Auburn", position="RB")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        WeeklyProjection(
+            player_id=player.id, season=2026, week=1, projection_version="PRESEASON",
+            fantasy_points=17.5, floor=10.0, ceiling=25.0, projection_status="ACTIVE",
+        )
+    )
+    db_session.commit()
+    row = {
+        "player_name": "Projection Safety", "team_name": "Auburn", "position": "RB",
+        "status": "Out", "injury": "Knee", "return_timeline": "1 week",
+        "practice_level": "DNP", "notes": "Official report", "conference": "SEC",
+        "source_url": "https://www.secsports.com/fbreports",
+    }
+
+    _upsert_official_availability_rows(db_session, season=2026, week=1, rows=[row])
+    db_session.commit()
+
+    projection = db_session.scalar(
+        current_published_projections_query(season=2026, week=1, player_ids=(player.id,))
+    )
+    assert projection.projection_version == "CORRECTED_INJURY"
+    assert projection.projection_status == "OUT"
+    assert projection.fantasy_points == 0.0
+
+
+def test_reviewed_manual_override_blocks_stale_official_healthy_status_only_in_its_window(db_session):
+    player = Player(name="Manual Override", school="Auburn", position="WR")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        Injury(player_id=player.id, season=2026, week=1, status="OUT", injury="Verified injury")
+    )
+    db_session.add(
+        PlayerAvailabilityEvent(
+            player_id=player.id, season=2026, week=1, status="OUT",
+            probability_active=0.0, availability_multiplier=0.0,
+            source=MANUAL_VERIFIED_SOURCE, source_url="https://example.test/team-report",
+            source_reliability=1.0, effective_from_week=1, effective_until_week=1,
+            reviewed=True, notes="Verified team report",
+        )
+    )
+    db_session.commit()
+    healthy_row = {
+        "player_name": "Manual Override", "team_name": "Auburn", "position": "WR",
+        "status": "Available", "injury": None, "return_timeline": None,
+        "practice_level": "Full", "notes": "Stale report", "conference": "SEC",
+        "source_url": "https://www.secsports.com/fbreports",
+    }
+
+    changes = _upsert_official_availability_rows(db_session, season=2026, week=1, rows=[healthy_row])
+
+    assert changes["overrides_preserved"] == 1
+    assert db_session.query(Injury).filter_by(player_id=player.id, season=2026, week=1).one().status == "OUT"
 
 
 def test_player_card_exposes_official_availability_news(client, db_session):
