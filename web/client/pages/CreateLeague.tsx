@@ -71,7 +71,7 @@ const standardRosterSlots = {
   IR: 1,
 };
 
-const standardBetaScoring = {
+const standardScoring = {
   ppr: 1,
   pass_td: 4,
   pass_yds_per_pt: 25,
@@ -86,7 +86,7 @@ const standardBetaScoring = {
 };
 
 const standardRosterSummary = "QB 1 · RB 2 · WR 2 · TE 1 · FLEX 1 · K 1 · Bench 5 · IR 1";
-const standardBetaScoringSummary = "Standard PPR · 3-point field goals · 1-point extra points";
+const standardScoringSummary = "Standard PPR · 3-point field goals · 1-point extra points";
 const managedWaiverSchedule = {
   waiver_period_hours: 24,
   waiver_processing_weekday: 6,
@@ -365,7 +365,7 @@ function CreateLeagueForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<LeagueCreateResponse | null>(null);
-  const [betaScoringAcknowledged, setBetaScoringAcknowledged] = useState(false);
+  const [standardRulesAcknowledged, setStandardRulesAcknowledged] = useState(false);
 
   const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
   const timezone = timezoneOptions.some((option) => option.value === detectedTimezone)
@@ -449,8 +449,8 @@ function CreateLeagueForm() {
       setError("Draft time must be at least 5 minutes in the future.");
       return;
     }
-    if (!betaScoringAcknowledged) {
-      setError("Acknowledge the standard beta rules before creating the league.");
+    if (!standardRulesAcknowledged) {
+      setError("Acknowledge the standard league rules before creating the league.");
       return;
     }
 
@@ -467,7 +467,7 @@ function CreateLeagueForm() {
           icon_url: basics.icon_url || null,
         },
         settings: {
-          scoring_json: createLeagueScoringToApi(standardBetaScoring),
+          scoring_json: createLeagueScoringToApi(standardScoring),
           roster_slots_json: standardRosterSlots,
           playoff_teams: settings.playoff_teams,
           waiver_type: settings.waiver_type,
@@ -477,7 +477,9 @@ function CreateLeagueForm() {
           kicker_enabled: true,
           defense_enabled: false,
         },
-        beta_scoring_acknowledged: betaScoringAcknowledged,
+        // This field name is part of the existing API contract. The product-facing
+        // copy intentionally describes the current alpha rule, not the old beta.
+        beta_scoring_acknowledged: standardRulesAcknowledged,
         draft: {
           draft_datetime_utc: draftDateTime.toISOString(),
           timezone: draft.timezone,
@@ -693,7 +695,7 @@ function CreateLeagueForm() {
               <div className="space-y-8">
                 <SectionHeader
                   title="League Settings"
-                  description="Choose the three league rules available in beta. Standard roster, scoring, and processing rules apply to every league."
+                  description="Choose your playoff, waiver, and trade-review rules. Standard roster, scoring, and processing rules apply to every league."
                 />
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -870,19 +872,22 @@ function CreateLeagueForm() {
                   <ReviewItem label="Draft" value={formatDraftDateTime(draftDateTime)} />
                   <ReviewItem label="Commissioner" value="You" />
                   <ReviewItem label="Roster" value={standardRosterSummary} />
-                  <ReviewItem label="Scoring" value={standardBetaScoringSummary} />
+                  <ReviewItem label="Scoring" value={standardScoringSummary} />
                 </div>
-                <div className="rounded-[16px] border border-amber-300/20 bg-amber-300/10 p-5">
-                  <p className="text-sm font-bold text-amber-100">
-                    Beta notice: Standard scoring and roster rules are applied to every league and cannot be changed after creation.
-                  </p>
+                <div className="rounded-[16px] border border-[#60A5FA]/30 bg-[#60A5FA]/10 p-5">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#60A5FA]" aria-hidden="true" />
+                    <p className="text-sm font-bold text-[#DBEAFE]">
+                      Standard league rules: Scoring and roster rules are applied to every league and cannot be changed after creation.
+                    </p>
+                  </div>
                   <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm font-semibold leading-6 text-slate-100">
                     <Checkbox
-                      checked={betaScoringAcknowledged}
-                      onCheckedChange={(checked) => setBetaScoringAcknowledged(checked === true)}
-                      aria-label="I understand that standard scoring and roster rules cannot be changed during the beta."
+                      checked={standardRulesAcknowledged}
+                      onCheckedChange={(checked) => setStandardRulesAcknowledged(checked === true)}
+                      aria-label="I understand that standard scoring and roster rules cannot be changed after league creation."
                     />
-                    <span>I understand that standard scoring and roster rules cannot be changed during the beta.</span>
+                    <span>I understand that standard scoring and roster rules cannot be changed after league creation.</span>
                   </label>
                 </div>
               </div>
@@ -914,7 +919,7 @@ function CreateLeagueForm() {
                 type="button"
                 className={primaryButtonClass}
                 onClick={handleCreate}
-                disabled={loading || !betaScoringAcknowledged}
+                disabled={loading || !standardRulesAcknowledged}
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 Create League
