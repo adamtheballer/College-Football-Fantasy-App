@@ -7,66 +7,65 @@ import { clearPendingGuide, setCompletedGuide } from "@/lib/onboarding";
 type TourStep = {
   title: string;
   description: string;
-  target?: string;
+  navItem: string;
+  target: string;
 };
+
+const guidedNavTarget = (navItem: string) => `[data-guide-nav="${navItem}"]`;
 
 export const TOUR_STEPS: TourStep[] = [
   {
-    target: "#nav-home",
+    navItem: "HOME",
+    target: guidedNavTarget("HOME"),
     title: "Home Dashboard",
     description:
       "Start here for your high-level fantasy dashboard, quick league access, and the main hub for the app.",
   },
   {
-    target: "#nav-leagues",
+    navItem: "LEAGUES",
+    target: guidedNavTarget("LEAGUES"),
     title: "Leagues",
     description:
       "Use Leagues to create, join, and manage your fantasy leagues, view league settings, and prepare for your draft.",
   },
   {
-    target: "#nav-chats",
+    navItem: "CHATS",
+    target: guidedNavTarget("CHATS"),
     title: "Chats",
     description:
       "Use Chats for league conversation, manager coordination, trade talk, and commissioner updates once league messaging is active.",
   },
   {
-    target: "#nav-injury-center",
-    title: "Injury Center",
-    description:
-      "Injury Center is where player availability and health context belongs so lineup and waiver decisions stay informed.",
-  },
-  {
-    target: "#nav-alerts",
-    title: "Alerts",
-    description:
-      "Alerts keeps league and player notifications in one supported workflow so you can review important changes quickly.",
-  },
-  {
-    target: "#nav-report-bug",
-    title: "Report Bug",
-    description:
-      "Use Report Bug to open the dedicated support page and email the product team a clear issue report without losing your place in the app.",
-  },
-  {
-    target: "#nav-coming-soon",
-    title: "Coming Soon",
-    description:
-      "Coming Soon is the roadmap for upcoming app features. Saturday Pick 6 lives on the Home dashboard.",
-  },
-  {
-    target: "#nav-mock-draft",
+    navItem: "MOCK DRAFT",
+    target: guidedNavTarget("MOCK DRAFT"),
     title: "Mock Draft",
     description:
       "Practice your draft strategy in Mock Draft. It uses a separate simulation, so it never changes a real league, roster, or transaction.",
   },
   {
-    target: "#nav-settings",
+    navItem: "INJURY CENTER",
+    target: guidedNavTarget("INJURY CENTER"),
+    title: "Injury Center",
+    description:
+      "Injury Center is where player availability and health context belongs so lineup and waiver decisions stay informed.",
+  },
+  {
+    navItem: "ALERTS",
+    target: guidedNavTarget("ALERTS"),
+    title: "Alerts",
+    description:
+      "Alerts keeps league and player notifications in one supported workflow so you can review important changes quickly.",
+  },
+  {
+    navItem: "SETTINGS",
+    target: guidedNavTarget("SETTINGS"),
     title: "Settings",
     description:
       "Update your manager profile, choose your default league, and revisit this guide whenever you need it.",
   },
   {
-    target: "#nav-sign-out",
+    navItem: "SIGN OUT",
+    target: guidedNavTarget("SIGN OUT"),
     title: "Sign Out",
     description:
       "Use Sign Out when you are finished on a shared device. You can sign back in later and return to your leagues and saved account.",
@@ -77,6 +76,7 @@ type AppOnboardingTourProps = {
   isOpen: boolean;
   userId: number;
   onClose: () => void;
+  onStepChange?: (navItem: string) => void;
 };
 
 type TooltipPosition = {
@@ -93,23 +93,7 @@ export const getTourTooltipTop = (targetTop: number, viewportHeight: number, isN
   return Math.max(minimumTop, Math.min(targetTop, viewportHeight - 220));
 };
 
-const scrollGuideContainerToTop = (behavior: ScrollBehavior = "auto") => {
-  const appMain = document.querySelector('main[data-app-scroll="true"]');
-  if (appMain instanceof HTMLElement) {
-    appMain.scrollTo({ top: 0, left: 0, behavior });
-    return;
-  }
-  window.scrollTo({ top: 0, left: 0, behavior });
-};
-
-const resetSidebarNavToTop = () => {
-  const sidebarNav = document.querySelector("aside nav");
-  if (sidebarNav instanceof HTMLElement) {
-    sidebarNav.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  }
-};
-
-export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTourProps) {
+export function AppOnboardingTour({ isOpen, userId, onClose, onStepChange }: AppOnboardingTourProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null);
@@ -130,6 +114,10 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
       setTooltipPosition(null);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) onStepChange?.(TOUR_STEPS[currentStep].navItem);
+  }, [currentStep, isOpen, onStepChange]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -174,15 +162,9 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
         activeTargetRef.current = null;
       }
 
-      if (!step.target) {
-        scrollGuideContainerToTop("auto");
-        resetSidebarNavToTop();
-        setTargetRect(null);
-        setTooltipPosition(null);
-        return;
-      }
-
-      const element = document.querySelector(step.target);
+      const element = Array.from(document.querySelectorAll<HTMLElement>(step.target)).find(
+        (candidate) => candidate.getClientRects().length > 0,
+      );
       if (!(element instanceof HTMLElement)) {
         setTargetRect(null);
         setTooltipPosition(null);
@@ -227,6 +209,7 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
     };
 
     updateTarget();
+    const delayedUpdate = window.setTimeout(updateTarget, 120);
     window.addEventListener("resize", updateTarget);
     window.addEventListener("scroll", updateTarget, true);
     return () => {
@@ -236,6 +219,7 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
       }
       window.removeEventListener("resize", updateTarget);
       window.removeEventListener("scroll", updateTarget, true);
+      window.clearTimeout(delayedUpdate);
     };
   }, [currentStep, isNativeShell, isOpen, step.target]);
 

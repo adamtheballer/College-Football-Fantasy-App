@@ -37,6 +37,7 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
             <div
               id={navDomId(item.name)}
               data-nav-item="true"
+              data-guide-nav={item.name}
               data-nav-active={isActive ? "true" : "false"}
               className={cn(
                 "group relative flex min-h-[44px] w-full items-center gap-3 rounded-md border px-3 py-2 text-left font-ui text-sm font-bold uppercase tracking-[0.06em] transition-colors duration-150",

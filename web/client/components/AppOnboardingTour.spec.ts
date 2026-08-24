@@ -1,21 +1,22 @@
 import { describe, expect, it } from "vitest";
 
 import { getTourTooltipTop, TOUR_STEPS } from "./AppOnboardingTour";
-import { getShellNavItems, navDomId } from "./app-shell/navigation";
 import { shouldStartGuide } from "@/lib/onboarding";
 
 describe("first-sign-in onboarding", () => {
-  it("introduces every signed-in sidebar destination", () => {
-    const regularNewUser = {
-      id: 1,
-      firstName: "New User",
-      email: "new.user@example.com",
-      isAdmin: false,
-      avatarUrl: null,
-    };
-
+  it("moves from the four bottom tabs into More-only destinations in guide order", () => {
+    expect(TOUR_STEPS.map((step) => step.navItem)).toEqual([
+      "HOME",
+      "LEAGUES",
+      "CHATS",
+      "MOCK DRAFT",
+      "INJURY CENTER",
+      "ALERTS",
+      "SETTINGS",
+      "SIGN OUT",
+    ]);
     expect(TOUR_STEPS.map((step) => step.target)).toEqual(
-      getShellNavItems(regularNewUser, true, 0, true).map((item) => `#${navDomId(item.name)}`),
+      TOUR_STEPS.map((step) => `[data-guide-nav="${step.navItem}"]`),
     );
   });
 
