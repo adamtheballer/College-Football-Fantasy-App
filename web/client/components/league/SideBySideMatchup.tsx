@@ -7,7 +7,6 @@ import { SurfaceCard } from "@/components/fantasy";
 import { usePlayerCard } from "@/hooks/use-players";
 import { managerTeamName } from "@/lib/manager-team-name";
 import { PlayerAvailabilityIndicator } from "@/lib/playerAvailability";
-import { formatProjectionDisplay } from "@/lib/projection-display";
 import type { LeagueMatchupTeam, LeagueRosterPlayer } from "@/types/league";
 
 const reserveSlots = new Set(["BENCH", "IR"]);
@@ -40,13 +39,7 @@ const compactSlot = (player?: LeagueRosterPlayer) =>
   player ? (player.display_label ?? rosterSlot(player) ?? "—").toUpperCase() : "—";
 
 const compactPointValue = (player: LeagueRosterPlayer | undefined, pointMode: RosterPointMode) => {
-  if (pointMode === "live") {
-    return player ? formatRosterPointValue(player, pointMode) : "—";
-  }
-  return formatProjectionDisplay(
-    player?.projected_points ?? player?.weekly_projected_fantasy_points ?? null,
-    player?.projection_status,
-  );
+  return player ? formatRosterPointValue(player, pointMode) : "—";
 };
 
 const pointModeForMatchupStatus = (status?: string | null): RosterPointMode =>

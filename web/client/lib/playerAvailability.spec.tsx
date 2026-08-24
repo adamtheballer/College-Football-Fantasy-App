@@ -3,7 +3,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { PlayerAvailabilityIndicator, playerAvailabilityBadge } from "./playerAvailability";
+import { PlayerAvailabilityIndicator, playerAvailabilityBadge, playerAvailabilityDotClass } from "./playerAvailability";
 
 describe("player availability badges", () => {
   it("keeps active and unreported players free of a status marker", () => {
@@ -28,5 +28,11 @@ describe("player availability badges", () => {
 
     expect(screen.getByText("Ahmad Hardy")).toBeTruthy();
     expect(screen.getByLabelText("Out").textContent).toBe("O");
+  });
+
+  it("uses red for out, yellow for questionable, and green for verified active status dots", () => {
+    expect(playerAvailabilityDotClass("OUT_FOR_SEASON")).toBe("bg-red-400");
+    expect(playerAvailabilityDotClass("QUESTIONABLE")).toBe("bg-amber-300");
+    expect(playerAvailabilityDotClass("ACTIVE")).toBe("bg-emerald-300");
   });
 });

@@ -126,4 +126,13 @@ describe("normalizePlayer", () => {
 
     expect(player.hasWeeklyProjection).toBe(false);
   });
+
+  it("keeps an out-for-season injury as OUT for the real draft room badge", () => {
+    const player = normalizePlayer(
+      { id: 3, name: "Ahmad Hardy", position: "RB", school: "Missouri" },
+      { status: "OUT_FOR_SEASON" },
+    );
+
+    expect(player.status).toBe("OUT");
+  });
 });
