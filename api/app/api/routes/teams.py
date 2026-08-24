@@ -82,7 +82,10 @@ def list_teams_endpoint(
     return TeamList(
         data=[
             TeamRead.model_validate(team).model_copy(
-                update={"owner_avatar_url": avatars_by_owner_id.get(team.owner_user_id)}
+                update={
+                    "name": team.display_name,
+                    "owner_avatar_url": avatars_by_owner_id.get(team.owner_user_id),
+                }
             )
             for team in teams
         ],

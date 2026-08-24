@@ -24,3 +24,10 @@ class Team(TimestampMixin, Base):
 
     league = relationship("League", back_populates="teams")
     roster_entries = relationship("RosterEntry", back_populates="team", cascade="all, delete-orphan")
+
+    @property
+    def display_name(self) -> str:
+        """Resolve generated manager-team labels from the current owner name."""
+        if self.owner_name and self.name.endswith("'s Team"):
+            return f"{self.owner_name}'s Team"
+        return self.name

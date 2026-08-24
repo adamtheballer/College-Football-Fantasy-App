@@ -310,7 +310,7 @@ def build_draft_room_state(db: Session, league: League, current_user: User) -> D
         teams=[
             DraftRoomTeamRead(
                 id=team.id,
-                name=team.name,
+                name=team.display_name,
                 owner_user_id=team.owner_user_id,
                 owner_name=team.owner_name,
                 owner_avatar_url=avatars_by_owner_id.get(team.owner_user_id),
@@ -325,7 +325,7 @@ def build_draft_room_state(db: Session, league: League, current_user: User) -> D
                 round_number=pick.round_number,
                 round_pick=pick.round_pick,
                 team_id=team.id,
-                team_name=team.name,
+                team_name=team.display_name,
                 player_id=player.id,
                 player_name=player.name,
                 player_position=player.position,
@@ -340,7 +340,7 @@ def build_draft_room_state(db: Session, league: League, current_user: User) -> D
         current_round=current_round,
         current_round_pick=current_round_pick,
         current_team_id=current_team.id if current_team else None,
-        current_team_name=current_team.name if current_team else None,
+        current_team_name=current_team.display_name if current_team else None,
         user_team_id=user_team.id if user_team else None,
         can_make_pick=can_make_pick,
         can_start_draft=bool(

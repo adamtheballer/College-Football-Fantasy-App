@@ -74,7 +74,7 @@ def get_league_detail(
             entries=[
                 DraftOrderEntryRead(
                     team_id=team.id,
-                    team_name=team.name,
+                    team_name=team.display_name,
                     owner_user_id=team.owner_user_id,
                     owner_name=team.owner_name,
                     owner_avatar_url=(managers.get(team.owner_user_id).avatar_url if team.owner_user_id else None),
@@ -204,7 +204,7 @@ def build_league_list_current_user_summary(
     matchup = build_matchup_summary(db, league, owned_team, current_user)
 
     return LeagueListCurrentUserSummaryRead(
-        team_name=owned_team.name,
+        team_name=owned_team.display_name,
         wins=standing.wins if standing else 0,
         losses=standing.losses if standing else 0,
         ties=standing.ties if standing else 0,
@@ -244,7 +244,7 @@ def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspace
     return [
         LeagueWorkspaceStandingSummaryRead(
             team_id=item.team.id,
-            team_name=item.team.name,
+            team_name=item.team.display_name,
             wins=item.wins,
             losses=item.losses,
             ties=item.ties,
@@ -288,9 +288,9 @@ def build_scoreboard_rows(db: Session, league: League, week: int | None = None) 
     rows = (
         db.query(
             Matchup,
-            home_team.c.name,
+            home_team.c.id,
             home_team.c.owner_user_id,
-            away_team.c.name,
+            away_team.c.id,
             away_team.c.owner_user_id,
         )
         .join(home_team, home_team.c.id == Matchup.home_team_id)
@@ -305,7 +305,7 @@ def build_scoreboard_rows(db: Session, league: League, week: int | None = None) 
     )
     owner_ids = {
         owner_user_id
-        for _matchup, _home_name, home_owner_user_id, _away_name, away_owner_user_id in rows
+        for _matchup, _home_team_id, home_owner_user_id, _away_team_id, away_owner_user_id in rows
         for owner_user_id in (home_owner_user_id, away_owner_user_id)
         if owner_user_id is not None
     }
@@ -313,6 +313,10 @@ def build_scoreboard_rows(db: Session, league: League, week: int | None = None) 
         user_id: avatar_url
         for user_id, avatar_url in db.query(User.id, User.avatar_url).filter(User.id.in_(owner_ids)).all()
     } if owner_ids else {}
+    team_names_by_id = {
+        team.id: team.display_name
+        for team in db.query(Team).filter(Team.league_id == league.id).all()
+    }
 
     return [
         LeagueScoreboardRow(
@@ -320,15 +324,15 @@ def build_scoreboard_rows(db: Session, league: League, week: int | None = None) 
             week=matchup.week,
             status=matchup.status,
             home_team_id=matchup.home_team_id,
-            home_team_name=home_name,
+            home_team_name=team_names_by_id.get(home_team_id, "TBD"),
             home_owner_avatar_url=avatars_by_owner_id.get(home_owner_user_id),
             home_score=float(matchup.home_score or 0.0),
             away_team_id=matchup.away_team_id,
-            away_team_name=away_name,
+            away_team_name=team_names_by_id.get(away_team_id, "TBD"),
             away_owner_avatar_url=avatars_by_owner_id.get(away_owner_user_id),
             away_score=float(matchup.away_score or 0.0),
         )
-        for matchup, home_name, home_owner_user_id, away_name, away_owner_user_id in rows
+        for matchup, home_team_id, home_owner_user_id, away_team_id, away_owner_user_id in rows
     ]
 
 
@@ -375,7 +379,7 @@ def _injury_headline(player_name: str, status_value: str, injury_text: str | Non
 
 def build_league_news_items(db: Session, league: League, limit: int = 25) -> list[LeagueNewsItem]:
     team_rows = db.query(Team).filter(Team.league_id == league.id).all()
-    team_name_by_id = {row.id: row.name for row in team_rows}
+    team_name_by_id = {row.id: row.display_name for row in team_rows}
     team_id_by_player_id = {
         player_id: team_id
         for player_id, team_id in db.query(RosterEntry.player_id, RosterEntry.team_id)
@@ -498,7 +502,7 @@ def build_league_workspace(
             LeagueWorkspaceTeamRead(
                 id=owned_team.id,
                 league_id=owned_team.league_id,
-                name=owned_team.name,
+                name=owned_team.display_name,
                 owner_user_id=owned_team.owner_user_id,
             )
             if owned_team
