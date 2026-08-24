@@ -80,6 +80,12 @@ describe("RosterSlotTable", () => {
     expect(screen.getByText("18.4")).toBeTruthy();
   });
 
+  it("shows the shared red out marker beside an unavailable player name", () => {
+    render(<RosterSlotTable title="Starters" players={[{ ...projectedReceiver, injury_status: "OUT_FOR_SEASON" }]} />);
+
+    expect(screen.getByLabelText("Out").textContent).toBe("O");
+  });
+
   it("uses persisted live points when the caller marks the table as live", () => {
     const liveReceiver = { ...projectedReceiver, live_points: 21.37, live_scoring_status: "live" };
     render(<RosterSlotTable title="Starters" players={[liveReceiver]} pointMode="live" />);

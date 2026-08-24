@@ -7,6 +7,7 @@ import { usePlayerCard } from "@/hooks/use-players";
 import { useDropRosterPlayer, useUpdateLineup } from "@/hooks/use-roster-actions";
 import { getEligibleSlotsForPosition, normalizePosition } from "@/lib/rosterLegality";
 import { formatProjectionDisplay } from "@/lib/projection-display";
+import { PlayerAvailabilityIndicator } from "@/lib/playerAvailability";
 import type { LeagueRosterPlayer } from "@/types/league";
 import { cn } from "@/lib/utils";
 import {
@@ -305,10 +306,9 @@ export function RosterSlotTable({
                 </span>
                 <span className="flex min-w-0 flex-col gap-1">
                   <span className="flex min-w-0 items-center gap-1.5">
-                    {player.injury_status === "QUESTIONABLE" ? <span aria-label="Questionable" className="text-xs font-black text-amber-300">Q</span> : null}
-                    {player.injury_status === "OUT" ? <span aria-label="Out" className="text-xs font-black text-red-400">O</span> : null}
-                    {player.injury_status === "IR" ? <span aria-label="Injured reserve" className="text-[10px] font-black text-red-400">IR</span> : null}
-                    <span className="truncate font-black text-cfb-text-primary">{isRealPlayer ? player.player_name : "N/A"}</span>
+                    <PlayerAvailabilityIndicator status={player.injury_status}>
+                      <span className="truncate font-black text-cfb-text-primary">{isRealPlayer ? player.player_name : "N/A"}</span>
+                    </PlayerAvailabilityIndicator>
                     {isFinalGame ? <Lock aria-label="Game final" className="h-3 w-3 shrink-0 text-cfb-text-muted" /> : null}
                   </span>
                   <span

@@ -67,7 +67,11 @@ import {
   shouldShowMatchupScorePanels,
 } from "./LeagueMatchup";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  routerMocks.setSearchParams.mockClear();
+  routerMocks.navigate.mockClear();
+});
 
 describe("league matchup helpers", () => {
   it("maps backend matchup statuses to honest UI labels", () => {
@@ -138,7 +142,7 @@ describe("league matchup scoreboard", () => {
     expect(screen.getByText("Week 1 matchup")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Updated Adam's Team vs Taylor's Team" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: "League matchups" })).toBeNull();
-    expect(screen.getByLabelText("Matchup 1 of 2. Swipe left or right to view another matchup.")).toBeTruthy();
+    expect(screen.getByLabelText("Matchup 1 of 2. Use the previous and next controls or swipe to view another matchup.")).toBeTruthy();
     expect(
       screen
         .queryAllByText("Projected", { exact: true })
@@ -164,6 +168,16 @@ describe("league matchup scoreboard", () => {
     const swipeSurface = screen.getByTestId("matchup-swipe-surface");
     fireEvent.touchStart(swipeSurface, { touches: [{ clientX: 240 }] });
     fireEvent.touchEnd(swipeSurface, { changedTouches: [{ clientX: 120 }] });
+
+    expect(routerMocks.setSearchParams).toHaveBeenCalledTimes(1);
+    const nextParams = routerMocks.setSearchParams.mock.calls[0][0] as URLSearchParams;
+    expect(nextParams.toString()).toBe("week=1&matchup=2");
+  });
+
+  it("provides desktop previous and next matchup controls", () => {
+    render(createElement(LeagueMatchup));
+
+    fireEvent.click(screen.getByRole("button", { name: "Next matchup" }));
 
     expect(routerMocks.setSearchParams).toHaveBeenCalledTimes(1);
     const nextParams = routerMocks.setSearchParams.mock.calls[0][0] as URLSearchParams;

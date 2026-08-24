@@ -15,6 +15,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useLeagueDetail } from "@/hooks/use-leagues";
 import { useDraftPlayerPool, usePlayerCard } from "@/hooks/use-players";
 import { ApiError } from "@/lib/api";
+import { PlayerAvailabilityIndicator } from "@/lib/playerAvailability";
 import { buildDraftBoard, type DraftConfig, type DraftPlayer } from "@/lib/draftRankings";
 import { formatDraftProjection } from "@/lib/draft-projections";
 import {
@@ -800,7 +801,11 @@ export default function Draft() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Queue {index + 1}</p>
-                    <p className="mt-2 text-base font-black text-foreground">{player.name}</p>
+                    <p className="mt-2 flex min-w-0 items-center text-base font-black text-foreground">
+                      <PlayerAvailabilityIndicator status={player.status}>
+                        <span className="truncate">{player.name}</span>
+                      </PlayerAvailabilityIndicator>
+                    </p>
                     <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">RK {player.masterDraftRank ?? player.draftRank} • {player.school}</p>
                     {!isBackendPlayer ? (
                       <p className="mt-2 text-[9px] font-black uppercase tracking-[0.16em] text-amber-200">
@@ -1412,7 +1417,11 @@ export default function Draft() {
                   >
                     <p className="self-center text-base font-bold tabular-nums text-muted-foreground sm:text-xl sm:font-black">{visibleRank}</p>
                     <div className="min-w-0 self-center">
-                      <p className="truncate text-sm font-black leading-4 text-foreground transition-colors hover:text-amber-100 sm:text-base sm:leading-normal">{player.name}</p>
+                      <p className="flex min-w-0 items-center text-sm font-black leading-4 text-foreground transition-colors hover:text-amber-100 sm:text-base sm:leading-normal">
+                        <PlayerAvailabilityIndicator status={player.status}>
+                          <span className="truncate">{player.name}</span>
+                        </PlayerAvailabilityIndicator>
+                      </p>
                       <div className="mt-0.5 flex min-w-0 items-center gap-1.5 sm:mt-1 sm:gap-2">
                         <p className="truncate text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground sm:text-[10px] sm:tracking-[0.18em]">{player.school}</p>
                         <span className={cn("shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black sm:rounded-full sm:px-2 sm:text-[9px]", positionClass)}>{player.pos}</span>
