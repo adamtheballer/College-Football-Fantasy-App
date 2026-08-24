@@ -32,7 +32,9 @@ class SaturdayPickContest(TimestampMixin, Base):
     override_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
     position_override_actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     position_overridden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    # A contest can outlive an administrator's account. Account deletion must
+    # not erase shared contest results or be blocked by this audit reference.
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

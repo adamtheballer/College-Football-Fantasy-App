@@ -258,6 +258,27 @@ class AuthenticatedPasswordChange(PasswordChangeFields):
     pass
 
 
+class AccountDeletionRequest(BaseModel):
+    """Explicit, re-authenticated request to permanently delete an account."""
+
+    current_password: str
+    confirmation: str
+
+    @field_validator("current_password")
+    @classmethod
+    def require_current_password(cls, value: str) -> str:
+        if not value:
+            raise ValueError("current password is required")
+        return value
+
+    @field_validator("confirmation")
+    @classmethod
+    def require_deletion_confirmation(cls, value: str) -> str:
+        if value != "DELETE":
+            raise ValueError('type DELETE to confirm account deletion')
+        return value
+
+
 class SessionRead(BaseModel):
     id: int
     issued_at: datetime

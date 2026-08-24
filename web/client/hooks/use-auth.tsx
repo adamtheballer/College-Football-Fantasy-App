@@ -95,6 +95,7 @@ type AuthContextValue = {
   listSessions: () => Promise<AuthSession[]>;
   revokeSession: (sessionId: number) => Promise<void>;
   logoutAll: () => Promise<void>;
+  deleteAccount: (currentPassword: string, confirmation: string) => Promise<void>;
   isLoggedIn: boolean;
   isBootstrapping: boolean;
 };
@@ -420,6 +421,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatchAuthChanged();
   }, [queryClient]);
 
+  const deleteAccount = useCallback(async (currentPassword: string, confirmation: string) => {
+    await apiDelete("/auth/me", undefined, {
+      current_password: currentPassword,
+      confirmation,
+    });
+    clearBrowserPushIdentity();
+    clearStoredAuth();
+    queryClient.clear();
+    setUser(null);
+    dispatchAuthChanged();
+  }, [queryClient]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -436,6 +449,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       listSessions,
       revokeSession,
       logoutAll,
+      deleteAccount,
       isLoggedIn: !!user,
       isBootstrapping,
     }),
@@ -447,6 +461,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       logoutAll,
+      deleteAccount,
       resetPasswordWithCurrentPassword,
       requestPasswordReset,
       requestPasswordResetForCurrentUser,

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   updateProfile: vi.fn(),
+  deleteAccount: vi.fn(),
   setActiveLeagueId: vi.fn(),
   prepareProfileImage: vi.fn(),
   runtimeCapabilities: {},
@@ -17,6 +18,7 @@ vi.mock("@/hooks/use-auth", () => ({
     user: state.user,
     isBootstrapping: false,
     logoutAll: vi.fn(),
+    deleteAccount: state.deleteAccount,
     updateProfile: state.updateProfile,
   }),
 }));
@@ -71,6 +73,8 @@ describe("Settings beta preferences", () => {
     localStorage.clear();
     state.updateProfile.mockReset();
     state.updateProfile.mockResolvedValue({ id: 7, firstName: "Updated Adam", avatarUrl: null, managerNameChangeAvailableAt: null });
+    state.deleteAccount.mockReset();
+    state.deleteAccount.mockResolvedValue(undefined);
     state.prepareProfileImage.mockReset();
     state.runtimeCapabilities = {};
     state.user = { id: 7, firstName: "Adam", email: "adam@example.com", isAdmin: false, avatarUrl: null, managerNameChangeAvailableAt: null };
@@ -192,6 +196,23 @@ describe("Settings beta preferences", () => {
     expect(screen.getByRole("link", { name: "Privacy Policy" }).getAttribute("href")).toBe("/privacy");
     expect(screen.getByRole("link", { name: "Terms" }).getAttribute("href")).toBe("/terms");
     expect(screen.queryByRole("link", { name: /provider disclosure/i })).toBeNull();
+  });
+
+  it("requires password reauthentication and DELETE confirmation before deleting an account", async () => {
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole("button", { name: /delete my account/i }));
+    expect(screen.getByRole("heading", { name: /delete your account permanently/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /delete account permanently/i }));
+    expect(screen.getByRole("alert").textContent).toMatch(/type delete/i);
+    expect(state.deleteAccount).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Current password"), { target: { value: "StrongPass123!" } });
+    fireEvent.change(screen.getByLabelText("Type DELETE to confirm"), { target: { value: "DELETE" } });
+    fireEvent.click(screen.getByRole("button", { name: /delete account permanently/i }));
+
+    await waitFor(() => expect(state.deleteAccount).toHaveBeenCalledWith("StrongPass123!", "DELETE"));
   });
 
   it("uses a configured runtime policy URL when available", () => {
