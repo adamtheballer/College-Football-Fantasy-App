@@ -126,6 +126,22 @@ describe("Settings beta preferences", () => {
     expect(screen.getByLabelText("Manager Name").getAttribute("maxLength")).toBe("50");
   });
 
+  it("shows the manager-name character count only while that field has focus", () => {
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    const managerName = screen.getByLabelText("Manager Name");
+    expect(screen.queryByText("4 / 50 characters")).toBeNull();
+
+    fireEvent.focus(managerName);
+    expect(screen.getByText("4 / 50 characters")).toBeTruthy();
+
+    fireEvent.change(managerName, { target: { value: "Updated Adam" } });
+    expect(screen.getByText("12 / 50 characters")).toBeTruthy();
+
+    fireEvent.blur(managerName);
+    expect(screen.queryByText("12 / 50 characters")).toBeNull();
+  });
+
   it("keeps the image-address fallback available and removes it immediately", async () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
