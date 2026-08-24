@@ -31,7 +31,7 @@ const renderPage = () => {
   );
 };
 
-describe("CreateLeague beta defaults", () => {
+describe("CreateLeague standard rules", () => {
   beforeEach(() => {
     state.apiPost.mockReset();
     state.apiPost.mockResolvedValue({
@@ -60,7 +60,20 @@ describe("CreateLeague beta defaults", () => {
     expect(screen.queryByText("Processing time (local hour)")).toBeNull();
   });
 
-  it("submits the standard beta roster and managed processing schedule", async () => {
+  it("shows the alpha standard-rules acknowledgment without beta copy", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Draft" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Review" }));
+
+    const standardRulesNotice = screen.getByText(/Standard league rules:/);
+    expect(standardRulesNotice).toBeTruthy();
+    expect(standardRulesNotice.parentElement?.querySelector("svg")).toBeTruthy();
+    expect(screen.getByText(/cannot be changed after league creation/i)).toBeTruthy();
+    expect(screen.queryByText(/beta/i)).toBeNull();
+  });
+
+  it("submits the standard roster and managed processing schedule", async () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "Continue to Settings" }));
     fireEvent.click(screen.getByRole("button", { name: "Continue to Draft" }));
