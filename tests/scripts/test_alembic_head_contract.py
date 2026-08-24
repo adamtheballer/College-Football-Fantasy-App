@@ -18,5 +18,5 @@ def test_runtime_and_ci_gates_derive_the_current_alembic_head():
         assert 'alembic_revision == "0101_injury_notification_scope"' not in contents
 
     alpha_release_workflow = (ROOT / ".github/workflows/alpha-release-certification.yml").read_text(encoding="utf-8")
-    assert 'test "$expected_head" = "0106_manager_name_cooldown"' in alpha_release_workflow
+    assert 'test "$expected_head" = "0107_account_delete"' in alpha_release_workflow
     assert "0105_auth_token_ts_defaults" not in alpha_release_workflow
