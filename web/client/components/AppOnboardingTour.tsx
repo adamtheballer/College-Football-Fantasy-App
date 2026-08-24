@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 
 import { Button } from "@/components/ui/button";
 import { clearPendingGuide, setCompletedGuide } from "@/lib/onboarding";
@@ -85,6 +86,12 @@ type TooltipPosition = {
 };
 
 const PADDING = 12;
+const NATIVE_TOP_SAFE_AREA_FALLBACK = 59;
+
+export const getTourTooltipTop = (targetTop: number, viewportHeight: number, isNativeShell: boolean): number => {
+  const minimumTop = isNativeShell ? NATIVE_TOP_SAFE_AREA_FALLBACK : 16;
+  return Math.max(minimumTop, Math.min(targetTop, viewportHeight - 220));
+};
 
 const scrollGuideContainerToTop = (behavior: ScrollBehavior = "auto") => {
   const appMain = document.querySelector('main[data-app-scroll="true"]');
@@ -108,6 +115,10 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null);
   const primaryButtonRef = useRef<HTMLButtonElement | null>(null);
   const activeTargetRef = useRef<HTMLElement | null>(null);
+  // This dialog is portaled outside AppShell. It needs the same explicit
+  // native-status-bar floor as the More drawer instead of relying on the
+  // viewport's padding.
+  const isNativeShell = Capacitor.isNativePlatform();
 
   const step = TOUR_STEPS[currentStep];
   const isFinalStep = currentStep === TOUR_STEPS.length - 1;
@@ -210,7 +221,7 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
       const left = roomRight > width + 24
         ? preferredLeft
         : Math.max(16, Math.min(rect.left - width - 20, window.innerWidth - width - 16));
-      const top = Math.max(16, Math.min(rect.top, window.innerHeight - 220));
+      const top = getTourTooltipTop(rect.top, window.innerHeight, isNativeShell);
 
       setTooltipPosition({ top, left, width });
     };
@@ -226,7 +237,7 @@ export function AppOnboardingTour({ isOpen, userId, onClose }: AppOnboardingTour
       window.removeEventListener("resize", updateTarget);
       window.removeEventListener("scroll", updateTarget, true);
     };
-  }, [currentStep, isOpen, step.target]);
+  }, [currentStep, isNativeShell, isOpen, step.target]);
 
   useEffect(() => {
     if (!isOpen) return;
