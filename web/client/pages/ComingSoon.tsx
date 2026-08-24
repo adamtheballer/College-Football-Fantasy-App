@@ -4,8 +4,8 @@ import { SurfaceCard } from "@/components/fantasy";
 
 const roadmap = [
   {
-    title: "CFB Fantasy App",
-    description: "The CFB Fantasy app is coming soon to the App Store, so you can manage your league from your phone.",
+    title: "College Fantasy Football App",
+    description: "The College Fantasy Football app is coming soon to the App Store, so you can manage your league from your phone.",
     icon: Smartphone,
   },
   {

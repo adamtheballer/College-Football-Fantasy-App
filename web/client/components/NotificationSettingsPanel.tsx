@@ -105,7 +105,7 @@ const permissionCopy: Record<BrowserPushState, string> = {
   default: "Get alerts for drafts, trades, waivers, and important fantasy updates.",
   granted: "Push notifications are enabled for this browser.",
   denied: "Browser notifications are blocked. Update this site's permission in your browser settings to enable them.",
-  unsupported: "This browser cannot receive web push here. On iPhone, add CFB Fantasy to your Home Screen first.",
+  unsupported: "This browser cannot receive web push here. On iPhone, add College Fantasy Football to your Home Screen first.",
   unconfigured: "Push notifications are not configured for this environment yet.",
 };
 
@@ -251,7 +251,7 @@ export function NotificationSettingsPanel() {
       if (nextPermission === "granted" && preferences) {
         await save({ ...preferences, push_enabled: true });
       } else if (nextPermission === "default") {
-        setMessage("iPhone did not grant notification permission. Open CFB Fantasy from its Home Screen icon and try again.");
+        setMessage("iPhone did not grant notification permission. Open College Fantasy Football from its Home Screen icon and try again.");
       }
     } catch (error) {
       if (!isCurrentRequest(controller, generation) || isAbortError(error)) return;

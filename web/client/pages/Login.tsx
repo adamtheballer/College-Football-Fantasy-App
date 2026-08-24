@@ -310,7 +310,7 @@ export default function Login() {
                 className="inline-flex items-center gap-2 rounded-full border border-cfb-brand/35 bg-cfb-brand/[0.12] px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-blue-100 transition hover:border-cfb-brand/55 hover:bg-cfb-brand/20"
               >
                 <Trophy className="h-4 w-4 text-cfb-gold" aria-hidden="true" />
-                CFB Fantasy
+                College Fantasy Football
               </Link>
 
               <div className="max-w-2xl space-y-4">
@@ -376,9 +376,9 @@ export default function Login() {
                   {mode === "signin"
                     ? "Continue to your leagues, draft rooms, and matchup dashboard."
                     : mode === "access"
-                      ? "Your code is optional: it records one free year of CFB Fantasy Pro for alpha launch."
+                      ? "Your code is optional: it records one free year of College Fantasy Football Pro for alpha launch."
                       : signupHasVerifiedProCode
-                        ? "Your verified email is locked while we attach your free year of CFB Fantasy Pro."
+                        ? "Your verified email is locked while we attach your free year of College Fantasy Football Pro."
                         : "No code is needed to create a normal account and use the beta."}
                 </p>
               </div>
@@ -478,7 +478,7 @@ export default function Login() {
           <DialogHeader>
             <DialogTitle className="pr-8 text-3xl font-black uppercase italic tracking-tight">Account created</DialogTitle>
             <DialogDescription className="text-base font-semibold leading-6 text-cfb-text-secondary">
-              Save this password somewhere secure before continuing. CFB Fantasy does not store or show it again.
+              Save this password somewhere secure before continuing. College Fantasy Football does not store or show it again.
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-2xl border border-cfb-cyan/25 bg-cfb-cyan/[0.08] p-4">
