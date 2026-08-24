@@ -106,7 +106,7 @@ describe("MobileNavigation", () => {
     expect(screen.getByRole("dialog").className).toContain("cfb-native-mobile-drawer");
   });
 
-  it("opens More only for a guided drawer destination and closes it when the guide returns to Draft", () => {
+  it("keeps More closed for guided drawer destinations while highlighting the visible More tab", () => {
     const view = renderNavigation(undefined, "MOCK DRAFT");
 
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -124,8 +124,8 @@ describe("MobileNavigation", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("dialog")).toBeTruthy();
-    expect(document.querySelector('[data-guide-nav="INJURY CENTER"]')?.className).toContain("ring-cfb-brand");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.querySelector('[data-guide-nav="MORE"]')?.className).toContain("ring-cfb-brand");
 
     view.rerender(
       <MemoryRouter initialEntries={["/chats"]}>
@@ -140,6 +140,17 @@ describe("MobileNavigation", () => {
     );
 
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("gives the More drawer a shrinkable scroll area so its sign-out action stays reachable on short phones", () => {
+    renderNavigation();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open all navigation" }));
+
+    const scrollArea = document.querySelector('[data-mobile-more-scroll-area="true"]');
+    expect(scrollArea?.className).toContain("min-h-0");
+    expect(scrollArea?.className).toContain("overflow-y-auto");
+    expect(screen.getByRole("button", { name: "SIGN OUT" })).toBeTruthy();
   });
 
   it("keeps the five primary labels on one line at narrow mobile widths", () => {

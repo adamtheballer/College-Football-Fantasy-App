@@ -4,7 +4,7 @@ import { getTourTooltipTop, TOUR_STEPS } from "./AppOnboardingTour";
 import { shouldStartGuide } from "@/lib/onboarding";
 
 describe("first-sign-in onboarding", () => {
-  it("moves from the four bottom tabs into More-only destinations in guide order", () => {
+  it("keeps More-only guide destinations anchored to the visible More tab on mobile", () => {
     expect(TOUR_STEPS.map((step) => step.navItem)).toEqual([
       "HOME",
       "LEAGUES",
@@ -15,9 +15,13 @@ describe("first-sign-in onboarding", () => {
       "SETTINGS",
       "SIGN OUT",
     ]);
-    expect(TOUR_STEPS.map((step) => step.target)).toEqual(
-      TOUR_STEPS.map((step) => `[data-guide-nav="${step.navItem}"]`),
+    expect(TOUR_STEPS.slice(0, 4).map((step) => step.target)).toEqual(
+      TOUR_STEPS.slice(0, 4).map((step) => `[data-guide-nav="${step.navItem}"]`),
     );
+    for (const step of TOUR_STEPS.slice(4)) {
+      expect(step.target).toContain(`[data-guide-nav="${step.navItem}"]`);
+      expect(step.target).toContain('[data-guide-nav="MORE"]');
+    }
   });
 
   it("honors an explicit replay request even when persistent browser storage is unavailable", () => {

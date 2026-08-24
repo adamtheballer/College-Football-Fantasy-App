@@ -22,8 +22,20 @@ export const formatCurrentValueRating = (value?: number | null) =>
   typeof value === "number" && Number.isFinite(value) ? value.toFixed(0) : "N/A";
 
 export const formatPlayerCardStatus = (value?: string | null) => {
-  if (!value || value.toUpperCase() === "N_A" || value.toUpperCase() === "UNREPORTED") return "NO OFFICIAL REPORT";
-  return value.replace(/_/g, " ");
+  const normalized = (value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/_/g, " ")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ");
+
+  // No reviewed injury report means the player is active until the injury
+  // pipeline supplies a current designation. This keeps provider casing out
+  // of the card so statuses never render as lowercase prose.
+  if (["", "N A", "NA", "NONE", "UNREPORTED", "FULL", "HEALTHY", "AVAILABLE", "ACTIVE"].includes(normalized)) {
+    return "ACTIVE";
+  }
+  return normalized;
 };
 
 export const resolvePlayerCardStatus = (
@@ -56,7 +68,7 @@ export function PlayerCardHeader({
   title: string;
 }) {
   const playerStatus = resolvePlayerCardStatus(card, player.status);
-  const statusSource = card?.current_injury_status ?? player.status;
+  const statusSource = playerStatus;
   const metricCards = [
     {
       label: "Proj",
