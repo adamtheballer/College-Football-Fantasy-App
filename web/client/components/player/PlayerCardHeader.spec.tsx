@@ -8,11 +8,15 @@ import { PlayerCardHeader, resolvePlayerCardStatus } from "./PlayerCardHeader";
 afterEach(cleanup);
 
 describe("PlayerCardHeader injury status", () => {
-  it("does not convert missing official availability into a generic Active label", () => {
+  it("treats a missing official injury report as ACTIVE", () => {
     expect(resolvePlayerCardStatus({
       current_injury_status: null,
       about: { status: "Active", source: "espn" },
-    } as never, "UNREPORTED")).toBe("NO OFFICIAL REPORT");
+    } as never, "UNREPORTED")).toBe("ACTIVE");
+  });
+
+  it("normalizes provider casing for active labels", () => {
+    expect(resolvePlayerCardStatus(undefined, "active")).toBe("ACTIVE");
   });
 
   it("renders the reviewed injury designation instead of generic Active availability", () => {

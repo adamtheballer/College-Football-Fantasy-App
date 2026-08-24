@@ -34,11 +34,11 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
       (drawerItems.some((item) => item.name === guidedNavItem) || signOutItem?.name === guidedNavItem),
   );
 
-  // The tour controls the route guide, so More opens only for drawer-only
-  // steps and closes immediately when Back returns to Draft or another tab.
+  // Keep More closed throughout the tour. Drawer-only steps highlight the
+  // visible More tab; opening the sheet would cover Back and Next.
   useEffect(() => {
-    if (guidedNavItem) setIsMoreOpen(isGuidedDrawerItem);
-  }, [guidedNavItem, isGuidedDrawerItem]);
+    if (guidedNavItem) setIsMoreOpen(false);
+  }, [guidedNavItem]);
   const isMoreActive = drawerItems.some(
     (item) => item.path === pathname && !items.some((mobileItem) => mobileItem.name === item.name),
   );
@@ -143,7 +143,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div data-mobile-more-scroll-area="true" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
           <div className="grid gap-2">
             {drawerItems.map((item) => {
               const Icon = item.icon;

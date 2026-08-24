@@ -11,7 +11,10 @@ type TourStep = {
   target: string;
 };
 
-const guidedNavTarget = (navItem: string) => `[data-guide-nav="${navItem}"]`;
+const guidedNavTarget = (navItem: string, fallBackToMore = false) =>
+  fallBackToMore
+    ? `[data-guide-nav="${navItem}"], [data-guide-nav="MORE"]`
+    : `[data-guide-nav="${navItem}"]`;
 
 export const TOUR_STEPS: TourStep[] = [
   {
@@ -44,28 +47,30 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     navItem: "INJURY CENTER",
-    target: guidedNavTarget("INJURY CENTER"),
+    // Drawer destinations retain their desktop target. On phones, the More
+    // tab is the visible highlight without opening the drawer over controls.
+    target: guidedNavTarget("INJURY CENTER", true),
     title: "Injury Center",
     description:
       "Injury Center is where player availability and health context belongs so lineup and waiver decisions stay informed.",
   },
   {
     navItem: "ALERTS",
-    target: guidedNavTarget("ALERTS"),
+    target: guidedNavTarget("ALERTS", true),
     title: "Alerts",
     description:
       "Alerts keeps league and player notifications in one supported workflow so you can review important changes quickly.",
   },
   {
     navItem: "SETTINGS",
-    target: guidedNavTarget("SETTINGS"),
+    target: guidedNavTarget("SETTINGS", true),
     title: "Settings",
     description:
       "Update your manager profile, choose your default league, and revisit this guide whenever you need it.",
   },
   {
     navItem: "SIGN OUT",
-    target: guidedNavTarget("SIGN OUT"),
+    target: guidedNavTarget("SIGN OUT", true),
     title: "Sign Out",
     description:
       "Use Sign Out when you are finished on a shared device. You can sign back in later and return to your leagues and saved account.",
