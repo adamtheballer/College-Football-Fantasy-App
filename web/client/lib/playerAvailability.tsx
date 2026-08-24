@@ -40,6 +40,26 @@ export function playerAvailabilityBadge(status?: string | null): PlayerAvailabil
   return { code: "Q", label: "Questionable", className: "border-amber-200/45 bg-amber-300/15 text-amber-100" };
 }
 
+/** Keep the full card's dot color aligned with the O/Q badge shown elsewhere. */
+export function playerAvailabilityDotClass(status?: string | null) {
+  const normalized = (status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/_/g, " ")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ");
+
+  if (["", "N/A", "NA", "NONE", "UNREPORTED"].includes(normalized)) return "bg-slate-300/70";
+  if (ACTIVE_STATUSES.has(normalized)) return "bg-emerald-300";
+
+  const badge = playerAvailabilityBadge(status);
+  if (badge?.code === "O") return "bg-red-400";
+  if (badge?.code === "Q") return "bg-amber-300";
+
+  // Missing official information is not a verified active designation.
+  return "bg-slate-300/70";
+}
+
 export function PlayerAvailabilityIndicator({ status, children }: { status?: string | null; children?: ReactNode }) {
   const badge = playerAvailabilityBadge(status);
   if (!badge) return <>{children}</>;

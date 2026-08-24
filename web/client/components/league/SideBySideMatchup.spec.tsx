@@ -7,7 +7,8 @@ import type { LeagueMatchupTeam, LeagueRosterPlayer } from "@/types/league";
 
 vi.mock("@/components/league/RosterSlotTable", () => ({
   RosterSlotTable: ({ title }: { title: string }) => <div data-testid="desktop-roster-table">{title}</div>,
-  formatRosterPointValue: (player: LeagueRosterPlayer) => {
+  formatRosterPointValue: (player: LeagueRosterPlayer, pointMode: "projected" | "live") => {
+    if (pointMode === "projected" && player.injury_status?.startsWith("OUT")) return "0.0";
     const value = player.current_fantasy_points ?? player.live_points ?? player.projected_points;
     return typeof value === "number" ? value.toFixed(1) : "—";
   },
@@ -140,6 +141,18 @@ describe("SideBySideMatchup", () => {
 
     expect(screen.getByLabelText("Game final")).toBeTruthy();
     expect(screen.getByText("18.5")).toBeTruthy();
+  });
+
+  it("keeps an out marker by the player name while rendering a numeric zero projection", () => {
+    const unavailableMyTeam = {
+      ...myTeam,
+      roster: [{ ...myTeam.roster[0], injury_status: "OUT_FOR_SEASON", projection_status: "OUT" }],
+    };
+
+    render(<SideBySideMatchup myTeam={unavailableMyTeam} opponentTeam={opponentTeam} />);
+
+    expect(screen.getByLabelText("Out").textContent).toBe("O");
+    expect(screen.getByText("0.0")).toBeTruthy();
   });
 
   it("keeps bench rows collapsed until a user chooses to inspect them", () => {

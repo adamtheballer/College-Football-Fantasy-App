@@ -7,7 +7,7 @@ import { usePlayerCard } from "@/hooks/use-players";
 import { useDropRosterPlayer, useUpdateLineup } from "@/hooks/use-roster-actions";
 import { getEligibleSlotsForPosition, normalizePosition } from "@/lib/rosterLegality";
 import { formatProjectionDisplay } from "@/lib/projection-display";
-import { PlayerAvailabilityIndicator } from "@/lib/playerAvailability";
+import { playerAvailabilityBadge, PlayerAvailabilityIndicator } from "@/lib/playerAvailability";
 import type { LeagueRosterPlayer } from "@/types/league";
 import { cn } from "@/lib/utils";
 import {
@@ -72,6 +72,11 @@ export const formatRosterPointValue = (player: LeagueRosterPlayer, pointMode: Ro
   }
   if (pointMode === "live" && typeof player.live_points === "number" && Number.isFinite(player.live_points)) {
     return player.live_points.toFixed(1);
+  }
+  // Availability belongs beside the player name. A ruled-out player has a
+  // numeric zero projection rather than another textual status in this rail.
+  if (pointMode === "projected" && playerAvailabilityBadge(player.injury_status)?.code === "O") {
+    return "0.0";
   }
   const projection = player.projected_points ?? player.weekly_projected_fantasy_points;
   return formatProjectionDisplay(projection, player.projection_status);
