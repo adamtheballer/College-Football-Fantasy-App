@@ -10,6 +10,7 @@ underlying projection snapshots for auditability.
 from __future__ import annotations
 
 import argparse
+from hashlib import sha256
 import os
 import sys
 from datetime import datetime, timezone
@@ -20,16 +21,17 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
-from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.db.model_registry import ensure_models_registered
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
-from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
-
-
-CORRECTION_VERSION = "CORRECTED_INJURY"
-CORRECTION_MODEL_VERSION = "injury_override_v1"
+from collegefootballfantasy_api.app.models.player_availability_event import PlayerAvailabilityEvent
+from collegefootballfantasy_api.app.models.player_news_event import PlayerNewsEvent
+from collegefootballfantasy_api.app.services.availability_corrections import (
+    CORRECTION_VERSION,
+    MANUAL_VERIFIED_SOURCE,
+    publish_zero_projection_for_unavailable_player,
+)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -42,33 +44,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--injury", required=True)
     parser.add_argument("--return-timeline", required=True)
     parser.add_argument("--notes", required=True)
+    parser.add_argument("--source-url", required=True, help="Public team or reputable local-report URL backing this correction.")
+    parser.add_argument("--effective-until-week", type=int, help="Last week this override applies (defaults to --week).")
     parser.add_argument("--apply", action="store_true", help="Persist the correction; otherwise only print the target.")
     return parser.parse_args(argv)
-
-
-def _zero_projection(row: WeeklyProjection, *, status: str, note: str) -> None:
-    """Make every displayed and calculated projection component consistent."""
-
-    for column in (
-        "pass_attempts", "rush_attempts", "targets", "receptions", "expected_plays",
-        "expected_rush_per_play", "expected_td_per_play", "pass_yards", "rush_yards",
-        "rec_yards", "pass_tds", "rush_tds", "rec_tds", "interceptions",
-        "field_goals_made_0_to_39", "field_goals_made_40_to_49", "field_goals_made_0_to_49",
-        "field_goals_made_50_plus", "extra_points_made", "fantasy_points", "floor", "ceiling",
-        "boom_prob", "bust_prob",
-    ):
-        setattr(row, column, 0.0)
-    row.qb_rating = None
-    row.projection_status = status
-    row.availability_multiplier = 0.0
-    row.usage_multiplier = 1.0
-    row.offense_multiplier = 1.0
-    row.opponent_defense_multiplier = 1.0
-    row.confidence = 1.0
-    row.fallback_reason = note
-    row.model_version = CORRECTION_MODEL_VERSION
-    row.is_published = True
-    row.locked_at = None
 
 
 def apply_correction(args: argparse.Namespace) -> dict[str, object]:
@@ -79,16 +58,6 @@ def apply_correction(args: argparse.Namespace) -> dict[str, object]:
         )
         if player is None:
             raise ValueError(f"No exact player match for {args.player} ({args.school}).")
-
-        source_projection = db.scalar(
-            current_published_projections_query(
-                season=args.season, week=args.week, player_ids=(player.id,)
-            )
-        )
-        if source_projection is None:
-            raise ValueError(
-                f"No published Week {args.week} projection exists for {args.player}; refusing to create an unverified correction."
-            )
 
         injury = db.scalar(
             select(Injury)
@@ -105,29 +74,65 @@ def apply_correction(args: argparse.Namespace) -> dict[str, object]:
         injury.is_game_time_decision = False
         injury.is_returning = False
         injury.notes = args.notes
-
-        correction = db.scalar(
-            select(WeeklyProjection).where(
-                WeeklyProjection.player_id == player.id,
-                WeeklyProjection.season == args.season,
-                WeeklyProjection.week == args.week,
-                WeeklyProjection.projection_version == CORRECTION_VERSION,
+        effective_until_week = args.effective_until_week or args.week
+        if effective_until_week < args.week:
+            raise ValueError("--effective-until-week cannot be before --week.")
+        content_hash = sha256(
+            "\x1f".join((str(player.id), str(args.season), str(args.week), args.status, args.notes, args.source_url)).encode()
+        ).hexdigest()
+        event = db.scalar(
+            select(PlayerAvailabilityEvent).where(
+                PlayerAvailabilityEvent.player_id == player.id,
+                PlayerAvailabilityEvent.season == args.season,
+                PlayerAvailabilityEvent.week == args.week,
+                PlayerAvailabilityEvent.source == MANUAL_VERIFIED_SOURCE,
             )
         )
-        if correction is None:
-            correction = WeeklyProjection(
-                player_id=player.id,
-                season=args.season,
-                week=args.week,
-                projection_version=CORRECTION_VERSION,
-                team_id=source_projection.team_id,
-                opponent_team_id=source_projection.opponent_team_id,
-                neutral_baseline=source_projection.neutral_baseline,
-                baseline_games_played=source_projection.baseline_games_played,
-                baseline_source="official_team_availability_correction",
+        if event is None:
+            event = PlayerAvailabilityEvent(player_id=player.id, season=args.season, week=args.week)
+            db.add(event)
+        event.status = args.status
+        event.probability_active = 0.0 if args.status == "OUT" else 0.7
+        event.availability_multiplier = 0.0 if args.status == "OUT" else 0.7
+        event.source = MANUAL_VERIFIED_SOURCE
+        event.source_url = args.source_url
+        event.content_hash = content_hash
+        event.source_reliability = 1.0
+        event.published_at = datetime.now(timezone.utc)
+        event.effective_from_week = args.week
+        event.effective_until_week = effective_until_week
+        event.reviewed = True
+        event.notes = args.notes
+        db.flush()
+        news = db.scalar(
+            select(PlayerNewsEvent).where(
+                PlayerNewsEvent.player_id == player.id,
+                PlayerNewsEvent.season == args.season,
+                PlayerNewsEvent.week == args.week,
+                PlayerNewsEvent.source == MANUAL_VERIFIED_SOURCE,
             )
-            db.add(correction)
-        _zero_projection(correction, status=args.status, note=args.notes)
+        )
+        if news is None:
+            news = PlayerNewsEvent(player_id=player.id, season=args.season, week=args.week)
+            db.add(news)
+        news.event_type = "AVAILABILITY"
+        news.source = MANUAL_VERIFIED_SOURCE
+        news.source_url = args.source_url
+        news.content_hash = content_hash
+        news.source_reliability = 1.0
+        news.published_at = event.published_at
+        news.effective_from_week = args.week
+        news.effective_until_week = effective_until_week
+        news.reviewed = True
+        news.notes = args.notes
+        correction = publish_zero_projection_for_unavailable_player(
+            db, player=player, season=args.season, week=args.week,
+            status=args.status, note=args.notes,
+        )
+        if correction is None and args.status in {"OUT", "IR"}:
+            raise ValueError(
+                f"No published Week {args.week} projection exists for {args.player}; refusing to create an unverified correction."
+            )
 
         result = {
             "player_id": player.id,
@@ -137,8 +142,9 @@ def apply_correction(args: argparse.Namespace) -> dict[str, object]:
             "week": args.week,
             "status": args.status,
             "projection_version": CORRECTION_VERSION,
-            "fantasy_points": 0.0,
-            "source_projection_id": source_projection.id,
+            "fantasy_points": 0.0 if correction is not None else None,
+            "source_url": args.source_url,
+            "effective_until_week": effective_until_week,
         }
         if args.apply:
             db.commit()

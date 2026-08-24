@@ -24,6 +24,10 @@ from collegefootballfantasy_api.app.models.player_availability_event import Play
 from collegefootballfantasy_api.app.models.player_news_event import PlayerNewsEvent
 from collegefootballfantasy_api.app.models.player_weekly_context import PlayerWeeklyContext
 from collegefootballfantasy_api.app.services.notification_service import log_official_injury_update
+from collegefootballfantasy_api.app.services.availability_corrections import (
+    has_active_manual_override,
+    publish_zero_projection_for_unavailable_player,
+)
 from collegefootballfantasy_api.app.services.power4 import (
     conference_for_school,
     list_power4_teams,
@@ -526,7 +530,7 @@ def _upsert_official_availability_rows(
         injury.player_id: injury
         for injury in db.query(Injury).filter(Injury.season == season, Injury.week == week).all()
     }
-    created = updated = unchanged = skipped = events_created = 0
+    created = updated = unchanged = skipped = events_created = overrides_preserved = 0
 
     for row in rows:
         school = resolve_power4_school(row.get("team_name") or "")
@@ -546,6 +550,13 @@ def _upsert_official_availability_rows(
         content_hash = _availability_hash(row, status)
         probability_active, multiplier = _availability_multiplier(status)
         existing = current_injuries.get(player.id)
+        # A reviewed manual/team report is intentionally allowed to beat an
+        # older or incomplete conference report, but only for the weeks it
+        # explicitly covers.  Once the window ends, normal official sync
+        # resumes automatically.
+        if has_active_manual_override(db, player_id=player.id, season=season, week=week):
+            overrides_preserved += 1
+            continue
         semantic_change = (
             existing is None
             or existing.status != status
@@ -642,6 +653,10 @@ def _upsert_official_availability_rows(
             context.reviewed = True
             context.change_reason = f"official conference availability report: {status}"
             db.add(context)
+        publish_zero_projection_for_unavailable_player(
+            db, player=player, season=season, week=week, status=status,
+            note=event.notes or f"Official status: {status}",
+        )
         log_official_injury_update(
             db, player=player, season=season, week=week, status=status,
             content_hash=content_hash, source_url=row.get("source_url"), detail=event.notes,
@@ -652,6 +667,7 @@ def _upsert_official_availability_rows(
     return {
         "created": created, "updated": updated, "unchanged": unchanged,
         "skipped": skipped, "events_created": events_created,
+        "overrides_preserved": overrides_preserved,
     }
 
 
