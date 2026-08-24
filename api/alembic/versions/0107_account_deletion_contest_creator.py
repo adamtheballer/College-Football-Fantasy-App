@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from alembic import op
 
 
-revision = "0107_account_deletion_contest_creator"
+revision = "0107_account_delete"
 down_revision = "0106_manager_name_cooldown"
 branch_labels = None
 depends_on = None
