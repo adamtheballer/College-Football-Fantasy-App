@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from collegefootballfantasy_api.app.integrations.conference_availability_reports import (
     ConferenceAvailabilityReportClient,
     ConferenceReportUnavailable,
@@ -287,6 +289,7 @@ def test_player_card_exposes_official_availability_news(client, db_session):
             source_reliability=1.0,
             effective_from_week=1,
             reviewed=True,
+            published_at=datetime(2026, 8, 24, 16, 58, tzinfo=timezone.utc),
             notes="Shoulder • Limited",
         )
     )
@@ -297,3 +300,6 @@ def test_player_card_exposes_official_availability_news(client, db_session):
     recent_news = response.json()["recent_news"]
     assert recent_news[0]["status"] == "QUESTIONABLE"
     assert recent_news[0]["source_url"] == "https://www.secsports.com/fbreports"
+    assert datetime.fromisoformat(recent_news[0]["published_at"].replace("Z", "+00:00")) == datetime(
+        2026, 8, 24, 16, 58, tzinfo=timezone.utc
+    )

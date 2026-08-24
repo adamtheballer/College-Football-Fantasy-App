@@ -4,6 +4,7 @@ import { statValue } from "@/lib/playerProjectionStats";
 
 import {
   formatGameLogDate,
+  formatPlayerNewsReportTime,
   gameLogColumnsForPosition,
   gameLogOpponentLabel,
   buildHistoricalSeasonSummaryColumns,
@@ -35,6 +36,12 @@ describe("PlayerCardModal helpers", () => {
     ]);
     expect(gameLogOpponentLabel({ location: "away", opponent_name: "Ohio State" })).toBe("at Ohio State");
     expect(formatGameLogDate("2026-09-05")).toBe("Sep 5, 2026");
+  });
+
+  it("labels player news with its Eastern report date and time", () => {
+    expect(formatPlayerNewsReportTime("2026-08-24T16:58:00Z")).toBe("Report · 8/24/26, 12:58 PM ET");
+    expect(formatPlayerNewsReportTime(null)).toBe("Report time unavailable");
+    expect(formatPlayerNewsReportTime("not-a-date")).toBe("Report time unavailable");
   });
   it("formats empty player-card fields with an em dash fallback", () => {
     expect(formatPlayerCardValue(null)).toBe("—");

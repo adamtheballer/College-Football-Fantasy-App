@@ -199,6 +199,13 @@ def _is_stale(updated_at: datetime | None, ttl_days: int) -> bool:
     return updated_at <= now - timedelta(days=max(1, ttl_days))
 
 
+def _as_utc_timestamp(value: datetime | None) -> datetime | None:
+    """Keep the public card timestamp unambiguous across database drivers."""
+    if value is None:
+        return None
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
 def _player_card_player_with_sheet_projection_fallback(db: Session, player: Player) -> PlayerRead:
     player_read = PlayerRead.model_validate(player)
     if player_read.sheet_projection_stats and player_read.sheet_projected_season_points is not None:
@@ -428,7 +435,7 @@ def get_player_card_endpoint(
                 detail=row.notes,
                 source=row.source,
                 source_url=row.source_url,
-                published_at=row.published_at,
+                published_at=_as_utc_timestamp(row.published_at),
                 return_timeline=(
                     next(
                         (
