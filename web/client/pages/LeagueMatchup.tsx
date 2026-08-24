@@ -1,4 +1,4 @@
-import { Bell, MessageCircle, ShieldAlert } from "lucide-react";
+import { Bell, ChevronLeft, ChevronRight, MessageCircle, ShieldAlert } from "lucide-react";
 import { useRef } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -171,6 +171,8 @@ function CompactMatchupScoreboard({
   scoreRow,
   matchupIndex,
   matchupCount,
+  onPreviousMatchup,
+  onNextMatchup,
 }: {
   data: LeagueMatchupTabResponse;
   myTeam: LeagueMatchupTeam | null;
@@ -179,6 +181,8 @@ function CompactMatchupScoreboard({
   scoreRow?: LeagueScoreboardRow;
   matchupIndex: number;
   matchupCount: number;
+  onPreviousMatchup: () => void;
+  onNextMatchup: () => void;
 }) {
   const winChance = displayedProbabilityPair(myTeam?.win_probability, opponentTeam?.win_probability);
   const myTeamIsLeading = Boolean(winChance && winChance.my >= winChance.opponent);
@@ -190,7 +194,7 @@ function CompactMatchupScoreboard({
       </h2>
       {matchupCount > 1 ? (
         <div
-          aria-label={`Matchup ${matchupIndex + 1} of ${matchupCount}. Swipe left or right to view another matchup.`}
+          aria-label={`Matchup ${matchupIndex + 1} of ${matchupCount}. Use the previous and next controls or swipe to view another matchup.`}
           className="absolute right-3 top-2 flex items-center gap-1 sm:right-5"
         >
           {Array.from({ length: matchupCount }, (_, index) => (
@@ -202,6 +206,26 @@ function CompactMatchupScoreboard({
               }`}
             />
           ))}
+        </div>
+      ) : null}
+      {matchupCount > 1 ? (
+        <div className="absolute left-1/2 top-2 hidden -translate-x-1/2 items-center gap-1 md:flex">
+          <button
+            type="button"
+            aria-label="Previous matchup"
+            onClick={onPreviousMatchup}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-cfb-border-subtle bg-cfb-surface text-cfb-text-secondary transition hover:border-cfb-brand/60 hover:text-cfb-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            aria-label="Next matchup"
+            onClick={onNextMatchup}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-cfb-border-subtle bg-cfb-surface text-cfb-text-secondary transition hover:border-cfb-brand/60 hover:text-cfb-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"
+          >
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </button>
         </div>
       ) : null}
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-5">
@@ -391,6 +415,8 @@ export default function LeagueMatchup() {
               scoreRow={activeScoreRow}
               matchupIndex={activeMatchupIndex}
               matchupCount={scheduledMatchups.length}
+              onPreviousMatchup={() => selectAdjacentMatchup(-1)}
+              onNextMatchup={() => selectAdjacentMatchup(1)}
             />
           </div>
 

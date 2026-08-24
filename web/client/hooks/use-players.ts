@@ -579,7 +579,7 @@ export function useDraftPlayerPool(
           offset: pageOffset,
         });
 
-      const [firstPayload, projections, teams] = await Promise.all([
+      const [firstPayload, projections, teams, injuries] = await Promise.all([
         fetchPage(offset),
         apiGet<BackendProjectionListResponse>("/projections", {
           season,
@@ -596,6 +596,15 @@ export function useDraftPlayerPool(
           conference: "ALL",
         }).catch(
           (): BackendTeamSummaryResponse => ({
+            data: [],
+          })
+        ),
+        apiGet<BackendInjuryResponse>("/stats/injuries", {
+          season,
+          week,
+          conference: "ALL",
+        }).catch(
+          (): BackendInjuryResponse => ({
             data: [],
           })
         ),
@@ -620,6 +629,9 @@ export function useDraftPlayerPool(
       const projectionByPlayerId = new Map<number, BackendProjectionRead>(
         projections.data.map((row) => [row.player_id, row])
       );
+      const injuryByPlayerId = new Map<number, string>(
+        injuries.data.map((row) => [row.player_id, row.status])
+      );
 
       return {
         ...firstPayload,
@@ -630,6 +642,7 @@ export function useDraftPlayerPool(
             rank: player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? 0,
             adp: player.sheet_adp ?? player.board_rank ?? 0,
             posRank: player.cfb27_position_rank ?? null,
+            status: injuryByPlayerId.get(player.id),
             projection: projectionByPlayerId.get(player.id),
           })
         ),

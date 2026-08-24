@@ -6,6 +6,7 @@ import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { SurfaceCard } from "@/components/fantasy";
 import { usePlayerCard } from "@/hooks/use-players";
 import { managerTeamName } from "@/lib/manager-team-name";
+import { PlayerAvailabilityIndicator } from "@/lib/playerAvailability";
 import { formatProjectionDisplay } from "@/lib/projection-display";
 import type { LeagueMatchupTeam, LeagueRosterPlayer } from "@/types/league";
 
@@ -134,7 +135,9 @@ function CompactMatchupPlayer({
         <span className="self-center text-left text-[11px] font-black tabular-nums text-cfb-text-primary"><span className="block">{points}</span>{liveDetail ? <span className="block text-[8px] font-semibold text-cfb-text-muted">{liveDetail}</span> : null}</span>
         <div className="min-w-0">
           <p className={`flex min-w-0 items-center gap-1 truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
-            <span className="truncate">{playerName}</span>
+            <PlayerAvailabilityIndicator status={player?.injury_status}>
+              <span className="truncate">{playerName}</span>
+            </PlayerAvailabilityIndicator>
             {isFinalGame ? <Lock aria-label="Game final" className="h-2.5 w-2.5 shrink-0 text-cfb-text-muted" /> : null}
           </p>
           <p data-player-game-matchup className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
@@ -163,7 +166,9 @@ function CompactMatchupPlayer({
     <>
       <div className="min-w-0">
         <p className={`flex min-w-0 items-center gap-1 truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
-          <span className="truncate">{playerName}</span>
+          <PlayerAvailabilityIndicator status={player?.injury_status}>
+            <span className="truncate">{playerName}</span>
+          </PlayerAvailabilityIndicator>
           {isFinalGame ? <Lock aria-label="Game final" className="h-2.5 w-2.5 shrink-0 text-cfb-text-muted" /> : null}
         </p>
         <p data-player-game-matchup className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">

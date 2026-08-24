@@ -5,6 +5,7 @@ import pytest
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.services.injury_status import normalize_injury_status
+from collegefootballfantasy_api.app.services.league_roster_matchup import _injury_status_by_player
 
 
 @pytest.mark.parametrize(
@@ -113,3 +114,23 @@ def test_player_card_resolved_current_injury_returns_normal_availability(client,
     assert response.status_code == 200
     assert response.json()["current_injury_status"] is None
     assert response.json()["about"]["status"] == "Available"
+
+
+def test_league_roster_availability_preserves_every_reviewed_non_active_status(db_session):
+    player = Player(name="Availability Contract", position="RB", school="Texas")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        Injury(
+            player_id=player.id,
+            season=2026,
+            week=1,
+            status="Out for Season",
+            updated_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    statuses = _injury_status_by_player(db_session, season=2026, week=1, player_ids={player.id})
+
+    assert statuses == {player.id: "OUT_FOR_SEASON"}

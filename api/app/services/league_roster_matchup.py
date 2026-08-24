@@ -58,6 +58,7 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
 from collegefootballfantasy_api.app.schemas.waiver import WaiverDropCandidateRead
 from collegefootballfantasy_api.app.services.league_weeks import resolve_current_week
 from collegefootballfantasy_api.app.services.espn_live_scoring import espn_week_freshness
+from collegefootballfantasy_api.app.services.injury_status import is_current_injury_designation, normalize_injury_status
 from collegefootballfantasy_api.app.services.league_workspace import build_standings_summary
 from collegefootballfantasy_api.app.services.matchup_probability import (
     calculate_matchup_win_probability,
@@ -371,8 +372,8 @@ def _injury_status_by_player(
     )
     statuses: dict[int, str] = {}
     for row in rows:
-        normalized = (row.status or "").upper()
-        if row.player_id not in statuses and normalized in {"QUESTIONABLE", "OUT", "IR"}:
+        normalized = normalize_injury_status(row.status)
+        if row.player_id not in statuses and is_current_injury_designation(normalized):
             statuses[row.player_id] = normalized
     return statuses
 
