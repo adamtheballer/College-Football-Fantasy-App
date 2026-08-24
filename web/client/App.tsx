@@ -218,8 +218,8 @@ const ApplicationRoutes = () => (
                 <Route path="/stats" element={<Navigate to="/leagues" replace />} />
                 <Route path="/stats/players" element={<Navigate to="/leagues" replace />} />
                 <Route path="/login" element={<Login />} />
-                {/* Kept for shared legacy links; codes now grant optional Pro credit. */}
-                <Route path="/beta-access" element={<Navigate to="/login?flow=pro" replace />} />
+                {/* Keep old shared links functional without reviving the retired Pro claim flow. */}
+                <Route path="/beta-access" element={<Navigate to="/login" replace />} />
                 <Route path="/signup" element={<Navigate to="/login?flow=signup" replace />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />

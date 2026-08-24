@@ -43,8 +43,6 @@ async function signUp(page: Page, firstName: string, fixture: { email: string })
     page.getByRole("button", { name: /Create (beta )?account/i }).click(),
   ]);
   expect(signupResponse.status()).toBe(201);
-  await expect(page.getByRole("dialog", { name: /Account created/i })).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("button", { name: /Continue to dashboard/i }).click();
   await page.waitForURL("**/");
 
   const endGuide = page.getByRole("button", { name: /End Guide/i });

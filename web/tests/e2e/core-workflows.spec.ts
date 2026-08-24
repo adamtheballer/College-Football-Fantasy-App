@@ -577,9 +577,8 @@ test.describe("critical browser workflows", () => {
     await page.locator("#signup-email").fill("ci-beta-user@example.test");
     await page.locator("#signup-password").fill("StrongPass123!");
     await page.getByRole("button", { name: /Create (beta )?account/i }).click();
-    await expect(page.getByRole("dialog", { name: /Account created/i })).toBeVisible();
-    await expect(page.getByText("Save this password somewhere secure before continuing.")).toBeVisible();
-    await page.getByRole("button", { name: /Continue to dashboard/i }).click();
+    await expect(page.getByRole("dialog", { name: /Account created/i })).toHaveCount(0);
+    await expect(page.getByText("Save this password somewhere secure before continuing.")).toHaveCount(0);
     await expect
       .poll(() => page.evaluate(() => window.localStorage.getItem("cfb_access_token")))
       .toBe("signup-access-token");

@@ -27,6 +27,7 @@ describe("first-sign-in onboarding", () => {
   it("keeps native tour cards below the iOS status area", () => {
     expect(getTourTooltipTop(16, 844, true)).toBe(59);
     expect(getTourTooltipTop(160, 844, true)).toBe(160);
+    expect(getTourTooltipTop(800, 844, true)).toBe(430);
     expect(getTourTooltipTop(16, 844, false)).toBe(16);
   });
 });

@@ -47,7 +47,6 @@ async function signUp(page: Page, fixture: (typeof fixtures)[number]) {
     page.getByRole("button", { name: /Create (beta )?account/i }).click(),
   ]);
   expect(response.status()).toBe(201);
-  await page.getByRole("button", { name: /Continue to dashboard/i }).click();
   await page.waitForURL("**/");
   const endGuide = page.getByRole("button", { name: /End Guide/i });
   if (await endGuide.isVisible().catch(() => false)) await endGuide.click();

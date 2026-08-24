@@ -64,22 +64,21 @@ describe("post-login redirect safety", () => {
   });
 });
 
-describe("optional Early Access Pro flow", () => {
-  it("keeps standard signup and login open while retaining legacy code links", () => {
+describe("alpha authentication entry", () => {
+  it("keeps standard signup and login open while retiring legacy Pro-code links", () => {
     expect(initialLoginMode(null, true)).toBe("signin");
     expect(initialLoginMode("signup", true)).toBe("signup");
-    expect(initialLoginMode("pro", true)).toBe("access");
-    expect(initialLoginMode("beta", true)).toBe("access");
+    expect(initialLoginMode("pro", true)).toBe("signin");
+    expect(initialLoginMode("beta", true)).toBe("signin");
     expect(initialLoginMode("pro", false)).toBe("signin");
   });
 
-  it("routes the optional code claim separately from normal account creation", () => {
+  it("routes only normal sign-in and account creation", () => {
     expect(loginPathForMode("signin")).toBe("/login");
     expect(loginPathForMode("signup")).toBe("/login?flow=signup");
-    expect(loginPathForMode("access")).toBe("/login?flow=pro");
   });
 
-  it("holds auth forms until a remembered session resolves, then keeps new-account confirmation available", () => {
+  it("holds auth forms until a remembered session resolves", () => {
     expect(shouldHoldAuthEntry(true, false, false)).toBe(true);
     expect(shouldHoldAuthEntry(false, true, false)).toBe(true);
     expect(shouldHoldAuthEntry(false, true, true)).toBe(false);
