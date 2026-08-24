@@ -83,9 +83,9 @@ def _invite_read(db: Session, invite: LeagueRivalryInvite) -> RivalryInviteRead:
     sender, recipient = _team(db, invite.league_id, invite.sender_team_id), _team(db, invite.league_id, invite.recipient_team_id)
     sender_user, recipient_user = _user(db, sender.owner_user_id), _user(db, recipient.owner_user_id)
     return RivalryInviteRead(
-        id=invite.id, league_id=invite.league_id, sender_team_id=sender.id, sender_team_name=sender.name,
+        id=invite.id, league_id=invite.league_id, sender_team_id=sender.id, sender_team_name=sender.display_name,
         sender_manager_name=_manager_name(sender_user, sender), sender_manager_avatar_url=sender_user.avatar_url if sender_user else None,
-        recipient_team_id=recipient.id, recipient_team_name=recipient.name,
+        recipient_team_id=recipient.id, recipient_team_name=recipient.display_name,
         recipient_manager_name=_manager_name(recipient_user, recipient), recipient_manager_avatar_url=recipient_user.avatar_url if recipient_user else None,
         status=invite.status, expires_at=invite.expires_at, created_at=invite.created_at,
     )
@@ -96,7 +96,7 @@ def _rivalry_read(db: Session, rivalry: LeagueRivalry, my_team_id: int) -> Rival
     opponent = _team(db, rivalry.league_id, opponent_id)
     opponent_user = _user(db, opponent.owner_user_id)
     return RivalryRead(
-        id=rivalry.id, league_id=rivalry.league_id, opponent_team_id=opponent.id, opponent_team_name=opponent.name,
+        id=rivalry.id, league_id=rivalry.league_id, opponent_team_id=opponent.id, opponent_team_name=opponent.display_name,
         opponent_manager_name=_manager_name(opponent_user, opponent), opponent_manager_avatar_url=opponent_user.avatar_url if opponent_user else None,
         accepted_at=rivalry.accepted_at, status=rivalry.status,
     )
@@ -128,7 +128,7 @@ def get_rivalry_view(db: Session, league: League, user: User) -> LeagueRivalryVi
             if candidate.id in bound_ids or not _is_member(db, league.id, candidate.owner_user_id):
                 continue
             manager = _user(db, candidate.owner_user_id)
-            candidates.append(RivalryCandidateRead(team_id=candidate.id, team_name=candidate.name, manager_user_id=candidate.owner_user_id, manager_name=_manager_name(manager, candidate), manager_avatar_url=manager.avatar_url if manager else None))
+            candidates.append(RivalryCandidateRead(team_id=candidate.id, team_name=candidate.display_name, manager_user_id=candidate.owner_user_id, manager_name=_manager_name(manager, candidate), manager_avatar_url=manager.avatar_url if manager else None))
     return LeagueRivalryViewRead(
         eligible=eligible, rivalry=_rivalry_read(db, rivalry, team.id) if rivalry and rivalry.status == ACTIVE else None,
         outgoing_invite=_invite_read(db, outgoing) if outgoing else None,
@@ -256,4 +256,4 @@ def matchup_rivalry_context(
     if rows:
         latest = rows[0]; mine, theirs = (latest.home_score, latest.away_score) if latest.home_team_id == primary_team.id else (latest.away_score, latest.home_score)
         last = f"Week {latest.week}: {mine:.1f}-{theirs:.1f}"
-    return RivalryMatchupRead(is_rivalry_matchup=True, rivalry_id=rivalry.id, opponent_team_id=opponent.id, opponent_team_name=opponent.name, series=RivalrySeriesRead(wins=wins, losses=losses, ties=ties, last_meeting=last))
+    return RivalryMatchupRead(is_rivalry_matchup=True, rivalry_id=rivalry.id, opponent_team_id=opponent.id, opponent_team_name=opponent.display_name, series=RivalrySeriesRead(wins=wins, losses=losses, ties=ties, last_meeting=last))

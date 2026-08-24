@@ -29,7 +29,7 @@ def _serialize(db: Session, draft: Draft, league: League, teams: list[Team]) -> 
         entries=[
             DraftOrderEntryRead(
                 team_id=team.id,
-                team_name=team.name,
+                team_name=team.display_name,
                 owner_user_id=team.owner_user_id,
                 owner_name=team.owner_name,
                 owner_avatar_url=avatars_by_owner_id.get(team.owner_user_id),

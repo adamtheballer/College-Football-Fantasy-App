@@ -219,6 +219,14 @@ def test_profile_name_update_propagates_to_all_owned_league_teams(client, db_ses
     assert db_session.get(Team, unassigned_team.id).owner_name == "Unassigned"
 
 
+def test_stale_generated_team_label_reads_from_the_current_owner_name():
+    stale_generated_team = Team(name="Adam's Team", owner_name="An1skiii")
+    custom_team = Team(name="Gridiron Kings", owner_name="An1skiii")
+
+    assert stale_generated_team.display_name == "An1skiii's Team"
+    assert custom_team.display_name == "Gridiron Kings"
+
+
 def test_profile_name_change_cooldown_is_server_enforced(client, db_session):
     payload = signup_user(client, "name-cooldown")
     headers = auth_headers(payload["access_token"])

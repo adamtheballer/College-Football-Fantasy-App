@@ -281,7 +281,7 @@ def _participant_reads_by_thread(db: Session, *, thread_ids: list[int]) -> dict[
                 joined_at=participant.joined_at,
                 display_name=_participant_display_name(user),
                 avatar_url=user.avatar_url,
-                fantasy_team_name=team.name if team else None,
+                fantasy_team_name=team.display_name if team else None,
             )
         )
 
@@ -307,7 +307,7 @@ def _participant_reads_by_thread(db: Session, *, thread_ids: list[int]) -> dict[
                 joined_at=member.joined_at,
                 display_name=_participant_display_name(user),
                 avatar_url=user.avatar_url,
-                fantasy_team_name=team.name if team else None,
+                fantasy_team_name=team.display_name if team else None,
             )
             for member, user, team in member_rows
         ]
@@ -380,7 +380,7 @@ def _user_profiles(db: Session, *, league_id: int, user_ids: set[int]) -> dict[i
         .all()
     )
     return {
-        user.id: (_participant_display_name(user), user.avatar_url, team.name if team else None)
+        user.id: (_participant_display_name(user), user.avatar_url, team.display_name if team else None)
         for user, team in rows
     }
 

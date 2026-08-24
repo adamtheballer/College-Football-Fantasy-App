@@ -286,7 +286,7 @@ def _owner_avatar_urls(db: Session, teams: list[Team], viewer: User) -> dict[int
 def _team_read(db: Session, league: League, team: Team) -> RosterTabTeamRead:
     return RosterTabTeamRead(
         id=team.id,
-        name=team.name,
+        name=team.display_name,
         owner_user_id=team.owner_user_id,
         record=_team_record(db, league, team.id),
     )
@@ -423,7 +423,7 @@ def _serialize_roster_entry(
         league_id=league.id,
         team_id=team.id,
         fantasy_team_id=team.id,
-        fantasy_team_name=team.name,
+        fantasy_team_name=team.display_name,
         player_id=entry.player_id if entry else None,
         slot=roster_slot.slot_type,
         slot_id=roster_slot.slot_id,
@@ -699,7 +699,7 @@ def build_roster_tab_view(
         LeagueRosterTeamRead(
             team=RosterTabTeamRead(
                 id=league_team.id,
-                name=league_team.name,
+                name=league_team.display_name,
                 owner_user_id=league_team.owner_user_id,
                 owner_name=league_team.owner_name,
                 owner_avatar_url=avatars_by_owner_id.get(league_team.owner_user_id),
@@ -734,7 +734,7 @@ def build_roster_tab_view(
         week=week,
         owned_team=team_read,
         fantasy_team_id=team.id,
-        fantasy_team_name=team.name,
+        fantasy_team_name=team.display_name,
         roster=roster,
         data=roster,
         slots=roster,
@@ -825,12 +825,12 @@ def build_matchup_tab_view(
         my_total = _starter_projection_total(my_roster)
         my_team = MatchupTeamRead(
             id=primary_team.id,
-            name=primary_team.name,
+            name=primary_team.display_name,
             record=_team_record(db, league, primary_team.id),
             projected_points=my_total,
             win_probability=None,
             fantasy_team_id=primary_team.id,
-            fantasy_team_name=primary_team.name,
+            fantasy_team_name=primary_team.display_name,
             manager_name=primary_team.owner_name,
             projected_total=my_total,
             current_points=0.0 if my_total is not None else None,
@@ -891,12 +891,12 @@ def build_matchup_tab_view(
     )
     my_team = MatchupTeamRead(
         id=primary_team.id,
-        name=primary_team.name,
+        name=primary_team.display_name,
         record=records[primary_team.id],
         projected_points=my_total,
         win_probability=my_probability,
         fantasy_team_id=primary_team.id,
-        fantasy_team_name=primary_team.name,
+        fantasy_team_name=primary_team.display_name,
         manager_name=primary_team.owner_name,
         owner_avatar_url=avatars_by_owner_id.get(primary_team.owner_user_id),
         projected_total=my_total,
@@ -908,12 +908,12 @@ def build_matchup_tab_view(
     opponent_team = (
         MatchupTeamRead(
             id=opponent.id,
-            name=opponent.name,
+            name=opponent.display_name,
             record=records[opponent.id],
             projected_points=opponent_total,
             win_probability=opponent_probability,
             fantasy_team_id=opponent.id,
-            fantasy_team_name=opponent.name,
+            fantasy_team_name=opponent.display_name,
             manager_name=opponent.owner_name,
             owner_avatar_url=avatars_by_owner_id.get(opponent.owner_user_id),
             projected_total=opponent_total,
@@ -1182,19 +1182,19 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
         for row in build_standings_summary(db, league)
     ]
     schedule_rows = (
-        db.query(Matchup, Team.name, Team.id)
+        db.query(Matchup, Team.id)
         .join(Team, Team.id == Matchup.home_team_id)
         .filter(Matchup.league_id == league.id, Matchup.season == league.season_year)
         .order_by(Matchup.week.asc(), Matchup.id.asc())
         .all()
     )
-    away_names = {team.id: team.name for team in teams}
+    away_names = {team.id: team.display_name for team in teams}
     schedule = [
         LeagueScheduleRowRead(
             matchup_id=matchup.id,
             week=matchup.week,
             home_team_id=matchup.home_team_id,
-            home_team_name=home_name,
+            home_team_name=away_names.get(home_team_id, "TBD"),
             away_team_id=matchup.away_team_id,
             away_team_name=away_names.get(matchup.away_team_id, "TBD"),
             home_projected_total=float(matchup.home_score or 0.0),
@@ -1202,7 +1202,7 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
             home_win_probability=50.0,
             away_win_probability=50.0,
         )
-        for matchup, home_name, _home_id in schedule_rows
+        for matchup, home_team_id in schedule_rows
     ]
     draft = db.query(Draft).filter(Draft.league_id == league.id).first()
     draft_status = (draft.status if draft else None) or league.status
@@ -1238,7 +1238,7 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
                 "round_number": pick.round_number,
                 "round_pick": pick.round_pick,
                 "team_id": team.id,
-                "team_name": team.name,
+                "team_name": team.display_name,
                 "player_id": player.id,
                 "player_name": player.name,
                 "position": player.position,
@@ -1261,7 +1261,7 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
         team = teams_by_id.get(team_id)
         return LeagueTradeHistoryPartyRead(
             team_id=team_id,
-            team_name=team.name if team else "Unknown team",
+            team_name=team.display_name if team else "Unknown team",
             manager_name=team.owner_name if team else None,
         )
 
@@ -1326,7 +1326,7 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
             LeagueWorkspaceTeamRead(
                 id=team.id,
                 league_id=team.league_id,
-                name=team.name,
+                name=team.display_name,
                 owner_user_id=team.owner_user_id,
             )
             for team in teams
