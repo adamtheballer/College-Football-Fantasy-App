@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { LogOut, Menu } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -24,6 +25,7 @@ const displayNavName = (name: string) => name.toLowerCase().replace(/\b\w/g, (le
 
 export function MobileNavigation({ items, allItems, pathname, onSignOut }: MobileNavigationProps) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const isNativeShell = Capacitor.isNativePlatform();
   const drawerItems = allItems.filter((item) => item.kind !== "danger");
   const signOutItem = allItems.find((item) => item.kind === "danger");
   const isMoreActive = drawerItems.some(
@@ -101,7 +103,14 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
 
       <SheetContent
         side="right"
-        className="z-[220] flex h-[100dvh] w-[min(22rem,calc(100vw-1rem))] flex-col overflow-hidden border-cfb-border-subtle bg-cfb-sidebar p-0 text-cfb-text-primary sm:max-w-none"
+        className={cn(
+          "z-[220] flex h-[100dvh] w-[min(22rem,calc(100vw-1rem))] flex-col overflow-hidden border-cfb-border-subtle bg-cfb-sidebar p-0 text-cfb-text-primary sm:max-w-none",
+          // Radix portals the drawer outside AppShell, so it cannot inherit
+          // the native status-bar protection applied to .cfb-app-viewport.
+          // Keep this fallback native-only: browser drawers retain their
+          // edge-to-edge presentation.
+          isNativeShell && "cfb-native-mobile-drawer",
+        )}
       >
         <SheetHeader className="border-b border-cfb-border-subtle px-6 pb-5 pt-7 text-left">
           <SheetTitle className="font-display text-2xl font-black tracking-[-0.04em] text-cfb-text-primary">

@@ -8,7 +8,16 @@ import { getMobileNavItems, getShellNavItems } from "./navigation";
 import { MobileNavigation } from "./MobileNavigation";
 import type { User } from "@/hooks/use-auth";
 
-afterEach(cleanup);
+const nativePlatform = vi.hoisted(() => ({ value: false }));
+
+vi.mock("@capacitor/core", () => ({
+  Capacitor: { isNativePlatform: () => nativePlatform.value },
+}));
+
+afterEach(() => {
+  nativePlatform.value = false;
+  cleanup();
+});
 
 const user: User = {
   id: 1,
@@ -84,6 +93,15 @@ describe("MobileNavigation", () => {
     fireEvent.click(screen.getByRole("button", { name: "SIGN OUT" }));
 
     expect(onSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the native More drawer below the iOS status area", () => {
+    nativePlatform.value = true;
+    renderNavigation();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open all navigation" }));
+
+    expect(screen.getByRole("dialog").className).toContain("cfb-native-mobile-drawer");
   });
 
   it("keeps the five primary labels on one line at narrow mobile widths", () => {
