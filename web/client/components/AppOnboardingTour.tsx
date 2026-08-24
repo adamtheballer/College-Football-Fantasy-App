@@ -87,10 +87,16 @@ type TooltipPosition = {
 
 const PADDING = 12;
 const NATIVE_TOP_SAFE_AREA_FALLBACK = 59;
+const TOOLTIP_RESERVED_HEIGHT = 380;
+const NATIVE_BOTTOM_SAFE_AREA = 34;
 
 export const getTourTooltipTop = (targetTop: number, viewportHeight: number, isNativeShell: boolean): number => {
   const minimumTop = isNativeShell ? NATIVE_TOP_SAFE_AREA_FALLBACK : 16;
-  return Math.max(minimumTop, Math.min(targetTop, viewportHeight - 220));
+  const bottomInset = isNativeShell ? NATIVE_BOTTOM_SAFE_AREA : 16;
+  // Bottom-nav steps need room for the complete card above the persistent
+  // navigation. Reserving the card's height keeps the highlighted tab usable
+  // instead of placing the tour controls on top of it.
+  return Math.max(minimumTop, Math.min(targetTop, viewportHeight - TOOLTIP_RESERVED_HEIGHT - bottomInset));
 };
 
 export function AppOnboardingTour({ isOpen, userId, onClose, onStepChange }: AppOnboardingTourProps) {
@@ -197,7 +203,7 @@ export function AppOnboardingTour({ isOpen, userId, onClose, onStepChange }: App
       const rect = element.getBoundingClientRect();
       setTargetRect(rect);
 
-      const width = Math.min(360, window.innerWidth - 32);
+      const width = Math.min(336, window.innerWidth - 32);
       const preferredLeft = rect.right + 20;
       const roomRight = window.innerWidth - rect.right;
       const left = roomRight > width + 24
@@ -273,12 +279,12 @@ export function AppOnboardingTour({ isOpen, userId, onClose, onStepChange }: App
       )}
 
       <div
-        className="fixed z-[1210] rounded-[28px] border border-white/10 bg-[#08121d]/92 p-6 shadow-[0_30px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl"
+        className="fixed z-[1210] max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-[24px] border border-white/10 bg-[#08121d]/92 p-5 shadow-[0_30px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:p-6"
         style={
           tooltipPosition
             ? { top: tooltipPosition.top, left: tooltipPosition.left, width: tooltipPosition.width }
             : {
-                width: Math.min(420, window.innerWidth - 32),
+                width: Math.min(336, window.innerWidth - 32),
                 left: "50%",
                 top: "50%",
                 transform: "translate(-50%, -50%)",
