@@ -197,9 +197,12 @@ class ConferenceAvailabilityReportClient:
                     )
                     if iframe.count() == 0:
                         raise ConferenceReportUnavailable("official page did not expose its report frame")
-                    frame = iframe.content_frame()
-                    if frame is None:
-                        raise ConferenceReportUnavailable("official report frame was unavailable")
+                    # Playwright 1.56+ exposes ``content_frame`` as a
+                    # FrameLocator property (not a callable Frame).  Calling
+                    # it caused every JS-hosted conference report to fail
+                    # before parsing, silently reducing the daily audit to
+                    # zero usable sources.
+                    frame = iframe.content_frame
                     try:
                         frame.locator("table").first.wait_for(
                             state="attached", timeout=int(self.timeout_seconds * 1000)
@@ -210,7 +213,10 @@ class ConferenceAvailabilityReportClient:
                         # `parse_report_document` can distinguish it from a
                         # broken page without inventing availability statuses.
                         pass
-                    return frame.content()
+                    # FrameLocator has no ``content`` method.  Reading the
+                    # public frame's rendered HTML preserves the same
+                    # table-only parser and source-provenance safeguards.
+                    return frame.locator("html").inner_html()
                 finally:
                     browser.close()
         except ConferenceReportUnavailable:
