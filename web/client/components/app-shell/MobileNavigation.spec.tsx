@@ -8,7 +8,16 @@ import { getMobileNavItems, getShellNavItems } from "./navigation";
 import { MobileNavigation } from "./MobileNavigation";
 import type { User } from "@/hooks/use-auth";
 
-afterEach(cleanup);
+const nativePlatform = vi.hoisted(() => ({ value: false }));
+
+vi.mock("@capacitor/core", () => ({
+  Capacitor: { isNativePlatform: () => nativePlatform.value },
+}));
+
+afterEach(() => {
+  nativePlatform.value = false;
+  cleanup();
+});
 
 const user: User = {
   id: 1,
@@ -18,8 +27,8 @@ const user: User = {
   avatarUrl: null,
 };
 
-const renderNavigation = (onSignOut = vi.fn()) => {
-  const allItems = getShellNavItems(user, true, 2, true);
+const renderNavigation = (onSignOut = vi.fn(), guidedNavItem?: string) => {
+  const allItems = getShellNavItems(user, true, 2);
   return {
     onSignOut,
     ...render(
@@ -29,6 +38,7 @@ const renderNavigation = (onSignOut = vi.fn()) => {
           allItems={allItems}
           pathname="/chats"
           onSignOut={onSignOut}
+          guidedNavItem={guidedNavItem}
         />
       </MemoryRouter>,
     ),
@@ -71,7 +81,8 @@ describe("MobileNavigation", () => {
     expect(screen.getByRole("heading", { name: "All navigation" })).toBeTruthy();
     expect(screen.getByText("Injury Center")).toBeTruthy();
     expect(screen.getByText("Alerts")).toBeTruthy();
-    expect(screen.getByText("Report Bug")).toBeTruthy();
+    expect(screen.queryByText("Report Bug")).toBeNull();
+    expect(screen.queryByText("Coming Soon")).toBeNull();
     expect(screen.getByText("Settings")).toBeTruthy();
     expect(screen.getByRole("button", { name: "SIGN OUT" })).toBeTruthy();
   });
@@ -84,6 +95,51 @@ describe("MobileNavigation", () => {
     fireEvent.click(screen.getByRole("button", { name: "SIGN OUT" }));
 
     expect(onSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the native More drawer below the iOS status area", () => {
+    nativePlatform.value = true;
+    renderNavigation();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open all navigation" }));
+
+    expect(screen.getByRole("dialog").className).toContain("cfb-native-mobile-drawer");
+  });
+
+  it("opens More only for a guided drawer destination and closes it when the guide returns to Draft", () => {
+    const view = renderNavigation(undefined, "MOCK DRAFT");
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.querySelector('[data-guide-nav="MOCK DRAFT"]')?.className).toContain("ring-cfb-brand");
+
+    view.rerender(
+      <MemoryRouter initialEntries={["/chats"]}>
+        <MobileNavigation
+          items={getMobileNavItems(getShellNavItems(user, true, 2))}
+          allItems={getShellNavItems(user, true, 2)}
+          pathname="/chats"
+          onSignOut={vi.fn()}
+          guidedNavItem="INJURY CENTER"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(document.querySelector('[data-guide-nav="INJURY CENTER"]')?.className).toContain("ring-cfb-brand");
+
+    view.rerender(
+      <MemoryRouter initialEntries={["/chats"]}>
+        <MobileNavigation
+          items={getMobileNavItems(getShellNavItems(user, true, 2))}
+          allItems={getShellNavItems(user, true, 2)}
+          pathname="/chats"
+          onSignOut={vi.fn()}
+          guidedNavItem="MOCK DRAFT"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("keeps the five primary labels on one line at narrow mobile widths", () => {

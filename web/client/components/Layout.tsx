@@ -21,7 +21,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useChatUnreadSummary } from "@/hooks/use-chat";
 import { useNotifications } from "@/hooks/use-notifications";
 import { clearPendingGuide, shouldStartGuide } from "@/lib/onboarding";
-import { useRuntimeCapabilities } from "@/components/RuntimeCompatibilityGate";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -31,13 +30,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isLoggedIn } = useAuth();
-  const { support_email: supportEmail } = useRuntimeCapabilities();
   const { data: unreadChatSummary } = useChatUnreadSummary(
     isLoggedIn,
     location.pathname === "/chats",
   );
   const { data: notifications } = useNotifications(isLoggedIn);
   const [isGuideActive, setIsGuideActive] = useState(false);
+  const [guidedNavItem, setGuidedNavItem] = useState<string | undefined>();
   const mainScrollRef = useRef<HTMLElement | null>(null);
 
   const navItems = useMemo(
@@ -46,10 +45,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         user,
         isLoggedIn,
         unreadChatSummary?.total_unread ?? 0,
-        Boolean(supportEmail),
         notifications?.unread_count ?? 0,
       ),
-    [isLoggedIn, notifications?.unread_count, supportEmail, unreadChatSummary?.total_unread, user],
+    [isLoggedIn, notifications?.unread_count, unreadChatSummary?.total_unread, user],
   );
 
   const isDraftRoomPage = isDraftRoomRoute(location.pathname);
@@ -73,11 +71,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   useEffect(() => {
     if (!user) {
       setIsGuideActive(false);
+      setGuidedNavItem(undefined);
       return;
     }
 
     if (isAuthFlowPage) {
       setIsGuideActive(false);
+      setGuidedNavItem(undefined);
       return;
     }
 
@@ -85,6 +85,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (!guideShouldStart) {
       clearPendingGuide(user.id);
       setIsGuideActive(false);
+      setGuidedNavItem(undefined);
       return;
     }
 
@@ -108,7 +109,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <AppOnboardingTour
           isOpen={isGuideActive}
           userId={user.id}
-          onClose={() => setIsGuideActive(false)}
+          onStepChange={setGuidedNavItem}
+          onClose={() => {
+            setIsGuideActive(false);
+            setGuidedNavItem(undefined);
+          }}
         />
       ) : null}
 
@@ -132,6 +137,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         fixedViewport={false}
         onSignOut={logout}
         mainScrollRef={mainScrollRef}
+        guidedNavItem={guidedNavItem}
       >
         {children}
       </AppShell>

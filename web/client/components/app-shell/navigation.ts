@@ -1,14 +1,12 @@
 import type { ComponentType } from "react";
 import {
   Bell,
-  Bug,
   Home,
   LogIn,
   LogOut,
   MessageSquare,
   Settings,
   ShieldAlert,
-  Sparkles,
   Timer,
   Trophy,
   Wrench,
@@ -47,7 +45,6 @@ export const getShellNavItems = (
   user: User | null,
   isLoggedIn: boolean,
   chatUnreadCount = 0,
-  supportAvailable = false,
   notificationUnreadCount = 0,
 ): ShellNavItem[] => {
   if (!isLoggedIn) {
@@ -74,10 +71,6 @@ export const getShellNavItems = (
       icon: Bell,
       badge: notificationUnreadCount > 99 ? "99+" : notificationUnreadCount > 0 ? String(notificationUnreadCount) : undefined,
     },
-    // This mailto workflow is only reachable after the server has supplied a
-    // configured support address. Beta must not expose a dead feedback link.
-    ...(supportAvailable ? [{ name: "REPORT BUG", path: "/report-bug", icon: Bug }] : []),
-    { name: "COMING SOON", path: "/coming-soon", icon: Sparkles },
     { name: "MOCK DRAFT", path: "/draft", icon: Timer },
     ...(user?.isAdmin
       ? [{ name: "ADMIN SCORING", path: "/admin/scoring", icon: Wrench, kind: "admin" as const }]

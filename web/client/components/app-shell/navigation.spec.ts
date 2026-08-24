@@ -59,19 +59,10 @@ describe("app shell navigation helpers", () => {
     ).toBe(true);
   });
 
-  it("shows the report-bug entry only when the API supplies a support address", () => {
-    expect(getShellNavItems(user, true)).not.toContainEqual(
-      expect.objectContaining({ name: "REPORT BUG" }),
-    );
-    expect(getShellNavItems(user, true, 0, true)).toContainEqual(
-      expect.objectContaining({ name: "REPORT BUG", path: "/report-bug" }),
-    );
-  });
-
-  it("keeps Coming Soon linked to the roadmap only", () => {
-    expect(getShellNavItems(user, true)).toContainEqual(
-      expect.objectContaining({ name: "COMING SOON", path: "/coming-soon" }),
-    );
+  it("removes beta-only report and roadmap entries from authenticated navigation", () => {
+    const items = getShellNavItems(user, true);
+    expect(items).not.toContainEqual(expect.objectContaining({ name: "REPORT BUG" }));
+    expect(items).not.toContainEqual(expect.objectContaining({ name: "COMING SOON" }));
   });
 
   it("keeps Saturday Pick 6 out of permanent authenticated desktop navigation", () => {
@@ -89,21 +80,20 @@ describe("app shell navigation helpers", () => {
   });
 
   it("surfaces a separate unread badge for notifications", () => {
-    const alerts = getShellNavItems(user, true, 0, false, 3).find((item) => item.name === "ALERTS");
-    const cappedAlerts = getShellNavItems(user, true, 0, false, 120).find((item) => item.name === "ALERTS");
+    const alerts = getShellNavItems(user, true, 0, 3).find((item) => item.name === "ALERTS");
+    const cappedAlerts = getShellNavItems(user, true, 0, 120).find((item) => item.name === "ALERTS");
 
     expect(alerts?.badge).toBe("3");
     expect(cappedAlerts?.badge).toBe("99+");
   });
 
   it("keeps mobile navigation focused on the primary destinations", () => {
-    const mobileItems = getMobileNavItems(getShellNavItems(user, true, 1, true));
+    const mobileItems = getMobileNavItems(getShellNavItems(user, true, 1));
     const mobile = mobileItems.map((item) => item.name);
 
     expect(mobile).toEqual(["HOME", "LEAGUES", "CHATS", "MOCK DRAFT"]);
     expect(mobile).toHaveLength(4);
     expect(mobileItems.find((item) => item.name === "CHATS")?.badge).toBe("1");
-    expect(mobile).not.toContain("REPORT BUG");
     expect(mobile).not.toContain("SIGN OUT");
     expect(mobile).not.toContain("SATURDAY PICK 6");
   });

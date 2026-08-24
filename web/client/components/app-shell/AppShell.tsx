@@ -21,6 +21,7 @@ type AppShellProps = {
   fixedViewport: boolean;
   onSignOut: () => void;
   mainScrollRef: React.RefObject<HTMLElement>;
+  guidedNavItem?: string;
 };
 
 export function shouldShowHomeHeader(pathname: string, hideChrome: boolean) {
@@ -39,6 +40,7 @@ export function AppShell({
   fixedViewport,
   onSignOut,
   mainScrollRef,
+  guidedNavItem,
 }: AppShellProps) {
   const mobileNavItems = getMobileNavItems(navItems);
   // Capacitor's iOS webview can report a zero CSS safe-area inset even while
@@ -46,7 +48,7 @@ export function AppShell({
   // fallback on the shared viewport so every route begins below the status
   // area instead of requiring page-by-page top padding.
   const isNativeShell = Capacitor.isNativePlatform();
-  // The Early Access lockup and manager greeting are home-dashboard context,
+  // The home lockup and manager greeting are dashboard context,
   // not global navigation. Keeping them off data-heavy league routes returns
   // meaningful vertical space on phones without removing the persistent nav.
   const showHomeHeader = shouldShowHomeHeader(pathname, hideChrome);
@@ -106,6 +108,7 @@ export function AppShell({
           allItems={navItems}
           pathname={pathname}
           onSignOut={onSignOut}
+          guidedNavItem={guidedNavItem}
         />
       ) : null}
     </div>

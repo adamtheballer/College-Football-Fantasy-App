@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { LogOut, Menu } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -18,14 +19,26 @@ type MobileNavigationProps = {
   allItems: ShellNavItem[];
   pathname: string;
   onSignOut: () => void;
+  guidedNavItem?: string;
 };
 
 const displayNavName = (name: string) => name.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase()).replace("Mock Draft", "Draft");
 
-export function MobileNavigation({ items, allItems, pathname, onSignOut }: MobileNavigationProps) {
+export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedNavItem }: MobileNavigationProps) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const isNativeShell = Capacitor.isNativePlatform();
   const drawerItems = allItems.filter((item) => item.kind !== "danger");
   const signOutItem = allItems.find((item) => item.kind === "danger");
+  const isGuidedDrawerItem = Boolean(
+    guidedNavItem && !items.some((item) => item.name === guidedNavItem) &&
+      (drawerItems.some((item) => item.name === guidedNavItem) || signOutItem?.name === guidedNavItem),
+  );
+
+  // The tour controls the route guide, so More opens only for drawer-only
+  // steps and closes immediately when Back returns to Draft or another tab.
+  useEffect(() => {
+    if (guidedNavItem) setIsMoreOpen(isGuidedDrawerItem);
+  }, [guidedNavItem, isGuidedDrawerItem]);
   const isMoreActive = drawerItems.some(
     (item) => item.path === pathname && !items.some((mobileItem) => mobileItem.name === item.name),
   );
@@ -41,6 +54,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
         className={cn(
           "relative z-[170] mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))] mt-2 shrink-0 rounded-lg border border-cfb-border-subtle bg-cfb-sidebar p-1 shadow-sm transition-opacity lg:hidden",
           isMoreOpen && "pointer-events-none opacity-0",
+          guidedNavItem && "z-[1205] pointer-events-none",
         )}
       >
         <div
@@ -51,15 +65,20 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
           {items.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.path;
+            const isGuided = guidedNavItem === item.name;
 
             return (
               <Link
                 key={item.name}
                 to={item.path}
+                data-nav-item="true"
+                data-guide-nav={item.name}
                 aria-label={item.badge ? `${item.name}: ${item.badge} unread chat messages` : item.name}
                 className={cn(
                   "font-ui relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[11px] font-bold uppercase tracking-[0.04em] leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent",
-                  isActive
+                  isGuided
+                    ? "bg-cfb-brand/[0.18] text-cfb-text-primary ring-1 ring-cfb-brand/80 after:bg-cfb-brand"
+                    : isActive
                     ? "bg-cfb-brand/[0.12] text-cfb-text-primary after:bg-cfb-brand"
                     : "text-cfb-text-muted hover:bg-cfb-surface-hover/70 hover:text-cfb-text-primary",
                 )}
@@ -84,11 +103,15 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
           <button
             type="button"
             aria-label="Open all navigation"
+            data-nav-item="true"
+            data-guide-nav="MORE"
             aria-expanded={isMoreOpen}
             onClick={() => setIsMoreOpen(true)}
             className={cn(
               "font-ui relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[11px] font-bold uppercase tracking-[0.04em] leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent",
-              isMoreActive
+              isGuidedDrawerItem
+                ? "bg-cfb-brand/[0.18] text-cfb-text-primary ring-1 ring-cfb-brand/80 after:bg-cfb-brand"
+                : isMoreActive
                 ? "bg-cfb-brand/[0.12] text-cfb-text-primary after:bg-cfb-brand"
                 : "text-cfb-text-muted hover:bg-cfb-surface-hover/70 hover:text-cfb-text-primary",
             )}
@@ -101,7 +124,15 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
 
       <SheetContent
         side="right"
-        className="z-[220] flex h-[100dvh] w-[min(22rem,calc(100vw-1rem))] flex-col overflow-hidden border-cfb-border-subtle bg-cfb-sidebar p-0 text-cfb-text-primary sm:max-w-none"
+        className={cn(
+          "z-[220] flex h-[100dvh] w-[min(22rem,calc(100vw-1rem))] flex-col overflow-hidden border-cfb-border-subtle bg-cfb-sidebar p-0 text-cfb-text-primary sm:max-w-none",
+          // Radix portals the drawer outside AppShell, so it cannot inherit
+          // the native status-bar protection applied to .cfb-app-viewport.
+          // Keep this fallback native-only: browser drawers retain their
+          // edge-to-edge presentation.
+          isNativeShell && "cfb-native-mobile-drawer",
+          isGuidedDrawerItem && "z-[1205] pointer-events-none",
+        )}
       >
         <SheetHeader className="border-b border-cfb-border-subtle px-6 pb-5 pt-7 text-left">
           <SheetTitle className="font-display text-2xl font-black tracking-[-0.04em] text-cfb-text-primary">
@@ -117,15 +148,20 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
             {drawerItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.path;
+              const isGuided = guidedNavItem === item.name;
 
               return (
                 <SheetClose key={item.name} asChild>
                   <Link
                     to={item.path}
                     data-mobile-nav-item={navDomId(item.name)}
+                    data-nav-item="true"
+                    data-guide-nav={item.name}
                     className={cn(
                       "font-ui flex min-h-[52px] items-center gap-4 rounded-md border px-4 py-3 text-sm font-bold uppercase tracking-[0.05em] transition-colors",
-                      isActive
+                      isGuided
+                        ? "border-cfb-brand/80 bg-cfb-brand/[0.18] text-cfb-text-primary ring-1 ring-cfb-brand/55"
+                        : isActive
                         ? "border-cfb-brand/40 bg-cfb-brand/[0.10] text-cfb-text-primary"
                         : "border-transparent text-cfb-text-secondary hover:border-cfb-border-subtle hover:bg-cfb-surface-hover/70 hover:text-cfb-text-primary",
                     )}
@@ -149,11 +185,16 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut }: Mobil
             <button
               type="button"
               aria-label={signOutItem.name}
+              data-nav-item="true"
+              data-guide-nav={signOutItem.name}
               onClick={() => {
                 setIsMoreOpen(false);
                 onSignOut();
               }}
-              className="font-ui flex min-h-[52px] w-full items-center gap-4 rounded-md border border-cfb-danger/25 bg-cfb-danger/[0.06] px-4 py-3 text-left text-sm font-bold uppercase tracking-[0.05em] text-red-700 transition hover:bg-cfb-danger/[0.10]"
+              className={cn(
+                "font-ui flex min-h-[52px] w-full items-center gap-4 rounded-md border border-cfb-danger/25 bg-cfb-danger/[0.06] px-4 py-3 text-left text-sm font-bold uppercase tracking-[0.05em] text-red-700 transition hover:bg-cfb-danger/[0.10]",
+                guidedNavItem === signOutItem.name && "border-cfb-brand/80 bg-cfb-brand/[0.18] text-cfb-text-primary ring-1 ring-cfb-brand/55",
+              )}
             >
               <LogOut className="h-4 w-4" aria-hidden="true" />
               {displayNavName(signOutItem.name)}

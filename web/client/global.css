@@ -216,6 +216,16 @@
     .cfb-app-viewport[data-native-shell="true"] {
       padding-top: max(env(safe-area-inset-top, 0px), 59px);
     }
+
+    /*
+     * Radix sheet portals render outside .cfb-app-viewport. On a native
+     * Capacitor phone that otherwise leaves the More drawer beneath the
+     * overlaying status bar (and clips its title and close control).
+     */
+    .cfb-native-mobile-drawer {
+      top: max(env(safe-area-inset-top, 0px), 59px);
+      height: auto;
+    }
   }
 
   :focus-visible {
