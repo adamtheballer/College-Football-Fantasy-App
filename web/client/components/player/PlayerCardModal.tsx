@@ -253,6 +253,27 @@ export const formatGameLogDate = (value?: string | null) => {
     : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date);
 };
 
+/**
+ * Availability updates are reported against the product's primary audience in
+ * Eastern time.  Do not infer a report date when the source did not provide
+ * one: an absent timestamp remains visibly unreported.
+ */
+export const formatPlayerNewsReportTime = (value?: string | null) => {
+  if (!value) return "Report time unavailable";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Report time unavailable";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    month: "numeric",
+    day: "numeric",
+    year: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+  return `Report · ${parts} ET`;
+};
+
 export const resolvePlayerCardProjectionStats = (
   player: PlayerCardModalPlayer,
   card?: PlayerCardResponse | null
@@ -519,6 +540,9 @@ export function PlayerCardModal({
                         <p className="text-sm font-black text-white">{item.status ?? item.event_type}</p>
                         <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/45">{item.source}</p>
                       </div>
+                      <p className="mt-1 text-[9px] font-black uppercase tracking-[0.14em] text-white/55">
+                        {formatPlayerNewsReportTime(item.published_at)}
+                      </p>
                       <p className="mt-1 text-xs font-semibold leading-5 text-white/70">
                         {[item.detail, item.return_timeline].filter(Boolean).join(" • ") || "Official update"}
                       </p>
