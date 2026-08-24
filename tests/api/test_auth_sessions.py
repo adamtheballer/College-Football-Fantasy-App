@@ -170,7 +170,9 @@ def test_profile_name_update_propagates_to_all_owned_league_teams(client, db_ses
     payload = signup_user(client, "profile-owner")
     user_id = payload["user"]["id"]
     league = League(name="Profile owner league", commissioner_user_id=user_id)
-    db_session.add(league)
+    legacy_league = League(name="Legacy profile owner league", commissioner_user_id=user_id)
+    custom_name_league = League(name="Custom profile owner league", commissioner_user_id=user_id)
+    db_session.add_all([league, legacy_league, custom_name_league])
     db_session.flush()
     owned_team = Team(
         league_id=league.id,
@@ -183,7 +185,21 @@ def test_profile_name_update_propagates_to_all_owned_league_teams(client, db_ses
         name="Unassigned Team",
         owner_name="Unassigned",
     )
-    db_session.add_all([owned_team, unassigned_team])
+    # This represents an auto-generated team label that a previous profile
+    # update left stale. It must be repaired along with the current label.
+    legacy_owned_team = Team(
+        league_id=legacy_league.id,
+        name="Adam's Team",
+        owner_name="Coachprofile-owner",
+        owner_user_id=user_id,
+    )
+    custom_owned_team = Team(
+        league_id=custom_name_league.id,
+        name="Gridiron Kings",
+        owner_name="Coachprofile-owner",
+        owner_user_id=user_id,
+    )
+    db_session.add_all([owned_team, unassigned_team, legacy_owned_team, custom_owned_team])
     db_session.commit()
 
     response = client.patch(
@@ -195,6 +211,11 @@ def test_profile_name_update_propagates_to_all_owned_league_teams(client, db_ses
     assert response.status_code == 200
     db_session.expire_all()
     assert db_session.get(Team, owned_team.id).owner_name == "Updated Manager"
+    assert db_session.get(Team, owned_team.id).name == "Updated Manager's Team"
+    assert db_session.get(Team, legacy_owned_team.id).owner_name == "Updated Manager"
+    assert db_session.get(Team, legacy_owned_team.id).name == "Updated Manager's Team"
+    assert db_session.get(Team, custom_owned_team.id).owner_name == "Updated Manager"
+    assert db_session.get(Team, custom_owned_team.id).name == "Gridiron Kings"
     assert db_session.get(Team, unassigned_team.id).owner_name == "Unassigned"
 
 

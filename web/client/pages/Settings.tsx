@@ -116,6 +116,7 @@ export default function Settings() {
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [managerName, setManagerName] = useState("");
+  const [isManagerNameFocused, setIsManagerNameFocused] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
   const [pendingAvatarUrl, setPendingAvatarUrl] = useState<string | null>(null);
   const [pendingAvatarName, setPendingAvatarName] = useState<string | null>(null);
@@ -374,6 +375,8 @@ export default function Settings() {
                 value={managerName}
                 maxLength={50}
                 onChange={(event) => setManagerName(event.target.value)}
+                onFocus={() => setIsManagerNameFocused(true)}
+                onBlur={() => setIsManagerNameFocused(false)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
@@ -383,6 +386,11 @@ export default function Settings() {
                 disabled={managerNameCooldownActive}
                 className="h-10 rounded-md border-border bg-background px-3 text-sm font-semibold text-foreground"
               />
+              {isManagerNameFocused ? (
+                <p aria-live="polite" className="text-[10px] font-black uppercase tracking-[0.12em] text-primary">
+                  {managerName.length} / 50 characters
+                </p>
+              ) : null}
               {managerNameCooldownActive ? (
                 <p className="text-xs font-medium text-muted-foreground">Name changes are available again on {managerNameAvailableDate}.</p>
               ) : (
