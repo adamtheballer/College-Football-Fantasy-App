@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>College Fantasy Football uses your selected photo for your manager profile picture.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>College Fantasy Football does not use your location. This disclosure is included because a third-party service in the app may reference location APIs.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
