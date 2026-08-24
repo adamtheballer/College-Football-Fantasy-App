@@ -19,7 +19,7 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
       <div className="relative z-10 border-b border-cfb-border-subtle p-6">
         <Link
           to="/"
-          aria-label="Early Access CFB Fantasy Beta"
+          aria-label="College Fantasy Football"
           className="group relative inline-flex min-h-12 items-center rounded-md px-1 py-1"
         >
           <AppBrandLockup variant="desktop" />

@@ -7,16 +7,16 @@ import { describe, expect, it, vi } from "vitest";
 import { DesktopSidebar } from "./DesktopSidebar";
 
 describe("DesktopSidebar", () => {
-  it("uses the same Early Access beta identity as the compact header", () => {
+  it("uses the same CFFB identity as the compact header", () => {
     render(
       <MemoryRouter>
         <DesktopSidebar items={[]} pathname="/" onSignOut={vi.fn()} />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: "Early Access CFB Fantasy Beta" }).getAttribute("href")).toBe("/");
-    expect(screen.getByText("Early Access")).toBeTruthy();
-    expect(screen.getByText("Beta")).toBeTruthy();
-    expect(screen.queryByText("College Football")).toBeNull();
+    expect(screen.getByRole("link", { name: "College Fantasy Football" }).getAttribute("href")).toBe("/");
+    expect(screen.getByText("CFFB")).toBeTruthy();
+    expect(screen.queryByText("Early Access")).toBeNull();
+    expect(screen.queryByText("Beta")).toBeNull();
   });
 });

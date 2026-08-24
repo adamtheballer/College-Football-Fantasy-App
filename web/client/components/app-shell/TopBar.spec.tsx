@@ -7,15 +7,16 @@ import { describe, expect, it } from "vitest";
 import { TopBar } from "./TopBar";
 
 describe("TopBar", () => {
-  it("labels the compact app brand as the Early Access beta", () => {
+  it("shows the compact College Fantasy Football brand without release-stage labels", () => {
     render(
       <MemoryRouter>
         <TopBar isLoggedIn user={null} />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: "Early Access CFB Fantasy Beta" }).getAttribute("href")).toBe("/");
-    expect(screen.getByText("Early Access")).toBeTruthy();
-    expect(screen.getByText("Beta")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "College Fantasy Football" }).getAttribute("href")).toBe("/");
+    expect(screen.getByText("CFFB")).toBeTruthy();
+    expect(screen.queryByText("Early Access")).toBeNull();
+    expect(screen.queryByText("Beta")).toBeNull();
   });
 });
