@@ -26,6 +26,7 @@ from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.auth import (
+    AccountDeletionRequest,
     AuthMessageResponse,
     AuthResponse,
     AuthenticatedPasswordChange,
@@ -54,6 +55,7 @@ from collegefootballfantasy_api.app.services.auth_security import (
     revoke_user_sessions,
     utcnow,
 )
+from collegefootballfantasy_api.app.services.account_deletion import permanently_delete_user_account
 from collegefootballfantasy_api.app.services.beta_access import (
     GENERIC_MISMATCH_MESSAGE,
     consume_beta_access_reservation,
@@ -302,6 +304,42 @@ def update_current_user_profile(
     db.commit()
     db.refresh(current_user)
     return UserRead.model_validate(current_user)
+
+
+@router.delete("/me", response_model=AuthMessageResponse)
+def delete_current_user_account(
+    payload: AccountDeletionRequest,
+    response: Response,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> AuthMessageResponse:
+    """Permanently delete the authenticated account and its personal data."""
+
+    enforce_auth_rate_limit(
+        db,
+        action="account_deletion",
+        identifier=f"user:{current_user.id}",
+        request=request,
+        limit=settings.auth_password_change_rate_limit,
+    )
+    if not verify_password(payload.current_password, current_user.password_hash):
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PASSWORD_CHANGE_CREDENTIAL_ERROR)
+
+    try:
+        permanently_delete_user_account(db, user=current_user)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.exception("account_deletion_failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to delete your account right now.",
+        ) from exc
+
+    _clear_refresh_cookie(response, request)
+    return AuthMessageResponse(message="account deleted")
 
 
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)

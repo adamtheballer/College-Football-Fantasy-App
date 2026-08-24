@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { User, Sliders, Shield, Save, LogOut, ImagePlus } from "lucide-react";
+import { User, Sliders, Shield, Save, LogOut, ImagePlus, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -104,7 +104,7 @@ const SettingItem = ({ label, description, children }: any) => (
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { user, isBootstrapping, logoutAll, updateProfile, requestPasswordResetForCurrentUser } = useAuth();
+  const { user, isBootstrapping, logoutAll, deleteAccount, updateProfile, requestPasswordResetForCurrentUser } = useAuth();
   const {
     privacy_policy_url: privacyPolicyUrl,
     terms_url: termsUrl,
@@ -126,6 +126,11 @@ export default function Settings() {
   const [pendingNameChange, setPendingNameChange] = useState<{ name: string; avatarUrl: string | null } | null>(null);
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
   const [isSendingReset, setIsSendingReset] = useState(false);
+  const [accountDeletionOpen, setAccountDeletionOpen] = useState(false);
+  const [accountDeletionPassword, setAccountDeletionPassword] = useState("");
+  const [accountDeletionConfirmation, setAccountDeletionConfirmation] = useState("");
+  const [accountDeletionError, setAccountDeletionError] = useState<string | null>(null);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -280,6 +285,28 @@ export default function Settings() {
       setSecurityMessage(error instanceof ApiError && error.status === 429 ? "Too many reset requests. Please wait before trying again." : "Unable to send a reset email right now.");
     } finally {
       setIsSendingReset(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (accountDeletionConfirmation !== "DELETE") {
+      setAccountDeletionError('Type DELETE exactly to confirm account deletion.');
+      return;
+    }
+    if (!accountDeletionPassword) {
+      setAccountDeletionError("Enter your current password to continue.");
+      return;
+    }
+    setIsDeletingAccount(true);
+    setAccountDeletionError(null);
+    try {
+      await deleteAccount(accountDeletionPassword, accountDeletionConfirmation);
+      setAccountDeletionOpen(false);
+      navigate("/login", { replace: true, state: { accountDeleted: true } });
+    } catch (error) {
+      setAccountDeletionError(error instanceof Error ? error.message : "Unable to delete your account right now.");
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -533,6 +560,26 @@ export default function Settings() {
                 />
               </div>
             </div>
+            <div className="rounded-lg border border-red-500/35 bg-red-500/5 p-4">
+              <h3 className="text-sm font-black uppercase tracking-[0.16em] text-red-200">Delete Account</h3>
+              <p className="mt-2 text-sm font-medium leading-relaxed text-muted-foreground">
+                Permanently delete your account, profile, sign-in sessions, saved preferences, and personal content. League history remains anonymized for other managers. This cannot be undone.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-4 h-11 border-red-400/60 bg-transparent text-[10px] font-black uppercase tracking-widest text-red-200 hover:bg-red-500/10 hover:text-red-100"
+                onClick={() => {
+                  setAccountDeletionError(null);
+                  setAccountDeletionPassword("");
+                  setAccountDeletionConfirmation("");
+                  setAccountDeletionOpen(true);
+                }}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete My Account
+              </Button>
+            </div>
             <PolicyLinks privacyPolicyUrl={privacyPolicyUrl} termsUrl={termsUrl} supportEmail={supportEmail} />
 
             <div className="flex justify-center pt-3">
@@ -570,6 +617,49 @@ export default function Settings() {
             >
               Confirm name change
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={accountDeletionOpen} onOpenChange={setAccountDeletionOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account permanently?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This erases your account and personal data. Your league history will remain only as anonymized records for other managers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="account-deletion-password">Current password</Label>
+              <Input
+                id="account-deletion-password"
+                type="password"
+                autoComplete="current-password"
+                value={accountDeletionPassword}
+                onChange={(event) => setAccountDeletionPassword(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="account-deletion-confirmation">Type DELETE to confirm</Label>
+              <Input
+                id="account-deletion-confirmation"
+                value={accountDeletionConfirmation}
+                onChange={(event) => setAccountDeletionConfirmation(event.target.value)}
+                autoComplete="off"
+              />
+            </div>
+            {accountDeletionError ? <p role="alert" className="text-sm font-semibold text-red-300">{accountDeletionError}</p> : null}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingAccount}>Keep My Account</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void handleDeleteAccount()}
+              disabled={isDeletingAccount}
+            >
+              {isDeletingAccount ? "Deleting…" : "Delete Account Permanently"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

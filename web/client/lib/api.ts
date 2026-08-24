@@ -399,7 +399,8 @@ export const apiPatch = async <T>(
 
 export const apiDelete = async <T>(
   path: string,
-  params?: Record<string, string | number | boolean | undefined>
+  params?: Record<string, string | number | boolean | undefined>,
+  body?: unknown,
 ): Promise<T> => {
-  return apiRequest<T>({ method: "DELETE", path, params });
+  return apiRequest<T>({ method: "DELETE", path, params, body });
 };

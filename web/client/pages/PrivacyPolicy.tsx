@@ -68,14 +68,16 @@ export default function PrivacyPolicy() {
         <p>
           Information is retained for as long as reasonably necessary to operate the service, maintain legitimate fantasy and
           career history, secure accounts, resolve disputes, and meet applicable obligations. Some league and career history may
-          remain as part of a historical league record after an account-related request.
+          remain only as anonymized historical records after an account is deleted.
         </p>
       </LegalSection>
 
       <LegalSection title="Your Choices and Requests">
         <p>
-          You can update certain account information and notification preferences from Settings. For appropriate account or data
-          requests, contact <a className="font-semibold text-cfb-brand underline underline-offset-4 hover:text-cfb-cyan" href="mailto:absportscfb@gmail.com">absportscfb@gmail.com</a>.
+          You can update certain account information and notification preferences from Settings. You can also permanently delete
+          your account from Settings by confirming the request with your current password. Account deletion removes your profile,
+          credentials, sessions, saved preferences, and personal content; shared league history is retained only in anonymized form.
+          For other appropriate data requests, contact <a className="font-semibold text-cfb-brand underline underline-offset-4 hover:text-cfb-cyan" href="mailto:absportscfb@gmail.com">absportscfb@gmail.com</a>.
         </p>
       </LegalSection>
 

@@ -227,6 +227,63 @@ def test_stale_generated_team_label_reads_from_the_current_owner_name():
     assert custom_team.display_name == "Gridiron Kings"
 
 
+def test_account_deletion_requires_explicit_confirmation_and_current_password(client, db_session):
+    payload = signup_user(client, "delete-confirmation")
+    headers = auth_headers(payload["access_token"])
+
+    missing_confirmation = client.request(
+        "DELETE",
+        "/auth/me",
+        json={"current_password": STRONG_PASSWORD, "confirmation": "delete"},
+        headers=headers,
+    )
+    assert missing_confirmation.status_code == 422
+
+    wrong_password = client.request(
+        "DELETE",
+        "/auth/me",
+        json={"current_password": "wrong-password", "confirmation": "DELETE"},
+        headers=headers,
+    )
+    assert wrong_password.status_code == 400
+    assert db_session.get(User, payload["user"]["id"]) is not None
+
+
+def test_account_deletion_erases_account_and_anonymizes_retained_team_history(client, db_session):
+    payload = signup_user(client, "delete-account")
+    user_id = payload["user"]["id"]
+    headers = auth_headers(payload["access_token"])
+    league = League(name="Account deletion league", commissioner_user_id=user_id)
+    db_session.add(league)
+    db_session.flush()
+    team = Team(
+        league_id=league.id,
+        name="Coachdelete-account's Team",
+        owner_name="Coachdelete-account",
+        owner_user_id=user_id,
+    )
+    db_session.add(team)
+    db_session.commit()
+
+    response = client.request(
+        "DELETE",
+        "/auth/me",
+        json={"current_password": STRONG_PASSWORD, "confirmation": "DELETE"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"success": True, "message": "account deleted"}
+    db_session.expire_all()
+    assert db_session.get(User, user_id) is None
+    retained_team = db_session.get(Team, team.id)
+    assert retained_team is not None
+    assert retained_team.owner_user_id is None
+    assert retained_team.owner_name == "Former Manager"
+    assert retained_team.name == f"Vacant Team {team.id}"
+    assert client.get("/auth/me", headers=headers).status_code == 401
+
+
 def test_profile_name_change_cooldown_is_server_enforced(client, db_session):
     payload = signup_user(client, "name-cooldown")
     headers = auth_headers(payload["access_token"])

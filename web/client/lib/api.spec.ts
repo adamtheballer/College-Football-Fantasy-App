@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   apiGet,
+  apiDelete,
   apiPut,
   buildApiUrl,
   clearAccessTokenSession,
@@ -106,6 +107,25 @@ describe("api client", () => {
       expect.objectContaining({
         method: "PUT",
         body: JSON.stringify({ selected_pick_player_id: 9 }),
+        headers: expect.objectContaining({ "Content-Type": "application/json" }),
+      })
+    );
+  });
+
+  it("sends a JSON body for a reauthenticated DELETE request", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    await expect(apiDelete("/auth/me", undefined, { current_password: "StrongPass123!", confirmation: "DELETE" })).resolves.toMatchObject({ success: true });
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/auth/me"),
+      expect.objectContaining({
+        method: "DELETE",
+        body: JSON.stringify({ current_password: "StrongPass123!", confirmation: "DELETE" }),
         headers: expect.objectContaining({ "Content-Type": "application/json" }),
       })
     );
