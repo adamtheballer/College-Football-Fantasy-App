@@ -21,14 +21,14 @@ export const formatCurrentValueRating = (value?: number | null) =>
   typeof value === "number" && Number.isFinite(value) ? value.toFixed(0) : "N/A";
 
 export const formatPlayerCardStatus = (value?: string | null) => {
-  if (!value || value.toUpperCase() === "N_A") return "N/A";
+  if (!value || value.toUpperCase() === "N_A" || value.toUpperCase() === "UNREPORTED") return "NO OFFICIAL REPORT";
   return value.replace(/_/g, " ");
 };
 
 export const resolvePlayerCardStatus = (
   card?: PlayerCardResponse | null,
   contextualStatus?: string | null,
-) => formatPlayerCardStatus(card?.current_injury_status ?? card?.about.status ?? contextualStatus);
+) => formatPlayerCardStatus(card?.current_injury_status ?? contextualStatus ?? "UNREPORTED");
 
 const playbookMarks = [
   { label: "X", className: "left-[58%] top-8" },

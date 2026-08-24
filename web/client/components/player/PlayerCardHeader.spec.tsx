@@ -3,11 +3,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
-import { PlayerCardHeader } from "./PlayerCardHeader";
+import { PlayerCardHeader, resolvePlayerCardStatus } from "./PlayerCardHeader";
 
 afterEach(cleanup);
 
 describe("PlayerCardHeader injury status", () => {
+  it("does not convert missing official availability into a generic Active label", () => {
+    expect(resolvePlayerCardStatus({
+      current_injury_status: null,
+      about: { status: "Active", source: "espn" },
+    } as never, "UNREPORTED")).toBe("NO OFFICIAL REPORT");
+  });
+
   it("renders the reviewed injury designation instead of generic Active availability", () => {
     render(
       <PlayerCardHeader

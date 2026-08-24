@@ -412,7 +412,7 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
     );
     const consistency = clamp(1 - spread / maxSpread, 0.2, 0.9);
 
-    const injuryPenalty = player.status && player.status !== "HEALTHY" ? 0.05 : 0.0;
+    const injuryPenalty = ["OUT", "QUESTIONABLE", "DOUBTFUL", "IR"].includes(player.status) ? 0.05 : 0.0;
     const committeePenalty = ["RB", "WR", "TE"].includes(player.pos) ? (1 - roleCertainty) * 0.05 : 0.0;
     const cfb27Rating = findCfb27Rating({
       name: player.name,

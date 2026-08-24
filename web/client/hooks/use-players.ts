@@ -310,14 +310,16 @@ export type PlayerCardResponse = {
   } | null;
 };
 
-const VALID_STATUSES = new Set(["HEALTHY", "OUT", "QUESTIONABLE", "DOUBTFUL", "IR"]);
+const VALID_STATUSES = new Set(["HEALTHY", "OUT", "QUESTIONABLE", "DOUBTFUL", "IR", "UNREPORTED"]);
 
 const normalizeStatus = (value?: string | null): Player["status"] => {
-  if (!value) return "HEALTHY";
+  // No injury row is not an affirmative health report. Treating an absent
+  // report as HEALTHY hid verified team news that had not reached a provider.
+  if (!value) return "UNREPORTED";
   const normalized = value.toUpperCase();
   if (VALID_STATUSES.has(normalized)) return normalized as Player["status"];
   if (normalized === "PROBABLE") return "HEALTHY";
-  return "HEALTHY";
+  return "UNREPORTED";
 };
 
 const mapProjection = (

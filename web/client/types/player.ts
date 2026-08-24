@@ -36,7 +36,7 @@ export interface Player {
   adp: number;
   posRank: number | null;
   rostered: number;
-  status: "HEALTHY" | "OUT" | "QUESTIONABLE" | "DOUBTFUL" | "IR";
+  status: "HEALTHY" | "OUT" | "QUESTIONABLE" | "DOUBTFUL" | "IR" | "UNREPORTED";
   projection: PlayerStats;
   hasWeeklyProjection?: boolean;
   history: PlayerHistory[];
