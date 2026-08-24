@@ -200,8 +200,8 @@ export default function Login() {
   };
 
   // A remembered user is validated by AuthProvider before this route becomes
-  // interactive. That keeps returning users out of sign-in, signup, and Pro
-  // claim forms unless they deliberately sign out first.
+  // interactive. That keeps returning users out of sign-in and signup forms
+  // unless they deliberately sign out first.
   if (shouldHoldAuthEntry(isBootstrapping, isLoggedIn, false)) {
     return (
       <main className="mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-xl items-center justify-center px-4 py-8">
