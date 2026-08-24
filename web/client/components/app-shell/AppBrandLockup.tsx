@@ -7,18 +7,10 @@ export function AppBrandLockup({ variant }: AppBrandLockupProps) {
   const isDesktop = variant === "desktop";
 
   return (
-    <>
-      <span className="relative flex leading-none">
-        <span
-          className={
-            isDesktop
-              ? "font-display text-[1.75rem] font-black uppercase italic tracking-[-0.08em] text-cfb-text-primary transition group-hover:text-white"
-              : "font-display text-lg font-black uppercase italic tracking-[-0.06em] text-cfb-text-primary"
-          }
-        >
-          CFFB
-        </span>
-      </span>
-    </>
+    <img
+      src="/brand/cffb-logo.png"
+      alt="CFFB — College Fantasy Football"
+      className={isDesktop ? "h-12 w-auto rounded-lg" : "h-9 w-auto rounded-md"}
+    />
   );
 }

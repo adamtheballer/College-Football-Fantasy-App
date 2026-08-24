@@ -101,7 +101,7 @@ export default function Signup() {
             className="group inline-flex items-center gap-3 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.18)] transition-all hover:border-cyan-200/50 hover:bg-cyan-300/15"
           >
             <Trophy className="h-4 w-4 text-amber-200 transition-transform group-hover:rotate-[-8deg] group-hover:scale-110" />
-            CFB Fantasy
+            College Fantasy Football
           </Link>
 
           <div className="max-w-3xl space-y-3">
