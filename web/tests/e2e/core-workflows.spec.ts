@@ -1202,6 +1202,7 @@ test.describe("critical browser workflows", () => {
         outerScrollable: appScroller ? appScroller.scrollHeight > appScroller.clientHeight : null,
         listScrollable: playerList ? /auto|scroll/.test(getComputedStyle(playerList).overflowY) : null,
         tabsInViewport: tabs ? tabs.getBoundingClientRect().bottom <= viewportHeight : null,
+        tabIconCount: tabs?.querySelectorAll("svg").length ?? null,
         filtersOnOneLine: new Set(filterButtons.map((button) => Math.round(button.getBoundingClientRect().top))).size === 1,
         tabLabelsDoNotWrap: Array.from(document.querySelectorAll("[data-testid='draft-room-tabs'] button")).every(
           (button) => getComputedStyle(button).whiteSpace === "nowrap",
@@ -1213,6 +1214,7 @@ test.describe("critical browser workflows", () => {
       outerScrollable: false,
       listScrollable: false,
       tabsInViewport: true,
+      tabIconCount: 0,
       filtersOnOneLine: true,
       tabLabelsDoNotWrap: true,
     });

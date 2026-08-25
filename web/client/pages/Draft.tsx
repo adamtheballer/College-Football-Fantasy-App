@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ClipboardList, Grid3X3, History, LocateFixed, Loader2, Lock, Search, ShieldAlert, Trophy, Users } from "lucide-react";
+import { ArrowLeft, LocateFixed, Loader2, Lock, Search, ShieldAlert, Trophy, Users } from "lucide-react";
 
 import { DraftBoard } from "@/components/DraftBoard";
 import { DraftOrderPickCard } from "@/components/DraftOrderPickCard";
@@ -1562,26 +1562,22 @@ export default function Draft() {
 
       <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-cfb-border-subtle bg-cfb-surface-raised/96 p-0 shadow-[0_-8px_24px_rgba(0,0,0,0.26)] backdrop-blur-xl sm:pointer-events-none sm:inset-x-auto sm:bottom-3 sm:left-1/2 sm:flex sm:w-[min(100vw-3rem,60rem)] sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">
         <div className={cn("grid w-full grid-cols-5 overflow-hidden sm:pointer-events-auto sm:mx-auto sm:rounded-2xl", draftMatteControlClass)}>
-          {DRAFT_TABS.map((tab) => {
-            const Icon = tab.value === "draft" ? Trophy : tab.value === "queue" ? ClipboardList : tab.value === "board" ? Grid3X3 : tab.value === "roster" ? Users : History;
-            return (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={() => setActiveTab(tab.value)}
-                aria-current={activeTab === tab.value ? "page" : undefined}
-                className={cn(
-                  "relative inline-flex min-h-[7rem] min-w-0 touch-manipulation flex-col items-center justify-center gap-2.5 whitespace-nowrap px-2 py-3 text-xs font-black uppercase leading-none tracking-[0.02em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-1 after:bg-transparent focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand focus-visible:ring-inset sm:min-h-[3.75rem] sm:flex-row sm:gap-2.5 sm:px-5 sm:py-4 sm:text-[11px] sm:tracking-[0.14em]",
-                  activeTab === tab.value
+          {DRAFT_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setActiveTab(tab.value)}
+              aria-current={activeTab === tab.value ? "page" : undefined}
+              className={cn(
+                "relative inline-flex min-h-[4.75rem] min-w-0 touch-manipulation items-center justify-center whitespace-nowrap px-2 py-3 text-xs font-black uppercase leading-none tracking-[0.02em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-1 after:bg-transparent focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand focus-visible:ring-inset sm:min-h-[3.75rem] sm:px-5 sm:py-4 sm:text-[11px] sm:tracking-[0.14em]",
+                activeTab === tab.value
                   ? "bg-white/[0.04] text-white after:bg-cfb-brand"
-                    : "text-muted-foreground hover:bg-white/[0.035] hover:text-white"
-                )}
-              >
-                <Icon className="h-7 w-7 shrink-0 sm:h-5 sm:w-5" />
-                {tab.label}
-              </button>
-            );
-          })}
+                  : "text-muted-foreground hover:bg-white/[0.035] hover:text-white"
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
     </div>
