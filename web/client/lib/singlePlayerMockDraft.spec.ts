@@ -237,8 +237,8 @@ describe("single-player mock draft engine", () => {
 
     expect(source).toContain("Slot</p>");
     expect(source).toContain("Player</p>");
-    expect(source).toContain("Bye</p>");
-    expect(source).toContain("Position limits");
+    expect(source).not.toContain("Bye</p>");
+    expect(source).not.toContain("Position limits");
     expect(source).not.toContain("Roster Viewer");
     expect(source).not.toContain("Inspect every manager's roster by position group");
   });

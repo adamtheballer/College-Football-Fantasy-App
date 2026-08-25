@@ -629,11 +629,6 @@ export default function SinglePlayerMockDraftRoom() {
 
   const renderRoster = () => {
     const filledSlots = selectedRoster.filter((slot) => slot.player).length;
-    const rosterSlotLimits = selectedRoster.reduce<Record<string, number>>((limits, slot) => {
-      const limitName = slot.label.startsWith("BENCH") ? "BE" : slot.label.replace(/\s+\d+$/, "");
-      limits[limitName] = (limits[limitName] ?? 0) + 1;
-      return limits;
-    }, {});
 
     const renderSlotRow = (slot: (typeof selectedRoster)[number], index: number) => {
       const displayLabel = slot.label.startsWith("BENCH") ? "BE" : slot.label.replace(/\s+\d+$/, "");
@@ -642,7 +637,7 @@ export default function SinglePlayerMockDraftRoom() {
         <div
           key={slot.label}
           className={cn(
-            "grid min-h-14 grid-cols-[3.35rem_minmax(0,1fr)_2.4rem] items-center gap-2 border-b border-white/[0.07] px-3 py-2.5 last:border-b-0 sm:grid-cols-[4.5rem_minmax(0,1fr)_3.25rem] sm:px-5",
+            "grid min-h-14 grid-cols-[3.35rem_minmax(0,1fr)] items-center gap-2 border-b border-white/[0.07] px-3 py-2.5 last:border-b-0 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:px-5",
             index % 2 === 0 ? "bg-[#202224]" : "bg-[#1b1d1f]",
             slot.player ? "transition-colors hover:bg-[#292c2f]" : "text-slate-500"
           )}
@@ -663,13 +658,12 @@ export default function SinglePlayerMockDraftRoom() {
           ) : (
             <p className="truncate text-sm font-medium text-slate-500 sm:text-base">Open slot</p>
           )}
-          <span className="border-l border-white/10 pl-2 text-right text-xs font-medium tabular-nums text-slate-400 sm:pl-3 sm:text-sm">—</span>
         </div>
       );
     };
 
     return (
-      <section className="overflow-hidden rounded-xl border border-white/12 bg-[#17191b] shadow-[0_8px_20px_rgba(2,6,23,0.18)]">
+      <section data-testid="draft-roster-table" className="overflow-hidden rounded-xl border border-white/12 bg-[#17191b] shadow-[0_8px_20px_rgba(2,6,23,0.18)]">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-white/10 bg-[#151719] px-3 py-3 sm:px-5">
           <div className="flex items-center gap-3">
             <p className="text-sm font-bold text-slate-100">{selectedRosterTeam?.id === draftState.userTeamId ? "My Team" : "Team"}</p>
@@ -690,24 +684,11 @@ export default function SinglePlayerMockDraftRoom() {
             </select>
           </div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">{filledSlots}/{selectedRoster.length} filled</p>
-          <details className="relative ml-auto">
-            <summary className="cursor-pointer list-none rounded-full border border-primary/70 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-primary transition-colors hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70">
-              Position limits
-            </summary>
-            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-30 flex min-w-44 flex-wrap gap-1.5 rounded-lg border border-white/15 bg-[#151719] p-3 shadow-xl">
-              {Object.entries(rosterSlotLimits).map(([slot, count]) => (
-                <span key={slot} className="rounded border border-white/10 bg-[#202328] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.06em] text-slate-300">
-                  {slot} {count}
-                </span>
-              ))}
-            </div>
-          </details>
         </div>
 
-        <div className="grid grid-cols-[3.35rem_minmax(0,1fr)_2.4rem] items-center border-b border-white/10 bg-[#1a1c1e] px-3 py-2 sm:grid-cols-[4.5rem_minmax(0,1fr)_3.25rem] sm:px-5">
+        <div className="grid grid-cols-[3.35rem_minmax(0,1fr)] items-center border-b border-white/10 bg-[#1a1c1e] px-3 py-2 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:px-5">
           <p className="text-center text-[9px] font-bold uppercase tracking-[0.08em] text-slate-100">Slot</p>
           <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-100">Player</p>
-          <p className="border-l border-white/10 pl-2 text-right text-[9px] font-bold uppercase tracking-[0.08em] text-slate-100 sm:pl-3">Bye</p>
         </div>
 
         <div>{selectedRoster.map(renderSlotRow)}</div>
