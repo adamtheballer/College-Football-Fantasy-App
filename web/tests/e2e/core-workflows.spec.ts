@@ -1238,6 +1238,12 @@ test.describe("critical browser workflows", () => {
     await expect(queuedRow.getByRole("button", { name: /^Draft Quinn Ewers$/i })).toHaveCount(0);
     await queuedRow.getByRole("button", { name: /^Queue Quinn Ewers$/i }).click();
     await expect(queuedRow.getByRole("button", { name: /Remove Quinn Ewers from queue/i })).toBeVisible();
+    await page.getByRole("button", { name: /^Roster$/ }).click();
+    const realRoster = page.getByTestId("draft-roster-table");
+    await expect(realRoster.getByText("Slot", { exact: true })).toBeVisible();
+    await expect(realRoster.getByText("Player", { exact: true })).toBeVisible();
+    await expect(realRoster.getByText("Position limits", { exact: true })).toHaveCount(0);
+    await expect(realRoster.getByText("Bye", { exact: true })).toHaveCount(0);
   });
 
   test("a completed draft stops the timer and offers one clear roster exit", async ({ page }) => {
@@ -2651,6 +2657,11 @@ test.describe("critical browser workflows", () => {
 
     const rosterPlayerName = afterUserPick.picks[userPickIndex].playerName;
     await page.getByRole("button", { name: /^Roster$/ }).click();
+    const mockRoster = page.getByTestId("draft-roster-table");
+    await expect(mockRoster.getByText("Slot", { exact: true })).toBeVisible();
+    await expect(mockRoster.getByText("Player", { exact: true })).toBeVisible();
+    await expect(mockRoster.getByText("Position limits", { exact: true })).toHaveCount(0);
+    await expect(mockRoster.getByText("Bye", { exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: `Open ${rosterPlayerName} player card` }).click();
     await expect(page.getByRole("dialog", { name: `${rosterPlayerName} player card` })).toBeVisible();
     await page.getByRole("button", { name: "Close player card" }).click();
