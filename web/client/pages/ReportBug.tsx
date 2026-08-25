@@ -12,14 +12,14 @@ export default function ReportBug() {
         <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-cfb-danger/30 bg-cfb-danger/10 text-red-100">
           <Bug className="h-5 w-5" aria-hidden="true" />
         </div>
-        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">Beta feedback</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">Product feedback</p>
         <h1 className="mt-3 text-4xl font-black uppercase italic tracking-tight text-foreground sm:text-6xl">
           Report a Bug
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
           {supportEmail
-            ? "Send the product team the details by email. Your report opens in your email app, so nothing is silently lost inside the beta."
-            : "Email feedback is unavailable during beta."}
+            ? "Send the product team the details by email. Your report opens in your email app, so nothing is silently lost."
+            : "Email feedback is currently unavailable."}
         </p>
       </header>
 

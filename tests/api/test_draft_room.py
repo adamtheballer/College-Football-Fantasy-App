@@ -10,8 +10,10 @@ from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.matchup import Matchup
+from collegefootballfantasy_api.app.models.notification import NotificationDeliveryAttempt
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
@@ -351,6 +353,31 @@ def test_commissioner_starts_first_pick_immediately_with_configured_timer(client
     assert commissioner_room["current_pick"] == member_room["current_pick"] == 1
     assert commissioner_room["can_make_pick"] is not member_room["can_make_pick"]
     assert commissioner_room["current_pick_deadline"] is not None
+
+    start_events = (
+        db_session.query(ScheduledNotification)
+        .filter(ScheduledNotification.league_id == league["id"], ScheduledNotification.event_type == "DRAFT_START")
+        .all()
+    )
+    assert len(start_events) == 2
+    start_attempts = (
+        db_session.query(NotificationDeliveryAttempt)
+        .filter(NotificationDeliveryAttempt.scheduled_notification_id.in_([event.id for event in start_events]))
+        .all()
+    )
+    assert {attempt.channel for attempt in start_attempts} == {"in_app", "push", "email"}
+
+    on_clock_event = (
+        db_session.query(ScheduledNotification)
+        .filter(ScheduledNotification.league_id == league["id"], ScheduledNotification.event_type == "DRAFT_ON_CLOCK")
+        .one()
+    )
+    on_clock_attempts = (
+        db_session.query(NotificationDeliveryAttempt)
+        .filter(NotificationDeliveryAttempt.scheduled_notification_id == on_clock_event.id)
+        .all()
+    )
+    assert {attempt.channel for attempt in on_clock_attempts} == {"in_app", "push"}
 
 
 def test_commissioner_recovers_legacy_pre_draft_without_reshuffling_the_order(client, db_session):
