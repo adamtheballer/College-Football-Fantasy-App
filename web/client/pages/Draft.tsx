@@ -304,25 +304,13 @@ export default function Draft() {
     );
   }, []);
 
-  const playDraftStartCue = useCallback(
-    (room: Pick<DraftRoom, "draft_id" | "status" | "current_pick" | "current_pick_started_at" | "current_team_id" | "user_team_id">) => {
-      const state = toDraftAudioState(room);
-      if (state.currentPick === 1 && state.status?.trim().toLowerCase() === "on_clock") {
-        playDraftAudioCue("start", state);
-      }
-    },
-    [playDraftAudioCue],
-  );
-
   const startDraft = useCallback(() => {
     setLocalError(null);
-    startDraftMutation.mutate(undefined, {
-      // This comes from the start endpoint after the server has created the
-      // first-pick deadline, so the commissioner never hears the cue for a
-      // failed or mock-draft start.
-      onSuccess: playDraftStartCue,
-    });
-  }, [playDraftStartCue, startDraftMutation]);
+    // Audio is deliberately not tied to this click. The timer-transition
+    // effect below is the single source of truth, so a cue plays only after
+    // the server has started an authoritative on-clock timer.
+    startDraftMutation.mutate();
+  }, [startDraftMutation]);
 
   const viewFinalRoster = useCallback(async () => {
     if (!parsedLeagueId) return;

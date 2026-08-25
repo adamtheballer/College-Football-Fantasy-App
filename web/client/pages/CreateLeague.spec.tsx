@@ -73,6 +73,22 @@ describe("CreateLeague standard rules", () => {
     expect(screen.queryByText(/beta/i)).toBeNull();
   });
 
+  it("explains the five-minute draft-time rule before a user can continue", () => {
+    const { container } = renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Draft" }));
+
+    const draftDateInput = container.querySelector<HTMLInputElement>('input[type="date"]');
+    const draftTimeInput = container.querySelector<HTMLInputElement>('input[type="time"]');
+    expect(draftDateInput).not.toBeNull();
+    expect(draftTimeInput).not.toBeNull();
+    fireEvent.change(draftDateInput!, { target: { value: "2000-01-01" } });
+    fireEvent.change(draftTimeInput!, { target: { value: "00:00" } });
+
+    expect(screen.getByRole("alert").textContent).toContain("Draft time must be at least 5 minutes in the future.");
+    expect((screen.getByRole("button", { name: "Continue to Review" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("submits the standard roster and managed processing schedule", async () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "Continue to Settings" }));

@@ -408,15 +408,28 @@ function CreateLeagueForm() {
     return `${days} days`;
   }, [draftDateTime]);
 
+  // Keep the disabled action and its explanation derived from the same clock
+  // check. Previously the button was disabled here, but the message was only
+  // assigned much later inside handleCreate, which a user can never reach.
+  const draftTimeError = useMemo(() => {
+    if (!draftDateTime || !Number.isFinite(draftDateTime.getTime())) {
+      return "Choose a valid draft date and time.";
+    }
+    if (!isDraftTimeSafelyInFuture(draftDateTime)) {
+      return "Draft time must be at least 5 minutes in the future.";
+    }
+    return null;
+  }, [draftDateTime]);
+
   const canContinue = useMemo(() => {
     if (step === 0) {
       return basics.name.trim().length > 2 && basics.max_teams > 0;
     }
     if (step === 2) {
-      return isDraftTimeSafelyInFuture(draftDateTime);
+      return draftTimeError === null;
     }
     return true;
-  }, [basics.name, basics.max_teams, draftDateTime, step]);
+  }, [basics.name, basics.max_teams, draftTimeError, step]);
 
   const nextStepLabel = step < steps.length - 1 ? `Continue to ${steps[step + 1]}` : "Create League";
 
@@ -762,6 +775,12 @@ function CreateLeagueForm() {
                   title="Draft Schedule"
                   description="Choose when managers should enter the real league draft room."
                 />
+
+                {draftTimeError ? (
+                  <div role="alert" className="rounded-[12px] border border-[#EF4444]/35 bg-[#EF4444]/10 px-4 py-3 text-sm font-semibold text-[#FCA5A5]">
+                    {draftTimeError}
+                  </div>
+                ) : null}
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                   <Field label="Draft date">

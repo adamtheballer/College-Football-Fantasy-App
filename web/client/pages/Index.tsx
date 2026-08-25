@@ -86,7 +86,7 @@ function GuestHome() {
       <section className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
         <div className="space-y-6">
           <div className="space-y-3">
-            <p className="cfb-micro-label text-cfb-gold">College Football Fantasy · Beta</p>
+            <p className="cfb-micro-label text-cfb-gold">College Fantasy Football</p>
             <h1 className="cfb-display-title max-w-2xl text-4xl sm:text-5xl">
               Fantasy football for college football.
             </h1>
@@ -102,7 +102,7 @@ function GuestHome() {
               <Link to="/login">Log In</Link>
             </Button>
           </div>
-          <p className="text-sm text-cfb-text-muted">Early access beta. League tools and scoring coverage continue to expand.</p>
+          <p className="text-sm text-cfb-text-muted">Create a league, draft your team, and compete all season.</p>
         </div>
 
         <SurfaceCard variant="scoreboard" padding="default" className="space-y-5">

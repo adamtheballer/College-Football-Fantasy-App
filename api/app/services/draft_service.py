@@ -155,6 +155,10 @@ def _notify_on_clock(db: Session, *, league: League, draft_row: Draft, team: Tea
         event_type="DRAFT_ON_CLOCK",
         event_key=f"draft_on_clock:{draft_row.id}:{draft_row.current_pick_number}:{owner.id}",
         payload={"draft_id": draft_row.id, "round_number": round_number, "pick_number": draft_row.current_pick_number},
+        # An on-clock turn remains visible in the notification center and can
+        # reach a subscribed device, but it must never create a mailbox email
+        # for every round. Draft start is the only draft lifecycle email.
+        channels=("in_app", "push"),
     )
 
 

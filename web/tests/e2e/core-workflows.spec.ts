@@ -62,6 +62,13 @@ const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]
 };
 
 test.describe("critical browser workflows", () => {
+  test("public launch page has no retired beta copy", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(page.getByRole("heading", { name: /Fantasy football for college football/i })).toBeVisible();
+    await expect(page.getByText(/beta/i)).toHaveCount(0);
+  });
+
   test("public policy routes load anonymously by direct URL and remain readable after refresh on mobile", async ({ page }) => {
     const documents = [
       { path: "/privacy", heading: "Privacy Policy", title: "Privacy Policy | College Football Fantasy" },
@@ -839,6 +846,14 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByRole("heading", { name: "League Settings", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Continue to Draft", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Draft Schedule", exact: true })).toBeVisible();
+    await page.locator('input[type="date"]').fill("2000-01-01");
+    await page.locator('input[type="time"]').fill("00:00");
+    await expect(page.getByRole("alert")).toHaveText("Draft time must be at least 5 minutes in the future.");
+    await expect(page.getByRole("button", { name: "Continue to Review", exact: true })).toBeDisabled();
+    const futureDraft = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await page.locator('input[type="date"]').fill(futureDraft.toISOString().slice(0, 10));
+    await page.locator('input[type="time"]').fill("20:00");
+    await expect(page.getByRole("alert")).toHaveCount(0);
     await page.getByRole("button", { name: "Continue to Review", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Review", exact: true })).toBeVisible();
     const scoringAcknowledgment = page.getByRole("checkbox", {
