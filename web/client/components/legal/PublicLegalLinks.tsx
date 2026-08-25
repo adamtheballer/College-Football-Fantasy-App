@@ -17,6 +17,10 @@ export function PublicLegalLinks({ className }: PublicLegalLinksProps) {
       <Link to="/terms" className="transition-colors hover:text-cfb-text-primary">
         Terms
       </Link>
+      <span aria-hidden="true">·</span>
+      <Link to="/support" className="transition-colors hover:text-cfb-text-primary">
+        Support
+      </Link>
     </nav>
   );
 }

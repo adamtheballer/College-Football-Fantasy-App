@@ -45,6 +45,7 @@ const SaturdayPick6 = lazyWithRouteRecovery(() => import("./pages/SaturdayPick6"
 const PrivacyPolicy = lazyWithRouteRecovery(() => import("./pages/PrivacyPolicy"));
 const TermsOfUse = lazyWithRouteRecovery(() => import("./pages/TermsOfUse"));
 const ProviderDisclosure = lazyWithRouteRecovery(() => import("./pages/ProviderDisclosure"));
+const Support = lazyWithRouteRecovery(() => import("./pages/Support"));
 
 const NON_RETRYABLE_STATUSES = new Set([401, 403, 404]);
 
@@ -246,6 +247,7 @@ const App = () => (
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfUse />} />
           <Route path="/provider-disclosure" element={<ProviderDisclosure />} />
+          <Route path="/support" element={<Support />} />
           <Route path="*" element={<ApplicationRoutes />} />
         </Routes>
       </Suspense>

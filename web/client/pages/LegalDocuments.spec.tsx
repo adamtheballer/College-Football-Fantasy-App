@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import PrivacyPolicy from "./PrivacyPolicy";
 import ProviderDisclosure from "./ProviderDisclosure";
+import Support from "./Support";
 import TermsOfUse from "./TermsOfUse";
 
 const renderPublicDocument = (page: React.ReactElement) => render(<MemoryRouter>{page}</MemoryRouter>);
@@ -38,5 +39,14 @@ describe("public legal documents", () => {
     expect(screen.getByRole("heading", { name: "Live Scoring" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Projections and Rankings" })).toBeTruthy();
     expect(screen.getByText(/not affiliated with or endorsed by ESPN/i)).toBeTruthy();
+  });
+
+  it("renders a public support contact with a working email link", () => {
+    renderPublicDocument(<Support />);
+
+    expect(screen.getByRole("heading", { name: "Support" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "absportscfb@gmail.com" }).getAttribute("href")).toBe(
+      "mailto:absportscfb@gmail.com",
+    );
   });
 });
