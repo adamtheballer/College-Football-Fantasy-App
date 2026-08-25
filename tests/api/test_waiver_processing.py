@@ -28,6 +28,7 @@ from collegefootballfantasy_api.app.services.waiver_service import (
     process_waiver_claims_once,
     record_player_dropped_for_waivers,
 )
+import collegefootballfantasy_api.app.services.waiver_service as waiver_service
 
 
 def canonical_player(name: str, position: str, school: str) -> Player:
@@ -52,6 +53,14 @@ def _league_settings_payload() -> dict:
         "kicker_enabled": False,
         "defense_enabled": False,
     }
+
+
+def _freeze_free_agent_time(monkeypatch: pytest.MonkeyPatch) -> datetime:
+    """Keep free-agent tests in the same CFB week as their completed window."""
+
+    current = datetime(2026, 8, 19, 12, tzinfo=timezone.utc)
+    monkeypatch.setattr(waiver_service, "_now", lambda: current)
+    return current
 
 
 def test_waiver_timezone_must_be_a_valid_iana_identifier():
@@ -661,7 +670,8 @@ def test_waiver_results_are_scoped_to_the_latest_completed_period(client, db_ses
     assert [claim.add_player_id for claim in waiver_view.results] == [recent_player.id]
 
 
-def test_free_agent_add_fills_an_open_slot_without_charging_faab(client, db_session):
+def test_free_agent_add_fills_an_open_slot_without_charging_faab(client, db_session, monkeypatch):
+    current = _freeze_free_agent_time(monkeypatch)
     user = User(
         email="free-agent-owner@example.com",
         first_name="Free",
@@ -684,11 +694,11 @@ def test_free_agent_add_fills_an_open_slot_without_charging_faab(client, db_sess
             season=2026,
             week=1,
             window_key="2026-week-1-completed-free-agent",
-            opens_at=datetime.now(timezone.utc) - timedelta(days=2),
-            closes_at=datetime.now(timezone.utc) - timedelta(days=1),
-            processes_at=datetime.now(timezone.utc) - timedelta(days=1),
+            opens_at=current - timedelta(days=2),
+            closes_at=current - timedelta(days=1),
+            processes_at=current - timedelta(days=1),
             status="completed",
-            processed_at=datetime.now(timezone.utc) - timedelta(days=1),
+            processed_at=current - timedelta(days=1),
         )
     )
     db_session.add(
@@ -720,7 +730,8 @@ def test_free_agent_add_fills_an_open_slot_without_charging_faab(client, db_sess
     assert db_session.query(WaiverPriority).filter_by(league_id=league.id, team_id=team.id).count() == 0
 
 
-def test_free_agent_add_accepts_untracked_player_after_waivers_clear(client, db_session):
+def test_free_agent_add_accepts_untracked_player_after_waivers_clear(client, db_session, monkeypatch):
+    current = _freeze_free_agent_time(monkeypatch)
     user = User(
         email="untracked-free-agent-owner@example.com",
         first_name="Untracked",
@@ -744,11 +755,11 @@ def test_free_agent_add_accepts_untracked_player_after_waivers_clear(client, db_
                 season=2026,
                 week=1,
                 window_key="2026-week-1-cleared-untracked",
-                opens_at=datetime.now(timezone.utc) - timedelta(days=2),
-                closes_at=datetime.now(timezone.utc) - timedelta(days=1),
-                processes_at=datetime.now(timezone.utc) - timedelta(days=1),
+                opens_at=current - timedelta(days=2),
+                closes_at=current - timedelta(days=1),
+                processes_at=current - timedelta(days=1),
                 status="completed",
-                processed_at=datetime.now(timezone.utc) - timedelta(days=1),
+                processed_at=current - timedelta(days=1),
             ),
         )
     )
