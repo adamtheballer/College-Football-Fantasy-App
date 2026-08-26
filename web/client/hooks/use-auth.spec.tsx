@@ -9,7 +9,7 @@ vi.mock("@/lib/push-notifications", () => ({
   syncBrowserPushIdentity: vi.fn(),
 }));
 
-import { AuthProvider, useAuth } from "./use-auth";
+import { AuthProvider, shouldAttemptInitialSessionRestore, useAuth } from "./use-auth";
 import { hasSessionRestoreHint } from "@/lib/api";
 
 const originalFetch = globalThis.fetch;
@@ -29,6 +29,15 @@ function AuthProbe() {
 }
 
 describe("AuthProvider session restoration", () => {
+  it("attempts a secure native refresh even when WebView storage has no hint", () => {
+    expect(shouldAttemptInitialSessionRestore({
+      accessTokenNeedsRefresh: true,
+      hasCachedAuth: false,
+      hasRestoreHint: false,
+      isNativeRuntime: true,
+    })).toBe(true);
+  });
+
   it("restores a valid cookie session when local access-token storage is empty", async () => {
     const storage = new Map<string, string>([["cfb_session_restore_hint", "1"]]);
     vi.stubGlobal("localStorage", {

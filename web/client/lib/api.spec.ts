@@ -6,6 +6,7 @@ import {
   apiPut,
   buildApiUrl,
   clearAccessTokenSession,
+  isNativeCapacitorRuntime,
   restoreAccessTokenSession,
   resolveDefaultApiBase,
   storeAccessTokenSession,
@@ -28,6 +29,8 @@ describe("api client", () => {
   it("uses the production API from a Capacitor bundle even without a build-time URL", () => {
     expect(resolveDefaultApiBase("capacitor:")).toBe("https://api.collegefantasyfootball.org");
     expect(resolveDefaultApiBase("https:")).toBe("/api");
+    expect(isNativeCapacitorRuntime("capacitor:")).toBe(true);
+    expect(isNativeCapacitorRuntime("https:")).toBe(false);
   });
 
   it("notifies the auth provider when the access token session is cleared", () => {
