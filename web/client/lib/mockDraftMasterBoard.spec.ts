@@ -37,4 +37,10 @@ describe("mock draft master board player source", () => {
   it("does not invent a fallback player when the approved player pool is empty", () => {
     expect(mergeMockDraftMasterBoardPlayers([])).toEqual([]);
   });
+
+  it("preserves official availability so mock draft rows use the same status marker as real drafts", () => {
+    const outPlayer = makePlayer({ id: 1594, name: "Ahmad Hardy", school: "Missouri", pos: "RB", status: "OUT" });
+
+    expect(mergeMockDraftMasterBoardPlayers([outPlayer])[0].status).toBe("OUT");
+  });
 });

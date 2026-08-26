@@ -14,7 +14,11 @@ from collegefootballfantasy_api.app.models.player_trade_value import PlayerTrade
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.schemas.player_trade_value import PlayerTradeValueHistoryRead, PlayerTradeValueRead
+from collegefootballfantasy_api.app.services.injury_value import injury_value_multiplier
 
+# Preserve the published policy identifier for existing histories. Official
+# availability is a controlled adjustment within that preseason policy, not a
+# separate source of baseline truth.
 PRESEASON_VALUE_POLICY_VERSION = "cfb27_exact_preseason_v1"
 IN_SEASON_VALUE_POLICY_VERSION = "universal_v2"
 # The default is the policy selected after checking authoritative application
@@ -118,10 +122,30 @@ def _position_pool(db: Session, position: str) -> list[Player]:
 
 
 def _availability_score(db: Session, player_id: int, season: int, week: int) -> tuple[float, float]:
-    injury = db.query(Injury).filter(Injury.player_id == player_id, Injury.season == season, Injury.week <= week).order_by(Injury.week.desc(), Injury.id.desc()).first()
+    injury = _latest_injury(db, player_id=player_id, season=season, week=week)
     status = (injury.status if injury else "ACTIVE").upper()
     scores = {"ACTIVE": (100.0, 1.0), "QUESTIONABLE": (82.0, 0.85), "DOUBTFUL": (55.0, 0.7), "OUT": (30.0, 0.7), "SUSPENDED": (20.0, 0.65), "UNKNOWN": (70.0, 0.55)}
     return scores.get(status, scores["UNKNOWN"])
+
+
+def _latest_injury(db: Session, *, player_id: int, season: int, week: int) -> Injury | None:
+    return (
+        db.query(Injury)
+        .filter(Injury.player_id == player_id, Injury.season == season, Injury.week <= week)
+        .order_by(Injury.week.desc(), Injury.id.desc())
+        .first()
+    )
+
+
+def _preseason_value_with_availability(db: Session, *, player: Player, season: int) -> tuple[float | None, Injury | None, float]:
+    baseline = preseason_rating_value(player)
+    injury = _latest_injury(db, player_id=player.id, season=season, week=1)
+    multiplier = injury_value_multiplier(
+        injury.status if injury else None,
+        return_timeline=injury.return_timeline if injury else None,
+        is_returning=bool(injury.is_returning) if injury else False,
+    )
+    return (_normalized_trade_value(baseline * multiplier) if baseline is not None else None), injury, multiplier
 
 
 def _serialize(row: PlayerTradeValue | None, *, player: Player) -> PlayerTradeValueRead | None:
@@ -161,9 +185,13 @@ def get_player_trade_values(db: Session, *, player_id: int, season: int, policy_
     rows = db.query(PlayerTradeValue).filter(PlayerTradeValue.player_id == player_id, PlayerTradeValue.season == season, PlayerTradeValue.policy_version == active_policy).order_by(PlayerTradeValue.week.asc()).all()
     serialized_rows = [_serialize(row, player=player) for row in rows]
     history = [row for row in serialized_rows if row is not None]
-    # A legacy dynamic row/current value is never publishable during preseason.
-    # Use raw CFB27 exactly, but do not mutate in a read endpoint.
-    effective_value = preseason_rating_value(player) if active_policy == PRESEASON_VALUE_POLICY_VERSION else player.current_value_rating
+    # Before Week 1 finalizes, the reviewed CFB27 rating is the baseline, with
+    # the latest official injury report as the single controlled exception.
+    effective_value = (
+        _preseason_value_with_availability(db, player=player, season=season)[0]
+        if active_policy == PRESEASON_VALUE_POLICY_VERSION
+        else player.current_value_rating
+    )
     current = (
         _current_value_read(player, rows[-1] if rows else None, value=effective_value, policy_version=active_policy)
         if effective_value is not None
@@ -178,7 +206,11 @@ def current_trade_value_snapshot(db: Session, *, player_id: int, season: int | N
         return None
     effective_season = season if season is not None else 2026
     active_policy = active_value_policy_version(db, season=effective_season)
-    value = preseason_rating_value(player) if active_policy == PRESEASON_VALUE_POLICY_VERSION else player.current_value_rating
+    value = (
+        _preseason_value_with_availability(db, player=player, season=effective_season)[0]
+        if active_policy == PRESEASON_VALUE_POLICY_VERSION
+        else player.current_value_rating
+    )
     if value is None:
         return None
     return {"value": float(value), "tier": value_tier(float(value)), "policy_version": active_policy, "week": 0 if active_policy == PRESEASON_VALUE_POLICY_VERSION else player.value_calculation_week or 0, "calculated_at": player.value_calculated_at.isoformat() if player.value_calculated_at else None}
@@ -193,13 +225,15 @@ def calculate_player_trade_value(db: Session, *, player_id: int, season: int, we
     if active_policy == PRESEASON_VALUE_POLICY_VERSION:
         if baseline is None:
             raise ValueError("player is missing an approved raw CFB27 rating")
+        value, injury, multiplier = _preseason_value_with_availability(db, player=player, season=season)
+        assert value is not None
         row = db.query(PlayerTradeValue).filter_by(player_id=player.id, season=season, week=0, policy_version=PRESEASON_VALUE_POLICY_VERSION).one_or_none()
         if row is None:
-            row = PlayerTradeValue(player_id=player.id, season=season, week=0, policy_version=PRESEASON_VALUE_POLICY_VERSION, value=baseline, tier=value_tier(baseline), calculated_at=_utcnow(), input_version="cfb27-approved-preseason-v1")
+            row = PlayerTradeValue(player_id=player.id, season=season, week=0, policy_version=PRESEASON_VALUE_POLICY_VERSION, value=value, tier=value_tier(value), calculated_at=_utcnow(), input_version="cfb27-injury-adjusted-preseason-v2")
             db.add(row)
-        row.value, row.tier, row.weekly_change, row.confidence = baseline, value_tier(baseline), None, 1.0
-        row.calculated_at, row.factor_breakdown_json, row.explanation_json = _utcnow(), {"preseasonRating": baseline, "seasonPerformance": 0.0, "recentForm": 0.0, "futureProjection": 0.0, "usageRole": 0.0, "availability": 0.0, "positionalScarcity": 0.0}, []
-        _apply_current_value(player, value=baseline, policy_version=PRESEASON_VALUE_POLICY_VERSION, calculation_week=0, inputs={"raw_cfb27_rating": player.raw_cfb27_rating, "preseason_guard": "week_1_not_authoritatively_finalized"})
+        row.value, row.tier, row.weekly_change, row.confidence = value, value_tier(value), None, 1.0
+        row.calculated_at, row.factor_breakdown_json, row.explanation_json = _utcnow(), {"preseasonRating": baseline, "seasonPerformance": 0.0, "recentForm": 0.0, "futureProjection": 0.0, "usageRole": 0.0, "availability": round(multiplier * 100, 2), "positionalScarcity": 0.0}, ([{"direction": "DOWN", "reason": "AVAILABILITY", "label": "Official availability adjustment", "impact": round((1 - multiplier) * 100, 1)}] if multiplier < 1 else [])
+        _apply_current_value(player, value=value, policy_version=PRESEASON_VALUE_POLICY_VERSION, calculation_week=0, inputs={"raw_cfb27_rating": player.raw_cfb27_rating, "preseason_guard": "week_1_not_authoritatively_finalized", "availability_multiplier": multiplier, "injury_status": injury.status if injury else "ACTIVE", "return_timeline": injury.return_timeline if injury else None})
         db.flush()
         return row
     rating_weight, performance_weight, future_weight = weekly_value_weights(week)

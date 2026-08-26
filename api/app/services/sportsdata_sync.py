@@ -24,6 +24,7 @@ from collegefootballfantasy_api.app.models.player_availability_event import Play
 from collegefootballfantasy_api.app.models.player_news_event import PlayerNewsEvent
 from collegefootballfantasy_api.app.models.player_weekly_context import PlayerWeeklyContext
 from collegefootballfantasy_api.app.services.notification_service import log_official_injury_update
+from collegefootballfantasy_api.app.services.player_trade_value import calculate_player_trade_value
 from collegefootballfantasy_api.app.services.availability_corrections import (
     has_active_manual_override,
     publish_zero_projection_for_unavailable_player,
@@ -531,6 +532,7 @@ def _upsert_official_availability_rows(
         for injury in db.query(Injury).filter(Injury.season == season, Injury.week == week).all()
     }
     created = updated = unchanged = skipped = events_created = overrides_preserved = 0
+    value_refresh_player_ids: set[int] = set()
 
     for row in rows:
         school = resolve_power4_school(row.get("team_name") or "")
@@ -576,6 +578,7 @@ def _upsert_official_availability_rows(
             db.add(existing)
             current_injuries[player.id] = existing
             created += 1
+            value_refresh_player_ids.add(player.id)
         elif semantic_change:
             existing.status = status
             existing.injury = row.get("injury")
@@ -586,6 +589,7 @@ def _upsert_official_availability_rows(
             existing.notes = row.get("notes")
             db.add(existing)
             updated += 1
+            value_refresh_player_ids.add(player.id)
         else:
             # A policy multiplier may change without the official report row
             # changing. Repair the current-week cache in place without emitting
@@ -663,6 +667,14 @@ def _upsert_official_availability_rows(
         )
         events_created += 1
 
+    db.flush()
+    # Publish the same availability adjustment used by player cards and trade
+    # analysis to the general player payload immediately after an official
+    # status changes. This keeps list, roster, draft, and card values aligned.
+    for player_id in value_refresh_player_ids:
+        player = db.get(Player, player_id)
+        if player is not None and player.raw_cfb27_rating is not None:
+            calculate_player_trade_value(db, player_id=player_id, season=season, week=week)
     db.flush()
     return {
         "created": created, "updated": updated, "unchanged": unchanged,
