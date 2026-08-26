@@ -18,6 +18,7 @@ import {
   clearAccessTokenSession,
   getStoredAccessToken,
   hasSessionRestoreHint,
+  isNativeCapacitorRuntime,
   isStoredAccessTokenExpired,
   restoreAccessTokenSession,
   storeAccessTokenSession,
@@ -193,6 +194,26 @@ const mapSessionPayload = (payload: AuthSessionPayload): AuthSession => ({
   isCurrent: !!payload.is_current,
 });
 
+export const shouldAttemptInitialSessionRestore = ({
+  accessTokenNeedsRefresh,
+  hasCachedAuth,
+  hasRestoreHint,
+  isNativeRuntime,
+}: {
+  accessTokenNeedsRefresh: boolean;
+  hasCachedAuth: boolean;
+  hasRestoreHint: boolean;
+  isNativeRuntime: boolean;
+}): boolean => {
+  if (!accessTokenNeedsRefresh) return false;
+
+  // A Capacitor app can retain the HTTP-only API refresh cookie while its
+  // WebView localStorage is unavailable or has been cleared.  It must still
+  // attempt one silent refresh on launch, otherwise an existing native
+  // session is incorrectly treated as a signed-out user.
+  return hasCachedAuth || hasRestoreHint || isNativeRuntime;
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
@@ -213,9 +234,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // access token is missing or expired; this restores a valid signed-in
       // user without sending them back through the login screen.
       const accessTokenNeedsRefresh = !storedToken || isStoredAccessTokenExpired();
-      const shouldAttemptRestore = accessTokenNeedsRefresh && (
-        Boolean(storedUser || storedToken) || hasSessionRestoreHint()
-      );
+      const shouldAttemptRestore = shouldAttemptInitialSessionRestore({
+        accessTokenNeedsRefresh,
+        hasCachedAuth: Boolean(storedUser || storedToken),
+        hasRestoreHint: hasSessionRestoreHint(),
+        isNativeRuntime: isNativeCapacitorRuntime(),
+      });
 
       if (shouldAttemptRestore) {
         const refreshResult = await restoreAccessTokenSession(controller.signal);

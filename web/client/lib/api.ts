@@ -14,6 +14,15 @@ export const resolveDefaultApiBase = (
   return "/api";
 };
 
+/**
+ * The Capacitor shell is the only client that has a durable, native HTTP-only
+ * refresh cookie without also sharing the web app's localStorage.  Do not use
+ * a persisted JavaScript token as a substitute for that cookie.
+ */
+export const isNativeCapacitorRuntime = (
+  protocol = typeof window === "undefined" ? "" : window.location.protocol,
+): boolean => protocol === "capacitor:";
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || resolveDefaultApiBase();
 
 const isLocalApiBase = () => {
