@@ -1,5 +1,6 @@
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
+from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.services.player_trade_value import (
     MAX_TRADE_VALUE,
     VALUE_POLICY_VERSION,
@@ -126,6 +127,43 @@ def test_preseason_contract_ignores_stale_dynamic_value_and_keeps_jeremiah_at_99
     assert values.current.value == 99
     assert values.current.policy_version == "cfb27_exact_preseason_v1"
     assert snapshot is not None and snapshot["value"] == 99
+
+
+def test_official_short_term_injury_reprices_preseason_value_and_returning_player_recovers_to_ninety_percent(db_session):
+    hardy = Player(
+        name="Ahmad Hardy",
+        position="RB",
+        school="Missouri",
+        cfb27_overall=96,
+        raw_cfb27_rating=96,
+    )
+    db_session.add(hardy)
+    db_session.flush()
+    injury = Injury(
+        player_id=hardy.id,
+        season=2026,
+        week=1,
+        status="OUT",
+        return_timeline="2-4 weeks",
+    )
+    db_session.add(injury)
+    db_session.commit()
+
+    out_value = calculate_player_trade_value(db_session, player_id=hardy.id, season=2026, week=0)
+    snapshot = current_trade_value_snapshot(db_session, player_id=hardy.id, season=2026)
+
+    assert out_value.value == 67.2
+    assert out_value.factor_breakdown_json["availability"] == 70.0
+    assert snapshot is not None and snapshot["value"] == 67.2
+
+    injury.status = "FULL"
+    injury.is_returning = True
+    injury.return_timeline = None
+    db_session.commit()
+
+    returning_value = calculate_player_trade_value(db_session, player_id=hardy.id, season=2026, week=0)
+    assert returning_value.value == 86.4
+    assert returning_value.factor_breakdown_json["availability"] == 90.0
 
 
 def test_preseason_current_value_is_exposed_consistently_by_player_card_and_trade_api(client, db_session):

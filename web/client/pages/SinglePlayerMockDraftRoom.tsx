@@ -13,6 +13,7 @@ import { useDraftPlayerPool, usePlayerCard, usePlayerDetail } from "@/hooks/use-
 import { buildDraftBoard, type DraftPlayer } from "@/lib/draftRankings";
 import { formatDraftProjection } from "@/lib/draft-projections";
 import { mergeMockDraftMasterBoardPlayers } from "@/lib/mockDraftMasterBoard";
+import { PlayerAvailabilityIndicator } from "@/lib/playerAvailability";
 import { FIRST_CENTERED_DRAFT_PICK } from "@/lib/draftOrderCarousel";
 import {
   advanceSinglePlayerMockDraft,
@@ -518,7 +519,9 @@ export default function SinglePlayerMockDraftRoom() {
               >
                 <p className="self-center text-base font-bold tabular-nums text-muted-foreground sm:text-xl sm:font-black">{visibleRank}</p>
                 <div className="min-w-0 self-center">
-                  <p className="truncate text-sm font-black leading-4 text-foreground transition-colors hover:text-amber-100 sm:text-base sm:leading-normal">{player.name}</p>
+                  <PlayerAvailabilityIndicator status={player.status}>
+                    <p className="truncate text-sm font-black leading-4 text-foreground transition-colors hover:text-amber-100 sm:text-base sm:leading-normal">{player.name}</p>
+                  </PlayerAvailabilityIndicator>
                   <div className="mt-0.5 flex min-w-0 items-center gap-1.5 sm:mt-1 sm:gap-2">
                     <p className="truncate text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground sm:text-[10px] sm:tracking-[0.18em]">{player.school}</p>
                     <span className={cn("shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black sm:rounded-full sm:px-2 sm:text-[9px]", positionClass)}>{player.pos}</span>
@@ -601,7 +604,9 @@ export default function SinglePlayerMockDraftRoom() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Queue {index + 1}</p>
-                  <p className="mt-2 text-base font-black text-foreground">{player.name}</p>
+                  <PlayerAvailabilityIndicator status={player.status}>
+                    <p className="mt-2 text-base font-black text-foreground">{player.name}</p>
+                  </PlayerAvailabilityIndicator>
                   <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">RK {player.draftRank} • {player.school}</p>
                   {!isLegalForCurrentPick ? (
                     <p className="mt-2 text-[9px] font-black uppercase tracking-[0.16em] text-amber-200">

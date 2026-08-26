@@ -28,6 +28,7 @@ from collegefootballfantasy_api.app.schemas.trade import (
 from collegefootballfantasy_api.app.services.matchup_grades import build_matchup_row
 from collegefootballfantasy_api.app.services.scoring_service import calculate_player_fantasy_points
 from collegefootballfantasy_api.app.services.player_trade_value import current_trade_value_snapshot
+from collegefootballfantasy_api.app.services.injury_value import injury_value_multiplier
 from collegefootballfantasy_api.app.services.trade_service import (
     accept_trade_offer,
     cancel_trade_offer,
@@ -269,18 +270,7 @@ def _league_analyzer_context(
 
 
 def _injury_multiplier(status: str | None) -> float:
-    if not status:
-        return 1.0
-    status = status.upper()
-    if status == "OUT":
-        return 0.4
-    if status == "DOUBTFUL":
-        return 0.6
-    if status == "QUESTIONABLE":
-        return 0.8
-    if status == "PROBABLE":
-        return 0.95
-    return 1.0
+    return injury_value_multiplier(status)
 
 
 def _schedule_multiplier(
@@ -353,7 +343,7 @@ def _player_value(
         available_parts = [(score, weight) for score, weight in weighted_parts if score is not None and weight > 0]
         total_weight = sum(weight for _score, weight in available_parts)
         if total_weight > 0:
-            return round(sum(score * weight for score, weight in available_parts) / total_weight, 2)
+            return round((sum(score * weight for score, weight in available_parts) / total_weight) * _injury_multiplier(injury_status), 2)
 
     points = _projection_points(player, projection, scoring_rules)
     replacement = replacement_by_pos.get(player.position.upper(), 0.0)
