@@ -300,6 +300,7 @@ export function RosterSlotTable({
             const liveGameState = (player.live_game_state ?? "").toLowerCase();
             const isLiveGame = isRealPlayer && liveGameState === "live";
             const isFinalGame = isRealPlayer && ["final", "post"].includes(liveGameState);
+            const hasActualPoints = isLiveGame || isFinalGame || ["live", "stale"].includes((player.live_scoring_status ?? "").toLowerCase());
             const hasRedZone = isLiveGame && player.team_in_red_zone === true;
             const hasPossession = isLiveGame && player.team_has_possession === true;
             const liveDetail = liveProjectionDetail(player);
@@ -377,7 +378,7 @@ export function RosterSlotTable({
                   <span className={cn("hidden font-black md:block", style.text)}>{position}</span>
                 ) : null}
                 <span className="hidden text-cfb-text-muted md:block">{isRealPlayer ? player.opponent ?? "TBD" : "—"}</span>
-                <span className={cn("flex flex-col items-end text-right font-black tabular-nums", pointValueClassName ?? style.text)}>
+                <span className={cn("flex flex-col items-end text-right font-black tabular-nums", hasActualPoints ? "text-cfb-brand" : pointValueClassName ?? style.text)}>
                   <span className="text-[8px] uppercase tracking-[0.12em] text-cfb-text-muted md:hidden">{pointMode === "live" ? "Live" : "Proj"}</span>
                   {isLiveGame ? <Lock data-lineup-lock aria-label="Game in progress — lineup locked" className="mb-0.5 h-3 w-3 text-cfb-text-muted" /> : null}
                   <span>{pointValue}</span>

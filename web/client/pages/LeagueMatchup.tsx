@@ -1,4 +1,4 @@
-import { Bell, ChevronLeft, ChevronRight, MessageCircle, ShieldAlert } from "lucide-react";
+import { Bell, ChevronLeft, ChevronRight, Clock3, MessageCircle, ShieldAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -168,7 +168,7 @@ function MatchupTeamSummary({
         {teamLabel}
       </p>
       <p className="text-[9px] font-bold text-cfb-text-muted sm:text-[10px]">{team?.record ?? "0-0-0"}</p>
-      <p className="cfb-score-value mt-0.5 text-2xl text-cfb-text-primary sm:mt-1 sm:text-4xl">
+      <p className={`cfb-score-value mt-0.5 text-2xl sm:mt-1 sm:text-4xl ${showActual ? "text-cfb-brand" : "text-cfb-text-primary"}`}>
         {showActual ? formatMatchupPoints(team?.current_points ?? currentScore ?? 0) : formatMatchupPoints(projected)}
       </p>
       <p aria-label={`Projected ${formatMatchupPoints(projected)}`} className="mt-0.5 text-[9px] font-bold text-cfb-text-muted">
@@ -376,6 +376,15 @@ export default function LeagueMatchup() {
         <button type="button" aria-label="Notifications" onClick={() => navigate("/alerts")} className="flex h-11 w-11 items-center justify-center rounded-full bg-cfb-surface-raised text-cfb-text-primary hover:bg-cfb-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"><Bell className="h-4 w-4" aria-hidden="true" /></button>
         <button type="button" aria-label="Messages" onClick={() => navigate("/chats")} className="flex h-11 w-11 items-center justify-center rounded-full bg-cfb-surface-raised text-cfb-text-primary hover:bg-cfb-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"><MessageCircle className="h-4 w-4" aria-hidden="true" /></button>
       </header>
+      {refreshCountdownSeconds !== null ? (
+        <div className="flex items-center justify-center gap-2 border-b border-cfb-brand/20 bg-cfb-brand/[0.06] px-3 py-2" data-testid="live-score-refresh-countdown">
+          <Clock3 className="h-3.5 w-3.5 text-cfb-brand" aria-hidden="true" />
+          <span className="text-[9px] font-black uppercase tracking-[0.16em] text-cfb-brand">Live refresh</span>
+          <span className="font-mono text-xs font-black tabular-nums text-cfb-brand">
+            {matchupQuery.isFetching ? "Refreshing…" : formatRefreshCountdown(refreshCountdownSeconds)}
+          </span>
+        </div>
+      ) : null}
       <div className="px-3 sm:px-5">
         <LeagueTabs leagueId={parsedLeagueId} draftStatus={leagueQuery.data?.draft?.status} leagueStatus={leagueQuery.data?.status} />
       </div>
@@ -440,12 +449,6 @@ export default function LeagueMatchup() {
               onNextMatchup={() => selectAdjacentMatchup(1)}
             />
           </div>
-
-          {refreshCountdownSeconds !== null ? (
-            <p className="mx-3 mt-3 text-center text-[10px] font-bold text-cfb-text-muted sm:mx-5" data-testid="live-score-refresh-countdown">
-              {matchupQuery.isFetching ? "Refreshing live scores…" : `Next score refresh in ${formatRefreshCountdown(refreshCountdownSeconds)}.`}
-            </p>
-          ) : null}
 
           <div className="mx-3 mt-3 rounded-full bg-cfb-surface px-4 py-2 sm:mx-5"><p className="text-sm font-black text-cfb-text-primary">Starters</p></div>
           <div className="mt-2"><SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={parsedLeagueId} scoringStatus={data.status} /></div>
