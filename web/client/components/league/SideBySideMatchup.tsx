@@ -135,7 +135,7 @@ function CompactMatchupPlayer({
         <span className={`self-center text-left text-[11px] font-black tabular-nums ${hasActualPoints ? "text-cfb-brand" : "text-cfb-text-primary"}`}>
           {isLiveGame ? <Lock data-lineup-lock aria-label="Game in progress — lineup locked" className="mb-0.5 h-2.5 w-2.5 text-cfb-text-muted" /> : null}
           <span className="block">{points}</span>
-          {liveDetail ? <span className="block text-[8px] font-semibold text-cfb-text-muted">{liveDetail}</span> : null}
+          {liveDetail ? <span data-player-final-status={isFinalGame ? "true" : undefined} className={`block ${isFinalGame ? "text-[9px] font-black text-cfb-brand" : "text-[8px] font-semibold text-cfb-text-muted"}`}>{liveDetail}</span> : null}
         </span>
         <div className="min-w-0">
           <p className={`flex min-w-0 items-center gap-1 truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
@@ -150,9 +150,9 @@ function CompactMatchupPlayer({
           </p>
           {gameStatus ? (
             <p data-player-live-game-status className="truncate text-[9px] font-black leading-3 text-cfb-brand">{gameStatus}</p>
-          ) : (
+          ) : !isFinalGame ? (
             <p data-player-game-time className="truncate text-[9px] font-bold leading-3 text-cfb-text-muted">{gameTime}</p>
-          )}
+          ) : null}
         </div>
       </>
     );
@@ -184,14 +184,14 @@ function CompactMatchupPlayer({
         </p>
         {gameStatus ? (
           <p data-player-live-game-status className="truncate text-[9px] font-black leading-3 text-cfb-brand">{gameStatus}</p>
-        ) : (
+        ) : !isFinalGame ? (
           <p data-player-game-time className="truncate text-[9px] font-bold leading-3 text-cfb-text-muted">{gameTime}</p>
-        )}
+        ) : null}
       </div>
       <span className={`self-center text-right text-[11px] font-black tabular-nums ${hasActualPoints ? "text-cfb-brand" : "text-cfb-text-primary"}`}>
         {isLiveGame ? <Lock data-lineup-lock aria-label="Game in progress — lineup locked" className="mb-0.5 h-2.5 w-2.5 text-cfb-text-muted" /> : null}
         <span className="block">{points}</span>
-        {liveDetail ? <span className="block text-[8px] font-semibold text-cfb-text-muted">{liveDetail}</span> : null}
+        {liveDetail ? <span data-player-final-status={isFinalGame ? "true" : undefined} className={`block ${isFinalGame ? "text-[9px] font-black text-cfb-brand" : "text-[8px] font-semibold text-cfb-text-muted"}`}>{liveDetail}</span> : null}
       </span>
     </>
   );

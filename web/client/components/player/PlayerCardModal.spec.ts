@@ -14,11 +14,14 @@ import {
   formatPlayerCardValue,
   getPlayerCardPalette,
   historicalSeasonSummaryValue,
+  historicalSeasonSummaryDisplayValue,
+  currentSeasonSummaryValue,
   resolvePlayerCardCfb27Rating,
   resolvePlayerCardCurrentValueRating,
   resolvePlayerCardProjectionStats,
   visiblePlayerCardAboutMessage,
   visiblePlayerCardTabs,
+  unifiedSeasonSummaryColumns,
 } from "./PlayerCardModal";
 import { CURRENT_VALUE_RATING_LABEL, formatCurrentValueRating } from "./PlayerCardHeader";
 
@@ -70,6 +73,28 @@ describe("PlayerCardModal helpers", () => {
     expect(totals.totals).toContainEqual(["PASS YDS", 280]);
     expect(totals.totals).toContainEqual(["PASS TD", 3]);
     expect(totals.totals).not.toContainEqual(["PASS YDS", 580]);
+  });
+
+  it("places current final totals into the same aligned season-stat columns as historical data", () => {
+    const totals = completedSeasonGameTotals([
+      {
+        schedule_id: 1,
+        week: 1,
+        location: "home",
+        location_label: "Home",
+        neutral_site: false,
+        conference_game: false,
+        game_status: "final",
+        stat_status: "final",
+        stats: { source: "espn_final_boxscore", updated_at: "2026-08-29T20:00:00Z", fantasy_points: 25.4, stats: { pass_yards: 280, pass_tds: 3, completions: 20, passing_attempts: 30 } },
+      },
+    ], "QB");
+    const columns = unifiedSeasonSummaryColumns(["Games", "Pass Yds", "Pass TD", "INT"], "QB");
+
+    expect(columns).toEqual(["GP", "FPTS", "Comp", "Pass Att", "Pass Yds", "Pass TD", "INT", "Rush Att", "Rush Yds", "Rush TD"]);
+    expect(currentSeasonSummaryValue(totals, "GP")).toBe(1);
+    expect(currentSeasonSummaryValue(totals, "Pass Yds")).toBe(280);
+    expect(historicalSeasonSummaryDisplayValue({ summary: [{ label: "Games", value: 12 }], categories: [] } as never, "GP")).toBe(12);
   });
 
   it("labels player news with its Eastern report date and time", () => {

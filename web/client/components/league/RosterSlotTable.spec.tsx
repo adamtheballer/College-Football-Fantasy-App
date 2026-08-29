@@ -146,7 +146,7 @@ describe("RosterSlotTable", () => {
     expect(liveGameStatusLabel(halftimeReceiver)).toBe("Halftime · Michigan 10 – Ohio State 14");
   });
 
-  it("marks a finalized player game with a compact lock", () => {
+  it("marks a finalized player game with a compact lock and clear blue final scoring", () => {
     const finalReceiver = {
       ...projectedReceiver,
       live_game_state: "final" as const,
@@ -155,7 +155,9 @@ describe("RosterSlotTable", () => {
     render(<RosterSlotTable title="Starters" players={[finalReceiver]} pointMode="live" />);
 
     expect(screen.getByLabelText("Game final")).toBeTruthy();
-    expect(screen.getByText("17.8")).toBeTruthy();
+    expect(screen.getByText("17.8").parentElement?.className).toContain("text-cfb-brand");
+    expect(screen.getByText("Final").className).toContain("text-cfb-brand");
+    expect(screen.getByText("Final").className).toContain("text-[10px]");
   });
 
   it("preserves stale live values and explicitly labels the delayed data", () => {

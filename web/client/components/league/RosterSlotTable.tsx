@@ -382,7 +382,7 @@ export function RosterSlotTable({
                   <span className="text-[8px] uppercase tracking-[0.12em] text-cfb-text-muted md:hidden">{pointMode === "live" ? "Live" : "Proj"}</span>
                   {isLiveGame ? <Lock data-lineup-lock aria-label="Game in progress — lineup locked" className="mb-0.5 h-3 w-3 text-cfb-text-muted" /> : null}
                   <span>{pointValue}</span>
-                  {liveDetail ? <span className="text-[9px] font-semibold text-cfb-text-muted">{liveDetail}</span> : null}
+                  {liveDetail ? <span data-player-final-status={isFinalGame ? "true" : undefined} className={cn(isFinalGame ? "text-[10px] font-black text-cfb-brand" : "text-[9px] font-semibold text-cfb-text-muted")}>{liveDetail}</span> : null}
                 </span>
               </button>
             );
