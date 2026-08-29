@@ -757,12 +757,12 @@ export function PlayerCardModal({
                     </thead>
                     <tbody className="divide-y divide-white/10">
                       {currentSeasonTotals.gamesPlayed ? (
-                        <tr className="bg-cfb-brand/[0.08] text-xs font-bold text-white/75">
-                          <td className="whitespace-nowrap px-2.5 py-2.5 text-sm font-black tabular-nums text-cfb-brand">2026</td>
-                          <td className="min-w-28 px-2.5 py-2.5"><p className="font-black leading-4 text-cfb-brand">{gameLogQuery.data?.team_name ?? card?.about.team ?? player.school}</p><p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-cfb-brand/80">Final box scores</p></td>
-                          <td className="px-2.5 py-2.5"><span className="rounded-full border border-cfb-brand/35 bg-cfb-brand/[0.12] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-cfb-brand">{position || "—"}</span></td>
+                        <tr className="text-xs font-bold text-white/75 transition hover:bg-white/[0.035]">
+                          <td className="whitespace-nowrap px-2.5 py-2.5 text-sm font-black tabular-nums text-white">2026</td>
+                          <td className="min-w-28 px-2.5 py-2.5"><p className="font-black leading-4 text-white">{gameLogQuery.data?.team_name ?? card?.about.team ?? player.school}</p></td>
+                          <td className="px-2.5 py-2.5"><span className="rounded-full border border-white/15 bg-white/[0.06] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-white/70">{position || "—"}</span></td>
                           {unifiedSeasonColumns.map((label) => (
-                            <td key={label} className="px-2.5 py-2.5 text-right font-black tabular-nums text-cfb-brand">
+                            <td key={label} className="px-2.5 py-2.5 text-right font-black tabular-nums text-white">
                               {formatPlayerCardValue(currentSeasonSummaryValue(currentSeasonTotals, label))}
                             </td>
                           ))}
