@@ -142,6 +142,53 @@ def test_player_game_log_attaches_weekly_live_stats_when_game_level_stats_are_un
     assert row["stats"]["stats"]["receiving_yards"] == 104
 
 
+def test_player_game_log_marks_a_persisted_final_espn_box_score_complete(client, db_session):
+    player = Player(name="Final Box Score Receiver", position="WR", school="Ohio State")
+    game = Game(
+        external_id="final-boxscore-game",
+        season=2026,
+        week=1,
+        home_team="Ohio State",
+        away_team="Texas",
+    )
+    db_session.add_all([player, game])
+    db_session.flush()
+    db_session.add_all(
+        [
+            TeamSchedule(
+                team_name="Ohio State",
+                season=2026,
+                week=1,
+                game_id=game.id,
+                opponent_name="Texas",
+                location="home",
+                is_bye=False,
+                neutral_site=False,
+                conference_game=False,
+                date_confirmed=True,
+            ),
+            PlayerGameStat(
+                player_id=player.id,
+                game_id=game.id,
+                season=2026,
+                week=1,
+                source="espn_final_boxscore",
+                stats={"receptions": 6, "rec_yards": 104, "rec_tds": 1},
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(f"/players/{player.id}/game-log", params={"season": 2026})
+
+    assert response.status_code == 200
+    row = response.json()["games"][0]
+    assert row["game_status"] == "final"
+    assert row["stat_status"] == "final"
+    assert row["stats"]["source"] == "espn_final_boxscore"
+    assert row["stats"]["stats"]["rec_yards"] == 104
+
+
 def test_player_game_log_does_not_invent_schedule_for_unmatched_school(client, db_session):
     player = Player(name="Unmatched Player", position="RB", school="Independent Program")
     db_session.add(player)

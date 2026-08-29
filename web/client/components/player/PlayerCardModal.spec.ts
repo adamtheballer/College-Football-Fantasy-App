@@ -9,6 +9,7 @@ import {
   gameLogOpponentLabel,
   buildHistoricalSeasonSummaryColumns,
   buildHistoricalStatsTableRows,
+  completedSeasonGameTotals,
   draftHistorySummary,
   formatPlayerCardValue,
   getPlayerCardPalette,
@@ -36,6 +37,39 @@ describe("PlayerCardModal helpers", () => {
     ]);
     expect(gameLogOpponentLabel({ location: "away", opponent_name: "Ohio State" })).toBe("at Ohio State");
     expect(formatGameLogDate("2026-09-05")).toBe("Sep 5, 2026");
+  });
+
+  it("adds only completed final box scores into the 2026 season totals", () => {
+    const totals = completedSeasonGameTotals([
+      {
+        schedule_id: 1,
+        week: 1,
+        location: "home",
+        location_label: "Home",
+        neutral_site: false,
+        conference_game: false,
+        game_status: "final",
+        stat_status: "final",
+        stats: { source: "espn_final_boxscore", updated_at: "2026-08-29T20:00:00Z", fantasy_points: 25.4, stats: { pass_yards: 280, pass_tds: 3, completions: 20, passing_attempts: 30 } },
+      },
+      {
+        schedule_id: 2,
+        week: 2,
+        location: "away",
+        location_label: "Away",
+        neutral_site: false,
+        conference_game: false,
+        game_status: "active",
+        stat_status: "active",
+        stats: { source: "espn", updated_at: "2026-09-05T20:00:00Z", fantasy_points: 30, stats: { pass_yards: 300, pass_tds: 4 } },
+      },
+    ], "QB");
+
+    expect(totals.gamesPlayed).toBe(1);
+    expect(totals.totals).toContainEqual(["FPTS", 25.4]);
+    expect(totals.totals).toContainEqual(["PASS YDS", 280]);
+    expect(totals.totals).toContainEqual(["PASS TD", 3]);
+    expect(totals.totals).not.toContainEqual(["PASS YDS", 580]);
   });
 
   it("labels player news with its Eastern report date and time", () => {

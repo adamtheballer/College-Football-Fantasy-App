@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.integrations.espn import ESPNClient, extract_player_box_score_stats
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.services.provider_identity import record_unmatched_provider_row
@@ -183,6 +184,59 @@ def persist_normalized_espn_player_stats(
             # ESPN box-score rows are cumulative current-game totals.  Replace
             # the prior verified total; never add snapshots together.
             stat.source = "espn"
+            stat.stats = stats
+        upserted += 1
+    return upserted
+
+
+def persist_final_espn_player_game_stats(
+    db: Session,
+    *,
+    season: int,
+    week: int,
+    game_id: int,
+    normalized_rows: list[dict[str, Any]],
+) -> int:
+    """Persist one accepted final ESPN box score per player/game.
+
+    ``PlayerStat`` remains the current-week scoring authority. This separate
+    game-keyed record is written only after the provider marks the game final,
+    so player-card game logs and season totals never treat a live snapshot as
+    a completed performance.
+    """
+
+    upserted = 0
+    for normalized in normalized_rows:
+        player_id = int(normalized["player_id"])
+        stats = dict(normalized["stats"])
+        stat = (
+            db.query(PlayerGameStat)
+            .filter(PlayerGameStat.player_id == player_id, PlayerGameStat.game_id == game_id)
+            .one_or_none()
+        )
+        if stat is None:
+            stat = PlayerGameStat(
+                player_id=player_id,
+                game_id=game_id,
+                season=season,
+                week=week,
+                source="espn_final_boxscore",
+                stats=stats,
+            )
+            db.add(stat)
+        else:
+            # A verified ESPN final correction replaces this game's prior
+            # total; it is never added to the existing box score.
+            if (
+                stat.season == season
+                and stat.week == week
+                and stat.source == "espn_final_boxscore"
+                and stat.stats == stats
+            ):
+                continue
+            stat.season = season
+            stat.week = week
+            stat.source = "espn_final_boxscore"
             stat.stats = stats
         upserted += 1
     return upserted

@@ -116,10 +116,16 @@ def _game_result(schedule: TeamSchedule, game: Game | None) -> str | None:
     return f"{outcome} {team_points}\u2013{opponent_points}"
 
 
+def _has_final_box_score(stat: PlayerGameStat | PlayerStat | None) -> bool:
+    """Only the worker's final-game record can finalize a scoreless schedule row."""
+
+    return isinstance(stat, PlayerGameStat) and stat.source == "espn_final_boxscore"
+
+
 def _game_status(schedule: TeamSchedule, game: Game | None, stat: PlayerGameStat | PlayerStat | None) -> str:
     if schedule.is_bye:
         return "bye"
-    if _game_result(schedule, game) is not None:
+    if _game_result(schedule, game) is not None or _has_final_box_score(stat):
         return "final"
     # A provider may publish in-progress player statistics before the team
     # final score is available.  Never describe that as a final game.
@@ -129,7 +135,7 @@ def _game_status(schedule: TeamSchedule, game: Game | None, stat: PlayerGameStat
 def _stat_status(schedule: TeamSchedule, game: Game | None, stat: PlayerGameStat | PlayerStat | None) -> str:
     if schedule.is_bye:
         return "not_available"
-    if _game_result(schedule, game) is not None:
+    if _game_result(schedule, game) is not None or _has_final_box_score(stat):
         return "final" if stat is not None else "missing"
     return "active" if stat is not None else "scheduled"
 
