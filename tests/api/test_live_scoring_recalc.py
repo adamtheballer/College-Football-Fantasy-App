@@ -17,7 +17,7 @@ from tests.api.scoring_helpers import create_scoring_fixture
 
 
 def test_recalculate_league_week_scores_is_idempotent_and_sums_starters_only(client, db_session):
-    league, home, _away, players, _matchup = create_scoring_fixture(db_session)
+    league, home, _away, players, matchup = create_scoring_fixture(db_session)
 
     first = recalculate_league_week_scores(db_session, league.id, 2026, 1)
     second = recalculate_league_week_scores(db_session, league.id, 2026, 1)
@@ -32,6 +32,8 @@ def test_recalculate_league_week_scores_is_idempotent_and_sums_starters_only(cli
     assert home_score.starter_points == 56.0
     assert home_score.bench_points == 32.0
     assert home_score.total_points == 56.0
+    db_session.refresh(matchup)
+    assert matchup.home_score == 56.0
     assert any(row["player_id"] == players["bench"].id for row in home_score.breakdown_json["players"])
     assert all(row["status"] == "live" for row in home_score.breakdown_json["players"] if row["player_id"] != players["ir"].id)
 

@@ -22,6 +22,7 @@ vi.mock("@/components/league/WinChanceMeter", () => ({
 }));
 
 vi.mock("@/hooks/use-leagues", () => ({
+  hasLiveRosteredPlayer: () => false,
   matchupRefreshCountdownSeconds: () => null,
   useLeagueDetail: () => ({
     data: { draft: { status: "completed" }, status: "post_draft" },
@@ -69,6 +70,7 @@ import {
   formatMatchupStatus,
   matchupStatusVariant,
   shouldShowMatchupScorePanels,
+  formatRefreshCountdown,
 } from "./LeagueMatchup";
 
 afterEach(() => {
@@ -139,6 +141,11 @@ describe("league matchup helpers", () => {
 });
 
 describe("league matchup scoreboard", () => {
+  it("renders the live refresh counter as minutes and seconds", () => {
+    expect(formatRefreshCountdown(180)).toBe("3:00");
+    expect(formatRefreshCountdown(0)).toBe("0:00");
+  });
+
   it("renders the mobile scoreboard with truthful pregame scores, projections, and win chances", () => {
     render(createElement(LeagueMatchup));
 
