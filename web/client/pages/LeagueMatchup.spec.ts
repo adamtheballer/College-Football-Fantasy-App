@@ -5,6 +5,7 @@ import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const routerMocks = vi.hoisted(() => ({ setSearchParams: vi.fn(), navigate: vi.fn() }));
+const matchupMocks = vi.hoisted(() => ({ weekStarted: false }));
 
 vi.mock("react-router-dom", () => ({
   Navigate: () => null,
@@ -31,9 +32,10 @@ vi.mock("@/hooks/use-leagues", () => ({
     data: {
       matchup_id: 1,
       week: 1,
+      week_started: matchupMocks.weekStarted,
       status: "projected",
-      my_team: { fantasy_team_id: 10, fantasy_team_name: "My Team", manager_name: "Updated Adam", owner_avatar_url: "https://images.example.com/my-team.jpg", record: "0-0-0", projected_total: 111.2, win_probability: 54, roster: [] },
-      opponent_team: { fantasy_team_id: 11, fantasy_team_name: "My Opponent", manager_name: "Taylor", owner_avatar_url: "https://images.example.com/my-opponent.jpg", record: "0-0-0", projected_total: 106.4, win_probability: 46, roster: [] },
+      my_team: { fantasy_team_id: 10, fantasy_team_name: "My Team", manager_name: "Updated Adam", owner_avatar_url: "https://images.example.com/my-team.jpg", record: "0-0-0", current_points: 0, projected_total: 111.2, win_probability: 54, roster: [] },
+      opponent_team: { fantasy_team_id: 11, fantasy_team_name: "My Opponent", manager_name: "Taylor", owner_avatar_url: "https://images.example.com/my-opponent.jpg", record: "0-0-0", current_points: 0, projected_total: 106.4, win_probability: 46, roster: [] },
     },
     isLoading: false,
     isError: false,
@@ -72,6 +74,7 @@ afterEach(() => {
   cleanup();
   routerMocks.setSearchParams.mockClear();
   routerMocks.navigate.mockClear();
+  matchupMocks.weekStarted = false;
 });
 
 describe("league matchup helpers", () => {
@@ -161,6 +164,19 @@ describe("league matchup scoreboard", () => {
     expect(screen.queryByText("CFB Scores available once games begin")).toBeNull();
     expect(screen.getAllByAltText("Updated Adam profile picture").every((image) => image.getAttribute("src") === "https://images.example.com/my-team.jpg")).toBe(true);
     expect(screen.getAllByAltText("Taylor profile picture").every((image) => image.getAttribute("src") === "https://images.example.com/my-opponent.jpg")).toBe(true);
+  });
+
+  it("shows actual zero-point totals from the first kickoff while retaining projections and win chances", () => {
+    matchupMocks.weekStarted = true;
+
+    render(createElement(LeagueMatchup));
+
+    expect(screen.getAllByText("0.0")).toHaveLength(2);
+    expect(screen.getByText("Proj 111.2")).toBeTruthy();
+    expect(screen.getByText("Proj 106.4")).toBeTruthy();
+    expect(screen.queryByText("Pregame projection")).toBeNull();
+    expect(screen.getAllByText("54.0%")).toHaveLength(2);
+    expect(screen.getAllByText("46.0%")).toHaveLength(2);
   });
 
   it("lets a member swipe through same-league matchups from the scorecard", () => {

@@ -687,6 +687,7 @@ class LeagueMatchupTabRead(BaseModel):
     league_id: int
     season: int
     week: int
+    week_started: bool = False
     matchup_id: int | None = None
     status: str | None = None
     my_team: MatchupTeamRead | None = None

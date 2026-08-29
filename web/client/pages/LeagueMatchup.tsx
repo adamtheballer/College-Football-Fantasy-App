@@ -126,16 +126,20 @@ function MatchupTeamSummary({
   accent,
   align,
   status,
+  weekStarted,
   currentScore,
 }: {
   team: LeagueMatchupTeam | null;
   accent: "brand" | "crimson";
   align: "left" | "right";
   status: string;
+  weekStarted?: boolean;
   currentScore?: number | null;
 }) {
   const isBrand = accent === "brand";
-  const showActual = shouldShowMatchupScorePanels(status) && typeof currentScore === "number";
+  const showActual = weekStarted || (shouldShowMatchupScorePanels(status) && (
+    typeof team?.current_points === "number" || typeof currentScore === "number"
+  ));
   const projected = teamTotal(team);
   const managerName = managerNameForAvatar(team, "Team TBD");
   const teamLabel = managerTeamName(team, "Team TBD");
@@ -159,7 +163,7 @@ function MatchupTeamSummary({
       </p>
       <p className="text-[9px] font-bold text-cfb-text-muted sm:text-[10px]">{team?.record ?? "0-0-0"}</p>
       <p className="cfb-score-value mt-0.5 text-2xl text-cfb-text-primary sm:mt-1 sm:text-4xl">
-        {showActual ? formatMatchupPoints(team?.current_points ?? currentScore) : formatMatchupPoints(projected)}
+        {showActual ? formatMatchupPoints(team?.current_points ?? currentScore ?? 0) : formatMatchupPoints(projected)}
       </p>
       <p aria-label={`Projected ${formatMatchupPoints(projected)}`} className="mt-0.5 text-[9px] font-bold text-cfb-text-muted">
         {showActual ? `Proj ${formatMatchupPoints(projected)}` : "Pregame projection"}
@@ -239,6 +243,7 @@ function CompactMatchupScoreboard({
           accent="brand"
           align="left"
           status={data.status ?? "projected"}
+          weekStarted={data.week_started}
           currentScore={scoreRow?.home_score}
         />
 
@@ -261,6 +266,7 @@ function CompactMatchupScoreboard({
           accent="crimson"
           align="right"
           status={data.status ?? "projected"}
+          weekStarted={data.week_started}
           currentScore={scoreRow?.away_score}
         />
       </div>

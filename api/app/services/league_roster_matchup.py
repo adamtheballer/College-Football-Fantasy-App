@@ -25,6 +25,7 @@ from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGam
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.trade_offer import TradeOffer
 from collegefootballfantasy_api.app.models.trade_offer_item import TradeOfferItem
 from collegefootballfantasy_api.app.models.user import User
@@ -668,6 +669,28 @@ def _starter_live_totals(roster: list[RosterTabEntryRead]) -> tuple[float | None
     return round(current, 2), round(final, 2), round(pregame, 2), any_live
 
 
+def _week_has_started(db: Session, *, season: int, week: int) -> bool:
+    """Return true only when a verified non-bye kickoff has passed.
+
+    The matchup's presentation state must be able to show actual fantasy
+    points from the first kickoff, even before either fantasy lineup has a
+    player in a live game. Do not infer a start from a date-only schedule row.
+    """
+    now = datetime.now(timezone.utc)
+    return (
+        db.query(TeamSchedule.id)
+        .filter(
+            TeamSchedule.season == season,
+            TeamSchedule.week == week,
+            TeamSchedule.is_bye.is_(False),
+            TeamSchedule.kickoff_at.is_not(None),
+            TeamSchedule.kickoff_at <= now,
+        )
+        .first()
+        is not None
+    )
+
+
 def _latest_projection_metadata(*rosters: list[RosterTabEntryRead]) -> tuple[datetime | None, datetime | None]:
     rows = [entry for roster in rosters for entry in roster if entry.projection_updated_at]
     if not rows:
@@ -754,6 +777,7 @@ def build_matchup_tab_view(
     matchup_id: int | None = None,
 ) -> LeagueMatchupTabRead:
     week = resolve_current_week(db, league, selected_week)
+    week_started = _week_has_started(db, season=league.season_year, week=week)
     freshness_read = LiveScoringFreshnessRead(
         state="unavailable",
     )
@@ -815,6 +839,7 @@ def build_matchup_tab_view(
             league_id=league.id,
             season=league.season_year,
             week=week,
+            week_started=week_started,
             my_roster=[],
             opponent_roster=[],
             live_scoring_freshness=freshness_read,
@@ -843,6 +868,7 @@ def build_matchup_tab_view(
             league_id=league.id,
             season=league.season_year,
             week=week,
+            week_started=week_started,
             status=None,
             my_team=my_team,
             user_team=my_team if viewer_team and viewer_team.id == primary_team.id else None,
@@ -932,6 +958,7 @@ def build_matchup_tab_view(
         league_id=league.id,
         season=league.season_year,
         week=week,
+        week_started=week_started,
         matchup_id=matchup.id,
         status=effective_status,
         my_team=my_team,

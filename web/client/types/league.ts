@@ -343,6 +343,7 @@ export interface LeagueMatchupTabResponse {
   season?: number;
   matchup_id: number | null;
   week: number;
+  week_started?: boolean;
   status: string | null;
   my_team?: LeagueMatchupTeam | null;
   user_team: LeagueMatchupTeam | null;

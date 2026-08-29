@@ -1,6 +1,9 @@
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy import event
 
 from collegefootballfantasy_api.app.models.standing import Standing
+from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.league_roster_matchup import build_matchup_tab_view
 from collegefootballfantasy_api.app.services.scoring_service import recalculate_league_week_scores
@@ -52,7 +55,35 @@ def test_matchup_tab_uses_a_bounded_number_of_selects(client, db_session):
     # server-authoritative permanent-rival lookup are each one bounded query,
     # never one query per roster slot.
     # Keep this cap tight so the matchup view cannot regress into an N+1 read.
-    assert select_count <= 11
+    assert select_count <= 12
+
+
+def test_matchup_tab_marks_the_week_started_after_a_verified_kickoff(client, db_session):
+    league, home, _away, _players, _matchup = create_scoring_fixture(db_session)
+    user = User(
+        first_name="Week start",
+        email="week-start@example.com",
+        password_hash="hash",
+        api_token="week-start-token",
+    )
+    db_session.add(user)
+    db_session.flush()
+    home.owner_user_id = user.id
+    db_session.add(
+        TeamSchedule(
+            team_name="Test",
+            season=2026,
+            week=1,
+            location="home",
+            is_bye=False,
+            kickoff_at=datetime.now(timezone.utc) - timedelta(minutes=1),
+        )
+    )
+    db_session.commit()
+
+    response = build_matchup_tab_view(db_session, league, user, selected_week=1)
+
+    assert response.week_started is True
 
 
 def test_matchup_tab_exposes_persisted_player_scores_without_falling_back_to_projections(client, db_session):
