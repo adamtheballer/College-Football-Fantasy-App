@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const routerMocks = vi.hoisted(() => ({ setSearchParams: vi.fn(), navigate: vi.fn() }));
-const matchupMocks = vi.hoisted(() => ({ weekStarted: false }));
+const matchupMocks = vi.hoisted(() => ({ weekStarted: false, freshness: undefined as { state: string; relevant_game_count: number } | undefined }));
 
 vi.mock("react-router-dom", () => ({
   Navigate: () => null,
@@ -34,6 +34,7 @@ vi.mock("@/hooks/use-leagues", () => ({
       week: 1,
       week_started: matchupMocks.weekStarted,
       status: "projected",
+      live_scoring_freshness: matchupMocks.freshness,
       my_team: { fantasy_team_id: 10, fantasy_team_name: "My Team", manager_name: "Updated Adam", owner_avatar_url: "https://images.example.com/my-team.jpg", record: "0-0-0", current_points: 0, projected_total: 111.2, win_probability: 54, roster: [] },
       opponent_team: { fantasy_team_id: 11, fantasy_team_name: "My Opponent", manager_name: "Taylor", owner_avatar_url: "https://images.example.com/my-opponent.jpg", record: "0-0-0", current_points: 0, projected_total: 106.4, win_probability: 46, roster: [] },
     },
@@ -75,6 +76,7 @@ afterEach(() => {
   routerMocks.setSearchParams.mockClear();
   routerMocks.navigate.mockClear();
   matchupMocks.weekStarted = false;
+  matchupMocks.freshness = undefined;
 });
 
 describe("league matchup helpers", () => {
@@ -177,6 +179,15 @@ describe("league matchup scoreboard", () => {
     expect(screen.queryByText("Pregame projection")).toBeNull();
     expect(screen.getAllByText("54.0%")).toHaveLength(2);
     expect(screen.getAllByText("46.0%")).toHaveLength(2);
+  });
+
+  it("does not render a stale-provider warning banner", () => {
+    matchupMocks.freshness = { state: "stale", relevant_game_count: 2 };
+
+    render(createElement(LeagueMatchup));
+
+    expect(screen.queryByText("Live provider data is stale. Existing scores are retained while the worker retries.")).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("lets a member swipe through same-league matchups from the scorecard", () => {
