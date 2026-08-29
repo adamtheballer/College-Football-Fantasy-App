@@ -305,6 +305,7 @@ export function RosterSlotTable({
             const hasPossession = isLiveGame && player.team_has_possession === true;
             const liveDetail = liveProjectionDetail(player);
             const gameStatus = liveGameStatusLabel(player);
+            const finalGameStatLine = isFinalGame ? player.final_game_stat_line : null;
             return (
               <button
                 key={player.slot_id ?? `${player.team_id ?? player.fantasy_team_id}-${slotType(player)}-${player.slot_index ?? 0}`}
@@ -363,6 +364,11 @@ export function RosterSlotTable({
                   {gameStatus ? (
                     <span data-player-live-game-status className="truncate text-[9px] font-black leading-3 text-cfb-brand">
                       {gameStatus}
+                    </span>
+                  ) : null}
+                  {finalGameStatLine ? (
+                    <span data-player-final-stat-line title={finalGameStatLine} className="truncate text-[9px] font-semibold leading-3 text-cfb-text-muted">
+                      {finalGameStatLine}
                     </span>
                   ) : null}
                   {hasRedZone ? (

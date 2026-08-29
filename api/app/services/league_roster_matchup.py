@@ -18,6 +18,7 @@ from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.live_player_projection import LivePlayerProjection
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.player_waiver_availability import PlayerWaiverAvailability
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.models.postseason import PostseasonMatchup
@@ -408,6 +409,82 @@ def _player_week_score_map(
     return {row.player_id: row for row in rows}
 
 
+def _stat_value(stats: dict[str, Any], *keys: str) -> int | float:
+    for key in keys:
+        value = stats.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+            return int(value) if float(value).is_integer() else float(value)
+    return 0
+
+
+def _compact_final_game_stat_line(stats: dict[str, Any], position: str | None) -> str:
+    """Return the roster row's position-specific final box-score shorthand.
+
+    Final player-game rows are already verified by the live worker. Keep the
+    public roster contract intentionally compact: four useful measures for a
+    QB and three for every other supported fantasy position.
+    """
+
+    normalized_position = (position or "").upper()
+    if normalized_position == "QB":
+        return " · ".join((
+            f"{_stat_value(stats, 'pass_yards', 'passing_yards', 'PassingYards')} PASS YDS",
+            f"{_stat_value(stats, 'pass_tds', 'passing_touchdowns', 'PassingTouchdowns')} PASS TD",
+            f"{_stat_value(stats, 'rush_yards', 'rushing_yards', 'RushingYards')} RUSH YDS",
+            f"{_stat_value(stats, 'rush_tds', 'rushing_touchdowns', 'RushingTouchdowns')} RUSH TD",
+        ))
+    if normalized_position == "RB":
+        return " · ".join((
+            f"{_stat_value(stats, 'rushing_attempts', 'rush_attempts', 'RushingAttempts')} CAR",
+            f"{_stat_value(stats, 'rush_yards', 'rushing_yards', 'RushingYards')} RUSH YDS",
+            f"{_stat_value(stats, 'rush_tds', 'rushing_touchdowns', 'RushingTouchdowns')} RUSH TD",
+        ))
+    if normalized_position in {"WR", "TE"}:
+        return " · ".join((
+            f"{_stat_value(stats, 'receptions', 'Receptions')} REC",
+            f"{_stat_value(stats, 'rec_yards', 'receiving_yards', 'ReceivingYards')} REC YDS",
+            f"{_stat_value(stats, 'rec_tds', 'receiving_touchdowns', 'ReceivingTouchdowns')} REC TD",
+        ))
+    if normalized_position in {"K", "PK"}:
+        field_goals = _stat_value(stats, 'field_goals_made', 'fg_made', 'FGM', 'FieldGoalsMade')
+        extra_points = _stat_value(stats, 'extra_points_made', 'xp_made', 'XPM', 'ExtraPointsMade')
+        return f"{field_goals} FGM · {extra_points} XPM · {field_goals * 3 + extra_points} K PTS"
+    return ""
+
+
+def _final_game_stat_line_map(
+    db: Session,
+    *,
+    season: int,
+    week: int,
+    player_ids: set[int],
+    player_positions: dict[int, str | None],
+) -> dict[int, str]:
+    """Get one verified final box-score line per rostered player in one query."""
+
+    if not player_ids:
+        return {}
+    rows = (
+        db.query(PlayerGameStat)
+        .filter(
+            PlayerGameStat.season == season,
+            PlayerGameStat.week == week,
+            PlayerGameStat.player_id.in_(player_ids),
+            PlayerGameStat.source == "espn_final_boxscore",
+        )
+        .order_by(PlayerGameStat.updated_at.desc(), PlayerGameStat.id.desc())
+        .all()
+    )
+    lines: dict[int, str] = {}
+    for row in rows:
+        if row.player_id in lines:
+            continue
+        line = _compact_final_game_stat_line(row.stats or {}, player_positions.get(row.player_id))
+        if line:
+            lines[row.player_id] = line
+    return lines
+
+
 def _roster_rows(db: Session, team_id: int) -> list[RosterEntry]:
     return (
         db.query(RosterEntry)
@@ -467,6 +544,7 @@ def _serialize_roster_entry(
     live_projection: LivePlayerProjection | None = None,
     scoring_rules: dict | None = None,
     injury_status: str | None = None,
+    final_game_stat_line: str | None = None,
 ) -> RosterTabEntryRead:
     entry = roster_slot.entry
     projected = float(projection.fantasy_points) if projection and projection.fantasy_points is not None else None
@@ -486,7 +564,8 @@ def _serialize_roster_entry(
         if live_projection.projected_remaining_fantasy_points is not None and current_points is not None:
             live_final_points = round(current_points + float(live_projection.projected_remaining_fantasy_points), 2)
     effective_game_state = (
-        live_game.state if live_game and live_game.state != "unavailable"
+        "final" if final_game_stat_line
+        else live_game.state if live_game and live_game.state != "unavailable"
         else "final" if live_projection and live_projection.projection_status == "FINAL"
         else "live" if live_projection and live_projection.projection_status in {"LIVE", "STALE", "OUT"}
         # Preserve the existing score-feed behavior during the first accepted
@@ -545,6 +624,7 @@ def _serialize_roster_entry(
         team_has_possession=live_game.has_possession if live_game else False,
         team_in_red_zone=live_game.in_red_zone if live_game else False,
         game_start_at=game_start_at,
+        final_game_stat_line=final_game_stat_line,
         is_locked=is_locked,
     )
 
@@ -568,6 +648,17 @@ def _serialize_team_roster(
         entry.player_id: entry.player.school if entry.player else None
         for entry in entries
     }
+    player_positions = {
+        entry.player_id: entry.player.position if entry.player else None
+        for entry in entries
+    }
+    final_game_stat_lines = _final_game_stat_line_map(
+        db,
+        season=league.season_year,
+        week=week,
+        player_ids=player_ids,
+        player_positions=player_positions,
+    )
     games = (
         db.query(Game).filter(Game.season == league.season_year, Game.week == week).all()
         if player_ids
@@ -605,6 +696,7 @@ def _serialize_team_roster(
             live_projection=live_projection_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             scoring_rules=settings.scoring_json if settings else {},
             injury_status=injury_statuses.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+            final_game_stat_line=final_game_stat_lines.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             is_locked=(
                 roster_slot.entry is not None
                 and game_starts.get(roster_slot.entry.player_id) is not None
@@ -630,6 +722,18 @@ def _serialize_team_rosters(
         for entries in entries_by_team.values()
         for entry in entries
     }
+    player_positions = {
+        entry.player_id: entry.player.position if entry.player else None
+        for entries in entries_by_team.values()
+        for entry in entries
+    }
+    final_game_stat_lines = _final_game_stat_line_map(
+        db,
+        season=league.season_year,
+        week=week,
+        player_ids=player_ids,
+        player_positions=player_positions,
+    )
     games = (
         db.query(Game).filter(Game.season == league.season_year, Game.week == week).all()
         if player_ids
@@ -668,6 +772,7 @@ def _serialize_team_rosters(
                 live_projection=live_projection_by_player.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 scoring_rules=settings.scoring_json if settings else {},
                 injury_status=injury_statuses.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+                final_game_stat_line=final_game_stat_lines.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 is_locked=(
                     roster_slot.entry is not None
                     and game_starts.get(roster_slot.entry.player_id) is not None

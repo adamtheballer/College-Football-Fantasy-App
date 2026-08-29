@@ -1640,6 +1640,32 @@ test.describe("critical browser workflows", () => {
       my_roster: liveMyRoster,
       opponent_roster: liveOpponentRoster,
     };
+    const finalMyRoster = myRoster.map((player) =>
+      player.player_name === "Arch Manning"
+        ? {
+            ...player,
+            live_game_state: "final",
+            current_fantasy_points: 25.6,
+            live_points: 25.6,
+            final_game_stat_line: "281 PASS YDS · 3 PASS TD · 34 RUSH YDS · 1 RUSH TD",
+          }
+        : player,
+    );
+    const finalPayload = {
+      ...scheduledPayload,
+      status: "live",
+      my_team: {
+        ...scheduledPayload.my_team,
+        current_points: 25.6,
+        roster: finalMyRoster,
+      },
+      user_team: {
+        ...scheduledPayload.user_team,
+        current_points: 25.6,
+        roster: finalMyRoster,
+      },
+      my_roster: finalMyRoster,
+    };
     let matchupPayload: unknown = scheduledPayload;
 
     await page.route("**/leagues/1", async (route) => {
@@ -1792,6 +1818,21 @@ test.describe("critical browser workflows", () => {
     await expect(liveMobileLineup.getByText("0.0", { exact: true })).toBeVisible();
     await expect(liveMobileLineup.getByText("Proj 121.7", { exact: true })).toBeVisible();
     await page.screenshot({ path: "test-results/live-matchup-current-and-projection.png", fullPage: true });
+
+    matchupPayload = finalPayload;
+    await page.goto("/league/1/matchup");
+    const finalMobileLineup = page.getByTestId("mobile-starting-lineup");
+    await finalMobileLineup.scrollIntoViewIfNeeded();
+    const finalStatLine = finalMobileLineup.getByText("281 PASS YDS · 3 PASS TD · 34 RUSH YDS · 1 RUSH TD", { exact: true });
+    await expect(finalStatLine).toBeVisible();
+    await expect(finalStatLine).toHaveAttribute("data-player-final-stat-line", "true");
+    await expect(finalStatLine).toHaveClass(/truncate/);
+    await expect(finalStatLine).toHaveClass(/text-cfb-text-muted/);
+    await expect(
+      finalMobileLineup.getByRole("button", { name: "Open A. Manning player card" }).locator("[data-player-game-time]"),
+    ).toHaveCount(0);
+    await expect(finalMobileLineup.getByText("Final", { exact: true })).toBeVisible();
+    await page.screenshot({ path: "test-results/final-matchup-stat-line.png", fullPage: true });
 
     matchupPayload = emptyPayload;
     await page.goto("/league/1/matchup");

@@ -11,6 +11,7 @@ from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.postseason import LeaguePostseasonSettings
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll
 from collegefootballfantasy_api.app.models.roster import RosterEntry
@@ -1320,6 +1321,62 @@ def test_league_roster_tab_uses_cached_espn_possession_and_red_zone_context(clie
     assert roster_player["game_score"] == "Ohio State 10 – Texas 14"
     assert roster_player["game_down_distance"] == "2nd & 7 at OHST 33"
     assert roster_player["game_is_halftime"] is False
+
+
+def test_roster_exposes_position_specific_final_boxscore_lines(client, db_session):
+    token = create_user_and_token(client, "final-stat-line")
+    league = create_league(client, token, name="Final stat line league", max_teams=2)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).order_by(Team.id.asc()).first()
+    assert team is not None
+    quarterback = Player(name="Final QB", position="QB", school="Test")
+    running_back = Player(name="Final RB", position="RB", school="Test")
+    receiver = Player(name="Final WR", position="WR", school="Test")
+    db_session.add_all([quarterback, running_back, receiver])
+    db_session.flush()
+    db_session.add_all([
+        RosterEntry(league_id=league["id"], team_id=team.id, player_id=quarterback.id, slot="QB", status="active"),
+        RosterEntry(league_id=league["id"], team_id=team.id, player_id=running_back.id, slot="RB", status="active"),
+        RosterEntry(league_id=league["id"], team_id=team.id, player_id=receiver.id, slot="WR", status="active"),
+    ])
+    game = Game(season=2026, week=1, home_team="Test", away_team="Rival", home_points=31, away_points=24)
+    db_session.add(game)
+    db_session.flush()
+    db_session.add_all([
+        PlayerGameStat(
+            player_id=quarterback.id,
+            game_id=game.id,
+            season=2026,
+            week=1,
+            source="espn_final_boxscore",
+            stats={"pass_yards": 281, "pass_tds": 3, "rush_yards": 34, "rush_tds": 1},
+        ),
+        PlayerGameStat(
+            player_id=running_back.id,
+            game_id=game.id,
+            season=2026,
+            week=1,
+            source="espn_final_boxscore",
+            stats={"rushing_attempts": 19, "rush_yards": 105, "rush_tds": 2},
+        ),
+        PlayerGameStat(
+            player_id=receiver.id,
+            game_id=game.id,
+            season=2026,
+            week=1,
+            source="espn_final_boxscore",
+            stats={"receptions": 7, "rec_yards": 112, "rec_tds": 1},
+        ),
+    ])
+    db_session.commit()
+
+    response = client.get(f"/leagues/{league['id']}/roster?week=1", headers=auth_headers(token))
+
+    assert response.status_code == 200
+    roster_by_player = {row["player_id"]: row for row in response.json()["roster"] if row["player_id"]}
+    assert roster_by_player[quarterback.id]["live_game_state"] == "final"
+    assert roster_by_player[quarterback.id]["final_game_stat_line"] == "281 PASS YDS · 3 PASS TD · 34 RUSH YDS · 1 RUSH TD"
+    assert roster_by_player[running_back.id]["final_game_stat_line"] == "19 CAR · 105 RUSH YDS · 2 RUSH TD"
+    assert roster_by_player[receiver.id]["final_game_stat_line"] == "7 REC · 112 REC YDS · 1 REC TD"
 
 
 def test_league_hub_endpoints_return_scoreboard_rankings_and_news(client, db_session):

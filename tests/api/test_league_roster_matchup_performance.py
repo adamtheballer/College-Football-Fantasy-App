@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import event
 
+from collegefootballfantasy_api.app.models.game import Game
+from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.user import User
@@ -51,11 +53,11 @@ def test_matchup_tab_uses_a_bounded_number_of_selects(client, db_session):
     assert response.opponent_team.manager_name == away.owner_name
     assert len(response.my_roster) == 8
     assert len(response.opponent_roster) == 8
-    # Player-level live scoring, official availability, and the
-    # server-authoritative permanent-rival lookup are each one bounded query,
-    # never one query per roster slot.
+    # Player-level live scoring, verified final box-score stat lines, official
+    # availability, and the server-authoritative permanent-rival lookup are
+    # each one bounded query, never one query per roster slot.
     # Keep this cap tight so the matchup view cannot regress into an N+1 read.
-    assert select_count <= 12
+    assert select_count <= 13
 
 
 def test_matchup_tab_marks_the_week_started_after_a_verified_kickoff(client, db_session):
@@ -109,3 +111,36 @@ def test_matchup_tab_exposes_persisted_player_scores_without_falling_back_to_pro
     assert quarterback.live_scoring_updated_at is not None
     assert open_slot.live_points is None
     assert open_slot.live_scoring_status == "unavailable"
+
+
+def test_matchup_tab_exposes_verified_final_stat_line_for_a_completed_roster_game(client, db_session):
+    league, home, _away, players, _matchup = create_scoring_fixture(db_session)
+    user = User(
+        first_name="Final line",
+        email="final-line-matchup@example.com",
+        password_hash="hash",
+        api_token="final-line-token",
+    )
+    db_session.add(user)
+    db_session.flush()
+    home.owner_user_id = user.id
+    game = Game(season=2026, week=1, home_team="Test", away_team="Rival", home_points=31, away_points=24)
+    db_session.add(game)
+    db_session.flush()
+    db_session.add(
+        PlayerGameStat(
+            player_id=players["qb"].id,
+            game_id=game.id,
+            season=2026,
+            week=1,
+            source="espn_final_boxscore",
+            stats={"pass_yards": 281, "pass_tds": 3, "rush_yards": 34, "rush_tds": 1},
+        )
+    )
+    db_session.commit()
+
+    response = build_matchup_tab_view(db_session, league, user, selected_week=1)
+    quarterback = next(row for row in response.my_roster if row.player_id == players["qb"].id)
+
+    assert quarterback.live_game_state == "final"
+    assert quarterback.final_game_stat_line == "281 PASS YDS · 3 PASS TD · 34 RUSH YDS · 1 RUSH TD"
