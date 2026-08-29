@@ -132,6 +132,23 @@ describe("RosterSlotTable", () => {
     expect(liveProjectionDetail(liveReceiver)).toBe("Proj 16.7");
   });
 
+  it("shows a current in-progress stat line beneath the live game fixture and updates from the refreshed roster payload", () => {
+    const liveReceiver = {
+      ...projectedReceiver,
+      live_game_state: "live" as const,
+      game_stat_line: "4 REC · 67 REC YDS · 1 REC TD",
+      game_period: 2,
+      game_clock: "04:32",
+      game_score: "Michigan 14 – Ohio State 10",
+    };
+    render(<RosterSlotTable title="Bench" players={[liveReceiver]} pointMode="live" />);
+
+    const statLine = screen.getByText("4 REC · 67 REC YDS · 1 REC TD");
+    expect(statLine.getAttribute("data-player-game-stat-line")).not.toBeNull();
+    expect(statLine.getAttribute("data-player-final-stat-line")).toBeNull();
+    expect(statLine.className).toContain("truncate");
+  });
+
   it("uses a halftime label instead of a stale clock or down", () => {
     const halftimeReceiver = {
       ...projectedReceiver,

@@ -118,7 +118,7 @@ function CompactMatchupPlayer({
   const gameMatchup = hasPlayer ? formatPlayerGameMatchup(player) : "Set a starter in your roster";
   const gameTime = hasPlayer ? formatPlayerGameTime(player) : "Kickoff TBD";
   const gameStatus = player ? liveGameStatusLabel(player) : null;
-  const finalGameStatLine = isFinalGame ? player?.final_game_stat_line : null;
+  const gameStatLine = player?.game_stat_line ?? (isFinalGame ? player?.final_game_stat_line : null);
   const interactive = Boolean(hasPlayer && player && onSelect);
   const openPlayerCard = () => {
     if (player && onSelect) onSelect(player);
@@ -155,8 +155,8 @@ function CompactMatchupPlayer({
           ) : !isFinalGame ? (
             <p data-player-game-time className="truncate text-[9px] font-bold leading-3 text-cfb-text-muted">{gameTime}</p>
           ) : null}
-          {finalGameStatLine ? (
-            <p data-player-final-stat-line title={finalGameStatLine} className="truncate text-[8px] font-semibold leading-3 text-cfb-text-muted">{finalGameStatLine}</p>
+          {gameStatLine ? (
+            <p data-player-game-stat-line data-player-final-stat-line={isFinalGame ? "true" : undefined} title={gameStatLine} className="truncate text-[8px] font-semibold leading-3 text-cfb-text-muted">{gameStatLine}</p>
           ) : null}
         </div>
       </>
@@ -192,8 +192,8 @@ function CompactMatchupPlayer({
         ) : !isFinalGame ? (
           <p data-player-game-time className="truncate text-[9px] font-bold leading-3 text-cfb-text-muted">{gameTime}</p>
         ) : null}
-        {finalGameStatLine ? (
-          <p data-player-final-stat-line title={finalGameStatLine} className="truncate text-[8px] font-semibold leading-3 text-cfb-text-muted">{finalGameStatLine}</p>
+        {gameStatLine ? (
+          <p data-player-game-stat-line data-player-final-stat-line={isFinalGame ? "true" : undefined} title={gameStatLine} className="truncate text-[8px] font-semibold leading-3 text-cfb-text-muted">{gameStatLine}</p>
         ) : null}
       </div>
       <span className={`self-center text-right text-[11px] font-black tabular-nums ${hasActualPoints ? "text-cfb-brand" : "text-cfb-text-primary"}`}>

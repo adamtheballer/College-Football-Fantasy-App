@@ -1578,9 +1578,9 @@ test.describe("critical browser workflows", () => {
       user_team: { ...scheduledPayload.user_team, projected_points: 120.0, projected_total: 120.0, win_probability: 70.0 },
       opponent_team: { ...scheduledPayload.opponent_team, projected_points: 100.0, projected_total: 100.0, win_probability: 30.0 },
     };
-    const liveMyRoster = myRoster.map((player) =>
-      player.player_name === "Arch Manning"
-        ? {
+    const liveMyRoster = myRoster.map((player) => {
+      if (player.player_name === "Arch Manning") {
+        return {
             ...player,
             live_game_state: "live",
             current_fantasy_points: 0,
@@ -1591,9 +1591,20 @@ test.describe("critical browser workflows", () => {
             game_period: 1,
             game_clock: "08:15",
             game_progress: 0.1125,
-          }
-        : player,
-    );
+            game_stat_line: "184 PASS YDS · 2 PASS TD · 21 RUSH YDS · 1 RUSH TD",
+          };
+      }
+      if (player.player_name === "Bench Reserve") {
+        return {
+          ...player,
+          live_game_state: "live",
+          current_fantasy_points: 4.1,
+          live_points: 4.1,
+          game_stat_line: "4 REC · 67 REC YDS · 1 REC TD",
+        };
+      }
+      return player;
+    });
     const liveOpponentRoster = opponentRoster.map((player) =>
       player.player_name === "Rival QB"
         ? {
@@ -1843,6 +1854,14 @@ test.describe("critical browser workflows", () => {
     await liveMobileLineup.scrollIntoViewIfNeeded();
     await expect(liveMobileLineup.getByText("0.0", { exact: true })).toBeVisible();
     await expect(liveMobileLineup.getByText("Proj 121.7", { exact: true })).toBeVisible();
+    const liveStarterStatLine = liveMobileLineup.getByText("184 PASS YDS · 2 PASS TD · 21 RUSH YDS · 1 RUSH TD", { exact: true });
+    await expect(liveStarterStatLine).toBeVisible();
+    await expect(liveStarterStatLine).toHaveAttribute("data-player-game-stat-line", "true");
+    const liveBenchDetails = page.getByTestId("mobile-bench-lineup").locator("xpath=ancestor::details");
+    await liveBenchDetails.locator("summary").click();
+    const liveBenchStatLine = page.getByTestId("mobile-bench-lineup").getByText("4 REC · 67 REC YDS · 1 REC TD", { exact: true });
+    await expect(liveBenchStatLine).toBeVisible();
+    await expect(liveBenchStatLine).toHaveAttribute("data-player-game-stat-line", "true");
     await page.screenshot({ path: "test-results/live-matchup-current-and-projection.png", fullPage: true });
 
     matchupPayload = kickoffOnlyPayload;

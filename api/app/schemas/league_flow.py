@@ -620,6 +620,10 @@ class RosterTabEntryRead(BaseModel):
     team_has_possession: bool = False
     team_in_red_zone: bool = False
     game_start_at: datetime | None = None
+    # A compact position-specific cumulative stat line for this player's
+    # current game. It is refreshed from live snapshots and retained as the
+    # verified final line once the game ends.
+    game_stat_line: str | None = None
     # A compact, verified final box-score summary for this player's current
     # roster-row game. This is deliberately display-ready rather than the
     # provider's full stat payload.
