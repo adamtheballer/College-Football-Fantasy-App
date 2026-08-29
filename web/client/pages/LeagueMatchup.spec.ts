@@ -21,6 +21,7 @@ vi.mock("@/components/league/WinChanceMeter", () => ({
 }));
 
 vi.mock("@/hooks/use-leagues", () => ({
+  matchupRefreshCountdownSeconds: () => null,
   useLeagueDetail: () => ({
     data: { draft: { status: "completed" }, status: "post_draft" },
     isLoading: false,

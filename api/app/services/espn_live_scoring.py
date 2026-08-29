@@ -650,7 +650,11 @@ def claim_due_espn_games(
             ProviderGamePoll.season == season,
             ProviderGamePoll.week == week,
             ProviderGamePoll.provider_game_id.notlike("discovery:%"),
-            ProviderGamePoll.status.in_(("scheduled", "live", "final", "delayed")),
+            # Scoreboard discovery is the authority for scheduled games.
+            # ESPN legitimately omits player box-score rows before kickoff;
+            # requesting their summaries treats that normal pregame response
+            # as a failure and can falsely mark the entire scoring week stale.
+            ProviderGamePoll.status.in_(("live", "final", "delayed")),
             or_(ProviderGamePoll.next_poll_at.is_(None), ProviderGamePoll.next_poll_at <= now),
             or_(ProviderGamePoll.lease_expires_at.is_(None), ProviderGamePoll.lease_expires_at <= now),
         )

@@ -1,5 +1,5 @@
 import { Bell, ChevronLeft, ChevronRight, MessageCircle, ShieldAlert } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
@@ -11,7 +11,12 @@ import { RivalWeekPatch } from "@/components/league/RivalWeekPatch";
 import { RivalryControls } from "@/components/league/RivalryControls";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
-import { useLeagueDetail, useLeagueMatchupTab, useLeagueScoreboard } from "@/hooks/use-leagues";
+import {
+  matchupRefreshCountdownSeconds,
+  useLeagueDetail,
+  useLeagueMatchupTab,
+  useLeagueScoreboard,
+} from "@/hooks/use-leagues";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import { managerNameForAvatar, managerTeamName } from "@/lib/manager-team-name";
 import type { LeagueMatchupTabResponse, LeagueMatchupTeam, LeagueScoreboardRow } from "@/types/league";
@@ -299,7 +304,15 @@ export default function LeagueMatchup() {
   const activeScoreRow = scheduledMatchups.find((matchup) => matchup.matchup_id === activeMatchupId);
   const activeMatchupIndex = Math.max(0, scheduledMatchups.findIndex((matchup) => matchup.matchup_id === activeMatchupId));
   const swipeStartX = useRef<number | null>(null);
+  const [refreshClock, setRefreshClock] = useState(() => Date.now());
   const scoringFreshnessMessage = freshnessText(data);
+  const refreshCountdownSeconds = matchupRefreshCountdownSeconds(data, matchupQuery.dataUpdatedAt, refreshClock);
+  useEffect(() => {
+    if (refreshCountdownSeconds === null) return;
+    setRefreshClock(Date.now());
+    const interval = window.setInterval(() => setRefreshClock(Date.now()), 1_000);
+    return () => window.clearInterval(interval);
+  }, [data?.live_scoring_freshness?.state, data?.next_refresh_at, data?.status, matchupQuery.dataUpdatedAt]);
   const scoringFreshnessTone = data?.live_scoring_freshness?.state === "fresh"
     ? "border-emerald-300/20 bg-emerald-300/[0.06] text-emerald-100"
     : ["delayed", "stale", "unavailable"].includes(data?.live_scoring_freshness?.state ?? "")
@@ -423,6 +436,11 @@ export default function LeagueMatchup() {
           {scoringFreshnessMessage ? (
             <p role="status" className={`mx-3 mt-3 rounded-lg border px-3 py-2 text-[11px] font-semibold sm:mx-5 ${scoringFreshnessTone}`}>
               {scoringFreshnessMessage}
+              {refreshCountdownSeconds !== null ? (
+                <span className="ml-2 font-black" data-testid="live-score-refresh-countdown">
+                  {matchupQuery.isFetching ? "Refreshing live scores…" : `Next score refresh in ${refreshCountdownSeconds}s.`}
+                </span>
+              ) : null}
             </p>
           ) : null}
 

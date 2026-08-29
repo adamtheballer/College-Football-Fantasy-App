@@ -61,11 +61,26 @@ def resolve_scoring_window(db, *, now: datetime | None = None) -> tuple[int, int
         return None
 
     # Prefer the most recently started possible game window, then the nearest
-    # verified upcoming kickoff.  Duplicate home/away schedule rows collapse
-    # naturally to the same season/week tuple.
+    # verified upcoming kickoff.  Resolve at the season/week level rather
+    # than choosing an arbitrary schedule row: a stale duplicate from a prior
+    # week can share a kickoff with the current week.  In that case choosing
+    # the first database row silently sends the worker to the wrong week.
     live = [row for row in rows if _as_utc(row.kickoff_at) <= current]
-    selected = max(live, key=lambda row: _as_utc(row.kickoff_at)) if live else rows[0]
-    return selected.season, selected.week
+    candidates = live or rows
+    windows: dict[tuple[int, int], list[TeamSchedule]] = {}
+    for row in candidates:
+        windows.setdefault((row.season, row.week), []).append(row)
+
+    def priority(item: tuple[tuple[int, int], list[TeamSchedule]]):
+        (season, week), window_rows = item
+        latest_kickoff = max(_as_utc(row.kickoff_at) for row in window_rows)
+        distinct_schools = len({row.team_name.strip().casefold() for row in window_rows if row.team_name.strip()})
+        # A canonical current-week import has the fuller schedule.  The
+        # season/week fallback keeps the choice deterministic if malformed
+        # duplicate windows have the same kickoff and school coverage.
+        return latest_kickoff, distinct_schools, season, week
+
+    return max(windows.items(), key=priority)[0]
 
 
 def run_iteration(*, now: datetime | None = None, client: ESPNClient | None = None) -> EspnCycleResult | None:
