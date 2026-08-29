@@ -5,7 +5,11 @@ import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const routerMocks = vi.hoisted(() => ({ setSearchParams: vi.fn(), navigate: vi.fn() }));
-const matchupMocks = vi.hoisted(() => ({ weekStarted: false, freshness: undefined as { state: string; relevant_game_count: number } | undefined }));
+const matchupMocks = vi.hoisted(() => ({
+  weekStarted: false,
+  freshness: undefined as { state: string; relevant_game_count: number } | undefined,
+  refreshCountdownSeconds: null as number | null,
+}));
 
 vi.mock("react-router-dom", () => ({
   Navigate: () => null,
@@ -23,7 +27,7 @@ vi.mock("@/components/league/WinChanceMeter", () => ({
 
 vi.mock("@/hooks/use-leagues", () => ({
   hasLiveRosteredPlayer: () => false,
-  matchupRefreshCountdownSeconds: () => null,
+  matchupRefreshCountdownSeconds: () => matchupMocks.refreshCountdownSeconds,
   useLeagueDetail: () => ({
     data: { draft: { status: "completed" }, status: "post_draft" },
     isLoading: false,
@@ -79,6 +83,7 @@ afterEach(() => {
   routerMocks.navigate.mockClear();
   matchupMocks.weekStarted = false;
   matchupMocks.freshness = undefined;
+  matchupMocks.refreshCountdownSeconds = null;
 });
 
 describe("league matchup helpers", () => {
@@ -186,6 +191,18 @@ describe("league matchup scoreboard", () => {
     expect(screen.queryByText("Pregame projection")).toBeNull();
     expect(screen.getAllByText("54.0%")).toHaveLength(2);
     expect(screen.getAllByText("46.0%")).toHaveLength(2);
+    expect(screen.getAllByText("0.0").every((score) => score.className.includes("text-cfb-brand"))).toBe(true);
+  });
+
+  it("places the blue three-minute countdown at the top of the matchup screen", () => {
+    matchupMocks.refreshCountdownSeconds = 180;
+
+    render(createElement(LeagueMatchup));
+
+    const timer = screen.getByTestId("live-score-refresh-countdown");
+    expect(timer.textContent).toContain("Live refresh");
+    expect(timer.textContent).toContain("3:00");
+    expect(timer.className).toContain("bg-cfb-brand");
   });
 
   it("does not render a stale-provider warning banner", () => {
