@@ -828,7 +828,6 @@ export function PlayerCardModal({
                     <tbody className="divide-y divide-white/10">
                       {gameLogQuery.data.games.map((row) => {
                         const stats = row.stats ? { ...row.stats.stats, fantasy_points: row.stats.fantasy_points } : undefined;
-                        const isCompletedGame = row.stat_status === "final";
                         return (
                           <tr key={row.schedule_id} className="text-sm font-bold text-white/75">
                             <td className="px-4 py-4 font-black tabular-nums text-white">{row.week}</td>
@@ -837,11 +836,11 @@ export function PlayerCardModal({
                               <p className="mt-1 text-[10px] font-bold text-white/40">{formatGameLogDate(row.date)}</p>
                             </td>
                             <td className="whitespace-nowrap px-4 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-white/55">{row.location_label}</td>
-                            <td className={`whitespace-nowrap px-4 py-4 text-xs font-black tabular-nums ${isCompletedGame ? "text-cfb-brand" : "text-white/70"}`}>{row.result ?? "—"}</td>
+                            <td className="whitespace-nowrap px-4 py-4 text-xs font-black tabular-nums text-white/70">{row.result ?? "—"}</td>
                             {gameLogColumnsForPosition(position).map(([label, keys]) => {
                               const value = row.location === "bye" ? null : gameLogStatValue(stats, keys);
                               return (
-                                <td key={label} className={`whitespace-nowrap px-4 py-4 text-right font-black tabular-nums ${isCompletedGame ? "text-cfb-brand" : "text-white"}`}>
+                                <td key={label} className="whitespace-nowrap px-4 py-4 text-right font-black tabular-nums text-white">
                                   {formatPlayerCardValue(value)}
                                 </td>
                               );
@@ -855,7 +854,6 @@ export function PlayerCardModal({
                 <div className="mt-5 space-y-3 md:hidden">
                   {gameLogQuery.data.games.map((row) => {
                     const stats = row.stats ? { ...row.stats.stats, fantasy_points: row.stats.fantasy_points } : undefined;
-                    const isCompletedGame = row.stat_status === "final";
                     return (
                       <article key={row.schedule_id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
                         <div className="flex items-start justify-between gap-3">
@@ -864,7 +862,7 @@ export function PlayerCardModal({
                             <p className="mt-1 font-black text-white">{gameLogOpponentLabel(row)}</p>
                             <p className="mt-1 text-xs font-bold text-white/45">{formatGameLogDate(row.date)} • {row.location_label}</p>
                           </div>
-                          <p className={`text-right text-xs font-black tabular-nums ${isCompletedGame ? "text-cfb-brand" : "text-white/70"}`}>{row.result ?? "—"}</p>
+                          <p className="text-right text-xs font-black tabular-nums text-white/70">{row.result ?? "—"}</p>
                         </div>
                         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
                           {gameLogColumnsForPosition(position).map(([label, keys]) => {
@@ -872,7 +870,7 @@ export function PlayerCardModal({
                             return (
                               <div key={label} className="flex items-center justify-between gap-3 text-xs">
                                 <span className="font-black uppercase tracking-[0.12em] text-white/45">{label}</span>
-                                <span className={`font-black tabular-nums ${isCompletedGame ? "text-cfb-brand" : "text-white"}`}>{formatPlayerCardValue(value)}</span>
+                                <span className="font-black tabular-nums text-white">{formatPlayerCardValue(value)}</span>
                               </div>
                             );
                           })}

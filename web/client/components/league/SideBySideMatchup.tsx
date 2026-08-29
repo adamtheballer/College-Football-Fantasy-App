@@ -240,7 +240,7 @@ function CompactMobileLineup({
         <div
           aria-hidden="true"
           data-mobile-slot-rail
-          className="pointer-events-none absolute inset-y-0 left-1/2 z-0 w-11 -translate-x-1/2 border-x border-[#101d31] bg-[#060c17]"
+          className="pointer-events-none absolute inset-y-0 left-1/2 z-0 w-14 -translate-x-1/2 border-x border-[#101d31] bg-[#060c17]"
         />
         {Array.from({ length: rowCount }, (_, index) => {
           const myPlayer = myPlayers[index];
@@ -253,12 +253,12 @@ function CompactMobileLineup({
             <div
               key={`${slot}-${index}`}
               data-mobile-matchup-row
-              className="relative z-10 grid min-h-[72px] grid-cols-[minmax(0,1fr)_2.75rem_minmax(0,1fr)] items-stretch px-3"
+              className="relative z-10 grid min-h-[72px] grid-cols-[minmax(0,1fr)_3.5rem_minmax(0,1fr)] items-stretch px-3"
             >
               <div data-mobile-player-live={myPlayerIsLive ? "true" : "false"} className={`flex min-w-0 items-center py-2 ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""} ${myPlayerIsLive ? "bg-slate-100/[0.10]" : ""}`}>
                 <CompactMatchupPlayer player={myPlayer} align="left" pointMode={pointMode} onSelect={onPlayerSelect} />
               </div>
-              <span data-mobile-slot-column className="inline-flex min-h-[72px] items-center justify-center px-1 text-[9px] font-black uppercase tracking-[0.04em] text-cfb-text-secondary">
+              <span data-mobile-slot-column className="inline-flex min-h-[72px] whitespace-nowrap items-center justify-center px-1 text-[9px] font-black uppercase tracking-[0.02em] text-cfb-text-secondary">
                 {slot}
               </span>
               <div data-mobile-player-live={opponentPlayerIsLive ? "true" : "false"} className={`flex min-w-0 items-center py-2 ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""} ${opponentPlayerIsLive ? "bg-slate-100/[0.10]" : ""}`}>
