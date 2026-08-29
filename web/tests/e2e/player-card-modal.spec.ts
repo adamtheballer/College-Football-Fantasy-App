@@ -251,9 +251,9 @@ test.describe("player card modal", () => {
     await expect(dialog.getByText("Season Stats", { exact: true })).toBeVisible();
     await expect(dialog.getByRole("columnheader", { name: "Fantasy Points" })).toHaveCount(0);
     await expect(dialog.getByRole("columnheader", { name: "Rec Yds" })).toBeVisible();
-    await expect(dialog.getByLabel("Historical stats table; scroll horizontally for all columns")).toBeVisible();
+    await expect(dialog.getByLabel("Season stats table; scroll horizontally for all columns")).toBeVisible();
     expect(await dialog.getByRole("columnheader").allTextContents()).toEqual([
-      "Year", "Team", "Pos", "Receptions", "Rec Yds", "Rec TD", "Rush Yds", "Rush TD", "Games", "Pass Yds",
+      "Year", "Team", "Pos", "GP", "FPTS", "Receptions", "Targets", "Rec Yds", "Rec TD", "Rush Att", "Rush Yds", "Rush TD", "Pass Yds",
     ]);
 
     await page.getByRole("button", { name: /Close player card/i }).click();
