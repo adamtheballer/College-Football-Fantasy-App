@@ -50,6 +50,9 @@ const pointModeForMatchupStatus = (status?: string | null): RosterPointMode =>
 const playerGameIsFinal = (player?: LeagueRosterPlayer) =>
   ["final", "post"].includes((player?.live_game_state ?? "").toLowerCase());
 
+const playerGameIsLive = (player?: LeagueRosterPlayer) =>
+  Boolean(player?.player_id && (player.live_game_state ?? "").toLowerCase() === "live");
+
 export const compactMatchupPlayerName = (name?: string | null) => {
   const parts = name?.trim().split(/\s+/).filter(Boolean) ?? [];
   if (parts.length < 2) return name?.trim() || "No starter set";
@@ -106,6 +109,8 @@ function CompactMatchupPlayer({
   const hasPlayer = Boolean(player?.player_id && player.player_name);
   const points = compactPointValue(player, pointMode);
   const liveDetail = player ? liveProjectionDetail(player) : null;
+  const isLiveGame = playerGameIsLive(player);
+  const hasPossession = isLiveGame && player?.team_has_possession === true;
   const isFinalGame = playerGameIsFinal(player);
   const playerName = hasPlayer ? compactMatchupPlayerName(player?.player_name) : "No starter set";
   const gameMatchup = hasPlayer ? formatPlayerGameMatchup(player) : "Set a starter in your roster";
@@ -131,6 +136,7 @@ function CompactMatchupPlayer({
             <PlayerAvailabilityIndicator status={player?.injury_status}>
               <span className="truncate">{playerName}</span>
             </PlayerAvailabilityIndicator>
+            {hasPossession ? <span role="img" aria-label="Team has possession" className="shrink-0 text-[11px] leading-none">🏈</span> : null}
             {isFinalGame ? <Lock aria-label="Game final" className="h-2.5 w-2.5 shrink-0 text-cfb-text-muted" /> : null}
           </p>
           <p data-player-game-matchup className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
@@ -144,11 +150,11 @@ function CompactMatchupPlayer({
     );
     return (
       interactive ? (
-        <button type="button" data-mobile-matchup-player="right" aria-label={`Open ${playerName} player card`} onClick={openPlayerCard} className={`grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)] gap-x-1.5 ${interactiveClassName}`}>
+        <button type="button" data-mobile-matchup-player="right" data-live-game-state={isLiveGame ? "live" : "unavailable"} data-has-possession={hasPossession ? "true" : "false"} aria-label={`Open ${playerName} player card`} onClick={openPlayerCard} className={`grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)] gap-x-1.5 ${interactiveClassName}`}>
           {content}
         </button>
       ) : (
-        <div data-mobile-matchup-player="right" className="grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)] gap-x-1.5 text-left">
+        <div data-mobile-matchup-player="right" data-live-game-state={isLiveGame ? "live" : "unavailable"} data-has-possession={hasPossession ? "true" : "false"} className="grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)] gap-x-1.5 text-left">
           {content}
         </div>
       )
@@ -162,6 +168,7 @@ function CompactMatchupPlayer({
           <PlayerAvailabilityIndicator status={player?.injury_status}>
             <span className="truncate">{playerName}</span>
           </PlayerAvailabilityIndicator>
+          {hasPossession ? <span role="img" aria-label="Team has possession" className="shrink-0 text-[11px] leading-none">🏈</span> : null}
           {isFinalGame ? <Lock aria-label="Game final" className="h-2.5 w-2.5 shrink-0 text-cfb-text-muted" /> : null}
         </p>
         <p data-player-game-matchup className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
@@ -177,11 +184,11 @@ function CompactMatchupPlayer({
 
   return (
     interactive ? (
-      <button type="button" data-mobile-matchup-player="left" aria-label={`Open ${playerName} player card`} onClick={openPlayerCard} className={`grid min-w-0 grid-cols-[minmax(0,1fr)_2.75rem] gap-x-1.5 ${interactiveClassName}`}>
+      <button type="button" data-mobile-matchup-player="left" data-live-game-state={isLiveGame ? "live" : "unavailable"} data-has-possession={hasPossession ? "true" : "false"} aria-label={`Open ${playerName} player card`} onClick={openPlayerCard} className={`grid min-w-0 grid-cols-[minmax(0,1fr)_2.75rem] gap-x-1.5 ${interactiveClassName}`}>
         {content}
       </button>
     ) : (
-      <div data-mobile-matchup-player="left" className="grid min-w-0 grid-cols-[minmax(0,1fr)_2.75rem] gap-x-1.5 text-left">
+      <div data-mobile-matchup-player="left" data-live-game-state={isLiveGame ? "live" : "unavailable"} data-has-possession={hasPossession ? "true" : "false"} className="grid min-w-0 grid-cols-[minmax(0,1fr)_2.75rem] gap-x-1.5 text-left">
         {content}
       </div>
     )
@@ -226,19 +233,21 @@ function CompactMobileLineup({
           const opponentPlayer = opponentPlayers[index];
           const slot = compactSlot(myPlayer ?? opponentPlayer);
           const hasFollowingRow = index < rowCount - 1;
+          const myPlayerIsLive = playerGameIsLive(myPlayer);
+          const opponentPlayerIsLive = playerGameIsLive(opponentPlayer);
           return (
             <div
               key={`${slot}-${index}`}
               data-mobile-matchup-row
               className="relative z-10 grid min-h-[72px] grid-cols-[minmax(0,1fr)_2.75rem_minmax(0,1fr)] items-stretch px-3"
             >
-              <div className={`flex min-w-0 items-center py-2 ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""}`}>
+              <div data-mobile-player-live={myPlayerIsLive ? "true" : "false"} className={`flex min-w-0 items-center py-2 ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""} ${myPlayerIsLive ? "bg-slate-100/[0.10]" : ""}`}>
                 <CompactMatchupPlayer player={myPlayer} align="left" pointMode={pointMode} onSelect={onPlayerSelect} />
               </div>
               <span data-mobile-slot-column className="inline-flex min-h-[72px] items-center justify-center px-1 text-[9px] font-black uppercase tracking-[0.04em] text-cfb-text-secondary">
                 {slot}
               </span>
-              <div className={`flex min-w-0 items-center py-2 ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""}`}>
+              <div data-mobile-player-live={opponentPlayerIsLive ? "true" : "false"} className={`flex min-w-0 items-center py-2 ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""} ${opponentPlayerIsLive ? "bg-slate-100/[0.10]" : ""}`}>
                 <CompactMatchupPlayer player={opponentPlayer} align="right" pointMode={pointMode} onSelect={onPlayerSelect} />
               </div>
             </div>

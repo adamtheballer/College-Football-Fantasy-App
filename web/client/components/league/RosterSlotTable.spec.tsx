@@ -167,6 +167,7 @@ describe("RosterSlotTable", () => {
     const row = container.querySelector('[data-has-possession="true"]');
 
     expect(row?.className).toContain("bg-slate-100/[0.10]");
-    expect(screen.getByText("Possession")).toBeTruthy();
+    expect(screen.getByLabelText("Team has possession")).toBeTruthy();
+    expect(screen.queryByText("Possession")).toBeNull();
   });
 });
