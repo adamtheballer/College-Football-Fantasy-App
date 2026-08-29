@@ -189,13 +189,51 @@ export function useLeagueRosterTab(
   });
 }
 
+export const LIVE_MATCHUP_REFRESH_MS = 180_000;
+export const DEGRADED_MATCHUP_REFRESH_MS = 10_000;
+
+function hasDegradedLiveScoring(data: LeagueMatchupTabResponse | undefined) {
+  return ["delayed", "stale", "unavailable"].includes(data?.live_scoring_freshness?.state ?? "");
+}
+
+export function matchupRefreshInterval(data: LeagueMatchupTabResponse | undefined, now = Date.now()) {
+  const status = data?.status?.toLowerCase();
+  if (status === "live" || status === "delayed") {
+    if (hasDegradedLiveScoring(data)) return DEGRADED_MATCHUP_REFRESH_MS;
+    const nextRefreshAt = data?.next_refresh_at;
+    if (nextRefreshAt) {
+      const remaining = new Date(nextRefreshAt).getTime() - now;
+      if (Number.isFinite(remaining) && remaining > 0) return Math.max(15_000, remaining);
+    }
+    return LIVE_MATCHUP_REFRESH_MS;
+  }
+  if (status === "final" || status === "stat_corrected") return false;
+  return 30_000;
+}
+
+export function matchupRefreshCountdownSeconds(
+  data: LeagueMatchupTabResponse | undefined,
+  dataUpdatedAt: number | undefined,
+  now = Date.now(),
+) {
+  const status = data?.status?.toLowerCase();
+  if (status !== "live" && status !== "delayed") return null;
+  const interval = matchupRefreshInterval(data, now);
+  if (typeof interval !== "number") return null;
+  const parsedNextRefresh = new Date(data?.next_refresh_at ?? "").getTime();
+  const useProviderTarget = !hasDegradedLiveScoring(data) && Number.isFinite(parsedNextRefresh) && parsedNextRefresh > now;
+  const target = useProviderTarget
+    ? parsedNextRefresh
+    : (typeof dataUpdatedAt === "number" && dataUpdatedAt > 0 ? dataUpdatedAt : now) + interval;
+  return Math.max(0, Math.ceil((target - now) / 1_000));
+}
+
 export function useLeagueMatchupTab(
   leagueId?: number,
   week?: number,
   matchupId?: number,
   enabled = true
 ) {
-  const LIVE_REFRESH_MS = 180_000;
   return useQuery({
     queryKey: ["league", leagueId, "matchup", week ?? "auto", matchupId ?? "mine"],
     enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
@@ -211,19 +249,7 @@ export function useLeagueMatchupTab(
         week: typeof week === "number" ? week : undefined,
         matchup_id: typeof matchupId === "number" ? matchupId : undefined,
       }),
-    refetchInterval: (query) => {
-      const status = query.state.data?.status?.toLowerCase();
-      if (status === "live") {
-        const nextRefreshAt = query.state.data?.next_refresh_at;
-        if (nextRefreshAt) {
-          const remaining = new Date(nextRefreshAt).getTime() - Date.now();
-          if (Number.isFinite(remaining) && remaining > 0) return Math.max(15_000, remaining);
-        }
-        return LIVE_REFRESH_MS;
-      }
-      if (status === "final" || status === "stat_corrected") return false;
-      return 30_000;
-    },
+    refetchInterval: (query) => matchupRefreshInterval(query.state.data),
     refetchIntervalInBackground: true,
   });
 }

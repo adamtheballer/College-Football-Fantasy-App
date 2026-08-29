@@ -27,6 +27,7 @@ from collegefootballfantasy_api.app.services.espn_stats_sync import UnresolvedKi
 from collegefootballfantasy_api.app.services.espn_live_scoring import (
     MIN_GAME_POLL_INTERVAL_SECONDS,
     SnapshotOrderMetadata,
+    _event_status,
     claim_due_espn_games,
     classify_snapshot_order,
     discover_relevant_espn_games,
@@ -155,6 +156,48 @@ def _make_public_promotion_ready(db_session, *, at):
     heartbeat.status = "healthy"
     heartbeat.heartbeat_at = at
     db_session.commit()
+
+
+def test_espn_status_names_with_the_provider_prefix_are_classified_as_live():
+    assert _event_status({"status": {"type": {"name": "STATUS_IN_PROGRESS"}}}) == "live"
+    assert _event_status({"status": {"type": {"name": "STATUS_FINAL", "completed": True}}}) == "final"
+
+
+def test_resolve_scoring_window_prefers_the_complete_current_week_when_stale_week_rows_tie(db_session):
+    """A duplicate prior-week row must not starve the actual live week."""
+
+    kickoff = datetime(2026, 8, 29, 19, 30, tzinfo=timezone.utc)
+    db_session.add_all(
+        [
+            TeamSchedule(team_name="North Carolina", season=2026, week=0, opponent_name="TCU", location="home", is_bye=False, kickoff_at=datetime(2026, 8, 29, 16, 0, tzinfo=timezone.utc)),
+            TeamSchedule(team_name="NC State", season=2026, week=0, opponent_name="Virginia", location="home", is_bye=False, kickoff_at=kickoff),
+            TeamSchedule(team_name="Virginia", season=2026, week=0, opponent_name="NC State", location="away", is_bye=False, kickoff_at=kickoff),
+            TeamSchedule(team_name="North Carolina", season=2026, week=1, opponent_name="TCU", location="home", is_bye=False, kickoff_at=datetime(2026, 8, 29, 16, 0, tzinfo=timezone.utc)),
+            TeamSchedule(team_name="TCU", season=2026, week=1, opponent_name="North Carolina", location="away", is_bye=False, kickoff_at=datetime(2026, 8, 29, 16, 0, tzinfo=timezone.utc)),
+            TeamSchedule(team_name="USC", season=2026, week=1, opponent_name="San José State", location="home", is_bye=False, kickoff_at=datetime(2026, 8, 29, 19, 0, tzinfo=timezone.utc)),
+            TeamSchedule(team_name="NC State", season=2026, week=1, opponent_name="Virginia", location="home", is_bye=False, kickoff_at=kickoff),
+            TeamSchedule(team_name="Virginia", season=2026, week=1, opponent_name="NC State", location="away", is_bye=False, kickoff_at=kickoff),
+        ]
+    )
+    db_session.commit()
+
+    assert scoring_worker.resolve_scoring_window(db_session, now=datetime(2026, 8, 29, 20, 13, tzinfo=timezone.utc)) == (2026, 1)
+
+
+def test_scheduled_games_are_not_claimed_before_espn_publishes_box_scores(db_session):
+    db_session.add(
+        ProviderGamePoll(
+            provider="espn",
+            provider_game_id="pregame-event",
+            season=2026,
+            week=1,
+            status="scheduled",
+            next_poll_at=NOW,
+        )
+    )
+    db_session.commit()
+
+    assert claim_due_espn_games(db_session, season=2026, week=1, now=NOW) == []
 
 
 def _synthetic_live_matchup(db_session, *, at):
