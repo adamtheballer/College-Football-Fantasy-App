@@ -12,6 +12,7 @@ import { RivalryControls } from "@/components/league/RivalryControls";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
 import {
+  hasLiveRosteredPlayer,
   matchupRefreshCountdownSeconds,
   useLeagueDetail,
   useLeagueMatchupTab,
@@ -43,6 +44,11 @@ export function matchupStatusVariant(status: string | null | undefined): StatusB
 
 export function formatMatchupPoints(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "—";
+}
+
+export function formatRefreshCountdown(seconds: number) {
+  const remaining = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}`;
 }
 
 export function shouldShowMatchupScorePanels(status: string | null | undefined) {
@@ -299,11 +305,13 @@ export default function LeagueMatchup() {
   const myTeam = data?.my_team ?? data?.user_team ?? null;
   const opponentTeam = data?.opponent_team ?? null;
   const displayWeek = data?.week ?? selectedWeek;
+  const rosteredPlayerIsLive = hasLiveRosteredPlayer(data);
   const hasScheduledMatchup = Boolean(data?.matchup_id && myTeam && opponentTeam);
   const scoreboardQuery = useLeagueScoreboard(
     parsedLeagueId,
     displayWeek,
     postDraft,
+    rosteredPlayerIsLive,
   );
   const scheduledMatchups = scoreboardQuery.data?.data ?? [];
   const activeMatchupId = selectedMatchupId ?? data?.matchup_id;
@@ -317,7 +325,7 @@ export default function LeagueMatchup() {
     setRefreshClock(Date.now());
     const interval = window.setInterval(() => setRefreshClock(Date.now()), 1_000);
     return () => window.clearInterval(interval);
-  }, [data?.live_scoring_freshness?.state, data?.next_refresh_at, data?.status, matchupQuery.dataUpdatedAt]);
+  }, [rosteredPlayerIsLive, data?.status, matchupQuery.dataUpdatedAt]);
   const updateSelection = (week: number, matchupId?: number) => {
     const next = new URLSearchParams(searchParams);
     next.set("week", String(week));
@@ -435,7 +443,7 @@ export default function LeagueMatchup() {
 
           {refreshCountdownSeconds !== null ? (
             <p className="mx-3 mt-3 text-center text-[10px] font-bold text-cfb-text-muted sm:mx-5" data-testid="live-score-refresh-countdown">
-              {matchupQuery.isFetching ? "Refreshing live scores…" : `Next score refresh in ${refreshCountdownSeconds}s.`}
+              {matchupQuery.isFetching ? "Refreshing live scores…" : `Next score refresh in ${formatRefreshCountdown(refreshCountdownSeconds)}.`}
             </p>
           ) : null}
 

@@ -38,6 +38,7 @@ from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.services.espn_stats_sync import (
+    persist_final_espn_player_game_stats,
     normalize_espn_summary_player_stats,
     persist_normalized_espn_player_stats,
 )
@@ -171,6 +172,44 @@ def _summary_status(summary: dict[str, Any], fallback: str) -> str:
     if not isinstance(header, dict):
         return fallback
     return _event_status(header)
+
+
+def _final_score_from_summary(summary: dict[str, Any]) -> tuple[int, int] | None:
+    """Return trusted home/away final scores from an ESPN summary.
+
+    This is intentionally limited to a provider-declared final summary. A
+    live score must not populate ``Game.home_points`` / ``away_points``
+    because the player game log uses those values as its final-result signal.
+    """
+
+    if _summary_status(summary, "scheduled") != "final":
+        return None
+    header = summary.get("header")
+    if not isinstance(header, dict):
+        return None
+    competitions = header.get("competitions")
+    if not isinstance(competitions, list) or not competitions or not isinstance(competitions[0], dict):
+        return None
+    competitors = competitions[0].get("competitors")
+    if not isinstance(competitors, list):
+        return None
+    scores: dict[str, int] = {}
+    for competitor in competitors:
+        if not isinstance(competitor, dict):
+            continue
+        home_away = str(competitor.get("homeAway") or "").strip().lower()
+        if home_away not in {"home", "away"}:
+            continue
+        try:
+            score = int(str(competitor.get("score")).strip())
+        except (TypeError, ValueError):
+            continue
+        if score < 0:
+            continue
+        scores[home_away] = score
+    if "home" not in scores or "away" not in scores:
+        return None
+    return scores["home"], scores["away"]
 
 
 def _summary_status_payload(summary: dict[str, Any]) -> dict[str, Any]:
@@ -932,6 +971,75 @@ def _assert_complete_espn_summary(
         raise ProviderDataIncompleteError("ESPN summary is missing a previously verified player row")
 
 
+def _backfill_accepted_final_espn_game_stats(
+    db: Session,
+    *,
+    season: int,
+    week: int,
+) -> bool:
+    """Reconcile previously accepted final ESPN snapshots into player history.
+
+    This keeps the feature deployment-safe: games that became final before a
+    worker version learned to persist ``PlayerGameStat`` rows still appear in
+    the player card without another provider request. Only the durable,
+    accepted final snapshot is used; rejected, stale, and live captures never
+    become historical box scores.
+    """
+
+    changed = False
+    polls = (
+        db.query(ProviderGamePoll)
+        .filter(
+            ProviderGamePoll.provider == ESPN_PROVIDER,
+            ProviderGamePoll.season == season,
+            ProviderGamePoll.week == week,
+            ProviderGamePoll.status == "final",
+        )
+        .all()
+    )
+    for poll in polls:
+        snapshot = _accepted_snapshot(db, poll)
+        if snapshot is None or snapshot.event_state != "final":
+            continue
+        rows = snapshot.normalized_rows if isinstance(snapshot.normalized_rows, list) else []
+        if not rows:
+            continue
+        game = (
+            db.query(Game)
+            .filter(
+                Game.external_id == poll.provider_game_id,
+                Game.season == season,
+                Game.week == week,
+            )
+            .one_or_none()
+        )
+        if game is None:
+            continue
+        changed = bool(
+            persist_final_espn_player_game_stats(
+                db,
+                season=season,
+                week=week,
+                game_id=game.id,
+                normalized_rows=rows,
+            )
+        ) or changed
+        final_score = _final_score_from_summary(snapshot.raw_payload)
+        if final_score is None:
+            continue
+        home_points, away_points = final_score
+        if (
+            game.home_points != home_points
+            or game.away_points != away_points
+            or game.schedule_status != "final"
+        ):
+            game.home_points = home_points
+            game.away_points = away_points
+            game.schedule_status = "final"
+            changed = True
+    return changed
+
+
 def run_espn_scoring_cycle(
     db: Session,
     *,
@@ -970,6 +1078,8 @@ def run_espn_scoring_cycle(
     claims = claim_due_espn_games(db, season=season, week=week, worker_id=worker_id, now=current)
     successful = failed = normalized_count = unmatched_count = promoted = 0
     pending_promotion: list[dict[str, Any]] = []
+    pending_final_game_stats: dict[int, list[dict[str, Any]]] = {}
+    pending_final_game_scores: dict[int, tuple[int, int]] = {}
     corrected_provider_game_ids: set[str] = set()
     for claim in claims:
         try:
@@ -1016,6 +1126,21 @@ def run_espn_scoring_cycle(
                 corrected_provider_game_ids.add(claim.provider_game_id)
             if decision.accepted:
                 pending_promotion.extend(normalized)
+                if _summary_status(summary, "scheduled") == "final":
+                    game = (
+                        db.query(Game)
+                        .filter(
+                            Game.external_id == claim.provider_game_id,
+                            Game.season == season,
+                            Game.week == week,
+                        )
+                        .one_or_none()
+                    )
+                    if game is not None:
+                        pending_final_game_stats[game.id] = normalized
+                        final_score = _final_score_from_summary(summary)
+                        if final_score is not None:
+                            pending_final_game_scores[game.id] = final_score
                 if mode == "enabled":
                     # This consumes the same accepted, persisted provider
                     # snapshot as scoring. It makes no provider request. Keep
@@ -1043,22 +1168,66 @@ def run_espn_scoring_cycle(
             record_espn_game_failure(db, claim=claim, error=error, now=current)
             failed += 1
 
+    accepted_final_snapshot_exists = (
+        db.query(ProviderGamePoll.id)
+        .filter(
+            ProviderGamePoll.provider == ESPN_PROVIDER,
+            ProviderGamePoll.season == season,
+            ProviderGamePoll.week == week,
+            ProviderGamePoll.status == "final",
+            ProviderGamePoll.accepted_snapshot_hash.isnot(None),
+        )
+        .first()
+        is not None
+    )
+    if mode == "enabled" and (pending_promotion or accepted_final_snapshot_exists):
+        # This gate protects every public mutation below, including the
+        # one-time reconciliation of final snapshots captured before this
+        # player-history feature was deployed.
+        from collegefootballfantasy_api.app.services.live_scoring_readiness import assert_public_scoring_ready
+
+        assert_public_scoring_ready(db, season=season, week=week, now=current)
+
     if mode == "enabled" and pending_promotion:
         # Promotion is intentionally a short database operation after every
         # provider request has completed.  Shadow mode stops before this line.
         # The gate lives at the authority boundary, not only in process
         # configuration: a worker may start correctly then encounter an
         # unresolved starter or an unhealthy provider before a later cycle.
-        from collegefootballfantasy_api.app.services.live_scoring_readiness import assert_public_scoring_ready
-
-        assert_public_scoring_ready(db, season=season, week=week, now=current)
         promoted = persist_normalized_espn_player_stats(
             db,
             season=season,
             week=week,
             normalized_rows=pending_promotion,
         )
+        for game_id, rows in pending_final_game_stats.items():
+            persist_final_espn_player_game_stats(
+                db,
+                season=season,
+                week=week,
+                game_id=game_id,
+                normalized_rows=rows,
+            )
+        for game_id, (home_points, away_points) in pending_final_game_scores.items():
+            game = db.get(Game, game_id)
+            if game is not None:
+                game.home_points = home_points
+                game.away_points = away_points
+                game.schedule_status = "final"
         db.commit()
+
+    if mode == "enabled":
+        # Reconcile accepted final snapshots from before the player-card
+        # history feature was deployed. This is idempotent and does not make
+        # an external provider request.
+        if _backfill_accepted_final_espn_game_stats(
+            db,
+            season=season,
+            week=week,
+        ):
+            db.commit()
+
+    if mode == "enabled" and pending_promotion:
         # Existing scoring is the sole public-score authority.  It reads the
         # newly promoted canonical totals and transactionally updates every
         # affected league from the same shared provider cache.

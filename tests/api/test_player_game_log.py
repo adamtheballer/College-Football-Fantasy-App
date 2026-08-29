@@ -1,3 +1,5 @@
+from datetime import date, datetime, timezone
+
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
@@ -140,6 +142,116 @@ def test_player_game_log_attaches_weekly_live_stats_when_game_level_stats_are_un
     assert row["stat_status"] == "active"
     assert row["stats"]["fantasy_points"] == 18.2
     assert row["stats"]["stats"]["receiving_yards"] == 104
+
+
+def test_player_game_log_discards_a_duplicate_legacy_team_week_for_the_same_game(client, db_session):
+    """A stale Week 0 import must not render beside the canonical Week 1 game."""
+
+    player = Player(name="Duplicate Schedule Quarterback", position="QB", school="USC")
+    legacy = Game(
+        external_id="sheet-2026-w0-usc-vs-san-jose-state",
+        season=2026,
+        week=0,
+        home_team="USC",
+        away_team="San José State",
+    )
+    espn_game = Game(
+        external_id="401864494",
+        season=2026,
+        week=1,
+        home_team="USC",
+        away_team="San José State",
+        start_date=datetime(2026, 8, 29, 19, tzinfo=timezone.utc),
+    )
+    db_session.add_all([player, legacy, espn_game])
+    db_session.flush()
+    db_session.add_all(
+        [
+            TeamSchedule(
+                team_name="USC",
+                season=2026,
+                week=0,
+                game_id=legacy.id,
+                opponent_name="San José State",
+                location="home",
+                is_bye=False,
+                game_date=date(2026, 8, 29),
+            ),
+            TeamSchedule(
+                team_name="USC",
+                season=2026,
+                week=1,
+                game_id=espn_game.id,
+                opponent_name="San José State",
+                location="home",
+                is_bye=False,
+                game_date=date(2026, 8, 29),
+                kickoff_at=datetime(2026, 8, 29, 19, tzinfo=timezone.utc),
+            ),
+            PlayerStat(
+                player_id=player.id,
+                season=2026,
+                week=1,
+                source="espn",
+                stats={"EventID": "401864494", "pass_yards": 201, "pass_tds": 1},
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(f"/players/{player.id}/game-log", params={"season": 2026})
+
+    assert response.status_code == 200
+    assert [row["week"] for row in response.json()["games"]] == [1]
+    assert response.json()["games"][0]["game_id"] == espn_game.id
+    assert response.json()["games"][0]["stats"]["stats"]["pass_yards"] == 201
+
+
+def test_player_game_log_marks_a_persisted_final_espn_box_score_complete(client, db_session):
+    player = Player(name="Final Box Score Receiver", position="WR", school="Ohio State")
+    game = Game(
+        external_id="final-boxscore-game",
+        season=2026,
+        week=1,
+        home_team="Ohio State",
+        away_team="Texas",
+    )
+    db_session.add_all([player, game])
+    db_session.flush()
+    db_session.add_all(
+        [
+            TeamSchedule(
+                team_name="Ohio State",
+                season=2026,
+                week=1,
+                game_id=game.id,
+                opponent_name="Texas",
+                location="home",
+                is_bye=False,
+                neutral_site=False,
+                conference_game=False,
+                date_confirmed=True,
+            ),
+            PlayerGameStat(
+                player_id=player.id,
+                game_id=game.id,
+                season=2026,
+                week=1,
+                source="espn_final_boxscore",
+                stats={"receptions": 6, "rec_yards": 104, "rec_tds": 1},
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(f"/players/{player.id}/game-log", params={"season": 2026})
+
+    assert response.status_code == 200
+    row = response.json()["games"][0]
+    assert row["game_status"] == "final"
+    assert row["stat_status"] == "final"
+    assert row["stats"]["source"] == "espn_final_boxscore"
+    assert row["stats"]["stats"]["rec_yards"] == 104
 
 
 def test_player_game_log_does_not_invent_schedule_for_unmatched_school(client, db_session):

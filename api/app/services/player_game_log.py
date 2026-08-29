@@ -116,10 +116,16 @@ def _game_result(schedule: TeamSchedule, game: Game | None) -> str | None:
     return f"{outcome} {team_points}\u2013{opponent_points}"
 
 
+def _has_final_box_score(stat: PlayerGameStat | PlayerStat | None) -> bool:
+    """Only the worker's final-game record can finalize a scoreless schedule row."""
+
+    return isinstance(stat, PlayerGameStat) and stat.source == "espn_final_boxscore"
+
+
 def _game_status(schedule: TeamSchedule, game: Game | None, stat: PlayerGameStat | PlayerStat | None) -> str:
     if schedule.is_bye:
         return "bye"
-    if _game_result(schedule, game) is not None:
+    if _game_result(schedule, game) is not None or _has_final_box_score(stat):
         return "final"
     # A provider may publish in-progress player statistics before the team
     # final score is available.  Never describe that as a final game.
@@ -129,7 +135,7 @@ def _game_status(schedule: TeamSchedule, game: Game | None, stat: PlayerGameStat
 def _stat_status(schedule: TeamSchedule, game: Game | None, stat: PlayerGameStat | PlayerStat | None) -> str:
     if schedule.is_bye:
         return "not_available"
-    if _game_result(schedule, game) is not None:
+    if _game_result(schedule, game) is not None or _has_final_box_score(stat):
         return "final" if stat is not None else "missing"
     return "active" if stat is not None else "scheduled"
 
@@ -141,6 +147,76 @@ def _league_scoring_rules(db: Session, league_id: int | None) -> dict | None:
         raise ValueError("league not found")
     settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league_id).one_or_none()
     return settings.scoring_json if settings and settings.scoring_json else {}
+
+
+def _provider_event_id(stat: PlayerGameStat | PlayerStat | None) -> str | None:
+    if stat is None:
+        return None
+    for key in ("EventID", "event_id", "eventId"):
+        value = stat.stats.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return None
+
+
+def _schedule_duplicate_key(schedule: TeamSchedule) -> tuple[object, ...]:
+    """Identify impossible duplicate schedule rows without merging real games."""
+
+    if schedule.is_bye:
+        return ("bye", schedule.week)
+    if schedule.game_date is not None and schedule.opponent_name:
+        # A college team cannot play the same opponent twice on the same date.
+        # This is the stable key for legacy Week 0/Week 1 duplicate imports.
+        return (
+            "dated-game",
+            canonical_team_name(schedule.team_name),
+            canonical_team_name(schedule.opponent_name),
+            schedule.game_date.isoformat(),
+        )
+    if schedule.game_id is not None:
+        return ("game-id", schedule.game_id)
+    return ("schedule", schedule.id)
+
+
+def _canonical_player_schedules(
+    schedules: list[TeamSchedule],
+    *,
+    games_by_id: dict[int, Game],
+    stats_by_game: dict[int, PlayerGameStat],
+    stats_by_week: dict[int, PlayerStat],
+) -> list[TeamSchedule]:
+    """Return one schedule row per actual game, preferring verified evidence.
+
+    Legacy imports may contain the same game twice under different week
+    numbers. The player card must not show a phantom game simply because that
+    stale row survived beside the canonical ESPN-linked schedule record.
+    """
+
+    canonical: dict[tuple[object, ...], TeamSchedule] = {}
+
+    def priority(schedule: TeamSchedule) -> tuple[int, int, int, int, int]:
+        game = games_by_id.get(schedule.game_id) if schedule.game_id is not None else None
+        stat = (
+            stats_by_game.get(schedule.game_id)
+            if schedule.game_id is not None
+            else None
+        ) or stats_by_week.get(schedule.week)
+        event_id = _provider_event_id(stat)
+        game_event_id = str(game.external_id).strip() if game and game.external_id else ""
+        return (
+            int(bool(event_id and event_id == game_event_id)),
+            int(stat is not None),
+            int(game_event_id.isdecimal()),
+            int(schedule.kickoff_at is not None),
+            schedule.week,
+        )
+
+    for schedule in schedules:
+        key = _schedule_duplicate_key(schedule)
+        current = canonical.get(key)
+        if current is None or priority(schedule) > priority(current):
+            canonical[key] = schedule
+    return sorted(canonical.values(), key=lambda schedule: (schedule.week, schedule.id))
 
 
 def build_player_game_log(
@@ -200,6 +276,12 @@ def build_player_game_log(
         )
         .all()
     }
+    player_schedules = _canonical_player_schedules(
+        player_schedules,
+        games_by_id=games_by_id,
+        stats_by_game=stats_by_game,
+        stats_by_week=stats_by_week,
+    )
     rows: list[PlayerGameLogRowRead] = []
     for schedule in player_schedules:
         game = games_by_id.get(schedule.game_id) if schedule.game_id is not None else None

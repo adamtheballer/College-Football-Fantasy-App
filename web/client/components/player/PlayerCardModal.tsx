@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, AlertTriangle, BarChart3, CalendarDays, History, Info, Loader2, Newspaper } from "lucide-react";
 
-import { useLeaguePlayerHistory, usePlayerGameLog, usePlayerTradeValues, usePlayerTrajectory, type PlayerCardResponse } from "@/hooks/use-players";
+import { useLeaguePlayerHistory, usePlayerGameLog, usePlayerTradeValues, usePlayerTrajectory, type PlayerCardResponse, type PlayerGameLogResponse } from "@/hooks/use-players";
 import {
   getHistoricalStatColumnsForPosition,
   historicalStatValuesForSeason,
@@ -237,6 +237,36 @@ export const gameLogColumnsForPosition = (position: string): readonly GameLogCol
   }
 };
 
+export const completedSeasonGameTotals = (
+  games: PlayerGameLogResponse["games"],
+  position: string,
+) => {
+  const completedGames = games.filter(
+    (game) => game.game_status === "final" && game.location !== "bye" && game.stats,
+  );
+  return {
+    gamesPlayed: completedGames.length,
+    totals: gameLogColumnsForPosition(position).map(([label, keys]) => {
+      let total = 0;
+      let hasValue = false;
+      for (const game of completedGames) {
+        const stats = game.stats
+          ? { ...game.stats.stats, fantasy_points: game.stats.fantasy_points }
+          : undefined;
+        const value = gameLogStatValue(stats, keys);
+        const numeric = typeof value === "number"
+          ? value
+          : typeof value === "string" && value.trim() ? Number(value) : Number.NaN;
+        if (Number.isFinite(numeric)) {
+          total += numeric;
+          hasValue = true;
+        }
+      }
+      return [label, hasValue ? Math.round(total * 100) / 100 : null] as const;
+    }),
+  };
+};
+
 export const gameLogOpponentLabel = (row: { location: string; opponent_name?: string | null }) => {
   if (row.location === "bye") return "BYE";
   if (!row.opponent_name) return "TBD";
@@ -377,7 +407,12 @@ export function PlayerCardModal({
   const hasLeagueContext = typeof leagueId === "number" && Number.isFinite(leagueId) && leagueId > 0;
   const position = (card?.about.position ?? player.position ?? "").toUpperCase();
   const playerStatus = resolvePlayerCardStatus(card, player.status);
-  const gameLogQuery = usePlayerGameLog(player.id, 2026, leagueId, activeTab === "game-log");
+  const gameLogQuery = usePlayerGameLog(
+    player.id,
+    2026,
+    leagueId,
+    activeTab === "game-log" || activeTab === "stats",
+  );
   const historyQuery = useLeaguePlayerHistory(leagueId ?? undefined, player.id, activeTab === "history" && hasLeagueContext);
   const valueQuery = usePlayerTradeValues(player.id, 2026);
   const trajectoryQuery = usePlayerTrajectory(
@@ -398,6 +433,10 @@ export function PlayerCardModal({
   );
   const aboutMessage = visiblePlayerCardAboutMessage(card?.about.message);
   const cardActions = [...(action ? [action] : []), ...actions];
+  const currentSeasonTotals = useMemo(
+    () => completedSeasonGameTotals(gameLogQuery.data?.games ?? [], position),
+    [gameLogQuery.data?.games, position],
+  );
 
   useEffect(() => {
     if (historicalStatsScrollRef.current) historicalStatsScrollRef.current.scrollLeft = 0;
@@ -642,6 +681,48 @@ export function PlayerCardModal({
                   </p>
                 </div>
               </div>
+
+              <section className="mt-4 rounded-2xl border border-cfb-brand/25 bg-cfb-brand/[0.08] p-3 sm:p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>2026 Season</p>
+                    <p className="mt-1 text-[10px] font-bold leading-4 text-white/55">Final box-score totals · completed games only</p>
+                  </div>
+                  <span className="rounded-full border border-white/15 bg-black/20 px-2.5 py-1 text-[9px] font-black tabular-nums text-white/70">
+                    {currentSeasonTotals.gamesPlayed} GP
+                  </span>
+                </div>
+                {gameLogQuery.isLoading ? (
+                  <div className="mt-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-white/55">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading final box scores
+                  </div>
+                ) : currentSeasonTotals.gamesPlayed ? (
+                  <div className="mt-3 overflow-x-auto overscroll-x-contain touch-pan-x rounded-xl border border-white/10 bg-black/20">
+                    <table className="min-w-max border-collapse text-left">
+                      <thead className="bg-white/[0.055] text-[8px] font-black uppercase tracking-[0.14em] text-white/45">
+                        <tr>
+                          <th className="whitespace-nowrap px-2.5 py-2.5">Year</th>
+                          <th className="whitespace-nowrap px-2.5 py-2.5 text-right">GP</th>
+                          {currentSeasonTotals.totals.map(([label]) => (
+                            <th key={label} className="whitespace-nowrap px-2.5 py-2.5 text-right">{label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="text-xs font-bold text-white/75">
+                          <td className="px-2.5 py-2.5 text-sm font-black tabular-nums text-white">2026</td>
+                          <td className="px-2.5 py-2.5 text-right font-black tabular-nums text-white">{currentSeasonTotals.gamesPlayed}</td>
+                          {currentSeasonTotals.totals.map(([label, value]) => (
+                            <td key={label} className="px-2.5 py-2.5 text-right font-black tabular-nums text-white">{formatPlayerCardValue(value)}</td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs font-bold leading-5 text-white/55">No completed 2026 games have a verified box score yet.</p>
+                )}
+              </section>
 
               {historicalSeasons.length ? (
                 <div ref={historicalStatsScrollRef} className="mt-3 overflow-x-auto overscroll-x-contain touch-pan-x rounded-2xl border border-white/10 bg-black/20" aria-label="Historical stats table; scroll horizontally for all columns">

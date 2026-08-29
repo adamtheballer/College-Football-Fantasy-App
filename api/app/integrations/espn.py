@@ -313,9 +313,12 @@ ESPN_STAT_KEY_MAP = {
     "passingYards": "pass_yards",
     "passingTouchdowns": "pass_tds",
     "interceptions": "interceptions",
+    "rushingAttempts": "rushing_attempts",
     "rushingYards": "rush_yards",
     "rushingTouchdowns": "rush_tds",
     "receptions": "receptions",
+    "targets": "targets",
+    "receivingTargets": "targets",
     "receivingYards": "rec_yards",
     "receivingTouchdowns": "rec_tds",
     "fumblesLost": "fumbles_lost",
@@ -474,11 +477,20 @@ def extract_player_box_score_stats(summary: dict[str, Any]) -> list[dict[str, An
                     canonical = ESPN_STAT_KEY_MAP.get(str(key))
                     if canonical:
                         row[canonical] = row.get(canonical, 0.0) + _number(stat_value)
+                    elif key == "completions/passingAttempts":
+                        row["completions"] = row.get("completions", 0.0) + _made(stat_value)
+                        row["passing_attempts"] = row.get("passing_attempts", 0.0) + _attempted(stat_value)
                     elif key == "extraPointsMade/extraPointAttempts":
-                        row["xp_made"] = row.get("xp_made", 0.0) + _made(stat_value)
+                        made, attempted = _made(stat_value), _attempted(stat_value)
+                        row["xp_made"] = row.get("xp_made", 0.0) + made
+                        row["extra_points_made"] = row.get("extra_points_made", 0.0) + made
+                        row["extra_points_attempted"] = row.get("extra_points_attempted", 0.0) + attempted
                     elif key == "fieldGoalsMade/fieldGoalAttempts":
-                        row["espn_field_goals_made_unbucketed"] = row.get("espn_field_goals_made_unbucketed", 0.0) + _made(stat_value)
-                        row["espn_field_goals_attempted"] = row.get("espn_field_goals_attempted", 0.0) + _attempted(stat_value)
+                        made, attempted = _made(stat_value), _attempted(stat_value)
+                        row["espn_field_goals_made_unbucketed"] = row.get("espn_field_goals_made_unbucketed", 0.0) + made
+                        row["espn_field_goals_attempted"] = row.get("espn_field_goals_attempted", 0.0) + attempted
+                        row["field_goals_made"] = row.get("field_goals_made", 0.0) + made
+                        row["field_goals_attempted"] = row.get("field_goals_attempted", 0.0) + attempted
                     elif key == "longFieldGoalMade":
                         row["espn_long_field_goal_made"] = _number(stat_value)
 

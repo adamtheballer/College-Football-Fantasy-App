@@ -12,6 +12,7 @@ from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
+from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.models.team_week_score import TeamWeekScore
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
@@ -352,6 +353,11 @@ def test_synthetic_three_minute_drill_updates_matchup_then_finalizes_downstream_
     matchup = db_session.query(Matchup).filter_by(league_id=league.id, season=2026, week=1).one()
     assert matchup.status == "final"
     assert matchup.home_score > second_score
+    game = db_session.query(Game).filter_by(external_id="401", season=2026, week=1).one()
+    assert (game.home_points, game.away_points, game.schedule_status) == (31, 24, "final")
+    final_box_score = db_session.query(PlayerGameStat).filter_by(player_id=arch.id, game_id=game.id).one()
+    assert final_box_score.source == "espn_final_boxscore"
+    assert final_box_score.stats["pass_yards"] == 300.0
     assert db_session.query(WeeklyProjection).filter_by(
         player_id=arch.id,
         season=2026,
@@ -801,6 +807,35 @@ def test_final_correction_requires_a_monotonic_provider_revision_and_promotes_on
     poll = db_session.query(ProviderGamePoll).filter_by(provider_game_id="401").one()
     assert poll.last_snapshot_classification == "VERIFIED_CORRECTION"
     assert db_session.query(PlayerStat).filter_by(player_id=arch.id, season=2026, week=1).one().stats["pass_yards"] == 294.0
+
+
+def test_enabled_worker_backfills_previously_accepted_final_box_scores(db_session):
+    """A deployment can safely populate completed games without refetching ESPN."""
+
+    _league, arch, _wingo = _synthetic_live_matchup(db_session, at=NOW)
+    run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="shadow",
+        client=FakeLiveESPN(summary=_final_summary(pass_yards=300)),
+        now=NOW,
+        relevant_team_names={"texas"},
+    )
+    assert db_session.query(PlayerGameStat).filter_by(player_id=arch.id).count() == 0
+
+    _make_public_promotion_ready(db_session, at=NOW + timedelta(seconds=180))
+    result = _run_summary(
+        db_session,
+        summary=_final_summary(pass_yards=300),
+        at=NOW + timedelta(seconds=180),
+        mode="enabled",
+    )
+
+    assert result.promoted_rows == 0  # Duplicate provider snapshot.
+    final_box_score = db_session.query(PlayerGameStat).filter_by(player_id=arch.id).one()
+    assert final_box_score.source == "espn_final_boxscore"
+    assert final_box_score.stats["pass_yards"] == 300.0
 
 
 def test_snapshot_ordering_survives_a_worker_restart_and_two_claimers(db_session):

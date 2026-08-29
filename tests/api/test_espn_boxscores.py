@@ -19,7 +19,11 @@ def espn_summary_payload():
                         "period": 1,
                         "displayClock": "10:00",
                         "type": {"state": "in", "completed": False},
-                    }
+                    },
+                    "competitors": [
+                        {"homeAway": "home", "score": "31", "team": {"location": "Texas"}},
+                        {"homeAway": "away", "score": "24", "team": {"location": "Ohio State"}},
+                    ],
                 }
             ]
         },
@@ -119,6 +123,9 @@ def test_extract_player_box_score_stats_from_espn_summary():
     assert by_name["Arch Manning"]["pass_yards"] == 275.0
     assert by_name["Arch Manning"]["pass_tds"] == 3.0
     assert by_name["Arch Manning"]["interceptions"] == 1.0
+    assert by_name["Arch Manning"]["completions"] == 20.0
+    assert by_name["Arch Manning"]["passing_attempts"] == 30.0
+    assert by_name["Arch Manning"]["rushing_attempts"] == 6.0
     assert by_name["Arch Manning"]["rush_yards"] == 34.0
     assert by_name["Arch Manning"]["rush_tds"] == 1.0
 
@@ -128,6 +135,10 @@ def test_extract_player_box_score_stats_from_espn_summary():
     assert by_name["Ryan Wingo"]["fumbles_lost"] == 1.0
 
     assert by_name["Bert Auburn"]["xp_made"] == 3.0
+    assert by_name["Bert Auburn"]["extra_points_made"] == 3.0
+    assert by_name["Bert Auburn"]["extra_points_attempted"] == 3.0
+    assert by_name["Bert Auburn"]["field_goals_made"] == 2.0
+    assert by_name["Bert Auburn"]["field_goals_attempted"] == 2.0
     assert by_name["Bert Auburn"]["fg_made_31_40"] == 1
     assert by_name["Bert Auburn"]["fg_made_41_50"] == 1
 

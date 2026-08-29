@@ -190,21 +190,27 @@ export function useLeagueRosterTab(
 }
 
 export const LIVE_MATCHUP_REFRESH_MS = 180_000;
-export const DEGRADED_MATCHUP_REFRESH_MS = 10_000;
 
-function hasDegradedLiveScoring(data: LeagueMatchupTabResponse | undefined) {
-  return ["delayed", "stale", "unavailable"].includes(data?.live_scoring_freshness?.state ?? "");
+export function hasLiveRosteredPlayer(data: LeagueMatchupTabResponse | undefined) {
+  const roster = [
+    ...(data?.my_roster ?? []),
+    ...(data?.opponent_roster ?? []),
+    ...(data?.my_team?.roster ?? []),
+    ...(data?.opponent_team?.roster ?? []),
+  ];
+  return roster.some((player) => {
+    const gameState = (player.live_game_state ?? "").toLowerCase();
+    const scoringState = (player.live_scoring_status ?? "").toLowerCase();
+    return gameState === "live" || scoringState === "live" || scoringState === "stale";
+  });
 }
 
-export function matchupRefreshInterval(data: LeagueMatchupTabResponse | undefined, now = Date.now()) {
+export function matchupRefreshInterval(data: LeagueMatchupTabResponse | undefined) {
   const status = data?.status?.toLowerCase();
-  if (status === "live" || status === "delayed") {
-    if (hasDegradedLiveScoring(data)) return DEGRADED_MATCHUP_REFRESH_MS;
-    const nextRefreshAt = data?.next_refresh_at;
-    if (nextRefreshAt) {
-      const remaining = new Date(nextRefreshAt).getTime() - now;
-      if (Number.isFinite(remaining) && remaining > 0) return Math.max(15_000, remaining);
-    }
+  // A matchup page contains both starter and bench rows. Bench players do
+  // not contribute to the matchup total, but their live game still needs the
+  // same visible, recurring refresh cycle as every other rostered player.
+  if (hasLiveRosteredPlayer(data) || status === "live" || status === "delayed") {
     return LIVE_MATCHUP_REFRESH_MS;
   }
   if (status === "final" || status === "stat_corrected") return false;
@@ -217,14 +223,10 @@ export function matchupRefreshCountdownSeconds(
   now = Date.now(),
 ) {
   const status = data?.status?.toLowerCase();
-  if (status !== "live" && status !== "delayed") return null;
-  const interval = matchupRefreshInterval(data, now);
+  if (!hasLiveRosteredPlayer(data) && status !== "live" && status !== "delayed") return null;
+  const interval = matchupRefreshInterval(data);
   if (typeof interval !== "number") return null;
-  const parsedNextRefresh = new Date(data?.next_refresh_at ?? "").getTime();
-  const useProviderTarget = !hasDegradedLiveScoring(data) && Number.isFinite(parsedNextRefresh) && parsedNextRefresh > now;
-  const target = useProviderTarget
-    ? parsedNextRefresh
-    : (typeof dataUpdatedAt === "number" && dataUpdatedAt > 0 ? dataUpdatedAt : now) + interval;
+  const target = (typeof dataUpdatedAt === "number" && dataUpdatedAt > 0 ? dataUpdatedAt : now) + interval;
   return Math.max(0, Math.ceil((target - now) / 1_000));
 }
 
@@ -331,7 +333,8 @@ export function useLeagueWaiverTab(
 export function useLeagueScoreboard(
   leagueId?: number,
   week?: number,
-  enabled = true
+  enabled = true,
+  hasLiveRosteredPlayer = false,
 ) {
   return useQuery({
     queryKey: ["league", leagueId, "scoreboard", week ?? "default"],
@@ -348,8 +351,9 @@ export function useLeagueScoreboard(
         week: typeof week === "number" ? week : undefined,
       }),
     refetchInterval: (query) => {
+      if (hasLiveRosteredPlayer) return LIVE_MATCHUP_REFRESH_MS;
       const statuses = query.state.data?.data.map((matchup) => matchup.status.toLowerCase()) ?? [];
-      if (statuses.some((status) => status === "live" || status === "delayed")) return 10_000;
+      if (statuses.some((status) => status === "live" || status === "delayed")) return LIVE_MATCHUP_REFRESH_MS;
       if (statuses.length > 0 && statuses.every((status) => status === "final" || status === "stat_corrected")) return false;
       return 30_000;
     },
