@@ -146,6 +146,7 @@ describe("SideBySideMatchup", () => {
     expect(liveRows).toHaveLength(2);
     expect([...liveRows].every((row) => row.className.includes("bg-slate-100/[0.10]"))).toBe(true);
     expect(screen.getByLabelText("Team has possession")).toBeTruthy();
+    expect(screen.getAllByLabelText("Game in progress — lineup locked")).toHaveLength(2);
   });
 
   it("marks finalized player games with a compact lock in the mobile matchup", () => {
