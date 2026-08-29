@@ -12,7 +12,9 @@ vi.mock("@/components/league/RosterSlotTable", () => ({
     const value = player.current_fantasy_points ?? player.live_points ?? player.projected_points;
     return typeof value === "number" ? value.toFixed(1) : "—";
   },
-  liveProjectionDetail: (player: LeagueRosterPlayer) => player.live_projected_final_points ? `Proj ${player.live_projected_final_points.toFixed(1)}` : null,
+  liveProjectionDetail: (player: LeagueRosterPlayer) => player.live_game_state === "final" || player.live_game_state === "post"
+    ? "Final"
+    : player.live_projected_final_points ? `Proj ${player.live_projected_final_points.toFixed(1)}` : null,
   liveGameStatusLabel: (player: LeagueRosterPlayer) => {
     if (player.live_game_state !== "live") return null;
     const period = player.game_is_halftime ? "Halftime" : player.game_period && player.game_clock ? `Q${player.game_period} ${player.game_clock}` : "In progress";
@@ -170,7 +172,7 @@ describe("SideBySideMatchup", () => {
     expect(screen.getAllByText("Q1 08:15 · 2nd & 7 at OHST 33 · Ohio State 10 – Texas 14")).toHaveLength(2);
   });
 
-  it("marks finalized player games with a compact lock in the mobile matchup", () => {
+  it("marks finalized player games with clear blue totals and removes their obsolete kickoff time", () => {
     const finalMyTeam = {
       ...myTeam,
       roster: [{ ...myTeam.roster[0], live_game_state: "final" as const, current_fantasy_points: 18.5 }],
@@ -179,7 +181,10 @@ describe("SideBySideMatchup", () => {
     render(<SideBySideMatchup myTeam={finalMyTeam} opponentTeam={opponentTeam} scoringStatus="final" />);
 
     expect(screen.getByLabelText("Game final")).toBeTruthy();
-    expect(screen.getByText("18.5")).toBeTruthy();
+    expect(screen.getByText("18.5").parentElement?.className).toContain("text-cfb-brand");
+    expect(screen.getByText("Final").className).toContain("text-cfb-brand");
+    expect(screen.getByText("Final").className).toContain("text-[9px]");
+    expect(screen.getByText("L. Name Quarterback").closest("[data-mobile-matchup-player]")?.querySelector("[data-player-game-time]")).toBeNull();
   });
 
   it("keeps an out marker by the player name while rendering a numeric zero projection", () => {

@@ -267,6 +267,55 @@ export const completedSeasonGameTotals = (
   };
 };
 
+const CURRENT_SEASON_STAT_LABELS: Record<string, string> = {
+  FPTS: "FPTS",
+  CMP: "Comp",
+  ATT: "Pass Att",
+  "PASS YDS": "Pass Yds",
+  "PASS TD": "Pass TD",
+  INT: "INT",
+  "RUSH ATT": "Rush Att",
+  "RUSH YDS": "Rush Yds",
+  "RUSH TD": "Rush TD",
+  REC: "Receptions",
+  TAR: "Targets",
+  "REC YDS": "Rec Yds",
+  "REC TD": "Rec TD",
+  FGM: "FGM",
+  FGA: "FGA",
+  XPM: "XPM",
+  XPA: "XPA",
+};
+
+export const unifiedSeasonSummaryColumns = (
+  historicalColumns: string[],
+  position: string,
+) => {
+  const currentSeasonColumns = [
+    "GP",
+    ...gameLogColumnsForPosition(position).map(([label]) => CURRENT_SEASON_STAT_LABELS[label] ?? label),
+  ];
+  return [
+    ...new Set([
+      ...currentSeasonColumns,
+      ...historicalColumns.filter((label) => label !== "Games"),
+    ]),
+  ];
+};
+
+export const currentSeasonSummaryValue = (
+  totals: ReturnType<typeof completedSeasonGameTotals>,
+  label: string,
+) => {
+  if (label === "GP") return totals.gamesPlayed;
+  const gameLogLabel = Object.entries(CURRENT_SEASON_STAT_LABELS)
+    .find(([, summaryLabel]) => summaryLabel === label)?.[0];
+  return totals.totals.find(([totalLabel]) => totalLabel === gameLogLabel)?.[1] ?? null;
+};
+
+export const historicalSeasonSummaryDisplayValue = (season: HistoricalSeason, label: string) =>
+  historicalSeasonSummaryValue(season, label === "GP" ? "Games" : label);
+
 export const gameLogOpponentLabel = (row: { location: string; opponent_name?: string | null }) => {
   if (row.location === "bye") return "BYE";
   if (!row.opponent_name) return "TBD";
@@ -437,6 +486,11 @@ export function PlayerCardModal({
     () => completedSeasonGameTotals(gameLogQuery.data?.games ?? [], position),
     [gameLogQuery.data?.games, position],
   );
+  const unifiedSeasonColumns = useMemo(
+    () => unifiedSeasonSummaryColumns(historicalSummaryColumns, position),
+    [historicalSummaryColumns, position],
+  );
+  const hasSeasonStats = currentSeasonTotals.gamesPlayed > 0 || historicalSeasons.length > 0;
 
   useEffect(() => {
     if (historicalStatsScrollRef.current) historicalStatsScrollRef.current.scrollLeft = 0;
@@ -682,70 +736,46 @@ export function PlayerCardModal({
                 </div>
               </div>
 
-              <section className="mt-4 rounded-2xl border border-cfb-brand/25 bg-cfb-brand/[0.08] p-3 sm:p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>2026 Season</p>
-                    <p className="mt-1 text-[10px] font-bold leading-4 text-white/55">Final box-score totals · completed games only</p>
-                  </div>
-                  <span className="rounded-full border border-white/15 bg-black/20 px-2.5 py-1 text-[9px] font-black tabular-nums text-white/70">
-                    {currentSeasonTotals.gamesPlayed} GP
-                  </span>
+              {gameLogQuery.isLoading ? (
+                <div className="mt-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-white/55">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading final 2026 box scores
                 </div>
-                {gameLogQuery.isLoading ? (
-                  <div className="mt-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-white/55">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading final box scores
-                  </div>
-                ) : currentSeasonTotals.gamesPlayed ? (
-                  <div className="mt-3 overflow-x-auto overscroll-x-contain touch-pan-x rounded-xl border border-white/10 bg-black/20">
-                    <table className="min-w-max border-collapse text-left">
-                      <thead className="bg-white/[0.055] text-[8px] font-black uppercase tracking-[0.14em] text-white/45">
-                        <tr>
-                          <th className="whitespace-nowrap px-2.5 py-2.5">Year</th>
-                          <th className="whitespace-nowrap px-2.5 py-2.5 text-right">GP</th>
-                          {currentSeasonTotals.totals.map(([label]) => (
-                            <th key={label} className="whitespace-nowrap px-2.5 py-2.5 text-right">{label}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="text-xs font-bold text-white/75">
-                          <td className="px-2.5 py-2.5 text-sm font-black tabular-nums text-cfb-brand">2026</td>
-                          <td className="px-2.5 py-2.5 text-right font-black tabular-nums text-cfb-brand">{currentSeasonTotals.gamesPlayed}</td>
-                          {currentSeasonTotals.totals.map(([label, value]) => (
-                            <td key={label} className="px-2.5 py-2.5 text-right font-black tabular-nums text-cfb-brand">{formatPlayerCardValue(value)}</td>
-                          ))}
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="mt-3 text-xs font-bold leading-5 text-white/55">No completed 2026 games have a verified box score yet.</p>
-                )}
-              </section>
+              ) : null}
 
-              {historicalSeasons.length ? (
-                <div ref={historicalStatsScrollRef} className="mt-3 overflow-x-auto overscroll-x-contain touch-pan-x rounded-2xl border border-white/10 bg-black/20" aria-label="Historical stats table; scroll horizontally for all columns">
+              {hasSeasonStats ? (
+                <div ref={historicalStatsScrollRef} className="mt-4 overflow-x-auto overscroll-x-contain touch-pan-x rounded-2xl border border-white/10 bg-black/20" aria-label="Season stats table; scroll horizontally for all columns">
                   <table className="min-w-[720px] w-max border-collapse text-left">
                     <thead className="bg-white/[0.055] text-[8px] font-black uppercase tracking-[0.14em] text-white/45">
                       <tr>
                         <th className="min-w-[3.75rem] whitespace-nowrap px-2.5 py-2.5">Year</th>
                         <th className="min-w-28 whitespace-nowrap px-2.5 py-2.5">Team</th>
                         <th className="min-w-[3.5rem] whitespace-nowrap px-2.5 py-2.5">Pos</th>
-                        {historicalSummaryColumns.map((label) => (
+                        {unifiedSeasonColumns.map((label) => (
                           <th key={label} className="whitespace-nowrap px-2.5 py-2.5 text-right">{label}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
+                      {currentSeasonTotals.gamesPlayed ? (
+                        <tr className="bg-cfb-brand/[0.08] text-xs font-bold text-white/75">
+                          <td className="whitespace-nowrap px-2.5 py-2.5 text-sm font-black tabular-nums text-cfb-brand">2026</td>
+                          <td className="min-w-28 px-2.5 py-2.5"><p className="font-black leading-4 text-cfb-brand">{gameLogQuery.data?.team_name ?? card?.about.team ?? player.school}</p><p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-cfb-brand/80">Final box scores</p></td>
+                          <td className="px-2.5 py-2.5"><span className="rounded-full border border-cfb-brand/35 bg-cfb-brand/[0.12] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-cfb-brand">{position || "—"}</span></td>
+                          {unifiedSeasonColumns.map((label) => (
+                            <td key={label} className="px-2.5 py-2.5 text-right font-black tabular-nums text-cfb-brand">
+                              {formatPlayerCardValue(currentSeasonSummaryValue(currentSeasonTotals, label))}
+                            </td>
+                          ))}
+                        </tr>
+                      ) : null}
                       {historicalSeasons.map((season) => (
                         <tr key={`${season.season}-${season.team_name ?? "team"}-${season.season_type}`} className="text-xs font-bold text-white/75 transition hover:bg-white/[0.035]">
                           <td className="whitespace-nowrap px-2.5 py-2.5 text-sm font-black tabular-nums text-white">{season.season}</td>
                           <td className="min-w-28 px-2.5 py-2.5"><p className="font-black leading-4 text-white">{season.team_name ?? card?.about.team ?? player.school}</p><p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-white/45">{season.season_type}</p></td>
                           <td className="px-2.5 py-2.5"><span className="rounded-full border border-white/15 bg-white/[0.06] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-white/70">{season.position ?? position ?? "—"}</span></td>
-                          {historicalSummaryColumns.map((label) => (
+                          {unifiedSeasonColumns.map((label) => (
                             <td key={label} className="px-2.5 py-2.5 text-right font-black tabular-nums text-white">
-                              {formatPlayerCardValue(historicalSeasonSummaryValue(season, label))}
+                              {formatPlayerCardValue(historicalSeasonSummaryDisplayValue(season, label))}
                             </td>
                           ))}
                         </tr>
@@ -755,8 +785,7 @@ export function PlayerCardModal({
                 </div>
               ) : (
                 <p className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
-                  {historicalStats?.message ??
-                    "No imported historical season stats are linked to this player yet."}
+                  {historicalStats?.message ?? "No verified season totals are available for this player yet."}
                 </p>
               )}
             </section>
