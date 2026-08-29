@@ -104,6 +104,23 @@ describe("SideBySideMatchup", () => {
     expect(starters.querySelector("[data-mobile-slot-column]")?.className).not.toContain("border-x");
   });
 
+  it("keeps numbered bench slot labels on one line in the wider mobile slot rail", () => {
+    const benchTwoMyTeam = {
+      ...myTeam,
+      roster: [myTeam.roster[0], { ...myTeam.roster[1], display_label: "BENCH 2" }],
+    };
+    const benchTwoOpponentTeam = {
+      ...opponentTeam,
+      roster: [opponentTeam.roster[0], { ...opponentTeam.roster[1], display_label: "BENCH 2" }],
+    };
+    const { container } = render(<SideBySideMatchup myTeam={benchTwoMyTeam} opponentTeam={benchTwoOpponentTeam} />);
+    const benchSlot = screen.getAllByText("BENCH 2")[0];
+
+    expect(benchSlot.className).toContain("whitespace-nowrap");
+    expect(benchSlot.closest("[data-mobile-matchup-row]")?.className).toContain("_3.5rem_");
+    expect(container.querySelector("[data-mobile-slot-rail]")?.className).toContain("w-14");
+  });
+
   it("opens the existing player card from either side of a mobile matchup row", () => {
     render(<SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={42} />);
 
