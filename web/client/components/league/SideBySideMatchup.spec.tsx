@@ -192,7 +192,12 @@ describe("SideBySideMatchup", () => {
   it("marks finalized player games with clear blue totals and removes their obsolete kickoff time", () => {
     const finalMyTeam = {
       ...myTeam,
-      roster: [{ ...myTeam.roster[0], live_game_state: "final" as const, current_fantasy_points: 18.5 }],
+      roster: [{
+        ...myTeam.roster[0],
+        live_game_state: "final" as const,
+        current_fantasy_points: 18.5,
+        final_game_stat_line: "281 PASS YDS · 3 PASS TD · 34 RUSH YDS · 1 RUSH TD",
+      }],
     };
 
     render(<SideBySideMatchup myTeam={finalMyTeam} opponentTeam={opponentTeam} scoringStatus="final" />);
@@ -202,6 +207,10 @@ describe("SideBySideMatchup", () => {
     expect(screen.getByText("Final").className).toContain("text-cfb-brand");
     expect(screen.getByText("Final").className).toContain("text-[9px]");
     expect(screen.getByText("L. Name Quarterback").closest("[data-mobile-matchup-player]")?.querySelector("[data-player-game-time]")).toBeNull();
+    const statLine = screen.getByText("281 PASS YDS · 3 PASS TD · 34 RUSH YDS · 1 RUSH TD");
+    expect(statLine.getAttribute("data-player-final-stat-line")).not.toBeNull();
+    expect(statLine.className).toContain("truncate");
+    expect(statLine.className).toContain("text-cfb-text-muted");
   });
 
   it("keeps an out marker by the player name while rendering a numeric zero projection", () => {

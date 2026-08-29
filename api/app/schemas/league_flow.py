@@ -620,6 +620,10 @@ class RosterTabEntryRead(BaseModel):
     team_has_possession: bool = False
     team_in_red_zone: bool = False
     game_start_at: datetime | None = None
+    # A compact, verified final box-score summary for this player's current
+    # roster-row game. This is deliberately display-ready rather than the
+    # provider's full stat payload.
+    final_game_stat_line: str | None = None
     is_locked: bool = False
     acquisition_type: str = "ROSTER"
     draft_pick_id: int | None = None

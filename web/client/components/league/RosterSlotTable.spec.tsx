@@ -151,6 +151,7 @@ describe("RosterSlotTable", () => {
       ...projectedReceiver,
       live_game_state: "final" as const,
       current_fantasy_points: 17.8,
+      final_game_stat_line: "6 REC · 104 REC YDS · 1 REC TD",
     };
     render(<RosterSlotTable title="Starters" players={[finalReceiver]} pointMode="live" />);
 
@@ -158,6 +159,10 @@ describe("RosterSlotTable", () => {
     expect(screen.getByText("17.8").parentElement?.className).toContain("text-cfb-brand");
     expect(screen.getByText("Final").className).toContain("text-cfb-brand");
     expect(screen.getByText("Final").className).toContain("text-[10px]");
+    const statLine = screen.getByText("6 REC · 104 REC YDS · 1 REC TD");
+    expect(statLine.getAttribute("data-player-final-stat-line")).not.toBeNull();
+    expect(statLine.className).toContain("truncate");
+    expect(statLine.className).toContain("text-cfb-text-muted");
   });
 
   it("preserves stale live values and explicitly labels the delayed data", () => {

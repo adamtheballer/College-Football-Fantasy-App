@@ -283,6 +283,8 @@ export interface LeagueRosterPlayer {
   team_has_possession?: boolean;
   team_in_red_zone?: boolean;
   game_start_at?: string | null;
+  /** Verified, compact final box-score summary for this roster-row game. */
+  final_game_stat_line?: string | null;
   is_locked?: boolean;
   is_placeholder?: boolean;
 }
