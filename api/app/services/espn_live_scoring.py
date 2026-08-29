@@ -151,11 +151,17 @@ def _event_status(event: dict[str, Any]) -> str:
             status = competitions[0].get("status")
     status = status if isinstance(status, dict) else {}
     status_type = status.get("type") if isinstance(status.get("type"), dict) else {}
-    name = str(status_type.get("name") or status_type.get("state") or status.get("type") or "").lower()
+    status_names = {
+        str(value).strip().lower().removeprefix("status_").replace("-", "_").replace(" ", "_")
+        for value in (status_type.get("name"), status_type.get("state"), status.get("type"))
+        if value
+    }
     completed = bool(status_type.get("completed") or status.get("completed"))
-    if completed or name in {"final", "post", "postponed", "canceled", "cancelled"}:
-        return "final" if name not in {"postponed", "canceled", "cancelled"} else name
-    if name in {"in", "live", "in_progress", "in progress"}:
+    if completed or status_names.intersection({"final", "post", "postponed", "canceled", "cancelled"}):
+        if status_names.intersection({"postponed", "canceled", "cancelled"}):
+            return next(name for name in ("postponed", "canceled", "cancelled") if name in status_names)
+        return "final"
+    if status_names.intersection({"in", "live", "in_progress"}):
         return "live"
     return "scheduled"
 

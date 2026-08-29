@@ -27,6 +27,7 @@ from collegefootballfantasy_api.app.services.espn_stats_sync import UnresolvedKi
 from collegefootballfantasy_api.app.services.espn_live_scoring import (
     MIN_GAME_POLL_INTERVAL_SECONDS,
     SnapshotOrderMetadata,
+    _event_status,
     claim_due_espn_games,
     classify_snapshot_order,
     discover_relevant_espn_games,
@@ -155,6 +156,11 @@ def _make_public_promotion_ready(db_session, *, at):
     heartbeat.status = "healthy"
     heartbeat.heartbeat_at = at
     db_session.commit()
+
+
+def test_espn_status_names_with_the_provider_prefix_are_classified_as_live():
+    assert _event_status({"status": {"type": {"name": "STATUS_IN_PROGRESS"}}}) == "live"
+    assert _event_status({"status": {"type": {"name": "STATUS_FINAL", "completed": True}}}) == "final"
 
 
 def test_resolve_scoring_window_prefers_the_complete_current_week_when_stale_week_rows_tie(db_session):
