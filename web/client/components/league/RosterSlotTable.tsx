@@ -291,6 +291,7 @@ export function RosterSlotTable({
                   "grid min-h-[72px] w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-3 text-left text-sm text-cfb-text-secondary transition focus:outline-none focus-visible:bg-cfb-brand/[0.08] focus-visible:ring-2 focus-visible:ring-cfb-brand/50 md:min-h-0 md:gap-3 md:px-5 md:py-4",
                   tableColumns,
                   isRealPlayer ? style.row : "cursor-not-allowed opacity-75",
+                  isLiveGame && "bg-slate-100/[0.10] hover:bg-slate-100/[0.14]",
                   hasRedZone && "border-l-2 border-red-300 bg-red-500/[0.10] hover:bg-red-500/[0.14]",
                   !hasRedZone && hasPossession && "border-l-2 border-slate-200/70 bg-slate-100/[0.10] hover:bg-slate-100/[0.14]",
                 )}
@@ -314,6 +315,7 @@ export function RosterSlotTable({
                     <PlayerAvailabilityIndicator status={player.injury_status}>
                       <span className="truncate font-black text-cfb-text-primary">{isRealPlayer ? player.player_name : "N/A"}</span>
                     </PlayerAvailabilityIndicator>
+                    {hasPossession ? <span role="img" aria-label="Team has possession" className="shrink-0 text-xs leading-none">🏈</span> : null}
                     {isFinalGame ? <Lock aria-label="Game final" className="h-3 w-3 shrink-0 text-cfb-text-muted" /> : null}
                   </span>
                   <span
@@ -329,12 +331,11 @@ export function RosterSlotTable({
                       ? [displaySchoolName(player.school ?? player.player_school), player.opponent ? `vs ${player.opponent}` : "Opponent TBD"].filter(Boolean).join(" · ")
                       : "Open roster slot"}
                   </span>
-                  {hasRedZone || hasPossession ? (
+                  {hasRedZone ? (
                     <span className={cn(
-                      "w-fit rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.1em]",
-                      hasRedZone ? "bg-red-300/20 text-red-100" : "bg-slate-100/15 text-slate-100",
+                      "w-fit rounded bg-red-300/20 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.1em] text-red-100",
                     )}>
-                      {hasRedZone ? "Red zone" : "Possession"}
+                      Red zone
                     </span>
                   ) : null}
                 </span>

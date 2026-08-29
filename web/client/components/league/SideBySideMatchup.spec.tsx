@@ -131,6 +131,23 @@ describe("SideBySideMatchup", () => {
     expect(screen.queryByText("22.7")).toBeNull();
   });
 
+  it("highlights every live mobile player row and uses a football icon for team possession", () => {
+    const liveMyTeam = {
+      ...myTeam,
+      roster: [{ ...myTeam.roster[0], live_game_state: "live" as const, team_has_possession: true }],
+    };
+    const liveOpponentTeam = {
+      ...opponentTeam,
+      roster: [{ ...opponentTeam.roster[0], live_game_state: "live" as const }],
+    };
+    const { container } = render(<SideBySideMatchup myTeam={liveMyTeam} opponentTeam={liveOpponentTeam} scoringStatus="live" />);
+
+    const liveRows = container.querySelectorAll('[data-mobile-player-live="true"]');
+    expect(liveRows).toHaveLength(2);
+    expect([...liveRows].every((row) => row.className.includes("bg-slate-100/[0.10]"))).toBe(true);
+    expect(screen.getByLabelText("Team has possession")).toBeTruthy();
+  });
+
   it("marks finalized player games with a compact lock in the mobile matchup", () => {
     const finalMyTeam = {
       ...myTeam,
