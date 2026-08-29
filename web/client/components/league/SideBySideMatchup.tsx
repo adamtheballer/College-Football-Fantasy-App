@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Lock } from "lucide-react";
 
-import { RosterSlotTable, type RosterPointMode, formatRosterPointValue, liveProjectionDetail } from "@/components/league/RosterSlotTable";
+import { RosterSlotTable, type RosterPointMode, formatRosterPointValue, liveGameStatusLabel, liveProjectionDetail } from "@/components/league/RosterSlotTable";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { SurfaceCard } from "@/components/fantasy";
 import { usePlayerCard } from "@/hooks/use-players";
@@ -115,6 +115,7 @@ function CompactMatchupPlayer({
   const playerName = hasPlayer ? compactMatchupPlayerName(player?.player_name) : "No starter set";
   const gameMatchup = hasPlayer ? formatPlayerGameMatchup(player) : "Set a starter in your roster";
   const gameTime = hasPlayer ? formatPlayerGameTime(player) : "Kickoff TBD";
+  const gameStatus = player ? liveGameStatusLabel(player) : null;
   const interactive = Boolean(hasPlayer && player && onSelect);
   const openPlayerCard = () => {
     if (player && onSelect) onSelect(player);
@@ -146,9 +147,11 @@ function CompactMatchupPlayer({
           <p data-player-game-matchup className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
             {gameMatchup}
           </p>
-          <p data-player-game-time className="truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
-            {gameTime}
-          </p>
+          {gameStatus ? (
+            <p data-player-live-game-status className="truncate text-[9px] font-black leading-3 text-cfb-brand">{gameStatus}</p>
+          ) : (
+            <p data-player-game-time className="truncate text-[9px] font-bold leading-3 text-cfb-text-muted">{gameTime}</p>
+          )}
         </div>
       </>
     );
@@ -178,9 +181,11 @@ function CompactMatchupPlayer({
         <p data-player-game-matchup className="mt-0.5 truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
           {gameMatchup}
         </p>
-        <p data-player-game-time className="truncate text-[9px] font-bold leading-3 text-cfb-text-muted">
-          {gameTime}
-        </p>
+        {gameStatus ? (
+          <p data-player-live-game-status className="truncate text-[9px] font-black leading-3 text-cfb-brand">{gameStatus}</p>
+        ) : (
+          <p data-player-game-time className="truncate text-[9px] font-bold leading-3 text-cfb-text-muted">{gameTime}</p>
+        )}
       </div>
       <span className="self-center text-right text-[11px] font-black tabular-nums text-cfb-text-primary">
         {isLiveGame ? <Lock data-lineup-lock aria-label="Game in progress — lineup locked" className="mb-0.5 h-2.5 w-2.5 text-cfb-text-muted" /> : null}

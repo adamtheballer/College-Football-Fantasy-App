@@ -1280,21 +1280,29 @@ def test_league_roster_tab_uses_cached_espn_possession_and_red_zone_context(clie
                 "header": {
                     "competitions": [
                         {
-                            "status": {"type": {"state": "in", "completed": False}},
+                            "status": {
+                                "period": 1,
+                                "displayClock": "08:15",
+                                "type": {"state": "in", "completed": False},
+                            },
                             "competitors": [
                                 {
                                     "id": "10",
+                                    "homeAway": "home",
+                                    "score": "14",
                                     "team": {"id": "10", "location": "Texas", "displayName": "Texas Longhorns"},
                                 },
                                 {
                                     "id": "20",
+                                    "homeAway": "away",
+                                    "score": "10",
                                     "team": {"id": "20", "location": "Ohio State", "displayName": "Ohio State Buckeyes"},
                                 },
                             ],
                         }
                     ]
                 },
-                "situation": {"possession": "10", "isRedZone": True},
+                "situation": {"possession": "10", "isRedZone": True, "downDistanceText": "2nd & 7 at OHST 33"},
             },
         )
     )
@@ -1307,6 +1315,11 @@ def test_league_roster_tab_uses_cached_espn_possession_and_red_zone_context(clie
     assert roster_player["live_game_state"] == "live"
     assert roster_player["team_has_possession"] is True
     assert roster_player["team_in_red_zone"] is True
+    assert roster_player["game_period"] == 1
+    assert roster_player["game_clock"] == "08:15"
+    assert roster_player["game_score"] == "Ohio State 10 – Texas 14"
+    assert roster_player["game_down_distance"] == "2nd & 7 at OHST 33"
+    assert roster_player["game_is_halftime"] is False
 
 
 def test_league_hub_endpoints_return_scoreboard_rankings_and_news(client, db_session):

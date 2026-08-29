@@ -611,6 +611,9 @@ class RosterTabEntryRead(BaseModel):
     provider_snapshot_at: datetime | None = None
     game_period: int | None = None
     game_clock: str | None = None
+    game_score: str | None = None
+    game_down_distance: str | None = None
+    game_is_halftime: bool = False
     game_progress: float | None = None
     live_projection_fallback_reason: str | None = None
     live_game_state: str = "unavailable"
