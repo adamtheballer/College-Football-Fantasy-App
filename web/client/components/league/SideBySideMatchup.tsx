@@ -130,7 +130,11 @@ function CompactMatchupPlayer({
   if (align === "right") {
     const content = (
       <>
-        <span className="self-center text-left text-[11px] font-black tabular-nums text-cfb-text-primary"><span className="block">{points}</span>{liveDetail ? <span className="block text-[8px] font-semibold text-cfb-text-muted">{liveDetail}</span> : null}</span>
+        <span className="self-center text-left text-[11px] font-black tabular-nums text-cfb-text-primary">
+          {isLiveGame ? <Lock data-lineup-lock aria-label="Game in progress — lineup locked" className="mb-0.5 h-2.5 w-2.5 text-cfb-text-muted" /> : null}
+          <span className="block">{points}</span>
+          {liveDetail ? <span className="block text-[8px] font-semibold text-cfb-text-muted">{liveDetail}</span> : null}
+        </span>
         <div className="min-w-0">
           <p className={`flex min-w-0 items-center gap-1 truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
             <PlayerAvailabilityIndicator status={player?.injury_status}>
@@ -178,7 +182,11 @@ function CompactMatchupPlayer({
           {gameTime}
         </p>
       </div>
-      <span className="self-center text-right text-[11px] font-black tabular-nums text-cfb-text-primary"><span className="block">{points}</span>{liveDetail ? <span className="block text-[8px] font-semibold text-cfb-text-muted">{liveDetail}</span> : null}</span>
+      <span className="self-center text-right text-[11px] font-black tabular-nums text-cfb-text-primary">
+        {isLiveGame ? <Lock data-lineup-lock aria-label="Game in progress — lineup locked" className="mb-0.5 h-2.5 w-2.5 text-cfb-text-muted" /> : null}
+        <span className="block">{points}</span>
+        {liveDetail ? <span className="block text-[8px] font-semibold text-cfb-text-muted">{liveDetail}</span> : null}
+      </span>
     </>
   );
 

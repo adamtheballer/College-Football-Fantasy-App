@@ -111,6 +111,7 @@ describe("RosterSlotTable", () => {
     expect(screen.getByText("0.0")).toBeTruthy();
     expect(screen.getByText("Proj 18.4")).toBeTruthy();
     expect(screen.getByText("Red zone")).toBeTruthy();
+    expect(screen.getByLabelText("Game in progress — lineup locked")).toBeTruthy();
     expect(container.querySelector('[data-live-game-state="live"]')?.getAttribute("data-in-red-zone")).toBe("true");
     expect(formatRosterPointValue(liveReceiver, "projected")).toBe("0.0");
   });
