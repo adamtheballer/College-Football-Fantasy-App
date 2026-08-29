@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const routerMocks = vi.hoisted(() => ({ setSearchParams: vi.fn(), navigate: vi.fn() }));
 const matchupMocks = vi.hoisted(() => ({
   weekStarted: false,
+  hasLiveRosteredPlayer: false,
+  hasUpcomingKickoff: false,
   freshness: undefined as { state: string; relevant_game_count: number } | undefined,
   refreshCountdownSeconds: null as number | null,
 }));
@@ -26,7 +28,8 @@ vi.mock("@/components/league/WinChanceMeter", () => ({
 }));
 
 vi.mock("@/hooks/use-leagues", () => ({
-  hasLiveRosteredPlayer: () => false,
+  hasLiveRosteredPlayer: () => matchupMocks.hasLiveRosteredPlayer,
+  hasUpcomingRosteredKickoff: () => matchupMocks.hasUpcomingKickoff,
   matchupRefreshCountdownSeconds: () => matchupMocks.refreshCountdownSeconds,
   useLeagueDetail: () => ({
     data: { draft: { status: "completed" }, status: "post_draft" },
@@ -82,6 +85,8 @@ afterEach(() => {
   routerMocks.setSearchParams.mockClear();
   routerMocks.navigate.mockClear();
   matchupMocks.weekStarted = false;
+  matchupMocks.hasLiveRosteredPlayer = false;
+  matchupMocks.hasUpcomingKickoff = false;
   matchupMocks.freshness = undefined;
   matchupMocks.refreshCountdownSeconds = null;
 });
@@ -192,6 +197,17 @@ describe("league matchup scoreboard", () => {
     expect(screen.getAllByText("54.0%")).toHaveLength(2);
     expect(screen.getAllByText("46.0%")).toHaveLength(2);
     expect(screen.getAllByText("0.0").every((score) => score.className.includes("text-cfb-brand"))).toBe(true);
+  });
+
+  it("switches totals to zero immediately when a rostered kickoff is live before the server response catches up", () => {
+    matchupMocks.hasLiveRosteredPlayer = true;
+
+    render(createElement(LeagueMatchup));
+
+    expect(screen.getAllByText("0.0")).toHaveLength(2);
+    expect(screen.getByText("Proj 111.2")).toBeTruthy();
+    expect(screen.getByText("Proj 106.4")).toBeTruthy();
+    expect(screen.queryByText("Pregame projection")).toBeNull();
   });
 
   it("places the blue three-minute countdown at the top of the matchup screen", () => {

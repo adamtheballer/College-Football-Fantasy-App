@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Lock } from "lucide-react";
 
@@ -8,6 +8,7 @@ import { useDropRosterPlayer, useUpdateLineup } from "@/hooks/use-roster-actions
 import { getEligibleSlotsForPosition, normalizePosition } from "@/lib/rosterLegality";
 import { formatProjectionDisplay } from "@/lib/projection-display";
 import { playerAvailabilityBadge, PlayerAvailabilityIndicator } from "@/lib/playerAvailability";
+import { rosterPlayerGameState } from "@/lib/rosterGameState";
 import type { LeagueRosterPlayer } from "@/types/league";
 import { cn } from "@/lib/utils";
 import {
@@ -57,7 +58,7 @@ const weeklyProjectionLabel = (player: LeagueRosterPlayer) => {
 export type RosterPointMode = "projected" | "live";
 
 export const formatRosterPointValue = (player: LeagueRosterPlayer, pointMode: RosterPointMode) => {
-  const liveGameState = (player.live_game_state ?? "").toLowerCase();
+  const liveGameState = rosterPlayerGameState(player);
   if (liveGameState === "live") {
     const current = player.current_fantasy_points ?? player.live_points;
     return typeof current === "number" && Number.isFinite(current)
@@ -83,7 +84,7 @@ export const formatRosterPointValue = (player: LeagueRosterPlayer, pointMode: Ro
 };
 
 export const liveProjectionDetail = (player: LeagueRosterPlayer) => {
-  const state = (player.live_game_state ?? "").toLowerCase();
+  const state = rosterPlayerGameState(player);
   if (["final", "post"].includes(state)) return "Final";
   if (state !== "live") return null;
   const final = player.live_projected_final_points ?? player.pregame_projected_points ?? player.projected_points ?? player.weekly_projected_fantasy_points;
@@ -100,7 +101,7 @@ const gamePeriodLabel = (period?: number | null) => {
 
 /** A concise, provider-backed game line for roster rows while a game is live. */
 export const liveGameStatusLabel = (player: LeagueRosterPlayer) => {
-  if ((player.live_game_state ?? "").toLowerCase() !== "live") return null;
+  if (rosterPlayerGameState(player) !== "live") return null;
   const sections: string[] = [];
   if (player.game_is_halftime) {
     sections.push("Halftime");
@@ -186,6 +187,25 @@ export function RosterSlotTable({
     if (slotDelta !== 0) return slotDelta;
     return (left.slot_index ?? 0) - (right.slot_index ?? 0);
   });
+  // The roster tab is also used outside the matchup page. Schedule a local
+  // repaint at the next known kickoff so this row switches to live/0.0 at the
+  // exact published time instead of waiting for the next API polling cycle.
+  const nextKickoffAt = sorted.reduce<number | null>((earliest, player) => {
+    const state = rosterPlayerGameState(player);
+    if (["live", "final", "post"].includes(state) || !player.game_start_at) return earliest;
+    const kickoff = new Date(player.game_start_at).getTime();
+    if (!Number.isFinite(kickoff) || kickoff <= Date.now()) return earliest;
+    return earliest === null || kickoff < earliest ? kickoff : earliest;
+  }, null);
+  const [, setKickoffRepaint] = useState(0);
+  useEffect(() => {
+    if (nextKickoffAt === null) return;
+    const timeout = window.setTimeout(
+      () => setKickoffRepaint((value) => value + 1),
+      Math.max(0, nextKickoffAt - Date.now()) + 10,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [nextKickoffAt]);
 
   const selectedPosition = selectedPlayer ? positionLabel(selectedPlayer) : null;
   const selectedProjection =
@@ -297,7 +317,7 @@ export function RosterSlotTable({
             const isRealPlayer = isRealRosterPlayer(player);
             const style = getPositionStyle();
             const pointValue = isRealPlayer ? formatRosterPointValue(player, pointMode) : pointMode === "live" ? "—" : "0.0";
-            const liveGameState = (player.live_game_state ?? "").toLowerCase();
+            const liveGameState = rosterPlayerGameState(player);
             const isLiveGame = isRealPlayer && liveGameState === "live";
             const isFinalGame = isRealPlayer && ["final", "post"].includes(liveGameState);
             const hasActualPoints = isLiveGame || isFinalGame || ["live", "stale"].includes((player.live_scoring_status ?? "").toLowerCase());

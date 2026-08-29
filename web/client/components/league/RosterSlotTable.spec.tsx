@@ -183,6 +183,23 @@ describe("RosterSlotTable", () => {
     expect(formatRosterPointValue(scheduledReceiver, "live")).toBe("18.4");
   });
 
+  it("starts a roster row at its published kickoff even before provider play data arrives", () => {
+    const justStartedReceiver = {
+      ...projectedReceiver,
+      live_game_state: "scheduled" as const,
+      game_start_at: new Date(Date.now() - 1_000).toISOString(),
+    };
+
+    render(<RosterSlotTable title="Starters" players={[justStartedReceiver]} />);
+
+    expect(formatRosterPointValue(justStartedReceiver, "projected")).toBe("0.0");
+    expect(liveProjectionDetail(justStartedReceiver)).toBe("Proj 18.4");
+    expect(liveGameStatusLabel(justStartedReceiver)).toBe("In progress");
+    expect(screen.getByText("0.0")).toBeTruthy();
+    expect(screen.getByText("Proj 18.4")).toBeTruthy();
+    expect(screen.getByText("In progress")).toBeTruthy();
+  });
+
   it("uses the neutral possession treatment when the offense is outside the red zone", () => {
     const possessionReceiver = {
       ...projectedReceiver,

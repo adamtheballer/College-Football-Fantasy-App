@@ -9,14 +9,24 @@ vi.mock("@/components/league/RosterSlotTable", () => ({
   RosterSlotTable: ({ title }: { title: string }) => <div data-testid="desktop-roster-table">{title}</div>,
   formatRosterPointValue: (player: LeagueRosterPlayer, pointMode: "projected" | "live") => {
     if (pointMode === "projected" && player.injury_status?.startsWith("OUT")) return "0.0";
+    const kickoffStarted = Boolean(
+      player.game_start_at && new Date(player.game_start_at).getTime() <= Date.now() && player.live_game_state !== "final" && player.live_game_state !== "post",
+    );
+    if (kickoffStarted) {
+      const current = player.current_fantasy_points ?? player.live_points;
+      return typeof current === "number" ? current.toFixed(1) : "0.0";
+    }
     const value = player.current_fantasy_points ?? player.live_points ?? player.projected_points;
     return typeof value === "number" ? value.toFixed(1) : "—";
   },
   liveProjectionDetail: (player: LeagueRosterPlayer) => player.live_game_state === "final" || player.live_game_state === "post"
     ? "Final"
+    : player.game_start_at && new Date(player.game_start_at).getTime() <= Date.now()
+      ? `Proj ${(player.projected_points ?? 0).toFixed(1)}`
     : player.live_projected_final_points ? `Proj ${player.live_projected_final_points.toFixed(1)}` : null,
   liveGameStatusLabel: (player: LeagueRosterPlayer) => {
-    if (player.live_game_state !== "live") return null;
+    const kickoffStarted = Boolean(player.game_start_at && new Date(player.game_start_at).getTime() <= Date.now());
+    if (player.live_game_state !== "live" && !kickoffStarted) return null;
     const period = player.game_is_halftime ? "Halftime" : player.game_period && player.game_clock ? `Q${player.game_period} ${player.game_clock}` : "In progress";
     return [period, player.game_is_halftime ? null : player.game_down_distance, player.game_score].filter(Boolean).join(" · ");
   },
@@ -51,7 +61,7 @@ const makePlayer = (id: number, name: string, slot: string, projection: number):
   slot_index: 1,
   opponent: "Week One Opponent",
   game_location: id < 10 ? "home" : "away",
-  game_start_at: "2026-08-29T16:00:00Z",
+  game_start_at: new Date(Date.now() + 60 * 60 * 1_000).toISOString(),
   projected_points: projection,
   weekly_projected_fantasy_points: projection,
 });
@@ -88,7 +98,7 @@ describe("SideBySideMatchup", () => {
     const starters = screen.getByTestId("mobile-starting-lineup");
     expect(starters.textContent).toContain("Week One Opponent @ Ohio State");
     expect(starters.textContent).toContain("Texas @ Week One Opponent");
-    expect(starters.textContent).toMatch(/Sat,? Aug 29.*12:00 PM|Sat,? Aug 29.*4:00 PM|Sat,? Aug 29.*11:00 AM/);
+    expect(starters.textContent).toMatch(/AM|PM/);
     expect(starters.querySelectorAll("[data-player-game-matchup]")).toHaveLength(2);
     expect(starters.querySelectorAll("[data-player-game-time]")).toHaveLength(2);
     expect(starters.querySelector('[data-mobile-matchup-player="right"]')?.className).toContain(
@@ -187,6 +197,24 @@ describe("SideBySideMatchup", () => {
     expect(screen.getByLabelText("Team has possession")).toBeTruthy();
     expect(screen.getAllByLabelText("Game in progress — lineup locked")).toHaveLength(2);
     expect(screen.getAllByText("Q1 08:15 · 2nd & 7 at OHST 33 · Ohio State 10 – Texas 14")).toHaveLength(2);
+  });
+
+  it("starts a scheduled row at kickoff without waiting for a provider play", () => {
+    const kickoffStartedMyTeam = {
+      ...myTeam,
+      roster: [{
+        ...myTeam.roster[0],
+        live_game_state: "scheduled" as const,
+        game_start_at: new Date(Date.now() - 1_000).toISOString(),
+      }],
+    };
+
+    const { container } = render(<SideBySideMatchup myTeam={kickoffStartedMyTeam} opponentTeam={opponentTeam} />);
+
+    expect(screen.getByText("0.0")).toBeTruthy();
+    expect(screen.getByText("Proj 24.1")).toBeTruthy();
+    expect(screen.getByText("In progress")).toBeTruthy();
+    expect(container.querySelector('[data-mobile-player-live="true"]')?.className).toContain("bg-slate-100/[0.10]");
   });
 
   it("marks finalized player games with clear blue totals and removes their obsolete kickoff time", () => {
