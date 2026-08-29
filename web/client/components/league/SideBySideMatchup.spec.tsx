@@ -13,6 +13,11 @@ vi.mock("@/components/league/RosterSlotTable", () => ({
     return typeof value === "number" ? value.toFixed(1) : "—";
   },
   liveProjectionDetail: (player: LeagueRosterPlayer) => player.live_projected_final_points ? `Proj ${player.live_projected_final_points.toFixed(1)}` : null,
+  liveGameStatusLabel: (player: LeagueRosterPlayer) => {
+    if (player.live_game_state !== "live") return null;
+    const period = player.game_is_halftime ? "Halftime" : player.game_period && player.game_clock ? `Q${player.game_period} ${player.game_clock}` : "In progress";
+    return [period, player.game_is_halftime ? null : player.game_down_distance, player.game_score].filter(Boolean).join(" · ");
+  },
 }));
 
 vi.mock("@/components/player/PlayerCardModal", () => ({
@@ -134,11 +139,26 @@ describe("SideBySideMatchup", () => {
   it("highlights every live mobile player row and uses a football icon for team possession", () => {
     const liveMyTeam = {
       ...myTeam,
-      roster: [{ ...myTeam.roster[0], live_game_state: "live" as const, team_has_possession: true }],
+      roster: [{
+        ...myTeam.roster[0],
+        live_game_state: "live" as const,
+        team_has_possession: true,
+        game_period: 1,
+        game_clock: "08:15",
+        game_down_distance: "2nd & 7 at OHST 33",
+        game_score: "Ohio State 10 – Texas 14",
+      }],
     };
     const liveOpponentTeam = {
       ...opponentTeam,
-      roster: [{ ...opponentTeam.roster[0], live_game_state: "live" as const }],
+      roster: [{
+        ...opponentTeam.roster[0],
+        live_game_state: "live" as const,
+        game_period: 1,
+        game_clock: "08:15",
+        game_down_distance: "2nd & 7 at OHST 33",
+        game_score: "Ohio State 10 – Texas 14",
+      }],
     };
     const { container } = render(<SideBySideMatchup myTeam={liveMyTeam} opponentTeam={liveOpponentTeam} scoringStatus="live" />);
 
@@ -147,6 +167,7 @@ describe("SideBySideMatchup", () => {
     expect([...liveRows].every((row) => row.className.includes("bg-slate-100/[0.10]"))).toBe(true);
     expect(screen.getByLabelText("Team has possession")).toBeTruthy();
     expect(screen.getAllByLabelText("Game in progress — lineup locked")).toHaveLength(2);
+    expect(screen.getAllByText("Q1 08:15 · 2nd & 7 at OHST 33 · Ohio State 10 – Texas 14")).toHaveLength(2);
   });
 
   it("marks finalized player games with a compact lock in the mobile matchup", () => {

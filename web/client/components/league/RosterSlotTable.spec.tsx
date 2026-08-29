@@ -18,7 +18,7 @@ vi.mock("@/hooks/use-roster-actions", () => ({
   useUpdateLineup: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
-import { formatRosterPointValue, liveProjectionDetail, RosterSlotTable } from "./RosterSlotTable";
+import { formatRosterPointValue, liveGameStatusLabel, liveProjectionDetail, RosterSlotTable } from "./RosterSlotTable";
 
 afterEach(cleanup);
 
@@ -105,12 +105,17 @@ describe("RosterSlotTable", () => {
       live_points: null,
       team_has_possession: true,
       team_in_red_zone: true,
+      game_period: 1,
+      game_clock: "08:15",
+      game_down_distance: "2nd & 7 at MICH 33",
+      game_score: "Michigan 10 – Ohio State 14",
     };
     const { container } = render(<RosterSlotTable title="Starters" players={[liveReceiver]} />);
 
     expect(screen.getByText("0.0")).toBeTruthy();
     expect(screen.getByText("Proj 18.4")).toBeTruthy();
     expect(screen.getByText("Red zone")).toBeTruthy();
+    expect(screen.getByText("Q1 08:15 · 2nd & 7 at MICH 33 · Michigan 10 – Ohio State 14")).toBeTruthy();
     expect(screen.getByLabelText("Game in progress — lineup locked")).toBeTruthy();
     expect(container.querySelector('[data-live-game-state="live"]')?.getAttribute("data-in-red-zone")).toBe("true");
     expect(formatRosterPointValue(liveReceiver, "projected")).toBe("0.0");
@@ -125,6 +130,20 @@ describe("RosterSlotTable", () => {
     };
     expect(formatRosterPointValue(liveReceiver, "live")).toBe("4.2");
     expect(liveProjectionDetail(liveReceiver)).toBe("Proj 16.7");
+  });
+
+  it("uses a halftime label instead of a stale clock or down", () => {
+    const halftimeReceiver = {
+      ...projectedReceiver,
+      live_game_state: "live" as const,
+      game_period: 2,
+      game_clock: "00:00",
+      game_down_distance: "4th & 3",
+      game_score: "Michigan 10 – Ohio State 14",
+      game_is_halftime: true,
+    };
+
+    expect(liveGameStatusLabel(halftimeReceiver)).toBe("Halftime · Michigan 10 – Ohio State 14");
   });
 
   it("marks a finalized player game with a compact lock", () => {

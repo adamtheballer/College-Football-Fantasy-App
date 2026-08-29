@@ -274,6 +274,9 @@ export interface LeagueRosterPlayer {
   provider_snapshot_at?: string | null;
   game_period?: number | null;
   game_clock?: string | null;
+  game_score?: string | null;
+  game_down_distance?: string | null;
+  game_is_halftime?: boolean;
   game_progress?: number | null;
   live_projection_fallback_reason?: string | null;
   live_game_state?: "scheduled" | "live" | "final" | "unavailable" | string | null;

@@ -1,5 +1,5 @@
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -89,6 +89,11 @@ class LiveGameContext:
     state: str = "unavailable"
     has_possession: bool = False
     in_red_zone: bool = False
+    game_period: int | None = None
+    game_clock: str | None = None
+    game_score: str | None = None
+    game_down_distance: str | None = None
+    game_is_halftime: bool = False
 
 
 def _live_projection_map(
@@ -113,12 +118,12 @@ def _school_key(value: str | None) -> str | None:
     return canonical_school_name(value) or normalize_school(value)
 
 
-def _summary_live_context(payload: dict[str, Any]) -> tuple[str, set[str], bool]:
-    """Read possession/red-zone from the accepted cached ESPN summary only.
+def _summary_live_context(payload: dict[str, Any]) -> tuple[LiveGameContext, set[str]]:
+    """Read the live game context from the accepted cached ESPN summary only.
 
     The roster endpoint must never make a provider call. ESPN's summary payload
     identifies the offense by competitor id (or a competitor possession flag)
-    and exposes ``situation.isRedZone`` while live. Missing fields stay false
+    and exposes ``situation`` game state while live. Missing fields stay null
     rather than being guessed from play text or score shape.
     """
 
@@ -130,15 +135,50 @@ def _summary_live_context(payload: dict[str, Any]) -> tuple[str, set[str], bool]
     state = str(status_type.get("state") or "unavailable").strip().lower()
     state = "live" if state == "in" else "final" if state == "post" or status_type.get("completed") is True else "scheduled" if state == "pre" else "unavailable"
     if state != "live":
-        return state, set(), False
+        return LiveGameContext(state=state), set()
 
     situation = payload.get("situation") if isinstance(payload.get("situation"), dict) else {}
+    period_value = status.get("period")
+    try:
+        game_period = int(period_value) if period_value is not None else None
+    except (TypeError, ValueError):
+        game_period = None
+    game_clock_value = status.get("displayClock") or status.get("clock")
+    game_clock = str(game_clock_value).strip() if game_clock_value is not None else None
+    if not game_clock:
+        game_clock = None
+
+    status_detail = " ".join(
+        str(status_type.get(key) or "") for key in ("detail", "shortDetail", "description")
+    ).lower()
+    is_halftime = "halftime" in status_detail
+
+    def _competitor_label(competitor: dict[str, Any]) -> str | None:
+        team = competitor.get("team") if isinstance(competitor.get("team"), dict) else {}
+        for value in (team.get("location"), team.get("shortDisplayName"), team.get("displayName"), team.get("abbreviation")):
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return None
+
+    def _competitor_score(competitor: dict[str, Any]) -> str | None:
+        value = competitor.get("score")
+        if isinstance(value, (str, int, float)) and str(value).strip():
+            return str(value).strip()
+        return None
+
     possession_id = str(situation.get("possession") or "").strip()
     possession_keys: set[str] = set()
     competitors = competition.get("competitors") if isinstance(competition.get("competitors"), list) else []
+    home_competitor: dict[str, Any] | None = None
+    away_competitor: dict[str, Any] | None = None
     for competitor in competitors:
         if not isinstance(competitor, dict):
             continue
+        home_away = str(competitor.get("homeAway") or "").strip().lower()
+        if home_away == "home":
+            home_competitor = competitor
+        elif home_away == "away":
+            away_competitor = competitor
         team = competitor.get("team") if isinstance(competitor.get("team"), dict) else {}
         competitor_id = str(competitor.get("id") or team.get("id") or "").strip()
         is_possession = (
@@ -151,7 +191,40 @@ def _summary_live_context(payload: dict[str, Any]) -> tuple[str, set[str], bool]
         for name in (team.get("location"), team.get("shortDisplayName"), team.get("displayName")):
             if isinstance(name, str) and (key := _school_key(name)):
                 possession_keys.add(key)
-    return state, possession_keys, situation.get("isRedZone") is True
+
+    score: str | None = None
+    if home_competitor is not None and away_competitor is not None:
+        home_label, home_score = _competitor_label(home_competitor), _competitor_score(home_competitor)
+        away_label, away_score = _competitor_label(away_competitor), _competitor_score(away_competitor)
+        if home_label and home_score is not None and away_label and away_score is not None:
+            score = f"{away_label} {away_score} – {home_label} {home_score}"
+
+    down_distance: str | None = None
+    value = situation.get("downDistanceText")
+    if isinstance(value, str) and value.strip():
+        down_distance = value.strip()
+    else:
+        try:
+            down = int(situation.get("down"))
+            distance = int(situation.get("distance"))
+        except (TypeError, ValueError):
+            down = distance = None
+        if down is not None and distance is not None and down > 0 and distance >= 0:
+            suffix = "th" if 10 <= down % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(down % 10, "th")
+            down_distance = f"{down}{suffix} & {distance}"
+
+    return (
+        LiveGameContext(
+            state=state,
+            in_red_zone=situation.get("isRedZone") is True,
+            game_period=game_period,
+            game_clock=game_clock,
+            game_score=score,
+            game_down_distance=down_distance,
+            game_is_halftime=is_halftime,
+        ),
+        possession_keys,
+    )
 
 
 def _live_game_context_by_player(
@@ -190,7 +263,7 @@ def _live_game_context_by_player(
         .all()
     } if game_ids else {}
     contexts: dict[int, LiveGameContext] = {}
-    parsed: dict[str, tuple[str, set[str], bool]] = {}
+    parsed: dict[str, tuple[LiveGameContext, set[str]]] = {}
     for player_id, school in player_schools.items():
         key = _school_key(school)
         game_id = school_to_game_id.get(key) if key else None
@@ -200,11 +273,12 @@ def _live_game_context_by_player(
             continue
         if game_id not in parsed:
             parsed[game_id] = _summary_live_context(poll.latest_payload)
-        state, possession_keys, is_red_zone = parsed[game_id]
-        contexts[player_id] = LiveGameContext(
-            state=state,
-            has_possession=bool(key and key in possession_keys),
-            in_red_zone=bool(is_red_zone and key and key in possession_keys),
+        game_context, possession_keys = parsed[game_id]
+        has_possession = bool(key and key in possession_keys)
+        contexts[player_id] = replace(
+            game_context,
+            has_possession=has_possession,
+            in_red_zone=bool(game_context.in_red_zone and has_possession),
         )
     return contexts
 
@@ -460,8 +534,11 @@ def _serialize_roster_entry(
         live_projection_model_version=live_projection.model_version if live_projection else None,
         projection_updated_at=live_projection.calculated_at if live_projection else None,
         provider_snapshot_at=live_projection.provider_snapshot_at if live_projection else None,
-        game_period=live_projection.game_period if live_projection else None,
-        game_clock=live_projection.game_clock if live_projection else None,
+        game_period=live_game.game_period if live_game and live_game.game_period is not None else live_projection.game_period if live_projection else None,
+        game_clock=live_game.game_clock if live_game and live_game.game_clock is not None else live_projection.game_clock if live_projection else None,
+        game_score=live_game.game_score if live_game else None,
+        game_down_distance=None if live_game and live_game.game_is_halftime else live_game.game_down_distance if live_game else None,
+        game_is_halftime=live_game.game_is_halftime if live_game else False,
         game_progress=live_projection.game_progress if live_projection else None,
         live_projection_fallback_reason=live_projection.fallback_reason if live_projection else None,
         live_game_state=effective_game_state,

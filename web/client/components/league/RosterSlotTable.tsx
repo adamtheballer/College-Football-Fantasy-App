@@ -92,6 +92,33 @@ export const liveProjectionDetail = (player: LeagueRosterPlayer) => {
   return delayed ? `Proj ${final.toFixed(1)} · Data delayed` : `Proj ${final.toFixed(1)}`;
 };
 
+const gamePeriodLabel = (period?: number | null) => {
+  if (!Number.isInteger(period) || !period || period < 1) return null;
+  if (period <= 4) return `Q${period}`;
+  return period === 5 ? "OT" : `${period - 4}OT`;
+};
+
+/** A concise, provider-backed game line for roster rows while a game is live. */
+export const liveGameStatusLabel = (player: LeagueRosterPlayer) => {
+  if ((player.live_game_state ?? "").toLowerCase() !== "live") return null;
+  const sections: string[] = [];
+  if (player.game_is_halftime) {
+    sections.push("Halftime");
+  } else {
+    const period = gamePeriodLabel(player.game_period);
+    const clock = player.game_clock?.trim();
+    if (period && clock) sections.push(`${period} ${clock}`);
+    else if (period) sections.push(period);
+    else if (clock) sections.push(clock);
+    else sections.push("In progress");
+    const downDistance = player.game_down_distance?.trim();
+    if (downDistance) sections.push(downDistance);
+  }
+  const score = player.game_score?.trim();
+  if (score) sections.push(score);
+  return sections.join(" · ");
+};
+
 const isRealRosterPlayer = (player: LeagueRosterPlayer) =>
   Boolean(
     player.player_id !== null &&
@@ -276,6 +303,7 @@ export function RosterSlotTable({
             const hasRedZone = isLiveGame && player.team_in_red_zone === true;
             const hasPossession = isLiveGame && player.team_has_possession === true;
             const liveDetail = liveProjectionDetail(player);
+            const gameStatus = liveGameStatusLabel(player);
             return (
               <button
                 key={player.slot_id ?? `${player.team_id ?? player.fantasy_team_id}-${slotType(player)}-${player.slot_index ?? 0}`}
@@ -331,6 +359,11 @@ export function RosterSlotTable({
                       ? [displaySchoolName(player.school ?? player.player_school), player.opponent ? `vs ${player.opponent}` : "Opponent TBD"].filter(Boolean).join(" · ")
                       : "Open roster slot"}
                   </span>
+                  {gameStatus ? (
+                    <span data-player-live-game-status className="truncate text-[9px] font-black leading-3 text-cfb-brand">
+                      {gameStatus}
+                    </span>
+                  ) : null}
                   {hasRedZone ? (
                     <span className={cn(
                       "w-fit rounded bg-red-300/20 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.1em] text-red-100",
