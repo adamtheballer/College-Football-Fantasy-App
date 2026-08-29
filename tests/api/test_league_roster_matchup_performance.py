@@ -88,6 +88,37 @@ def test_matchup_tab_marks_the_week_started_after_a_verified_kickoff(client, db_
     assert response.week_started is True
 
 
+def test_matchup_transitions_to_live_at_kickoff_before_provider_play_data_arrives(client, db_session):
+    league, home, _away, players, _matchup = create_scoring_fixture(db_session)
+    user = User(
+        first_name="Kickoff",
+        email="kickoff-transition@example.com",
+        password_hash="hash",
+        api_token="kickoff-transition-token",
+    )
+    db_session.add(user)
+    db_session.flush()
+    home.owner_user_id = user.id
+    db_session.add(
+        Game(
+            season=2026,
+            week=1,
+            schedule_status="scheduled",
+            start_date=datetime.now(timezone.utc) - timedelta(seconds=1),
+            home_team="Test",
+            away_team="Rival",
+        )
+    )
+    db_session.commit()
+
+    response = build_matchup_tab_view(db_session, league, user, selected_week=1)
+    quarterback = next(row for row in response.my_roster if row.player_id == players["qb"].id)
+
+    assert quarterback.live_game_state == "live"
+    assert quarterback.current_fantasy_points is None
+    assert response.status == "live"
+
+
 def test_matchup_tab_exposes_persisted_player_scores_without_falling_back_to_projections(client, db_session):
     league, home, _away, players, _matchup = create_scoring_fixture(db_session)
     user = User(

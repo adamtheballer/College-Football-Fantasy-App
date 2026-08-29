@@ -545,6 +545,7 @@ def _serialize_roster_entry(
     scoring_rules: dict | None = None,
     injury_status: str | None = None,
     final_game_stat_line: str | None = None,
+    now: datetime | None = None,
 ) -> RosterTabEntryRead:
     entry = roster_slot.entry
     projected = float(projection.fantasy_points) if projection and projection.fantasy_points is not None else None
@@ -563,10 +564,14 @@ def _serialize_roster_entry(
         )
         if live_projection.projected_remaining_fantasy_points is not None and current_points is not None:
             live_final_points = round(current_points + float(live_projection.projected_remaining_fantasy_points), 2)
+    kickoff_has_started = game_start_at is not None and as_utc(game_start_at) <= as_utc(now or datetime.now(timezone.utc))
     effective_game_state = (
         "final" if final_game_stat_line
-        else live_game.state if live_game and live_game.state != "unavailable"
+        else "final" if live_game and live_game.state in {"final", "post"}
+        else "live" if live_game and live_game.state == "live"
         else "final" if live_projection and live_projection.projection_status == "FINAL"
+        else "live" if kickoff_has_started
+        else live_game.state if live_game and live_game.state != "unavailable"
         else "live" if live_projection and live_projection.projection_status in {"LIVE", "STALE", "OUT"}
         # Preserve the existing score-feed behavior during the first accepted
         # snapshot, before its per-player projection records have been written.
@@ -697,6 +702,7 @@ def _serialize_team_roster(
             scoring_rules=settings.scoring_json if settings else {},
             injury_status=injury_statuses.get(roster_slot.entry.player_id) if roster_slot.entry else None,
             final_game_stat_line=final_game_stat_lines.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+            now=current_time,
             is_locked=(
                 roster_slot.entry is not None
                 and game_starts.get(roster_slot.entry.player_id) is not None
@@ -773,6 +779,7 @@ def _serialize_team_rosters(
                 scoring_rules=settings.scoring_json if settings else {},
                 injury_status=injury_statuses.get(roster_slot.entry.player_id) if roster_slot.entry else None,
                 final_game_stat_line=final_game_stat_lines.get(roster_slot.entry.player_id) if roster_slot.entry else None,
+                now=current_time,
                 is_locked=(
                     roster_slot.entry is not None
                     and game_starts.get(roster_slot.entry.player_id) is not None
@@ -1135,7 +1142,14 @@ def build_matchup_tab_view(
         else None
     )
     projection_updated_at, provider_snapshot_at = _latest_projection_metadata(my_roster, opponent_roster)
-    effective_status = "live" if my_has_live or opponent_has_live else matchup.status
+    # A bench player's kickoff must activate the page refresh timer and live
+    # row treatment too. Starter-only values above remain the sole authority
+    # for the fantasy matchup total.
+    any_rostered_game_live = any(
+        (entry.live_game_state or "").lower() == "live"
+        for entry in [*my_roster, *opponent_roster]
+    )
+    effective_status = "live" if any_rostered_game_live or my_has_live or opponent_has_live else matchup.status
     return LeagueMatchupTabRead(
         league_id=league.id,
         season=league.season_year,

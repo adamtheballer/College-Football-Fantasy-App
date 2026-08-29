@@ -13,6 +13,7 @@ import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
 import {
   hasLiveRosteredPlayer,
+  hasUpcomingRosteredKickoff,
   matchupRefreshCountdownSeconds,
   useLeagueDetail,
   useLeagueMatchupTab,
@@ -20,7 +21,7 @@ import {
 } from "@/hooks/use-leagues";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import { managerNameForAvatar, managerTeamName } from "@/lib/manager-team-name";
-import type { LeagueMatchupTabResponse, LeagueMatchupTeam, LeagueScoreboardRow } from "@/types/league";
+import type { LeagueMatchupTabResponse, LeagueMatchupTeam } from "@/types/league";
 
 export function formatMatchupStatus(status: string | null | undefined) {
   const normalized = (status || "projected").toLowerCase();
@@ -133,19 +134,18 @@ function MatchupTeamSummary({
   align,
   status,
   weekStarted,
-  currentScore,
 }: {
   team: LeagueMatchupTeam | null;
   accent: "brand" | "crimson";
   align: "left" | "right";
   status: string;
   weekStarted?: boolean;
-  currentScore?: number | null;
 }) {
   const isBrand = accent === "brand";
-  const showActual = weekStarted || (shouldShowMatchupScorePanels(status) && (
-    typeof team?.current_points === "number" || typeof currentScore === "number"
-  ));
+  // Kickoff moves the display to real scoring immediately. A provider may not
+  // have emitted the first play yet, so absent persisted points are a true 0.0
+  // rather than a reason to keep showing a pregame projection.
+  const showActual = weekStarted || shouldShowMatchupScorePanels(status);
   const projected = teamTotal(team);
   const managerName = managerNameForAvatar(team, "Team TBD");
   const teamLabel = managerTeamName(team, "Team TBD");
@@ -169,7 +169,7 @@ function MatchupTeamSummary({
       </p>
       <p className="text-[9px] font-bold text-cfb-text-muted sm:text-[10px]">{team?.record ?? "0-0-0"}</p>
       <p className={`cfb-score-value mt-0.5 text-2xl sm:mt-1 sm:text-4xl ${showActual ? "text-cfb-brand" : "text-cfb-text-primary"}`}>
-        {showActual ? formatMatchupPoints(team?.current_points ?? currentScore ?? 0) : formatMatchupPoints(projected)}
+        {showActual ? formatMatchupPoints(team?.current_points ?? 0) : formatMatchupPoints(projected)}
       </p>
       <p aria-label={`Projected ${formatMatchupPoints(projected)}`} className="mt-0.5 text-[9px] font-bold text-cfb-text-muted">
         {showActual ? `Proj ${formatMatchupPoints(projected)}` : "Pregame projection"}
@@ -183,9 +183,9 @@ function CompactMatchupScoreboard({
   myTeam,
   opponentTeam,
   displayWeek,
-  scoreRow,
   matchupIndex,
   matchupCount,
+  status,
   onPreviousMatchup,
   onNextMatchup,
 }: {
@@ -193,9 +193,9 @@ function CompactMatchupScoreboard({
   myTeam: LeagueMatchupTeam | null;
   opponentTeam: LeagueMatchupTeam | null;
   displayWeek: number;
-  scoreRow?: LeagueScoreboardRow;
   matchupIndex: number;
   matchupCount: number;
+  status: string;
   onPreviousMatchup: () => void;
   onNextMatchup: () => void;
 }) {
@@ -248,9 +248,8 @@ function CompactMatchupScoreboard({
           team={myTeam}
           accent="brand"
           align="left"
-          status={data.status ?? "projected"}
+          status={status}
           weekStarted={data.week_started}
-          currentScore={scoreRow?.home_score}
         />
 
         <div className="flex min-w-[80px] flex-col items-center text-center">
@@ -271,9 +270,8 @@ function CompactMatchupScoreboard({
           team={opponentTeam}
           accent="crimson"
           align="right"
-          status={data.status ?? "projected"}
+          status={status}
           weekStarted={data.week_started}
-          currentScore={scoreRow?.away_score}
         />
       </div>
 
@@ -305,7 +303,9 @@ export default function LeagueMatchup() {
   const myTeam = data?.my_team ?? data?.user_team ?? null;
   const opponentTeam = data?.opponent_team ?? null;
   const displayWeek = data?.week ?? selectedWeek;
-  const rosteredPlayerIsLive = hasLiveRosteredPlayer(data);
+  const [refreshClock, setRefreshClock] = useState(() => Date.now());
+  const rosteredPlayerIsLive = hasLiveRosteredPlayer(data, refreshClock);
+  const hasUpcomingKickoff = hasUpcomingRosteredKickoff(data, refreshClock);
   const hasScheduledMatchup = Boolean(data?.matchup_id && myTeam && opponentTeam);
   const scoreboardQuery = useLeagueScoreboard(
     parsedLeagueId,
@@ -315,17 +315,36 @@ export default function LeagueMatchup() {
   );
   const scheduledMatchups = scoreboardQuery.data?.data ?? [];
   const activeMatchupId = selectedMatchupId ?? data?.matchup_id;
-  const activeScoreRow = scheduledMatchups.find((matchup) => matchup.matchup_id === activeMatchupId);
   const activeMatchupIndex = Math.max(0, scheduledMatchups.findIndex((matchup) => matchup.matchup_id === activeMatchupId));
   const swipeStartX = useRef<number | null>(null);
-  const [refreshClock, setRefreshClock] = useState(() => Date.now());
-  const refreshCountdownSeconds = matchupRefreshCountdownSeconds(data, matchupQuery.dataUpdatedAt, refreshClock);
+  const presentationStatus = rosteredPlayerIsLive && !["final", "stat_corrected", "corrected"].includes((data?.status ?? "").toLowerCase())
+    ? "live"
+    : data?.status ?? "projected";
+  const isLocalKickoffTransition = rosteredPlayerIsLive && presentationStatus === "live" && (data?.status ?? "").toLowerCase() !== "live";
+  const [localKickoffRefreshAt, setLocalKickoffRefreshAt] = useState<number | null>(null);
+  const refreshCountdownSeconds = matchupRefreshCountdownSeconds(
+    data,
+    localKickoffRefreshAt ?? matchupQuery.dataUpdatedAt,
+    refreshClock,
+  );
   useEffect(() => {
-    if (refreshCountdownSeconds === null) return;
+    if (refreshCountdownSeconds === null && !hasUpcomingKickoff) return;
     setRefreshClock(Date.now());
     const interval = window.setInterval(() => setRefreshClock(Date.now()), 1_000);
     return () => window.clearInterval(interval);
-  }, [rosteredPlayerIsLive, data?.status, matchupQuery.dataUpdatedAt]);
+  }, [rosteredPlayerIsLive, hasUpcomingKickoff, data?.status, matchupQuery.dataUpdatedAt]);
+  const wasLiveRef = useRef(false);
+  useEffect(() => {
+    if (isLocalKickoffTransition && localKickoffRefreshAt === null) {
+      setLocalKickoffRefreshAt(Date.now());
+    } else if (!isLocalKickoffTransition && localKickoffRefreshAt !== null) {
+      setLocalKickoffRefreshAt(null);
+    }
+    if (rosteredPlayerIsLive && !wasLiveRef.current) {
+      void matchupQuery.refetch();
+    }
+    wasLiveRef.current = rosteredPlayerIsLive;
+  }, [isLocalKickoffTransition, localKickoffRefreshAt, matchupQuery.refetch, rosteredPlayerIsLive]);
   const updateSelection = (week: number, matchupId?: number) => {
     const next = new URLSearchParams(searchParams);
     next.set("week", String(week));
@@ -442,16 +461,16 @@ export default function LeagueMatchup() {
               myTeam={myTeam}
               opponentTeam={opponentTeam}
               displayWeek={displayWeek}
-              scoreRow={activeScoreRow}
               matchupIndex={activeMatchupIndex}
               matchupCount={scheduledMatchups.length}
+              status={presentationStatus}
               onPreviousMatchup={() => selectAdjacentMatchup(-1)}
               onNextMatchup={() => selectAdjacentMatchup(1)}
             />
           </div>
 
           <div className="mx-3 mt-3 rounded-full bg-cfb-surface px-4 py-2 sm:mx-5"><p className="text-sm font-black text-cfb-text-primary">Starters</p></div>
-          <div className="mt-2"><SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={parsedLeagueId} scoringStatus={data.status} /></div>
+          <div className="mt-2"><SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={parsedLeagueId} scoringStatus={presentationStatus} /></div>
         </>
       )}
     </main>

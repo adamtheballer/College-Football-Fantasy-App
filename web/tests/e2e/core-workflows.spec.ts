@@ -1640,6 +1640,32 @@ test.describe("critical browser workflows", () => {
       my_roster: liveMyRoster,
       opponent_roster: liveOpponentRoster,
     };
+    const kickoffOnlyMyRoster = myRoster.map((player) =>
+      player.player_name === "Arch Manning"
+        ? {
+            ...player,
+            live_game_state: "scheduled",
+            game_start_at: new Date(Date.now() - 1_000).toISOString(),
+            current_fantasy_points: null,
+            live_points: null,
+          }
+        : player,
+    );
+    const kickoffOnlyPayload = {
+      ...scheduledPayload,
+      status: "projected",
+      my_team: {
+        ...scheduledPayload.my_team,
+        current_points: null,
+        roster: kickoffOnlyMyRoster,
+      },
+      user_team: {
+        ...scheduledPayload.user_team,
+        current_points: null,
+        roster: kickoffOnlyMyRoster,
+      },
+      my_roster: kickoffOnlyMyRoster,
+    };
     const finalMyRoster = myRoster.map((player) =>
       player.player_name === "Arch Manning"
         ? {
@@ -1818,6 +1844,18 @@ test.describe("critical browser workflows", () => {
     await expect(liveMobileLineup.getByText("0.0", { exact: true })).toBeVisible();
     await expect(liveMobileLineup.getByText("Proj 121.7", { exact: true })).toBeVisible();
     await page.screenshot({ path: "test-results/live-matchup-current-and-projection.png", fullPage: true });
+
+    matchupPayload = kickoffOnlyPayload;
+    await page.goto("/league/1/matchup");
+    const kickoffMobileLineup = page.getByTestId("mobile-starting-lineup");
+    await kickoffMobileLineup.scrollIntoViewIfNeeded();
+    await expect(kickoffMobileLineup.getByRole("button", { name: "Open A. Manning player card" }).getByText("0.0", { exact: true })).toBeVisible();
+    await expect(kickoffMobileLineup.getByText("In progress", { exact: true })).toBeVisible();
+    await expect(kickoffMobileLineup.locator('[data-mobile-player-live="true"]')).toHaveCount(1);
+    await expect(page.getByTestId("live-score-refresh-countdown")).toContainText(/Live refresh.*[23]:\d{2}/);
+    await expect(page.getByLabel("Projected 133.1")).toBeVisible();
+    await expect(page.getByText("0.0", { exact: true }).first()).toBeVisible();
+    await page.screenshot({ path: "test-results/kickoff-transition-live-row.png", fullPage: true });
 
     matchupPayload = finalPayload;
     await page.goto("/league/1/matchup");

@@ -7,6 +7,7 @@ import { SurfaceCard } from "@/components/fantasy";
 import { usePlayerCard } from "@/hooks/use-players";
 import { managerTeamName } from "@/lib/manager-team-name";
 import { PlayerAvailabilityIndicator } from "@/lib/playerAvailability";
+import { rosterPlayerGameState, rosterPlayerIsLive } from "@/lib/rosterGameState";
 import type { LeagueMatchupTeam, LeagueRosterPlayer } from "@/types/league";
 
 const reserveSlots = new Set(["BENCH", "IR"]);
@@ -48,10 +49,10 @@ const pointModeForMatchupStatus = (status?: string | null): RosterPointMode =>
     : "projected";
 
 const playerGameIsFinal = (player?: LeagueRosterPlayer) =>
-  ["final", "post"].includes((player?.live_game_state ?? "").toLowerCase());
+  ["final", "post"].includes(rosterPlayerGameState(player));
 
 const playerGameIsLive = (player?: LeagueRosterPlayer) =>
-  Boolean(player?.player_id && (player.live_game_state ?? "").toLowerCase() === "live");
+  Boolean(player?.player_id && rosterPlayerIsLive(player));
 
 export const compactMatchupPlayerName = (name?: string | null) => {
   const parts = name?.trim().split(/\s+/).filter(Boolean) ?? [];

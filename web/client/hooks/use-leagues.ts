@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiDelete, apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
+import { rosterPlayerHasUpcomingKickoff, rosterPlayerIsLive } from "@/lib/rosterGameState";
 import type {
   DraftInfo,
   DraftOrder,
@@ -191,26 +192,27 @@ export function useLeagueRosterTab(
 
 export const LIVE_MATCHUP_REFRESH_MS = 180_000;
 
-export function hasLiveRosteredPlayer(data: LeagueMatchupTabResponse | undefined) {
-  const roster = [
-    ...(data?.my_roster ?? []),
-    ...(data?.opponent_roster ?? []),
-    ...(data?.my_team?.roster ?? []),
-    ...(data?.opponent_team?.roster ?? []),
-  ];
-  return roster.some((player) => {
-    const gameState = (player.live_game_state ?? "").toLowerCase();
-    const scoringState = (player.live_scoring_status ?? "").toLowerCase();
-    return gameState === "live" || scoringState === "live" || scoringState === "stale";
-  });
+const matchupRoster = (data: LeagueMatchupTabResponse | undefined) => [
+  ...(data?.my_roster ?? []),
+  ...(data?.opponent_roster ?? []),
+  ...(data?.my_team?.roster ?? []),
+  ...(data?.opponent_team?.roster ?? []),
+];
+
+export function hasLiveRosteredPlayer(data: LeagueMatchupTabResponse | undefined, now = Date.now()) {
+  return matchupRoster(data).some((player) => rosterPlayerIsLive(player, now));
 }
 
-export function matchupRefreshInterval(data: LeagueMatchupTabResponse | undefined) {
+export function hasUpcomingRosteredKickoff(data: LeagueMatchupTabResponse | undefined, now = Date.now()) {
+  return matchupRoster(data).some((player) => rosterPlayerHasUpcomingKickoff(player, now));
+}
+
+export function matchupRefreshInterval(data: LeagueMatchupTabResponse | undefined, now = Date.now()) {
   const status = data?.status?.toLowerCase();
   // A matchup page contains both starter and bench rows. Bench players do
   // not contribute to the matchup total, but their live game still needs the
   // same visible, recurring refresh cycle as every other rostered player.
-  if (hasLiveRosteredPlayer(data) || status === "live" || status === "delayed") {
+  if (hasLiveRosteredPlayer(data, now) || status === "live" || status === "delayed") {
     return LIVE_MATCHUP_REFRESH_MS;
   }
   if (status === "final" || status === "stat_corrected") return false;
@@ -223,8 +225,8 @@ export function matchupRefreshCountdownSeconds(
   now = Date.now(),
 ) {
   const status = data?.status?.toLowerCase();
-  if (!hasLiveRosteredPlayer(data) && status !== "live" && status !== "delayed") return null;
-  const interval = matchupRefreshInterval(data);
+  if (!hasLiveRosteredPlayer(data, now) && status !== "live" && status !== "delayed") return null;
+  const interval = matchupRefreshInterval(data, now);
   if (typeof interval !== "number") return null;
   const target = (typeof dataUpdatedAt === "number" && dataUpdatedAt > 0 ? dataUpdatedAt : now) + interval;
   return Math.max(0, Math.ceil((target - now) / 1_000));

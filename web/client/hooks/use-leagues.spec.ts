@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   LIVE_MATCHUP_REFRESH_MS,
   hasLiveRosteredPlayer,
+  hasUpcomingRosteredKickoff,
   matchupRefreshCountdownSeconds,
   matchupRefreshInterval,
 } from "./use-leagues";
@@ -40,5 +41,23 @@ describe("matchup live refresh cadence", () => {
     expect(hasLiveRosteredPlayer(data)).toBe(true);
     expect(matchupRefreshInterval(data)).toBe(LIVE_MATCHUP_REFRESH_MS);
     expect(matchupRefreshCountdownSeconds(data, 10_000, 10_000)).toBe(180);
+  });
+
+  it("begins the three-minute live refresh cycle at kickoff before a provider play arrives", () => {
+    const now = Date.UTC(2026, 7, 29, 23, 0, 0);
+    const data = {
+      status: "projected",
+      my_roster: [{
+        is_starter: false,
+        live_game_state: "scheduled",
+        game_start_at: new Date(now - 1_000).toISOString(),
+      }],
+      opponent_roster: [],
+    } as any;
+
+    expect(hasLiveRosteredPlayer(data, now)).toBe(true);
+    expect(hasUpcomingRosteredKickoff(data, now)).toBe(false);
+    expect(matchupRefreshInterval(data, now)).toBe(LIVE_MATCHUP_REFRESH_MS);
+    expect(matchupRefreshCountdownSeconds(data, now, now)).toBe(180);
   });
 });
