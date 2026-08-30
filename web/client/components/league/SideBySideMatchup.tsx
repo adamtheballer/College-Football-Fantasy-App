@@ -88,11 +88,13 @@ function CompactMatchupPlayer({
   align,
   pointMode,
   onSelect,
+  desktop = false,
 }: {
   player?: LeagueRosterPlayer;
   align: "left" | "right";
   pointMode: RosterPointMode;
   onSelect?: (player: LeagueRosterPlayer) => void;
+  desktop?: boolean;
 }) {
   const hasPlayer = Boolean(player?.player_id && player.player_name);
   const points = compactPointValue(player, pointMode);
@@ -114,6 +116,7 @@ function CompactMatchupPlayer({
   const interactiveClassName = interactive
     ? "w-full rounded-md text-left transition-colors hover:bg-white/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"
     : "";
+  const playerNameClassName = desktop ? "text-[16px] leading-5" : "text-[12px] leading-4";
 
   // A flex row that is justified to the right moves the player name whenever
   // the projection or name changes width. Keep a fixed projection rail on
@@ -129,7 +132,7 @@ function CompactMatchupPlayer({
           {finalPregameProjection ? <span data-player-final-pregame-projection className="block text-[7px] font-semibold text-cfb-brand">{finalPregameProjection}</span> : null}
         </span>
         <div className="min-w-0">
-          <p className={`flex min-w-0 items-center gap-1 truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
+          <p className={`flex min-w-0 items-center gap-1 truncate font-black text-cfb-text-primary ${playerNameClassName} ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
             <PlayerAvailabilityIndicator status={player?.injury_status}>
               <span className="truncate">{playerName}</span>
             </PlayerAvailabilityIndicator>
@@ -166,7 +169,7 @@ function CompactMatchupPlayer({
   const content = (
     <>
       <div className="min-w-0">
-        <p className={`flex min-w-0 items-center gap-1 truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
+        <p className={`flex min-w-0 items-center gap-1 truncate font-black text-cfb-text-primary ${playerNameClassName} ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
           <PlayerAvailabilityIndicator status={player?.injury_status}>
             <span className="truncate">{playerName}</span>
           </PlayerAvailabilityIndicator>
@@ -278,13 +281,13 @@ function CompactMatchupLineup({
               className={rowClassName}
             >
               <div data-mobile-player-live={myPlayerIsLive ? "true" : "false"} className={`flex min-w-0 items-center ${playerCellClassName} ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""} ${myPlayerIsLive ? "bg-slate-100/[0.10]" : ""}`}>
-                <CompactMatchupPlayer player={myPlayer} align="left" pointMode={pointMode} onSelect={onPlayerSelect} />
+                <CompactMatchupPlayer player={myPlayer} align="left" pointMode={pointMode} onSelect={onPlayerSelect} desktop={desktop} />
               </div>
               <span data-mobile-slot-column data-desktop-slot-column={desktop ? "true" : undefined} className={`inline-flex ${slotCellClassName} whitespace-nowrap items-center justify-center px-1 text-[9px] font-black uppercase tracking-[0.02em] text-cfb-text-secondary`}>
                 {slot}
               </span>
               <div data-mobile-player-live={opponentPlayerIsLive ? "true" : "false"} className={`flex min-w-0 items-center ${playerCellClassName} ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""} ${opponentPlayerIsLive ? "bg-slate-100/[0.10]" : ""}`}>
-                <CompactMatchupPlayer player={opponentPlayer} align="right" pointMode={pointMode} onSelect={onPlayerSelect} />
+                <CompactMatchupPlayer player={opponentPlayer} align="right" pointMode={pointMode} onSelect={onPlayerSelect} desktop={desktop} />
               </div>
             </div>
           );

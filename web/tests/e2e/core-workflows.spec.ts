@@ -1769,6 +1769,8 @@ test.describe("critical browser workflows", () => {
     await expect(desktopStartingLineup).toBeVisible();
     await expect(desktopStartingLineup.getByText("Emily's Team Starters")).toHaveClass(/text-cfb-text-primary/);
     await expect(desktopStartingLineup.getByText("Adam 2's Team Starters")).toHaveClass(/text-cfb-text-primary/);
+    await expect(desktopStartingLineup.getByText("A. Manning", { exact: true }).locator(".."))
+      .toHaveClass(/text-\[16px\]/);
     await expect(desktopStartingLineup.getByRole("button", { name: "Open A. Manning player card" })).toBeVisible();
     await expect(desktopStartingLineup.getByRole("button", { name: "Open R. QB player card" })).toBeVisible();
     await expect(desktopStartingLineup.locator('[data-desktop-slot-rail="true"]')).toHaveCount(1);
@@ -1821,6 +1823,8 @@ test.describe("critical browser workflows", () => {
     const mobileStartingLineup = page.getByTestId("mobile-starting-lineup");
     await mobileStartingLineup.scrollIntoViewIfNeeded();
     await expect(mobileStartingLineup.getByText("A. Manning", { exact: true })).toBeVisible();
+    await expect(mobileStartingLineup.getByText("A. Manning", { exact: true }).locator(".."))
+      .toHaveClass(/text-\[12px\]/);
     await expect(page.getByText("CFB Scores", { exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: "Open A. Manning player card" }).click();
     const playerCard = page.getByRole("dialog", { name: "Arch Manning player card" });
