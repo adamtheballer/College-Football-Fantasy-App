@@ -1898,6 +1898,10 @@ test.describe("critical browser workflows", () => {
       finalMobileLineup.getByRole("button", { name: "Open A. Manning player card" }).locator("[data-player-game-time]"),
     ).toHaveCount(0);
     await expect(finalMobileLineup.getByText("Final", { exact: true })).toBeVisible();
+    const finalPregameProjection = finalMobileLineup.getByText("Proj 133.1", { exact: true });
+    await expect(finalPregameProjection).toBeVisible();
+    await expect(finalPregameProjection).toHaveAttribute("data-player-final-pregame-projection");
+    await expect(finalPregameProjection).toHaveClass(/text-cfb-brand/);
     await page.screenshot({ path: "test-results/final-matchup-stat-line.png", fullPage: true });
 
     matchupPayload = emptyPayload;

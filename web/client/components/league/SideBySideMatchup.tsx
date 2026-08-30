@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Lock } from "lucide-react";
 
-import { RosterSlotTable, type RosterPointMode, formatRosterGameKickoff, formatRosterPointValue, liveGameStatusLabel, liveProjectionDetail } from "@/components/league/RosterSlotTable";
+import { RosterSlotTable, type RosterPointMode, finalPregameProjectionDetail, formatRosterGameKickoff, formatRosterPointValue, liveGameStatusLabel, liveProjectionDetail } from "@/components/league/RosterSlotTable";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { SurfaceCard } from "@/components/fantasy";
 import { usePlayerCard } from "@/hooks/use-players";
@@ -97,6 +97,7 @@ function CompactMatchupPlayer({
   const hasPlayer = Boolean(player?.player_id && player.player_name);
   const points = compactPointValue(player, pointMode);
   const liveDetail = player ? liveProjectionDetail(player) : null;
+  const finalPregameProjection = player ? finalPregameProjectionDetail(player) : null;
   const isLiveGame = playerGameIsLive(player);
   const hasPossession = isLiveGame && player?.team_has_possession === true;
   const isFinalGame = playerGameIsFinal(player);
@@ -125,6 +126,7 @@ function CompactMatchupPlayer({
           {isLiveGame ? <Lock data-lineup-lock aria-label="Game in progress — lineup locked" className="mb-0.5 h-2.5 w-2.5 text-cfb-text-muted" /> : null}
           <span className="block">{points}</span>
           {liveDetail ? <span data-player-final-status={isFinalGame ? "true" : undefined} className={`block ${isFinalGame ? "text-[9px] font-black text-cfb-brand" : "text-[8px] font-semibold text-cfb-text-muted"}`}>{liveDetail}</span> : null}
+          {finalPregameProjection ? <span data-player-final-pregame-projection className="block text-[7px] font-semibold text-cfb-brand">{finalPregameProjection}</span> : null}
         </span>
         <div className="min-w-0">
           <p className={`flex min-w-0 items-center gap-1 truncate text-[12px] font-black leading-4 text-cfb-text-primary ${hasPlayer ? "" : "text-cfb-text-muted"}`}>
@@ -187,6 +189,7 @@ function CompactMatchupPlayer({
         {isLiveGame ? <Lock data-lineup-lock aria-label="Game in progress — lineup locked" className="mb-0.5 h-2.5 w-2.5 text-cfb-text-muted" /> : null}
         <span className="block">{points}</span>
         {liveDetail ? <span data-player-final-status={isFinalGame ? "true" : undefined} className={`block ${isFinalGame ? "text-[9px] font-black text-cfb-brand" : "text-[8px] font-semibold text-cfb-text-muted"}`}>{liveDetail}</span> : null}
+        {finalPregameProjection ? <span data-player-final-pregame-projection className="block text-[7px] font-semibold text-cfb-brand">{finalPregameProjection}</span> : null}
       </span>
     </>
   );

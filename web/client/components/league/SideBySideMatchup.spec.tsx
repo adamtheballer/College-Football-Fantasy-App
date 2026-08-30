@@ -25,6 +25,9 @@ vi.mock("@/components/league/RosterSlotTable", () => ({
     : player.game_start_at && new Date(player.game_start_at).getTime() <= Date.now()
       ? `Proj ${(player.projected_points ?? 0).toFixed(1)}`
     : player.live_projected_final_points ? `Proj ${player.live_projected_final_points.toFixed(1)}` : null,
+  finalPregameProjectionDetail: (player: LeagueRosterPlayer) => player.live_game_state === "final" || player.live_game_state === "post"
+    ? `Proj ${(player.pregame_projected_points ?? player.projected_points ?? 0).toFixed(1)}`
+    : null,
   liveGameStatusLabel: (player: LeagueRosterPlayer) => {
     const kickoffStarted = Boolean(player.game_start_at && new Date(player.game_start_at).getTime() <= Date.now());
     if (player.live_game_state !== "live" && !kickoffStarted) return null;
@@ -248,6 +251,7 @@ describe("SideBySideMatchup", () => {
         ...myTeam.roster[0],
         live_game_state: "final" as const,
         current_fantasy_points: 18.5,
+        pregame_projected_points: 24.1,
         final_game_stat_line: "281 PASS YDS · 3 PASS TD · 34 RUSH YDS · 1 RUSH TD",
       }],
     };
@@ -258,6 +262,9 @@ describe("SideBySideMatchup", () => {
     expect(screen.getByText("18.5").parentElement?.className).toContain("text-cfb-brand");
     expect(screen.getByText("Final").className).toContain("text-cfb-brand");
     expect(screen.getByText("Final").className).toContain("text-[9px]");
+    const pregameProjection = screen.getByText("Proj 24.1");
+    expect(pregameProjection.getAttribute("data-player-final-pregame-projection")).not.toBeNull();
+    expect(pregameProjection.className).toContain("text-cfb-brand");
     expect(screen.getByText("L. Name Quarterback").closest("[data-mobile-matchup-player]")?.querySelector("[data-player-game-time]")).toBeNull();
     const statLine = screen.getByText("281 PASS YDS · 3 PASS TD · 34 RUSH YDS · 1 RUSH TD");
     expect(statLine.getAttribute("data-player-final-stat-line")).not.toBeNull();
