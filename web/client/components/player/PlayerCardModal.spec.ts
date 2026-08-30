@@ -19,6 +19,7 @@ import {
   resolvePlayerCardCfb27Rating,
   resolvePlayerCardCurrentValueRating,
   resolvePlayerCardProjectionStats,
+  shouldUseCalculatedCurrentSeason,
   visiblePlayerCardAboutMessage,
   visiblePlayerCardTabs,
   unifiedSeasonSummaryColumns,
@@ -95,6 +96,12 @@ describe("PlayerCardModal helpers", () => {
     expect(currentSeasonSummaryValue(totals, "GP")).toBe(1);
     expect(currentSeasonSummaryValue(totals, "Pass Yds")).toBe(280);
     expect(historicalSeasonSummaryDisplayValue({ summary: [{ label: "Games", value: 12 }], categories: [] } as never, "GP")).toBe(12);
+  });
+
+  it("requires a normal 2026 row even before a player has completed a game", () => {
+    expect(shouldUseCalculatedCurrentSeason(0, [])).toBe(true);
+    expect(shouldUseCalculatedCurrentSeason(0, [{ season: 2026 }])).toBe(false);
+    expect(shouldUseCalculatedCurrentSeason(1, [{ season: 2026 }])).toBe(true);
   });
 
   it("labels player news with its Eastern report date and time", () => {

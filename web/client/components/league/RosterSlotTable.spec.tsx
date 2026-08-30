@@ -18,7 +18,7 @@ vi.mock("@/hooks/use-roster-actions", () => ({
   useUpdateLineup: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
-import { formatRosterPointValue, liveGameStatusLabel, liveProjectionDetail, RosterSlotTable } from "./RosterSlotTable";
+import { formatRosterGameKickoff, formatRosterPointValue, liveGameStatusLabel, liveProjectionDetail, RosterSlotTable } from "./RosterSlotTable";
 
 afterEach(cleanup);
 
@@ -149,6 +149,18 @@ describe("RosterSlotTable", () => {
     expect(statLine.className).toContain("truncate");
   });
 
+  it("keeps the published date and kickoff time below every non-final desktop roster player", () => {
+    const scheduledReceiver = {
+      ...projectedReceiver,
+      game_start_at: "2026-09-05T23:30:00Z",
+    };
+    render(<RosterSlotTable title="Starters" players={[scheduledReceiver]} />);
+
+    const gameTime = screen.getByText(/Sep 5.*at.*PM/);
+    expect(gameTime.getAttribute("data-player-game-time")).not.toBeNull();
+    expect(formatRosterGameKickoff("2026-09-05T23:30:00Z")).toMatch(/Sep 5.*at.*PM/);
+  });
+
   it("uses a halftime label instead of a stale clock or down", () => {
     const halftimeReceiver = {
       ...projectedReceiver,
@@ -169,6 +181,7 @@ describe("RosterSlotTable", () => {
       live_game_state: "final" as const,
       current_fantasy_points: 17.8,
       final_game_stat_line: "6 REC · 104 REC YDS · 1 REC TD",
+      game_start_at: "2026-08-29T23:00:00Z",
     };
     render(<RosterSlotTable title="Starters" players={[finalReceiver]} pointMode="live" />);
 
@@ -180,6 +193,7 @@ describe("RosterSlotTable", () => {
     expect(statLine.getAttribute("data-player-final-stat-line")).not.toBeNull();
     expect(statLine.className).toContain("truncate");
     expect(statLine.className).toContain("text-cfb-text-muted");
+    expect(screen.queryByText(/Aug 29.*at.*PM/)).toBeNull();
   });
 
   it("preserves stale live values and explicitly labels the delayed data", () => {

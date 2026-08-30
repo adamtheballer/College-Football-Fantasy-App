@@ -7,6 +7,7 @@ import type { LeagueMatchupTeam, LeagueRosterPlayer } from "@/types/league";
 
 vi.mock("@/components/league/RosterSlotTable", () => ({
   RosterSlotTable: ({ title }: { title: string }) => <div data-testid="desktop-roster-table">{title}</div>,
+  formatRosterGameKickoff: (value?: string | null) => value ? "Sat, Aug 29 at 7:00 PM" : "Kickoff TBD",
   formatRosterPointValue: (player: LeagueRosterPlayer, pointMode: "projected" | "live") => {
     if (pointMode === "projected" && player.injury_status?.startsWith("OUT")) return "0.0";
     const kickoffStarted = Boolean(

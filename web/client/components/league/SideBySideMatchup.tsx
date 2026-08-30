@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Lock } from "lucide-react";
 
-import { RosterSlotTable, type RosterPointMode, formatRosterPointValue, liveGameStatusLabel, liveProjectionDetail } from "@/components/league/RosterSlotTable";
+import { RosterSlotTable, type RosterPointMode, formatRosterGameKickoff, formatRosterPointValue, liveGameStatusLabel, liveProjectionDetail } from "@/components/league/RosterSlotTable";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { SurfaceCard } from "@/components/fantasy";
 import { usePlayerCard } from "@/hooks/use-players";
@@ -60,19 +60,6 @@ export const compactMatchupPlayerName = (name?: string | null) => {
   return `${parts[0][0]?.toUpperCase() ?? ""}. ${parts.slice(1).join(" ")}`;
 };
 
-const kickoffLabel = (value?: string | null) => {
-  if (!value) return "Kickoff TBD";
-  const kickoff = new Date(value);
-  if (Number.isNaN(kickoff.getTime())) return "Kickoff TBD";
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(kickoff);
-};
-
 export const formatPlayerGameMatchup = (player?: LeagueRosterPlayer) => {
   if (!player?.player_id) return "Open slot";
   const school = player.school ?? player.player_school ?? "School TBD";
@@ -88,7 +75,7 @@ export const formatPlayerGameMatchup = (player?: LeagueRosterPlayer) => {
 };
 
 export const formatPlayerGameTime = (player?: LeagueRosterPlayer) =>
-  player?.player_id ? kickoffLabel(player.game_start_at) : "Kickoff TBD";
+  player?.player_id ? formatRosterGameKickoff(player.game_start_at) : "Kickoff TBD";
 
 export const formatPlayerGameContext = (player?: LeagueRosterPlayer) => {
   const matchup = formatPlayerGameMatchup(player);

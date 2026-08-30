@@ -120,6 +120,24 @@ export const liveGameStatusLabel = (player: LeagueRosterPlayer) => {
   return sections.join(" · ");
 };
 
+/** The published kickoff, kept separate from the live game-state line. */
+export const formatRosterGameKickoff = (value?: string | null) => {
+  if (!value) return "Kickoff TBD";
+  const kickoff = new Date(value);
+  if (Number.isNaN(kickoff.getTime())) return "Kickoff TBD";
+
+  const date = new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(kickoff);
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(kickoff);
+  return `${date} at ${time}`;
+};
+
 const isRealRosterPlayer = (player: LeagueRosterPlayer) =>
   Boolean(
     player.player_id !== null &&
@@ -326,6 +344,9 @@ export function RosterSlotTable({
             const liveDetail = liveProjectionDetail(player);
             const gameStatus = liveGameStatusLabel(player);
             const gameStatLine = player.game_stat_line ?? (isFinalGame ? player.final_game_stat_line : null);
+            const gameTime = isRealPlayer && player.game_start_at
+              ? formatRosterGameKickoff(player.game_start_at)
+              : null;
             return (
               <button
                 key={player.slot_id ?? `${player.team_id ?? player.fantasy_team_id}-${slotType(player)}-${player.slot_index ?? 0}`}
@@ -381,6 +402,11 @@ export function RosterSlotTable({
                       ? [displaySchoolName(player.school ?? player.player_school), player.opponent ? `vs ${player.opponent}` : "Opponent TBD"].filter(Boolean).join(" · ")
                       : "Open roster slot"}
                   </span>
+                  {!isFinalGame && gameTime ? (
+                    <span data-player-game-time className="hidden truncate text-[9px] font-bold leading-3 text-cfb-text-muted md:block">
+                      {gameTime}
+                    </span>
+                  ) : null}
                   {gameStatus ? (
                     <span data-player-live-game-status className="truncate text-[9px] font-black leading-3 text-cfb-brand">
                       {gameStatus}
