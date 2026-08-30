@@ -18,7 +18,7 @@ vi.mock("@/hooks/use-roster-actions", () => ({
   useUpdateLineup: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
-import { formatRosterGameKickoff, formatRosterPointValue, liveGameStatusLabel, liveProjectionDetail, RosterSlotTable } from "./RosterSlotTable";
+import { finalPregameProjectionDetail, formatRosterGameKickoff, formatRosterPointValue, liveGameStatusLabel, liveProjectionDetail, RosterSlotTable } from "./RosterSlotTable";
 
 afterEach(cleanup);
 
@@ -180,6 +180,7 @@ describe("RosterSlotTable", () => {
       ...projectedReceiver,
       live_game_state: "final" as const,
       current_fantasy_points: 17.8,
+      pregame_projected_points: 15.3,
       final_game_stat_line: "6 REC · 104 REC YDS · 1 REC TD",
       game_start_at: "2026-08-29T23:00:00Z",
     };
@@ -189,6 +190,10 @@ describe("RosterSlotTable", () => {
     expect(screen.getByText("17.8").parentElement?.className).toContain("text-cfb-brand");
     expect(screen.getByText("Final").className).toContain("text-cfb-brand");
     expect(screen.getByText("Final").className).toContain("text-[10px]");
+    const pregameProjection = screen.getByText("Proj 15.3");
+    expect(pregameProjection.getAttribute("data-player-final-pregame-projection")).not.toBeNull();
+    expect(pregameProjection.className).toContain("text-cfb-brand");
+    expect(finalPregameProjectionDetail(finalReceiver)).toBe("Proj 15.3");
     const statLine = screen.getByText("6 REC · 104 REC YDS · 1 REC TD");
     expect(statLine.getAttribute("data-player-final-stat-line")).not.toBeNull();
     expect(statLine.className).toContain("truncate");

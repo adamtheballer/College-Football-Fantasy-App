@@ -93,6 +93,17 @@ export const liveProjectionDetail = (player: LeagueRosterPlayer) => {
   return delayed ? `Proj ${final.toFixed(1)} · Data delayed` : `Proj ${final.toFixed(1)}`;
 };
 
+/** Keep the published pregame baseline visible after a game is final. */
+export const finalPregameProjectionDetail = (player: LeagueRosterPlayer) => {
+  if (!["final", "post"].includes(rosterPlayerGameState(player))) return null;
+  const pregame = player.pregame_projected_points
+    ?? player.projected_points
+    ?? player.weekly_projected_fantasy_points;
+  return typeof pregame === "number" && Number.isFinite(pregame)
+    ? `Proj ${pregame.toFixed(1)}`
+    : null;
+};
+
 const gamePeriodLabel = (period?: number | null) => {
   if (!Number.isInteger(period) || !period || period < 1) return null;
   if (period <= 4) return `Q${period}`;
@@ -342,6 +353,7 @@ export function RosterSlotTable({
             const hasRedZone = isLiveGame && player.team_in_red_zone === true;
             const hasPossession = isLiveGame && player.team_has_possession === true;
             const liveDetail = liveProjectionDetail(player);
+            const finalPregameProjection = finalPregameProjectionDetail(player);
             const gameStatus = liveGameStatusLabel(player);
             const gameStatLine = player.game_stat_line ?? (isFinalGame ? player.final_game_stat_line : null);
             const gameTime = isRealPlayer && player.game_start_at
@@ -435,6 +447,7 @@ export function RosterSlotTable({
                   {isLiveGame ? <Lock data-lineup-lock aria-label="Game in progress — lineup locked" className="mb-0.5 h-3 w-3 text-cfb-text-muted" /> : null}
                   <span>{pointValue}</span>
                   {liveDetail ? <span data-player-final-status={isFinalGame ? "true" : undefined} className={cn(isFinalGame ? "text-[10px] font-black text-cfb-brand" : "text-[9px] font-semibold text-cfb-text-muted")}>{liveDetail}</span> : null}
+                  {finalPregameProjection ? <span data-player-final-pregame-projection className="text-[8px] font-semibold text-cfb-brand">{finalPregameProjection}</span> : null}
                 </span>
               </button>
             );
