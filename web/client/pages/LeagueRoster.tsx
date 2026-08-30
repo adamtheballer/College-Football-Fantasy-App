@@ -134,6 +134,7 @@ export default function LeagueRoster() {
   const parsedLeagueId = Number(leagueId);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(1);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [quickSwapPlayer, setQuickSwapPlayer] = useState<LeagueRosterPlayer | null>(null);
   const leagueQuery = useLeagueDetail(parsedLeagueId);
   const postDraft = isLeaguePostDraft({
     draftStatus: leagueQuery.data?.draft?.status,
@@ -159,6 +160,9 @@ export default function LeagueRoster() {
   const hasRosterSlots = fetchedRoster.length > 0;
   const isEmptyRoster = !rosterQuery.isLoading && !rosterQuery.isError && !hasRosterSlots;
   const roster = fetchedRoster;
+  useEffect(() => {
+    setQuickSwapPlayer(null);
+  }, [selectedTeamId, selectedWeek]);
   const rosterPointMode = realRoster.some(
     (player) => typeof player.live_points === "number" || (player.live_game_state ?? "").toLowerCase() === "live"
   ) ? "live" : "projected";
@@ -314,8 +318,27 @@ export default function LeagueRoster() {
         </div>
       </section>
 
-      <RosterSlotTable title="Starters" players={starters} emptyText="No starters set yet." pointMode={rosterPointMode} leagueId={parsedLeagueId} ownedRosterActions={ownedRosterActions} />
-      <RosterSlotTable title="Bench" players={bench} emptyText="Bench is empty." tone="bench" pointMode={rosterPointMode} leagueId={parsedLeagueId} ownedRosterActions={ownedRosterActions} />
+      <RosterSlotTable
+        title="Starters"
+        players={starters}
+        emptyText="No starters set yet."
+        pointMode={rosterPointMode}
+        leagueId={parsedLeagueId}
+        ownedRosterActions={ownedRosterActions}
+        quickSwapPlayer={quickSwapPlayer}
+        onQuickSwapPlayerChange={setQuickSwapPlayer}
+      />
+      <RosterSlotTable
+        title="Bench"
+        players={bench}
+        emptyText="Bench is empty."
+        tone="bench"
+        pointMode={rosterPointMode}
+        leagueId={parsedLeagueId}
+        ownedRosterActions={ownedRosterActions}
+        quickSwapPlayer={quickSwapPlayer}
+        onQuickSwapPlayerChange={setQuickSwapPlayer}
+      />
       <RosterSlotTable
         title={`IR (${rosterData?.ir_slots ?? 0})`}
         players={ir}
@@ -323,6 +346,8 @@ export default function LeagueRoster() {
         pointMode={rosterPointMode}
         leagueId={parsedLeagueId}
         ownedRosterActions={ownedRosterActions}
+        quickSwapPlayer={quickSwapPlayer}
+        onQuickSwapPlayerChange={setQuickSwapPlayer}
       />
     </main>
   );

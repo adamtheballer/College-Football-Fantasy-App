@@ -1853,7 +1853,7 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("Proj 121.7", { exact: true }).first()).toBeVisible();
     await expect(page.getByLabel("Projected 121.7")).toBeVisible();
     await expect(page.getByText("Pregame projection", { exact: true })).toHaveCount(0);
-    const liveDesktopStarter = page.getByRole("button", { name: /Arch Manning/ });
+    const liveDesktopStarter = page.locator("[data-roster-mobile-row]").filter({ hasText: "Arch Manning" }).first();
     await expect(liveDesktopStarter.getByText("0.0", { exact: true })).toBeVisible();
     await expect(liveDesktopStarter.getByText("Proj 121.7", { exact: true })).toBeVisible();
     await expect(liveDesktopStarter.locator("[data-player-game-time]")).toContainText(/Aug 29.*at.*PM/);
@@ -2208,8 +2208,19 @@ test.describe("critical browser workflows", () => {
       game_start_at: null,
       is_locked: false,
     });
-    const myRoster = [rosterPlayer(11, "My Team", 201, "My QB")];
+    const myStarter = rosterPlayer(11, "My Team", 201, "My QB");
+    const myBench = {
+      ...rosterPlayer(11, "My Team", 202, "My Bench QB"),
+      slot: "BENCH",
+      slot_id: "BENCH-11-1",
+      slot_index: 1,
+      display_label: "Bench 1",
+      roster_slot: "BENCH",
+      is_starter: false,
+    };
+    const myRoster = [myStarter, myBench];
     const rivalRoster = [rosterPlayer(12, "Rival Team", 301, "Rival QB")];
+    let lineupAssignments: unknown = null;
 
     await page.route("**/leagues?**", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [leagueDetail], total: 1, limit: 50, offset: 0 }) });
@@ -2241,10 +2252,21 @@ test.describe("critical browser workflows", () => {
         }),
       });
     });
+    await page.route("**/teams/11/lineup", async (route) => {
+      lineupAssignments = route.request().postDataJSON()?.assignments ?? null;
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({}) });
+    });
 
     await page.goto("/league/1/roster");
     await expect(page.getByText("My QB", { exact: true })).toBeVisible();
     await expect(page.getByText("Managing your roster", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Select My QB to swap" }).click();
+    await expect(page.getByRole("button", { name: "Cancel swap selection for My QB" })).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Swap My QB with My Bench QB" }).click();
+    await expect.poll(() => lineupAssignments).toEqual([
+      { roster_entry_id: 201, slot: "BENCH", slot_index: 1 },
+      { roster_entry_id: 202, slot: "QB", slot_index: 1 },
+    ]);
 
     await page.setViewportSize({ width: 390, height: 844 });
     const rosterRail = page.getByLabel("Swipe through league rosters");
