@@ -194,7 +194,6 @@ export const gameLogColumnsForPosition = (position: string): readonly GameLogCol
         ["RUSH YDS", ["rush_yards", "rushing_yards", "RushingYards"]],
         ["RUSH TD", ["rush_tds", "rushing_touchdowns", "RushingTouchdowns"]],
         ["REC", ["receptions", "Receptions"]],
-        ["TAR", ["targets", "receiving_targets", "ReceivingTargets"]],
         ["REC YDS", ["rec_yards", "receiving_yards", "ReceivingYards"]],
         ["REC TD", ["rec_tds", "receiving_touchdowns", "ReceivingTouchdowns"]],
       ] as const;
@@ -202,7 +201,6 @@ export const gameLogColumnsForPosition = (position: string): readonly GameLogCol
       return [
         ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
         ["REC", ["receptions", "Receptions"]],
-        ["TAR", ["targets", "receiving_targets", "ReceivingTargets"]],
         ["REC YDS", ["rec_yards", "receiving_yards", "ReceivingYards"]],
         ["REC TD", ["rec_tds", "receiving_touchdowns", "ReceivingTouchdowns"]],
         ["RUSH ATT", ["rushing_attempts", "rush_attempts", "RushingAttempts"]],
@@ -213,7 +211,6 @@ export const gameLogColumnsForPosition = (position: string): readonly GameLogCol
       return [
         ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
         ["REC", ["receptions", "Receptions"]],
-        ["TAR", ["targets", "receiving_targets", "ReceivingTargets"]],
         ["REC YDS", ["rec_yards", "receiving_yards", "ReceivingYards"]],
         ["REC TD", ["rec_tds", "receiving_touchdowns", "ReceivingTouchdowns"]],
       ] as const;
@@ -278,7 +275,6 @@ const CURRENT_SEASON_STAT_LABELS: Record<string, string> = {
   "RUSH YDS": "Rush Yds",
   "RUSH TD": "Rush TD",
   REC: "Receptions",
-  TAR: "Targets",
   "REC YDS": "Rec Yds",
   "REC TD": "Rec TD",
   FGM: "FGM",

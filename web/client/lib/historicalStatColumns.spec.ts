@@ -31,6 +31,7 @@ describe("historical position-aware stat columns", () => {
     expect(getHistoricalStatColumnsForPosition("K", allColumns).slice(0, 5)).toEqual([
       "FGM", "FGA", "FG%", "XPM", "XPA",
     ]);
+    expect(getHistoricalStatColumnsForPosition("WR", allColumns)).not.toContain("Targets");
   });
 
   it("uses the historical row position before the current player position", () => {
