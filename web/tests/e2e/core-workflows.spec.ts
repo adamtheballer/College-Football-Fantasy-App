@@ -1593,6 +1593,7 @@ test.describe("critical browser workflows", () => {
             pregame_projected_points: 133.1,
             live_projected_final_points: 121.7,
             live_projection_status: "LIVE",
+            game_start_at: "2026-08-29T23:00:00Z",
             game_period: 1,
             game_clock: "08:15",
             game_progress: 0.1125,
@@ -1852,8 +1853,11 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("Proj 121.7", { exact: true }).first()).toBeVisible();
     await expect(page.getByLabel("Projected 121.7")).toBeVisible();
     await expect(page.getByText("Pregame projection", { exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /Arch Manning/ }).getByText("0.0", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Arch Manning/ }).getByText("Proj 121.7", { exact: true })).toBeVisible();
+    const liveDesktopStarter = page.getByRole("button", { name: /Arch Manning/ });
+    await expect(liveDesktopStarter.getByText("0.0", { exact: true })).toBeVisible();
+    await expect(liveDesktopStarter.getByText("Proj 121.7", { exact: true })).toBeVisible();
+    await expect(liveDesktopStarter.locator("[data-player-game-time]")).toContainText(/Aug 29.*at.*PM/);
+    await expect(liveDesktopStarter.getByText("184 PASS YDS · 2 PASS TD · 21 RUSH YDS · 1 RUSH TD", { exact: true })).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     const liveMobileLineup = page.getByTestId("mobile-starting-lineup");
     await liveMobileLineup.scrollIntoViewIfNeeded();

@@ -313,6 +313,15 @@ export const currentSeasonSummaryValue = (
   return totals.totals.find(([totalLabel]) => totalLabel === gameLogLabel)?.[1] ?? null;
 };
 
+/**
+ * Every player card has one current-season row. Once a final game exists, its
+ * calculated game-log totals supersede any imported aggregate for that year.
+ */
+export const shouldUseCalculatedCurrentSeason = (
+  gamesPlayed: number,
+  historicalSeasons: ReadonlyArray<{ season: number }>,
+) => gamesPlayed > 0 || !historicalSeasons.some((season) => season.season === 2026);
+
 export const historicalSeasonSummaryDisplayValue = (season: HistoricalSeason, label: string) =>
   historicalSeasonSummaryValue(season, label === "GP" ? "Games" : label);
 
@@ -473,8 +482,6 @@ export function PlayerCardModal({
   const palette = getPlayerCardPalette(position);
   const historicalStats = card?.historical_stats;
   const historicalSeasons = historicalStats?.seasons ?? [];
-  const historicalTablePosition = historicalStatsTablePosition(historicalSeasons, position);
-  const historicalSummaryColumns = buildHistoricalSeasonSummaryColumns(historicalSeasons, historicalTablePosition);
   const projectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
   const currentValueRating = resolvePlayerCardCurrentValueRating(
     valueQuery.data?.current?.current_value_rating,
@@ -486,15 +493,32 @@ export function PlayerCardModal({
     () => completedSeasonGameTotals(gameLogQuery.data?.games ?? [], position),
     [gameLogQuery.data?.games, position],
   );
-  const unifiedSeasonColumns = useMemo(
-    () => unifiedSeasonSummaryColumns(historicalSummaryColumns, position),
-    [historicalSummaryColumns, position],
+  // The 2026 row is derived from the finalized game log, which is the
+  // authoritative current-season source. Keep exactly one 2026 row: use the
+  // calculated totals as soon as a final box score exists, otherwise retain a
+  // verified imported row when one is available. If neither has data yet, the
+  // calculated zero-game row still gives every player card the same table.
+  const useCalculatedCurrentSeason = shouldUseCalculatedCurrentSeason(
+    currentSeasonTotals.gamesPlayed,
+    historicalSeasons,
   );
-  const hasSeasonStats = currentSeasonTotals.gamesPlayed > 0 || historicalSeasons.length > 0;
+  const displayedHistoricalSeasons = useCalculatedCurrentSeason
+    ? historicalSeasons.filter((season) => season.season !== 2026)
+    : historicalSeasons;
+  const displayedHistoricalTablePosition = historicalStatsTablePosition(displayedHistoricalSeasons, position);
+  const displayedHistoricalSummaryColumns = buildHistoricalSeasonSummaryColumns(
+    displayedHistoricalSeasons,
+    displayedHistoricalTablePosition,
+  );
+  const unifiedSeasonColumns = useMemo(
+    () => unifiedSeasonSummaryColumns(displayedHistoricalSummaryColumns, position),
+    [displayedHistoricalSummaryColumns, position],
+  );
+  const hasSeasonStats = useCalculatedCurrentSeason || displayedHistoricalSeasons.length > 0;
 
   useEffect(() => {
     if (historicalStatsScrollRef.current) historicalStatsScrollRef.current.scrollLeft = 0;
-  }, [player.id, historicalTablePosition]);
+  }, [player.id, displayedHistoricalTablePosition]);
   const projectionHighlights = [
     ["Fantasy", projectionStats?.fpts ?? player.projectedPoints],
     ["Floor", projectionStats?.floor],
@@ -756,10 +780,10 @@ export function PlayerCardModal({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
-                      {currentSeasonTotals.gamesPlayed ? (
+                      {useCalculatedCurrentSeason ? (
                         <tr className="text-xs font-bold text-white/75 transition hover:bg-white/[0.035]">
                           <td className="whitespace-nowrap px-2.5 py-2.5 text-sm font-black tabular-nums text-white">2026</td>
-                          <td className="min-w-28 px-2.5 py-2.5"><p className="font-black leading-4 text-white">{gameLogQuery.data?.team_name ?? card?.about.team ?? player.school}</p></td>
+                          <td className="min-w-28 px-2.5 py-2.5"><p className="font-black leading-4 text-white">{gameLogQuery.data?.team_name ?? card?.about.team ?? player.school}</p><p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-white/45">Regular</p></td>
                           <td className="px-2.5 py-2.5"><span className="rounded-full border border-white/15 bg-white/[0.06] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-white/70">{position || "—"}</span></td>
                           {unifiedSeasonColumns.map((label) => (
                             <td key={label} className="px-2.5 py-2.5 text-right font-black tabular-nums text-white">
@@ -768,7 +792,7 @@ export function PlayerCardModal({
                           ))}
                         </tr>
                       ) : null}
-                      {historicalSeasons.map((season) => (
+                      {displayedHistoricalSeasons.map((season) => (
                         <tr key={`${season.season}-${season.team_name ?? "team"}-${season.season_type}`} className="text-xs font-bold text-white/75 transition hover:bg-white/[0.035]">
                           <td className="whitespace-nowrap px-2.5 py-2.5 text-sm font-black tabular-nums text-white">{season.season}</td>
                           <td className="min-w-28 px-2.5 py-2.5"><p className="font-black leading-4 text-white">{season.team_name ?? card?.about.team ?? player.school}</p><p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-white/45">{season.season_type}</p></td>
