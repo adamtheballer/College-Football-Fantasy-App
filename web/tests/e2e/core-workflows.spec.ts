@@ -103,7 +103,7 @@ test.describe("critical browser workflows", () => {
     }
   });
 
-  test("the public auth screen keeps the Barlow hierarchy readable without narrow-screen overflow", async ({ page }, testInfo) => {
+  test("the public auth screen keeps the universal Roboto typography readable without narrow-screen overflow", async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.goto("/login");
 
@@ -117,8 +117,8 @@ test.describe("critical browser workflows", () => {
       viewportWidth: document.documentElement.clientWidth,
     }));
 
-    expect(typography.bodyFamily).toContain("Barlow");
-    expect(typography.headingFamily).toContain("Barlow Condensed");
+    expect(typography.bodyFamily).toContain("Roboto");
+    expect(typography.headingFamily).toContain("Roboto");
     expect(typography.documentWidth).toBeLessThanOrEqual(typography.viewportWidth);
 
     if (process.env.CAPTURE_MOBILE_UI === "1") {
