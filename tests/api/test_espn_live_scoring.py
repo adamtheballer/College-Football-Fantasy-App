@@ -697,6 +697,50 @@ def test_verified_rostered_kicker_with_unbucketed_made_field_goal_delays_the_gam
     assert db_session.query(UnmatchedProviderRow).filter_by(feed="live_boxscore_kicker_distance").count() == 1
 
 
+def test_final_snapshot_can_omit_an_unrostered_kicker_without_blocking_active_players(db_session):
+    _verified_players(db_session)
+    kicker = Player(name="Exact Distance Kicker", position="K", school="Texas")
+    db_session.add(kicker)
+    db_session.flush()
+    db_session.add(PlayerProviderId(player_id=kicker.id, provider="espn", provider_player_id="303", verification_status="verified"))
+    db_session.commit()
+
+    live_summary = espn_summary_payload()
+    first = run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="shadow",
+        client=FakeLiveESPN(summary=live_summary),
+        now=NOW,
+        relevant_team_names={"texas"},
+    )
+    assert first.successful_games == 1
+    poll = db_session.query(ProviderGamePoll).filter_by(provider_game_id="401").one()
+    poll.next_poll_at = NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS)
+    db_session.commit()
+
+    final_summary = _final_summary(pass_yards=180)
+    final_summary.pop("drives")
+    second = run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="shadow",
+        client=FakeLiveESPN(summary=final_summary),
+        now=NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS),
+        relevant_team_names={"texas"},
+    )
+
+    assert second.successful_games == 1
+    poll = db_session.query(ProviderGamePoll).filter_by(provider_game_id="401").one()
+    assert poll.status == "final"
+    accepted = db_session.query(ProviderGameSnapshot).filter_by(provider_game_id="401", accepted=True).order_by(ProviderGameSnapshot.id.desc()).first()
+    assert accepted is not None
+    assert accepted.event_state == "final"
+    assert kicker.id not in {row["player_id"] for row in accepted.normalized_rows}
+
+
 def test_identical_replay_is_audited_without_promoting_and_later_progress_replaces_cumulative_totals(db_session):
     arch, _wingo = _verified_players(db_session)
     client = FakeLiveESPN()

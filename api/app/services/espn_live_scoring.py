@@ -375,6 +375,46 @@ def rostered_school_keys(db: Session, *, season: int) -> set[str]:
     return {_identity(school) for (school,) in rows if _identity(school)}
 
 
+def _unrostered_kicker_ids(db: Session, *, season: int, player_ids: set[int]) -> set[int]:
+    """Return unrostered kickers whose row may be absent from a later snapshot.
+
+    This is deliberately narrower than treating all unrostered player rows as
+    optional. A later provider snapshot that omits a QB/RB/WR/TE remains an
+    incomplete response. The exception applies only to kickers whose distance
+    detail cannot safely be promoted and whose score cannot affect any active
+    current-season roster.
+    """
+
+    if not player_ids:
+        return set()
+    kicker_ids = {
+        player_id
+        for (player_id,) in (
+            db.query(Player.id)
+            .filter(Player.id.in_(player_ids), Player.position.in_(("K", "PK")))
+            .all()
+        )
+    }
+    if not kicker_ids:
+        return set()
+    rostered_kicker_ids = {
+        player_id
+        for (player_id,) in (
+            db.query(RosterEntry.player_id)
+            .join(League, League.id == RosterEntry.league_id)
+            .filter(
+                RosterEntry.player_id.in_(kicker_ids),
+                RosterEntry.status == "active",
+                League.season_year == season,
+                League.status.notin_(("cancelled", "archived")),
+            )
+            .distinct()
+            .all()
+        )
+    }
+    return kicker_ids - rostered_kicker_ids
+
+
 def event_team_keys(event: dict[str, Any]) -> set[str]:
     competitions = event.get("competitions")
     if not isinstance(competitions, list) or not competitions or not isinstance(competitions[0], dict):
@@ -967,7 +1007,8 @@ def _assert_complete_espn_summary(
         if isinstance(item, dict) and item.get("player_id") is not None
     } if previous_snapshot else set()
     current_ids = {int(item["player_id"]) for item in normalized_rows}
-    if previous_ids and not previous_ids.issubset(current_ids):
+    required_previous_ids = previous_ids - _unrostered_kicker_ids(db, season=claim.season, player_ids=previous_ids)
+    if required_previous_ids and not required_previous_ids.issubset(current_ids):
         raise ProviderDataIncompleteError("ESPN summary is missing a previously verified player row")
 
 
