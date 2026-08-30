@@ -22,6 +22,10 @@ export function rosterPlayerGameState(player?: LeagueRosterPlayer, now = Date.no
 
 export function rosterPlayerIsLive(player?: LeagueRosterPlayer, now = Date.now()) {
   const state = rosterPlayerGameState(player, now);
+  // Providers can leave the scoring snapshot marked live or stale briefly after
+  // they publish a final game state. A final player must never remain visually
+  // highlighted or keep the matchup refresh loop active.
+  if (finalStates.has(state)) return false;
   return state === "live" || ["live", "stale"].includes((player?.live_scoring_status ?? "").toLowerCase());
 }
 

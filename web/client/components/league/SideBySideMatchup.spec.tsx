@@ -254,6 +254,7 @@ describe("SideBySideMatchup", () => {
       roster: [{
         ...myTeam.roster[0],
         live_game_state: "final" as const,
+        live_scoring_status: "stale",
         current_fantasy_points: 18.5,
         pregame_projected_points: 24.1,
         final_game_stat_line: "281 PASS YDS · 3 PASS TD · 34 RUSH YDS · 1 RUSH TD",
@@ -275,6 +276,9 @@ describe("SideBySideMatchup", () => {
     expect(statLine.getAttribute("data-player-final-stat-line")).not.toBeNull();
     expect(statLine.className).toContain("truncate");
     expect(statLine.className).toContain("text-cfb-text-muted");
+    const finalizedRow = within(starters).getByText("L. Name Quarterback").closest("[data-mobile-player-live]");
+    expect(finalizedRow?.getAttribute("data-mobile-player-live")).toBe("false");
+    expect(finalizedRow?.className).not.toContain("bg-slate-100/[0.10]");
   });
 
   it("keeps an out marker by the player name while rendering a numeric zero projection", () => {

@@ -1688,6 +1688,7 @@ test.describe("critical browser workflows", () => {
         ? {
             ...player,
             live_game_state: "final",
+            live_scoring_status: "stale",
             current_fantasy_points: 25.6,
             live_points: 25.6,
             final_game_stat_line: "281 PASS YDS · 3 PASS TD · 34 RUSH YDS · 1 RUSH TD",
@@ -1901,6 +1902,9 @@ test.describe("critical browser workflows", () => {
       finalMobileLineup.getByRole("button", { name: "Open A. Manning player card" }).locator("[data-player-game-time]"),
     ).toHaveCount(0);
     await expect(finalMobileLineup.getByText("Final", { exact: true })).toBeVisible();
+    const finalPlayerRow = finalMobileLineup.getByRole("button", { name: "Open A. Manning player card" }).locator("xpath=ancestor::*[@data-mobile-player-live]");
+    await expect(finalPlayerRow).toHaveAttribute("data-mobile-player-live", "false");
+    await expect(finalPlayerRow).not.toHaveClass(/bg-slate-100\/\[0\.10\]/);
     const finalPregameProjection = finalMobileLineup.getByText("Proj 133.1", { exact: true });
     await expect(finalPregameProjection).toBeVisible();
     await expect(finalPregameProjection).toHaveAttribute("data-player-final-pregame-projection");
