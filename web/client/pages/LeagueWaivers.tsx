@@ -41,6 +41,7 @@ type AvailablePlayerRow = {
   school: string | null;
   position: string | null;
   weekly_projected_fantasy_points: number | null;
+  final_fantasy_points: number | null;
   projection_status: string;
   availability_state: string;
   available_at: string | null;
@@ -134,6 +135,20 @@ export const waiverProjectionLabel = (
   points: number | null | undefined,
   projectionStatus: string | null | undefined,
 ) => formatProjectionDisplay(points, projectionStatus);
+
+export const waiverWeekPoints = (
+  finalPoints: number | null | undefined,
+  projectedPoints: number | null | undefined,
+  projectionStatus: string | null | undefined,
+) => {
+  if (typeof finalPoints === "number" && Number.isFinite(finalPoints)) {
+    return { label: finalPoints.toFixed(1), isFinal: true };
+  }
+  return {
+    label: waiverProjectionLabel(projectedPoints, projectionStatus),
+    isFinal: false,
+  };
+};
 
 export default function LeagueWaivers() {
   const { leagueId } = useParams();
@@ -264,6 +279,7 @@ export default function LeagueWaivers() {
       school: null,
       position: null,
       weekly_projected_fantasy_points: 0,
+      final_fantasy_points: null,
       projection_status: "UNAVAILABLE",
       availability_state: "waivers",
       available_at: null,
@@ -412,7 +428,14 @@ export default function LeagueWaivers() {
             <div className="rounded-2xl border border-sky-300/15 bg-sky-300/[0.06] p-4">
               <p className="text-sm font-black text-slate-50">Add: {claimPlayer?.name}</p>
               <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                {claimPlayer?.position ?? "-"} · {claimPlayer?.school ?? "-"} · {formatProjectionDisplay(claimPlayer?.weekly_projected_fantasy_points, claimPlayer?.projection_status)} projected points
+                {claimPlayer?.position ?? "-"} · {claimPlayer?.school ?? "-"} · {(() => {
+                  const points = waiverWeekPoints(
+                    claimPlayer?.final_fantasy_points,
+                    claimPlayer?.weekly_projected_fantasy_points,
+                    claimPlayer?.projection_status,
+                  );
+                  return `${points.label} ${points.isFinal ? "final" : "projected"} points`;
+                })()}
               </p>
             </div>
             <label className="grid gap-2">
@@ -581,7 +604,8 @@ export default function LeagueWaivers() {
             <div className="divide-y divide-cfb-border-subtle sm:hidden">
             {filteredPlayers.map((player) => {
               const tone = positionTone(player.position);
-              const projectionLabel = waiverProjectionLabel(
+              const weekPoints = waiverWeekPoints(
+                player.final_fantasy_points,
                 player.weekly_projected_fantasy_points,
                 player.projection_status,
               );
@@ -621,9 +645,12 @@ export default function LeagueWaivers() {
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <div className="text-right">
-                      <p className="text-[8px] font-black uppercase tracking-[0.1em] text-cfb-text-muted">W{waiverData?.current_period?.week ?? 1}</p>
-                      <p className={`mt-0.5 text-base font-semibold tabular-nums ${projectionLabel === "BYE" ? "text-amber-200" : projectionLabel === "OUT" ? "text-rose-200" : "text-cfb-text-primary"}`}>
-                        {projectionLabel}
+                      <p className="text-[8px] font-black uppercase tracking-[0.1em] text-cfb-text-muted">{weekPoints.isFinal ? "Final" : `W${waiverData?.current_period?.week ?? 1}`}</p>
+                      <p
+                        data-testid={`waiver-mobile-week-points-${player.id}`}
+                        className={`mt-0.5 text-base font-semibold tabular-nums ${weekPoints.isFinal ? "text-cfb-brand" : weekPoints.label === "BYE" ? "text-amber-200" : weekPoints.label === "OUT" ? "text-rose-200" : "text-cfb-text-primary"}`}
+                      >
+                        {weekPoints.label}
                       </p>
                     </div>
                     <Button
@@ -664,7 +691,7 @@ export default function LeagueWaivers() {
                   <th className="w-44 px-4 py-3">School</th>
                   <th className="w-24 px-4 py-3">POS</th>
                   <th className="w-32 px-4 py-3 text-right">
-                    Week {waiverData?.current_period?.week ?? 1} Proj
+                    Week {waiverData?.current_period?.week ?? 1} Pts
                   </th>
                   <th className="w-56 px-5 py-3 text-right">Action</th>
                 </tr>
@@ -672,8 +699,11 @@ export default function LeagueWaivers() {
               <tbody className="divide-y divide-cfb-border-subtle">
                 {filteredPlayers.map((player) => {
                   const tone = positionTone(player.position);
-                  const projected = player.weekly_projected_fantasy_points;
-                  const projectionLabel = waiverProjectionLabel(projected, player.projection_status);
+                  const weekPoints = waiverWeekPoints(
+                    player.final_fantasy_points,
+                    player.weekly_projected_fantasy_points,
+                    player.projection_status,
+                  );
                   const claimable = canClaimAvailability(player.availability_state);
                   return (
                     <tr
@@ -718,8 +748,11 @@ export default function LeagueWaivers() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right align-middle">
-                        <span className={`text-lg font-semibold tabular-nums ${projectionLabel === "BYE" ? "text-amber-200" : projectionLabel === "OUT" ? "text-rose-200" : "text-cfb-text-primary"}`}>
-                          {projectionLabel}
+                        <span
+                          data-testid={`waiver-week-points-${player.id}`}
+                          className={`text-lg font-semibold tabular-nums ${weekPoints.isFinal ? "text-cfb-brand" : weekPoints.label === "BYE" ? "text-amber-200" : weekPoints.label === "OUT" ? "text-rose-200" : "text-cfb-text-primary"}`}
+                        >
+                          {weekPoints.label}
                         </span>
                       </td>
                       <td className="px-5 py-3 align-middle">

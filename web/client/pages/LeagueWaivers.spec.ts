@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { waiverProjectionLabel } from "./LeagueWaivers";
+import { waiverProjectionLabel, waiverWeekPoints } from "./LeagueWaivers";
 
 describe("waiverProjectionLabel", () => {
   it("uses the backend projection status instead of presenting a bye as a missing projection", () => {
@@ -8,5 +8,16 @@ describe("waiverProjectionLabel", () => {
     expect(waiverProjectionLabel(0, "OUT")).toBe("OUT");
     expect(waiverProjectionLabel(12.34, "ACTIVE")).toBe("12.3");
     expect(waiverProjectionLabel(undefined, "UNAVAILABLE")).toBe("—");
+  });
+});
+
+describe("waiverWeekPoints", () => {
+  it("prefers a verified final total, including a scoreless final, over the forecast", () => {
+    expect(waiverWeekPoints(18.76, 12.34, "ACTIVE")).toEqual({ label: "18.8", isFinal: true });
+    expect(waiverWeekPoints(0, undefined, "UNAVAILABLE")).toEqual({ label: "0.0", isFinal: true });
+  });
+
+  it("retains the projection state when no verified final total exists", () => {
+    expect(waiverWeekPoints(null, undefined, "UNAVAILABLE")).toEqual({ label: "—", isFinal: false });
   });
 });

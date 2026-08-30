@@ -10,9 +10,11 @@ from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.player_waiver_availability import PlayerWaiverAvailability
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
@@ -466,6 +468,52 @@ def test_waiver_pool_surfaces_bye_status_instead_of_an_ambiguous_zero(db_session
     assert len(waiver_view.available_players) == 1
     assert waiver_view.available_players[0].weekly_projected_fantasy_points is None
     assert waiver_view.available_players[0].projection_status == "BYE"
+
+
+def test_waiver_pool_uses_verified_final_box_score_for_unrostered_player(db_session):
+    user = User(email="final-waiver-owner@example.com", first_name="Final", password_hash="test", api_token="final-waiver-owner-token")
+    db_session.add(user)
+    db_session.flush()
+    league = League(name="Final Waiver League", season_year=2026, commissioner_user_id=user.id, max_teams=1)
+    db_session.add(league)
+    db_session.flush()
+    team = Team(league_id=league.id, name="Final Waiver Team", owner_user_id=user.id, owner_name="Final")
+    player = canonical_player("Final Score USC WR", "WR", "USC")
+    scoreless_player = canonical_player("Scoreless USC WR", "WR", "USC")
+    game = Game(
+        season=2026,
+        week=1,
+        home_team="USC",
+        away_team="Opponent",
+        schedule_status="final",
+        home_points=31,
+        away_points=10,
+    )
+    db_session.add_all((team, LeagueSettings(league_id=league.id, roster_slots_json={"WR": 1}), player, scoreless_player, game))
+    db_session.flush()
+    db_session.add_all(
+        (
+            WeeklyProjection(player_id=player.id, season=2026, week=1, is_published=True, fantasy_points=11.5),
+            WeeklyProjection(player_id=scoreless_player.id, season=2026, week=1, is_published=True, fantasy_points=4.5),
+            PlayerGameStat(
+                player_id=player.id,
+                game_id=game.id,
+                season=2026,
+                week=1,
+                source="espn_final_boxscore",
+                stats={"receptions": 4, "rec_yards": 83, "rec_tds": 1},
+            ),
+        )
+    )
+    db_session.commit()
+
+    waiver_view = build_waivers_view(db_session, league, user, selected_week=1)
+
+    rows = {row.id: row for row in waiver_view.available_players}
+    row = rows[player.id]
+    assert row.weekly_projected_fantasy_points == 11.5
+    assert row.final_fantasy_points == 18.3
+    assert rows[scoreless_player.id].final_fantasy_points == 0.0
 
 
 def test_waiver_pool_sorts_the_full_selected_week_projection_set_before_pagination(db_session):
