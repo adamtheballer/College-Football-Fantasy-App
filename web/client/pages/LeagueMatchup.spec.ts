@@ -160,8 +160,8 @@ describe("league matchup scoreboard", () => {
     render(createElement(LeagueMatchup));
 
     expect(screen.getByTestId("league-matchup-page").className).toContain("max-w-none");
-    expect(screen.getByTestId("opening-week-patch")).toBeTruthy();
-    expect(screen.getByText("Opening Week")).toBeTruthy();
+    expect(screen.queryByTestId("opening-week-patch")).toBeNull();
+    expect(screen.queryByText("Opening Week")).toBeNull();
     expect(screen.getByText("Week 1 matchup")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Updated Adam's Team vs Taylor's Team" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: "League matchups" })).toBeNull();
@@ -196,7 +196,7 @@ describe("league matchup scoreboard", () => {
     expect(screen.queryByText("Pregame projection")).toBeNull();
     expect(screen.getAllByText("54.0%")).toHaveLength(2);
     expect(screen.getAllByText("46.0%")).toHaveLength(2);
-    expect(screen.getAllByText("0.0").every((score) => score.className.includes("text-cfb-brand"))).toBe(true);
+    expect(screen.getAllByText("0.0").every((score) => score.className.includes("text-cfb-text-primary"))).toBe(true);
   });
 
   it("switches totals to zero immediately when a rostered kickoff is live before the server response catches up", () => {
