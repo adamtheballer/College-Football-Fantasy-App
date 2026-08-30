@@ -1758,11 +1758,14 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByTestId("scoreboard-win-chance-right-bar")).toHaveAttribute("style", /width: 51\.95%/);
     await expect(page.getByText("Starters", { exact: true })).toBeVisible();
     await expect(page.getByText("CFB Scores", { exact: true })).toHaveCount(0);
-    // The responsive matchup view keeps a compact mobile lineup mounted alongside
-    // the desktop tables. Assert against the visible desktop player controls here
-    // rather than an ambiguous text locator shared by both representations.
-    await expect(page.getByRole("button", { name: /Arch Manning/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Rival QB/ })).toBeVisible();
+    // Desktop and mobile share the same compact matchup rows. The desktop version
+    // keeps one center slot rail, rather than a slot label plus a second player-position badge.
+    const desktopStartingLineup = page.getByTestId("desktop-starting-lineup");
+    await expect(desktopStartingLineup).toBeVisible();
+    await expect(desktopStartingLineup.getByRole("button", { name: "Open A. Manning player card" })).toBeVisible();
+    await expect(desktopStartingLineup.getByRole("button", { name: "Open R. QB player card" })).toBeVisible();
+    await expect(desktopStartingLineup.locator('[data-desktop-slot-rail="true"]')).toHaveCount(1);
+    await expect(desktopStartingLineup.locator('[data-desktop-slot-column="true"]')).toHaveCount(1);
     await expect(page.getByRole("button", { name: "Previous week" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Next week" })).toHaveCount(0);
     await expect(page.getByText("Prev", { exact: true })).toHaveCount(0);
@@ -1853,10 +1856,10 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("Proj 121.7", { exact: true }).first()).toBeVisible();
     await expect(page.getByLabel("Projected 121.7")).toBeVisible();
     await expect(page.getByText("Pregame projection", { exact: true })).toHaveCount(0);
-    const liveDesktopStarter = page.locator("[data-roster-mobile-row]").filter({ hasText: "Arch Manning" }).first();
+    const liveDesktopStarter = page.getByTestId("desktop-starting-lineup").getByRole("button", { name: "Open A. Manning player card" });
     await expect(liveDesktopStarter.getByText("0.0", { exact: true })).toBeVisible();
     await expect(liveDesktopStarter.getByText("Proj 121.7", { exact: true })).toBeVisible();
-    await expect(liveDesktopStarter.locator("[data-player-game-time]")).toContainText(/Aug 29.*at.*PM/);
+    await expect(liveDesktopStarter.locator("[data-player-live-game-status]")).toContainText("Q1 08:15");
     await expect(liveDesktopStarter.getByText("184 PASS YDS · 2 PASS TD · 21 RUSH YDS · 1 RUSH TD", { exact: true })).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     const liveMobileLineup = page.getByTestId("mobile-starting-lineup");

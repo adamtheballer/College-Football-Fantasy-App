@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Lock } from "lucide-react";
 
-import { RosterSlotTable, type RosterPointMode, finalPregameProjectionDetail, formatRosterGameKickoff, formatRosterPointValue, liveGameStatusLabel, liveProjectionDetail } from "@/components/league/RosterSlotTable";
+import { type RosterPointMode, finalPregameProjectionDetail, formatRosterGameKickoff, formatRosterPointValue, liveGameStatusLabel, liveProjectionDetail } from "@/components/league/RosterSlotTable";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { SurfaceCard } from "@/components/fantasy";
 import { usePlayerCard } from "@/hooks/use-players";
@@ -207,13 +207,16 @@ function CompactMatchupPlayer({
   );
 }
 
-function CompactMobileLineup({
+function CompactMatchupLineup({
   title,
   myPlayers,
   opponentPlayers,
   pointMode,
   testId,
   showHeader = true,
+  desktop = false,
+  myTeamName,
+  opponentTeamName,
   onPlayerSelect,
 }: {
   title: string;
@@ -222,12 +225,31 @@ function CompactMobileLineup({
   pointMode: RosterPointMode;
   testId: string;
   showHeader?: boolean;
+  desktop?: boolean;
+  myTeamName?: string;
+  opponentTeamName?: string;
   onPlayerSelect?: (player: LeagueRosterPlayer) => void;
 }) {
   const rowCount = Math.max(myPlayers.length, opponentPlayers.length);
+  const sectionClassName = desktop
+    ? "hidden overflow-hidden rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised md:block"
+    : "overflow-hidden border-y border-cfb-border-subtle bg-cfb-surface-raised/70 md:hidden";
+  const centerRailClassName = desktop ? "w-20" : "w-14";
+  const rowClassName = desktop
+    ? "relative z-10 grid min-h-[92px] grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)] items-stretch px-5"
+    : "relative z-10 grid min-h-[72px] grid-cols-[minmax(0,1fr)_3.5rem_minmax(0,1fr)] items-stretch px-3";
+  const playerCellClassName = desktop ? "py-3" : "py-2";
+  const slotCellClassName = desktop ? "min-h-[92px]" : "min-h-[72px]";
 
   return (
-    <section data-testid={testId} className="overflow-hidden border-y border-cfb-border-subtle bg-cfb-surface-raised/70 md:hidden">
+    <section data-testid={testId} className={sectionClassName}>
+      {desktop ? (
+        <div className="grid grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)] border-b border-cfb-border-subtle bg-cfb-surface/70 px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-cfb-text-muted">
+          <span className="text-cfb-brand">{myTeamName}</span>
+          <span className="text-center">Slot</span>
+          <span className="text-right text-cfb-brand">{opponentTeamName}</span>
+        </div>
+      ) : null}
       {showHeader ? (
         <div className="flex items-center justify-between bg-cfb-surface/70 px-4 py-3">
           <h2 className="text-[11px] font-black uppercase tracking-[0.17em] text-cfb-text-primary">{title}</h2>
@@ -238,7 +260,8 @@ function CompactMobileLineup({
         <div
           aria-hidden="true"
           data-mobile-slot-rail
-          className="pointer-events-none absolute inset-y-0 left-1/2 z-0 w-14 -translate-x-1/2 border-x border-[#101d31] bg-[#060c17]"
+          data-desktop-slot-rail={desktop ? "true" : undefined}
+          className={`pointer-events-none absolute inset-y-0 left-1/2 z-0 ${centerRailClassName} -translate-x-1/2 border-x border-[#101d31] bg-[#060c17]`}
         />
         {Array.from({ length: rowCount }, (_, index) => {
           const myPlayer = myPlayers[index];
@@ -251,15 +274,16 @@ function CompactMobileLineup({
             <div
               key={`${slot}-${index}`}
               data-mobile-matchup-row
-              className="relative z-10 grid min-h-[72px] grid-cols-[minmax(0,1fr)_3.5rem_minmax(0,1fr)] items-stretch px-3"
+              data-desktop-matchup-row={desktop ? "true" : undefined}
+              className={rowClassName}
             >
-              <div data-mobile-player-live={myPlayerIsLive ? "true" : "false"} className={`flex min-w-0 items-center py-2 ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""} ${myPlayerIsLive ? "bg-slate-100/[0.10]" : ""}`}>
+              <div data-mobile-player-live={myPlayerIsLive ? "true" : "false"} className={`flex min-w-0 items-center ${playerCellClassName} ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""} ${myPlayerIsLive ? "bg-slate-100/[0.10]" : ""}`}>
                 <CompactMatchupPlayer player={myPlayer} align="left" pointMode={pointMode} onSelect={onPlayerSelect} />
               </div>
-              <span data-mobile-slot-column className="inline-flex min-h-[72px] whitespace-nowrap items-center justify-center px-1 text-[9px] font-black uppercase tracking-[0.02em] text-cfb-text-secondary">
+              <span data-mobile-slot-column data-desktop-slot-column={desktop ? "true" : undefined} className={`inline-flex ${slotCellClassName} whitespace-nowrap items-center justify-center px-1 text-[9px] font-black uppercase tracking-[0.02em] text-cfb-text-secondary`}>
                 {slot}
               </span>
-              <div data-mobile-player-live={opponentPlayerIsLive ? "true" : "false"} className={`flex min-w-0 items-center py-2 ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""} ${opponentPlayerIsLive ? "bg-slate-100/[0.10]" : ""}`}>
+              <div data-mobile-player-live={opponentPlayerIsLive ? "true" : "false"} className={`flex min-w-0 items-center ${playerCellClassName} ${hasFollowingRow ? "border-b-2 border-[#07101f]" : ""} ${opponentPlayerIsLive ? "bg-slate-100/[0.10]" : ""}`}>
                 <CompactMatchupPlayer player={opponentPlayer} align="right" pointMode={pointMode} onSelect={onPlayerSelect} />
               </div>
             </div>
@@ -295,7 +319,7 @@ export function SideBySideMatchup({
   return (
     <div className="space-y-4 sm:space-y-6">
       <section className="space-y-3">
-        <CompactMobileLineup
+        <CompactMatchupLineup
           title="Starter matchup"
           myPlayers={myStarters}
           opponentPlayers={opponentStarters}
@@ -304,24 +328,18 @@ export function SideBySideMatchup({
           showHeader={false}
           onPlayerSelect={setSelectedPlayer}
         />
-        <div className="hidden gap-5 md:grid xl:grid-cols-2">
-          <RosterSlotTable
-            title={`${managerTeamName(myTeam, "Your Team")} Starters`}
-            players={myStarters}
-            emptyText="Your starters are empty or projections are unavailable."
-            showPositionColumn={false}
-            pointMode={pointMode}
-            leagueId={leagueId}
-          />
-          <RosterSlotTable
-            title={`${managerTeamName(opponentTeam, "Opponent")} Starters`}
-            players={opponentStarters}
-            emptyText="Opponent starters are pending."
-            showPositionColumn={false}
-            pointMode={pointMode}
-            leagueId={leagueId}
-          />
-        </div>
+        <CompactMatchupLineup
+          title="Starter matchup"
+          myPlayers={myStarters}
+          opponentPlayers={opponentStarters}
+          pointMode={pointMode}
+          testId="desktop-starting-lineup"
+          showHeader={false}
+          desktop
+          myTeamName={`${managerTeamName(myTeam, "Your Team")} Starters`}
+          opponentTeamName={`${managerTeamName(opponentTeam, "Opponent")} Starters`}
+          onPlayerSelect={setSelectedPlayer}
+        />
       </section>
 
       <details className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised/95 p-0 md:hidden">
@@ -330,7 +348,7 @@ export function SideBySideMatchup({
           <span className="text-[9px] text-cfb-text-muted">{myReserves.length} / {opponentReserves.length}</span>
         </summary>
         <div className="border-t border-cfb-border-subtle p-3">
-          <CompactMobileLineup
+          <CompactMatchupLineup
             title="Bench"
             myPlayers={myReserves}
             opponentPlayers={opponentReserves}
@@ -349,26 +367,18 @@ export function SideBySideMatchup({
             </p>
           </div>
         </div>
-        <div className="grid gap-5 xl:grid-cols-2">
-          <RosterSlotTable
-            title={`${managerTeamName(myTeam, "Your Team")} Bench`}
-            players={myReserves}
-            emptyText="Your bench is empty."
-            showPositionColumn={false}
-            tone="bench"
-            pointMode={pointMode}
-            leagueId={leagueId}
-          />
-          <RosterSlotTable
-            title={`${managerTeamName(opponentTeam, "Opponent")} Bench`}
-            players={opponentReserves}
-            emptyText="Opponent bench is pending."
-            showPositionColumn={false}
-            tone="bench"
-            pointMode={pointMode}
-            leagueId={leagueId}
-          />
-        </div>
+        <CompactMatchupLineup
+          title="Bench"
+          myPlayers={myReserves}
+          opponentPlayers={opponentReserves}
+          pointMode={pointMode}
+          testId="desktop-bench-lineup"
+          showHeader={false}
+          desktop
+          myTeamName={`${managerTeamName(myTeam, "Your Team")} Bench`}
+          opponentTeamName={`${managerTeamName(opponentTeam, "Opponent")} Bench`}
+          onPlayerSelect={setSelectedPlayer}
+        />
       </SurfaceCard>
       {selectedPlayer ? (
         <PlayerCardModal
