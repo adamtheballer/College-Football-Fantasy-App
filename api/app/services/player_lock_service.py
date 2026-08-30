@@ -21,6 +21,14 @@ def _school_schedule_key(school: str | None) -> str | None:
     return canonical_school_name(school) or normalize_school(school)
 
 
+def _display_school_name(school: str | None) -> str | None:
+    """Return the canonical public school label without altering stored provider data."""
+
+    if not school:
+        return school
+    return canonical_school_name(school) or school
+
+
 def game_context_for_players(
     db: Session,
     *,
@@ -59,7 +67,7 @@ def game_context_for_players(
         if home_key in school_keys:
             locations_by_school.setdefault(home_key, "home")
             if away_key:
-                opponents_by_school.setdefault(home_key, game.away_team)
+                opponents_by_school.setdefault(home_key, _display_school_name(game.away_team))
             if game.start_date is not None:
                 start = as_utc(game.start_date)
                 if home_key not in starts_by_school or start < starts_by_school[home_key]:
@@ -67,7 +75,7 @@ def game_context_for_players(
         if away_key in school_keys:
             locations_by_school.setdefault(away_key, "away")
             if home_key:
-                opponents_by_school.setdefault(away_key, game.home_team)
+                opponents_by_school.setdefault(away_key, _display_school_name(game.home_team))
             if game.start_date is not None:
                 start = as_utc(game.start_date)
                 if away_key not in starts_by_school or start < starts_by_school[away_key]:

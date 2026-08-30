@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, field_serializer
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.schemas.historical_stats import PlayerHistoricalStatsResponse
+from collegefootballfantasy_api.app.services.power4 import canonical_school_name
 
 
 class PlayerBase(BaseModel):
@@ -46,6 +47,11 @@ class PlayerRead(PlayerBase):
     def serialize_player_image_url(self, value: str | None) -> str | None:
         """Preserve the nullable contract while withholding unlicensed portraits."""
         return value if settings.player_headshots_enabled else None
+
+    @field_serializer("school")
+    def serialize_school(self, value: str) -> str:
+        """Keep canonical school capitalization consistent in every player response."""
+        return canonical_school_name(value) or value
 
 
 class PlayerList(BaseModel):
