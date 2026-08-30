@@ -399,7 +399,7 @@ export default function LeagueMatchup() {
         <button type="button" aria-label="Notifications" onClick={() => navigate("/alerts")} className="flex h-11 w-11 items-center justify-center rounded-full bg-cfb-surface-raised text-cfb-text-primary hover:bg-cfb-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"><Bell className="h-4 w-4" aria-hidden="true" /></button>
         <button type="button" aria-label="Messages" onClick={() => navigate("/chats")} className="flex h-11 w-11 items-center justify-center rounded-full bg-cfb-surface-raised text-cfb-text-primary hover:bg-cfb-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"><MessageCircle className="h-4 w-4" aria-hidden="true" /></button>
       </header>
-      {refreshCountdownSeconds !== null ? (
+      {rosteredPlayerIsLive && refreshCountdownSeconds !== null ? (
         <div className="flex items-center justify-center gap-2 border-b border-cfb-brand/20 bg-cfb-brand/[0.06] px-3 py-2" data-testid="live-score-refresh-countdown">
           <Clock3 className="h-3.5 w-3.5 text-cfb-brand" aria-hidden="true" />
           <span className="text-[9px] font-black uppercase tracking-[0.16em] text-cfb-brand">Live refresh</span>

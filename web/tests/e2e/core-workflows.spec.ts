@@ -103,7 +103,7 @@ test.describe("critical browser workflows", () => {
     }
   });
 
-  test("the public auth screen keeps the universal Roboto typography readable without narrow-screen overflow", async ({ page }, testInfo) => {
+  test("the public auth screen keeps the universal Josefin Sans typography readable without narrow-screen overflow", async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.goto("/login");
 
@@ -117,8 +117,8 @@ test.describe("critical browser workflows", () => {
       viewportWidth: document.documentElement.clientWidth,
     }));
 
-    expect(typography.bodyFamily).toContain("Roboto");
-    expect(typography.headingFamily).toContain("Roboto");
+    expect(typography.bodyFamily).toContain("Josefin Sans");
+    expect(typography.headingFamily).toContain("Josefin Sans");
     expect(typography.documentWidth).toBeLessThanOrEqual(typography.viewportWidth);
 
     if (process.env.CAPTURE_MOBILE_UI === "1") {
@@ -1897,6 +1897,7 @@ test.describe("critical browser workflows", () => {
 
     matchupPayload = finalPayload;
     await page.goto("/league/1/matchup");
+    await expect(page.getByTestId("live-score-refresh-countdown")).toHaveCount(0);
     const finalMobileLineup = page.getByTestId("mobile-starting-lineup");
     await finalMobileLineup.scrollIntoViewIfNeeded();
     const finalStatLine = finalMobileLineup.getByText("281 PASS YDS · 3 PASS TD · 34 RUSH YDS · 1 RUSH TD", { exact: true });

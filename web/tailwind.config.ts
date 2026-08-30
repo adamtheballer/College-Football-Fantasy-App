@@ -94,19 +94,19 @@ export default {
       },
       fontFamily: {
         display: [
-          "Roboto",
+          "Josefin Sans",
           "ui-sans-serif",
           "system-ui",
           "sans-serif",
         ],
         ui: [
-          "Roboto",
+          "Josefin Sans",
           "ui-sans-serif",
           "system-ui",
           "sans-serif",
         ],
         sans: [
-          "Roboto",
+          "Josefin Sans",
           "ui-sans-serif",
           "system-ui",
           "sans-serif",

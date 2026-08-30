@@ -7,16 +7,16 @@ const globalCss = readFileSync(fileURLToPath(new URL("./global.css", import.meta
 const tailwindConfig = readFileSync(fileURLToPath(new URL("../tailwind.config.ts", import.meta.url)), "utf8");
 
 describe("college football typography system", () => {
-  it("loads the approved lighter Roboto family with swap behavior", () => {
-    expect(globalCss).toContain("family=Roboto:");
+  it("loads Josefin Sans with swap behavior", () => {
+    expect(globalCss).toContain("family=Josefin+Sans:");
     expect(globalCss).toContain("display=swap");
     expect(globalCss).not.toContain("family=Barlow");
   });
 
-  it("uses Roboto for every body, operational UI, and display token", () => {
-    expect(tailwindConfig).toMatch(/sans:\s*\[\s*"Roboto"/);
-    expect(tailwindConfig).toMatch(/ui:\s*\[\s*"Roboto"/);
-    expect(tailwindConfig).toMatch(/display:\s*\[\s*"Roboto"/);
+  it("uses Josefin Sans for every body, operational UI, and display token", () => {
+    expect(tailwindConfig).toMatch(/sans:\s*\[\s*"Josefin Sans"/);
+    expect(tailwindConfig).toMatch(/ui:\s*\[\s*"Josefin Sans"/);
+    expect(tailwindConfig).toMatch(/display:\s*\[\s*"Josefin Sans"/);
     expect(tailwindConfig).not.toContain('"Barlow');
   });
 

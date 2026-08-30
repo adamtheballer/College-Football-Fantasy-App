@@ -14,6 +14,7 @@ describe("matchup live refresh cadence", () => {
     const data = {
       status: "live",
       live_scoring_freshness: { state: "stale" },
+      my_roster: [{ live_game_state: "live", live_scoring_status: "live" }],
     } as any;
 
     expect(matchupRefreshInterval(data)).toBe(LIVE_MATCHUP_REFRESH_MS);
@@ -26,6 +27,7 @@ describe("matchup live refresh cadence", () => {
       status: "live",
       live_scoring_freshness: { state: "fresh" },
       next_refresh_at: new Date(now + LIVE_MATCHUP_REFRESH_MS).toISOString(),
+      my_roster: [{ live_game_state: "live", live_scoring_status: "live" }],
     } as any;
 
     expect(matchupRefreshInterval(data, now)).toBe(LIVE_MATCHUP_REFRESH_MS);
@@ -38,6 +40,7 @@ describe("matchup live refresh cadence", () => {
     const data = {
       status: "live",
       next_refresh_at: new Date(now + 2_000).toISOString(),
+      my_roster: [{ live_game_state: "live", live_scoring_status: "live" }],
     } as any;
 
     expect(matchupRefreshCountdownSeconds(data, now, now)).toBe(2);
@@ -73,5 +76,17 @@ describe("matchup live refresh cadence", () => {
     expect(hasUpcomingRosteredKickoff(data, now)).toBe(false);
     expect(matchupRefreshInterval(data, now)).toBe(LIVE_MATCHUP_REFRESH_MS);
     expect(matchupRefreshCountdownSeconds(data, now, now)).toBe(180);
+  });
+
+  it("does not expose a refresh countdown once neither roster has a live player", () => {
+    const data = {
+      status: "live",
+      next_refresh_at: new Date(Date.now() + LIVE_MATCHUP_REFRESH_MS).toISOString(),
+      my_roster: [{ live_game_state: "final", live_scoring_status: "stale" }],
+      opponent_roster: [{ live_game_state: "scheduled", game_start_at: new Date(Date.now() + 60_000).toISOString() }],
+    } as any;
+
+    expect(hasLiveRosteredPlayer(data)).toBe(false);
+    expect(matchupRefreshCountdownSeconds(data, Date.now(), Date.now())).toBeNull();
   });
 });

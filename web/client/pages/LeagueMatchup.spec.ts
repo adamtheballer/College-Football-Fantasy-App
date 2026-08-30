@@ -211,6 +211,7 @@ describe("league matchup scoreboard", () => {
   });
 
   it("places the blue three-minute countdown at the top of the matchup screen", () => {
+    matchupMocks.hasLiveRosteredPlayer = true;
     matchupMocks.refreshCountdownSeconds = 180;
 
     render(createElement(LeagueMatchup));
@@ -219,6 +220,14 @@ describe("league matchup scoreboard", () => {
     expect(timer.textContent).toContain("Live refresh");
     expect(timer.textContent).toContain("3:00");
     expect(timer.className).toContain("bg-cfb-brand");
+  });
+
+  it("hides the refresh strip when no player on either roster is live", () => {
+    matchupMocks.refreshCountdownSeconds = 0;
+
+    render(createElement(LeagueMatchup));
+
+    expect(screen.queryByTestId("live-score-refresh-countdown")).toBeNull();
   });
 
   it("does not render a stale-provider warning banner", () => {
