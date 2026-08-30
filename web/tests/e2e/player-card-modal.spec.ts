@@ -302,8 +302,14 @@ test.describe("player card modal", () => {
     await expect(currentSeasonRow).toContainText("3");
     await expect(currentSeasonRow).toContainText("50");
     expect(await dialog.getByRole("columnheader").allTextContents()).toEqual([
-      "Year", "Team", "Pos", "GP", "FPTS", "Receptions", "Targets", "Rec Yds", "Rec TD", "Rush Att", "Rush Yds", "Rush TD", "Pass Yds",
+      "Year", "Team", "Pos", "GP", "FPTS", "Receptions", "Rec Yds", "Rec TD", "Rush Att", "Rush Yds", "Rush TD", "Pass Yds",
     ]);
+
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await dialog.getByRole("button", { name: "Game Log" }).click();
+    await expect(dialog.getByText("2026 Game Log", { exact: true })).toBeVisible();
+    await expect(dialog.getByRole("columnheader", { name: "REC", exact: true })).toBeVisible();
+    await expect(dialog.getByRole("columnheader", { name: "TAR", exact: true })).toHaveCount(0);
 
     await page.getByRole("button", { name: /Close player card/i }).click();
     await expect(dialog).toBeHidden();
