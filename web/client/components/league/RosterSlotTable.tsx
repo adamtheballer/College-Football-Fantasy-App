@@ -184,6 +184,30 @@ const playerCanFillSlot = (player: LeagueRosterPlayer, slot: string, superflexEn
   return Boolean(position && getEligibleSlotsForPosition(position, superflexEnabled).includes(slot as never));
 };
 
+/** One shared eligibility rule for the player-card dialog and two-tap roster swaps. */
+const canSwapPlayers = (
+  source: LeagueRosterPlayer,
+  target: LeagueRosterPlayer,
+  ownedRosterActions: OwnedRosterActions,
+) => {
+  if (
+    source.id === target.id
+    || !isRealRosterPlayer(source)
+    || !isRealRosterPlayer(target)
+    || isUnavailableForSwap(source)
+    || isUnavailableForSwap(target)
+  ) {
+    return false;
+  }
+  const sourceSlot = slotType(source);
+  const targetSlot = slotType(target);
+  return (
+    sourceSlot !== targetSlot
+    && playerCanFillSlot(target, sourceSlot, ownedRosterActions.superflexEnabled)
+    && playerCanFillSlot(source, targetSlot, ownedRosterActions.superflexEnabled)
+  );
+};
+
 export function RosterSlotTable({
   title,
   players,
@@ -194,6 +218,8 @@ export function RosterSlotTable({
   pointValueClassName,
   leagueId,
   ownedRosterActions,
+  quickSwapPlayer,
+  onQuickSwapPlayerChange,
 }: {
   title: string;
   players: LeagueRosterPlayer[];
@@ -205,6 +231,9 @@ export function RosterSlotTable({
   pointValueClassName?: string;
   leagueId?: number | string;
   ownedRosterActions?: OwnedRosterActions;
+  /** Shared across starter, bench, and IR tables so a two-tap swap can cross sections. */
+  quickSwapPlayer?: LeagueRosterPlayer | null;
+  onQuickSwapPlayerChange?: (player: LeagueRosterPlayer | null) => void;
 }) {
   const navigate = useNavigate();
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueRosterPlayer | null>(null);
@@ -258,15 +287,8 @@ export function RosterSlotTable({
   };
   const swapCandidates = useMemo(() => {
     if (!swapPlayer || !ownedRosterActions) return [];
-    const selectedSlot = slotType(swapPlayer);
     return ownedRosterActions.roster.filter((candidate) => {
-      if (candidate.id === swapPlayer.id || !isRealRosterPlayer(candidate) || isUnavailableForSwap(candidate)) return false;
-      const candidateSlot = slotType(candidate);
-      return (
-        candidateSlot !== selectedSlot &&
-        playerCanFillSlot(candidate, selectedSlot, ownedRosterActions.superflexEnabled) &&
-        playerCanFillSlot(swapPlayer, candidateSlot, ownedRosterActions.superflexEnabled)
-      );
+      return canSwapPlayers(swapPlayer, candidate, ownedRosterActions);
     });
   }, [ownedRosterActions, swapPlayer]);
   const beginSwap = () => {
@@ -275,26 +297,50 @@ export function RosterSlotTable({
     setSwapPlayer(selectedPlayer);
     setSelectedPlayer(null);
   };
-  const confirmSwap = async (candidate: LeagueRosterPlayer) => {
-    if (!swapPlayer || !swapPlayer.id || !candidate.id || !swapPlayer.slot_index || !candidate.slot_index) return;
+  const submitSwap = async (source: LeagueRosterPlayer, candidate: LeagueRosterPlayer) => {
+    if (!source.id || !candidate.id || !source.slot_index || !candidate.slot_index) return false;
     setSwapError(null);
     try {
       await updateLineupMutation.mutateAsync([
         {
-          roster_entry_id: swapPlayer.id,
+          roster_entry_id: source.id,
           slot: slotType(candidate),
           slot_index: candidate.slot_index,
         },
         {
           roster_entry_id: candidate.id,
-          slot: slotType(swapPlayer),
-          slot_index: swapPlayer.slot_index,
+          slot: slotType(source),
+          slot_index: source.slot_index,
         },
       ]);
-      setSwapPlayer(null);
+      return true;
     } catch (error) {
       setSwapError(error instanceof Error ? error.message : "Unable to swap players.");
+      return false;
     }
+  };
+  const confirmSwap = async (candidate: LeagueRosterPlayer) => {
+    if (!swapPlayer) return;
+    if (await submitSwap(swapPlayer, candidate)) setSwapPlayer(null);
+  };
+  const quickSwapEnabled = Boolean(ownedRosterActions && onQuickSwapPlayerChange);
+  const handleQuickSwap = (player: LeagueRosterPlayer) => {
+    if (!quickSwapEnabled || !ownedRosterActions || !onQuickSwapPlayerChange || !isRealRosterPlayer(player)) return;
+    if (!quickSwapPlayer) {
+      if (!isUnavailableForSwap(player)) {
+        setSwapError(null);
+        onQuickSwapPlayerChange(player);
+      }
+      return;
+    }
+    if (quickSwapPlayer.id === player.id) {
+      onQuickSwapPlayerChange(null);
+      return;
+    }
+    if (!canSwapPlayers(quickSwapPlayer, player, ownedRosterActions)) return;
+    void (async () => {
+      if (await submitSwap(quickSwapPlayer, player)) onQuickSwapPlayerChange(null);
+    })();
   };
   const dropSelectedPlayer = async () => {
     if (!selectedPlayer || !selectedPlayer.id || !ownedRosterActions || isUnavailableForSwap(selectedPlayer)) return;
@@ -360,15 +406,9 @@ export function RosterSlotTable({
               ? formatRosterGameKickoff(player.game_start_at)
               : null;
             return (
-              <button
+              <div
                 key={player.slot_id ?? `${player.team_id ?? player.fantasy_team_id}-${slotType(player)}-${player.slot_index ?? 0}`}
-                type="button"
                 data-roster-mobile-row
-                onClick={() => {
-                  if (!isRealPlayer) return;
-                  setSelectedPlayer(player);
-                }}
-                disabled={!isRealPlayer}
                 aria-disabled={!isRealPlayer}
                 className={cn(
                   "grid min-h-[72px] w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-3 text-left text-sm text-cfb-text-secondary transition focus:outline-none focus-visible:bg-cfb-brand/[0.08] focus-visible:ring-2 focus-visible:ring-cfb-brand/50 md:min-h-0 md:gap-3 md:px-5 md:py-4",
@@ -382,18 +422,60 @@ export function RosterSlotTable({
                 data-has-possession={hasPossession ? "true" : "false"}
                 data-in-red-zone={hasRedZone ? "true" : "false"}
               >
-                <span className="flex items-center gap-2">
-                  <span
+                {isRealPlayer && quickSwapEnabled ? (() => {
+                  const isQuickSwapSource = quickSwapPlayer?.id === player.id;
+                  const targetEligible = !quickSwapPlayer || isQuickSwapSource || canSwapPlayers(quickSwapPlayer, player, ownedRosterActions!);
+                  const disabled = !targetEligible || updateLineupMutation.isPending;
+                  const actionLabel = isQuickSwapSource
+                    ? `Cancel swap selection for ${player.player_name}`
+                    : quickSwapPlayer
+                      ? `Swap ${quickSwapPlayer.player_name} with ${player.player_name}`
+                      : `Select ${player.player_name} to swap`;
+                  return (
+                    <button
+                      type="button"
+                      data-roster-slot-swap
+                      data-roster-slot-swap-selected={isQuickSwapSource ? "true" : undefined}
+                      aria-label={actionLabel}
+                      aria-pressed={isQuickSwapSource}
+                      disabled={disabled}
+                      onClick={() => handleQuickSwap(player)}
+                      className="flex min-w-0 items-center gap-2 text-left disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <span
+                        className={cn(
+                          "inline-flex min-w-[3.4rem] shrink-0 justify-center whitespace-nowrap rounded-md border px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] transition-colors md:min-w-[3.25rem] md:px-3 md:py-1 md:tracking-[0.14em]",
+                          style.pill,
+                          isQuickSwapSource && "cfb-roster-slot-swap-selected",
+                        )}
+                      >
+                        {slotLabel(player)}
+                      </span>
+                      <span className={cn("hidden h-2.5 w-2.5 rounded-full md:block", style.dot)} />
+                    </button>
+                  );
+                })() : (
+                  <span className="flex items-center gap-2">
+                    <span
                     className={cn(
                       "inline-flex min-w-[3.4rem] shrink-0 justify-center whitespace-nowrap rounded-md border px-2 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] md:min-w-[3.25rem] md:px-3 md:py-1 md:tracking-[0.14em]",
                       style.pill
                     )}
-                  >
-                    {slotLabel(player)}
+                    >
+                      {slotLabel(player)}
+                    </span>
+                    <span className={cn("hidden h-2.5 w-2.5 rounded-full md:block", style.dot)} />
                   </span>
-                  <span className={cn("hidden h-2.5 w-2.5 rounded-full md:block", style.dot)} />
-                </span>
-                <span className="flex min-w-0 flex-col gap-1">
+                )}
+                <button
+                  type="button"
+                  aria-label={isRealPlayer ? `Open ${player.player_name} player card` : "Open roster slot unavailable"}
+                  onClick={() => {
+                    if (isRealPlayer) setSelectedPlayer(player);
+                  }}
+                  disabled={!isRealPlayer}
+                  className="flex min-w-0 flex-col gap-1 text-left focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/50 disabled:cursor-not-allowed"
+                >
                   <span className="flex min-w-0 items-center gap-1.5">
                     <PlayerAvailabilityIndicator status={player.injury_status}>
                       <span className="truncate font-black text-cfb-text-primary">{isRealPlayer ? player.player_name : "N/A"}</span>
@@ -436,7 +518,7 @@ export function RosterSlotTable({
                       Red zone
                     </span>
                   ) : null}
-                </span>
+                </button>
                 <span className="hidden text-cfb-text-muted md:block">{isRealPlayer ? displaySchoolName(player.school ?? player.player_school) || "—" : "—"}</span>
                 {showPositionColumn ? (
                   <span className={cn("hidden font-black md:block", style.text)}>{position}</span>
@@ -449,7 +531,7 @@ export function RosterSlotTable({
                   {liveDetail ? <span data-player-final-status={isFinalGame ? "true" : undefined} className={cn(isFinalGame ? "text-[10px] font-black text-cfb-brand" : "text-[9px] font-semibold text-cfb-text-muted")}>{liveDetail}</span> : null}
                   {finalPregameProjection ? <span data-player-final-pregame-projection className="text-[8px] font-semibold text-cfb-brand">{finalPregameProjection}</span> : null}
                 </span>
-              </button>
+              </div>
             );
           })}
         </div>

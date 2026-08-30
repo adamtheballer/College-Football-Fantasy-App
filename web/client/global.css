@@ -341,6 +341,25 @@
     background-image: none;
   }
 
+  /* A selected roster position badge is the first half of the two-tap swap. */
+  @keyframes cfb-roster-slot-swap-blink {
+    0%,
+    100% {
+      background-color: hsl(var(--background-surface-hover));
+      border-color: hsl(var(--border-strong));
+      color: hsl(var(--text-secondary));
+    }
+    50% {
+      background-color: hsl(var(--text-secondary) / 0.22);
+      border-color: hsl(var(--text-secondary) / 0.85);
+      color: hsl(var(--text-primary));
+    }
+  }
+
+  .cfb-roster-slot-swap-selected {
+    animation: cfb-roster-slot-swap-blink 900ms ease-in-out infinite;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

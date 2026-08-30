@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LeagueRosterPlayer } from "@/types/league";
@@ -13,9 +14,14 @@ vi.mock("@/hooks/use-players", () => ({
   usePlayerCard: () => ({ data: null, isLoading: false }),
 }));
 
+const rosterActionMocks = vi.hoisted(() => ({
+  updateLineup: vi.fn(),
+  dropPlayer: vi.fn(),
+}));
+
 vi.mock("@/hooks/use-roster-actions", () => ({
-  useDropRosterPlayer: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useUpdateLineup: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDropRosterPlayer: () => ({ mutateAsync: rosterActionMocks.dropPlayer, isPending: false }),
+  useUpdateLineup: () => ({ mutateAsync: rosterActionMocks.updateLineup, isPending: false }),
 }));
 
 import { finalPregameProjectionDetail, formatRosterGameKickoff, formatRosterPointValue, liveGameStatusLabel, liveProjectionDetail, RosterSlotTable } from "./RosterSlotTable";
@@ -78,6 +84,53 @@ describe("RosterSlotTable", () => {
     expect(screen.getByText("A Very Long Receiver Name That Must Stay Compact")).toBeTruthy();
     expect(screen.getByText("Ohio State · vs Michigan")).toBeTruthy();
     expect(screen.getByText("18.4")).toBeTruthy();
+  });
+
+  it("swaps eligible players with two position-badge taps while preserving the player card route", async () => {
+    rosterActionMocks.updateLineup.mockResolvedValue({});
+    const benchReceiver = {
+      ...projectedReceiver,
+      id: 10,
+      player_id: 100,
+      player_name: "Bench Receiver",
+      slot: "BENCH",
+      slot_id: "team-5-BENCH-1",
+      slot_index: 1,
+      display_label: "Bench 1",
+    };
+    const ownedRosterActions = {
+      teamId: 5,
+      roster: [projectedReceiver, benchReceiver],
+      superflexEnabled: false,
+    };
+    const QuickSwapHarness = () => {
+      const [quickSwapPlayer, setQuickSwapPlayer] = useState<LeagueRosterPlayer | null>(null);
+      return (
+        <RosterSlotTable
+          title="Starters"
+          players={[projectedReceiver, benchReceiver]}
+          ownedRosterActions={ownedRosterActions}
+          quickSwapPlayer={quickSwapPlayer}
+          onQuickSwapPlayerChange={setQuickSwapPlayer}
+        />
+      );
+    };
+
+    const { container } = render(<QuickSwapHarness />);
+    fireEvent.click(screen.getByRole("button", { name: "Select A Very Long Receiver Name That Must Stay Compact to swap" }));
+
+    const selectedBadge = container.querySelector('[data-roster-slot-swap-selected="true"]');
+    expect(selectedBadge?.querySelector(".cfb-roster-slot-swap-selected")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open A Very Long Receiver Name That Must Stay Compact player card" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Swap A Very Long Receiver Name That Must Stay Compact with Bench Receiver" }));
+
+    await waitFor(() => {
+      expect(rosterActionMocks.updateLineup).toHaveBeenCalledWith([
+        { roster_entry_id: 9, slot: "BENCH", slot_index: 1 },
+        { roster_entry_id: 10, slot: "WR", slot_index: 1 },
+      ]);
+    });
   });
 
   it("shows the shared red out marker beside an unavailable player name", () => {
