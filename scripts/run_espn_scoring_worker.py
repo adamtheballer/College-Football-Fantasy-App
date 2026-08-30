@@ -105,6 +105,21 @@ def run_iteration(*, now: datetime | None = None, client: ESPNClient | None = No
         created_client = client is None
         espn = client or ESPNClient()
         try:
+            # The enabled-mode promotion boundary verifies that this durable
+            # process is alive.  Record liveness before entering that boundary
+            # so a fresh deployment (or a previously failed cycle) can recover
+            # instead of deadlocking: the former implementation only wrote a
+            # healthy heartbeat *after* a successful promoted cycle, while the
+            # cycle refused to start unless that heartbeat was already healthy.
+            # This does not declare the provider refresh successful; failure is
+            # still recorded below and all other preflight safeguards remain in
+            # force.
+            record_worker_heartbeat(
+                db,
+                worker_name="espn_scoring_processor",
+                success=True,
+                details={"state": "running", "season": season, "week": week},
+            )
             result = run_espn_scoring_cycle(
                 db,
                 season=season,
@@ -132,6 +147,7 @@ def run_iteration(*, now: datetime | None = None, client: ESPNClient | None = No
                 worker_name="espn_scoring_processor",
                 success=result.failed_games == 0,
                 details={
+                    "state": "completed",
                     "mode": settings.scoring_mode,
                     "season": season,
                     "week": week,
@@ -144,6 +160,14 @@ def run_iteration(*, now: datetime | None = None, client: ESPNClient | None = No
             )
             db.commit()
             return result
+        except Exception as error:
+            record_worker_heartbeat(
+                db,
+                worker_name="espn_scoring_processor",
+                success=False,
+                details={"state": "failed", "season": season, "week": week, "error": str(error)},
+            )
+            raise
         finally:
             if created_client:
                 espn.close()

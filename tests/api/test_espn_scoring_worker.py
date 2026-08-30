@@ -71,6 +71,77 @@ def test_worker_registers_orm_models_before_its_first_schedule_query(monkeypatch
     assert registered == [True]
 
 
+def test_worker_records_liveness_before_enabled_scoring_preflight(monkeypatch):
+    heartbeats = []
+
+    class FakeSession:
+        def commit(self):
+            return None
+
+    @contextmanager
+    def fake_session():
+        yield FakeSession()
+
+    class FakeResult:
+        discovered_games = 1
+        claimed_games = 1
+        successful_games = 1
+        failed_games = 0
+        unmatched_rows = 0
+
+    def capture_heartbeat(*_args, **kwargs):
+        heartbeats.append(kwargs)
+
+    def run_cycle(*_args, **_kwargs):
+        assert heartbeats == [
+            {
+                "worker_name": "espn_scoring_processor",
+                "success": True,
+                "details": {"state": "running", "season": 2026, "week": 1},
+            }
+        ]
+        return FakeResult()
+
+    monkeypatch.setattr(worker.settings, "scoring_mode", "enabled")
+    monkeypatch.setattr(worker.settings, "scoring_provider", "espn")
+    monkeypatch.setattr(worker, "ensure_models_registered", lambda: None)
+    monkeypatch.setattr(worker, "SessionLocal", fake_session)
+    monkeypatch.setattr(worker, "resolve_scoring_window", lambda _db, now=None: (2026, 1))
+    monkeypatch.setattr(worker, "record_worker_heartbeat", capture_heartbeat)
+    monkeypatch.setattr(worker, "run_espn_scoring_cycle", run_cycle)
+    monkeypatch.setattr(worker, "scoring_operations_report", lambda *_args, **_kwargs: {"alerts": []})
+
+    assert worker.run_iteration(now=NOW, client=object()) is not None
+    assert heartbeats[-1]["success"] is True
+    assert heartbeats[-1]["details"]["state"] == "completed"
+
+
+def test_worker_records_a_failure_heartbeat_when_a_cycle_raises(monkeypatch):
+    heartbeats = []
+
+    class FakeSession:
+        def commit(self):
+            return None
+
+    @contextmanager
+    def fake_session():
+        yield FakeSession()
+
+    monkeypatch.setattr(worker.settings, "scoring_mode", "enabled")
+    monkeypatch.setattr(worker.settings, "scoring_provider", "espn")
+    monkeypatch.setattr(worker, "ensure_models_registered", lambda: None)
+    monkeypatch.setattr(worker, "SessionLocal", fake_session)
+    monkeypatch.setattr(worker, "resolve_scoring_window", lambda _db, now=None: (2026, 1))
+    monkeypatch.setattr(worker, "record_worker_heartbeat", lambda *_args, **kwargs: heartbeats.append(kwargs))
+    monkeypatch.setattr(worker, "run_espn_scoring_cycle", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("provider unavailable")))
+
+    with pytest.raises(RuntimeError, match="provider unavailable"):
+        worker.run_iteration(now=NOW, client=object())
+
+    assert [item["success"] for item in heartbeats] == [True, False]
+    assert heartbeats[-1]["details"]["state"] == "failed"
+
+
 def test_once_mode_returns_a_nonzero_failure_instead_of_hiding_worker_boot_errors(monkeypatch):
     monkeypatch.setattr(worker.settings, "scoring_mode", "shadow")
     monkeypatch.setattr(worker.settings, "scoring_provider", "espn")
