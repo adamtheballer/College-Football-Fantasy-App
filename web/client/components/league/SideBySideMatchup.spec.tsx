@@ -320,6 +320,8 @@ describe("SideBySideMatchup", () => {
     expect(desktopStarters.querySelectorAll('[data-desktop-slot-column="true"]')).toHaveLength(1);
     expect(desktopStarters.querySelectorAll("[data-roster-slot-swap]")).toHaveLength(0);
     expect(within(desktopStarters).getAllByText("QB")).toHaveLength(1);
+    expect(within(desktopStarters).getByText("L. Name Quarterback").parentElement?.className).toContain("text-[16px]");
+    expect(within(screen.getByTestId("mobile-starting-lineup")).getByText("L. Name Quarterback").parentElement?.className).toContain("text-[12px]");
   });
 
   it("keeps desktop matchup players selectable after moving them into the shared layout", () => {
