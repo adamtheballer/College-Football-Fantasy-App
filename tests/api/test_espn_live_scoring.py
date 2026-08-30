@@ -634,11 +634,47 @@ def test_strict_live_identity_rejects_legacy_backfill_mappings(db_session):
     assert result.unmatched_rows == 3
 
 
-def test_verified_kicker_with_unbucketed_made_field_goal_delays_the_game_without_promoting_stats(db_session):
+def test_verified_unrostered_kicker_with_unbucketed_made_field_goal_does_not_block_other_players(db_session):
+    _verified_players(db_session)
     kicker = Player(name="Exact Distance Kicker", position="K", school="Texas")
     db_session.add(kicker)
     db_session.flush()
     db_session.add(PlayerProviderId(player_id=kicker.id, provider="espn", provider_player_id="303", verification_status="verified"))
+    db_session.commit()
+
+    summary = espn_summary_payload()
+    summary.pop("drives")
+    normalized, skipped = normalize_espn_summary_player_stats(db_session, season=2026, week=1, summary=summary, strict_identity=True)
+    assert skipped == 1
+    assert kicker.id not in {row["player_id"] for row in normalized}
+
+    result = run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="shadow",
+        client=FakeLiveESPN(summary=summary),
+        now=NOW,
+        relevant_team_names={"texas"},
+    )
+    assert result.successful_games == 1
+    assert result.failed_games == 0
+    poll = db_session.query(ProviderGamePoll).filter_by(provider_game_id="401").one()
+    assert poll.status == "live"
+    assert db_session.query(UnmatchedProviderRow).filter_by(feed="live_boxscore_kicker_distance").count() == 1
+
+
+def test_verified_rostered_kicker_with_unbucketed_made_field_goal_delays_the_game_without_promoting_stats(db_session):
+    league, home, _away, _players, _matchup = create_scoring_fixture(db_session)
+    kicker = Player(name="Exact Distance Kicker", position="K", school="Texas")
+    db_session.add(kicker)
+    db_session.flush()
+    db_session.add_all(
+        [
+            PlayerProviderId(player_id=kicker.id, provider="espn", provider_player_id="303", verification_status="verified"),
+            RosterEntry(league_id=league.id, team_id=home.id, player_id=kicker.id, slot="K", status="active"),
+        ]
+    )
     db_session.commit()
 
     summary = espn_summary_payload()

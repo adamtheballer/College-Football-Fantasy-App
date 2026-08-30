@@ -6,10 +6,12 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.integrations.espn import ESPNClient, extract_player_box_score_stats
+from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
+from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.services.provider_identity import record_unmatched_provider_row
 
 
@@ -55,6 +57,28 @@ def _build_provider_player_index(db: Session) -> dict[str, Player]:
         .all()
     )
     return {mapping.provider_player_id: mapping.player for mapping in mappings}
+
+
+def _is_active_current_season_roster_player(db: Session, *, player_id: int, season: int) -> bool:
+    """Return whether an unresolved live stat could affect a current league.
+
+    An incomplete kicker row must retain the strict fail-closed behavior when
+    someone can actually score that player.  It must not, however, hold an
+    entire provider game hostage for an unrelated, unrostered kicker.
+    """
+
+    return (
+        db.query(RosterEntry.id)
+        .join(League, League.id == RosterEntry.league_id)
+        .filter(
+            RosterEntry.player_id == player_id,
+            RosterEntry.status == "active",
+            League.season_year == season,
+            League.status.notin_(("cancelled", "archived")),
+        )
+        .first()
+        is not None
+    )
 
 
 def _match_player(
@@ -148,9 +172,15 @@ def normalize_espn_summary_player_stats(
                 reason=reason,
             )
             db.flush()
-            raise UnresolvedKickerDistanceError(
-                f"verified kicker {player.id} has a made field goal without an exact ESPN distance"
-            )
+            if _is_active_current_season_roster_player(db, player_id=player.id, season=season):
+                raise UnresolvedKickerDistanceError(
+                    f"verified kicker {player.id} has a made field goal without an exact ESPN distance"
+                )
+            # Preserve the incomplete row for provider-identity review, but
+            # do not publish a potentially wrong waiver value or prevent
+            # unrelated rostered players in this completed game from updating.
+            skipped += 1
+            continue
         normalized.append({"player_id": player.id, "stats": row})
     return normalized, skipped
 
