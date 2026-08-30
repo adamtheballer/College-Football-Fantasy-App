@@ -116,7 +116,7 @@ describe("Settings beta preferences", () => {
   it("disables manager-name edits until the seven-day cooldown ends", () => {
     state.user = {
       ...state.user,
-      managerNameChangeAvailableAt: "2026-08-30T12:00:00Z",
+    managerNameChangeAvailableAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     };
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
