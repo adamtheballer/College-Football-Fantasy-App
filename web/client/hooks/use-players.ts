@@ -786,7 +786,14 @@ export function usePlayerGameLog(
   return useQuery({
     queryKey: ["player-game-log", playerId, season, leagueId ?? null],
     enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
-    staleTime: 60_000,
+    // A finalized box score is written by the server-side live worker. Never
+    // leave an open player card displaying the pre-final cache after that
+    // worker accepts a game's final result: refresh on every tab open and on
+    // the same three-minute cadence as live-score ingestion.
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchInterval: 180_000,
+    refetchIntervalInBackground: true,
     queryFn: () => apiGet<PlayerGameLogResponse>(`/players/${playerId}/game-log`, {
       season,
       ...(typeof leagueId === "number" && Number.isFinite(leagueId) ? { league_id: leagueId } : {}),
