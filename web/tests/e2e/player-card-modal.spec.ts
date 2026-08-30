@@ -163,6 +163,49 @@ test.describe("player card modal", () => {
         });
         return;
       }
+      if (url.pathname.endsWith("/players/1/game-log")) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            player_id: 1,
+            player_name: "Jeremiah Smith",
+            season: 2026,
+            team_name: "Ohio State",
+            position: "WR",
+            games: [
+              {
+                schedule_id: 101,
+                game_id: 301,
+                week: 1,
+                date: "2026-08-29",
+                kickoff_at: "2026-08-29T19:00:00Z",
+                opponent_name: "Texas",
+                location: "home",
+                location_label: "Home",
+                neutral_site: false,
+                conference_game: false,
+                venue: null,
+                tv_network: null,
+                game_status: "final",
+                stat_status: "final",
+                result: "W 31–17",
+                stats: {
+                  source: "espn_final_boxscore",
+                  fantasy_points: 8,
+                  updated_at: "2026-08-30T03:00:00Z",
+                  stats: {
+                    receptions: 3,
+                    rec_yards: 50,
+                    rec_tds: 0,
+                  },
+                },
+              },
+            ],
+          }),
+        });
+        return;
+      }
       if (url.pathname.endsWith("/players/1")) {
         await route.fulfill({
           status: 200,
@@ -252,6 +295,12 @@ test.describe("player card modal", () => {
     await expect(dialog.getByRole("columnheader", { name: "Fantasy Points" })).toHaveCount(0);
     await expect(dialog.getByRole("columnheader", { name: "Rec Yds" })).toBeVisible();
     await expect(dialog.getByLabel("Season stats table; scroll horizontally for all columns")).toBeVisible();
+    const currentSeasonRow = dialog.locator("tbody tr").filter({ hasText: "2026" });
+    await expect(currentSeasonRow).toHaveCount(1);
+    await expect(currentSeasonRow).toContainText("Ohio State");
+    await expect(currentSeasonRow).toContainText("1");
+    await expect(currentSeasonRow).toContainText("3");
+    await expect(currentSeasonRow).toContainText("50");
     expect(await dialog.getByRole("columnheader").allTextContents()).toEqual([
       "Year", "Team", "Pos", "GP", "FPTS", "Receptions", "Targets", "Rec Yds", "Rec TD", "Rush Att", "Rush Yds", "Rush TD", "Pass Yds",
     ]);
