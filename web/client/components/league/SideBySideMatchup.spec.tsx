@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LeagueMatchupTeam, LeagueRosterPlayer } from "@/types/league";
@@ -90,16 +90,15 @@ const opponentTeam: LeagueMatchupTeam = {
 
 describe("SideBySideMatchup", () => {
   it("renders a compact mobile starting lineup with both teams, slot, and weekly projections in each row", () => {
-    const { container } = render(<SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} />);
+    render(<SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} />);
 
-    expect(screen.getByTestId("mobile-starting-lineup")).toBeTruthy();
-    expect(screen.getByTestId("mobile-starting-lineup").querySelectorAll("[data-mobile-matchup-row]")).toHaveLength(1);
-    expect(screen.getByText("L. Name Quarterback")).toBeTruthy();
-    expect(screen.getByText("O. Quarterback")).toBeTruthy();
-    expect(screen.getByText("QB")).toBeTruthy();
-    expect(screen.getByText("24.1")).toBeTruthy();
-    expect(screen.getByText("22.7")).toBeTruthy();
     const starters = screen.getByTestId("mobile-starting-lineup");
+    expect(starters.querySelectorAll("[data-mobile-matchup-row]")).toHaveLength(1);
+    expect(within(starters).getByText("L. Name Quarterback")).toBeTruthy();
+    expect(within(starters).getByText("O. Quarterback")).toBeTruthy();
+    expect(within(starters).getByText("QB")).toBeTruthy();
+    expect(within(starters).getByText("24.1")).toBeTruthy();
+    expect(within(starters).getByText("22.7")).toBeTruthy();
     expect(starters.textContent).toContain("Week One Opponent @ Ohio State");
     expect(starters.textContent).toContain("Texas @ Week One Opponent");
     expect(starters.textContent).toMatch(/AM|PM/);
@@ -109,11 +108,11 @@ describe("SideBySideMatchup", () => {
       "grid-cols-[2.75rem_minmax(0,1fr)]",
     );
     expect(starters.querySelector('[data-mobile-matchup-player="right"]')?.className).toContain("text-left");
-    expect(screen.getByText("22.7").parentElement?.className).toContain("text-cfb-text-primary");
+    expect(within(starters).getByText("22.7").parentElement?.className).toContain("text-cfb-text-primary");
     expect(starters.querySelector('[data-mobile-matchup-player="left"]')?.className).toContain(
       "grid-cols-[minmax(0,1fr)_2.75rem]",
     );
-    expect(screen.getByText("24.1").parentElement?.className).toContain("text-cfb-text-primary");
+    expect(within(starters).getByText("24.1").parentElement?.className).toContain("text-cfb-text-primary");
     expect(starters.querySelector("[data-mobile-slot-rail]")).toBeTruthy();
     expect(starters.querySelector("[data-mobile-slot-column]")?.className).not.toContain("border-x");
   });
@@ -127,22 +126,24 @@ describe("SideBySideMatchup", () => {
       ...opponentTeam,
       roster: [opponentTeam.roster[0], { ...opponentTeam.roster[1], display_label: "BENCH 2" }],
     };
-    const { container } = render(<SideBySideMatchup myTeam={benchTwoMyTeam} opponentTeam={benchTwoOpponentTeam} />);
-    const benchSlot = screen.getAllByText("BENCH 2")[0];
+    render(<SideBySideMatchup myTeam={benchTwoMyTeam} opponentTeam={benchTwoOpponentTeam} />);
+    const bench = screen.getByTestId("mobile-bench-lineup");
+    const benchSlot = within(bench).getByText("BENCH 2");
 
     expect(benchSlot.className).toContain("whitespace-nowrap");
     expect(benchSlot.closest("[data-mobile-matchup-row]")?.className).toContain("_3.5rem_");
-    expect(container.querySelector("[data-mobile-slot-rail]")?.className).toContain("w-14");
+    expect(bench.querySelector("[data-mobile-slot-rail]")?.className).toContain("w-14");
   });
 
   it("opens the existing player card from either side of a mobile matchup row", () => {
     render(<SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={42} />);
+    const starters = screen.getByTestId("mobile-starting-lineup");
 
-    fireEvent.click(screen.getByRole("button", { name: "Open L. Name Quarterback player card" }));
+    fireEvent.click(within(starters).getByRole("button", { name: "Open L. Name Quarterback player card" }));
     expect(screen.getByRole("dialog").textContent).toContain("Long Name Quarterback matchup player card");
 
     fireEvent.click(screen.getByRole("button", { name: "Close player card" }));
-    fireEvent.click(screen.getByRole("button", { name: "Open O. Quarterback player card" }));
+    fireEvent.click(within(starters).getByRole("button", { name: "Open O. Quarterback player card" }));
     expect(screen.getByRole("dialog").textContent).toContain("Opponent Quarterback matchup player card");
   });
 
@@ -162,11 +163,12 @@ describe("SideBySideMatchup", () => {
     };
 
     render(<SideBySideMatchup myTeam={liveMyTeam} opponentTeam={liveOpponentTeam} scoringStatus="live" />);
+    const starters = screen.getByTestId("mobile-starting-lineup");
 
-    expect(screen.getByText("7.3")).toBeTruthy();
-    expect(screen.getByText("13.0")).toBeTruthy();
-    expect(screen.queryByText("24.1")).toBeNull();
-    expect(screen.queryByText("22.7")).toBeNull();
+    expect(within(starters).getByText("7.3")).toBeTruthy();
+    expect(within(starters).getByText("13.0")).toBeTruthy();
+    expect(within(starters).queryByText("24.1")).toBeNull();
+    expect(within(starters).queryByText("22.7")).toBeNull();
   });
 
   it("highlights every live mobile player row and uses a football icon for team possession", () => {
@@ -193,14 +195,15 @@ describe("SideBySideMatchup", () => {
         game_score: "Ohio State 10 – Texas 14",
       }],
     };
-    const { container } = render(<SideBySideMatchup myTeam={liveMyTeam} opponentTeam={liveOpponentTeam} scoringStatus="live" />);
+    render(<SideBySideMatchup myTeam={liveMyTeam} opponentTeam={liveOpponentTeam} scoringStatus="live" />);
+    const starters = screen.getByTestId("mobile-starting-lineup");
 
-    const liveRows = container.querySelectorAll('[data-mobile-player-live="true"]');
+    const liveRows = starters.querySelectorAll('[data-mobile-player-live="true"]');
     expect(liveRows).toHaveLength(2);
     expect([...liveRows].every((row) => row.className.includes("bg-slate-100/[0.10]"))).toBe(true);
-    expect(screen.getByLabelText("Team has possession")).toBeTruthy();
-    expect(screen.getAllByLabelText("Game in progress — lineup locked")).toHaveLength(2);
-    expect(screen.getAllByText("Q1 08:15 · 2nd & 7 at OHST 33 · Ohio State 10 – Texas 14")).toHaveLength(2);
+    expect(within(starters).getByLabelText("Team has possession")).toBeTruthy();
+    expect(within(starters).getAllByLabelText("Game in progress — lineup locked")).toHaveLength(2);
+    expect(within(starters).getAllByText("Q1 08:15 · 2nd & 7 at OHST 33 · Ohio State 10 – Texas 14")).toHaveLength(2);
   });
 
   it("shows refreshed current-game stat lines for live starters and bench players", () => {
@@ -222,8 +225,8 @@ describe("SideBySideMatchup", () => {
 
     render(<SideBySideMatchup myTeam={liveMyTeam} opponentTeam={opponentTeam} scoringStatus="live" />);
 
-    expect(screen.getByText("184 PASS YDS · 2 PASS TD · 21 RUSH YDS · 1 RUSH TD").getAttribute("data-player-game-stat-line")).not.toBeNull();
-    expect(screen.getByText("4 REC · 67 REC YDS · 1 REC TD").getAttribute("data-player-game-stat-line")).not.toBeNull();
+    expect(within(screen.getByTestId("mobile-starting-lineup")).getByText("184 PASS YDS · 2 PASS TD · 21 RUSH YDS · 1 RUSH TD").getAttribute("data-player-game-stat-line")).not.toBeNull();
+    expect(within(screen.getByTestId("mobile-bench-lineup")).getByText("4 REC · 67 REC YDS · 1 REC TD").getAttribute("data-player-game-stat-line")).not.toBeNull();
   });
 
   it("starts a scheduled row at kickoff without waiting for a provider play", () => {
@@ -236,12 +239,13 @@ describe("SideBySideMatchup", () => {
       }],
     };
 
-    const { container } = render(<SideBySideMatchup myTeam={kickoffStartedMyTeam} opponentTeam={opponentTeam} />);
+    render(<SideBySideMatchup myTeam={kickoffStartedMyTeam} opponentTeam={opponentTeam} />);
+    const starters = screen.getByTestId("mobile-starting-lineup");
 
-    expect(screen.getByText("0.0")).toBeTruthy();
-    expect(screen.getByText("Proj 24.1")).toBeTruthy();
-    expect(screen.getByText("In progress")).toBeTruthy();
-    expect(container.querySelector('[data-mobile-player-live="true"]')?.className).toContain("bg-slate-100/[0.10]");
+    expect(within(starters).getByText("0.0")).toBeTruthy();
+    expect(within(starters).getByText("Proj 24.1")).toBeTruthy();
+    expect(within(starters).getByText("In progress")).toBeTruthy();
+    expect(starters.querySelector('[data-mobile-player-live="true"]')?.className).toContain("bg-slate-100/[0.10]");
   });
 
   it("marks finalized player games with clear blue totals and removes their obsolete kickoff time", () => {
@@ -257,16 +261,17 @@ describe("SideBySideMatchup", () => {
     };
 
     render(<SideBySideMatchup myTeam={finalMyTeam} opponentTeam={opponentTeam} scoringStatus="final" />);
+    const starters = screen.getByTestId("mobile-starting-lineup");
 
-    expect(screen.getByLabelText("Game final")).toBeTruthy();
-    expect(screen.getByText("18.5").parentElement?.className).toContain("text-cfb-brand");
-    expect(screen.getByText("Final").className).toContain("text-cfb-brand");
-    expect(screen.getByText("Final").className).toContain("text-[9px]");
-    const pregameProjection = screen.getByText("Proj 24.1");
+    expect(within(starters).getByLabelText("Game final")).toBeTruthy();
+    expect(within(starters).getByText("18.5").parentElement?.className).toContain("text-cfb-brand");
+    expect(within(starters).getByText("Final").className).toContain("text-cfb-brand");
+    expect(within(starters).getByText("Final").className).toContain("text-[9px]");
+    const pregameProjection = within(starters).getByText("Proj 24.1");
     expect(pregameProjection.getAttribute("data-player-final-pregame-projection")).not.toBeNull();
     expect(pregameProjection.className).toContain("text-cfb-brand");
-    expect(screen.getByText("L. Name Quarterback").closest("[data-mobile-matchup-player]")?.querySelector("[data-player-game-time]")).toBeNull();
-    const statLine = screen.getByText("281 PASS YDS · 3 PASS TD · 34 RUSH YDS · 1 RUSH TD");
+    expect(within(starters).getByText("L. Name Quarterback").closest("[data-mobile-matchup-player]")?.querySelector("[data-player-game-time]")).toBeNull();
+    const statLine = within(starters).getByText("281 PASS YDS · 3 PASS TD · 34 RUSH YDS · 1 RUSH TD");
     expect(statLine.getAttribute("data-player-final-stat-line")).not.toBeNull();
     expect(statLine.className).toContain("truncate");
     expect(statLine.className).toContain("text-cfb-text-muted");
@@ -279,9 +284,10 @@ describe("SideBySideMatchup", () => {
     };
 
     render(<SideBySideMatchup myTeam={unavailableMyTeam} opponentTeam={opponentTeam} />);
+    const starters = screen.getByTestId("mobile-starting-lineup");
 
-    expect(screen.getByLabelText("Out").textContent).toBe("O");
-    expect(screen.getByText("0.0")).toBeTruthy();
+    expect(within(starters).getByLabelText("Out").textContent).toBe("O");
+    expect(within(starters).getByText("0.0")).toBeTruthy();
   });
 
   it("keeps bench rows collapsed until a user chooses to inspect them", () => {
@@ -292,13 +298,28 @@ describe("SideBySideMatchup", () => {
     expect(container.querySelector("details")?.open).toBe(false);
   });
 
-  it("uses the current manager-derived team name for desktop matchup tables", () => {
+  it("uses one shared desktop slot rail and no duplicate player-position badges", () => {
     render(<SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} />);
+    const desktopStarters = screen.getByTestId("desktop-starting-lineup");
+    const desktopBench = screen.getByTestId("desktop-bench-lineup");
 
-    expect(screen.getByText("An1ski's Team Starters")).toBeTruthy();
-    expect(screen.getByText("Mary's Team Starters")).toBeTruthy();
-    expect(screen.getByText("An1ski's Team Bench")).toBeTruthy();
-    expect(screen.getByText("Mary's Team Bench")).toBeTruthy();
-    expect(screen.queryByText("Adam's Team Starters")).toBeNull();
+    expect(within(desktopStarters).getByText("An1ski's Team Starters")).toBeTruthy();
+    expect(within(desktopStarters).getByText("Mary's Team Starters")).toBeTruthy();
+    expect(within(desktopBench).getByText("An1ski's Team Bench")).toBeTruthy();
+    expect(within(desktopBench).getByText("Mary's Team Bench")).toBeTruthy();
+    expect(within(desktopStarters).queryByText("Adam's Team Starters")).toBeNull();
+    expect(desktopStarters.querySelectorAll('[data-desktop-slot-rail="true"]')).toHaveLength(1);
+    expect(desktopStarters.querySelectorAll('[data-desktop-slot-column="true"]')).toHaveLength(1);
+    expect(desktopStarters.querySelectorAll("[data-roster-slot-swap]")).toHaveLength(0);
+    expect(within(desktopStarters).getAllByText("QB")).toHaveLength(1);
+  });
+
+  it("keeps desktop matchup players selectable after moving them into the shared layout", () => {
+    render(<SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={42} />);
+    const desktopStarters = screen.getByTestId("desktop-starting-lineup");
+
+    fireEvent.click(within(desktopStarters).getByRole("button", { name: "Open L. Name Quarterback player card" }));
+
+    expect(screen.getByRole("dialog").textContent).toContain("Long Name Quarterback matchup player card");
   });
 });
