@@ -34,7 +34,10 @@ from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
-from collegefootballfantasy_api.app.domain.scoring_engine import calculate_player_fantasy_points
+from collegefootballfantasy_api.app.domain.scoring_engine import (
+    calculate_player_fantasy_points,
+    normalize_player_stats,
+)
 from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.schemas.league_flow import (
     LeagueMatchupTabRead,
@@ -490,6 +493,63 @@ def _final_game_stat_line_map(
         if line:
             lines[row.player_id] = line
     return lines
+
+
+def _final_waiver_score_map(
+    db: Session,
+    *,
+    season: int,
+    week: int,
+    player_ids: set[int],
+    player_positions: dict[int, str | None],
+    player_schools: dict[int, str | None],
+    scoring_rules: dict | None,
+) -> dict[int, float]:
+    """Calculate completed-game waiver totals from verified box scores.
+
+    ``PlayerWeekScore`` is intentionally scoped to roster snapshots so it
+    cannot provide totals for an unrostered player.  The waiver wire instead
+    reads the same verified final box score used by player game logs and
+    applies this league's scoring rules at the response boundary.
+    """
+
+    if not player_ids:
+        return {}
+    rows = (
+        db.query(PlayerGameStat)
+        .filter(
+            PlayerGameStat.season == season,
+            PlayerGameStat.week == week,
+            PlayerGameStat.player_id.in_(player_ids),
+            PlayerGameStat.source == "espn_final_boxscore",
+        )
+        .order_by(PlayerGameStat.updated_at.desc(), PlayerGameStat.id.desc())
+        .all()
+    )
+    scores: dict[int, float] = {}
+    for row in rows:
+        if row.player_id in scores:
+            continue
+        points, _ = calculate_player_fantasy_points(
+            normalize_player_stats(row.stats or {}, player_positions.get(row.player_id)),
+            scoring_rules or {},
+            player_positions.get(row.player_id),
+        )
+        scores[row.player_id] = points
+    # ESPN box scores can omit a player who appeared but recorded no counting
+    # stats.  A verified final team game still makes that player's actual
+    # fantasy total a meaningful zero rather than an unavailable projection.
+    final_school_keys = {
+        school_key
+        for game in db.query(Game).filter(Game.season == season, Game.week == week).all()
+        if (game.schedule_status or "").strip().lower() in {"final", "post"}
+        for school_key in (_school_key(game.home_team), _school_key(game.away_team))
+        if school_key
+    }
+    for player_id, school in player_schools.items():
+        if player_id not in scores and _school_key(school) in final_school_keys:
+            scores[player_id] = 0.0
+    return scores
 
 
 def _roster_rows(db: Session, team_id: int) -> list[RosterEntry]:
@@ -1231,22 +1291,22 @@ def build_waivers_view(
         .all()
     }
     projection_by_player = _projection_map(db, league.season_year, week, player_ids)
-    score_by_player = {
-        row.player_id: row
-        for row in db.query(PlayerWeekScore)
-        .filter(
-            PlayerWeekScore.league_id == league.id,
-            PlayerWeekScore.season == league.season_year,
-            PlayerWeekScore.week == week,
-            PlayerWeekScore.player_id.in_(player_ids or {0}),
-        )
-        .all()
-    }
+    player_positions = {player.id: player.position for player in eligible_players}
+    player_schools = {player.id: player.school for player in eligible_players}
     claims = []
     roster = []
     waiver_priority = None
     faab_remaining = None
     settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
+    final_score_by_player = _final_waiver_score_map(
+        db,
+        season=league.season_year,
+        week=week,
+        player_ids=player_ids,
+        player_positions=player_positions,
+        player_schools=player_schools,
+        scoring_rules=settings.scoring_json if settings else {},
+    )
     now = datetime.now(timezone.utc)
     waiver_state = waiver_window_state(db, league, settings, now=now) if settings else None
     current_period = (
@@ -1331,9 +1391,6 @@ def build_waivers_view(
         return availability.state, available_at
 
     def projection_for_player(player_id: int) -> tuple[float | None, str]:
-        score = score_by_player.get(player_id)
-        if score is not None:
-            return float(score.fantasy_points), "SCORED"
         projection = projection_by_player.get(player_id)
         if projection is None:
             return None, "UNAVAILABLE"
@@ -1371,6 +1428,7 @@ def build_waivers_view(
                 school=player.school,
                 position=player.position,
                 weekly_projected_fantasy_points=projection_for_player(player.id)[0],
+                final_fantasy_points=final_score_by_player.get(player.id),
                 projection_status=projection_for_player(player.id)[1],
                 availability_state=availability_for_player(player.id)[0],
                 available_at=availability_for_player(player.id)[1],

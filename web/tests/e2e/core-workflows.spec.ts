@@ -3046,6 +3046,7 @@ test.describe("critical browser workflows", () => {
             position: player.position,
             school: player.school,
             weekly_projected_fantasy_points: player.id === 801 ? 24.0 : 18.5,
+            final_fantasy_points: player.id === 801 ? 26.4 : null,
           })),
           claims: [],
           roster: [],
@@ -3060,6 +3061,8 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByRole("heading", { level: 1, name: /^Available Players$/i })).toBeVisible();
 
     const archManningRow = page.getByText("Arch Manning").locator("xpath=ancestor::tr");
+    await expect(page.getByTestId("waiver-week-points-801")).toHaveText("26.4");
+    await expect(page.getByTestId("waiver-week-points-801")).toHaveClass(/text-cfb-brand/);
     await archManningRow.getByRole("button", { name: /^Watch$/i }).click();
     await expect(archManningRow.getByRole("button", { name: /^Watching$/i })).toBeVisible();
 
@@ -3067,6 +3070,8 @@ test.describe("critical browser workflows", () => {
     const mobileRow = page.getByTestId("waiver-mobile-player-row-801");
     await expect(mobileRow).toBeVisible();
     await expect(mobileRow.getByText("Arch Manning")).toBeVisible();
+    await expect(page.getByTestId("waiver-mobile-week-points-801")).toHaveText("26.4");
+    await expect(page.getByTestId("waiver-mobile-week-points-801")).toHaveClass(/text-cfb-brand/);
     await expect(mobileRow.getByRole("button", { name: /Remove Arch Manning from watchlist/i })).toBeVisible();
     const playerBoard = page.getByTestId("league-player-board");
     const playerBoardBox = await playerBoard.boundingBox();

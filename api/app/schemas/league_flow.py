@@ -722,6 +722,10 @@ class LeagueWaiverPlayerRead(BaseModel):
     school: str | None = None
     position: str | None = None
     weekly_projected_fantasy_points: float | None = None
+    # This is populated only from a verified final box score.  Keeping it
+    # separate from the forecast prevents a completed-game total from being
+    # mislabeled as a projection in the waiver wire.
+    final_fantasy_points: float | None = None
     projection_status: str = "UNAVAILABLE"
     availability_state: str = "waivers"
     available_at: datetime | None = None
