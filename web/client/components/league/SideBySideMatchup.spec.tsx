@@ -307,8 +307,12 @@ describe("SideBySideMatchup", () => {
     const desktopStarters = screen.getByTestId("desktop-starting-lineup");
     const desktopBench = screen.getByTestId("desktop-bench-lineup");
 
-    expect(within(desktopStarters).getByText("An1ski's Team Starters")).toBeTruthy();
-    expect(within(desktopStarters).getByText("Mary's Team Starters")).toBeTruthy();
+    const myStarterHeading = within(desktopStarters).getByText("An1ski's Team Starters");
+    const opponentStarterHeading = within(desktopStarters).getByText("Mary's Team Starters");
+    expect(myStarterHeading).toBeTruthy();
+    expect(opponentStarterHeading).toBeTruthy();
+    expect(myStarterHeading.className).toContain("text-cfb-text-primary");
+    expect(opponentStarterHeading.className).toContain("text-cfb-text-primary");
     expect(within(desktopBench).getByText("An1ski's Team Bench")).toBeTruthy();
     expect(within(desktopBench).getByText("Mary's Team Bench")).toBeTruthy();
     expect(within(desktopStarters).queryByText("Adam's Team Starters")).toBeNull();

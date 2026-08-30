@@ -245,9 +245,9 @@ function CompactMatchupLineup({
     <section data-testid={testId} className={sectionClassName}>
       {desktop ? (
         <div className="grid grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)] border-b border-cfb-border-subtle bg-cfb-surface/70 px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-cfb-text-muted">
-          <span className="text-cfb-brand">{myTeamName}</span>
+          <span className="text-cfb-text-primary">{myTeamName}</span>
           <span className="text-center">Slot</span>
-          <span className="text-right text-cfb-brand">{opponentTeamName}</span>
+          <span className="text-right text-cfb-text-primary">{opponentTeamName}</span>
         </div>
       ) : null}
       {showHeader ? (

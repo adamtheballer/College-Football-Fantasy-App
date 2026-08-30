@@ -6,7 +6,6 @@ import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
 import { WinChanceBar } from "@/components/league/WinChanceMeter";
 import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
-import { OpeningWeekPatch } from "@/components/league/OpeningWeekPatch";
 import { RivalWeekPatch } from "@/components/league/RivalWeekPatch";
 import { RivalryControls } from "@/components/league/RivalryControls";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
@@ -169,7 +168,7 @@ function MatchupTeamSummary({
         {teamLabel}
       </p>
       <p className="text-[9px] font-bold text-cfb-text-muted sm:text-[10px]">{team?.record ?? "0-0-0"}</p>
-      <p className={`cfb-score-value mt-0.5 text-2xl sm:mt-1 sm:text-4xl ${showActual ? "text-cfb-brand" : "text-cfb-text-primary"}`}>
+      <p className="cfb-score-value mt-0.5 text-2xl text-cfb-text-primary sm:mt-1 sm:text-4xl">
         {showActual ? formatMatchupPoints(team?.current_points ?? 0) : formatMatchupPoints(projected)}
       </p>
       <p aria-label={`Projected ${formatMatchupPoints(projected)}`} className="mt-0.5 text-[9px] font-bold text-cfb-text-muted">
@@ -254,7 +253,7 @@ function CompactMatchupScoreboard({
         />
 
         <div className="flex min-w-[80px] flex-col items-center text-center">
-          <span className="font-ui text-[8px] font-bold uppercase tracking-[0.06em] text-cfb-brand">Week {displayWeek} matchup</span>
+          <span className="font-ui text-[8px] font-bold uppercase tracking-[0.06em] text-cfb-text-primary">Week {displayWeek} matchup</span>
           <span className="mt-0.5 font-ui text-[8px] font-bold uppercase tracking-[0.06em] text-cfb-text-muted">Win chance</span>
           <div className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-[10px] font-black tabular-nums sm:text-xs">
             <span className={myTeamIsLeading ? "text-emerald-300" : "text-red-300"}>
@@ -453,7 +452,6 @@ export default function LeagueMatchup() {
               swipeStartX.current = null;
             }}
           >
-            <OpeningWeekPatch week={displayWeek} />
             <RivalWeekPatch rivalry={data.rivalry} leagueId={parsedLeagueId} matchupId={data.matchup_id} />
             {data.postseason ? (
               <div className="mx-3 mt-2 flex items-center justify-between border-y border-amber-300/30 bg-amber-300/[0.06] px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-amber-100 sm:mx-5">

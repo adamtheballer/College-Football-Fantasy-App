@@ -1749,6 +1749,10 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("133.1 - 137.0")).toHaveCount(0);
     await expect(page.getByLabel("Projected 133.1")).toBeVisible();
     await expect(page.getByLabel("Projected 137.0")).toBeVisible();
+    await expect(page.getByText("Opening Week", { exact: true })).toHaveCount(0);
+    await expect(page.getByTestId("opening-week-patch")).toHaveCount(0);
+    await expect(page.getByLabel("Projected 133.1").locator("xpath=preceding-sibling::*[1]")).toHaveClass(/text-cfb-text-primary/);
+    await expect(page.getByLabel("Projected 137.0").locator("xpath=preceding-sibling::*[1]")).toHaveClass(/text-cfb-text-primary/);
     await expect(page.getByText("Projected matchup values are shown until live scoring begins.")).toHaveCount(0);
     await expect(page.getByText("Week 1 matchup", { exact: true })).toBeVisible();
     await expect(page.locator(".rounded-full").filter({ hasText: /^Projected$/ })).toHaveCount(0);
@@ -1763,6 +1767,8 @@ test.describe("critical browser workflows", () => {
     // keeps one center slot rail, rather than a slot label plus a second player-position badge.
     const desktopStartingLineup = page.getByTestId("desktop-starting-lineup");
     await expect(desktopStartingLineup).toBeVisible();
+    await expect(desktopStartingLineup.getByText("Emily's Team Starters")).toHaveClass(/text-cfb-text-primary/);
+    await expect(desktopStartingLineup.getByText("Adam 2's Team Starters")).toHaveClass(/text-cfb-text-primary/);
     await expect(desktopStartingLineup.getByRole("button", { name: "Open A. Manning player card" })).toBeVisible();
     await expect(desktopStartingLineup.getByRole("button", { name: "Open R. QB player card" })).toBeVisible();
     await expect(desktopStartingLineup.locator('[data-desktop-slot-rail="true"]')).toHaveCount(1);
