@@ -38,6 +38,11 @@ export function useLeagues(limit = 20, enabled = true) {
     queryKey: ["leagues", limit],
     enabled,
     staleTime: 30_000,
+    // League cards are derived from the server's persisted matchup state.
+    // Refresh them when Home is reopened and on the scoring-worker cadence.
+    refetchOnMount: "always",
+    refetchInterval: 180_000,
+    refetchIntervalInBackground: true,
     queryFn: async () => {
       const payload = await apiGet<LeagueListResponse>("/leagues", { limit });
       return payload.data.sort(
@@ -191,6 +196,7 @@ export function useLeagueRosterTab(
 }
 
 export const LIVE_MATCHUP_REFRESH_MS = 180_000;
+const OVERDUE_MATCHUP_REFRESH_RETRY_MS = 10_000;
 
 const matchupRoster = (data: LeagueMatchupTabResponse | undefined) => [
   ...(data?.my_roster ?? []),
@@ -207,12 +213,28 @@ export function hasUpcomingRosteredKickoff(data: LeagueMatchupTabResponse | unde
   return matchupRoster(data).some((player) => rosterPlayerHasUpcomingKickoff(player, now));
 }
 
+/** The server worker's durable next poll deadline for this matchup. */
+export function matchupNextRefreshAt(data: LeagueMatchupTabResponse | undefined) {
+  const value = data?.next_refresh_at;
+  if (!value) return null;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
 export function matchupRefreshInterval(data: LeagueMatchupTabResponse | undefined, now = Date.now()) {
   const status = data?.status?.toLowerCase();
   // A matchup page contains both starter and bench rows. Bench players do
   // not contribute to the matchup total, but their live game still needs the
   // same visible, recurring refresh cycle as every other rostered player.
   if (hasLiveRosteredPlayer(data, now) || status === "live" || status === "delayed") {
+    const scheduledRefreshAt = matchupNextRefreshAt(data);
+    if (scheduledRefreshAt !== null) {
+      // Do not restart a full three-minute cycle when a manager reopens the
+      // page. If the worker's update is late, retry without a tight loop.
+      return scheduledRefreshAt > now
+        ? Math.max(1_000, scheduledRefreshAt - now)
+        : OVERDUE_MATCHUP_REFRESH_RETRY_MS;
+    }
     return LIVE_MATCHUP_REFRESH_MS;
   }
   if (status === "final" || status === "stat_corrected") return false;
@@ -228,7 +250,9 @@ export function matchupRefreshCountdownSeconds(
   if (!hasLiveRosteredPlayer(data, now) && status !== "live" && status !== "delayed") return null;
   const interval = matchupRefreshInterval(data, now);
   if (typeof interval !== "number") return null;
-  const target = (typeof dataUpdatedAt === "number" && dataUpdatedAt > 0 ? dataUpdatedAt : now) + interval;
+  const target = matchupNextRefreshAt(data) ?? (
+    (typeof dataUpdatedAt === "number" && dataUpdatedAt > 0 ? dataUpdatedAt : now) + interval
+  );
   return Math.max(0, Math.ceil((target - now) / 1_000));
 }
 

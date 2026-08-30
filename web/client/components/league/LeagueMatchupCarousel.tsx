@@ -67,6 +67,7 @@ export function LeagueMatchupCarousel({
   const loopResetTimeoutRef = useRef<number | null>(null);
   const [visibleLeagueIndex, setVisibleLeagueIndex] = useState(0);
   const hasLoop = leagues.length > 1;
+  const leagueOrderKey = leagues.map((league) => league.id).join(",");
   const carouselLeagues = hasLoop ? [leagues[leagues.length - 1], ...leagues, leagues[0]] : leagues;
 
   const nearestCardIndex = useCallback(() => {
@@ -146,7 +147,7 @@ export function LeagueMatchupCarousel({
       if (loopResetTimeoutRef.current !== null) window.clearTimeout(loopResetTimeoutRef.current);
       window.removeEventListener("resize", syncVisibleLeague);
     };
-  }, [hasLoop, leagues.length, scrollToCard, syncVisibleLeague]);
+  }, [hasLoop, leagueOrderKey, scrollToCard, syncVisibleLeague]);
 
   return (
     <section aria-labelledby="league-matchup-carousel-title">

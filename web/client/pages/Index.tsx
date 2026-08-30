@@ -157,6 +157,11 @@ export default function Index() {
     }
     return leagues[0];
   }, [activeLeagueId, leagues]);
+  const dashboardLeagues = useMemo(() => {
+    if (!activeLeagueId) return leagues;
+    const activeLeague = leagues.find((league) => league.id === activeLeagueId);
+    return activeLeague ? [activeLeague, ...leagues.filter((league) => league.id !== activeLeagueId)] : leagues;
+  }, [activeLeagueId, leagues]);
 
   const { data: workspace } = useLeagueWorkspace(
     selectedLeague?.id,
@@ -232,7 +237,7 @@ export default function Index() {
           />
         ) : (
           <LeagueMatchupCarousel
-            leagues={leagues}
+            leagues={dashboardLeagues}
             activeLeagueId={selectedLeague?.id}
             onOpenLeague={(leagueId) => {
               setActiveLeagueId(leagueId);

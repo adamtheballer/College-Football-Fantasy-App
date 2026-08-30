@@ -297,6 +297,11 @@ test.describe("critical browser workflows", () => {
 
   test("home league carousel moves its active pagination dot as the visible card changes", async ({ page }) => {
     await seedAuthenticatedSession(page);
+    await page.addInitScript(() => {
+      // The last opened league must lead the Home carousel even if the API
+      // returns another league first.
+      window.localStorage.setItem("cfb_active_league_id", "2");
+    });
     await page.route("**/leagues?**", async (route) => {
       await route.fulfill({
         status: 200,
@@ -344,7 +349,7 @@ test.describe("critical browser workflows", () => {
         }),
       });
     });
-    await page.route("**/leagues/1/workspace", async (route) => {
+    await page.route("**/leagues/*/workspace", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({}) });
     });
     await page.route("**/notifications/alerts?**", async (route) => {
@@ -360,14 +365,14 @@ test.describe("critical browser workflows", () => {
     const rail = page.getByLabel("Swipe through your league matchups");
     await expect(pagination).toHaveAttribute("aria-label", "Showing league 1 of 2");
     await expect(rail).toBeVisible();
+    await expect(page.getByTestId("league-carousel-card-2-1")).toBeVisible();
     expect(await rail.evaluate((element) => element.scrollWidth > element.clientWidth)).toBeTruthy();
 
     await rail.evaluate((element) => {
       const railElement = element as HTMLElement;
-      // The rail has a leading clone for circular navigation. Index 2 is the
-      // actual second league; the physical final card is the clone that wraps
-      // back to league one.
-      const secondLeagueCard = railElement.querySelector<HTMLButtonElement>('[data-testid="league-carousel-card-2-2"]');
+      // The rail has a leading clone for circular navigation. The active
+      // league (id 2) is first, so index 2 is the next actual league (id 1).
+      const secondLeagueCard = railElement.querySelector<HTMLButtonElement>('[data-testid="league-carousel-card-1-2"]');
       if (!secondLeagueCard) throw new Error("Expected the second league card");
       railElement.scrollLeft = secondLeagueCard.offsetLeft;
       railElement.dispatchEvent(new Event("scroll"));
