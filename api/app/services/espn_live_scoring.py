@@ -52,6 +52,11 @@ DEFAULT_GAME_LEASE_SECONDS = 120
 DISCOVERY_INTERVAL_SECONDS = 180
 FINAL_RECONCILIATION_INTERVAL_SECONDS = 900
 BLOCKED_PROVIDER_RETRY_SECONDS = 6 * 60 * 60
+# A malformed but reachable provider response is different from a provider
+# block.  Keep retrying it at the normal live-game cadence, and cap every
+# other transient retry so one bad game cannot disappear for hours while the
+# rest of the slate continues to refresh.
+MAX_TRANSIENT_GAME_RETRY_SECONDS = 15 * 60
 
 LiveScoringMode = Literal["shadow", "enabled"]
 SnapshotClassification = Literal["DUPLICATE", "NEWER", "STALE", "AMBIGUOUS", "VERIFIED_CORRECTION"]
@@ -604,6 +609,12 @@ def _retry_after_seconds(error: Exception) -> int | None:
 
 
 def _failure_policy(error: Exception, *, failure_count: int) -> tuple[str, int]:
+    # Incomplete summaries are quarantined before they can overwrite any
+    # accepted score. They are commonly a temporary provider propagation gap
+    # around game end, so retry on the next allowed game poll rather than
+    # exponentially backing off and leaving a finished game stale.
+    if isinstance(error, ProviderDataIncompleteError):
+        return "delayed", MIN_GAME_POLL_INTERVAL_SECONDS
     if isinstance(error, httpx.HTTPStatusError):
         status = error.response.status_code
         if status == 403:
@@ -611,7 +622,11 @@ def _failure_policy(error: Exception, *, failure_count: int) -> tuple[str, int]:
         if status == 429:
             retry_after = _retry_after_seconds(error)
             return "delayed", max(MIN_GAME_POLL_INTERVAL_SECONDS, retry_after or 0)
-    return "delayed", max(MIN_GAME_POLL_INTERVAL_SECONDS, MIN_GAME_POLL_INTERVAL_SECONDS * (2 ** max(0, failure_count - 1)))
+    retry_seconds = max(
+        MIN_GAME_POLL_INTERVAL_SECONDS,
+        MIN_GAME_POLL_INTERVAL_SECONDS * (2 ** max(0, failure_count - 1)),
+    )
+    return "delayed", min(MAX_TRANSIENT_GAME_RETRY_SECONDS, retry_seconds)
 
 
 def _is_due(row: ProviderGamePoll, now: datetime) -> bool:

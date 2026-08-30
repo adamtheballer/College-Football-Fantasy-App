@@ -150,3 +150,24 @@ def test_once_mode_returns_a_nonzero_failure_instead_of_hiding_worker_boot_error
 
     with pytest.raises(RuntimeError, match="mapper failed"):
         worker.main()
+
+
+def test_worker_exits_for_supervisor_restart_after_repeated_fatal_iterations(monkeypatch):
+    attempts = []
+
+    monkeypatch.setattr(worker.settings, "scoring_mode", "shadow")
+    monkeypatch.setattr(worker.settings, "scoring_provider", "espn")
+    monkeypatch.setattr(worker, "parse_args", lambda: worker.argparse.Namespace(once=False, interval_seconds=30))
+    monkeypatch.setattr(worker, "MAX_CONSECUTIVE_FATAL_ITERATIONS", 3)
+    monkeypatch.setattr(worker.time, "sleep", lambda _seconds: None)
+
+    def fail_iteration():
+        attempts.append(True)
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(worker, "run_iteration", fail_iteration)
+
+    with pytest.raises(RuntimeError, match="database unavailable"):
+        worker.main()
+
+    assert len(attempts) == 3

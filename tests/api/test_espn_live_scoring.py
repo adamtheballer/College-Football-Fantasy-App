@@ -26,8 +26,11 @@ from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbe
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.services.espn_stats_sync import UnresolvedKickerDistanceError, normalize_espn_summary_player_stats
 from collegefootballfantasy_api.app.services.espn_live_scoring import (
+    MAX_TRANSIENT_GAME_RETRY_SECONDS,
     MIN_GAME_POLL_INTERVAL_SECONDS,
+    ProviderDataIncompleteError,
     SnapshotOrderMetadata,
+    _failure_policy,
     _event_status,
     claim_due_espn_games,
     classify_snapshot_order,
@@ -1018,6 +1021,23 @@ def test_timeout_marks_only_the_game_poll_delayed_and_does_not_retry_immediately
     poll = db_session.query(ProviderGamePoll).filter_by(provider_game_id="401").one()
     assert poll.status == "delayed"
     assert _utc(poll.next_poll_at) >= NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS)
+
+
+def test_incomplete_provider_data_retries_at_the_next_live_poll_without_exponential_delay():
+    for failure_count in range(1, 8):
+        status, retry_seconds = _failure_policy(
+            ProviderDataIncompleteError("summary is temporarily incomplete"),
+            failure_count=failure_count,
+        )
+        assert status == "delayed"
+        assert retry_seconds == MIN_GAME_POLL_INTERVAL_SECONDS
+
+
+def test_transient_provider_failures_have_a_bounded_retry_delay():
+    status, retry_seconds = _failure_policy(RuntimeError("temporary provider parsing failure"), failure_count=20)
+
+    assert status == "delayed"
+    assert retry_seconds == MAX_TRANSIENT_GAME_RETRY_SECONDS
 
 
 def test_empty_or_partial_summary_preserves_last_verified_cumulative_totals(db_session):

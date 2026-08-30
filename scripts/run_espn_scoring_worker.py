@@ -25,6 +25,11 @@ from collegefootballfantasy_api.app.services.worker_health import record_worker_
 
 logger = logging.getLogger("collegefootballfantasy_api.espn_scoring_worker")
 DISCOVERY_WAKE_SECONDS = 30
+# Railway is configured to restart this worker on process failure.  A bounded
+# escape from a repeated fatal iteration turns a wedged database/configuration
+# state into that supervised recovery path instead of an indefinitely alive
+# but non-functional process.
+MAX_CONSECUTIVE_FATAL_ITERATIONS = 3
 
 
 def parse_args() -> argparse.Namespace:
@@ -179,13 +184,21 @@ def main() -> None:
         raise SystemExit("--interval-seconds must be at least one second")
     if settings.scoring_mode not in {"shadow", "enabled"} or settings.scoring_provider.strip().lower() != "espn":
         raise SystemExit("ESPN scoring worker requires SCORING_PROVIDER=espn and SCORING_MODE=shadow or enabled.")
+    consecutive_fatal_iterations = 0
     while True:
         started = time.monotonic()
         try:
             run_iteration()
+            consecutive_fatal_iterations = 0
         except Exception as error:  # pragma: no cover - operational failure path
+            consecutive_fatal_iterations += 1
             logger.exception("espn_scoring_iteration_failed", extra={"error": str(error)})
-            if args.once:
+            if args.once or consecutive_fatal_iterations >= MAX_CONSECUTIVE_FATAL_ITERATIONS:
+                if not args.once:
+                    logger.critical(
+                        "espn_scoring_worker_restarting_after_fatal_iterations",
+                        extra={"consecutive_fatal_iterations": consecutive_fatal_iterations},
+                    )
                 raise
         if args.once:
             return
