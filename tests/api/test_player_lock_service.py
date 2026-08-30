@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.schemas.player import PlayerRead
 from collegefootballfantasy_api.app.services.player_lock_service import game_context_for_players
 
 
@@ -46,3 +47,31 @@ def test_game_context_returns_the_full_contract_for_an_empty_roster(db_session):
     assert starts == {}
     assert opponents == {}
     assert locations == {}
+
+
+def test_game_context_and_player_responses_use_notre_dame_title_case(db_session):
+    wisconsin_player = Player(name="Wisconsin QB", position="QB", school="Wisconsin")
+    notre_dame_player = Player(name="Notre Dame QB", position="QB", school="NOTRE DAME")
+    db_session.add_all([wisconsin_player, notre_dame_player])
+    db_session.flush()
+    db_session.add(
+        Game(
+            season=2026,
+            week=1,
+            home_team="NOTRE DAME",
+            away_team="Wisconsin",
+            start_date=datetime(2026, 9, 6, 19, 30, tzinfo=timezone.utc),
+            schedule_status="scheduled",
+        )
+    )
+    db_session.commit()
+
+    _starts, opponents, _locations = game_context_for_players(
+        db_session,
+        player_ids={wisconsin_player.id},
+        season=2026,
+        week=1,
+    )
+
+    assert opponents[wisconsin_player.id] == "Notre Dame"
+    assert PlayerRead.model_validate(notre_dame_player).model_dump(mode="json")["school"] == "Notre Dame"

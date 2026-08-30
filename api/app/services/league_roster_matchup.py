@@ -119,6 +119,12 @@ def _school_key(value: str | None) -> str | None:
     return canonical_school_name(value) or normalize_school(value)
 
 
+def _display_school_name(value: str | None) -> str | None:
+    if not value:
+        return value
+    return canonical_school_name(value) or value
+
+
 def _summary_live_context(payload: dict[str, Any]) -> tuple[LiveGameContext, set[str]]:
     """Read the live game context from the accepted cached ESPN summary only.
 
@@ -611,9 +617,9 @@ def _serialize_roster_entry(
         is_starter=roster_slot.is_starter,
         is_ir=roster_slot.is_ir,
         player_name=entry.player.name if entry and entry.player else None,
-        player_school=entry.player.school if entry and entry.player else None,
+        player_school=_display_school_name(entry.player.school) if entry and entry.player else None,
         player_position=entry.player.position if entry and entry.player else None,
-        school=entry.player.school if entry and entry.player else None,
+        school=_display_school_name(entry.player.school) if entry and entry.player else None,
         position=entry.player.position if entry and entry.player else None,
         projected_points=projected,
         floor=floor,
