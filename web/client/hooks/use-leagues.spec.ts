@@ -6,6 +6,7 @@ import {
   hasUpcomingRosteredKickoff,
   matchupRefreshCountdownSeconds,
   matchupRefreshInterval,
+  matchupNextRefreshAt,
 } from "./use-leagues";
 
 describe("matchup live refresh cadence", () => {
@@ -27,8 +28,21 @@ describe("matchup live refresh cadence", () => {
       next_refresh_at: new Date(now + LIVE_MATCHUP_REFRESH_MS).toISOString(),
     } as any;
 
-    expect(matchupRefreshInterval(data)).toBe(LIVE_MATCHUP_REFRESH_MS);
+    expect(matchupRefreshInterval(data, now)).toBe(LIVE_MATCHUP_REFRESH_MS);
     expect(matchupRefreshCountdownSeconds(data, now, now)).toBe(180);
+    expect(matchupNextRefreshAt(data)).toBe(now + LIVE_MATCHUP_REFRESH_MS);
+  });
+
+  it("keeps the worker's remaining deadline when a live matchup page is reopened", () => {
+    const now = Date.UTC(2026, 7, 29, 20, 2, 58);
+    const data = {
+      status: "live",
+      next_refresh_at: new Date(now + 2_000).toISOString(),
+    } as any;
+
+    expect(matchupRefreshCountdownSeconds(data, now, now)).toBe(2);
+    expect(matchupRefreshInterval(data, now)).toBe(2_000);
+    expect(matchupRefreshInterval(data, now + 2_001)).toBe(10_000);
   });
 
   it("refreshes for a live bench player even when the starter-only matchup is still projected", () => {

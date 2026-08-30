@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import event
 
 from collegefootballfantasy_api.app.models.game import Game
+from collegefootballfantasy_api.app.models.live_player_projection import LivePlayerProjection
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
@@ -144,6 +145,92 @@ def test_matchup_tab_exposes_persisted_player_scores_without_falling_back_to_pro
     assert open_slot.live_scoring_status == "unavailable"
 
 
+def test_matchup_tab_exposes_current_stat_lines_for_live_starter_and_bench_rows(client, db_session):
+    league, home, _away, players, _matchup = create_scoring_fixture(db_session)
+    user = User(
+        first_name="Live lines",
+        email="live-lines-matchup@example.com",
+        password_hash="hash",
+        api_token="live-lines-token",
+    )
+    db_session.add(user)
+    db_session.flush()
+    home.owner_user_id = user.id
+    game = Game(
+        season=2026,
+        week=1,
+        schedule_status="in_progress",
+        start_date=datetime.now(timezone.utc) - timedelta(minutes=1),
+        home_team="Test",
+        away_team="Rival",
+    )
+    db_session.add(game)
+    db_session.flush()
+    snapshot_at = datetime.now(timezone.utc)
+    db_session.add_all([
+        LivePlayerProjection(
+            player_id=players["qb"].id,
+            game_id=game.id,
+            season=2026,
+            week=1,
+            provider="espn",
+            provider_snapshot_hash="live-qb-line-prior",
+            provider_snapshot_at=snapshot_at - timedelta(minutes=3),
+            model_version="live_projection_v1",
+            projection_status="LIVE",
+            current_stats_json={"pass_yards": 90, "pass_tds": 1, "rush_yards": 8, "rush_tds": 0},
+            projected_final_stats_json={},
+            projected_remaining_stats_json={},
+            observability_json={},
+            input_hash="live-qb-line-prior",
+            calculated_at=snapshot_at - timedelta(minutes=3),
+        ),
+        LivePlayerProjection(
+            player_id=players["qb"].id,
+            game_id=game.id,
+            season=2026,
+            week=1,
+            provider="espn",
+            provider_snapshot_hash="live-qb-line",
+            provider_snapshot_at=snapshot_at,
+            model_version="live_projection_v1",
+            projection_status="LIVE",
+            current_stats_json={"pass_yards": 184, "pass_tds": 2, "rush_yards": 21, "rush_tds": 1},
+            projected_final_stats_json={},
+            projected_remaining_stats_json={},
+            observability_json={},
+            input_hash="live-qb-line",
+            calculated_at=snapshot_at,
+        ),
+        LivePlayerProjection(
+            player_id=players["bench"].id,
+            game_id=game.id,
+            season=2026,
+            week=1,
+            provider="espn",
+            provider_snapshot_hash="live-bench-line",
+            provider_snapshot_at=snapshot_at,
+            model_version="live_projection_v1",
+            projection_status="LIVE",
+            current_stats_json={"receptions": 4, "rec_yards": 67, "rec_tds": 1},
+            projected_final_stats_json={},
+            projected_remaining_stats_json={},
+            observability_json={},
+            input_hash="live-bench-line",
+            calculated_at=snapshot_at,
+        ),
+    ])
+    db_session.commit()
+
+    response = build_matchup_tab_view(db_session, league, user, selected_week=1)
+    roster_by_player = {row.player_id: row for row in response.my_roster if row.player_id}
+
+    assert roster_by_player[players["qb"].id].live_game_state == "live"
+    assert roster_by_player[players["qb"].id].game_stat_line == "184 PASS YDS · 2 PASS TD · 21 RUSH YDS · 1 RUSH TD"
+    assert roster_by_player[players["bench"].id].live_game_state == "live"
+    assert roster_by_player[players["bench"].id].game_stat_line == "4 REC · 67 REC YDS · 1 REC TD"
+
+
 def test_matchup_tab_exposes_verified_final_stat_line_for_a_completed_roster_game(client, db_session):
     league, home, _away, players, _matchup = create_scoring_fixture(db_session)
     user = User(
@@ -174,4 +261,5 @@ def test_matchup_tab_exposes_verified_final_stat_line_for_a_completed_roster_gam
     quarterback = next(row for row in response.my_roster if row.player_id == players["qb"].id)
 
     assert quarterback.live_game_state == "final"
+    assert quarterback.game_stat_line == "281 PASS YDS · 3 PASS TD · 34 RUSH YDS · 1 RUSH TD"
     assert quarterback.final_game_stat_line == "281 PASS YDS · 3 PASS TD · 34 RUSH YDS · 1 RUSH TD"

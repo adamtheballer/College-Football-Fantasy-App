@@ -358,7 +358,9 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
 def test_weekly_waiver_clear_opens_instant_adds_only_for_that_game_week(client, db_session, monkeypatch):
     """A completed Sunday run opens free agency for its week, not permanently."""
 
-    cleared_at = datetime(2026, 8, 23, 13, 0, tzinfo=timezone.utc)
+    # Week 1 runs from Aug. 25 through Aug. 29; its Sunday waiver clear is
+    # Aug. 30 and Week 2 opens on the following Tuesday.
+    cleared_at = datetime(2026, 8, 30, 13, 0, tzinfo=timezone.utc)
     monkeypatch.setattr(waiver_service, "_now", lambda: cleared_at)
     token = create_user_and_token(client, "weekly-free-agency")
     league = create_league(client, token)
@@ -413,7 +415,7 @@ def test_weekly_waiver_clear_opens_instant_adds_only_for_that_game_week(client, 
     assert next_free_agent.status_code == 201
     next_free_agent_id = next_free_agent.json()[0]["id"]
 
-    next_week = datetime(2026, 8, 31, 15, 0, tzinfo=timezone.utc)
+    next_week = datetime(2026, 9, 1, 15, 0, tzinfo=timezone.utc)
     monkeypatch.setattr(waiver_service, "_now", lambda: next_week)
     state_next_week = waiver_service.waiver_window_state(
         db_session,

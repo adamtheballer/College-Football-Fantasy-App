@@ -41,8 +41,11 @@ def _timezone(timezone_name: str) -> ZoneInfo:
 
 def season_week_one_start(season_year: int) -> datetime:
     anchor = datetime(season_year, 8, 24, tzinfo=timezone.utc)
-    days_since_week_start = (anchor.weekday() - CFB_WEEK_START_WEEKDAY) % 7
-    return anchor - timedelta(days=days_since_week_start)
+    # Week 1 starts on the first Tuesday on or after August 24.  Using the
+    # previous Tuesday shifts the entire season one week early (for 2026 that
+    # incorrectly made August 29 part of Week 2).
+    days_until_week_start = (CFB_WEEK_START_WEEKDAY - anchor.weekday()) % 7
+    return anchor + timedelta(days=days_until_week_start)
 
 
 def calendar_cfb_week(season_year: int, now: datetime | None = None) -> int:
@@ -106,9 +109,29 @@ def resolve_current_week(
     db: Session,
     league: League,
     selected_week: int | None = None,
+    now: datetime | None = None,
 ) -> int:
     if selected_week is not None and selected_week > 0:
         return selected_week
+
+    # A fantasy matchup can remain unavailable or delayed until the first
+    # scoring pass completes.  That status must not make the dashboard skip
+    # the league's calendar-active week in favor of a future scheduled
+    # matchup.  If this league has a matchup for the active CFB week, it is
+    # authoritative regardless of its current scoring status.
+    calendar_week = calendar_cfb_week(league.season_year, now)
+    has_calendar_week_matchup = (
+        db.query(Matchup.id)
+        .filter(
+            Matchup.league_id == league.id,
+            Matchup.season == league.season_year,
+            Matchup.week == calendar_week,
+        )
+        .first()
+        is not None
+    )
+    if has_calendar_week_matchup:
+        return calendar_week
 
     live_week = (
         db.query(func.min(Matchup.week))
@@ -134,4 +157,4 @@ def resolve_current_week(
     if scheduled_week is not None:
         return int(scheduled_week)
 
-    return calendar_cfb_week(league.season_year)
+    return calendar_week

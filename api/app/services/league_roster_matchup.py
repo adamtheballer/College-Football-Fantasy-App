@@ -417,12 +417,13 @@ def _stat_value(stats: dict[str, Any], *keys: str) -> int | float:
     return 0
 
 
-def _compact_final_game_stat_line(stats: dict[str, Any], position: str | None) -> str:
-    """Return the roster row's position-specific final box-score shorthand.
+def _compact_game_stat_line(stats: dict[str, Any], position: str | None) -> str:
+    """Return the roster row's compact current-game box-score shorthand.
 
-    Final player-game rows are already verified by the live worker. Keep the
-    public roster contract intentionally compact: four useful measures for a
-    QB and three for every other supported fantasy position.
+    Live-provider snapshots and verified final box scores use the same
+    position-specific presentation: four useful measures for a QB and three
+    for every other supported fantasy position.  Each snapshot is cumulative
+    for the game, so replacing the line on every refresh never double-counts.
     """
 
     normalized_position = (position or "").upper()
@@ -479,7 +480,7 @@ def _final_game_stat_line_map(
     for row in rows:
         if row.player_id in lines:
             continue
-        line = _compact_final_game_stat_line(row.stats or {}, player_positions.get(row.player_id))
+        line = _compact_game_stat_line(row.stats or {}, player_positions.get(row.player_id))
         if line:
             lines[row.player_id] = line
     return lines
@@ -578,6 +579,21 @@ def _serialize_roster_entry(
         else "live" if player_score and player_score.status in {"live", "stale"}
         else "unavailable"
     )
+    # The live-projection table is snapshot-keyed and stores cumulative
+    # current-game totals.  Render those while a game is in progress, then
+    # replace them with the verified PlayerGameStat line once it is final.
+    # A published kickoff without a provider snapshot still has a truthful
+    # zeroed stat line; it will be replaced on the next live refresh.
+    game_stat_line = (
+        final_game_stat_line
+        if final_game_stat_line
+        else _compact_game_stat_line(
+            live_projection.current_stats_json if live_projection else {},
+            position,
+        )
+        if effective_game_state == "live"
+        else None
+    )
     return RosterTabEntryRead(
         id=entry.id if entry else None,
         league_id=league.id,
@@ -629,6 +645,7 @@ def _serialize_roster_entry(
         team_has_possession=live_game.has_possession if live_game else False,
         team_in_red_zone=live_game.in_red_zone if live_game else False,
         game_start_at=game_start_at,
+        game_stat_line=game_stat_line,
         final_game_stat_line=final_game_stat_line,
         is_locked=is_locked,
     )

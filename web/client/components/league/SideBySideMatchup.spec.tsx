@@ -199,6 +199,29 @@ describe("SideBySideMatchup", () => {
     expect(screen.getAllByText("Q1 08:15 · 2nd & 7 at OHST 33 · Ohio State 10 – Texas 14")).toHaveLength(2);
   });
 
+  it("shows refreshed current-game stat lines for live starters and bench players", () => {
+    const liveMyTeam = {
+      ...myTeam,
+      roster: [
+        {
+          ...myTeam.roster[0],
+          live_game_state: "live" as const,
+          game_stat_line: "184 PASS YDS · 2 PASS TD · 21 RUSH YDS · 1 RUSH TD",
+        },
+        {
+          ...myTeam.roster[1],
+          live_game_state: "live" as const,
+          game_stat_line: "4 REC · 67 REC YDS · 1 REC TD",
+        },
+      ],
+    };
+
+    render(<SideBySideMatchup myTeam={liveMyTeam} opponentTeam={opponentTeam} scoringStatus="live" />);
+
+    expect(screen.getByText("184 PASS YDS · 2 PASS TD · 21 RUSH YDS · 1 RUSH TD").getAttribute("data-player-game-stat-line")).not.toBeNull();
+    expect(screen.getByText("4 REC · 67 REC YDS · 1 REC TD").getAttribute("data-player-game-stat-line")).not.toBeNull();
+  });
+
   it("starts a scheduled row at kickoff without waiting for a provider play", () => {
     const kickoffStartedMyTeam = {
       ...myTeam,

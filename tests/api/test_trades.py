@@ -1037,7 +1037,7 @@ def test_started_player_trade_is_accepted_pending_until_sunday(client, db_sessio
     db_session.add(
         Game(
             season=2026,
-            week=3,
+            week=2,
             season_type="regular",
             start_date=current - timedelta(hours=1),
             home_team=seed["give"].school,
@@ -1074,7 +1074,7 @@ def test_trade_processes_immediately_when_all_players_are_more_than_24_hours_fro
     db_session.add(
         Game(
             season=2026,
-            week=3,
+            week=2,
             season_type="regular",
             start_date=current + timedelta(hours=24, minutes=1),
             home_team=seed["give"].school,
@@ -1110,7 +1110,7 @@ def test_trade_with_player_kicking_off_within_24_hours_waits_until_sunday(client
     db_session.add(
         Game(
             season=2026,
-            week=3,
+            week=2,
             season_type="regular",
             start_date=current + timedelta(hours=23, minutes=59),
             home_team=seed["give"].school,

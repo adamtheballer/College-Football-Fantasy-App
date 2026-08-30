@@ -297,6 +297,11 @@ test.describe("critical browser workflows", () => {
 
   test("home league carousel moves its active pagination dot as the visible card changes", async ({ page }) => {
     await seedAuthenticatedSession(page);
+    await page.addInitScript(() => {
+      // The last opened league must lead the Home carousel even if the API
+      // returns another league first.
+      window.localStorage.setItem("cfb_active_league_id", "2");
+    });
     await page.route("**/leagues?**", async (route) => {
       await route.fulfill({
         status: 200,
@@ -344,7 +349,7 @@ test.describe("critical browser workflows", () => {
         }),
       });
     });
-    await page.route("**/leagues/1/workspace", async (route) => {
+    await page.route("**/leagues/*/workspace", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({}) });
     });
     await page.route("**/notifications/alerts?**", async (route) => {
@@ -360,14 +365,14 @@ test.describe("critical browser workflows", () => {
     const rail = page.getByLabel("Swipe through your league matchups");
     await expect(pagination).toHaveAttribute("aria-label", "Showing league 1 of 2");
     await expect(rail).toBeVisible();
+    await expect(page.getByTestId("league-carousel-card-2-1")).toBeVisible();
     expect(await rail.evaluate((element) => element.scrollWidth > element.clientWidth)).toBeTruthy();
 
     await rail.evaluate((element) => {
       const railElement = element as HTMLElement;
-      // The rail has a leading clone for circular navigation. Index 2 is the
-      // actual second league; the physical final card is the clone that wraps
-      // back to league one.
-      const secondLeagueCard = railElement.querySelector<HTMLButtonElement>('[data-testid="league-carousel-card-2-2"]');
+      // The rail has a leading clone for circular navigation. The active
+      // league (id 2) is first, so index 2 is the next actual league (id 1).
+      const secondLeagueCard = railElement.querySelector<HTMLButtonElement>('[data-testid="league-carousel-card-1-2"]');
       if (!secondLeagueCard) throw new Error("Expected the second league card");
       railElement.scrollLeft = secondLeagueCard.offsetLeft;
       railElement.dispatchEvent(new Event("scroll"));
@@ -1578,9 +1583,9 @@ test.describe("critical browser workflows", () => {
       user_team: { ...scheduledPayload.user_team, projected_points: 120.0, projected_total: 120.0, win_probability: 70.0 },
       opponent_team: { ...scheduledPayload.opponent_team, projected_points: 100.0, projected_total: 100.0, win_probability: 30.0 },
     };
-    const liveMyRoster = myRoster.map((player) =>
-      player.player_name === "Arch Manning"
-        ? {
+    const liveMyRoster = myRoster.map((player) => {
+      if (player.player_name === "Arch Manning") {
+        return {
             ...player,
             live_game_state: "live",
             current_fantasy_points: 0,
@@ -1591,9 +1596,20 @@ test.describe("critical browser workflows", () => {
             game_period: 1,
             game_clock: "08:15",
             game_progress: 0.1125,
-          }
-        : player,
-    );
+            game_stat_line: "184 PASS YDS · 2 PASS TD · 21 RUSH YDS · 1 RUSH TD",
+          };
+      }
+      if (player.player_name === "Bench Reserve") {
+        return {
+          ...player,
+          live_game_state: "live",
+          current_fantasy_points: 4.1,
+          live_points: 4.1,
+          game_stat_line: "4 REC · 67 REC YDS · 1 REC TD",
+        };
+      }
+      return player;
+    });
     const liveOpponentRoster = opponentRoster.map((player) =>
       player.player_name === "Rival QB"
         ? {
@@ -1843,6 +1859,14 @@ test.describe("critical browser workflows", () => {
     await liveMobileLineup.scrollIntoViewIfNeeded();
     await expect(liveMobileLineup.getByText("0.0", { exact: true })).toBeVisible();
     await expect(liveMobileLineup.getByText("Proj 121.7", { exact: true })).toBeVisible();
+    const liveStarterStatLine = liveMobileLineup.getByText("184 PASS YDS · 2 PASS TD · 21 RUSH YDS · 1 RUSH TD", { exact: true });
+    await expect(liveStarterStatLine).toBeVisible();
+    await expect(liveStarterStatLine).toHaveAttribute("data-player-game-stat-line", "true");
+    const liveBenchDetails = page.getByTestId("mobile-bench-lineup").locator("xpath=ancestor::details");
+    await liveBenchDetails.locator("summary").click();
+    const liveBenchStatLine = page.getByTestId("mobile-bench-lineup").getByText("4 REC · 67 REC YDS · 1 REC TD", { exact: true });
+    await expect(liveBenchStatLine).toBeVisible();
+    await expect(liveBenchStatLine).toHaveAttribute("data-player-game-stat-line", "true");
     await page.screenshot({ path: "test-results/live-matchup-current-and-projection.png", fullPage: true });
 
     matchupPayload = kickoffOnlyPayload;

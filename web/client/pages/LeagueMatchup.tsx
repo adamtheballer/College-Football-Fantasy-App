@@ -19,6 +19,7 @@ import {
   useLeagueMatchupTab,
   useLeagueScoreboard,
 } from "@/hooks/use-leagues";
+import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
 import { managerNameForAvatar, managerTeamName } from "@/lib/manager-team-name";
 import type { LeagueMatchupTabResponse, LeagueMatchupTeam } from "@/types/league";
@@ -293,6 +294,7 @@ export default function LeagueMatchup() {
   const selectedWeek = Number.isInteger(weekParam) && weekParam > 0 ? weekParam : 1;
   const matchupParam = Number(searchParams.get("matchup"));
   const selectedMatchupId = Number.isInteger(matchupParam) && matchupParam > 0 ? matchupParam : undefined;
+  const { setActiveLeagueId } = useActiveLeagueId();
   const leagueQuery = useLeagueDetail(parsedLeagueId);
   const postDraft = isLeaguePostDraft({
     draftStatus: leagueQuery.data?.draft?.status,
@@ -304,6 +306,9 @@ export default function LeagueMatchup() {
   const opponentTeam = data?.opponent_team ?? null;
   const displayWeek = data?.week ?? selectedWeek;
   const [refreshClock, setRefreshClock] = useState(() => Date.now());
+  useEffect(() => {
+    if (Number.isInteger(parsedLeagueId) && parsedLeagueId > 0) setActiveLeagueId(parsedLeagueId);
+  }, [parsedLeagueId, setActiveLeagueId]);
   const rosteredPlayerIsLive = hasLiveRosteredPlayer(data, refreshClock);
   const hasUpcomingKickoff = hasUpcomingRosteredKickoff(data, refreshClock);
   const hasScheduledMatchup = Boolean(data?.matchup_id && myTeam && opponentTeam);

@@ -1441,7 +1441,7 @@ def test_cfb_week_clock_uses_tuesday_to_saturday_game_window():
     assert is_cfb_game_week_active(sunday, "America/New_York") is False
 
     state = current_cfb_week_state(2026, tuesday, "America/New_York")
-    assert state.week == 3
+    assert state.week == 2
     assert state.game_week_active is True
 
 
