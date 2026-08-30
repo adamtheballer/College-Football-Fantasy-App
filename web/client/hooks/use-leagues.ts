@@ -246,8 +246,10 @@ export function matchupRefreshCountdownSeconds(
   dataUpdatedAt: number | undefined,
   now = Date.now(),
 ) {
-  const status = data?.status?.toLowerCase();
-  if (!hasLiveRosteredPlayer(data, now) && status !== "live" && status !== "delayed") return null;
+  // The visible countdown belongs to the two rosters shown in this matchup,
+  // not to a stale matchup-level provider status. Do not show a live refresh
+  // strip after both teams' rostered games have finished.
+  if (!hasLiveRosteredPlayer(data, now)) return null;
   const interval = matchupRefreshInterval(data, now);
   if (typeof interval !== "number") return null;
   const target = matchupNextRefreshAt(data) ?? (
