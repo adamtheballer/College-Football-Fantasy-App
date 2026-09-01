@@ -1430,7 +1430,7 @@ def test_calendar_week_before_season_start_is_week_one():
 
 
 def test_calendar_week_increments_during_season():
-    assert calendar_cfb_week(2026, datetime(2026, 9, 8, tzinfo=timezone.utc)) >= 3
+    assert calendar_cfb_week(2026, datetime(2026, 9, 8, tzinfo=timezone.utc)) >= 2
 
 
 def test_cfb_week_clock_uses_tuesday_to_saturday_game_window():
@@ -1441,7 +1441,7 @@ def test_cfb_week_clock_uses_tuesday_to_saturday_game_window():
     assert is_cfb_game_week_active(sunday, "America/New_York") is False
 
     state = current_cfb_week_state(2026, tuesday, "America/New_York")
-    assert state.week == 2
+    assert state.week == 1
     assert state.game_week_active is True
 
 

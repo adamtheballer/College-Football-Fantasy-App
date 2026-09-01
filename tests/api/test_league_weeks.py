@@ -9,6 +9,12 @@ def test_opening_saturday_is_part_of_week_one():
     assert calendar_cfb_week(2026, datetime(2026, 8, 29, 19, 0, tzinfo=timezone.utc)) == 1
 
 
+def test_opening_week_remains_week_one_through_the_following_monday():
+    assert calendar_cfb_week(2026, datetime(2026, 9, 1, 16, 0, tzinfo=timezone.utc)) == 1
+    assert calendar_cfb_week(2026, datetime(2026, 9, 7, 23, 59, tzinfo=timezone.utc)) == 1
+    assert calendar_cfb_week(2026, datetime(2026, 9, 8, 0, 0, tzinfo=timezone.utc)) == 2
+
+
 def test_current_week_does_not_skip_the_calendar_active_matchup_when_scoring_is_delayed(db_session):
     league, home, away, _players, week_one = create_scoring_fixture(db_session)
     # Reproduce the production state at kickoff: Week 1 exists, but the
@@ -29,7 +35,7 @@ def test_current_week_does_not_skip_the_calendar_active_matchup_when_scoring_is_
     assert resolve_current_week(
         db_session,
         league,
-        now=datetime(2026, 8, 29, 19, 0, tzinfo=timezone.utc),
+        now=datetime(2026, 9, 1, 16, 0, tzinfo=timezone.utc),
     ) == 1
 
 
