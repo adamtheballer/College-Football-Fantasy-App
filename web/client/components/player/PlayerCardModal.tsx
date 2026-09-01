@@ -686,7 +686,7 @@ export function PlayerCardModal({
                 {selectedGameLogData.games.length ? (
                 <>
                 <div className="mt-5 hidden overflow-x-auto rounded-sm border border-cfb-border-subtle bg-cfb-surface md:block">
-                  <table className="min-w-max border-collapse text-left">
+                  <table className="min-w-full w-full border-collapse text-left">
                     <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
                       <tr>
                         <th className="min-w-[4.5rem] whitespace-nowrap px-4 py-3">Week</th>
