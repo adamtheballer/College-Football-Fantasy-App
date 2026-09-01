@@ -173,6 +173,18 @@ test.describe("player card modal", () => {
             season: 2026,
             team_name: "Ohio State",
             position: "WR",
+            available_seasons: [2026],
+            season_summary: {
+              teams: ["Ohio State"],
+              games_played: 1,
+              games_started: 1,
+              stats: [
+                { label: "Receptions", value: 3 },
+                { label: "Rec Yds", value: 50 },
+                { label: "Rec TD", value: 0 },
+              ],
+              fantasy_points: 8,
+            },
             games: [
               {
                 schedule_id: 101,
@@ -290,24 +302,19 @@ test.describe("player card modal", () => {
       await page.screenshot({ path: testInfo.outputPath("player-card-mobile-390x844.png"), fullPage: true });
     }
 
-    await dialog.getByRole("button", { name: "Stats" }).click();
-    await expect(dialog.getByText("Season Stats", { exact: true })).toBeVisible();
-    await expect(dialog.getByRole("columnheader", { name: "Fantasy Points" })).toHaveCount(0);
-    await expect(dialog.getByRole("columnheader", { name: "Rec Yds" })).toBeVisible();
-    await expect(dialog.getByLabel("Season stats table; scroll horizontally for all columns")).toBeVisible();
-    const currentSeasonRow = dialog.locator("tbody tr").filter({ hasText: "2026" });
-    await expect(currentSeasonRow).toHaveCount(1);
-    await expect(currentSeasonRow).toContainText("Ohio State");
-    await expect(currentSeasonRow).toContainText("1");
-    await expect(currentSeasonRow).toContainText("3");
-    await expect(currentSeasonRow).toContainText("50");
-    expect(await dialog.getByRole("columnheader").allTextContents()).toEqual([
-      "Year", "Team", "Pos", "GP", "FPTS", "Receptions", "Rec Yds", "Rec TD", "Rush Att", "Rush Yds", "Rush TD", "Pass Yds",
-    ]);
+    // Game Log is the single historical-performance hub. A separate Stats
+    // tab must not be reintroduced, and the selected season owns its summary
+    // and position-specific game stats.
+    await expect(dialog.getByRole("button", { name: "Stats", exact: true })).toHaveCount(0);
+    await dialog.getByRole("button", { name: "Game Log" }).click();
+    await expect(dialog.getByLabel("Game log season")).toHaveValue("2026");
+    await expect(dialog.getByLabel("2026 season summary")).toBeVisible();
+    await expect(dialog.getByText("vs. Texas", { exact: true }).last()).toBeVisible();
+    await expect(dialog.getByText("REC", { exact: true }).last()).toBeVisible();
+    await expect(dialog.getByText("REC YDS", { exact: true }).last()).toBeVisible();
+    await expect(dialog.getByText("REC TD", { exact: true }).last()).toBeVisible();
 
     await page.setViewportSize({ width: 1440, height: 960 });
-    await dialog.getByRole("button", { name: "Game Log" }).click();
-    await expect(dialog.getByText("2026 Game Log", { exact: true })).toBeVisible();
     await expect(dialog.getByRole("columnheader", { name: "REC", exact: true })).toBeVisible();
     await expect(dialog.getByRole("columnheader", { name: "TAR", exact: true })).toHaveCount(0);
 
