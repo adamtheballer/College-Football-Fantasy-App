@@ -138,7 +138,11 @@ environments:
       post_deploy_runtime_proxy_verification: >-
         WEB_RUNTIME_URL=https://www.collegefantasyfootball.org
         DIRECT_API_RUNTIME_URL=https://api.collegefantasyfootball.org
-        CFF_GIT_SHA=<release-sha> npm --prefix web run verify:runtime
+        CFF_GIT_SHA=<release-sha>
+        CFF_EXPECT_SCORING_MODE=enabled
+        CFF_EXPECT_SPORTSDATA_ENABLED=false
+        CFF_EXPECT_PROVIDER_POLLING_EXPECTED=true
+        npm --prefix web run verify:runtime
       env:
         # The Vercel project must route /api/:path* to the always-on API host.
         # Keep the public build on same-origin /api so browser code never embeds

@@ -99,3 +99,6 @@ def test_runtime_proxy_verifier_rejects_html_and_checks_the_browser_api_surface(
     assert '"/api/auth/me"' in verifier
     assert '"/api/saturday-pick-6/current?season=2026&week=1"' in verifier
     assert "DIRECT_API_RUNTIME_URL" in verifier
+    assert "CFF_EXPECT_SCORING_MODE" in verifier
+    assert "CFF_EXPECT_SPORTSDATA_ENABLED" in verifier
+    assert "CFF_EXPECT_PROVIDER_POLLING_EXPECTED" in verifier
