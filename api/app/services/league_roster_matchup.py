@@ -1293,6 +1293,13 @@ def build_waivers_view(
     projection_by_player = _projection_map(db, league.season_year, week, player_ids)
     player_positions = {player.id: player.position for player in eligible_players}
     player_schools = {player.id: player.school for player in eligible_players}
+    _starts_by_player, opponent_by_player, _locations_by_player = game_context_for_players(
+        db,
+        player_ids=player_ids,
+        season=league.season_year,
+        week=week,
+        player_schools=player_schools,
+    )
     claims = []
     roster = []
     waiver_priority = None
@@ -1426,6 +1433,7 @@ def build_waivers_view(
                 id=player.id,
                 name=player.name,
                 school=player.school,
+                opponent=opponent_by_player.get(player.id),
                 position=player.position,
                 weekly_projected_fantasy_points=projection_for_player(player.id)[0],
                 final_fantasy_points=final_score_by_player.get(player.id),

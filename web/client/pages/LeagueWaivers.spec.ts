@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { waiverProjectionLabel, waiverWeekPoints } from "./LeagueWaivers";
+import { waiverOpponentLabel, waiverProjectionLabel, waiverWeekPoints } from "./LeagueWaivers";
 
 describe("waiverProjectionLabel", () => {
   it("uses the backend projection status instead of presenting a bye as a missing projection", () => {
@@ -19,5 +19,12 @@ describe("waiverWeekPoints", () => {
 
   it("retains the projection state when no verified final total exists", () => {
     expect(waiverWeekPoints(null, undefined, "UNAVAILABLE")).toEqual({ label: "—", isFinal: false });
+  });
+});
+
+describe("waiverOpponentLabel", () => {
+  it("shows the scheduled opponent and does not invent one when schedule data is unavailable", () => {
+    expect(waiverOpponentLabel("Oklahoma")).toBe("Oklahoma");
+    expect(waiverOpponentLabel(null)).toBe("—");
   });
 });

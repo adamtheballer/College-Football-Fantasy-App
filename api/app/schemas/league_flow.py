@@ -720,6 +720,7 @@ class LeagueWaiverPlayerRead(BaseModel):
     id: int
     name: str
     school: str | None = None
+    opponent: str | None = None
     position: str | None = None
     weekly_projected_fantasy_points: float | None = None
     # This is populated only from a verified final box score.  Keeping it

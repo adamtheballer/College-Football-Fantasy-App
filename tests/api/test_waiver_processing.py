@@ -513,6 +513,7 @@ def test_waiver_pool_uses_verified_final_box_score_for_unrostered_player(db_sess
     row = rows[player.id]
     assert row.weekly_projected_fantasy_points == 11.5
     assert row.final_fantasy_points == 18.3
+    assert row.opponent == "Opponent"
     assert rows[scoreless_player.id].final_fantasy_points == 0.0
 
 
