@@ -318,6 +318,20 @@ test.describe("player card modal", () => {
     await expect(dialog.getByRole("columnheader", { name: "REC", exact: true })).toBeVisible();
     await expect(dialog.getByRole("columnheader", { name: "TAR", exact: true })).toHaveCount(0);
 
+    const gameLogDimensions = await dialog.locator("table").evaluate((table) => {
+      const container = table.parentElement;
+      if (!container) {
+        throw new Error("Game Log table container is missing");
+      }
+
+      return {
+        tableWidth: table.getBoundingClientRect().width,
+        containerWidth: container.getBoundingClientRect().width,
+      };
+    });
+    // The table fills the frame; the 2px allowance is the frame's left/right border.
+    expect(Math.abs(gameLogDimensions.tableWidth - gameLogDimensions.containerWidth)).toBeLessThanOrEqual(2);
+
     await page.getByRole("button", { name: /Close player card/i }).click();
     await expect(dialog).toBeHidden();
 
