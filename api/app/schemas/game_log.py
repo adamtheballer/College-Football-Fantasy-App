@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date as Date, datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PlayerGameLogStatRead(BaseModel):
@@ -12,9 +12,28 @@ class PlayerGameLogStatRead(BaseModel):
     updated_at: datetime
 
 
+class PlayerGameLogSummaryStatRead(BaseModel):
+    """One verified season-total field, kept ordered for the player-card UI."""
+
+    label: str
+    value: float | int
+
+
+class PlayerGameLogSeasonSummaryRead(BaseModel):
+    """Authoritative totals for the selected season only."""
+
+    teams: list[str] = Field(default_factory=list)
+    games_played: int | None = None
+    games_started: int | None = None
+    stats: list[PlayerGameLogSummaryStatRead] = Field(default_factory=list)
+    fantasy_points: float | None = None
+    fantasy_points_per_game: float | None = None
+
+
 class PlayerGameLogRowRead(BaseModel):
     schedule_id: int
     game_id: int | None = None
+    team_name: str
     week: int
     date: Date | None = None
     kickoff_at: datetime | None = None
@@ -37,5 +56,7 @@ class PlayerGameLogRead(BaseModel):
     season: int
     team_name: str | None = None
     position: str
+    available_seasons: list[int] = Field(default_factory=list)
+    season_summary: PlayerGameLogSeasonSummaryRead | None = None
     games: list[PlayerGameLogRowRead]
     message: str | None = None

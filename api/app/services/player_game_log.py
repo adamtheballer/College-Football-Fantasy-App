@@ -5,15 +5,19 @@ from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.domain.scoring_engine import calculate_score
 from collegefootballfantasy_api.app.models.game import Game
+from collegefootballfantasy_api.app.models.historical_stats import PlayerHistoricalSeasonStat
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
+from collegefootballfantasy_api.app.services.historical_stats import canonical_historical_season_rows
 from collegefootballfantasy_api.app.schemas.game_log import (
     PlayerGameLogRead,
     PlayerGameLogRowRead,
+    PlayerGameLogSeasonSummaryRead,
+    PlayerGameLogSummaryStatRead,
     PlayerGameLogStatRead,
 )
 
@@ -149,6 +153,105 @@ def _league_scoring_rules(db: Session, league_id: int | None) -> dict | None:
     return settings.scoring_json if settings and settings.scoring_json else {}
 
 
+def _selected_historical_rows(
+    rows: list[PlayerHistoricalSeasonStat],
+    season: int,
+) -> list[PlayerHistoricalSeasonStat]:
+    selected = [row for row in rows if row.season == season]
+    # A provider may retain a separate postseason split. Prefer the complete
+    # regular-season rows when available, rather than summing overlapping data.
+    regular = [row for row in selected if row.season_type.strip().lower() == "regular"]
+    return regular or selected
+
+
+_SUMMARY_FIELDS: dict[str, tuple[tuple[str, str], ...]] = {
+    "QB": (
+        ("Completions", "passing_completions"),
+        ("Attempts", "passing_attempts"),
+        ("Pass Yds", "passing_yards"),
+        ("Pass TD", "passing_touchdowns"),
+        ("INT", "interceptions"),
+        ("Rush Att", "rushing_attempts"),
+        ("Rush Yds", "rushing_yards"),
+        ("Rush TD", "rushing_touchdowns"),
+        ("Fumbles", "fumbles"),
+    ),
+    "RB": (
+        ("Rush Att", "rushing_attempts"),
+        ("Rush Yds", "rushing_yards"),
+        ("Rush TD", "rushing_touchdowns"),
+        ("Receptions", "receptions"),
+        ("Rec Yds", "receiving_yards"),
+        ("Rec TD", "receiving_touchdowns"),
+        ("Fumbles", "fumbles"),
+    ),
+    "WR": (
+        ("Targets", "receiving_targets"),
+        ("Receptions", "receptions"),
+        ("Rec Yds", "receiving_yards"),
+        ("Rec TD", "receiving_touchdowns"),
+        ("Rush Att", "rushing_attempts"),
+        ("Rush Yds", "rushing_yards"),
+        ("Rush TD", "rushing_touchdowns"),
+        ("Fumbles", "fumbles"),
+    ),
+    "TE": (
+        ("Targets", "receiving_targets"),
+        ("Receptions", "receptions"),
+        ("Rec Yds", "receiving_yards"),
+        ("Rec TD", "receiving_touchdowns"),
+        ("Fumbles", "fumbles"),
+    ),
+    "K": (("FGM", "field_goals_made"), ("FGA", "field_goals_attempted"), ("XPM", "extra_points_made"), ("XPA", "extra_points_attempted"), ("Kicking points", "kick_points")),
+}
+
+
+def _season_summary(
+    rows: list[PlayerHistoricalSeasonStat],
+    *,
+    position: str,
+) -> PlayerGameLogSeasonSummaryRead | None:
+    if not rows:
+        return None
+
+    teams = list(dict.fromkeys(row.team_name for row in rows if row.team_name))
+    games = [row.games_played for row in rows if row.games_played is not None]
+    starts = [row.games_started for row in rows if row.games_started is not None]
+    stats: list[PlayerGameLogSummaryStatRead] = []
+    fields = _SUMMARY_FIELDS.get(position.upper(), _SUMMARY_FIELDS["RB"])
+    for label, field in fields:
+        values = [getattr(row, field) for row in rows if getattr(row, field) is not None]
+        if values:
+            stats.append(PlayerGameLogSummaryStatRead(label=label, value=sum(values)))
+
+    # A partial transfer season must not present its incomplete fantasy-point
+    # sum as a complete total.
+    fantasy_values = [row.fantasy_points for row in rows]
+    fantasy_points = sum(fantasy_values) if fantasy_values and all(value is not None for value in fantasy_values) else None
+    games_played = sum(games) if games else None
+    return PlayerGameLogSeasonSummaryRead(
+        teams=teams,
+        games_played=games_played,
+        games_started=sum(starts) if starts else None,
+        stats=stats,
+        fantasy_points=fantasy_points,
+        fantasy_points_per_game=(round(fantasy_points / games_played, 2) if fantasy_points is not None and games_played else None),
+    )
+
+
+def _current_school_schedule_seasons(db: Session, player: Player) -> list[int]:
+    if not _team_schedule_table_exists(db):
+        return []
+    return sorted(
+        {
+            schedule.season
+            for schedule in db.query(TeamSchedule.season, TeamSchedule.team_name).all()
+            if _same_team(schedule.team_name, player.school)
+        },
+        reverse=True,
+    )
+
+
 def _provider_event_id(stat: PlayerGameStat | PlayerStat | None) -> str | None:
     if stat is None:
         return None
@@ -223,36 +326,57 @@ def build_player_game_log(
     db: Session,
     player: Player,
     *,
-    season: int,
+    season: int | None,
     league_id: int | None = None,
 ) -> PlayerGameLogRead:
     scoring_rules = _league_scoring_rules(db, league_id)
+    historical_rows = canonical_historical_season_rows(db, player_id=player.id)
+    current_school_seasons = _current_school_schedule_seasons(db, player)
+    available_seasons = sorted(
+        {row.season for row in historical_rows} | set(current_school_seasons[:1]),
+        reverse=True,
+    )
+    selected_season = season if season is not None else (available_seasons[0] if available_seasons else 2026)
+    selected_history = _selected_historical_rows(historical_rows, selected_season)
+    season_summary = _season_summary(selected_history, position=player.position)
     if not _team_schedule_table_exists(db):
         return PlayerGameLogRead(
             player_id=player.id,
             player_name=player.name,
-            season=season,
+            season=selected_season,
             team_name=player.school,
             position=player.position,
+            available_seasons=available_seasons,
+            season_summary=season_summary,
             games=[],
-            message="The 2026 team schedule is not available yet.",
+            message=f"The {selected_season} team schedule is not available yet.",
         )
     schedules = (
         db.query(TeamSchedule)
-        .filter(TeamSchedule.season == season)
+        .filter(TeamSchedule.season == selected_season)
         .order_by(TeamSchedule.week.asc(), TeamSchedule.id.asc())
         .all()
     )
-    player_schedules = [schedule for schedule in schedules if _same_team(schedule.team_name, player.school)]
+    historical_teams = [row.team_name for row in selected_history if row.team_name]
+    # Historical records name the team the player actually represented. Use the
+    # current school only for the newest schedule season, preventing transfer
+    # seasons from silently adopting the player's current-team schedule.
+    schedule_teams = historical_teams or ([player.school] if selected_season in current_school_seasons[:1] else [])
+    player_schedules = [
+        schedule for schedule in schedules
+        if any(_same_team(schedule.team_name, team_name) for team_name in schedule_teams)
+    ]
     if not player_schedules:
         return PlayerGameLogRead(
             player_id=player.id,
             player_name=player.name,
-            season=season,
-            team_name=player.school,
+            season=selected_season,
+            team_name=", ".join(historical_teams) if historical_teams else player.school,
             position=player.position,
+            available_seasons=available_seasons,
+            season_summary=season_summary,
             games=[],
-            message="2026 schedule has not been imported for this player's team.",
+            message=f"No game log is available for {selected_season}; the schedule has not been imported for this player's recorded team.",
         )
 
     game_ids = [schedule.game_id for schedule in player_schedules if schedule.game_id is not None]
@@ -271,7 +395,7 @@ def build_player_game_log(
         for row in db.query(PlayerStat)
         .filter(
             PlayerStat.player_id == player.id,
-            PlayerStat.season == season,
+            PlayerStat.season == selected_season,
             PlayerStat.week.in_([schedule.week for schedule in player_schedules if not schedule.is_bye] or [-1]),
         )
         .all()
@@ -292,6 +416,7 @@ def build_player_game_log(
             PlayerGameLogRowRead(
                 schedule_id=schedule.id,
                 game_id=schedule.game_id,
+                team_name=schedule.team_name,
                 week=schedule.week,
                 date=schedule.game_date,
                 kickoff_at=schedule.kickoff_at,
@@ -311,8 +436,10 @@ def build_player_game_log(
     return PlayerGameLogRead(
         player_id=player.id,
         player_name=player.name,
-        season=season,
-        team_name=player.school,
+        season=selected_season,
+        team_name=", ".join(dict.fromkeys(schedule.team_name for schedule in player_schedules)),
         position=player.position,
+        available_seasons=available_seasons,
+        season_summary=season_summary,
         games=rows,
     )

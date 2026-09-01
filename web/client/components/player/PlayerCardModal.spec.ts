@@ -7,37 +7,30 @@ import {
   formatPlayerNewsReportTime,
   gameLogColumnsForPosition,
   gameLogOpponentLabel,
-  buildHistoricalSeasonSummaryColumns,
-  buildHistoricalStatsTableRows,
   completedSeasonGameTotals,
   draftHistorySummary,
   formatPlayerCardValue,
   getPlayerCardPalette,
-  historicalSeasonSummaryValue,
-  historicalSeasonSummaryDisplayValue,
-  currentSeasonSummaryValue,
   resolvePlayerCardCfb27Rating,
   resolvePlayerCardCurrentValueRating,
   resolvePlayerCardProjectionStats,
-  shouldUseCalculatedCurrentSeason,
   visiblePlayerCardAboutMessage,
   visiblePlayerCardTabs,
-  unifiedSeasonSummaryColumns,
 } from "./PlayerCardModal";
 import { CURRENT_VALUE_RATING_LABEL, formatCurrentValueRating } from "./PlayerCardHeader";
 
 describe("PlayerCardModal helpers", () => {
   it("always shows the History tab, with league context controlling its contents", () => {
     expect(visiblePlayerCardTabs(false).map((tab) => tab.label)).toEqual([
-      "Summary", "News", "Stats", "Game Log", "Alerts", "Projections", "History", "Value",
+      "Summary", "News", "Game Log", "Alerts", "Projections", "History", "Value",
     ]);
     expect(visiblePlayerCardTabs(true).map((tab) => tab.label)).toEqual([
-      "Summary", "News", "Stats", "Game Log", "Alerts", "Projections", "History", "Value",
+      "Summary", "News", "Game Log", "Alerts", "Projections", "History", "Value",
     ]);
   });
   it("uses position-specific Game Log columns and full school names", () => {
     expect(gameLogColumnsForPosition("TE").map(([label]) => label)).toEqual([
-      "FPTS", "REC", "REC YDS", "REC TD",
+      "FPTS", "TAR", "REC", "REC YDS", "REC TD",
     ]);
     expect(gameLogOpponentLabel({ location: "away", opponent_name: "Ohio State" })).toBe("at Ohio State");
     expect(formatGameLogDate("2026-09-05")).toBe("Sep 5, 2026");
@@ -74,34 +67,6 @@ describe("PlayerCardModal helpers", () => {
     expect(totals.totals).toContainEqual(["PASS YDS", 280]);
     expect(totals.totals).toContainEqual(["PASS TD", 3]);
     expect(totals.totals).not.toContainEqual(["PASS YDS", 580]);
-  });
-
-  it("places current final totals into the same aligned season-stat columns as historical data", () => {
-    const totals = completedSeasonGameTotals([
-      {
-        schedule_id: 1,
-        week: 1,
-        location: "home",
-        location_label: "Home",
-        neutral_site: false,
-        conference_game: false,
-        game_status: "final",
-        stat_status: "final",
-        stats: { source: "espn_final_boxscore", updated_at: "2026-08-29T20:00:00Z", fantasy_points: 25.4, stats: { pass_yards: 280, pass_tds: 3, completions: 20, passing_attempts: 30 } },
-      },
-    ], "QB");
-    const columns = unifiedSeasonSummaryColumns(["Games", "Pass Yds", "Pass TD", "INT"], "QB");
-
-    expect(columns).toEqual(["GP", "FPTS", "Comp", "Pass Att", "Pass Yds", "Pass TD", "INT", "Rush Att", "Rush Yds", "Rush TD"]);
-    expect(currentSeasonSummaryValue(totals, "GP")).toBe(1);
-    expect(currentSeasonSummaryValue(totals, "Pass Yds")).toBe(280);
-    expect(historicalSeasonSummaryDisplayValue({ summary: [{ label: "Games", value: 12 }], categories: [] } as never, "GP")).toBe(12);
-  });
-
-  it("requires a normal 2026 row even before a player has completed a game", () => {
-    expect(shouldUseCalculatedCurrentSeason(0, [])).toBe(true);
-    expect(shouldUseCalculatedCurrentSeason(0, [{ season: 2026 }])).toBe(false);
-    expect(shouldUseCalculatedCurrentSeason(1, [{ season: 2026 }])).toBe(true);
   });
 
   it("labels player news with its Eastern report date and time", () => {
@@ -226,61 +191,4 @@ describe("PlayerCardModal helpers", () => {
     expect(statValue(projectedStats, ["bustProb"])).toBe(0.16);
   });
 
-  it("flattens ESPN historical categories into organized table rows", () => {
-    const rows = buildHistoricalStatsTableRows({
-      season: 2025,
-      season_type: "regular",
-      summary: [],
-      categories: [
-        {
-          key: "rushing",
-          label: "Rushing",
-          stats: [
-            { label: "Attempts", value: 173 },
-            { label: "Yards", value: 947 },
-          ],
-        },
-        {
-          key: "receiving",
-          label: "Receiving",
-          stats: [{ label: "Receptions", value: 16 }],
-        },
-      ],
-      freshness: { provider: "espn", is_final: false },
-      scoring_context: {},
-    });
-
-    expect(rows).toEqual([
-      { category: "Rushing", label: "Attempts", value: 173 },
-      { category: "Rushing", label: "Yards", value: 947 },
-      { category: "Receiving", label: "Receptions", value: 16 },
-    ]);
-  });
-
-  it("removes unsupported historical fantasy totals while preserving aligned stat columns", () => {
-    const seasons = [
-      {
-        season: 2025,
-        season_type: "regular",
-        summary: [{ label: "Fantasy Pts", value: 212.3 }, { label: "Rush Yds", value: 1047 }],
-        categories: [],
-        freshness: { provider: "verified_import", is_final: true },
-        scoring_context: {},
-      },
-      {
-        season: 2024,
-        season_type: "regular",
-        summary: [{ label: "Fantasy Pts", value: 164.1 }, { label: "Rec Yds", value: 812 }],
-        categories: [],
-        freshness: { provider: "verified_import", is_final: true },
-        scoring_context: {},
-      },
-    ] as never;
-
-    expect(buildHistoricalSeasonSummaryColumns(seasons)).toEqual(["Rush Yds", "Rec Yds"]);
-    expect(buildHistoricalSeasonSummaryColumns(seasons)).not.toContain("Fantasy Points");
-    expect(buildHistoricalSeasonSummaryColumns(seasons)).not.toContain("Fantasy Pts");
-    expect(historicalSeasonSummaryValue(seasons[1], "Rec Yds")).toBe(812);
-    expect(historicalSeasonSummaryValue(seasons[1], "Rush Yds")).toBeNull();
-  });
 });

@@ -96,10 +96,20 @@ export type PlayerGameLogResponse = {
   season: number;
   team_name?: string | null;
   position: string;
+  available_seasons: number[];
+  season_summary?: {
+    teams: string[];
+    games_played?: number | null;
+    games_started?: number | null;
+    stats: Array<{ label: string; value: number }>;
+    fantasy_points?: number | null;
+    fantasy_points_per_game?: number | null;
+  } | null;
   message?: string | null;
   games: Array<{
     schedule_id: number;
     game_id?: number | null;
+    team_name?: string | null;
     week: number;
     date?: string | null;
     kickoff_at?: string | null;
@@ -779,7 +789,7 @@ export function usePlayerCard(playerId?: number | null, enabled = true) {
 
 export function usePlayerGameLog(
   playerId?: number | null,
-  season = 2026,
+  season?: number | null,
   leagueId?: number | null,
   enabled = true,
 ) {
@@ -795,7 +805,7 @@ export function usePlayerGameLog(
     refetchInterval: 180_000,
     refetchIntervalInBackground: true,
     queryFn: () => apiGet<PlayerGameLogResponse>(`/players/${playerId}/game-log`, {
-      season,
+      ...(typeof season === "number" && Number.isFinite(season) ? { season } : {}),
       ...(typeof leagueId === "number" && Number.isFinite(leagueId) ? { league_id: leagueId } : {}),
     }),
   });

@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 
 from collegefootballfantasy_api.app.models.game import Game
+from collegefootballfantasy_api.app.models.historical_stats import PlayerHistoricalSeasonStat
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
@@ -343,3 +344,139 @@ def test_player_game_log_rejects_unknown_league_context(client, db_session):
 
     assert response.status_code == 404
     assert response.json()["detail"] == "league not found"
+
+
+def test_player_game_log_uses_the_historical_team_for_a_transfer_season(client, db_session):
+    """A transfer must not inherit their current school's old schedule."""
+
+    player = Player(name="Transfer Receiver", position="WR", school="Team B")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add_all(
+        [
+            PlayerHistoricalSeasonStat(
+                player_id=player.id,
+                provider="google_season_stats",
+                provider_player_id="transfer-1",
+                season=2025,
+                season_type="regular",
+                team_name="Team A",
+                position="WR",
+                games_played=12,
+                receptions=48,
+                receiving_targets=71,
+                receiving_yards=702,
+                receiving_touchdowns=6,
+                fantasy_points=142.2,
+                parser_version="test",
+                imported_at=datetime.now(timezone.utc),
+                is_final=True,
+            ),
+            PlayerHistoricalSeasonStat(
+                player_id=player.id,
+                provider="google_season_stats",
+                provider_player_id="transfer-1",
+                season=2026,
+                season_type="regular",
+                team_name="Team B",
+                position="WR",
+                games_played=1,
+                receptions=5,
+                receiving_yards=61,
+                parser_version="test",
+                imported_at=datetime.now(timezone.utc),
+                is_final=False,
+            ),
+            TeamSchedule(
+                team_name="Team A", season=2025, week=1, opponent_name="Old Opponent",
+                location="away", is_bye=False, neutral_site=False, conference_game=False,
+            ),
+            TeamSchedule(
+                team_name="Team B", season=2025, week=1, opponent_name="Wrong Current Team Opponent",
+                location="home", is_bye=False, neutral_site=False, conference_game=False,
+            ),
+            TeamSchedule(
+                team_name="Team B", season=2026, week=1, opponent_name="New Opponent",
+                location="home", is_bye=False, neutral_site=False, conference_game=False,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    historical = client.get(f"/players/{player.id}/game-log", params={"season": 2025})
+    assert historical.status_code == 200
+    historical_body = historical.json()
+    assert historical_body["available_seasons"] == [2026, 2025]
+    assert historical_body["team_name"] == "Team A"
+    assert [row["opponent_name"] for row in historical_body["games"]] == ["Old Opponent"]
+    assert historical_body["games"][0]["team_name"] == "Team A"
+    assert historical_body["season_summary"]["teams"] == ["Team A"]
+    assert {stat["label"]: stat["value"] for stat in historical_body["season_summary"]["stats"]}["Targets"] == 71
+
+    current = client.get(f"/players/{player.id}/game-log", params={"season": 2026})
+    assert current.status_code == 200
+    assert [row["opponent_name"] for row in current.json()["games"]] == ["New Opponent"]
+
+
+def test_player_game_log_defaults_to_the_newest_actual_available_season(client, db_session):
+    player = Player(name="Historical Only Player", position="RB", school="New Team")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add_all(
+        [
+            PlayerHistoricalSeasonStat(
+                player_id=player.id,
+                provider="google_season_stats",
+                provider_player_id="history-1",
+                season=2024,
+                season_type="regular",
+                team_name="Old Team",
+                position="RB",
+                games_played=10,
+                rushing_yards=650,
+                parser_version="test",
+                imported_at=datetime.now(timezone.utc),
+                is_final=True,
+            ),
+            TeamSchedule(
+                team_name="Old Team", season=2024, week=1, opponent_name="Historic Opponent",
+                location="home", is_bye=False, neutral_site=False, conference_game=False,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(f"/players/{player.id}/game-log")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["season"] == 2024
+    assert body["available_seasons"] == [2024]
+    assert body["games"][0]["opponent_name"] == "Historic Opponent"
+
+
+def test_player_game_log_returns_a_clear_empty_state_for_an_unavailable_season(client, db_session):
+    player = Player(name="Limited History Player", position="TE", school="Current Team")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        PlayerHistoricalSeasonStat(
+            player_id=player.id,
+            provider="google_season_stats",
+            provider_player_id="limited-history",
+            season=2025,
+            season_type="regular",
+            team_name="Current Team",
+            position="TE",
+            games_played=9,
+            receptions=24,
+            parser_version="test",
+            imported_at=datetime.now(timezone.utc),
+            is_final=True,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/players/{player.id}/game-log", params={"season": 2024})
+    assert response.status_code == 200
+    assert response.json()["games"] == []
+    assert "No game log is available for 2024" in response.json()["message"]
