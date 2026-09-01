@@ -29,5 +29,9 @@ describe("LeagueTabs", () => {
     expect(rail.className).toContain("overflow-x-auto");
     expect(rail.className).toContain("overscroll-x-contain");
     expect(rail.className).toContain("touch-pan-x");
+    const tabRail = rail.firstElementChild as HTMLElement;
+    expect(tabRail.className).toContain("md:grid");
+    expect(tabRail.className).toContain("md:w-full");
+    expect(tabRail.style.gridTemplateColumns).toBe("repeat(5, minmax(0, 1fr))");
   });
 });
