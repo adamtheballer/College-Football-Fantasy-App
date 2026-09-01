@@ -1315,7 +1315,7 @@ def test_matchup_endpoint_returns_current_opponent_and_win_probability(client, d
     }
 
     response = client.get(
-        f"/leagues/{league['id']}/matchup",
+        f"/leagues/{league['id']}/matchup?week=1",
         headers=auth_headers(owner_token),
     )
     assert response.status_code == 200

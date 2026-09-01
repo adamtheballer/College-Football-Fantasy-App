@@ -483,14 +483,6 @@ export function RosterSlotTable({
                     {hasPossession ? <span role="img" aria-label="Team has possession" className="shrink-0 text-xs leading-none">🏈</span> : null}
                     {isFinalGame ? <Lock aria-label="Game final" className="h-3 w-3 shrink-0 text-cfb-text-muted" /> : null}
                   </span>
-                  <span
-                    className={cn(
-                      "hidden w-fit shrink-0 whitespace-nowrap rounded-md border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] md:inline-flex",
-                      style.pill
-                    )}
-                  >
-                    {position}
-                  </span>
                   <span className="truncate text-[10px] font-bold text-cfb-text-muted md:hidden">
                     {isRealPlayer
                       ? [displaySchoolName(player.school ?? player.player_school), player.opponent ? `vs ${player.opponent}` : "Opponent TBD"].filter(Boolean).join(" · ")
