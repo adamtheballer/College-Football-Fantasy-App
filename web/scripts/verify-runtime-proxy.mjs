@@ -1,6 +1,14 @@
 const webBase = (process.env.WEB_RUNTIME_URL ?? "http://127.0.0.1:8080").replace(/\/$/, "");
 const directApiBase = process.env.DIRECT_API_RUNTIME_URL?.replace(/\/$/, "");
 
+const readExpectedBoolean = (name) => {
+  const value = process.env[name];
+  if (value === undefined || value === "") return undefined;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new Error(`${name} must be true or false when provided.`);
+};
+
 const requireJson = (response, label) => {
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
@@ -72,8 +80,17 @@ const expectedRevision = process.env.CFF_GIT_SHA;
 if (expectedRevision && expectedRevision !== "unknown" && identity.git_sha !== expectedRevision) {
   throw new Error(`Unexpected API revision: expected=${expectedRevision} actual=${identity.git_sha}.`);
 }
-if (identity.scoring_mode !== "disabled" || identity.sportsdata_enabled !== false || identity.provider_polling_expected !== false) {
-  throw new Error(`Beta provider policy is not disabled: ${JSON.stringify(identity)}.`);
+const expectedScoringMode = process.env.CFF_EXPECT_SCORING_MODE;
+const expectedSportsdataEnabled = readExpectedBoolean("CFF_EXPECT_SPORTSDATA_ENABLED");
+const expectedProviderPolling = readExpectedBoolean("CFF_EXPECT_PROVIDER_POLLING_EXPECTED");
+if (expectedScoringMode && identity.scoring_mode !== expectedScoringMode) {
+  throw new Error(`Unexpected scoring mode: expected=${expectedScoringMode} actual=${identity.scoring_mode}.`);
+}
+if (expectedSportsdataEnabled !== undefined && identity.sportsdata_enabled !== expectedSportsdataEnabled) {
+  throw new Error(`Unexpected SportsData policy: expected=${expectedSportsdataEnabled} actual=${identity.sportsdata_enabled}.`);
+}
+if (expectedProviderPolling !== undefined && identity.provider_polling_expected !== expectedProviderPolling) {
+  throw new Error(`Unexpected provider polling policy: expected=${expectedProviderPolling} actual=${identity.provider_polling_expected}.`);
 }
 
 if (directApiBase) {
