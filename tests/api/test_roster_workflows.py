@@ -165,6 +165,24 @@ def complete_official_draft(db_session, league_id: int, player_ids: list[int]) -
     return teams
 
 
+def add_started_game_for_school(db_session, school: str, *, now: datetime | None = None) -> None:
+    """Make a waiver target eligible for the post-kickoff claim path."""
+
+    current = now or datetime.now(timezone.utc)
+    week_state = current_cfb_week_state(2026, now=current, timezone_name="America/Los_Angeles")
+    db_session.add(
+        Game(
+            external_id=f"waiver-target-{school}-{current.timestamp()}",
+            season=2026,
+            week=week_state.week,
+            home_team=school,
+            away_team="Opponent",
+            start_date=current - timedelta(minutes=1),
+        )
+    )
+    db_session.commit()
+
+
 def test_team_and_roster_routes_require_membership_and_ownership(client, db_session):
     owner_token = create_user_and_token(client, "owner")
     outsider_token = create_user_and_token(client, "outsider")
@@ -294,6 +312,7 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
     )
     assert roster_response.status_code == 201
     drop_entry_id = roster_response.json()["id"]
+    add_started_game_for_school(db_session, "Oregon")
 
     submitted_at = datetime.now(timezone.utc)
     submit_response = client.post(
@@ -355,8 +374,8 @@ def test_waiver_claim_contract_persists_and_processes_exact_drop_entry(client, d
     assert db_session.get(WaiverClaim, body["id"]).status == "won"
 
 
-def test_weekly_waiver_clear_opens_instant_adds_only_for_that_game_week(client, db_session, monkeypatch):
-    """A completed Sunday run opens free agency for its week, not permanently."""
+def test_unplayed_players_are_instant_adds_even_during_the_weekly_waiver_window(client, db_session, monkeypatch):
+    """A player remains an instant add until that player's own kickoff."""
 
     # The opening slate includes the late-August game and the following
     # Thursday-Sunday games. Week 1 clears on Sep. 7, and Week 2 opens on
@@ -431,8 +450,7 @@ def test_weekly_waiver_clear_opens_instant_adds_only_for_that_game_week(client, 
         json={"team_id": db_session.query(Team).filter(Team.league_id == league["id"]).one().id},
         headers=auth_headers(token),
     )
-    assert instant_add.status_code == 409
-    assert instant_add.json()["detail"] == "player is currently available on waivers"
+    assert instant_add.status_code == 201
 
 
 def test_waiver_claim_uses_configured_waiver_schedule(client, db_session):
@@ -441,6 +459,7 @@ def test_waiver_claim_uses_configured_waiver_schedule(client, db_session):
     team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
     _drop_player_id, add_player_id = create_players(client)
     complete_official_draft(db_session, league["id"], [add_player_id])
+    add_started_game_for_school(db_session, "Oregon")
 
     submitted_at = datetime.now(timezone.utc)
     submit_response = client.post(
@@ -461,7 +480,7 @@ def test_waiver_claim_uses_configured_waiver_schedule(client, db_session):
     assert process_response.json() == {"processed": 0, "failed": 0, "pending": 1}
 
 
-def test_waiver_claim_allows_same_day_before_player_school_kickoff(client, db_session, monkeypatch):
+def test_unplayed_player_must_use_an_instant_add_instead_of_a_waiver_claim(client, db_session, monkeypatch):
     fixed_now = datetime(2026, 8, 20, 14, 0, tzinfo=timezone.utc)
     monkeypatch.setattr(waiver_service, "_now", lambda: fixed_now)
     token = create_user_and_token(client, "waiver-before-kick")
@@ -481,17 +500,24 @@ def test_waiver_claim_allows_same_day_before_player_school_kickoff(client, db_se
     )
     db_session.commit()
 
-    response = client.post(
+    claim_response = client.post(
         f"/leagues/{league['id']}/waivers/claims",
         json={"team_id": team.id, "add_player_id": add_player_id, "faab_bid": 0},
         headers=auth_headers(token),
     )
 
-    assert response.status_code == 201
-    assert parse_api_datetime(response.json()["process_after"]) > fixed_now
+    assert claim_response.status_code == 409
+    assert claim_response.json()["detail"] == "player is available for an instant add until kickoff"
+
+    add_response = client.post(
+        f"/leagues/{league['id']}/waivers/free-agents/{add_player_id}/add",
+        json={"team_id": team.id},
+        headers=auth_headers(token),
+    )
+    assert add_response.status_code == 201
 
 
-def test_waiver_claim_rejects_player_school_after_kickoff(client, db_session, monkeypatch):
+def test_played_player_requires_a_waiver_claim_after_kickoff(client, db_session, monkeypatch):
     fixed_now = datetime(2026, 8, 20, 20, 0, tzinfo=timezone.utc)
     monkeypatch.setattr(waiver_service, "_now", lambda: fixed_now)
     token = create_user_and_token(client, "waiver-after-kick")
@@ -511,14 +537,22 @@ def test_waiver_claim_rejects_player_school_after_kickoff(client, db_session, mo
     )
     db_session.commit()
 
-    response = client.post(
+    instant_add_response = client.post(
+        f"/leagues/{league['id']}/waivers/free-agents/{add_player_id}/add",
+        json={"team_id": team.id},
+        headers=auth_headers(token),
+    )
+    assert instant_add_response.status_code == 409
+    assert instant_add_response.json()["detail"] == "player is currently available on waivers"
+
+    claim_response = client.post(
         f"/leagues/{league['id']}/waivers/claims",
         json={"team_id": team.id, "add_player_id": add_player_id, "faab_bid": 0},
         headers=auth_headers(token),
     )
 
-    assert response.status_code == 409
-    assert response.json()["detail"] == "waiver moves are locked after kickoff for: Oregon"
+    assert claim_response.status_code == 201
+    assert parse_api_datetime(claim_response.json()["process_after"]) > fixed_now
 
 
 def test_waiver_claim_cancel_endpoint_marks_pending_claim_cancelled(client, db_session):
@@ -527,6 +561,7 @@ def test_waiver_claim_cancel_endpoint_marks_pending_claim_cancelled(client, db_s
     team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
     _drop_player_id, add_player_id = create_players(client)
     complete_official_draft(db_session, league["id"], [add_player_id])
+    add_started_game_for_school(db_session, "Oregon")
 
     submit_response = client.post(
         f"/leagues/{league['id']}/waivers/claims",
@@ -583,6 +618,7 @@ def test_waiver_processing_deducts_faab_and_requires_commissioner(client, db_ses
     )
     _drop_player_id, add_player_id = create_players(client)
     complete_official_draft(db_session, league["id"], [add_player_id, _drop_player_id])
+    add_started_game_for_school(db_session, "Oregon")
 
     submit_response = client.post(
         f"/leagues/{league['id']}/waivers/claims",
@@ -625,6 +661,7 @@ def test_waiver_priority_processing_moves_winner_to_bottom(client, db_session):
     )
     _drop_player_id, add_player_id = create_players(client)
     complete_official_draft(db_session, league["id"], [add_player_id, _drop_player_id])
+    add_started_game_for_school(db_session, "Oregon")
 
     submit_response = client.post(
         f"/leagues/{league['id']}/waivers/claims",

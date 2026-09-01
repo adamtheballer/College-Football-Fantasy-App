@@ -22,6 +22,7 @@ from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.league_flow import LeagueSettingsInput, LeagueSettingsUpdate
 from collegefootballfantasy_api.app.services.league_roster_matchup import build_waivers_view
+from collegefootballfantasy_api.app.services.league_weeks import current_cfb_week_state
 from collegefootballfantasy_api.app.schemas.waiver import FreeAgentAdd
 from collegefootballfantasy_api.app.services.waiver_service import (
     _next_waiver_process_time,
@@ -517,6 +518,54 @@ def test_waiver_pool_uses_verified_final_box_score_for_unrostered_player(db_sess
     assert rows[scoreless_player.id].final_fantasy_points == 0.0
 
 
+def test_waiver_view_resolves_instant_adds_from_each_players_kickoff(db_session):
+    current = datetime.now(timezone.utc)
+    week = current_cfb_week_state(2026, now=current, timezone_name="America/New_York").week
+    user = User(
+        email="kickoff-availability-owner@example.com",
+        first_name="Kickoff",
+        password_hash="test",
+        api_token="kickoff-availability-owner-token",
+    )
+    db_session.add(user)
+    db_session.flush()
+    league = League(name="Kickoff Availability League", season_year=2026, commissioner_user_id=user.id, max_teams=1)
+    team = Team(league=league, name="Kickoff Availability Team", owner_user_id=user.id, owner_name="Kickoff")
+    upcoming_player = canonical_player("Upcoming Texas RB", "RB", "Texas")
+    played_player = canonical_player("Played Oregon RB", "RB", "Oregon")
+    db_session.add_all(
+        (
+            league,
+            team,
+            upcoming_player,
+            played_player,
+            Game(
+                season=2026,
+                week=week,
+                home_team="Texas",
+                away_team="Opponent A",
+                start_date=current + timedelta(hours=1),
+            ),
+            Game(
+                season=2026,
+                week=week,
+                home_team="Oregon",
+                away_team="Opponent B",
+                start_date=current - timedelta(hours=1),
+            ),
+        )
+    )
+    db_session.flush()
+    db_session.add(LeagueSettings(league_id=league.id, roster_slots_json={"RB": 2}))
+    db_session.commit()
+
+    waiver_view = build_waivers_view(db_session, league, user, selected_week=week)
+    states = {player.id: player.availability_state for player in waiver_view.available_players}
+
+    assert states[upcoming_player.id] == "free_agent"
+    assert states[played_player.id] == "waivers"
+
+
 def test_waiver_pool_sorts_the_full_selected_week_projection_set_before_pagination(db_session):
     user = User(email="waiver-sort-owner@example.com", first_name="Sort", password_hash="test", api_token="waiver-sort-owner-token")
     league = League(name="Waiver Sort League", season_year=2026, commissioner_user_id=1, max_teams=1)
@@ -832,7 +881,7 @@ def test_free_agent_add_accepts_untracked_player_after_waivers_clear(client, db_
     )
 
 
-def test_untracked_player_cannot_be_added_until_waivers_have_cleared(client, db_session):
+def test_untracked_unplayed_player_is_an_instant_add(client, db_session):
     user = User(
         email="pre-clear-free-agent-owner@example.com",
         first_name="PreClear",
@@ -855,11 +904,12 @@ def test_untracked_player_cannot_be_added_until_waivers_have_cleared(client, db_
     )
     db_session.commit()
 
-    with pytest.raises(HTTPException, match="currently available on waivers"):
-        add_free_agent(
-            db_session,
-            league=league,
-            current_user=user,
-            player_id=player.id,
-            payload=FreeAgentAdd(team_id=team.id),
-        )
+    result = add_free_agent(
+        db_session,
+        league=league,
+        current_user=user,
+        player_id=player.id,
+        payload=FreeAgentAdd(team_id=team.id),
+    )
+
+    assert db_session.get(RosterEntry, result.roster_entry_id).player_id == player.id

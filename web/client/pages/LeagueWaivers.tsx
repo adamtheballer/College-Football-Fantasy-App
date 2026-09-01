@@ -172,7 +172,6 @@ export default function LeagueWaivers() {
   });
   const waiverQuery = useLeagueWaiverTab(parsedLeagueId, 1000, 0, postDraft);
   const waiverData = waiverQuery.data;
-  const isFreeAgentPhase = waiverData?.waiver_rules.phase === "free_agents";
   const nextWaiverProcessAt = typeof waiverData?.waiver_rules.next_process_at === "string"
     ? waiverData.waiver_rules.next_process_at
     : null;
@@ -513,9 +512,7 @@ export default function LeagueWaivers() {
           <div>
             <h1 className="cfb-display-title text-3xl text-cfb-text-primary sm:text-4xl">Available Players</h1>
             <p className="mt-1.5 max-w-2xl text-sm text-cfb-text-secondary sm:mt-2">
-              {isFreeAgentPhase
-                ? "This week’s waivers have cleared. Remaining unrostered players are instant adds with no FAAB or priority; each player locks at their own kickoff."
-                : `Waiver bids are open until ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}. After processing, remaining unrostered players become instant adds until their own kickoff.`}
+              Unrostered players are instant adds until their own kickoff. Once a player’s game has started, claims process at ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}.
             </p>
           </div>
           <p className="text-xs font-semibold text-cfb-text-secondary sm:hidden">
@@ -551,9 +548,7 @@ export default function LeagueWaivers() {
                 Available Players
               </h2>
               <p className="mt-1.5 text-xs font-semibold leading-5 text-cfb-text-secondary sm:mt-2">
-                {isFreeAgentPhase
-                  ? "Waivers cleared for this week. Add eligible players immediately; no bid or priority is used."
-                  : `Claims process at ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}. Eligible players become instant adds only after the clear.`}
+                Players are instant adds before their own kickoff. After kickoff, claims process at ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}.
               </p>
             </div>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">

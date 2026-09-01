@@ -72,7 +72,11 @@ from collegefootballfantasy_api.app.services.player_lock_service import as_utc, 
 from collegefootballfantasy_api.app.services.player_pool_filters import canonical_fantasy_player_filter
 from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
 from collegefootballfantasy_api.app.services.roster_slots import CanonicalRosterSlot, build_team_roster_slots
-from collegefootballfantasy_api.app.services.waiver_service import serialize_claims, waiver_window_state
+from collegefootballfantasy_api.app.services.waiver_service import (
+    serialize_claims,
+    waiver_player_availability_states,
+    waiver_window_state,
+)
 from collegefootballfantasy_api.app.services.league_rivalry import matchup_rivalry_context
 
 DEFAULT_ROSTER_SLOTS = {
@@ -1293,7 +1297,7 @@ def build_waivers_view(
     projection_by_player = _projection_map(db, league.season_year, week, player_ids)
     player_positions = {player.id: player.position for player in eligible_players}
     player_schools = {player.id: player.school for player in eligible_players}
-    _starts_by_player, opponent_by_player, _locations_by_player = game_context_for_players(
+    game_starts_by_player, opponent_by_player, _locations_by_player = game_context_for_players(
         db,
         player_ids=player_ids,
         season=league.season_year,
@@ -1316,6 +1320,16 @@ def build_waivers_view(
     )
     now = datetime.now(timezone.utc)
     waiver_state = waiver_window_state(db, league, settings, now=now) if settings else None
+    availability_states = waiver_player_availability_states(
+        db,
+        league=league,
+        player_ids=player_ids,
+        now=now,
+        settings=settings,
+        player_schools=player_schools,
+        availability_by_player=availability_by_player,
+        game_starts_by_player=game_starts_by_player,
+    )
     current_period = (
         db.query(WaiverPeriod)
         .filter(
@@ -1381,21 +1395,7 @@ def build_waivers_view(
             for entry in _roster_rows(db, team.id)
         ]
     def availability_for_player(player_id: int) -> tuple[str, datetime | None]:
-        availability = availability_by_player.get(player_id)
-        if availability is None:
-            return ("free_agent", waiver_state.last_processed_at) if waiver_state and waiver_state.mode == "free_agents" else ("waivers", None)
-        available_at = availability.available_at
-        if availability.state == "free_agent" and waiver_state and waiver_state.mode != "free_agents":
-            return "waivers", None
-        if availability.state == "waivers" and waiver_state and waiver_state.mode == "free_agents":
-            return "free_agent", waiver_state.last_processed_at
-        if (
-            availability.state in {"waiver_locked", "waivers"}
-            and available_at is not None
-            and as_utc(available_at) <= now
-        ):
-            return ("free_agent", available_at) if waiver_state and waiver_state.mode == "free_agents" else ("waivers", available_at)
-        return availability.state, available_at
+        return availability_states[player_id]
 
     def projection_for_player(player_id: int) -> tuple[float | None, str]:
         projection = projection_by_player.get(player_id)
