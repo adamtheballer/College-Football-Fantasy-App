@@ -18,7 +18,7 @@ export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
       <div
         ref={ref}
         className={cn(
-          "relative overflow-hidden rounded-lg border p-4",
+          "relative overflow-hidden rounded-md border p-4",
           toneClasses.frame,
           className,
         )}
@@ -26,7 +26,7 @@ export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
       >
         <div
           aria-hidden="true"
-          className={cn("absolute left-0 top-0 h-full w-1", toneClasses.accent)}
+          className={cn("absolute left-0 top-0 h-full w-0.5", toneClasses.accent)}
         />
         <div className={cn("cfb-micro-label", toneClasses.label)}>{label}</div>
         <div className={cn("cfb-stat-value mt-2 text-3xl", toneClasses.value)}>

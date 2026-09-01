@@ -75,15 +75,15 @@ export function DraftBoard({
   return (
     <section
       data-testid="draft-board"
-      className="overflow-hidden rounded-[1.75rem] border border-cfb-border-subtle bg-cfb-surface-raised shadow-[0_14px_34px_rgba(0,0,0,0.28)]"
+      className="overflow-hidden rounded-md border border-cfb-border-subtle bg-cfb-surface-raised"
     >
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cfb-border-subtle px-4 py-4 sm:px-5">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-200">Draft board</p>
           <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Every pick, live in draft order</p>
         </div>
-        <div className="flex items-center gap-1 rounded-xl border border-cfb-border-subtle bg-cfb-surface p-1">
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-cfb-brand/12 px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-cfb-brand">
+        <div className="flex items-center gap-1 border border-cfb-border-subtle bg-cfb-surface p-1">
+          <span className="inline-flex items-center gap-1.5 rounded-sm bg-cfb-brand/12 px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-cfb-brand">
             <Grid3X3 className="h-3.5 w-3.5" /> Board
           </span>
           {currentPick ? (
@@ -91,14 +91,14 @@ export function DraftBoard({
               type="button"
               variant="ghost"
               onClick={() => focusCurrentPick()}
-              className="h-auto rounded-lg px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-cfb-gold hover:bg-cfb-gold/10 hover:text-cfb-gold"
+              className="h-auto rounded-sm px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-cfb-gold hover:bg-cfb-gold/10 hover:text-cfb-gold"
               aria-label="Center board on the current draft pick"
               title="Center current pick"
             >
               <LocateFixed className="mr-1.5 h-3.5 w-3.5" /> Current
             </Button>
           ) : null}
-          <Button type="button" variant="ghost" onClick={onOpenRosters} className="h-auto rounded-lg px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground hover:bg-cfb-surface-hover hover:text-cfb-text-primary">
+          <Button type="button" variant="ghost" onClick={onOpenRosters} className="h-auto rounded-sm px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground hover:bg-cfb-surface-hover hover:text-cfb-text-primary">
             <Users className="mr-1.5 h-3.5 w-3.5" /> Rosters
           </Button>
         </div>
@@ -121,7 +121,7 @@ export function DraftBoard({
               <div key={`round-${round}`} className="flex min-h-[5.25rem] items-center px-2 text-sm font-black tabular-nums text-cfb-text-secondary">{round}</div>,
               ...teams.map(([teamId]) => {
                 const slot = byTeam.get(teamId);
-                if (!slot) return <div key={`${round}-${teamId}`} className="min-h-[5.25rem] rounded-xl border border-cfb-border-subtle/60 bg-cfb-surface" />;
+                if (!slot) return <div key={`${round}-${teamId}`} className="min-h-[5.25rem] rounded-sm border border-cfb-border-subtle/60 bg-cfb-surface" />;
                 return (
                   <div
                     key={slot.overallPick}
@@ -129,7 +129,7 @@ export function DraftBoard({
                     data-testid={`draft-board-pick-${slot.overallPick}`}
                     aria-current={slot.isCurrent ? "step" : undefined}
                     className={cn(
-                      "relative min-h-[5.25rem] overflow-hidden rounded-xl border p-2.5 transition",
+                      "relative min-h-[5.25rem] overflow-hidden rounded-sm border p-2.5 transition",
                       slot.playerName
                         ? (BOARD_POSITION_TONES[slot.playerPosition ?? ""] ?? "border-white/10 bg-black/20")
                         : slot.isCurrent

@@ -229,7 +229,7 @@ function CompactMatchupScoreboard({
             type="button"
             aria-label="Previous matchup"
             onClick={onPreviousMatchup}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-cfb-border-subtle bg-cfb-surface text-cfb-text-secondary transition hover:border-cfb-brand/60 hover:text-cfb-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"
+            className="cfb-icon-button h-7 w-7"
           >
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -237,7 +237,7 @@ function CompactMatchupScoreboard({
             type="button"
             aria-label="Next matchup"
             onClick={onNextMatchup}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-cfb-border-subtle bg-cfb-surface text-cfb-text-secondary transition hover:border-cfb-brand/60 hover:text-cfb-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"
+            className="cfb-icon-button h-7 w-7"
           >
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -396,8 +396,8 @@ export default function LeagueMatchup() {
         <div className="min-w-0 flex-1 text-left text-base font-black italic tracking-tight text-cfb-text-primary">
           <span className="block truncate">{leagueQuery.data?.name ?? "League"}</span>
         </div>
-        <button type="button" aria-label="Notifications" onClick={() => navigate("/alerts")} className="flex h-11 w-11 items-center justify-center rounded-full bg-cfb-surface-raised text-cfb-text-primary hover:bg-cfb-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"><Bell className="h-4 w-4" aria-hidden="true" /></button>
-        <button type="button" aria-label="Messages" onClick={() => navigate("/chats")} className="flex h-11 w-11 items-center justify-center rounded-full bg-cfb-surface-raised text-cfb-text-primary hover:bg-cfb-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"><MessageCircle className="h-4 w-4" aria-hidden="true" /></button>
+        <button type="button" aria-label="Notifications" onClick={() => navigate("/alerts")} className="cfb-icon-button"><Bell className="h-4 w-4" aria-hidden="true" /></button>
+        <button type="button" aria-label="Messages" onClick={() => navigate("/chats")} className="cfb-icon-button"><MessageCircle className="h-4 w-4" aria-hidden="true" /></button>
       </header>
       {rosteredPlayerIsLive && refreshCountdownSeconds !== null ? (
         <div className="flex items-center justify-center gap-2 border-b border-cfb-brand/20 bg-cfb-brand/[0.06] px-3 py-2" data-testid="live-score-refresh-countdown">
@@ -472,7 +472,7 @@ export default function LeagueMatchup() {
             />
           </div>
 
-          <div className="mx-3 mt-3 rounded-full bg-cfb-surface px-4 py-2 sm:mx-5"><p className="text-sm font-black text-cfb-text-primary">Starters</p></div>
+          <div className="mt-3 border-y border-cfb-border-subtle bg-cfb-surface px-4 py-3 sm:px-5"><p className="cfb-section-title text-base">Starters</p></div>
           <div className="mt-2"><SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={parsedLeagueId} scoringStatus={presentationStatus} /></div>
         </>
       )}

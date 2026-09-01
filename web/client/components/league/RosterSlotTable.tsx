@@ -354,7 +354,7 @@ export function RosterSlotTable({
   };
 
   return (
-    <section className="overflow-hidden rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised">
+    <section className="overflow-hidden rounded-md border border-cfb-border-subtle bg-cfb-surface-raised">
       <div
         className={cn(
           "border-b border-cfb-border-subtle bg-cfb-surface/70 px-4 py-3 sm:px-5 sm:py-4"
@@ -592,7 +592,7 @@ export function RosterSlotTable({
                   type="button"
                   disabled={updateLineupMutation.isPending}
                   onClick={() => void confirmSwap(candidate)}
-                  className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/[0.045] p-4 text-left transition hover:border-cyan-200/40 hover:bg-cyan-200/10 disabled:opacity-60"
+                  className="flex w-full items-center justify-between rounded-md border border-cfb-border-subtle bg-cfb-surface p-4 text-left transition hover:border-cfb-brand/40 hover:bg-cfb-surface-hover disabled:opacity-60"
                 >
                   <span>
                     <span className="block font-black text-white">{candidate.player_name}</span>
@@ -603,14 +603,14 @@ export function RosterSlotTable({
                       Opp {candidate.opponent ?? "TBD"} • Proj {weeklyProjectionLabel(candidate)}
                     </span>
                   </span>
-                  <span className="rounded-full border border-white/15 px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-white/70">
+                  <span className="rounded-sm border border-cfb-border-subtle px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-cfb-text-secondary">
                     {slotLabel(candidate)}
                   </span>
                 </button>
               ))}
             </div>
           ) : (
-            <p className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-slate-300">
+            <p className="rounded-md border border-cfb-border-subtle bg-cfb-surface p-4 text-sm font-semibold text-cfb-text-secondary">
               No eligible, unlocked teammates can make this swap.
             </p>
           )}

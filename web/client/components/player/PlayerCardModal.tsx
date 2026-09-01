@@ -470,7 +470,7 @@ export function PlayerCardModal({
     >
       <article
         className={cn(
-          "relative mb-[max(1rem,env(safe-area-inset-bottom))] flex h-[78dvh] max-h-[calc(100dvh-3rem-env(safe-area-inset-bottom))] w-full max-w-5xl flex-col overflow-hidden rounded-[1.75rem] border border-white/12 bg-[#0b0d10] text-white shadow-[0_28px_80px_rgba(2,6,23,0.62)] sm:mb-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-xl",
+          "relative mb-[max(1rem,env(safe-area-inset-bottom))] flex h-[78dvh] max-h-[calc(100dvh-3rem-env(safe-area-inset-bottom))] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-cfb-border-subtle bg-cfb-surface text-cfb-text-primary shadow-[0_16px_44px_rgba(2,6,23,0.46)] sm:mb-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-lg",
           palette.glow
         )}
         onClick={(event) => event.stopPropagation()}
@@ -495,7 +495,7 @@ export function PlayerCardModal({
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "relative inline-flex shrink-0 items-center gap-1.5 px-2 py-2.5 text-[9px] font-bold uppercase tracking-[0.06em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent sm:gap-2 sm:px-1 sm:text-[10px] sm:font-black sm:tracking-[0.12em]",
+                  "relative inline-flex shrink-0 items-center gap-1.5 px-2 py-2.5 text-[9px] font-semibold uppercase tracking-[0.06em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-transparent sm:gap-2 sm:px-1 sm:text-[10px] sm:tracking-[0.12em]",
                   active
                     ? "text-white after:bg-cfb-brand"
                     : "text-white/55 hover:text-white"
@@ -515,30 +515,30 @@ export function PlayerCardModal({
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] p-3 pb-20 scroll-pb-20 sm:p-8 sm:pb-8 sm:scroll-pb-8"
         >
           {loading ? (
-            <div className="flex min-h-56 items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/[0.04] text-[10px] font-black uppercase tracking-[0.22em] text-white/55">
+            <div className="flex min-h-56 items-center justify-center gap-3 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised text-[10px] font-semibold uppercase tracking-[0.18em] text-cfb-text-muted">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading player card
             </div>
           ) : error ? (
-            <div className="flex min-h-56 flex-col items-center justify-center gap-4 rounded-3xl border border-amber-300/20 bg-amber-400/10 p-6 text-center">
+            <div className="flex min-h-56 flex-col items-center justify-center gap-4 rounded-md border border-cfb-warning/30 bg-cfb-warning/[0.08] p-6 text-center">
               <p className="text-sm font-black text-amber-50">Player details are unavailable right now.</p>
               <p className="text-xs font-bold leading-5 text-amber-100/75">The player card stayed open. Please try again.</p>
               {onRetry ? (
                 <button
                   type="button"
                   onClick={onRetry}
-                  className="rounded-2xl border border-amber-100/30 bg-amber-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-amber-950 transition hover:bg-white"
+                  className="rounded-sm border border-cfb-warning/40 bg-cfb-surface px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-cfb-warning transition hover:bg-cfb-surface-hover"
                 >
                   Retry
                 </button>
               ) : null}
             </div>
           ) : activeTab === "news" ? (
-            <section className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 sm:rounded-3xl sm:p-5">
+            <section className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5">
               <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Recent news</p>
               {card?.recent_news?.length ? (
                 <div className="mt-3 space-y-2">
                   {card.recent_news.map((item) => (
-                    <article key={item.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                    <article key={item.id} className="rounded-sm border border-cfb-border-subtle bg-cfb-surface p-3">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-black text-white">{item.status ?? item.event_type}</p>
                         <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/45">{item.source}</p>
@@ -556,12 +556,12 @@ export function PlayerCardModal({
                   ))}
                 </div>
               ) : (
-                <p className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3 text-sm font-semibold text-white/55">No verified recent news is available.</p>
+                <p className="mt-3 rounded-sm border border-cfb-border-subtle bg-cfb-surface p-3 text-sm font-semibold text-cfb-text-muted">No verified recent news is available.</p>
               )}
             </section>
           ) : activeTab === "summary" ? (
             <div className="w-full">
-              <section className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 sm:rounded-3xl sm:p-5">
+              <section className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5">
                 <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Bio</p>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
                   {[
@@ -572,7 +572,7 @@ export function PlayerCardModal({
                     ["School", card?.about.team ?? player.school],
                     ["Status", playerStatus],
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-xl border border-white/10 bg-black/20 p-2.5 sm:rounded-2xl sm:p-3">
+                    <div key={label} className="rounded-sm border border-cfb-border-subtle bg-cfb-surface p-2.5 sm:p-3">
                       <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
                       <p className="mt-1 text-sm font-black text-white sm:mt-2">{formatPlayerCardValue(value)}</p>
                     </div>
@@ -628,7 +628,7 @@ export function PlayerCardModal({
               </section>
             </div>
           ) : activeTab === "game-log" ? (
-            <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
+            <section className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Game Log</p>
@@ -662,7 +662,7 @@ export function PlayerCardModal({
               ) : selectedGameLogData ? (
                 <>
                 {selectedGameLogData.season_summary || calculatedGameLogSummary.gamesPlayed > 0 ? (
-                  <section className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4" aria-label={`${selectedGameLogData.season} season summary`}>
+                  <section className="mt-5 border-y border-cfb-border-subtle bg-cfb-surface px-4 py-4" aria-label={`${selectedGameLogData.season} season summary`}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Season summary</p>
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/45">{selectedGameLogData.season}</p>
@@ -685,7 +685,7 @@ export function PlayerCardModal({
                 ) : null}
                 {selectedGameLogData.games.length ? (
                 <>
-                <div className="mt-5 hidden overflow-x-auto rounded-2xl border border-white/10 bg-black/20 md:block">
+                <div className="mt-5 hidden overflow-x-auto rounded-sm border border-cfb-border-subtle bg-cfb-surface md:block">
                   <table className="min-w-max border-collapse text-left">
                     <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
                       <tr>
@@ -728,7 +728,7 @@ export function PlayerCardModal({
                   {selectedGameLogData.games.map((row) => {
                     const stats = row.stats ? { ...row.stats.stats, fantasy_points: row.stats.fantasy_points } : undefined;
                     return (
-                      <article key={row.schedule_id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <article key={row.schedule_id} className="border-b border-cfb-border-subtle bg-cfb-surface p-4 last:border-b-0">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/45">Week {row.week}</p>
