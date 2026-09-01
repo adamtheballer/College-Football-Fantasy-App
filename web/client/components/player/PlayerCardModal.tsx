@@ -1,12 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, AlertTriangle, BarChart3, CalendarDays, History, Info, Loader2, Newspaper } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Activity, AlertTriangle, CalendarDays, History, Info, Loader2, Newspaper } from "lucide-react";
 
 import { useLeaguePlayerHistory, usePlayerGameLog, usePlayerTradeValues, usePlayerTrajectory, type PlayerCardResponse, type PlayerGameLogResponse } from "@/hooks/use-players";
-import {
-  getHistoricalStatColumnsForPosition,
-  historicalStatValuesForSeason,
-  historicalStatsTablePosition,
-} from "@/lib/historicalStatColumns";
 import { buildProjectedStats, formatStat, statRowsForPosition, statValue } from "@/lib/playerProjectionStats";
 import { cn } from "@/lib/utils";
 import type { PlayerStats } from "@/types/player";
@@ -14,7 +9,7 @@ import type { PlayerStats } from "@/types/player";
 import { PlayerCardHeader, resolvePlayerCardStatus } from "./PlayerCardHeader";
 import { PlayerTrajectoryChart } from "./PlayerTrajectoryChart";
 
-type PlayerCardTab = "news" | "summary" | "stats" | "game-log" | "alerts" | "projections" | "history" | "value";
+type PlayerCardTab = "news" | "summary" | "game-log" | "alerts" | "projections" | "history" | "value";
 
 export type PlayerCardModalPlayer = {
   id: number;
@@ -36,16 +31,9 @@ export type PlayerCardAction = {
   onClick: () => void;
 };
 
-type HistoricalSeason = NonNullable<PlayerCardResponse["historical_stats"]>["seasons"][number];
-type HistoricalStatTableRow = {
-  category: string;
-  label: string;
-  value: number | string | null;
-};
 const tabConfig: Array<{ id: PlayerCardTab; label: string; icon: typeof Info }> = [
   { id: "summary", label: "Summary", icon: Info },
   { id: "news", label: "News", icon: Newspaper },
-  { id: "stats", label: "Stats", icon: BarChart3 },
   { id: "game-log", label: "Game Log", icon: CalendarDays },
   { id: "alerts", label: "Alerts", icon: AlertTriangle },
   { id: "projections", label: "Projections", icon: Activity },
@@ -200,6 +188,7 @@ export const gameLogColumnsForPosition = (position: string): readonly GameLogCol
     case "WR":
       return [
         ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
+        ["TAR", ["targets", "receiving_targets", "ReceivingTargets"]],
         ["REC", ["receptions", "Receptions"]],
         ["REC YDS", ["rec_yards", "receiving_yards", "ReceivingYards"]],
         ["REC TD", ["rec_tds", "receiving_touchdowns", "ReceivingTouchdowns"]],
@@ -210,6 +199,7 @@ export const gameLogColumnsForPosition = (position: string): readonly GameLogCol
     case "TE":
       return [
         ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
+        ["TAR", ["targets", "receiving_targets", "ReceivingTargets"]],
         ["REC", ["receptions", "Receptions"]],
         ["REC YDS", ["rec_yards", "receiving_yards", "ReceivingYards"]],
         ["REC TD", ["rec_tds", "receiving_touchdowns", "ReceivingTouchdowns"]],
@@ -263,63 +253,6 @@ export const completedSeasonGameTotals = (
     }),
   };
 };
-
-const CURRENT_SEASON_STAT_LABELS: Record<string, string> = {
-  FPTS: "FPTS",
-  CMP: "Comp",
-  ATT: "Pass Att",
-  "PASS YDS": "Pass Yds",
-  "PASS TD": "Pass TD",
-  INT: "INT",
-  "RUSH ATT": "Rush Att",
-  "RUSH YDS": "Rush Yds",
-  "RUSH TD": "Rush TD",
-  REC: "Receptions",
-  "REC YDS": "Rec Yds",
-  "REC TD": "Rec TD",
-  FGM: "FGM",
-  FGA: "FGA",
-  XPM: "XPM",
-  XPA: "XPA",
-};
-
-export const unifiedSeasonSummaryColumns = (
-  historicalColumns: string[],
-  position: string,
-) => {
-  const currentSeasonColumns = [
-    "GP",
-    ...gameLogColumnsForPosition(position).map(([label]) => CURRENT_SEASON_STAT_LABELS[label] ?? label),
-  ];
-  return [
-    ...new Set([
-      ...currentSeasonColumns,
-      ...historicalColumns.filter((label) => label !== "Games"),
-    ]),
-  ];
-};
-
-export const currentSeasonSummaryValue = (
-  totals: ReturnType<typeof completedSeasonGameTotals>,
-  label: string,
-) => {
-  if (label === "GP") return totals.gamesPlayed;
-  const gameLogLabel = Object.entries(CURRENT_SEASON_STAT_LABELS)
-    .find(([, summaryLabel]) => summaryLabel === label)?.[0];
-  return totals.totals.find(([totalLabel]) => totalLabel === gameLogLabel)?.[1] ?? null;
-};
-
-/**
- * Every player card has one current-season row. Once a final game exists, its
- * calculated game-log totals supersede any imported aggregate for that year.
- */
-export const shouldUseCalculatedCurrentSeason = (
-  gamesPlayed: number,
-  historicalSeasons: ReadonlyArray<{ season: number }>,
-) => gamesPlayed > 0 || !historicalSeasons.some((season) => season.season === 2026);
-
-export const historicalSeasonSummaryDisplayValue = (season: HistoricalSeason, label: string) =>
-  historicalSeasonSummaryValue(season, label === "GP" ? "Games" : label);
 
 export const gameLogOpponentLabel = (row: { location: string; opponent_name?: string | null }) => {
   if (row.location === "bye") return "BYE";
@@ -395,30 +328,6 @@ export const resolvePlayerCardCurrentValueRating = (
   return typeof cardValue === "number" && Number.isFinite(cardValue) ? cardValue : null;
 };
 
-export const buildHistoricalStatsTableRows = (season: HistoricalSeason | null): HistoricalStatTableRow[] =>
-  season?.categories.flatMap((category) =>
-    category.stats.map((stat) => ({
-      category: category.label,
-      label: stat.label,
-      value: stat.value,
-    }))
-  ) ?? [];
-
-export const buildHistoricalSeasonSummaryColumns = (
-  seasons: HistoricalSeason[],
-  currentPosition?: string | null,
-): string[] => {
-  const present = new Set(seasons.flatMap((season) => [...historicalStatValuesForSeason(season).keys()]));
-  return getHistoricalStatColumnsForPosition(
-    historicalStatsTablePosition(seasons, currentPosition),
-    present,
-  );
-};
-
-export const historicalSeasonSummaryValue = (season: HistoricalSeason, label: string) => {
-  return historicalStatValuesForSeason(season).get(label) ?? null;
-};
-
 export const visiblePlayerCardAboutMessage = (message?: string | null) => {
   const trimmed = message?.trim();
   if (!trimmed) return null;
@@ -457,15 +366,15 @@ export function PlayerCardModal({
 }) {
   const [activeTab, setActiveTab] = useState<PlayerCardTab>("summary");
   const [isOutlookExpanded, setIsOutlookExpanded] = useState(false);
-  const historicalStatsScrollRef = useRef<HTMLDivElement>(null);
+  const [selectedGameLogSeason, setSelectedGameLogSeason] = useState<number | null>(null);
   const hasLeagueContext = typeof leagueId === "number" && Number.isFinite(leagueId) && leagueId > 0;
   const position = (card?.about.position ?? player.position ?? "").toUpperCase();
   const playerStatus = resolvePlayerCardStatus(card, player.status);
   const gameLogQuery = usePlayerGameLog(
     player.id,
-    2026,
+    selectedGameLogSeason,
     leagueId,
-    activeTab === "game-log" || activeTab === "stats",
+    activeTab === "game-log",
   );
   const historyQuery = useLeaguePlayerHistory(leagueId ?? undefined, player.id, activeTab === "history" && hasLeagueContext);
   const valueQuery = usePlayerTradeValues(player.id, 2026);
@@ -476,8 +385,6 @@ export function PlayerCardModal({
     activeTab === "projections" || activeTab === "value",
   );
   const palette = getPlayerCardPalette(position);
-  const historicalStats = card?.historical_stats;
-  const historicalSeasons = historicalStats?.seasons ?? [];
   const projectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
   const currentValueRating = resolvePlayerCardCurrentValueRating(
     valueQuery.data?.current?.current_value_rating,
@@ -485,36 +392,18 @@ export function PlayerCardModal({
   );
   const aboutMessage = visiblePlayerCardAboutMessage(card?.about.message);
   const cardActions = [...(action ? [action] : []), ...actions];
-  const currentSeasonTotals = useMemo(
-    () => completedSeasonGameTotals(gameLogQuery.data?.games ?? [], position),
-    [gameLogQuery.data?.games, position],
+  const selectedGameLogData = gameLogQuery.data;
+  const selectedGameLogColumns = useMemo(() => {
+    const games = selectedGameLogData?.games ?? [];
+    return gameLogColumnsForPosition(position).filter(([, keys]) => games.some((game) => {
+      if (!game.stats || game.location === "bye") return false;
+      return gameLogStatValue({ ...game.stats.stats, fantasy_points: game.stats.fantasy_points }, keys) !== null;
+    }));
+  }, [position, selectedGameLogData?.games]);
+  const calculatedGameLogSummary = useMemo(
+    () => completedSeasonGameTotals(selectedGameLogData?.games ?? [], position),
+    [selectedGameLogData?.games, position],
   );
-  // The 2026 row is derived from the finalized game log, which is the
-  // authoritative current-season source. Keep exactly one 2026 row: use the
-  // calculated totals as soon as a final box score exists, otherwise retain a
-  // verified imported row when one is available. If neither has data yet, the
-  // calculated zero-game row still gives every player card the same table.
-  const useCalculatedCurrentSeason = shouldUseCalculatedCurrentSeason(
-    currentSeasonTotals.gamesPlayed,
-    historicalSeasons,
-  );
-  const displayedHistoricalSeasons = useCalculatedCurrentSeason
-    ? historicalSeasons.filter((season) => season.season !== 2026)
-    : historicalSeasons;
-  const displayedHistoricalTablePosition = historicalStatsTablePosition(displayedHistoricalSeasons, position);
-  const displayedHistoricalSummaryColumns = buildHistoricalSeasonSummaryColumns(
-    displayedHistoricalSeasons,
-    displayedHistoricalTablePosition,
-  );
-  const unifiedSeasonColumns = useMemo(
-    () => unifiedSeasonSummaryColumns(displayedHistoricalSummaryColumns, position),
-    [displayedHistoricalSummaryColumns, position],
-  );
-  const hasSeasonStats = useCalculatedCurrentSeason || displayedHistoricalSeasons.length > 0;
-
-  useEffect(() => {
-    if (historicalStatsScrollRef.current) historicalStatsScrollRef.current.scrollLeft = 0;
-  }, [player.id, displayedHistoricalTablePosition]);
   const projectionHighlights = [
     ["Fantasy", projectionStats?.fpts ?? player.projectedPoints],
     ["Floor", projectionStats?.floor],
@@ -541,6 +430,7 @@ export function PlayerCardModal({
   useEffect(() => {
     setActiveTab("summary");
     setIsOutlookExpanded(false);
+    setSelectedGameLogSeason(null);
   }, [player.id]);
 
   useEffect(() => {
@@ -580,7 +470,7 @@ export function PlayerCardModal({
     >
       <article
         className={cn(
-          "relative mb-[max(1rem,env(safe-area-inset-bottom))] flex h-[78dvh] max-h-[calc(100dvh-3rem-env(safe-area-inset-bottom))] w-full max-w-5xl flex-col overflow-hidden rounded-[1.75rem] border border-white/12 bg-[#0b0d10] text-white shadow-[0_28px_80px_rgba(2,6,23,0.62)] sm:mb-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-xl",
+          "relative mb-[max(1rem,env(safe-area-inset-bottom))] flex h-[78dvh] max-h-[calc(100dvh-3rem-env(safe-area-inset-bottom))] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-cfb-border-subtle bg-cfb-surface text-cfb-text-primary shadow-[0_16px_44px_rgba(2,6,23,0.46)] sm:mb-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-lg",
           palette.glow
         )}
         onClick={(event) => event.stopPropagation()}
@@ -605,7 +495,7 @@ export function PlayerCardModal({
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "relative inline-flex shrink-0 items-center gap-1.5 px-2 py-2.5 text-[9px] font-bold uppercase tracking-[0.06em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent sm:gap-2 sm:px-1 sm:text-[10px] sm:font-black sm:tracking-[0.12em]",
+                  "relative inline-flex shrink-0 items-center gap-1.5 px-2 py-2.5 text-[9px] font-semibold uppercase tracking-[0.06em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-transparent sm:gap-2 sm:px-1 sm:text-[10px] sm:tracking-[0.12em]",
                   active
                     ? "text-white after:bg-cfb-brand"
                     : "text-white/55 hover:text-white"
@@ -625,30 +515,30 @@ export function PlayerCardModal({
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] p-3 pb-20 scroll-pb-20 sm:p-8 sm:pb-8 sm:scroll-pb-8"
         >
           {loading ? (
-            <div className="flex min-h-56 items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/[0.04] text-[10px] font-black uppercase tracking-[0.22em] text-white/55">
+            <div className="flex min-h-56 items-center justify-center gap-3 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised text-[10px] font-semibold uppercase tracking-[0.18em] text-cfb-text-muted">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading player card
             </div>
           ) : error ? (
-            <div className="flex min-h-56 flex-col items-center justify-center gap-4 rounded-3xl border border-amber-300/20 bg-amber-400/10 p-6 text-center">
+            <div className="flex min-h-56 flex-col items-center justify-center gap-4 rounded-md border border-cfb-warning/30 bg-cfb-warning/[0.08] p-6 text-center">
               <p className="text-sm font-black text-amber-50">Player details are unavailable right now.</p>
               <p className="text-xs font-bold leading-5 text-amber-100/75">The player card stayed open. Please try again.</p>
               {onRetry ? (
                 <button
                   type="button"
                   onClick={onRetry}
-                  className="rounded-2xl border border-amber-100/30 bg-amber-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-amber-950 transition hover:bg-white"
+                  className="rounded-sm border border-cfb-warning/40 bg-cfb-surface px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-cfb-warning transition hover:bg-cfb-surface-hover"
                 >
                   Retry
                 </button>
               ) : null}
             </div>
           ) : activeTab === "news" ? (
-            <section className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 sm:rounded-3xl sm:p-5">
+            <section className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5">
               <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Recent news</p>
               {card?.recent_news?.length ? (
                 <div className="mt-3 space-y-2">
                   {card.recent_news.map((item) => (
-                    <article key={item.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                    <article key={item.id} className="rounded-sm border border-cfb-border-subtle bg-cfb-surface p-3">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-black text-white">{item.status ?? item.event_type}</p>
                         <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/45">{item.source}</p>
@@ -666,12 +556,12 @@ export function PlayerCardModal({
                   ))}
                 </div>
               ) : (
-                <p className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3 text-sm font-semibold text-white/55">No verified recent news is available.</p>
+                <p className="mt-3 rounded-sm border border-cfb-border-subtle bg-cfb-surface p-3 text-sm font-semibold text-cfb-text-muted">No verified recent news is available.</p>
               )}
             </section>
           ) : activeTab === "summary" ? (
             <div className="w-full">
-              <section className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 sm:rounded-3xl sm:p-5">
+              <section className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5">
                 <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Bio</p>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
                   {[
@@ -682,7 +572,7 @@ export function PlayerCardModal({
                     ["School", card?.about.team ?? player.school],
                     ["Status", playerStatus],
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-xl border border-white/10 bg-black/20 p-2.5 sm:rounded-2xl sm:p-3">
+                    <div key={label} className="rounded-sm border border-cfb-border-subtle bg-cfb-surface p-2.5 sm:p-3">
                       <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
                       <p className="mt-1 text-sm font-black text-white sm:mt-2">{formatPlayerCardValue(value)}</p>
                     </div>
@@ -737,90 +627,29 @@ export function PlayerCardModal({
                 ) : null}
               </section>
             </div>
-          ) : activeTab === "stats" ? (
-            <section className="rounded-2xl border border-white/10 bg-white/[0.045] p-3 sm:p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>
-                    Season Stats
-                  </p>
-                  <p className="mt-1 text-[10px] font-bold leading-4 text-white/55">
-                    Verified totals by season
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="hidden text-[8px] font-black uppercase tracking-[0.14em] text-white/35 sm:inline">Swipe table</span>
-                  <p className="rounded-full border border-white/15 bg-white/[0.05] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.14em] text-white/55">
-                    {position || "Player"}
-                  </p>
-                </div>
-              </div>
-
-              {gameLogQuery.isLoading ? (
-                <div className="mt-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-white/55">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading final 2026 box scores
-                </div>
-              ) : null}
-
-              {hasSeasonStats ? (
-                <div ref={historicalStatsScrollRef} className="mt-4 overflow-x-auto overscroll-x-contain touch-pan-x rounded-2xl border border-white/10 bg-black/20" aria-label="Season stats table; scroll horizontally for all columns">
-                  <table className="min-w-[720px] w-max border-collapse text-left">
-                    <thead className="bg-white/[0.055] text-[8px] font-black uppercase tracking-[0.14em] text-white/45">
-                      <tr>
-                        <th className="min-w-[3.75rem] whitespace-nowrap px-2.5 py-2.5">Year</th>
-                        <th className="min-w-28 whitespace-nowrap px-2.5 py-2.5">Team</th>
-                        <th className="min-w-[3.5rem] whitespace-nowrap px-2.5 py-2.5">Pos</th>
-                        {unifiedSeasonColumns.map((label) => (
-                          <th key={label} className="whitespace-nowrap px-2.5 py-2.5 text-right">{label}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/10">
-                      {useCalculatedCurrentSeason ? (
-                        <tr className="text-xs font-bold text-white/75 transition hover:bg-white/[0.035]">
-                          <td className="whitespace-nowrap px-2.5 py-2.5 text-sm font-black tabular-nums text-white">2026</td>
-                          <td className="min-w-28 px-2.5 py-2.5"><p className="font-black leading-4 text-white">{gameLogQuery.data?.team_name ?? card?.about.team ?? player.school}</p><p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-white/45">Regular</p></td>
-                          <td className="px-2.5 py-2.5"><span className="rounded-full border border-white/15 bg-white/[0.06] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-white/70">{position || "—"}</span></td>
-                          {unifiedSeasonColumns.map((label) => (
-                            <td key={label} className="px-2.5 py-2.5 text-right font-black tabular-nums text-white">
-                              {formatPlayerCardValue(currentSeasonSummaryValue(currentSeasonTotals, label))}
-                            </td>
-                          ))}
-                        </tr>
-                      ) : null}
-                      {displayedHistoricalSeasons.map((season) => (
-                        <tr key={`${season.season}-${season.team_name ?? "team"}-${season.season_type}`} className="text-xs font-bold text-white/75 transition hover:bg-white/[0.035]">
-                          <td className="whitespace-nowrap px-2.5 py-2.5 text-sm font-black tabular-nums text-white">{season.season}</td>
-                          <td className="min-w-28 px-2.5 py-2.5"><p className="font-black leading-4 text-white">{season.team_name ?? card?.about.team ?? player.school}</p><p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-white/45">{season.season_type}</p></td>
-                          <td className="px-2.5 py-2.5"><span className="rounded-full border border-white/15 bg-white/[0.06] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-white/70">{season.position ?? position ?? "—"}</span></td>
-                          {unifiedSeasonColumns.map((label) => (
-                            <td key={label} className="px-2.5 py-2.5 text-right font-black tabular-nums text-white">
-                              {formatPlayerCardValue(historicalSeasonSummaryDisplayValue(season, label))}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
-                  {historicalStats?.message ?? "No verified season totals are available for this player yet."}
-                </p>
-              )}
-            </section>
           ) : activeTab === "game-log" ? (
-            <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>2026 Game Log</p>
+            <section className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Game Log</p>
                   <p className="mt-2 text-sm font-bold leading-6 text-white/55">
-                    {gameLogQuery.data?.team_name ?? card?.about.team ?? player.school} schedule. Completed game stats appear here after they are verified.
+                    {selectedGameLogData?.team_name ?? card?.about.team ?? player.school} schedule and verified performance for {selectedGameLogData?.season ?? "the selected season"}.
                   </p>
                 </div>
-                <p className="rounded-full border border-white/15 bg-white/[0.05] px-3 py-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/55">
-                  {position || "Player"}
-                </p>
+                <label className="flex shrink-0 flex-col gap-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-white/55">
+                  Game log season
+                  <select
+                    aria-label="Game log season"
+                    value={selectedGameLogSeason ?? selectedGameLogData?.season ?? ""}
+                    onChange={(event) => setSelectedGameLogSeason(Number(event.target.value))}
+                    disabled={!selectedGameLogData?.available_seasons.length}
+                    className="min-w-28 rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-sm font-black normal-case tracking-normal text-white outline-none transition focus:border-cfb-brand disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {selectedGameLogData?.available_seasons.map((season) => (
+                      <option key={season} value={season}>{season}</option>
+                    ))}
+                  </select>
+                </label>
               </div>
               {gameLogQuery.isLoading ? (
                 <div className="mt-5 flex min-h-40 items-center justify-center gap-3 rounded-2xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">
@@ -830,9 +659,33 @@ export function PlayerCardModal({
                 <p className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm font-bold leading-6 text-amber-100">
                   The Game Log is unavailable right now. Please try again shortly.
                 </p>
-              ) : gameLogQuery.data?.games.length ? (
+              ) : selectedGameLogData ? (
                 <>
-                <div className="mt-5 hidden overflow-x-auto rounded-2xl border border-white/10 bg-black/20 md:block">
+                {selectedGameLogData.season_summary || calculatedGameLogSummary.gamesPlayed > 0 ? (
+                  <section className="mt-5 border-y border-cfb-border-subtle bg-cfb-surface px-4 py-4" aria-label={`${selectedGameLogData.season} season summary`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Season summary</p>
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/45">{selectedGameLogData.season}</p>
+                    </div>
+                    {selectedGameLogData.season_summary?.teams.length ? <p className="mt-1 text-xs font-bold text-white/55">{selectedGameLogData.season_summary.teams.join(" · ")}</p> : null}
+                    <div className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-3">
+                      {[
+                        ...(selectedGameLogData.season_summary?.games_played !== null && selectedGameLogData.season_summary?.games_played !== undefined ? [["Games", selectedGameLogData.season_summary.games_played] as const] : calculatedGameLogSummary.gamesPlayed > 0 ? [["Games", calculatedGameLogSummary.gamesPlayed] as const] : []),
+                        ...(selectedGameLogData.season_summary?.games_started !== null && selectedGameLogData.season_summary?.games_started !== undefined ? [["Starts", selectedGameLogData.season_summary.games_started] as const] : []),
+                        ...(selectedGameLogData.season_summary?.stats.map((stat) => [stat.label, stat.value] as const) ?? calculatedGameLogSummary.totals.filter(([, value]) => value !== null)),
+                        ...(selectedGameLogData.season_summary?.fantasy_points !== null && selectedGameLogData.season_summary?.fantasy_points !== undefined ? [["Fantasy points", selectedGameLogData.season_summary.fantasy_points] as const] : []),
+                      ].map(([label, value]) => (
+                        <div key={label} className="flex items-baseline justify-between gap-2 text-xs">
+                          <span className="font-black uppercase tracking-[0.12em] text-white/45">{label}</span>
+                          <span className="font-black tabular-nums text-white">{formatPlayerCardValue(value)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+                {selectedGameLogData.games.length ? (
+                <>
+                <div className="mt-5 hidden overflow-x-auto rounded-sm border border-cfb-border-subtle bg-cfb-surface md:block">
                   <table className="min-w-max border-collapse text-left">
                     <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
                       <tr>
@@ -840,13 +693,13 @@ export function PlayerCardModal({
                         <th className="min-w-[15rem] whitespace-nowrap px-4 py-3">Opponent</th>
                         <th className="min-w-[8rem] whitespace-nowrap px-4 py-3">Location</th>
                         <th className="min-w-[5.5rem] whitespace-nowrap px-4 py-3">Result</th>
-                        {gameLogColumnsForPosition(position).map(([label]) => (
+                        {selectedGameLogColumns.map(([label]) => (
                           <th key={label} className="whitespace-nowrap px-4 py-3 text-right">{label}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
-                      {gameLogQuery.data.games.map((row) => {
+                      {selectedGameLogData.games.map((row) => {
                         const stats = row.stats ? { ...row.stats.stats, fantasy_points: row.stats.fantasy_points } : undefined;
                         return (
                           <tr key={row.schedule_id} className="text-sm font-bold text-white/75">
@@ -857,7 +710,7 @@ export function PlayerCardModal({
                             </td>
                             <td className="whitespace-nowrap px-4 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-white/55">{row.location_label}</td>
                             <td className="whitespace-nowrap px-4 py-4 text-xs font-black tabular-nums text-white/70">{row.result ?? "—"}</td>
-                            {gameLogColumnsForPosition(position).map(([label, keys]) => {
+                            {selectedGameLogColumns.map(([label, keys]) => {
                               const value = row.location === "bye" ? null : gameLogStatValue(stats, keys);
                               return (
                                 <td key={label} className="whitespace-nowrap px-4 py-4 text-right font-black tabular-nums text-white">
@@ -872,10 +725,10 @@ export function PlayerCardModal({
                   </table>
                 </div>
                 <div className="mt-5 space-y-3 md:hidden">
-                  {gameLogQuery.data.games.map((row) => {
+                  {selectedGameLogData.games.map((row) => {
                     const stats = row.stats ? { ...row.stats.stats, fantasy_points: row.stats.fantasy_points } : undefined;
                     return (
-                      <article key={row.schedule_id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <article key={row.schedule_id} className="border-b border-cfb-border-subtle bg-cfb-surface p-4 last:border-b-0">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/45">Week {row.week}</p>
@@ -884,17 +737,23 @@ export function PlayerCardModal({
                           </div>
                           <p className="text-right text-xs font-black tabular-nums text-white/70">{row.result ?? "—"}</p>
                         </div>
-                        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
-                          {gameLogColumnsForPosition(position).map(([label, keys]) => {
-                            const value = row.location === "bye" ? null : gameLogStatValue(stats, keys);
-                            return (
-                              <div key={label} className="flex items-center justify-between gap-3 text-xs">
-                                <span className="font-black uppercase tracking-[0.12em] text-white/45">{label}</span>
-                                <span className="font-black tabular-nums text-white">{formatPlayerCardValue(value)}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
+                        {selectedGameLogColumns.length ? (
+                          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+                            {selectedGameLogColumns.map(([label, keys]) => {
+                              const value = row.location === "bye" ? null : gameLogStatValue(stats, keys);
+                              return (
+                                <div key={label} className="flex items-center justify-between gap-3 text-xs">
+                                  <span className="font-black uppercase tracking-[0.12em] text-white/45">{label}</span>
+                                  <span className="font-black tabular-nums text-white">{formatPlayerCardValue(value)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : row.game_status === "final" ? (
+                          <p className="mt-4 text-xs font-semibold text-white/55">
+                            Verified player statistics are not available for this game.
+                          </p>
+                        ) : null}
                       </article>
                     );
                   })}
@@ -902,9 +761,11 @@ export function PlayerCardModal({
                 </>
               ) : (
                 <p className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
-                  {gameLogQuery.data?.message ?? "No 2026 schedule has been imported for this player's team yet."}
+                  {selectedGameLogData.message ?? `No game log is available for ${selectedGameLogData.season}.`}
                 </p>
               )}
+                </>
+              ) : null}
             </section>
           ) : activeTab === "alerts" ? (
             <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">

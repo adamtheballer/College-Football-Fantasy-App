@@ -17,7 +17,7 @@ export const StatusBadge = React.forwardRef<HTMLSpanElement, StatusBadgeProps>(
     <span
       ref={ref}
       className={cn(
-        "inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold",
+        "inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-sm border px-2 py-1 text-[11px] font-semibold",
         statusBadgeClasses[variant],
         className,
       )}

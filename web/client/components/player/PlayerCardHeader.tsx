@@ -99,7 +99,7 @@ export function PlayerCardHeader({
         type="button"
         aria-label="Close player card"
         onClick={onClose}
-        className="absolute right-3 top-3 z-30 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/25 text-white/75 backdrop-blur transition hover:bg-white/10 hover:text-white sm:right-4 sm:top-4 sm:h-11 sm:w-11"
+        className="absolute right-3 top-3 z-30 inline-flex h-9 w-9 items-center justify-center rounded-sm border border-white/15 bg-black/25 text-white/75 backdrop-blur transition hover:bg-white/10 hover:text-white sm:right-4 sm:top-4 sm:h-11 sm:w-11"
       >
         <X className="h-5 w-5" />
       </button>
@@ -130,7 +130,7 @@ export function PlayerCardHeader({
         <div className="relative z-10 min-w-0">
           <p className="hidden text-[10px] font-black uppercase tracking-[0.28em] text-white/65 sm:block">{title}</p>
           <div className="flex min-w-0 items-center gap-3 sm:mt-4 sm:gap-5">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/25 bg-white/10 shadow-[0_16px_34px_rgba(2,6,23,0.28)] sm:h-[5.75rem] sm:w-[5.75rem] sm:rounded-[1.6rem]">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/25 bg-white/10 sm:h-[5.75rem] sm:w-[5.75rem]">
                 {card?.about.headshot_url ? (
                   <img src={card.about.headshot_url} alt={player.name} className="h-full w-full object-cover" />
                 ) : (
@@ -140,7 +140,7 @@ export function PlayerCardHeader({
                 )}
             </div>
             <div className="min-w-0">
-              <h2 className="max-w-2xl break-words text-[1.7rem] font-black italic leading-[0.92] tracking-tight text-white sm:text-5xl">
+              <h2 className="max-w-2xl break-words text-[1.7rem] font-semibold leading-[0.98] tracking-tight text-white sm:text-5xl">
                 {player.name}
               </h2>
               <p className="mt-2 truncate text-[10px] font-black uppercase tracking-[0.15em] text-white/80 sm:mt-3 sm:text-xs sm:tracking-[0.18em]">

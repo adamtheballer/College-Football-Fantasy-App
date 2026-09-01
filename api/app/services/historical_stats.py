@@ -36,6 +36,11 @@ from collegefootballfantasy_api.app.services.scoring_service import calculate_pl
 
 
 TRUSTED_PROVIDER_MAPPING_STATUSES = {"verified", "manual", "legacy_backfill", "auto_matched"}
+HISTORICAL_PROVIDER_PRIORITY = {
+    "google_season_stats": 0,
+    "espn": 1,
+    "google_preseason_sheet": 2,
+}
 
 
 def canonical_json_hash(payload: dict[str, Any]) -> str:
@@ -67,6 +72,30 @@ def resolve_espn_player_id(db: Session, player: Player) -> str | None:
         if status in TRUSTED_PROVIDER_MAPPING_STATUSES or confidence >= 0.9:
             return str(mapping.provider_player_id).strip() or None
     return legacy_espn_player_id(player.external_id)
+
+
+def canonical_historical_season_rows(
+    db: Session,
+    *,
+    player_id: int,
+    season: int | None = None,
+) -> list[PlayerHistoricalSeasonStat]:
+    """Return one authoritative row per player, season, team, and season type."""
+
+    query = db.query(PlayerHistoricalSeasonStat).filter(PlayerHistoricalSeasonStat.player_id == player_id)
+    if season is not None:
+        query = query.filter(PlayerHistoricalSeasonStat.season == season)
+    rows = query.order_by(PlayerHistoricalSeasonStat.season.desc(), PlayerHistoricalSeasonStat.id.desc()).all()
+    canonical_rows: dict[tuple[int, str, str | None], PlayerHistoricalSeasonStat] = {}
+    for row in rows:
+        key = (row.season, row.season_type, row.team_name)
+        existing = canonical_rows.get(key)
+        if existing is None or (
+            HISTORICAL_PROVIDER_PRIORITY.get(row.provider, 99)
+            < HISTORICAL_PROVIDER_PRIORITY.get(existing.provider, 99)
+        ):
+            canonical_rows[key] = row
+    return sorted(canonical_rows.values(), key=lambda row: (row.season, row.id), reverse=True)
 
 
 def _team_id_for_provider_team(db: Session, provider_team_id: str | None, team_name: str | None) -> int | None:
@@ -445,10 +474,7 @@ def get_player_historical_stats_response(
     # which made already-imported Google season rows invisible to users.
     # Treat the player-history table as canonical and select one authoritative
     # row for each recorded season/team rather than binding the UI to a source.
-    query = db.query(PlayerHistoricalSeasonStat).filter(PlayerHistoricalSeasonStat.player_id == player.id)
-    if season:
-        query = query.filter(PlayerHistoricalSeasonStat.season == season)
-    rows = query.order_by(PlayerHistoricalSeasonStat.season.desc(), PlayerHistoricalSeasonStat.id.desc()).all()
+    rows = canonical_historical_season_rows(db, player_id=player.id, season=season)
     if not rows:
         provider_player_id = resolve_espn_player_id(db, player)
         return PlayerHistoricalStatsResponse(
@@ -459,21 +485,13 @@ def get_player_historical_stats_response(
             seasons=[],
         )
 
-    provider_priority = {"google_season_stats": 0, "espn": 1, "google_preseason_sheet": 2}
-    canonical_rows: dict[tuple[int, str, str | None], PlayerHistoricalSeasonStat] = {}
-    for row in rows:
-        key = (row.season, row.season_type, row.team_name)
-        existing = canonical_rows.get(key)
-        if existing is None or provider_priority.get(row.provider, 99) < provider_priority.get(existing.provider, 99):
-            canonical_rows[key] = row
-    selected_rows = sorted(canonical_rows.values(), key=lambda row: (row.season, row.id), reverse=True)
-    seasons = [_season_read(row) for row in selected_rows]
+    seasons = [_season_read(row) for row in rows]
     return PlayerHistoricalStatsResponse(
         player_id=player.id,
         provider="verified_import",
         status="available",
         selected_season=seasons[0].season,
-        available_seasons=sorted({row.season for row in selected_rows}, reverse=True),
+        available_seasons=sorted({row.season for row in rows}, reverse=True),
         seasons=seasons,
     )
 

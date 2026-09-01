@@ -471,7 +471,7 @@ def get_player_card_endpoint(
 @router.get("/{player_id}/game-log", response_model=PlayerGameLogRead)
 def get_player_game_log_endpoint(
     player_id: int,
-    season: int = Query(2026, ge=2000, le=2100),
+    season: int | None = Query(default=None, ge=2000, le=2100),
     league_id: int | None = Query(default=None, ge=1),
     db: Session = Depends(get_db),
 ) -> PlayerGameLogRead:

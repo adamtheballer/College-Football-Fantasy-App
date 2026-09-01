@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import {
   Bell,
-  CalendarClock,
   Clock,
   ShieldCheck,
 } from "lucide-react";
@@ -11,7 +10,7 @@ import { EmptyState, SkeletonState } from "@/components/states";
 import { LeagueMatchupCarousel } from "@/components/league/LeagueMatchupCarousel";
 import { formatDisplayedProbabilityPair } from "@/components/league/WinChanceMeter";
 import { Button } from "@/components/ui/button";
-import { PositionBadge, StatusBadge, SurfaceCard } from "@/components/fantasy";
+import { PageHeader, PositionBadge, StatusBadge, SurfaceCard } from "@/components/fantasy";
 import { PublicLegalLinks } from "@/components/legal/PublicLegalLinks";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
@@ -218,14 +217,13 @@ export default function Index() {
   const ownedTeamName = workspace?.owned_team?.name ?? "Your Team";
 
   return (
-    <div className="mx-auto w-full touch-pan-y max-w-7xl space-y-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] pt-1 sm:space-y-6 sm:pb-24 sm:pt-3">
-      <section className="rounded-lg border border-cfb-border-subtle bg-cfb-surface p-3 shadow-sm sm:p-5">
-        <div className="mb-4 border-b border-cfb-border-subtle px-1 pb-4 sm:mb-5">
-          <p className="cfb-micro-label text-cfb-brand">League dashboard</p>
-          <h1 className="mt-1 text-2xl font-black tracking-[-0.04em] text-cfb-text-primary sm:text-3xl">
-            Good to see you, {user?.firstName ?? "Manager"}.
-          </h1>
-        </div>
+    <div className="mx-auto w-full max-w-7xl space-y-6 pb-[calc(env(safe-area-inset-bottom)+5rem)] pt-1 sm:pb-16 sm:pt-3">
+      <section className="space-y-4">
+        <PageHeader
+          eyebrow="League dashboard"
+          title={`Good to see you, ${user?.firstName ?? "Manager"}.`}
+          description="Your current league, matchup, and time-sensitive decisions."
+        />
         {leaguesLoading ? (
           <SkeletonState rows={1} label="Loading your league matchups" />
         ) : leagues.length === 0 ? (
@@ -249,19 +247,19 @@ export default function Index() {
 
       <SaturdayPick6 embedded />
 
-      <section className="grid gap-6 xl:grid-cols-2">
+      <section className="grid gap-4 xl:grid-cols-2">
         <SurfaceCard variant="default" padding="none">
-            <div className="border-b border-cfb-border-subtle px-5 py-4 sm:px-6">
+            <div className="cfb-data-section-header">
               <p className="cfb-micro-label text-cfb-brand">Roster Status</p>
               <h2 className="mt-1 text-xl font-black text-cfb-text-primary">{ownedTeamName}</h2>
             </div>
-            <div className="grid gap-3 p-5 sm:grid-cols-2 sm:p-6">
-              <div className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised/55 p-4">
+            <div className="grid divide-y divide-cfb-border-subtle sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+              <div className="p-4 sm:p-5">
                 <ShieldCheck className="h-5 w-5 text-cfb-success" aria-hidden="true" />
                 <p className="mt-3 text-2xl font-black text-cfb-text-primary">{rosterSize}</p>
                 <p className="text-xs font-semibold text-cfb-text-muted">Players rostered</p>
               </div>
-              <div className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised/55 p-4">
+              <div className="p-4 sm:p-5">
                 <PositionBadge position="FLEX" />
                 <p className="mt-3 text-sm font-bold text-cfb-text-secondary">
                   {rosterSize > 0 ? "Roster is ready for lineup review." : "Roster fills after the draft."}
@@ -271,7 +269,7 @@ export default function Index() {
         </SurfaceCard>
 
         <SurfaceCard variant="default" padding="none">
-            <div className="border-b border-cfb-border-subtle px-5 py-4 sm:px-6">
+            <div className="cfb-data-section-header">
               <p className="cfb-micro-label text-cfb-brand">Upcoming Drafts</p>
             </div>
             {upcomingDrafts.length === 0 ? (
@@ -280,7 +278,7 @@ export default function Index() {
               </div>
             ) : (
               upcomingDrafts.map((league) => (
-                <div key={league.id} className="flex items-center gap-3 border-b border-cfb-border-subtle px-5 py-4 last:border-b-0 sm:px-6">
+                <div key={league.id} className="cfb-data-row flex items-center gap-3 px-4 py-3 sm:px-5">
                   <Clock className="h-4 w-4 text-cfb-gold" aria-hidden="true" />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-black text-cfb-text-primary">{league.name}</p>
@@ -294,9 +292,9 @@ export default function Index() {
         </SurfaceCard>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+      <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
         <SurfaceCard variant="default" padding="none">
-          <div className="border-b border-cfb-border-subtle px-5 py-4 sm:px-6">
+          <div className="cfb-data-section-header">
             <p className="cfb-micro-label text-cfb-brand">League Standings</p>
           </div>
           {standings.length === 0 ? (
@@ -305,7 +303,7 @@ export default function Index() {
             </div>
           ) : (
             standings.slice(0, 5).map((standing, index) => (
-              <div key={standing.team_id} className="flex items-center justify-between border-b border-cfb-border-subtle px-5 py-4 last:border-b-0 sm:px-6">
+              <div key={standing.team_id} className="cfb-data-row flex items-center justify-between px-4 py-3 sm:px-5">
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="font-display text-xl font-black text-cfb-brand">#{standing.rank ?? index + 1}</span>
                   <p className="truncate text-sm font-black text-cfb-text-primary">{standing.team_name}</p>
@@ -319,7 +317,7 @@ export default function Index() {
         </SurfaceCard>
 
         <SurfaceCard variant="default" padding="none">
-          <div className="flex items-center justify-between border-b border-cfb-border-subtle px-5 py-4 sm:px-6">
+          <div className="cfb-data-section-header">
             <div>
               <p className="cfb-micro-label text-cfb-brand">League Alerts</p>
               <h2 className="mt-1 text-xl font-black text-cfb-text-primary">What needs attention</h2>
@@ -336,8 +334,8 @@ export default function Index() {
             </div>
           ) : (
             alerts.map((alert) => (
-              <div key={alert.id} className="flex items-start gap-4 border-b border-cfb-border-subtle px-5 py-5 last:border-b-0 sm:px-6">
-                <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-cfb-border-subtle bg-cfb-surface-raised text-cfb-brand">
+              <div key={alert.id} className="cfb-data-row flex items-start gap-4 px-4 py-4 sm:px-5">
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-sm bg-cfb-surface-raised text-cfb-brand">
                   <Bell className="h-4 w-4" aria-hidden="true" />
                 </div>
                 <div className="min-w-0">
@@ -350,10 +348,6 @@ export default function Index() {
         </SurfaceCard>
       </section>
 
-      <div className="rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised px-5 py-4 text-sm font-semibold text-cfb-text-secondary">
-        <CalendarClock className="mr-2 inline h-4 w-4 text-cfb-gold" aria-hidden="true" />
-        Deadline and lock warnings should always be checked before kickoff.
-      </div>
     </div>
   );
 }

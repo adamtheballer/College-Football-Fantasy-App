@@ -39,6 +39,7 @@ type AvailablePlayerRow = {
   id: number;
   name: string;
   school: string | null;
+  opponent: string | null;
   position: string | null;
   weekly_projected_fantasy_points: number | null;
   final_fantasy_points: number | null;
@@ -150,6 +151,8 @@ export const waiverWeekPoints = (
   };
 };
 
+export const waiverOpponentLabel = (opponent: string | null | undefined) => opponent?.trim() || "—";
+
 export default function LeagueWaivers() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
@@ -169,7 +172,6 @@ export default function LeagueWaivers() {
   });
   const waiverQuery = useLeagueWaiverTab(parsedLeagueId, 1000, 0, postDraft);
   const waiverData = waiverQuery.data;
-  const isFreeAgentPhase = waiverData?.waiver_rules.phase === "free_agents";
   const nextWaiverProcessAt = typeof waiverData?.waiver_rules.next_process_at === "string"
     ? waiverData.waiver_rules.next_process_at
     : null;
@@ -206,7 +208,7 @@ export default function LeagueWaivers() {
       .filter((player) => position === "ALL" || (player.position ?? "").toUpperCase() === position)
       .filter((player) => {
         if (!query) return true;
-        return [player.name, player.school, player.position]
+        return [player.name, player.school, player.opponent, player.position]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(query));
       });
@@ -277,6 +279,7 @@ export default function LeagueWaivers() {
       id: claim.add_player_id,
       name: claim.add_player_name,
       school: null,
+      opponent: null,
       position: null,
       weekly_projected_fantasy_points: 0,
       final_fantasy_points: null,
@@ -428,7 +431,7 @@ export default function LeagueWaivers() {
             <div className="rounded-2xl border border-sky-300/15 bg-sky-300/[0.06] p-4">
               <p className="text-sm font-black text-slate-50">Add: {claimPlayer?.name}</p>
               <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                {claimPlayer?.position ?? "-"} · {claimPlayer?.school ?? "-"} · {(() => {
+                {claimPlayer?.position ?? "-"} · {claimPlayer?.school ?? "-"} · {claimPlayer?.opponent ? `vs ${claimPlayer.opponent}` : "Opponent unavailable"} · {(() => {
                   const points = waiverWeekPoints(
                     claimPlayer?.final_fantasy_points,
                     claimPlayer?.weekly_projected_fantasy_points,
@@ -509,9 +512,7 @@ export default function LeagueWaivers() {
           <div>
             <h1 className="cfb-display-title text-3xl text-cfb-text-primary sm:text-4xl">Available Players</h1>
             <p className="mt-1.5 max-w-2xl text-sm text-cfb-text-secondary sm:mt-2">
-              {isFreeAgentPhase
-                ? "This week’s waivers have cleared. Remaining unrostered players are instant adds with no FAAB or priority; each player locks at their own kickoff."
-                : `Waiver bids are open until ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}. After processing, remaining unrostered players become instant adds until their own kickoff.`}
+              Unrostered players are instant adds until their own kickoff. Once a player’s game has started, claims process at ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}.
             </p>
           </div>
           <p className="text-xs font-semibold text-cfb-text-secondary sm:hidden">
@@ -547,9 +548,7 @@ export default function LeagueWaivers() {
                 Available Players
               </h2>
               <p className="mt-1.5 text-xs font-semibold leading-5 text-cfb-text-secondary sm:mt-2">
-                {isFreeAgentPhase
-                  ? "Waivers cleared for this week. Add eligible players immediately; no bid or priority is used."
-                  : `Claims process at ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}. Eligible players become instant adds only after the clear.`}
+                Players are instant adds before their own kickoff. After kickoff, claims process at ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}.
               </p>
             </div>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -640,7 +639,7 @@ export default function LeagueWaivers() {
                       </span>
                     </div>
                     <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-[0.1em] text-cfb-text-muted">
-                      {player.school ?? "School unavailable"}
+                      {player.school ?? "School unavailable"} · {player.opponent ? `vs ${player.opponent}` : "Opponent unavailable"}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
@@ -683,12 +682,13 @@ export default function LeagueWaivers() {
             })}
             </div>
             <div className="hidden overflow-x-auto sm:block">
-            <table className="min-w-[980px] w-full table-fixed text-left">
+            <table className="min-w-[1100px] w-full table-fixed text-left">
               <thead className="border-b border-cfb-border-subtle bg-cfb-surface-raised">
                 <tr className="text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
                   <th className="w-[7rem] min-w-[7rem] whitespace-nowrap px-5 py-3 text-right">RK</th>
                   <th className="px-4 py-3">Player</th>
                   <th className="w-44 px-4 py-3">School</th>
+                  <th className="w-44 px-4 py-3">Opponent</th>
                   <th className="w-24 px-4 py-3">POS</th>
                   <th className="w-32 px-4 py-3 text-right">
                     Week {waiverData?.current_period?.week ?? 1} Pts
@@ -739,6 +739,9 @@ export default function LeagueWaivers() {
                       </td>
                       <td className="px-4 py-3 align-middle text-sm font-semibold text-cfb-text-secondary">
                         {player.school ?? "-"}
+                      </td>
+                      <td className="px-4 py-3 align-middle text-sm font-semibold text-cfb-text-secondary">
+                        {waiverOpponentLabel(player.opponent)}
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <span

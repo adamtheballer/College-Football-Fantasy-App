@@ -479,6 +479,7 @@ export interface LeagueWaiverPlayer {
   id: number;
   name: string;
   school: string | null;
+  opponent: string | null;
   position: string | null;
   weekly_projected_fantasy_points: number | null;
   /** Present only when a verified final box score exists for this week. */

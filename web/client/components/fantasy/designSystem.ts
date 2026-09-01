@@ -6,15 +6,15 @@ export const surfaceCardVariants = cva(
     variants: {
       variant: {
         default:
-          "rounded-lg border-cfb-border-subtle bg-cfb-surface shadow-sm",
+          "rounded-md border-cfb-border-subtle bg-cfb-surface",
         raised:
-          "rounded-lg border-cfb-border-subtle bg-cfb-surface-raised shadow-sm",
+          "rounded-md border-cfb-border-subtle bg-cfb-surface-raised",
         interactive:
-          "rounded-lg border-cfb-border-subtle bg-cfb-surface hover:border-cfb-border-strong hover:bg-cfb-surface-hover",
+          "rounded-md border-cfb-border-subtle bg-cfb-surface hover:border-cfb-border-strong hover:bg-cfb-surface-hover",
         scoreboard:
-          "rounded-lg border-cfb-border-subtle bg-cfb-surface-raised shadow-sm",
+          "rounded-md border-cfb-border-subtle bg-cfb-surface-raised",
         field:
-          "rounded-lg border-cfb-border-subtle bg-cfb-surface shadow-sm",
+          "rounded-md border-cfb-border-subtle bg-cfb-surface",
       },
       padding: {
         none: "p-0",
@@ -72,16 +72,16 @@ export const statCardToneClasses = {
 export type StatCardTone = keyof typeof statCardToneClasses;
 
 export const statusBadgeClasses = {
-  live: "border-score-live/30 bg-score-live/[0.08] text-emerald-800",
-  projected: "border-score-projected/30 bg-score-projected/[0.08] text-blue-800",
-  final: "border-score-final/30 bg-score-final/[0.08] text-slate-700",
-  corrected: "border-score-corrected/30 bg-score-corrected/[0.08] text-violet-800",
-  delayed: "border-score-delayed/35 bg-score-delayed/[0.08] text-amber-800",
-  unavailable: "border-score-unavailable/30 bg-score-unavailable/[0.08] text-slate-600",
-  locked: "border-score-locked/35 bg-score-locked/[0.08] text-orange-800",
-  success: "border-cfb-success/30 bg-cfb-success/[0.08] text-emerald-800",
-  warning: "border-cfb-warning/35 bg-cfb-warning/[0.08] text-amber-800",
-  danger: "border-cfb-danger/35 bg-cfb-danger/[0.08] text-red-800",
+  live: "border-score-live/35 bg-score-live/[0.10] text-emerald-200",
+  projected: "border-score-projected/35 bg-score-projected/[0.10] text-blue-200",
+  final: "border-score-final/35 bg-score-final/[0.10] text-slate-200",
+  corrected: "border-score-corrected/35 bg-score-corrected/[0.10] text-violet-200",
+  delayed: "border-score-delayed/40 bg-score-delayed/[0.10] text-amber-200",
+  unavailable: "border-score-unavailable/35 bg-score-unavailable/[0.10] text-slate-300",
+  locked: "border-score-locked/40 bg-score-locked/[0.10] text-orange-200",
+  success: "border-cfb-success/35 bg-cfb-success/[0.10] text-emerald-200",
+  warning: "border-cfb-warning/40 bg-cfb-warning/[0.10] text-amber-200",
+  danger: "border-cfb-danger/35 bg-cfb-danger/[0.10] text-red-200",
   neutral: "border-cfb-border-subtle bg-cfb-surface-raised/75 text-cfb-text-secondary",
 } as const;
 
@@ -102,13 +102,13 @@ export const statusBadgeLabels: Record<StatusBadgeVariant, string> = {
 };
 
 export const positionBadgeClasses = {
-  QB: "border-blue-300/60 bg-blue-50 text-blue-800",
-  RB: "border-emerald-300/60 bg-emerald-50 text-emerald-800",
-  WR: "border-violet-300/60 bg-violet-50 text-violet-800",
-  TE: "border-amber-300/60 bg-amber-50 text-amber-800",
-  K: "border-cyan-300/60 bg-cyan-50 text-cyan-800",
+  QB: "border-blue-300/35 bg-blue-400/[0.10] text-blue-200",
+  RB: "border-emerald-300/35 bg-emerald-400/[0.10] text-emerald-200",
+  WR: "border-violet-300/35 bg-violet-400/[0.10] text-violet-200",
+  TE: "border-amber-300/35 bg-amber-400/[0.10] text-amber-200",
+  K: "border-cyan-300/35 bg-cyan-400/[0.10] text-cyan-200",
   FLEX: "border-cfb-crimson/60 bg-cfb-crimson/[0.08] text-cfb-crimson",
-  DST: "border-slate-300/60 bg-slate-50 text-slate-700",
+  DST: "border-slate-300/35 bg-slate-200/[0.10] text-slate-200",
   DEFAULT: "border-cfb-border-subtle bg-cfb-surface-raised/75 text-cfb-text-secondary",
 } as const;
 

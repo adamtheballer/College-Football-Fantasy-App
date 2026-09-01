@@ -40,15 +40,15 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
               data-guide-nav={item.name}
               data-nav-active={isActive ? "true" : "false"}
               className={cn(
-                "group relative flex min-h-[44px] w-full items-center gap-3 rounded-md border px-3 py-2 text-left font-ui text-sm font-bold uppercase tracking-[0.06em] transition-colors duration-150",
+                "group relative flex min-h-[42px] w-full items-center gap-3 rounded-sm border px-3 py-2 text-left font-ui text-sm font-semibold transition-colors duration-150",
                 isSignOut
-                  ? "border-transparent text-red-700 hover:border-cfb-danger/30 hover:bg-cfb-danger/[0.06] hover:text-red-800"
+                    ? "border-transparent text-red-300 hover:border-cfb-danger/30 hover:bg-cfb-danger/[0.06] hover:text-red-200"
                   : isAuth
                     ? "border-cfb-border-subtle bg-cfb-surface-raised text-cfb-text-secondary hover:border-cfb-brand/55 hover:bg-cfb-brand/[0.08] hover:text-cfb-text-primary focus-visible:border-cfb-brand/55 focus-visible:bg-cfb-brand/[0.08]"
                     : isActive
-                      ? "border-cfb-brand/25 bg-cfb-brand/[0.08] text-cfb-text-primary shadow-[inset_3px_0_0_hsl(var(--brand-primary))]"
+                    ? "border-transparent bg-cfb-brand/[0.08] text-cfb-text-primary shadow-[inset_2px_0_0_hsl(var(--brand-primary))]"
                       : isAdmin
-                        ? "border-cfb-gold/20 text-cfb-text-secondary hover:border-cfb-gold/40 hover:bg-cfb-gold/[0.08] hover:text-cfb-text-primary"
+                        ? "border-transparent text-cfb-text-secondary hover:border-cfb-gold/40 hover:bg-cfb-gold/[0.08] hover:text-cfb-text-primary"
                         : "border-transparent text-cfb-text-muted hover:border-cfb-border-subtle hover:bg-cfb-surface-hover/55 hover:text-cfb-text-primary",
               )}
             >

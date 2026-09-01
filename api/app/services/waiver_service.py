@@ -6,13 +6,11 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
-from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
@@ -37,7 +35,7 @@ from collegefootballfantasy_api.app.models.waiver_processing_run import WaiverPr
 from collegefootballfantasy_api.app.schemas.waiver import FreeAgentAdd, FreeAgentAddRead, WaiverClaimCreate, WaiverClaimRead
 from collegefootballfantasy_api.app.services.chat_service import create_system_chat_message
 from collegefootballfantasy_api.app.services.league_weeks import current_cfb_week_state
-from collegefootballfantasy_api.app.services.player_lock_service import is_player_locked
+from collegefootballfantasy_api.app.services.player_lock_service import game_context_for_players, is_player_locked
 from collegefootballfantasy_api.app.services.player_pool_filters import is_canonical_fantasy_player
 from collegefootballfantasy_api.app.services.live_scoring_readiness import ensure_official_acquisition_identity
 from collegefootballfantasy_api.app.services.roster_slots import first_open_eligible_slot
@@ -487,13 +485,76 @@ def _ensure_player_available(db: Session, league_id: int, player_id: int, *, now
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player is not currently available on waivers")
 
 
-def _has_completed_waiver_period(db: Session, league_id: int) -> bool:
-    return (
-        db.query(WaiverPeriod.id)
-        .filter(WaiverPeriod.league_id == league_id, WaiverPeriod.status == "completed")
-        .first()
-        is not None
-    )
+def waiver_player_availability_states(
+    db: Session,
+    *,
+    league: League,
+    player_ids: set[int],
+    now: datetime | None = None,
+    settings: LeagueSettings | None = None,
+    player_schools: dict[int, str | None] | None = None,
+    availability_by_player: dict[int, PlayerWaiverAvailability] | None = None,
+    game_starts_by_player: dict[int, datetime | None] | None = None,
+) -> dict[int, tuple[str, datetime | None]]:
+    """Resolve waiver availability from each player's own kickoff.
+
+    Unrostered players remain instant adds until their current-week game starts.
+    Once kickoff has passed, that player moves into the waiver pool for the next
+    configured processing run. Explicit post-drop holds and roster/claim locks
+    still take priority over this dynamic state.
+    """
+
+    if not player_ids:
+        return {}
+
+    current = _as_utc(now or _now())
+    if player_schools is None:
+        player_schools = {
+            player_id: school
+            for player_id, school in db.query(Player.id, Player.school).filter(Player.id.in_(player_ids)).all()
+        }
+    if availability_by_player is None:
+        availability_by_player = {
+            row.player_id: row
+            for row in db.query(PlayerWaiverAvailability)
+            .filter(
+                PlayerWaiverAvailability.league_id == league.id,
+                PlayerWaiverAvailability.player_id.in_(player_ids),
+            )
+            .all()
+        }
+    if game_starts_by_player is None:
+        settings = settings or _league_settings(db, league.id)
+        week_state = current_cfb_week_state(
+            league.season_year,
+            now=current,
+            timezone_name=_league_timezone_name(db, league, settings),
+        )
+        game_starts_by_player, _opponents, _locations = game_context_for_players(
+            db,
+            player_ids=player_ids,
+            season=league.season_year,
+            week=week_state.week,
+            player_schools=player_schools,
+        )
+
+    resolved: dict[int, tuple[str, datetime | None]] = {}
+    for player_id in player_ids:
+        availability = availability_by_player.get(player_id)
+        if availability and availability.state in {"rostered", "claim_pending", "game_locked"}:
+            resolved[player_id] = (availability.state, availability.available_at)
+            continue
+        if availability and availability.state == "waiver_locked":
+            if availability.available_at is None or _as_utc(availability.available_at) > current:
+                resolved[player_id] = ("waiver_locked", availability.available_at)
+                continue
+
+        kickoff = game_starts_by_player.get(player_id)
+        if kickoff is not None and _as_utc(kickoff) <= current:
+            resolved[player_id] = ("waivers", None)
+        else:
+            resolved[player_id] = ("free_agent", availability.available_at if availability else None)
+    return resolved
 
 
 def _ensure_player_is_free_agent(
@@ -514,26 +575,17 @@ def _ensure_player_is_free_agent(
     league = db.get(League, league_id)
     if league is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league not found")
-    if waiver_window_state(db, league, now=now).mode != "free_agents":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player is currently available on waivers")
-
     availability = _availability_row(db, league_id, player_id, for_update=True)
-    if availability is None:
-        if not _has_completed_waiver_period(db, league_id):
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player is currently available on waivers")
-        return
-    if availability.state in {"rostered", "game_locked", "claim_pending"}:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player is not currently a free agent")
-    if availability.state in {"waiver_locked", "waivers"}:
-        if availability.available_at is None or _as_utc(availability.available_at) > now:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player is currently available on waivers")
-        availability.state = "free_agent"
-        availability.available_at = None
-        availability.waiver_period_id = None
-        db.add(availability)
-        return
-    if availability.state != "free_agent":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="player is not currently a free agent")
+    state, _available_at = waiver_player_availability_states(
+        db,
+        league=league,
+        player_ids={player_id},
+        now=now,
+        availability_by_player={player_id: availability} if availability else {},
+    )[player_id]
+    if state != "free_agent":
+        detail = "player is currently available on waivers" if state == "waivers" else "player is not currently a free agent"
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
 
 
 def _validate_no_kicked_off_players(
@@ -546,24 +598,21 @@ def _validate_no_kicked_off_players(
     if not player_ids:
         return
     players = db.query(Player).filter(Player.id.in_(player_ids)).all()
-    school_names = {player.school for player in players if player.school}
-    if not school_names:
-        return
+    player_schools = {player.id: player.school for player in players}
     current = _as_utc(now or _now())
     settings = _league_settings(db, league.id)
     week_state = current_cfb_week_state(league.season_year, now=current, timezone_name=_league_timezone_name(db, league, settings))
-    games = (
-        db.query(Game)
-        .filter(Game.season == league.season_year, Game.week == week_state.week, Game.start_date.isnot(None))
-        .filter(or_(Game.home_team.in_(school_names), Game.away_team.in_(school_names)))
-        .all()
+    game_starts, _opponents, _locations = game_context_for_players(
+        db,
+        player_ids=set(player_schools),
+        season=league.season_year,
+        week=week_state.week,
+        player_schools=player_schools,
     )
     locked_schools = {
-        school
-        for game in games
-        if game.start_date is not None and _as_utc(game.start_date) <= current
-        for school in (game.home_team, game.away_team)
-        if school in school_names
+        player_schools[player_id]
+        for player_id, kickoff in game_starts.items()
+        if kickoff is not None and _as_utc(kickoff) <= current and player_schools.get(player_id)
     }
     if locked_schools:
         raise HTTPException(
@@ -658,8 +707,19 @@ def submit_waiver_claim(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="player is not in this season's approved waiver pool")
     ensure_official_acquisition_identity(db, league=league, player=add_player)
     _ensure_player_available(db, league.id, add_player.id, now=now)
+    availability_state = waiver_player_availability_states(
+        db,
+        league=league,
+        player_ids={add_player.id},
+        now=now,
+    )[add_player.id][0]
+    if availability_state == "free_agent":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="player is available for an instant add until kickoff",
+        )
     drop_entry = _drop_entry_for_payload(db, team, payload.drop_roster_entry_id)
-    _validate_no_kicked_off_players(db, league, {add_player.id, drop_entry.player_id if drop_entry else 0} - {0}, now=now)
+    _validate_no_kicked_off_players(db, league, {drop_entry.player_id} if drop_entry else set(), now=now)
     _best_slot_after_drop(
         db,
         team,
@@ -1043,7 +1103,7 @@ def _validate_claim_for_processing(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="claim player is not in this season's approved waiver pool")
     _ensure_player_available(db, league.id, claim.add_player_id, now=now)
     drop_entry = _load_drop_entry(db, claim, team)
-    _validate_no_kicked_off_players(db, league, {claim.add_player_id, drop_entry.player_id if drop_entry else 0} - {0}, now=now)
+    _validate_no_kicked_off_players(db, league, {drop_entry.player_id} if drop_entry else set(), now=now)
     if _waiver_type(settings) == "faab" and claim.faab_bid > _remaining_faab(priority):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="insufficient FAAB budget")
     _validate_drop_player_unlocked(db, league, drop_entry.player_id if drop_entry else None, now=now)

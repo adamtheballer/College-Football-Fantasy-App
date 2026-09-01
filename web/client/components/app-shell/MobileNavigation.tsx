@@ -52,7 +52,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
       <nav
         aria-label="Primary mobile navigation"
         className={cn(
-          "relative z-[170] mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))] mt-2 shrink-0 rounded-lg border border-cfb-border-subtle bg-cfb-sidebar p-1 shadow-sm transition-opacity lg:hidden",
+          "relative z-[170] mt-2 shrink-0 border-x-0 border-b-0 border-t border-cfb-border-subtle bg-cfb-sidebar px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 transition-opacity lg:hidden",
           isMoreOpen && "pointer-events-none opacity-0",
           guidedNavItem && "z-[1205] pointer-events-none",
         )}
@@ -75,7 +75,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
                 data-guide-nav={item.name}
                 aria-label={item.badge ? `${item.name}: ${item.badge} unread chat messages` : item.name}
                 className={cn(
-                  "font-ui relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[11px] font-bold uppercase tracking-[0.04em] leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent",
+                  "font-ui relative flex min-h-[54px] min-w-0 flex-col items-center justify-center gap-1 rounded-sm px-0.5 text-[11px] font-semibold leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-transparent",
                   isGuided
                     ? "bg-cfb-brand/[0.18] text-cfb-text-primary ring-1 ring-cfb-brand/80 after:bg-cfb-brand"
                     : isActive
@@ -108,7 +108,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
             aria-expanded={isMoreOpen}
             onClick={() => setIsMoreOpen(true)}
             className={cn(
-              "font-ui relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[11px] font-bold uppercase tracking-[0.04em] leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent",
+              "font-ui relative flex min-h-[54px] min-w-0 flex-col items-center justify-center gap-1 rounded-sm px-0.5 text-[11px] font-semibold leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-transparent",
               isGuidedDrawerItem
                 ? "bg-cfb-brand/[0.18] text-cfb-text-primary ring-1 ring-cfb-brand/80 after:bg-cfb-brand"
                 : isMoreActive

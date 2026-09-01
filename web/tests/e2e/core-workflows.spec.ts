@@ -427,7 +427,10 @@ test.describe("critical browser workflows", () => {
       scrolled: true,
       bodyOverflow: "",
     });
-    await expect(page.getByText("Deadline and lock warnings should always be checked before kickoff.")).toBeVisible();
+    // This route is intentionally in the empty-league state. Assert the
+    // current dashboard content instead of preserving retired explanatory
+    // copy; the purpose of this workflow is the mobile page scroller.
+    await expect(page.getByText("No leagues joined yet", { exact: true })).toBeVisible();
 
     await page.getByRole("navigation", { name: "Primary mobile navigation" }).getByRole("link", { name: "Leagues" }).click();
     await expect(page).toHaveURL(/\/leagues$/);
