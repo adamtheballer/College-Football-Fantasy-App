@@ -91,7 +91,7 @@ export default function LeagueWatchlist() {
   }
 
   return (
-    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-0 py-4 sm:px-6 sm:py-8">
+    <main className="relative mx-auto flex w-full max-w-none flex-col gap-6 px-0 py-4 sm:px-0 sm:py-8">
       <div className="space-y-4">
         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cfb-brand">
           League Watchlist
