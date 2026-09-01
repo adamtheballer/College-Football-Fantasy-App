@@ -235,7 +235,7 @@ export default function LeagueSettings() {
   }
 
   return (
-    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-4 px-0 py-4 sm:px-6 sm:py-8">
+    <main className="relative mx-auto flex w-full max-w-none flex-col gap-4 px-0 py-4 sm:px-0 sm:py-8">
       <div className="space-y-3">
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-cfb-brand">
           League Command Center

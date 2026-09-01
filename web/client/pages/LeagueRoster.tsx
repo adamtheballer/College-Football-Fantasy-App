@@ -244,7 +244,7 @@ export default function LeagueRoster() {
   }
 
   return (
-    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-4 px-0 pb-24 pt-4 sm:gap-6 sm:px-6 sm:py-8">
+    <main className="relative mx-auto flex w-full max-w-none flex-col gap-4 px-0 pb-24 pt-4 sm:gap-6 sm:px-0 sm:py-8">
       <div className="space-y-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>

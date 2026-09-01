@@ -409,7 +409,7 @@ export default function LeagueWaivers() {
   }
 
   return (
-    <main className="relative mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-0 py-4 sm:px-6 sm:py-8">
+    <main className="relative mx-auto flex w-full max-w-none flex-col gap-6 px-0 py-4 sm:px-0 sm:py-8">
       <Dialog open={Boolean(claimPlayer)} onOpenChange={(open) => {
         if (!open) {
           setClaimPlayer(null);
