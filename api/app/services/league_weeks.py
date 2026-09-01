@@ -40,10 +40,13 @@ def _timezone(timezone_name: str) -> ZoneInfo:
 
 
 def season_week_one_start(season_year: int) -> datetime:
-    anchor = datetime(season_year, 8, 24, tzinfo=timezone.utc)
-    # Week 1 starts on the first Tuesday on or after August 24.  Using the
-    # previous Tuesday shifts the entire season one week early (for 2026 that
-    # incorrectly made August 29 part of Week 2).
+    # Week 1 includes the opening Saturday and the following Thursday-Sunday
+    # slate.  The recurring Tuesday-to-Saturday cadence therefore begins on
+    # the first Tuesday in September: for 2026, Sep. 1 remains Week 1 and
+    # Week 2 begins Sep. 8.  Dates before this anchor are intentionally
+    # clamped to Week 1 by calendar_cfb_week so opening-week games in late
+    # August resolve to the same fantasy matchup.
+    anchor = datetime(season_year, 9, 1, tzinfo=timezone.utc)
     days_until_week_start = (CFB_WEEK_START_WEEKDAY - anchor.weekday()) % 7
     return anchor + timedelta(days=days_until_week_start)
 
