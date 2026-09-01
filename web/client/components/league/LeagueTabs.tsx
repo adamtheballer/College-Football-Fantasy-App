@@ -31,7 +31,10 @@ export function LeagueTabs({
       aria-label="League sections"
       className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain border-b border-cfb-border-subtle touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
-      <div className="flex w-max min-w-full items-stretch gap-7 px-1 sm:gap-10">
+      <div
+        className="flex w-max min-w-full items-stretch gap-7 px-1 sm:gap-10 md:grid md:w-full md:min-w-0 md:gap-0 md:px-0"
+        style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, minmax(0, 1fr))` }}
+      >
       {visibleTabs.map((tab) => {
         const href = `/league/${leagueId}/${tab.path}`;
         const active =
@@ -41,7 +44,7 @@ export function LeagueTabs({
           <Link
             key={tab.path}
             to={href}
-            className={`relative flex min-h-12 shrink-0 items-center px-1 text-xs font-black uppercase tracking-[0.11em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 ${
+            className={`relative flex min-h-12 shrink-0 items-center px-1 text-xs font-black uppercase tracking-[0.11em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 md:justify-self-center ${
               active ? "text-cfb-text-primary" : "text-cfb-text-muted hover:text-cfb-text-secondary"
             }`}
           >

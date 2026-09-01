@@ -164,6 +164,35 @@ test.describe("player card modal", () => {
         return;
       }
       if (url.pathname.endsWith("/players/1/game-log")) {
+        const requestedSeason = Number(url.searchParams.get("season") ?? "2026");
+        if (requestedSeason === 2025) {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              player_id: 1,
+              player_name: "Jeremiah Smith",
+              season: 2025,
+              team_name: "Ohio State",
+              position: "WR",
+              available_seasons: [2026, 2025],
+              season_summary: {
+                teams: ["Ohio State"],
+                games_played: 15,
+                games_started: 15,
+                stats: [
+                  { label: "Receptions", value: 82 },
+                  { label: "Rec Yds", value: 1305 },
+                  { label: "Rec TD", value: 12 },
+                ],
+                fantasy_points: 214.94,
+              },
+              message: "No game log is available for 2025; the schedule has not been imported.",
+              games: [],
+            }),
+          });
+          return;
+        }
         await route.fulfill({
           status: 200,
           contentType: "application/json",
@@ -173,7 +202,7 @@ test.describe("player card modal", () => {
             season: 2026,
             team_name: "Ohio State",
             position: "WR",
-            available_seasons: [2026],
+            available_seasons: [2026, 2025],
             season_summary: {
               teams: ["Ohio State"],
               games_played: 1,
@@ -313,8 +342,22 @@ test.describe("player card modal", () => {
     await expect(dialog.getByText("REC", { exact: true }).last()).toBeVisible();
     await expect(dialog.getByText("REC YDS", { exact: true }).last()).toBeVisible();
     await expect(dialog.getByText("REC TD", { exact: true }).last()).toBeVisible();
+    const summaryValueStyles = await dialog
+      .getByTestId("game-log-season-summary-stat")
+      .evaluateAll((rows) => rows.map((row) => {
+        const value = row.querySelector("span:last-child");
+        return value ? window.getComputedStyle(value).whiteSpace : null;
+      }));
+    expect(summaryValueStyles).not.toContain(null);
+    expect(summaryValueStyles.every((whiteSpace) => whiteSpace === "nowrap")).toBe(true);
+
+    await dialog.getByLabel("Game log season").selectOption("2025");
+    await expect(dialog.getByLabel("2025 season summary")).toBeVisible();
+    await expect(dialog.getByText(/No game log is available for 2025/i)).toHaveCount(0);
+    await expect(dialog.locator("table")).toHaveCount(0);
 
     await page.setViewportSize({ width: 1440, height: 960 });
+    await dialog.getByLabel("Game log season").selectOption("2026");
     await expect(dialog.getByRole("columnheader", { name: "REC", exact: true })).toBeVisible();
     await expect(dialog.getByRole("columnheader", { name: "TAR", exact: true })).toHaveCount(0);
 
