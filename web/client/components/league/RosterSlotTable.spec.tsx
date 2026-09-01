@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -84,6 +84,15 @@ describe("RosterSlotTable", () => {
     expect(screen.getByText("A Very Long Receiver Name That Must Stay Compact")).toBeTruthy();
     expect(screen.getByText("Ohio State · vs Michigan")).toBeTruthy();
     expect(screen.getByText("18.4")).toBeTruthy();
+  });
+
+  it("does not duplicate the position badge beneath a roster player's name", () => {
+    render(<RosterSlotTable title="Starters" players={[projectedReceiver]} />);
+
+    const playerCardButton = screen.getByRole("button", {
+      name: "Open A Very Long Receiver Name That Must Stay Compact player card",
+    });
+    expect(within(playerCardButton).queryByText("WR")).toBeNull();
   });
 
   it("swaps eligible players with two position-badge taps while preserving the player card route", async () => {
