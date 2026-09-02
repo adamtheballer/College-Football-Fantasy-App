@@ -27,3 +27,28 @@ def test_daily_availability_cron_runs_once_at_ten_am_new_york_across_dst():
         timezone_name="America/New_York",
         hour=10,
     )
+
+
+def test_availability_cron_supports_an_evening_recheck_without_dst_duplicates():
+    # 5 PM EDT and 5 PM EST respectively. The paired UTC schedule for the
+    # other daylight-saving offset must continue to no-op.
+    assert should_run_at_local_hour(
+        datetime(2026, 8, 20, 21, tzinfo=timezone.utc),
+        timezone_name="America/New_York",
+        hour=[10, 17],
+    )
+    assert not should_run_at_local_hour(
+        datetime(2026, 8, 20, 22, tzinfo=timezone.utc),
+        timezone_name="America/New_York",
+        hour=[10, 17],
+    )
+    assert should_run_at_local_hour(
+        datetime(2026, 12, 20, 22, tzinfo=timezone.utc),
+        timezone_name="America/New_York",
+        hour=[10, 17],
+    )
+    assert not should_run_at_local_hour(
+        datetime(2026, 12, 20, 21, tzinfo=timezone.utc),
+        timezone_name="America/New_York",
+        hour=[10, 17],
+    )

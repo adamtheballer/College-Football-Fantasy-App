@@ -5,6 +5,7 @@ from collegefootballfantasy_api.app.integrations.conference_availability_reports
     ConferenceReportUnavailable,
     ConferenceReportSource,
     _embedded_report_url,
+    _rendered_report_frame,
     parse_report_document,
 )
 from collegefootballfantasy_api.app.models.injury import Injury
@@ -20,6 +21,33 @@ from collegefootballfantasy_api.app.services.sportsdata_sync import (
     _upsert_official_availability_rows,
 )
 from bs4 import BeautifulSoup
+
+
+class _FakeFrameLocator:
+    def __init__(self, count: int):
+        self._count = count
+        self.first_requested = False
+
+    def count(self) -> int:
+        return self._count
+
+    @property
+    def first(self):
+        self.first_requested = True
+        return self
+
+
+class _FakeFramePage:
+    def __init__(self, embedded_count: int, fallback_count: int):
+        self.embedded = _FakeFrameLocator(embedded_count)
+        self.fallback = _FakeFrameLocator(fallback_count)
+        self.selectors: list[str] = []
+
+    def locator(self, selector: str):
+        self.selectors.append(selector)
+        if selector == "iframe#embedded-app":
+            return self.embedded
+        return self.fallback
 
 
 def test_official_report_parser_requires_a_recognized_public_table():
@@ -65,6 +93,26 @@ def test_report_parser_accepts_explicit_conference_heading_variants_and_skips_tr
     assert rows[0]["team_name"] == "Auburn"
     assert rows[0]["status"] == "Out"
     assert _embedded_report_url(BeautifulSoup(html, "html.parser"), "https://example.test/report") == "https://confinjrepxyz.example.test?source=SECreports"
+
+
+def test_browser_renderer_selects_only_the_dedicated_embedded_report_frame():
+    page = _FakeFramePage(embedded_count=1, fallback_count=3)
+
+    iframe = _rendered_report_frame(page)
+
+    assert iframe is page.embedded
+    assert page.embedded.first_requested
+    assert page.selectors == ["iframe#embedded-app"]
+
+
+def test_browser_renderer_uses_one_fallback_report_frame_when_no_embedded_app_exists():
+    page = _FakeFramePage(embedded_count=0, fallback_count=3)
+
+    iframe = _rendered_report_frame(page)
+
+    assert iframe is page.fallback
+    assert page.fallback.first_requested
+    assert len(page.selectors) == 2
 
 
 def test_official_ir_policy_requires_an_explicit_four_week_minimum():
