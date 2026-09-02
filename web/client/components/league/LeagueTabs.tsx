@@ -7,6 +7,7 @@ const tabs = [
   { label: "Matchup", path: "matchup" },
   { label: "Waiver Wire", path: "waivers" },
   { label: "Watchlist", path: "watchlist" },
+  { label: "Chat", path: "chat" },
   { label: "Settings", path: "settings" },
 ];
 
