@@ -133,7 +133,7 @@ describe("PlayerCardModal helpers", () => {
     );
   });
 
-  it("uses sheet projection stats from the loaded card when the selected row has none", () => {
+  it("uses only season-sheet totals for the season projection section", () => {
     const projectedStats = resolvePlayerCardProjectionStats(
       {
         id: 5278,
@@ -141,6 +141,7 @@ describe("PlayerCardModal helpers", () => {
         school: "California",
         position: "WR",
         projectedPoints: 294.9,
+        hasWeeklyProjection: true,
       },
       {
         player: {
@@ -165,11 +166,11 @@ describe("PlayerCardModal helpers", () => {
     expect(statValue(projectedStats, ["receptions"])).toBe(63);
     expect(statValue(projectedStats, ["rec_yds"])).toBe(925);
     expect(statValue(projectedStats, ["rec_tds"])).toBe(7);
-    expect(statValue(projectedStats, ["fpts"])).toBe(294.9);
+    expect(statValue(projectedStats, ["fpts"])).toBe(199.5);
   });
 
-  it("keeps weekly matchup projection ranges on roster player cards", () => {
-    const projectedStats = resolvePlayerCardProjectionStats({
+  it("does not treat weekly matchup ranges as season totals", () => {
+    const seasonProjectionStats = resolvePlayerCardProjectionStats({
       id: 12,
       name: "Lanorris Sellers",
       school: "South Carolina",
@@ -184,11 +185,7 @@ describe("PlayerCardModal helpers", () => {
       },
     });
 
-    expect(statValue(projectedStats, ["fpts"])).toBe(23.4);
-    expect(statValue(projectedStats, ["floor"])).toBe(14.2);
-    expect(statValue(projectedStats, ["ceiling"])).toBe(34.8);
-    expect(statValue(projectedStats, ["boomProb"])).toBe(0.31);
-    expect(statValue(projectedStats, ["bustProb"])).toBe(0.16);
+    expect(seasonProjectionStats).toBeNull();
   });
 
 });

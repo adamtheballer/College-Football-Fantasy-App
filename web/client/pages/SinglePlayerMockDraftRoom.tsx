@@ -578,6 +578,8 @@ export default function SinglePlayerMockDraftRoom() {
           playerClass: selectedPlayer.playerClass,
           status: selectedPlayer.status,
           projection: selectedPlayer.projection,
+          hasWeeklyProjection: selectedPlayer.hasWeeklyProjection,
+          seasonProjectedPoints: selectedPlayer.sheetProjectedSeasonPoints,
           sheetProjectionStats: selectedPlayer.sheetProjectionStats,
         }}
         title="Scouting Card"
