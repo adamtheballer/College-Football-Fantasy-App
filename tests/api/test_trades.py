@@ -719,6 +719,18 @@ def test_due_trade_worker_waits_until_sunday_reset(client, db_session):
     offer.status = "accepted_pending"
     offer.accepted_at = datetime(2026, 9, 3, 12, 0, tzinfo=timezone.utc)
     offer.process_after = datetime(2026, 9, 3, 12, 0, tzinfo=timezone.utc)
+    # A started traded player, not the mere fact that games are underway,
+    # is what requires the worker to defer until the Sunday settlement window.
+    db_session.add(
+        Game(
+            season=2026,
+            week=1,
+            season_type="regular",
+            start_date=datetime(2026, 9, 3, 15, 0, tzinfo=timezone.utc),
+            home_team=seed["give"].school,
+            away_team="Opponent",
+        )
+    )
     db_session.commit()
 
     result = process_trade_offers_once(

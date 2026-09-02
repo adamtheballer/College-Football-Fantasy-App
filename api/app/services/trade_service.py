@@ -1064,8 +1064,14 @@ def process_trade_offers_once(db: Session, now: datetime | None = None) -> dict[
             failed += 1
             db.commit()
             continue
-        timezone_name = _trade_timezone(db, league.id)
-        if is_cfb_game_week_active(current, timezone_name):
+        # A league-wide game window is not itself a reason to hold a completed
+        # review.  Only a traded player's started/near-kickoff game may defer
+        # this transfer; otherwise a no-veto trade settles when its 24-hour
+        # vote window ends.
+        if _trade_requires_sunday_processing(db, league, offer, current):
+            offer.process_after = next_cfb_trade_process_time(current, _trade_timezone(db, league.id))
+            sync_trade_review_chat_message(db, offer)
+            db.commit()
             continue
         try:
             with db.begin_nested():
