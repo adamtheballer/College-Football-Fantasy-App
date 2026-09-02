@@ -30,6 +30,12 @@ class LeagueBasics(BaseModel):
     description: str | None = Field(default=None, max_length=500)
     icon_url: str | None = Field(default=None, max_length=2048)
 
+    @field_validator("is_private")
+    @classmethod
+    def normalize_invite_only_leagues(cls, _value: bool) -> bool:
+        """Keep legacy clients compatible while enforcing invite-only leagues."""
+        return True
+
     @field_validator("max_teams")
     @classmethod
     def validate_even_manager_count(cls, value: int) -> int:

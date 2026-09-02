@@ -850,10 +850,19 @@ test.describe("critical browser workflows", () => {
 
     await page.goto("/leagues/create");
     await expect(page.getByRole("heading", { name: /Build your league/i })).toBeVisible();
+    await expect(page.getByText("Private league", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("switch")).toHaveCount(0);
     await page.getByRole("button", { name: "Continue to Settings", exact: true }).click();
     await expect(page.getByRole("heading", { name: "League Settings", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Continue to Draft", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Draft Schedule", exact: true })).toBeVisible();
+    const pickTimer = page.locator('input[type="number"]');
+    await expect(pickTimer).toHaveValue("90");
+    await pickTimer.fill("");
+    await expect(pickTimer).toHaveValue("");
+    await expect(pickTimer).toHaveAttribute("placeholder", "0");
+    await pickTimer.fill("45");
+    await expect(pickTimer).toHaveValue("45");
     await page.locator('input[type="date"]').fill("2000-01-01");
     await page.locator('input[type="time"]').fill("00:00");
     await expect(page.getByRole("alert")).toHaveText("Draft time must be at least 5 minutes in the future.");

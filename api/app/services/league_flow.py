@@ -286,7 +286,10 @@ def create_league(
         commissioner_user_id=current_user.id,
         season_year=payload.basics.season_year,
         max_teams=payload.basics.max_teams,
-        is_private=payload.basics.is_private,
+        # Public discovery is not a supported product mode. The schema also
+        # normalizes legacy request bodies, but this persistence boundary must
+        # remain invite-only even if another caller constructs the model.
+        is_private=True,
         invite_code=code,
         description=payload.basics.description,
         icon_url=payload.basics.icon_url,

@@ -56,6 +56,29 @@ describe("CreateLeague standard rules", () => {
     expect(leagueSizes).not.toContain(16);
   });
 
+  it("keeps every new league invite-only without rendering a privacy toggle", () => {
+    renderPage();
+
+    expect(screen.queryByText("Private league")).toBeNull();
+    expect(screen.queryByRole("switch")).toBeNull();
+  });
+
+  it("replaces the pick-timer default instead of prepending digits to a zero", () => {
+    const { container } = renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Draft" }));
+
+    const pickTimer = container.querySelector<HTMLInputElement>('input[type="number"]');
+    expect(pickTimer?.value).toBe("90");
+
+    fireEvent.change(pickTimer!, { target: { value: "" } });
+    expect(pickTimer?.value).toBe("");
+    expect(pickTimer?.placeholder).toBe("0");
+
+    fireEvent.change(pickTimer!, { target: { value: "45" } });
+    expect(pickTimer?.value).toBe("45");
+  });
+
   it("shows only the configurable playoff and waiver rules on the settings step", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "Continue to Settings" }));
@@ -109,6 +132,7 @@ describe("CreateLeague standard rules", () => {
       expect(state.apiPost).toHaveBeenCalledWith(
         "/leagues",
         expect.objectContaining({
+          basics: expect.objectContaining({ is_private: true }),
           settings: expect.objectContaining({
             roster_slots_json: {
               QB: 1,
