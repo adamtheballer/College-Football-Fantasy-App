@@ -23,6 +23,7 @@ from collegefootballfantasy_api.app.models.college_team import CollegeTeam
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.services.team_schedule_import import parse_schedule_csv
+from collegefootballfantasy_api.app.services.projections.ranges import weighted_projection_outcomes
 from scripts.audit_preseason_source_contract import _key, _position, _team
 from scripts.freeze_authoritative_sheet_snapshots import REQUIRED_WORKBOOKS
 
@@ -93,6 +94,20 @@ def _stats(row: dict[str, str], games: int) -> dict[str, float] | None:
     return {key: value / games for key, value in values.items() if value is not None}
 
 
+def _projected_opportunities(weekly: dict[str, float], position: str) -> float:
+    """Derive a conservative opportunity signal from the sealed annual sheet."""
+
+    normalized_position = position.upper()
+    if normalized_position == "QB":
+        return weekly.get("pass_attempts", 0.0) + max(0.0, weekly.get("rush_yards", 0.0) / 4.5)
+    if normalized_position in {"RB", "WR", "TE"}:
+        return (
+            weekly.get("receptions", 0.0)
+            + max(0.0, weekly.get("rush_yards", 0.0) / 4.5)
+        )
+    return weekly.get("field_goals_made_0_to_39", 0.0) + weekly.get("extra_points_made", 0.0)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--annual", type=Path, required=True)
@@ -146,6 +161,11 @@ def main() -> int:
                     points = 0.0 if row_status == "BYE" else None
                     if row_status == "ACTIVE" and weekly is not None:
                         points, _ = calculate_player_fantasy_points({"pass_yards": weekly["pass_yards"], "pass_tds": weekly["pass_tds"], "interceptions": weekly["interceptions"], "rush_yards": weekly["rush_yards"], "rush_tds": weekly["rush_tds"], "receptions": weekly["receptions"], "rec_yards": weekly["rec_yards"], "rec_tds": weekly["rec_tds"], "fg_made_0_30": weekly["field_goals_made_0_to_39"], "xp_made": weekly["extra_points_made"]}, BETA_KICKER_RULES if player.position == "K" else {}, player.position)
+                    outcome_range = weighted_projection_outcomes(
+                        points,
+                        position=player.position,
+                        expected_opportunities=_projected_opportunities(weekly, player.position) if weekly else None,
+                    )
                     report["counts"][row_status.lower()] += 1
                     if not args.apply:
                         continue
@@ -153,7 +173,7 @@ def main() -> int:
                     baseline_source = sealed_annual_baseline_source(annual_hash)
                     if existing and existing.baseline_source != baseline_source:
                         raise ValueError(f"Refusing to overwrite a different sealed PRESEASON source for player {player.id} week {week}.")
-                    values = dict(player_id=player.id, season=args.season, week=week, projection_version="PRESEASON", is_published=False, model_version=MODEL_VERSION, baseline_source=baseline_source, team_id=canonical_team.id, opponent_team_id=opponent_team.id if opponent_team else None, projection_status=row_status, baseline_games_played=games, neutral_baseline=points or 0.0, fantasy_points=points or 0.0, floor=points or 0.0, ceiling=points or 0.0, boom_prob=0.0, bust_prob=0.0, availability_multiplier=1.0, usage_multiplier=1.0, offense_multiplier=1.0, opponent_defense_multiplier=1.0, confidence=1.0 if row_status == "ACTIVE" else 0.0, fallback_reason=None if row_status == "ACTIVE" else row_status)
+                    values = dict(player_id=player.id, season=args.season, week=week, projection_version="PRESEASON", is_published=False, model_version=MODEL_VERSION, baseline_source=baseline_source, team_id=canonical_team.id, opponent_team_id=opponent_team.id if opponent_team else None, projection_status=row_status, baseline_games_played=games, neutral_baseline=points or 0.0, fantasy_points=points or 0.0, floor=outcome_range.floor, ceiling=outcome_range.ceiling, boom_prob=outcome_range.boom_prob, bust_prob=outcome_range.bust_prob, availability_multiplier=1.0, usage_multiplier=1.0, offense_multiplier=1.0, opponent_defense_multiplier=1.0, confidence=1.0 if row_status == "ACTIVE" else 0.0, fallback_reason=None if row_status == "ACTIVE" else row_status)
                     if weekly:
                         values.update(weekly)
                     if existing:
