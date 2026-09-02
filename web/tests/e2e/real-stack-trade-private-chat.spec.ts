@@ -600,10 +600,14 @@ test.describe("real FastAPI/PostgreSQL league chat", () => {
     await expect(pageB.getByText("Trade accepted").last()).toBeVisible();
 
     await pageB.getByRole("button", { name: "# General" }).click();
-    await expect(pageB.getByText("Trade Finalized").last()).toBeVisible();
-    await expect(pageB.getByText(quarterback.name)).toBeVisible();
-    await expect(pageB.getByText(runningBack.name)).toBeVisible();
-    await expect(pageB.getByText("Roster transfer complete")).toBeVisible();
+    const finalizedTradeCard = pageB
+      .getByTestId("league-trade-finalized-card")
+      .filter({ hasText: "Roster transfer complete" })
+      .last();
+    await expect(finalizedTradeCard.getByText("Trade Finalized")).toBeVisible();
+    await expect(finalizedTradeCard.getByText(quarterback.name)).toBeVisible();
+    await expect(finalizedTradeCard.getByText(runningBack.name)).toBeVisible();
+    await expect(finalizedTradeCard.getByText("Roster transfer complete")).toBeVisible();
 
     const leagueTwo = await createLeague(
       request,

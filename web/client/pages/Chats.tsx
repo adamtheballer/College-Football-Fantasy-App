@@ -105,7 +105,7 @@ export function TradeFinalizedCard({
     : <li>No players listed</li>;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-testid="league-trade-finalized-card">
       <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-cfb-gold">
         <ArrowRightLeft className="h-4 w-4" /> Trade Finalized
       </div>
