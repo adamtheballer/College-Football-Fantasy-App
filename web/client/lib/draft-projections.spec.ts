@@ -7,6 +7,10 @@ describe("formatDraftProjection", () => {
     expect(formatDraftProjection({ seasonProjection: 314 })).toBe("314.0");
   });
 
+  it("prefers a current rest-of-season forecast after weekly updates", () => {
+    expect(formatDraftProjection({ restOfSeasonProjection: 188, seasonProjection: 314 })).toBe("188.0");
+  });
+
   it("renders unavailable instead of substituting a weekly projection", () => {
     expect(formatDraftProjection({})).toBe("—");
   });

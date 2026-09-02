@@ -13,8 +13,14 @@ from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+from collegefootballfantasy_api.app.services.weekly_outlook_refresh import (
+    POSTGAME_MODEL_VERSION,
+    POSTGAME_PROJECTION_VERSION,
+)
 from collegefootballfantasy_api.app.services.cfb27_player_sync import (
     load_cfb27_ratings,
     load_reviewed_cfb27_snapshot,
@@ -148,6 +154,44 @@ def test_draft_pool_rejects_legacy_power4_records_even_when_they_have_projection
 
     assert response.status_code == 200
     assert [row["name"] for row in response.json()["data"]] == ["Snapshot Quarterback"]
+
+
+def test_draft_pool_exposes_rest_of_season_rank_after_verified_results(client, db_session):
+    players = [
+        Player(name="Duce Robinson", position="WR", school="Florida State", sheet_source_sheet_id="canonical-preseason:2026:ACC", sheet_projected_season_points=260.0, raw_cfb27_rating=93),
+        Player(name="Ryan Williams", position="WR", school="Alabama", sheet_source_sheet_id="canonical-preseason:2026:SEC", sheet_projected_season_points=250.0, raw_cfb27_rating=93),
+        Player(name="Cam Coleman", position="WR", school="Auburn", sheet_source_sheet_id="canonical-preseason:2026:SEC", sheet_projected_season_points=245.0, raw_cfb27_rating=92),
+    ]
+    db_session.add_all(players)
+    db_session.flush()
+    for player, week_one_actual, weekly_projection in (
+        (players[0], 8.0, 20.0),
+        (players[1], 21.0, 19.5),
+        (players[2], 20.0, 19.0),
+    ):
+        db_session.add(PlayerStat(player_id=player.id, season=2026, week=1, verified=True, stats={"fantasy_points": week_one_actual}))
+        for week in range(1, 14):
+            values = {
+                "player_id": player.id,
+                "season": 2026,
+                "week": week,
+                "is_published": True,
+                "fantasy_points": weekly_projection,
+            }
+            if week == 2:
+                values.update(projection_version=POSTGAME_PROJECTION_VERSION, model_version=POSTGAME_MODEL_VERSION)
+            else:
+                values.update(projection_version="PRESEASON")
+            db_session.add(WeeklyProjection(**values))
+    db_session.commit()
+
+    response = client.get("/players", params={"draft_eligible": "true", "sort": "draft_rank", "limit": 10})
+
+    assert response.status_code == 200
+    rows = {row["name"]: row for row in response.json()["data"]}
+    assert rows["Duce Robinson"]["rest_of_season_as_of_week"] == 1
+    assert rows["Duce Robinson"]["rest_of_season_projected_points"] < 240.0
+    assert rows["Ryan Williams"]["rest_of_season_rank"] < rows["Duce Robinson"]["rest_of_season_rank"]
 
 
 def test_cfb27_source_contains_critical_compare_players():

@@ -39,6 +39,13 @@ class PlayerRead(PlayerBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    # Read-only master-board outlook.  These values are calculated from the
+    # authoritative weekly projection series and must never enter PlayerCreate
+    # or the persisted players table.
+    rest_of_season_projected_points: float | None = None
+    rest_of_season_rank: int | None = None
+    rest_of_season_as_of_week: int | None = None
+    rest_of_season_updated_at: datetime | None = None
     board_rank: int | None = None
     created_at: datetime
     updated_at: datetime

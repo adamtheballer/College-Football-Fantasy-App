@@ -392,6 +392,34 @@ describe("buildDraftBoard", () => {
     expect(board[0].projectedPoints).toBe(265);
   });
 
+  it("uses the current rest-of-season forecast and rank over preseason board inputs", () => {
+    const board = buildDraftBoard(
+      [
+        makePlayer(1, "WR", 265, {
+          name: "Duce Robinson",
+          rank: 1,
+          adp: 1,
+          restOfSeasonProjectedPoints: 208,
+          restOfSeasonRank: 3,
+        }),
+        makePlayer(2, "WR", 240, {
+          name: "Ryan Williams",
+          rank: 9,
+          adp: 9,
+          restOfSeasonProjectedPoints: 230,
+          restOfSeasonRank: 1,
+        }),
+      ],
+      config
+    );
+
+    const byName = new Map(board.map((player) => [player.name, player]));
+    expect(byName.get("Ryan Williams")?.projectedPoints).toBe(230);
+    expect(byName.get("Ryan Williams")?.masterDraftRank).toBeLessThan(
+      byName.get("Duce Robinson")?.masterDraftRank ?? Number.POSITIVE_INFINITY
+    );
+  });
+
   it("does not rank a weekly snapshot when no approved season projection exists", () => {
     const board = buildDraftBoard(
       [makePlayer(1, "RB", 12.5, { sheetProjectedSeasonPoints: undefined, sheetProjectionStats: undefined, hasWeeklyProjection: true })],

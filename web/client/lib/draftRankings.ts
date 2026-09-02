@@ -106,6 +106,13 @@ const varianceByPos: Record<string, number> = {
 
 const espnFantasyPoints = (player: Player) => {
   if (
+    typeof player.restOfSeasonProjectedPoints === "number" &&
+    Number.isFinite(player.restOfSeasonProjectedPoints) &&
+    player.restOfSeasonProjectedPoints >= 0
+  ) {
+    return player.restOfSeasonProjectedPoints;
+  }
+  if (
     typeof player.sheetProjectedSeasonPoints === "number" &&
     Number.isFinite(player.sheetProjectedSeasonPoints) &&
     player.sheetProjectedSeasonPoints > 0
@@ -173,7 +180,7 @@ const QB_PROJECTION_RANK_BUFFER = 12;
 const EARLY_QB_ROUNDS = 6;
 
 const getProvidedBoardRank = (player: Player) => {
-  const candidates = [player.boardRank, player.adp, player.rank];
+  const candidates = [player.restOfSeasonRank, player.boardRank, player.adp, player.rank];
   const value = candidates.find(
     (candidate): candidate is number =>
       typeof candidate === "number" && Number.isFinite(candidate) && candidate > 0

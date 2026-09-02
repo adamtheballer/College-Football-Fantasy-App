@@ -256,11 +256,11 @@ function CompactMatchupScoreboard({
           <span className="font-ui text-[8px] font-bold uppercase tracking-[0.06em] text-cfb-text-primary">Week {displayWeek} matchup</span>
           <span className="mt-0.5 font-ui text-[8px] font-bold uppercase tracking-[0.06em] text-cfb-text-muted">Win chance</span>
           <div className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-[10px] font-black tabular-nums sm:text-xs">
-            <span className={myTeamIsLeading ? "text-emerald-300" : "text-red-300"}>
+            <span className={myTeamIsLeading ? "text-emerald-300" : "text-cfb-crimson"}>
               {winChance ? `${winChance.my.toFixed(1)}%` : "—"}
             </span>
             <span className="text-cfb-text-muted">VS</span>
-            <span className={myTeamIsLeading ? "text-red-300" : "text-emerald-300"}>
+            <span className={myTeamIsLeading ? "text-cfb-crimson" : "text-emerald-300"}>
               {winChance ? `${winChance.opponent.toFixed(1)}%` : "—"}
             </span>
           </div>
@@ -277,7 +277,7 @@ function CompactMatchupScoreboard({
 
       <div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-t border-cfb-border-subtle pt-2 text-[9px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
         <span>{winChance ? `${winChance.my.toFixed(1)}%` : "—"}</span>
-        {winChance ? <WinChanceBar myPercent={myTeam?.win_probability} opponentPercent={opponentTeam?.win_probability} className="h-2" testIdPrefix="scoreboard-win-chance" opponentColorClassName="bg-[#B42335]" /> : <span className="text-center normal-case tracking-normal">Win Probability available after lineups are set</span>}
+        {winChance ? <WinChanceBar myPercent={myTeam?.win_probability} opponentPercent={opponentTeam?.win_probability} className="h-2" testIdPrefix="scoreboard-win-chance" /> : <span className="text-center normal-case tracking-normal">Win Probability available after lineups are set</span>}
         <span>{winChance ? `${winChance.opponent.toFixed(1)}%` : "—"}</span>
       </div>
     </section>

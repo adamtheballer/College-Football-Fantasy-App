@@ -15,6 +15,20 @@ import type {
 const isValidLeagueId = (leagueId?: number) =>
   typeof leagueId === "number" && Number.isInteger(leagueId) && leagueId > 0;
 
+export type TradeReviewVoteAction = "uphold" | "veto";
+
+export type TradeReviewVoteResponse = {
+  trade_id: number;
+  status: string;
+  current_user_vote: TradeReviewVoteAction;
+  votes: {
+    uphold_count: number;
+    veto_count: number;
+    veto_threshold: number;
+    eligible_voter_count: number;
+  };
+};
+
 export const chatMessagesQueryKey = (leagueId?: number, threadId?: number) =>
   ["chat", "league", leagueId, "thread", threadId, "messages", "latest", "none"] as const;
 
@@ -234,6 +248,20 @@ export function useCreateDirectChatThread(leagueId?: number) {
         return { ...current, data: [...current.data, thread], total: current.total + 1 };
       });
       queryClient.invalidateQueries({ queryKey: threadsKey });
+    },
+  });
+}
+
+export function useTradeReviewVote(leagueId?: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tradeId, action }: { tradeId: number; action: TradeReviewVoteAction }) =>
+      apiPost<TradeReviewVoteResponse>(`/leagues/${leagueId}/trades/${tradeId}/review-vote`, { action }),
+    onSuccess: () => {
+      // The public trade-review card is an existing system message whose
+      // metadata changes in place, so invalidate the active message pages.
+      queryClient.invalidateQueries({ queryKey: ["chat", "league", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["league", leagueId, "trade-offers"] });
     },
   });
 }

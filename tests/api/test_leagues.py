@@ -315,7 +315,7 @@ def test_create_league_enforces_standard_beta_roster_and_managed_processing(clie
     assert settings["defense_enabled"] is False
     assert settings["playoff_teams"] == 6
     assert settings["waiver_type"] == "priority"
-    assert settings["trade_review_type"] == "commissioner"
+    assert settings["trade_review_type"] == "league_vote"
     assert settings["waiver_period_hours"] == 24
     assert settings["waiver_processing_weekday"] == 6
     assert settings["waiver_processing_hour"] == 8

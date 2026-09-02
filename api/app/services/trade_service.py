@@ -27,11 +27,16 @@ from collegefootballfantasy_api.app.schemas.trade import (
     TradeOfferList,
     TradeOfferRead,
     TradeReviewRead,
+    TradeReviewVoteRequest,
+    TradeReviewVoteResponse,
+    TradeReviewVoteTotalsRead,
 )
 from collegefootballfantasy_api.app.services.chat_service import (
     create_trade_private_chat_message,
     create_trade_finalized_chat_message,
+    create_trade_review_chat_message,
     mark_trade_finalized_chat_message_processed,
+    sync_trade_review_chat_message,
 )
 from collegefootballfantasy_api.app.services.content_moderation import moderate_user_text
 from collegefootballfantasy_api.app.services.league_player_history import EVENT_TRADED, EVENT_TRADE_FAILED, append_league_player_event
@@ -72,6 +77,7 @@ FINAL_STATUSES = {
 }
 STARTER_SLOTS = {"QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K"}
 DEFAULT_TRADE_EXPIRATION_DAYS = 7
+TRADE_REVIEW_WINDOW = timedelta(hours=24)
 
 
 @dataclass(frozen=True)
@@ -99,14 +105,6 @@ def _trade_timezone(db: Session, league_id: int) -> str:
 
 def _league_settings(db: Session, league_id: int) -> LeagueSettings | None:
     return db.query(LeagueSettings).filter(LeagueSettings.league_id == league_id).first()
-
-
-def _trade_requires_commissioner(db: Session, league_id: int) -> bool:
-    settings = _league_settings(db, league_id)
-    review_type = (settings.trade_review_type or "none").strip().lower() if settings else "none"
-    if review_type not in {"none", "commissioner"}:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="unsupported trade review type")
-    return review_type == "commissioner"
 
 
 def _ensure_trade_deadline_open(db: Session, league: League, now: datetime) -> None:
@@ -324,6 +322,49 @@ def _trade_requires_sunday_processing(db: Session, league: League, offer: TradeO
     )
     processing_cutoff = _as_utc(now) + timedelta(hours=24)
     return any(start is not None and start <= processing_cutoff for start in starts.values())
+
+
+def _trade_review_process_after(db: Session, league: League, offer: TradeOffer, now: datetime) -> datetime:
+    """Close the mandatory vote window without bypassing game-time locks."""
+    review_ends_at = _as_utc(now) + TRADE_REVIEW_WINDOW
+    if _trade_requires_sunday_processing(db, league, offer, now):
+        review_ends_at = max(review_ends_at, next_cfb_trade_process_time(now, _trade_timezone(db, league.id)))
+    return review_ends_at
+
+
+def _trade_vote_totals(db: Session, offer: TradeOffer) -> TradeReviewVoteTotalsRead:
+    votes = (
+        db.query(TradeReview.action)
+        .filter(TradeReview.trade_offer_id == offer.id, TradeReview.action.in_(("uphold", "veto")))
+        .all()
+    )
+    eligible_voter_count = max(
+        1,
+        db.query(LeagueMember.user_id)
+        .filter(LeagueMember.league_id == offer.league_id)
+        .distinct()
+        .count(),
+    )
+    return TradeReviewVoteTotalsRead(
+        uphold_count=sum(action == "uphold" for (action,) in votes),
+        veto_count=sum(action == "veto" for (action,) in votes),
+        veto_threshold=(eligible_voter_count + 1) // 2,
+        eligible_voter_count=eligible_voter_count,
+    )
+
+
+def _trade_vote_response(
+    db: Session,
+    offer: TradeOffer,
+    current_user_id: int,
+    action: str,
+) -> TradeReviewVoteResponse:
+    return TradeReviewVoteResponse(
+        trade_id=offer.id,
+        status=offer.status,
+        current_user_vote=action,
+        votes=_trade_vote_totals(db, offer),
+    )
 
 
 def _roster_slot_limits(db: Session, league_id: int) -> tuple[dict[str, int], bool]:
@@ -721,35 +762,22 @@ def accept_trade_offer(db: Session, league: League, trade_id: int, current_user:
     _proposing, receiving = _offer_participants(db, offer)
     _require_team_owner(receiving, current_user)
     _validate_offer_ownership(db, offer)
-    if _trade_requires_commissioner(db, league.id):
-        offer.status = TRADE_STATUS_COMMISSIONER_REVIEW
-        offer.accepted_at = now
-        body = "Trade accepted and sent to commissioner review."
-    elif _trade_requires_sunday_processing(db, league, offer, now):
-        offer.status = TRADE_STATUS_ACCEPTED_PENDING
-        offer.accepted_at = now
-        offer.process_after = next_cfb_trade_process_time(now, _trade_timezone(db, league.id))
-        body = f"Trade accepted. It will process after {offer.process_after.isoformat()}."
-    else:
-        _complete_accepted_trade(
-            db,
-            league=league,
-            offer=offer,
-            actor_user_id=current_user.id,
-            now=now,
-            review_action="processed",
-        )
-        body = "Trade accepted and processed."
+    # Validate the eventual roster move before opening a public vote. This
+    # prevents a league from reviewing an offer that could never be applied.
+    _plan_roster_swap(db, offer)
+    # Every accepted trade enters the same transparent league-vote window.
+    # This replaces both immediate processing and commissioner-only approval.
+    offer.status = TRADE_STATUS_ACCEPTED_PENDING
+    offer.accepted_at = now
+    offer.process_after = _trade_review_process_after(db, league, offer, now)
     _add_review(db, offer, "accepted", current_user.id, payload.reason)
-    if offer.status == TRADE_STATUS_ACCEPTED_PENDING:
-        _notify_participants(
-            db,
-            offer,
-            "TRADE_ACCEPTED_PENDING",
-        )
+    _notify_participants(
+        db,
+        offer,
+        "TRADE_ACCEPTED_PENDING",
+    )
     create_trade_private_chat_message(db, offer, event_status="accepted")
-    if offer.status == TRADE_STATUS_PROCESSED:
-        _announce_trade_finalized(db, offer, finalized_at=now)
+    create_trade_review_chat_message(db, offer)
     db.commit()
     return _serialize_offer(_load_offer(db, offer.id))
 
@@ -931,6 +959,48 @@ def commissioner_veto_trade(db: Session, league: League, trade_id: int, current_
     return _serialize_offer(_load_offer(db, offer.id))
 
 
+def vote_on_trade_review(
+    db: Session,
+    league: League,
+    trade_id: int,
+    current_user: User,
+    payload: TradeReviewVoteRequest,
+) -> TradeReviewVoteResponse:
+    """Record one league-member vote and veto immediately at the threshold."""
+    _member_or_404(db, league.id, current_user.id)
+    offer = _load_offer(db, trade_id, for_update=True)
+    if offer.league_id != league.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="trade offer not found")
+    if offer.status != TRADE_STATUS_ACCEPTED_PENDING:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade review is no longer open")
+
+    existing_vote = (
+        db.query(TradeReview)
+        .filter(
+            TradeReview.trade_offer_id == offer.id,
+            TradeReview.reviewer_user_id == current_user.id,
+            TradeReview.action.in_(("uphold", "veto")),
+        )
+        .one_or_none()
+    )
+    if existing_vote is not None:
+        if existing_vote.action != payload.action:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="trade vote has already been cast")
+        return _trade_vote_response(db, offer, current_user.id, existing_vote.action)
+
+    _add_review(db, offer, payload.action, current_user.id)
+    db.flush()
+    totals = _trade_vote_totals(db, offer)
+    if totals.veto_count >= totals.veto_threshold:
+        offer.status = TRADE_STATUS_VETOED
+        _add_review(db, offer, "vetoed", None, "league veto threshold reached")
+        _notify_participants(db, offer, "TRADE_VETOED", "Trade Vetoed", "League veto threshold reached.")
+        create_trade_private_chat_message(db, offer, event_status="vetoed")
+    sync_trade_review_chat_message(db, offer)
+    db.commit()
+    return _trade_vote_response(db, _load_offer(db, offer.id), current_user.id, payload.action)
+
+
 def expire_trade_offers_once(db: Session, now: datetime | None = None) -> dict[str, int]:
     current = _as_utc(now or _utcnow())
     offer_ids = [
@@ -994,8 +1064,14 @@ def process_trade_offers_once(db: Session, now: datetime | None = None) -> dict[
             failed += 1
             db.commit()
             continue
-        timezone_name = _trade_timezone(db, league.id)
-        if is_cfb_game_week_active(current, timezone_name):
+        # A league-wide game window is not itself a reason to hold a completed
+        # review.  Only a traded player's started/near-kickoff game may defer
+        # this transfer; otherwise a no-veto trade settles when its 24-hour
+        # vote window ends.
+        if _trade_requires_sunday_processing(db, league, offer, current):
+            offer.process_after = next_cfb_trade_process_time(current, _trade_timezone(db, league.id))
+            sync_trade_review_chat_message(db, offer)
+            db.commit()
             continue
         try:
             with db.begin_nested():
@@ -1011,6 +1087,7 @@ def process_trade_offers_once(db: Session, now: datetime | None = None) -> dict[
                 )
                 _announce_trade_finalized(db, offer, finalized_at=current)
                 mark_trade_finalized_chat_message_processed(db, offer)
+                sync_trade_review_chat_message(db, offer)
             processed += 1
         except Exception as exc:
             offer.status = TRADE_STATUS_FAILED

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 import re
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -74,6 +75,24 @@ class TradeOfferCounterCreate(TradeOfferCreate):
 
 class TradeActionRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=1000)
+
+
+class TradeReviewVoteRequest(BaseModel):
+    action: Literal["uphold", "veto"]
+
+
+class TradeReviewVoteTotalsRead(BaseModel):
+    uphold_count: int = Field(ge=0)
+    veto_count: int = Field(ge=0)
+    veto_threshold: int = Field(ge=1)
+    eligible_voter_count: int = Field(ge=1)
+
+
+class TradeReviewVoteResponse(BaseModel):
+    trade_id: int
+    status: str
+    current_user_vote: Literal["uphold", "veto"]
+    votes: TradeReviewVoteTotalsRead
 
 
 class TradeOfferItemRead(BaseModel):

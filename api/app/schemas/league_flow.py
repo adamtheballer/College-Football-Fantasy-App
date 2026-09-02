@@ -67,7 +67,7 @@ class LeagueSettingsInput(BaseModel):
     initial_waiver_priority_method: str = "reverse_draft"
     reveal_all_waiver_bids: bool = False
     post_drop_waiver_hours: int = 24
-    trade_review_type: str
+    trade_review_type: str = "league_vote"
     trade_deadline_week: int | None = None
     trade_deadline_at: datetime | None = None
     superflex_enabled: bool
@@ -126,9 +126,11 @@ class LeagueSettingsInput(BaseModel):
     @classmethod
     def validate_trade_review_type(cls, value: str) -> str:
         normalized = value.strip().lower()
-        if normalized not in {"none", "commissioner"}:
-            raise ValueError("trade_review_type must be none or commissioner")
-        return normalized
+        if normalized not in {"none", "commissioner", "league_vote"}:
+            raise ValueError("trade_review_type must be league_vote")
+        # Keep pre-release clients compatible while enforcing the sole
+        # supported rule for each new league.
+        return "league_vote"
 
     @field_validator("waiver_tiebreaker")
     @classmethod
@@ -245,7 +247,7 @@ class LeagueSettingsRead(BaseModel):
     post_drop_waiver_hours: int
     waivers_enabled: bool
     free_agent_mode: str
-    trade_review_type: str
+    trade_review_type: str = "league_vote"
     trade_deadline_week: int | None
     trade_deadline_at: datetime | None
     superflex_enabled: bool
@@ -345,9 +347,9 @@ class LeagueSettingsUpdate(BaseModel):
     @classmethod
     def validate_updated_trade_review_type(cls, value: str) -> str:
         normalized = value.strip().lower()
-        if normalized not in {"none", "commissioner"}:
-            raise ValueError("trade_review_type must be none or commissioner")
-        return normalized
+        if normalized not in {"none", "commissioner", "league_vote"}:
+            raise ValueError("trade_review_type must be league_vote")
+        return "league_vote"
 
     @field_validator("waiver_tiebreaker")
     @classmethod

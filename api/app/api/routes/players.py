@@ -44,6 +44,7 @@ from collegefootballfantasy_api.app.services.historical_stats import (
 from collegefootballfantasy_api.app.services.player_game_log import build_player_game_log
 from collegefootballfantasy_api.app.services.player_trade_value import get_player_trade_values
 from collegefootballfantasy_api.app.services.player_trajectory import build_player_trajectory
+from collegefootballfantasy_api.app.services.draft_board_outlook import build_rest_of_season_draft_board
 from collegefootballfantasy_api.app.services.player_season_outlook import get_persisted_player_season_outlook
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
 from collegefootballfantasy_api.app.services.auth_security import enforce_auth_rate_limit
@@ -276,7 +277,27 @@ def list_players_endpoint(
         draft_eligible=draft_eligible,
         sort=sort,
     )
-    return PlayerList(data=players, total=total, limit=limit, offset=offset)
+    if not draft_eligible:
+        return PlayerList(data=players, total=total, limit=limit, offset=offset)
+
+    board_outlook = build_rest_of_season_draft_board(db, season=2026)
+    data = []
+    for player in players:
+        outlook = board_outlook.get(player.id)
+        if outlook is None:
+            data.append(PlayerRead.model_validate(player))
+            continue
+        data.append(
+            PlayerRead.model_validate(player).model_copy(
+                update={
+                    "rest_of_season_projected_points": outlook.projected_points,
+                    "rest_of_season_rank": outlook.rank,
+                    "rest_of_season_as_of_week": outlook.completed_week,
+                    "rest_of_season_updated_at": outlook.updated_at,
+                }
+            )
+        )
+    return PlayerList(data=data, total=total, limit=limit, offset=offset)
 
 
 @router.get("/{player_id}", response_model=PlayerRead)

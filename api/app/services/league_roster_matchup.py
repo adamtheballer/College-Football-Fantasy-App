@@ -1654,7 +1654,7 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
         waiver_rules={
             "waiver_type": settings.waiver_type if settings else "FAAB",
             "waiver_period_hours": settings.waiver_period_hours if settings else 24,
-            "trade_review_type": settings.trade_review_type if settings else "commissioner",
+            "trade_review_type": settings.trade_review_type if settings else "league_vote",
         },
         standings=standings,
         schedule=schedule,

@@ -99,7 +99,7 @@ def join_league(client, token: str, league_id: int) -> dict:
 
 def seed_trade_rosters(db_session, league_id: int) -> dict:
     teams = db_session.query(Team).filter(Team.league_id == league_id).order_by(Team.id.asc()).all()
-    assert len(teams) == 2
+    assert len(teams) >= 2
     players = [
         Player(name="Alpha QB", position="QB", school="Alpha"),
         Player(name="Bravo RB", position="RB", school="Bravo"),
@@ -623,7 +623,7 @@ def test_private_trade_card_failure_rolls_back_trade_and_notification(client, db
     )
 
 
-def test_accept_no_review_trade_processes_roster_swap_and_writes_chat(client, db_session, monkeypatch):
+def test_accept_trade_opens_league_vote_card_before_any_roster_swap(client, db_session, monkeypatch):
     monkeypatch.setattr(trade_service, "is_cfb_game_week_active", lambda now=None, timezone_name="UTC": False)
     proposing_token = create_user_and_token(client, "accept-a")
     receiving_token = create_user_and_token(client, "accept-b")
@@ -644,13 +644,13 @@ def test_accept_no_review_trade_processes_roster_swap_and_writes_chat(client, db
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["status"] == "processed"
+    assert payload["status"] == "accepted_pending"
     assert payload["accepted_at"] is not None
     assert payload["process_after"] is not None
-    assert payload["processed_at"] is not None
+    assert payload["processed_at"] is None
     db_session.expire_all()
-    assert db_session.query(RosterEntry).filter_by(team_id=seed["receiving"].id, player_id=seed["give"].id).one()
-    assert db_session.query(RosterEntry).filter_by(team_id=seed["proposing"].id, player_id=seed["receive"].id).one()
+    assert db_session.query(RosterEntry).filter_by(team_id=seed["proposing"].id, player_id=seed["give"].id).one()
+    assert db_session.query(RosterEntry).filter_by(team_id=seed["receiving"].id, player_id=seed["receive"].id).one()
     private_created = db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:created").one()
     private_accepted = db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:accepted").one()
     assert private_created.thread_id == private_accepted.thread_id
@@ -664,8 +664,7 @@ def test_accept_no_review_trade_processes_roster_swap_and_writes_chat(client, db
     )
     assert replay.status_code == 409
     assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:accepted").count() == 1
-    message = db_session.query(ChatMessage).filter(ChatMessage.message_type == "trade_finalized").one()
-    assert message.event_key == f"trade:{created['id']}:finalized"
+    message = db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:league-review").one()
     assert message.metadata_json["event_key"] == message.event_key
     assert message.metadata_json["trade_id"] == created["id"]
     assert message.metadata_json["proposing_team"]["id"] == seed["proposing"].id
@@ -686,21 +685,18 @@ def test_accept_no_review_trade_processes_roster_swap_and_writes_chat(client, db
             "school": "Bravo",
         }
     ]
-    assert message.metadata_json["processing_status"] == "processed"
-    assert message.metadata_json["processed_at"] is not None
-
-    replayed = create_trade_finalized_chat_message(
-        db_session,
-        db_session.get(TradeOffer, created["id"]),
-        finalized_at=datetime.now(timezone.utc),
-        process_after=None,
-    )
-    assert replayed.id == message.id
+    assert message.metadata_json["review_status"] == "awaiting_votes"
+    assert message.metadata_json["votes"] == {
+        "uphold_count": 0,
+        "veto_count": 0,
+        "veto_threshold": 1,
+        "eligible_voter_count": 2,
+    }
     assert db_session.query(ChatMessage).filter(ChatMessage.event_key == message.event_key).count() == 1
     assert (
         db_session.query(ChatAuditEvent)
         .filter(
-            ChatAuditEvent.action == "system_trade_message_generated",
+            ChatAuditEvent.action == "league_trade_review_message_generated",
             ChatAuditEvent.message_id == message.id,
         )
         .count()
@@ -723,6 +719,18 @@ def test_due_trade_worker_waits_until_sunday_reset(client, db_session):
     offer.status = "accepted_pending"
     offer.accepted_at = datetime(2026, 9, 3, 12, 0, tzinfo=timezone.utc)
     offer.process_after = datetime(2026, 9, 3, 12, 0, tzinfo=timezone.utc)
+    # A started traded player, not the mere fact that games are underway,
+    # is what requires the worker to defer until the Sunday settlement window.
+    db_session.add(
+        Game(
+            season=2026,
+            week=1,
+            season_type="regular",
+            start_date=datetime(2026, 9, 3, 15, 0, tzinfo=timezone.utc),
+            home_team=seed["give"].school,
+            away_team="Opponent",
+        )
+    )
     db_session.commit()
 
     result = process_trade_offers_once(
@@ -814,12 +822,16 @@ def test_admin_due_trade_endpoint_rejects_time_travel_outside_the_e2e_runtime(cl
     assert response.json()["detail"] == "lifecycle time travel is available only in the E2E runtime"
 
 
-def test_accept_commissioner_review_trade_waits_for_approval_then_processes(client, db_session, monkeypatch):
+def test_league_vote_veto_cancels_at_half_of_league_managers(client, db_session, monkeypatch):
     monkeypatch.setattr(trade_service, "is_cfb_game_week_active", lambda now=None, timezone_name="UTC": False)
     proposing_token = create_user_and_token(client, "review-a")
     receiving_token = create_user_and_token(client, "review-b")
-    league = create_league(client, proposing_token, "review", review_type="commissioner")
+    third_token = create_user_and_token(client, "review-c")
+    fourth_token = create_user_and_token(client, "review-d")
+    league = create_league(client, proposing_token, "review", review_type="commissioner", max_teams=4)
     join_league(client, receiving_token, league["id"])
+    join_league(client, third_token, league["id"])
+    join_league(client, fourth_token, league["id"])
     seed = seed_trade_rosters(db_session, league["id"])
     created = client.post(
         f"/leagues/{league['id']}/trades",
@@ -833,21 +845,35 @@ def test_accept_commissioner_review_trade_waits_for_approval_then_processes(clie
         headers=auth_headers(receiving_token),
     )
     assert accepted.status_code == 200
-    assert accepted.json()["status"] == "commissioner_review"
+    assert accepted.json()["status"] == "accepted_pending"
     assert db_session.query(RosterEntry).filter_by(team_id=seed["proposing"].id, player_id=seed["give"].id).one()
-    assert db_session.query(ChatMessage).filter(ChatMessage.message_type == "trade_finalized").count() == 0
 
-    approved = client.post(
-        f"/leagues/{league['id']}/trades/{created['id']}/commissioner/approve",
-        json={"reason": "Approved"},
-        headers=auth_headers(proposing_token),
+    first_veto = client.post(
+        f"/leagues/{league['id']}/trades/{created['id']}/review-vote",
+        json={"action": "veto"},
+        headers=auth_headers(third_token),
     )
-    assert approved.status_code == 200
-    assert approved.json()["status"] == "processed"
+    assert first_veto.status_code == 200
+    assert first_veto.json()["status"] == "accepted_pending"
+    assert first_veto.json()["votes"] == {
+        "uphold_count": 0,
+        "veto_count": 1,
+        "veto_threshold": 2,
+        "eligible_voter_count": 4,
+    }
+
+    vetoed = client.post(
+        f"/leagues/{league['id']}/trades/{created['id']}/review-vote",
+        json={"action": "veto"},
+        headers=auth_headers(fourth_token),
+    )
+    assert vetoed.status_code == 200
+    assert vetoed.json()["status"] == "vetoed"
     db_session.expire_all()
-    assert db_session.query(RosterEntry).filter_by(team_id=seed["receiving"].id, player_id=seed["give"].id).one()
-    assert db_session.query(TradeReview).filter_by(trade_offer_id=created["id"], action="approved").one()
-    assert db_session.query(ChatMessage).filter(ChatMessage.event_key == f"trade:{created['id']}:finalized").count() == 1
+    assert db_session.query(RosterEntry).filter_by(team_id=seed["proposing"].id, player_id=seed["give"].id).one()
+    review_message = db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:league-review").one()
+    assert review_message.metadata_json["review_status"] == "vetoed"
+    assert review_message.metadata_json["votes"]["veto_count"] == 2
 
 
 def test_delayed_trade_updates_its_finalized_chat_card_after_processing(client, db_session, monkeypatch):
@@ -916,10 +942,10 @@ def test_chat_finalization_failure_rolls_back_trade_acceptance(client, db_sessio
         headers=auth_headers(proposing_token),
     ).json()
 
-    def fail_chat_finalization(*_args, **_kwargs):
+    def fail_trade_review_card(*_args, **_kwargs):
         raise RuntimeError("chat persistence unavailable")
 
-    monkeypatch.setattr(trade_service, "create_trade_finalized_chat_message", fail_chat_finalization)
+    monkeypatch.setattr(trade_service, "create_trade_review_chat_message", fail_trade_review_card)
     with pytest.raises(RuntimeError, match="chat persistence unavailable"):
         client.post(
             f"/leagues/{league['id']}/trades/{created['id']}/accept",
@@ -934,7 +960,7 @@ def test_chat_finalization_failure_rolls_back_trade_acceptance(client, db_sessio
     assert offer.processed_at is None
     assert db_session.query(RosterEntry).filter_by(team_id=seed["proposing"].id, player_id=seed["give"].id).one()
     assert db_session.query(RosterEntry).filter_by(team_id=seed["receiving"].id, player_id=seed["receive"].id).one()
-    assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:finalized").count() == 0
+    assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{created['id']}:league-review").count() == 0
 
 
 def test_trade_reject_cancel_counter_and_veto_endpoints(client, db_session):
@@ -1015,13 +1041,14 @@ def test_trade_reject_cancel_counter_and_veto_endpoints(client, db_session):
         headers=auth_headers(receiving_token),
     )
     veto_response = client.post(
-        f"/leagues/{league['id']}/trades/{vetoed['id']}/commissioner/veto",
-        json={"reason": "League integrity"},
+        f"/leagues/{league['id']}/trades/{vetoed['id']}/review-vote",
+        json={"action": "veto"},
         headers=auth_headers(proposing_token),
     )
     assert veto_response.status_code == 200
     assert veto_response.json()["status"] == "vetoed"
-    assert db_session.query(ChatMessage).filter_by(event_key=f"trade:{vetoed['id']}:vetoed").one()
+    review_message = db_session.query(ChatMessage).filter_by(event_key=f"trade:{vetoed['id']}:league-review").one()
+    assert review_message.metadata_json["review_status"] == "vetoed"
 
 
 def test_started_player_trade_is_accepted_pending_until_sunday(client, db_session, monkeypatch):
@@ -1063,7 +1090,7 @@ def test_started_player_trade_is_accepted_pending_until_sunday(client, db_sessio
     assert response.json()["process_after"].startswith("2026-09-06T04:00:00")
 
 
-def test_trade_processes_immediately_when_all_players_are_more_than_24_hours_from_kickoff(client, db_session, monkeypatch):
+def test_trade_review_window_is_twenty_four_hours_when_players_are_not_near_kickoff(client, db_session, monkeypatch):
     proposing_token = create_user_and_token(client, "safe-window-a")
     receiving_token = create_user_and_token(client, "safe-window-b")
     league = create_league(client, proposing_token, "safe-window", review_type="none")
@@ -1096,7 +1123,8 @@ def test_trade_processes_immediately_when_all_players_are_more_than_24_hours_fro
     )
 
     assert response.status_code == 200
-    assert response.json()["status"] == "processed"
+    assert response.json()["status"] == "accepted_pending"
+    assert datetime.fromisoformat(response.json()["process_after"]).replace(tzinfo=timezone.utc) == current + timedelta(hours=24)
 
 
 def test_trade_with_player_kicking_off_within_24_hours_waits_until_sunday(client, db_session, monkeypatch):

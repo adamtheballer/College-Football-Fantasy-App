@@ -69,6 +69,52 @@ def current_published_projections_query(
     )
 
 
+def current_published_projections_for_weeks_query(
+    *,
+    season: int,
+    weeks: Collection[int],
+    player_ids: Collection[int] | None = None,
+):
+    """Return one authoritative projection per player for every requested week.
+
+    Draft-board outlooks need a rest-of-season series, not a repeat of one
+    current-week row.  Keep version precedence identical to the single-week
+    reader above so an injury correction or locked snapshot is never replaced
+    by an older preseason estimate.
+    """
+
+    normalized_weeks = tuple(sorted({int(week) for week in weeks}))
+    if not normalized_weeks:
+        return select(WeeklyProjection).where(False)
+
+    ranked_query = select(
+        WeeklyProjection.id.label("projection_id"),
+        func.row_number()
+        .over(
+            partition_by=(WeeklyProjection.player_id, WeeklyProjection.week),
+            order_by=(
+                _published_projection_priority().desc(),
+                WeeklyProjection.updated_at.desc(),
+                WeeklyProjection.id.desc(),
+            ),
+        )
+        .label("projection_rank"),
+    ).where(
+        WeeklyProjection.season == season,
+        WeeklyProjection.week.in_(normalized_weeks),
+        WeeklyProjection.is_published.is_(True),
+    )
+    if player_ids is not None:
+        ranked_query = ranked_query.where(WeeklyProjection.player_id.in_(player_ids))
+
+    ranked = ranked_query.subquery()
+    return (
+        select(WeeklyProjection)
+        .join(ranked, WeeklyProjection.id == ranked.c.projection_id)
+        .where(ranked.c.projection_rank == 1)
+    )
+
+
 def list_projections(
     db: Session,
     season: int,

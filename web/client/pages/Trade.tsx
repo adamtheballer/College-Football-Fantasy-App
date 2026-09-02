@@ -711,9 +711,7 @@ export default function Trade() {
       action:
         | "accept"
         | "reject"
-        | "cancel"
-        | "commissioner/approve"
-        | "commissioner/veto";
+        | "cancel";
     }) =>
       apiPost<TradeOffer>(
         `/leagues/${leagueId}/trades/${tradeId}/${action}`,
@@ -1366,14 +1364,11 @@ export default function Trade() {
               offer.status === "proposed" &&
               receivingTeam?.owner_user_id === user?.id;
             const canCancel =
-              ["proposed", "commissioner_review"].includes(offer.status) &&
+              offer.status === "proposed" &&
               proposingTeam?.owner_user_id === user?.id;
             const canCounter =
               offer.status === "proposed" &&
               receivingTeam?.owner_user_id === user?.id;
-            const canReview =
-              offer.status === "commissioner_review" &&
-              league?.commissioner_user_id === user?.id;
             return (
               <div
                 key={offer.id}
@@ -1493,35 +1488,6 @@ export default function Trade() {
                       >
                         Unsend Offer
                       </Button>
-                    ) : null}
-                    {canReview ? (
-                      <>
-                        <Button
-                          className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
-                          disabled={tradeActionMutation.isPending}
-                          onClick={() =>
-                            tradeActionMutation.mutate({
-                              tradeId: offer.id,
-                              action: "commissioner/approve",
-                            })
-                          }
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="h-10 rounded-xl text-[10px] font-black uppercase tracking-[0.18em]"
-                          disabled={tradeActionMutation.isPending}
-                          onClick={() =>
-                            tradeActionMutation.mutate({
-                              tradeId: offer.id,
-                              action: "commissioner/veto",
-                            })
-                          }
-                        >
-                          Veto
-                        </Button>
-                      </>
                     ) : null}
                   </div>
                 </div>

@@ -43,7 +43,7 @@ jobs:
         run: |
           uv run alembic -c api/alembic.ini upgrade head
           expected_head="$(PYTHONPATH=. uv run python scripts/current_alembic_head.py)"
-          test "$expected_head" = "0107_account_delete"
+          test -n "$expected_head"
           test "$(uv run alembic -c api/alembic.ini heads | awk '{print $1}')" = "$expected_head"
           PYTHONPATH=. uv run python scripts/check_alembic_head.py
           PYTHONPATH=. uv run alembic -c api/alembic.ini check

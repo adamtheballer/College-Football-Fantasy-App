@@ -11,6 +11,7 @@ import {
   useLeagueChatThreads,
   useMarkChatThreadRead,
   useSendChatMessage,
+  useTradeReviewVote,
 } from "@/hooks/use-chat";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
 import { useAuth } from "@/hooks/use-auth";
@@ -104,7 +105,7 @@ export function TradeFinalizedCard({
     : <li>No players listed</li>;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-testid="league-trade-finalized-card">
       <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-cfb-gold">
         <ArrowRightLeft className="h-4 w-4" /> Trade Finalized
       </div>
@@ -126,6 +127,130 @@ export function TradeFinalizedCard({
           </Link>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+type TradeReviewVoteSnapshot = {
+  status: string;
+  currentUserVote: "uphold" | "veto";
+  upholdCount: number;
+  vetoCount: number;
+  vetoThreshold: number;
+  eligibleVoterCount: number;
+};
+
+const voteCount = (value: unknown) =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
+
+const reviewVoteSnapshot = (
+  metadata: Record<string, unknown>,
+  currentUserId?: number,
+): TradeReviewVoteSnapshot | null => {
+  const votes = isRecord(metadata.votes) ? metadata.votes : null;
+  if (!votes || currentUserId === undefined) return null;
+  const voteByUserId = isRecord(metadata.votes_by_user_id) ? metadata.votes_by_user_id : {};
+  const currentUserVote = voteByUserId[String(currentUserId)];
+  if (currentUserVote !== "uphold" && currentUserVote !== "veto") return null;
+  return {
+    status: typeof metadata.review_status === "string" ? metadata.review_status : "awaiting_votes",
+    currentUserVote,
+    upholdCount: voteCount(votes.uphold_count),
+    vetoCount: voteCount(votes.veto_count),
+    vetoThreshold: Math.max(1, voteCount(votes.veto_threshold)),
+    eligibleVoterCount: Math.max(1, voteCount(votes.eligible_voter_count)),
+  };
+};
+
+export const isLeagueTradeReviewMessage = (message: Pick<ChatMessage, "message_type" | "metadata">) =>
+  message.message_type === "system" && message.metadata.card_type === "league_trade_review";
+
+export function LeagueTradeReviewCard({
+  message,
+  currentUserId,
+}: {
+  message: { league_id: number; body: string | null; metadata: Record<string, unknown> };
+  currentUserId?: number;
+}) {
+  const metadata = message.metadata;
+  const proposingTeam = isRecord(metadata.proposing_team) && typeof metadata.proposing_team.name === "string"
+    ? metadata.proposing_team.name
+    : "Proposing team";
+  const receivingTeam = isRecord(metadata.receiving_team) && typeof metadata.receiving_team.name === "string"
+    ? metadata.receiving_team.name
+    : "Receiving team";
+  const proposingSends = tradeAssets(metadata.proposing_team_sends);
+  const receivingSends = tradeAssets(metadata.receiving_team_sends);
+  const baseSnapshot = reviewVoteSnapshot(metadata, currentUserId);
+  const [voteSnapshot, setVoteSnapshot] = useState<TradeReviewVoteSnapshot | null>(baseSnapshot);
+  const [voteError, setVoteError] = useState<string | null>(null);
+  const voteMutation = useTradeReviewVote(message.league_id);
+  const reviewStatus = voteSnapshot?.status ?? (typeof metadata.review_status === "string" ? metadata.review_status : "awaiting_votes");
+  const hasVoted = voteSnapshot !== null;
+  const votingOpen = reviewStatus === "awaiting_votes";
+  const reviewEndsAt = typeof metadata.review_ends_at === "string" ? metadata.review_ends_at : null;
+  const playerList = (assets: TradeAsset[]) => assets.length
+    ? assets.map((asset) => <li key={`${asset.player_id ?? asset.name}-${asset.position ?? ""}`}>{asset.name}{asset.position ? ` · ${asset.position}` : ""}{asset.school ? ` · ${asset.school}` : ""}</li>)
+    : <li>No players listed</li>;
+
+  const castVote = (action: "uphold" | "veto") => {
+    if (!votingOpen || voteMutation.isPending) return;
+    setVoteError(null);
+    const tradeId = typeof metadata.trade_id === "number" ? metadata.trade_id : null;
+    if (!tradeId) {
+      setVoteError("Trade review is unavailable.");
+      return;
+    }
+    voteMutation.mutate({ tradeId, action }, {
+      onSuccess: (result) => {
+        setVoteSnapshot({
+          status: result.status === "vetoed" ? "vetoed" : "awaiting_votes",
+          currentUserVote: result.current_user_vote,
+          upholdCount: result.votes.uphold_count,
+          vetoCount: result.votes.veto_count,
+          vetoThreshold: result.votes.veto_threshold,
+          eligibleVoterCount: result.votes.eligible_voter_count,
+        });
+      },
+      onError: (error) => setVoteError(errorMessage(error)),
+    });
+  };
+
+  return (
+    <div className="space-y-3" data-testid="league-trade-review-card">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-cfb-gold">
+          <ArrowRightLeft className="h-4 w-4" /> League trade review
+        </div>
+        <span className={cn(
+          "rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em]",
+          reviewStatus === "vetoed" ? "border-cfb-crimson/40 bg-cfb-crimson/10 text-cfb-crimson" : reviewStatus === "processed" ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200" : "border-cfb-gold/30 bg-cfb-gold/10 text-cfb-gold",
+        )}>
+          {reviewStatus === "vetoed" ? "Trade vetoed" : reviewStatus === "processed" ? "Trade processed" : "Vote open"}
+        </span>
+      </div>
+      <p className="text-xs font-semibold text-foreground">{proposingTeam} ↔ {receivingTeam}</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div className="rounded-xl border border-white/10 bg-black/15 p-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">{proposingTeam} receives</p>
+          <ul className="mt-2 space-y-1 text-sm font-semibold text-foreground">{playerList(receivingSends)}</ul>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-black/15 p-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">{receivingTeam} receives</p>
+          <ul className="mt-2 space-y-1 text-sm font-semibold text-foreground">{playerList(proposingSends)}</ul>
+        </div>
+      </div>
+      {reviewStatus === "awaiting_votes" ? <p className="text-[10px] font-bold text-muted-foreground">{reviewEndsAt ? `Review closes ${formatTime(reviewEndsAt)} unless the veto threshold is reached first.` : "This trade is awaiting league review."}</p> : null}
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => castVote("uphold")} disabled={!votingOpen || hasVoted || voteMutation.isPending} className="rounded-lg bg-emerald-500 px-3 py-2 text-[10px] font-black uppercase tracking-[0.13em] text-emerald-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60">
+          {hasVoted ? `Uphold: ${voteSnapshot.upholdCount}` : "Uphold"}
+        </button>
+        <button type="button" onClick={() => castVote("veto")} disabled={!votingOpen || hasVoted || voteMutation.isPending} className="rounded-lg bg-cfb-crimson px-3 py-2 text-[10px] font-black uppercase tracking-[0.13em] text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60">
+          {hasVoted ? `Veto: ${voteSnapshot.vetoCount}` : "Veto"}
+        </button>
+      </div>
+      {hasVoted ? <p className="text-center text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Your vote: {voteSnapshot.currentUserVote} · {voteSnapshot.vetoCount}/{voteSnapshot.vetoThreshold} vetoes needed · {voteSnapshot.eligibleVoterCount} managers</p> : null}
+      {voteError ? <p role="alert" className="text-xs font-semibold text-cfb-danger">{voteError}</p> : null}
     </div>
   );
 }
@@ -495,7 +620,7 @@ export default function Chats({ leagueId: lockedLeagueId, embedded = false }: Ch
                   {index === 0 || !sameDay(allMessages[index - 1].created_at, message.created_at) ? <div className="flex items-center gap-3 py-2"><span className="h-px flex-1 bg-white/10" /><span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">{dateLabel(message.created_at)}</span><span className="h-px flex-1 bg-white/10" /></div> : null}
                   <div className={cn("max-w-[88%] rounded-2xl border px-4 py-3", isSystemMessage(message.message_type) ? "mx-auto max-w-[96%] border-cfb-gold/30 bg-cfb-gold/10" : message.sender_user_id === user?.id ? "ml-auto border-primary/40 bg-primary/15" : "border-white/10 bg-white/[0.04]")}>
                     <div className="flex items-center justify-between gap-4 text-[9px] font-black uppercase tracking-[0.13em] text-muted-foreground/70"><span className="flex min-w-0 items-center gap-2">{!isSystemMessage(message.message_type) ? <ManagerAvatar avatarUrl={message.sender_avatar_url} managerName={message.sender_display_name} size="xs" /> : null}<span className="truncate">{isSystemMessage(message.message_type) ? message.message_type.replace("_", " ") : message.sender_user_id === user?.id ? "You" : message.sender_display_name ?? `Manager #${message.sender_user_id}`}{message.sender_fantasy_team_name ? ` · ${message.sender_fantasy_team_name}` : ""}</span></span><span>{formatTime(message.created_at)}</span></div>
-                    {isPrivateTradeMessage(message) ? <div className="mt-2"><PrivateTradeOfferCard message={message} currentUserId={user?.id} returnTo={returnTo} /></div> : message.message_type === "trade_finalized" ? <div className="mt-2"><TradeFinalizedCard message={message} returnTo={returnTo} /></div> : message.deleted_at ? <p className="mt-2 text-sm italic text-muted-foreground">Message deleted</p> : message.body ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">{message.body}</p> : null}
+                    {isPrivateTradeMessage(message) ? <div className="mt-2"><PrivateTradeOfferCard message={message} currentUserId={user?.id} returnTo={returnTo} /></div> : isLeagueTradeReviewMessage(message) ? <div className="mt-2"><LeagueTradeReviewCard message={message} currentUserId={user?.id} /></div> : message.message_type === "trade_finalized" ? <div className="mt-2"><TradeFinalizedCard message={message} returnTo={returnTo} /></div> : message.deleted_at ? <p className="mt-2 text-sm italic text-muted-foreground">Message deleted</p> : message.body ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">{message.body}</p> : null}
                     {message.delivery_status === "sending" ? <p className="mt-2 flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.12em] text-primary"><LoaderCircle className="h-3 w-3 animate-spin" />Sending</p> : null}
                     {message.delivery_status === "failed" ? <div className="mt-2 flex items-center justify-between gap-2 text-[9px] font-black uppercase tracking-[0.12em] text-red-200"><span className="flex items-center gap-1"><CircleAlert className="h-3 w-3" />Failed to send</span><button type="button" onClick={() => handleRetry(message)} className="inline-flex items-center gap-1 rounded-md border border-red-300/40 px-2 py-1 hover:bg-red-500/10"><RotateCcw className="h-3 w-3" />Retry</button></div> : null}
                   </div>
