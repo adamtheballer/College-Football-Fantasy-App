@@ -1820,7 +1820,7 @@ test.describe("critical browser workflows", () => {
     expect(outerWidths.bodyWidth).toBeLessThanOrEqual(outerWidths.viewportWidth + 1);
     await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toBeVisible();
     await expect(page.getByTestId("scoreboard-win-chance-left-bar")).toHaveClass(/bg-cfb-brand/);
-    await expect(page.getByTestId("scoreboard-win-chance-right-bar")).toHaveClass(/bg-\[#B42335\]/);
+    await expect(page.getByTestId("scoreboard-win-chance-right-bar")).toHaveClass(/bg-cfb-crimson/);
     await expect(page.locator('[style*="conic-gradient"]')).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
     const mobileStartingLineup = page.getByTestId("mobile-starting-lineup");
