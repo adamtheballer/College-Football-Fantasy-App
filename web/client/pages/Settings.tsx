@@ -123,6 +123,9 @@ export default function Settings() {
   const [photoState, setPhotoState] = useState<"idle" | "preparing" | "saving">("idle");
   const [avatarPreviewError, setAvatarPreviewError] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileErrorField, setProfileErrorField] = useState<"first_name" | "avatar_url" | null>(null);
+  const [managerNameCooldownOverride, setManagerNameCooldownOverride] = useState<string | null>(null);
+  const [managerNameCooldownNow, setManagerNameCooldownNow] = useState(() => Date.now());
   const [pendingNameChange, setPendingNameChange] = useState<{ name: string; avatarUrl: string | null } | null>(null);
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
   const [isSendingReset, setIsSendingReset] = useState(false);
@@ -141,26 +144,60 @@ export default function Settings() {
     setPhotoState("idle");
     setAvatarPreviewError(false);
     setProfileError(null);
+    setProfileErrorField(null);
+    setManagerNameCooldownOverride(null);
   }, [user]);
 
-  const managerNameChangeAvailableAt = user?.managerNameChangeAvailableAt ?? null;
+  const managerNameChangeAvailableAt = managerNameCooldownOverride ?? user?.managerNameChangeAvailableAt ?? null;
+  useEffect(() => {
+    const availableAt = managerNameChangeAvailableAt ? Date.parse(managerNameChangeAvailableAt) : Number.NaN;
+    if (!Number.isFinite(availableAt) || availableAt <= Date.now()) return undefined;
+    // Keep a still-open Settings page accurate at the exact unlock time; the
+    // durable timestamp still comes from the user record on every refresh.
+    const timeout = window.setTimeout(() => setManagerNameCooldownNow(Date.now()), availableAt - Date.now() + 50);
+    return () => window.clearTimeout(timeout);
+  }, [managerNameChangeAvailableAt]);
   const managerNameCooldownActive = Boolean(
-    managerNameChangeAvailableAt && Number.isFinite(Date.parse(managerNameChangeAvailableAt)) && Date.parse(managerNameChangeAvailableAt) > Date.now(),
+    managerNameChangeAvailableAt && Number.isFinite(Date.parse(managerNameChangeAvailableAt)) && Date.parse(managerNameChangeAvailableAt) > managerNameCooldownNow,
   );
   const managerNameAvailableDate = managerNameChangeAvailableAt
     ? new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(managerNameChangeAvailableAt))
     : null;
+  const managerNameAvailableDateTime = managerNameChangeAvailableAt
+    ? new Intl.DateTimeFormat(undefined, {
+      month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+    }).format(new Date(managerNameChangeAvailableAt))
+    : null;
+
+  const showProfileError = (error: unknown, fallback: string, preferredField: "first_name" | "avatar_url" | null = null) => {
+    const apiError = error instanceof ApiError ? error : null;
+    const field = apiError?.field === "first_name" || apiError?.field === "avatar_url"
+      ? apiError.field
+      : preferredField;
+    if (apiError?.retryAt && field === "first_name") {
+      setManagerNameCooldownOverride(apiError.retryAt);
+      const retryAt = new Date(apiError.retryAt);
+      const message = Number.isNaN(retryAt.getTime())
+        ? "Need to wait before changing your manager name."
+        : `Need to wait until ${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(retryAt)} before changing your manager name.`;
+      setProfileError(message);
+    } else {
+      setProfileError(error instanceof Error && error.message ? error.message : fallback);
+    }
+    setProfileErrorField(field);
+  };
 
   const saveProfile = async (nextName: string, nextAvatarUrl: string | null) => {
     if (!user) return;
     setSaveState("saving");
     setProfileError(null);
+    setProfileErrorField(null);
     try {
       await updateProfile({ firstName: nextName, avatarUrl: nextAvatarUrl });
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 1500);
     } catch (error) {
-      setProfileError(error instanceof Error ? error.message : "Unable to save your profile. Your previous settings are still active.");
+      showProfileError(error, "Unable to save your profile. Your previous settings are still active.");
       setSaveState("error");
     }
   };
@@ -171,18 +208,22 @@ export default function Settings() {
     const nextAvatarUrl = avatarUrl.trim() || null;
     if (!nextName) {
       setProfileError("Manager name is required.");
+      setProfileErrorField("first_name");
       setSaveState("error");
       return;
     }
     if (nextName.length > 50) {
       setProfileError("Manager name must be 50 characters or fewer.");
+      setProfileErrorField("first_name");
       setSaveState("error");
       return;
     }
     setProfileError(null);
+    setProfileErrorField(null);
     const isNameChange = nextName !== user.firstName;
     if (isNameChange && managerNameCooldownActive) {
-      setProfileError(`Manager name changes are available again on ${managerNameAvailableDate ?? "a later date"}.`);
+      setProfileError(`Need to wait until ${managerNameAvailableDateTime ?? "a later date"} before changing your manager name.`);
+      setProfileErrorField("first_name");
       setSaveState("error");
       return;
     }
@@ -207,13 +248,14 @@ export default function Settings() {
 
     setPhotoState("preparing");
     setProfileError(null);
+    setProfileErrorField(null);
     setAvatarPreviewError(false);
     try {
       const preparedPhoto = await prepareProfileImage(photo);
       setPendingAvatarUrl(preparedPhoto);
       setPendingAvatarName(photo.name);
     } catch (error) {
-      setProfileError(error instanceof Error ? error.message : "Unable to prepare this photo.");
+      showProfileError(error, "Unable to prepare this photo.", "avatar_url");
     } finally {
       setPhotoState("idle");
     }
@@ -234,12 +276,13 @@ export default function Settings() {
     setAvatarPreviewError(false);
     setPhotoState("saving");
     setProfileError(null);
+    setProfileErrorField(null);
     try {
       const updatedUser = await updateProfile({ avatarUrl: confirmedAvatarUrl });
       setAvatarUrl(updatedUser.avatarUrl ?? confirmedAvatarUrl);
     } catch (error) {
       setAvatarUrl(previousAvatarUrl);
-      setProfileError(error instanceof Error ? error.message : "Unable to update your profile picture. Your previous picture is still active.");
+      showProfileError(error, "Unable to update your profile picture. Your previous picture is still active.", "avatar_url");
     } finally {
       setPhotoState("idle");
     }
@@ -251,11 +294,12 @@ export default function Settings() {
     setAvatarPreviewError(false);
     setPhotoState("saving");
     setProfileError(null);
+    setProfileErrorField(null);
     try {
       await updateProfile({ avatarUrl: null });
       setAvatarUrl("");
     } catch (error) {
-      setProfileError(error instanceof Error ? error.message : "Unable to remove your profile picture. Your previous picture is still active.");
+      showProfileError(error, "Unable to remove your profile picture. Your previous picture is still active.", "avatar_url");
     } finally {
       setPhotoState("idle");
     }
@@ -401,7 +445,13 @@ export default function Settings() {
                 aria-label="Manager Name"
                 value={managerName}
                 maxLength={50}
-                onChange={(event) => setManagerName(event.target.value)}
+                onChange={(event) => {
+                  setManagerName(event.target.value);
+                  if (profileErrorField === "first_name") {
+                    setProfileError(null);
+                    setProfileErrorField(null);
+                  }
+                }}
                 onFocus={() => setIsManagerNameFocused(true)}
                 onBlur={() => setIsManagerNameFocused(false)}
                 onKeyDown={(event) => {
@@ -423,6 +473,11 @@ export default function Settings() {
               ) : (
                 <p className="text-xs font-medium text-muted-foreground">You can change your manager name once every 7 days.</p>
               )}
+              {profileError && profileErrorField === "first_name" ? (
+                <div role="alert" className="relative rounded-md border border-red-400/35 bg-red-500/10 px-3 py-2 text-xs font-semibold leading-relaxed text-red-200 before:absolute before:-top-1.5 before:left-5 before:h-3 before:w-3 before:rotate-45 before:border-l before:border-t before:border-red-400/35 before:bg-red-500/10">
+                  {profileError}
+                </div>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label className="text-[10px] font-black tracking-[0.14em] text-muted-foreground uppercase">Email Address</Label>
@@ -481,13 +536,18 @@ export default function Settings() {
                     setPendingAvatarUrl(null);
                     setPendingAvatarName(null);
                     setAvatarPreviewError(false);
+                    if (profileErrorField === "avatar_url") {
+                      setProfileError(null);
+                      setProfileErrorField(null);
+                    }
                   }}
                   className="mt-3 h-10 rounded-md border-border bg-background px-3 text-sm text-foreground"
                 />
               </details>
+              {profileError && profileErrorField === "avatar_url" ? <p role="alert" className="text-xs font-semibold text-red-300">{profileError}</p> : null}
             </div>
           </div>
-          {profileError ? <p role="alert" className="text-sm font-semibold text-red-300">{profileError}</p> : null}
+          {profileError && !profileErrorField ? <p role="alert" className="text-sm font-semibold text-red-300">{profileError}</p> : null}
         </SettingsSection>
 
         {/* PREFERENCES SECTION */}

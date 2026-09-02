@@ -297,7 +297,11 @@ def test_profile_name_change_cooldown_is_server_enforced(client, db_session):
     blocked_change = client.patch("/auth/me", json={"first_name": "Second Updated Manager"}, headers=headers)
 
     assert blocked_change.status_code == 429
-    assert blocked_change.json()["detail"] == "Manager name can only be changed once every 7 days."
+    detail = blocked_change.json()["detail"]
+    assert detail["code"] == "manager_name_cooldown"
+    assert detail["field"] == "first_name"
+    assert detail["retry_at"] == first_change.json()["manager_name_change_available_at"]
+    assert detail["message"] == "Manager name changes are temporarily unavailable."
     assert int(blocked_change.headers["retry-after"]) > 0
     assert db_session.get(User, user_id).first_name == "First Updated Manager"
 

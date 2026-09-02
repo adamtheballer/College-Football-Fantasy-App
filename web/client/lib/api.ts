@@ -50,12 +50,23 @@ export const API_REQUEST_TIMEOUT_MS = 15_000;
 export class ApiError extends Error {
   status: number;
   detail: unknown;
+  code?: string;
+  field?: string;
+  retryAt?: string;
 
-  constructor(status: number, message: string, detail?: unknown) {
+  constructor(
+    status: number,
+    message: string,
+    detail?: unknown,
+    metadata?: { code?: string; field?: string; retryAt?: string },
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.detail = detail;
+    this.code = metadata?.code;
+    this.field = metadata?.field;
+    this.retryAt = metadata?.retryAt;
   }
 }
 
@@ -218,6 +229,40 @@ const formatValidationDetail = (detail: unknown) => {
   return messages.length ? messages.join("; ") : null;
 };
 
+const validationField = (detail: unknown): string | undefined => {
+  if (!Array.isArray(detail)) return undefined;
+  for (const item of detail) {
+    if (!item || typeof item !== "object") continue;
+    const field = formatValidationLocation((item as Record<string, unknown>).loc);
+    if (field) return field;
+  }
+  return undefined;
+};
+
+type ActionableErrorDetail = {
+  code?: string;
+  message?: string;
+  field?: string;
+  retry_at?: string;
+};
+
+const parseActionableErrorDetail = (detail: unknown): ActionableErrorDetail | null => {
+  if (!detail || typeof detail !== "object" || Array.isArray(detail)) return null;
+  const record = detail as Record<string, unknown>;
+  if (typeof record.message !== "string" || !record.message.trim()) return null;
+  return {
+    code: typeof record.code === "string" ? record.code : undefined,
+    message: record.message,
+    field: typeof record.field === "string" ? record.field : undefined,
+    retry_at: typeof record.retry_at === "string" ? record.retry_at : undefined,
+  };
+};
+
+const genericServerErrorMessage = (status: number) =>
+  status >= 500
+    ? "We couldn’t complete that action right now. Your information was not changed. Please try again."
+    : null;
+
 const buildError = async (res: Response) => {
   let detail: unknown = null;
   try {
@@ -240,17 +285,39 @@ const buildError = async (res: Response) => {
   }
 
   if (detail && typeof detail === "object" && "detail" in detail) {
+    const actionable = parseActionableErrorDetail((detail as { detail?: unknown }).detail);
+    if (actionable?.message) {
+      return new ApiError(res.status, actionable.message, detail, {
+        code: actionable.code,
+        field: actionable.field,
+        retryAt: actionable.retry_at,
+      });
+    }
+  }
+
+  if (detail && typeof detail === "object" && "detail" in detail) {
     const validationMessage = formatValidationDetail((detail as { detail?: unknown }).detail);
     if (validationMessage) {
-      return new ApiError(res.status, validationMessage, detail);
+      return new ApiError(res.status, validationMessage, detail, {
+        field: validationField((detail as { detail?: unknown }).detail),
+      });
     }
+  }
+
+  const safeServerMessage = genericServerErrorMessage(res.status);
+  if (safeServerMessage) {
+    return new ApiError(res.status, safeServerMessage, detail);
   }
 
   if (typeof detail === "string" && detail.trim()) {
     return new ApiError(res.status, detail, detail);
   }
 
-  return new ApiError(res.status, `API ${res.status}: ${res.statusText}`, detail);
+  return new ApiError(
+    res.status,
+    `We couldn’t complete that action. Please check your information and try again.`,
+    detail,
+  );
 };
 
 const parseJson = async <T>(res: Response): Promise<T> => {

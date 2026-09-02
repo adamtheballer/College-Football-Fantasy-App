@@ -65,6 +65,7 @@ vi.mock("@/components/ui/select", async () => {
 });
 
 import Settings from "./Settings";
+import { ApiError } from "@/lib/api";
 
 describe("Settings beta preferences", () => {
   afterEach(cleanup);
@@ -122,6 +123,26 @@ describe("Settings beta preferences", () => {
 
     expect(screen.getByLabelText("Manager Name").getAttribute("disabled")).not.toBeNull();
     expect(screen.getByText(/name changes are available again on/i)).toBeTruthy();
+  });
+
+  it("shows the server-enforced manager-name cooldown beside the field and retains its unlock time", async () => {
+    const retryAt = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString();
+    state.updateProfile.mockRejectedValueOnce(new ApiError(
+      429,
+      "Manager name changes are temporarily unavailable.",
+      undefined,
+      { code: "manager_name_cooldown", field: "first_name", retryAt },
+    ));
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    fireEvent.change(screen.getByLabelText("Manager Name"), { target: { value: "Updated Adam" } });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirm name change/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toMatch(/Need to wait until .* before changing your manager name\./);
+    });
+    expect(screen.getByLabelText("Manager Name").getAttribute("disabled")).not.toBeNull();
   });
 
   it("limits the manager-name field to fifty characters", () => {
