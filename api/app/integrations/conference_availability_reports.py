@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 from collections.abc import Callable
+from typing import Any
 from urllib.parse import urljoin
 
 import httpx
@@ -95,6 +96,24 @@ def _embedded_report_url(soup: BeautifulSoup, document_url: str) -> str | None:
     if not candidates:
         return None
     return urljoin(document_url, str(candidates[0]["src"]))
+
+
+def _rendered_report_frame(page: Any) -> Any:
+    """Return one public report iframe, preferring the dedicated app frame.
+
+    Conference pages also embed analytics and advertising frames.  Passing a
+    locator that matches more than one iframe to ``content_frame`` triggers
+    Playwright's strict-mode exception, so the browser fallback must always
+    resolve a single, explicitly selected frame.
+    """
+
+    embedded_app = page.locator("iframe#embedded-app")
+    if embedded_app.count() > 0:
+        return embedded_app.first
+    return page.locator(
+        "iframe[src*='availability'], iframe[src*='injury'], "
+        "iframe[src*='report'], iframe[src*='confinj']"
+    ).first
 
 
 def parse_report_document(
@@ -191,10 +210,7 @@ class ConferenceAvailabilityReportClient:
                 try:
                     page = browser.new_page()
                     page.goto(source.url, wait_until="domcontentloaded", timeout=int(self.timeout_seconds * 1000))
-                    iframe = page.locator(
-                        "iframe#embedded-app, iframe[src*='availability'], iframe[src*='injury'], "
-                        "iframe[src*='report'], iframe[src*='confinj']"
-                    )
+                    iframe = _rendered_report_frame(page)
                     if iframe.count() == 0:
                         raise ConferenceReportUnavailable("official page did not expose its report frame")
                     # Playwright 1.56+ exposes ``content_frame`` as a

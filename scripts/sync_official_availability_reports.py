@@ -18,11 +18,17 @@ from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_f
 from collegefootballfantasy_api.app.services.sportsdata_sync import sync_power4_injuries
 
 
-def should_run_at_local_hour(now_utc: datetime, *, timezone_name: str, hour: int | None) -> bool:
-    """Return whether a UTC cron invocation is inside the configured local hour."""
+def should_run_at_local_hour(
+    now_utc: datetime,
+    *,
+    timezone_name: str,
+    hour: int | list[int] | None,
+) -> bool:
+    """Return whether a UTC cron invocation is inside a configured local hour."""
     if hour is None:
         return True
-    return now_utc.astimezone(ZoneInfo(timezone_name)).hour == hour
+    hours = {hour} if isinstance(hour, int) else set(hour)
+    return now_utc.astimezone(ZoneInfo(timezone_name)).hour in hours
 
 
 def main() -> None:
@@ -38,6 +44,7 @@ def main() -> None:
         type=int,
         choices=range(24),
         metavar="HOUR",
+        action="append",
         help="Exit successfully unless the current time is this hour in --timezone.",
     )
     parser.add_argument(

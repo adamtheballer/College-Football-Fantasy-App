@@ -12,17 +12,17 @@ Create a Railway Cron service with the production API variables and select
 command:
 
 ```sh
-uv run python scripts/sync_official_availability_reports.py --season 2026 --only-local-hour 10
+uv run python scripts/sync_official_availability_reports.py --season 2026 --only-local-hour 10 --only-local-hour 17
 ```
 
-Configure the Railway schedule as `0 14,15 * * *` (UTC). Railway cron has no
-timezone field, so the command's `--only-local-hour 10` guard runs exactly once
-at 10:00 AM `America/New_York` in both EST and EDT; the other UTC invocation
-exits successfully. The command calculates the game week from the CFB calendar;
-use `--week` only for a deliberate backfill or rehearsal. Conference reports can
-change nearer to kickoff, so add a second game-day Cron refresh after the
-conference's published availability deadline. The job is idempotent: retries do
-not duplicate player news or rostered-manager injury alerts.
+Configure the Railway schedule as `0 14,15,21,22 * * *` (UTC). Railway cron
+has no timezone field, so the command's `--only-local-hour 10` and
+`--only-local-hour 17` guards run exactly once at 10:00 AM and 5:00 PM
+`America/New_York` in both EST and EDT; the paired UTC invocations exit
+successfully. The evening refresh captures late conference availability updates
+before kickoff. The command calculates the game week from the CFB calendar; use
+`--week` only for a deliberate backfill or rehearsal. The job is idempotent:
+retries do not duplicate player news or rostered-manager injury alerts.
 
 Use the API Docker image for this Cron service. It contains Chromium and the
 public-page renderer required by the conference report apps; no undocumented
