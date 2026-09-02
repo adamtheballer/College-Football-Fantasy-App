@@ -18,7 +18,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { PlaybookDecor } from "@/components/fantasy/PlaybookDecor";
 import { cn } from "@/lib/utils";
 import { ApiError, apiPost, getStoredAccessToken } from "@/lib/api";
@@ -374,7 +373,6 @@ function CreateLeagueForm() {
   const [basics, setBasics] = useState({
     name: "Saturday League",
     max_teams: 12,
-    is_private: true,
     description: "",
     icon_url: "",
   });
@@ -390,7 +388,10 @@ function CreateLeagueForm() {
     timezone,
     draft_type: "snake",
     draft_order_mode: "random" as "random" | "custom",
-    pick_timer_seconds: 90,
+    // Preserve an empty field while the commissioner replaces the default.
+    // Coercing an empty number input to Number("") previously rendered it as
+    // a literal 0, so typing 45 produced the awkward value 045.
+    pick_timer_seconds: "90",
   });
 
   const draftDateTime = useMemo(() => {
@@ -473,7 +474,10 @@ function CreateLeagueForm() {
           name: basics.name.trim(),
           season_year: currentYear,
           max_teams: basics.max_teams,
-          is_private: basics.is_private,
+          // Public leagues are not a supported product mode. Keep this value
+          // explicit for the existing create-league contract and legacy API
+          // consumers while the server independently normalizes it as well.
+          is_private: true,
           description: basics.description || null,
           icon_url: basics.icon_url || null,
         },
@@ -496,7 +500,7 @@ function CreateLeagueForm() {
           timezone: draft.timezone,
           draft_type: draft.draft_type,
           draft_order_mode: draft.draft_order_mode,
-          pick_timer_seconds: draft.pick_timer_seconds,
+          pick_timer_seconds: Number(draft.pick_timer_seconds),
         },
       };
       const response = await apiPost<LeagueCreateResponse>("/leagues", payload);
@@ -646,7 +650,7 @@ function CreateLeagueForm() {
               <div className="space-y-8">
                 <SectionHeader
                   title="League Basics"
-                  description="Set the public identity, team count, and privacy mode for your league."
+                  description="Set your league name, team count, and the details managers will see in their invite."
                 />
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -680,18 +684,6 @@ function CreateLeagueForm() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </Field>
-                  <Field label="Private league" helper="Only invited managers can join this league.">
-                    <div className="flex h-12 items-center gap-3 rounded-[10px] border border-white/[0.08] bg-[#161E2E] px-4">
-                      <Switch
-                        checked={basics.is_private}
-                        onCheckedChange={(value) => setBasics((prev) => ({ ...prev, is_private: value }))}
-                        className="data-[state=checked]:bg-[#60A5FA] data-[state=unchecked]:bg-[#334155] focus-visible:ring-[#60A5FA]/30"
-                      />
-                      <span className="text-sm font-semibold text-[#F8FAFC]">
-                        {basics.is_private ? "Invite only" : "Public"}
-                      </span>
-                    </div>
                   </Field>
                   <Field label="Description (optional)" error={fieldErrors["basics.description"]} className="md:col-span-2">
                     <Input
@@ -857,8 +849,11 @@ function CreateLeagueForm() {
                   <Field label="Pick timer (seconds)" error={fieldErrors["draft.pick_timer_seconds"]}>
                     <Input
                       type="number"
+                      min="0"
+                      step="1"
                       value={draft.pick_timer_seconds}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, pick_timer_seconds: Number(e.target.value) }))}
+                      placeholder="0"
+                      onChange={(e) => setDraft((prev) => ({ ...prev, pick_timer_seconds: e.target.value }))}
                       className={inputClass}
                     />
                   </Field>

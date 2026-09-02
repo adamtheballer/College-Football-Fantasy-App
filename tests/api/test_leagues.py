@@ -52,7 +52,13 @@ def create_user_and_token(client, suffix: str = "one") -> str:
     return response.json()["access_token"]
 
 
-def create_league(client, token: str, name: str = "Test League", max_teams: int = 12) -> dict:
+def create_league(
+    client,
+    token: str,
+    name: str = "Test League",
+    max_teams: int = 12,
+    is_private: bool = True,
+) -> dict:
     # The default must remain future-dated: durable reminder assertions rely
     # on a scheduled draft, and a fixed calendar timestamp eventually turns
     # these generic fixtures into already-started drafts.
@@ -62,7 +68,7 @@ def create_league(client, token: str, name: str = "Test League", max_teams: int 
             "name": name,
             "season_year": 2026,
             "max_teams": max_teams,
-            "is_private": True,
+            "is_private": is_private,
             "description": "Workspace league",
             "icon_url": None,
         },
@@ -104,6 +110,14 @@ def test_create_and_list_leagues(client):
     assert data["data"][0]["max_teams"] == created["max_teams"]
     assert len(data["data"][0]["members"]) == 1
     assert data["data"][0]["draft"]["draft_type"] == "snake"
+
+
+def test_create_league_normalizes_legacy_public_requests_to_invite_only(client):
+    token = create_user_and_token(client, "invite-only")
+
+    created = create_league(client, token, name="Legacy Public Request", is_private=False)
+
+    assert created["is_private"] is True
 
 
 def test_create_league_allows_fourteen_teams_but_rejects_larger_sizes(client):
