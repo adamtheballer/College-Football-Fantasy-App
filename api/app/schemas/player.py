@@ -29,6 +29,10 @@ class PlayerBase(BaseModel):
     value_calculation_week: int | None = None
     value_calculated_at: datetime | None = None
     value_source_batch_id: str | None = None
+    rest_of_season_projected_points: float | None = None
+    rest_of_season_rank: int | None = None
+    rest_of_season_as_of_week: int | None = None
+    rest_of_season_updated_at: datetime | None = None
 
 
 class PlayerCreate(PlayerBase):

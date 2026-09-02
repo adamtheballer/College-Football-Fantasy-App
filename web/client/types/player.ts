@@ -50,5 +50,9 @@ export interface Player {
   cfb27Overall?: number;
   cfb27PositionRank?: number;
   cfb27SyncedAt?: string;
+  restOfSeasonProjectedPoints?: number;
+  restOfSeasonRank?: number;
+  restOfSeasonAsOfWeek?: number;
+  restOfSeasonUpdatedAt?: string;
   number?: number;
 }

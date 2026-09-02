@@ -466,7 +466,7 @@ export default function SinglePlayerMockDraftRoom() {
         <span>RK</span>
         <span>Player</span>
         <span className="hidden text-right sm:block">ADP</span>
-        <span className="text-right">Proj</span>
+        <span className="text-right">ROS</span>
         <span className="text-right">Action</span>
       </div>
 
@@ -528,7 +528,7 @@ export default function SinglePlayerMockDraftRoom() {
                   </div>
                 </div>
                 <p className="hidden text-right text-xs font-black tabular-nums text-muted-foreground sm:block">{player.adpEstimate ?? player.adpRank ?? "—"}</p>
-                <p className="text-right text-[10px] font-black tabular-nums text-foreground sm:text-sm">{formatDraftProjection({ seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</p>
+                <p className="text-right text-[10px] font-black tabular-nums text-foreground sm:text-sm">{formatDraftProjection({ restOfSeasonProjection: player.restOfSeasonProjectedPoints, seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</p>
                   <Button
                     className={cn(
                       "h-10 min-h-[44px] w-[78px] rounded-lg px-1 text-[8px] font-black uppercase tracking-[0.04em] sm:h-10 sm:min-h-0 sm:w-[140px] sm:rounded-xl sm:px-3 sm:text-[10px] sm:tracking-[0.14em]",

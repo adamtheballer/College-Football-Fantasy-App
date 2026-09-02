@@ -28,6 +28,10 @@ type BackendPlayerRead = {
   value_calculated_at?: string | null;
   value_source_batch_id?: string | null;
   board_rank?: number | null;
+  rest_of_season_projected_points?: number | null;
+  rest_of_season_rank?: number | null;
+  rest_of_season_as_of_week?: number | null;
+  rest_of_season_updated_at?: string | null;
 };
 
 type BackendPlayerListResponse = {
@@ -399,6 +403,10 @@ export const normalizePlayer = (
   cfb27Overall: player.cfb27_overall ?? undefined,
   cfb27PositionRank: player.cfb27_position_rank ?? undefined,
   cfb27SyncedAt: player.cfb27_synced_at ?? undefined,
+  restOfSeasonProjectedPoints: player.rest_of_season_projected_points ?? undefined,
+  restOfSeasonRank: player.rest_of_season_rank ?? undefined,
+  restOfSeasonAsOfWeek: player.rest_of_season_as_of_week ?? undefined,
+  restOfSeasonUpdatedAt: player.rest_of_season_updated_at ?? undefined,
 });
 
 export function usePlayers(
@@ -510,7 +518,7 @@ export function usePlayers(
         data: payload.data.map((player) =>
           normalizePlayer(player, {
             conference: conferenceBySchool.get(player.school.toUpperCase()) ?? "N/A",
-            rank: player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? overallRankByPlayer.get(player.id) ?? 0,
+            rank: player.rest_of_season_rank ?? player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? overallRankByPlayer.get(player.id) ?? 0,
             adp: player.sheet_adp ?? player.board_rank ?? overallRankByPlayer.get(player.id) ?? 0,
             posRank: player.cfb27_position_rank ?? null,
             status: injuryByPlayerId.get(player.id),
@@ -656,7 +664,7 @@ export function useDraftPlayerPool(
         data: rows.map((player) =>
           normalizePlayer(player, {
             conference: conferenceBySchool.get(player.school.toUpperCase()) ?? "N/A",
-            rank: player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? 0,
+            rank: player.rest_of_season_rank ?? player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? 0,
             adp: player.sheet_adp ?? player.board_rank ?? 0,
             posRank: player.cfb27_position_rank ?? null,
             status: injuryByPlayerId.get(player.id),
