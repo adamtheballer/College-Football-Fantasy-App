@@ -153,6 +153,18 @@ export const waiverWeekPoints = (
 
 export const waiverOpponentLabel = (opponent: string | null | undefined) => opponent?.trim() || "—";
 
+/** Search only the player's own identity; a scheduled opponent is display-only. */
+export const waiverSearchMatches = (
+  player: { name: string; school: string | null | undefined },
+  query: string,
+) => {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return true;
+  return [player.name, player.school]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(normalizedQuery));
+};
+
 export default function LeagueWaivers() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
@@ -206,12 +218,7 @@ export default function LeagueWaivers() {
     const query = search.trim().toLowerCase();
     return players
       .filter((player) => position === "ALL" || (player.position ?? "").toUpperCase() === position)
-      .filter((player) => {
-        if (!query) return true;
-        return [player.name, player.school, player.opponent, player.position]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(query));
-      });
+      .filter((player) => waiverSearchMatches(player, query));
   }, [players, position, search]);
 
   const topProjection = players.reduce<number | null>((top, player) => {
