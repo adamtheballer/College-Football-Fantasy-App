@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.models.defense_rating import DefenseRating
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.matchup import Matchup
@@ -18,12 +19,93 @@ from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.services.player_trade_value import calculate_weekly_trade_values
 from collegefootballfantasy_api.app.services.projections.engine import build_weekly_projections
+from collegefootballfantasy_api.app.services.projections.ranges import weighted_projection_outcomes
 from collegefootballfantasy_api.app.services.projections.usage import compute_usage_shares
+from collegefootballfantasy_api.app.scoring import calculate_fantasy_points
 
 
 POSTGAME_PROJECTION_VERSION = "MIDWEEK"
-POSTGAME_MODEL_VERSION = "postgame_espn_v1"
+POSTGAME_MODEL_VERSION = "postgame_espn_v2"
 FINAL_MATCHUP_STATUSES = {"final", "stat_corrected"}
+PERFORMANCE_RESIDUAL_WEIGHT = 0.22
+MAX_RESIDUAL_SHARE = 0.75
+MAX_PROJECTION_ADJUSTMENT_SHARE = 0.30
+
+
+def _verified_fantasy_points(stats: dict | None, *, position: str) -> float | None:
+    if not stats:
+        return None
+    for key in ("fantasy_points", "fantasyPoints", "fpts"):
+        value = stats.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+    return calculate_fantasy_points(stats, position=position)
+
+
+def performance_residual_adjustment(
+    *,
+    actual_points: float | None,
+    projected_points: float | None,
+    next_week_baseline: float | None,
+) -> float:
+    """Return a conservative Week N result adjustment for Week N+1.
+
+    The next-game matchup model remains the primary forecast.  A certified
+    performance miss contributes 22% of its capped residual, so a 14-point
+    shortfall moves the next projection by about three points rather than
+    treating one outlier as a permanent new talent level.
+    """
+
+    if (
+        actual_points is None
+        or projected_points is None
+        or next_week_baseline is None
+        or projected_points <= 0
+        or next_week_baseline <= 0
+    ):
+        return 0.0
+    expected = max(4.0, float(projected_points))
+    residual = float(actual_points) - expected
+    capped_residual = max(
+        -expected * MAX_RESIDUAL_SHARE,
+        min(expected * MAX_RESIDUAL_SHARE, residual),
+    )
+    adjustment = capped_residual * PERFORMANCE_RESIDUAL_WEIGHT
+    maximum_adjustment = float(next_week_baseline) * MAX_PROJECTION_ADJUSTMENT_SHARE
+    return max(-maximum_adjustment, min(maximum_adjustment, adjustment))
+
+
+def _apply_performance_residuals(
+    *,
+    projections: list[WeeklyProjection],
+    players_by_id: dict[int, Player],
+    actual_by_player_id: dict[int, float],
+    prior_projection_by_player_id: dict[int, WeeklyProjection],
+) -> None:
+    """Apply certified performance residuals while keeping ranges coupled."""
+
+    for candidate in projections:
+        baseline = float(candidate.fantasy_points or 0.0)
+        prior_projection = prior_projection_by_player_id.get(candidate.player_id)
+        adjustment = performance_residual_adjustment(
+            actual_points=actual_by_player_id.get(candidate.player_id),
+            projected_points=prior_projection.fantasy_points if prior_projection else None,
+            next_week_baseline=baseline,
+        )
+        if adjustment == 0.0:
+            continue
+        candidate.fantasy_points = round(max(0.0, baseline + adjustment), 2)
+        player = players_by_id.get(candidate.player_id)
+        outcome_range = weighted_projection_outcomes(
+            candidate.fantasy_points,
+            position=player.position if player else None,
+            expected_opportunities=candidate.expected_plays,
+            availability_multiplier=candidate.availability_multiplier,
+        )
+        candidate.floor = outcome_range.floor
+        candidate.ceiling = outcome_range.ceiling
+        candidate.boom_prob = outcome_range.boom_prob
+        candidate.bust_prob = outcome_range.bust_prob
 
 
 def _week_is_certified_final(db: Session, *, season: int, week: int) -> bool:
@@ -72,6 +154,26 @@ def refresh_post_final_outlook(
         )
         .all()
     }
+    prior_projection_by_player_id = {
+        row.player_id: row
+        for row in db.scalars(
+            current_published_projections_query(
+                season=season,
+                week=completed_week,
+                player_ids=tuple(player.id for player in players),
+            )
+        ).all()
+    }
+    actual_by_player_id = {
+        player.id: points
+        for player in players
+        if (
+            points := _verified_fantasy_points(
+                stats_by_player.get(player.id),
+                position=player.position,
+            )
+        ) is not None
+    }
     usage_by_player = {
         row.player_id: row
         for row in compute_usage_shares(players, stats_by_player, season, next_week)
@@ -116,6 +218,12 @@ def refresh_post_final_outlook(
         season=season,
         week=next_week,
     )
+    _apply_performance_residuals(
+        projections=projections,
+        players_by_id={player.id: player for player in players},
+        actual_by_player_id=actual_by_player_id,
+        prior_projection_by_player_id=prior_projection_by_player_id,
+    )
     existing = {
         row.player_id: row
         for row in db.query(WeeklyProjection).filter(
@@ -146,7 +254,13 @@ def refresh_post_final_outlook(
         if current.locked_at is not None:
             continue
         for column in projection_columns:
-            setattr(current, column, getattr(candidate, column))
+            value = getattr(candidate, column)
+            # The model intentionally omits inapplicable stat categories
+            # (for example, kicker-only fields on a QB). Keep the database
+            # default in place on an idempotent refresh instead of writing a
+            # NULL into a non-nullable projection column.
+            if value is not None:
+                setattr(current, column, value)
 
     # Week-one values remain CFB27-only until every Week 1 fantasy matchup is
     # certified final by the same lifecycle authority above.
