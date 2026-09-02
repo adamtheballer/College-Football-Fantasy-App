@@ -30,6 +30,7 @@ const LeagueRoster = lazyWithRouteRecovery(() => import("./pages/LeagueRoster"))
 const LeagueSettings = lazyWithRouteRecovery(() => import("./pages/LeagueSettings"));
 const LeagueWaivers = lazyWithRouteRecovery(() => import("./pages/LeagueWaivers"));
 const LeagueWatchlist = lazyWithRouteRecovery(() => import("./pages/LeagueWatchlist"));
+const LeagueChat = lazyWithRouteRecovery(() => import("./pages/LeagueChat"));
 const DraftHome = lazyWithRouteRecovery(() => import("./pages/DraftHome"));
 const DraftLobby = lazyWithRouteRecovery(() => import("./pages/DraftLobby"));
 const Draft = lazyWithRouteRecovery(() => import("./pages/Draft"));
@@ -175,6 +176,14 @@ const ApplicationRoutes = () => (
                   element={
                     <ProtectedRoute>
                       <LeagueWatchlist />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/league/:leagueId/chat"
+                  element={
+                    <ProtectedRoute>
+                      <LeagueChat />
                     </ProtectedRoute>
                   }
                 />

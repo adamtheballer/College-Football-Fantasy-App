@@ -98,6 +98,19 @@ describe("app shell navigation helpers", () => {
     expect(mobile).not.toContain("SATURDAY PICK 6");
   });
 
+  it("keeps the desktop guide sequence aligned with the mobile bar, then the More drawer", () => {
+    expect(getShellNavItems(user, true).map((item) => item.name)).toEqual([
+      "HOME",
+      "LEAGUES",
+      "CHATS",
+      "MOCK DRAFT",
+      "INJURY CENTER",
+      "ALERTS",
+      "SETTINGS",
+      "SIGN OUT",
+    ]);
+  });
+
   it("preserves stable onboarding target IDs", () => {
     expect(navDomId("INJURY CENTER")).toBe("nav-injury-center");
     expect(navDomId("SIGN OUT")).toBe("nav-sign-out");

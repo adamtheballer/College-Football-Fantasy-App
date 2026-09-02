@@ -64,6 +64,7 @@ export const getShellNavItems = (
       icon: MessageSquare,
       badge: chatUnreadCount > 99 ? "99+" : chatUnreadCount > 0 ? String(chatUnreadCount) : undefined,
     },
+    { name: "MOCK DRAFT", path: "/draft", icon: Timer },
     { name: "INJURY CENTER", path: "/injury-center", icon: ShieldAlert },
     {
       name: "ALERTS",
@@ -71,7 +72,6 @@ export const getShellNavItems = (
       icon: Bell,
       badge: notificationUnreadCount > 99 ? "99+" : notificationUnreadCount > 0 ? String(notificationUnreadCount) : undefined,
     },
-    { name: "MOCK DRAFT", path: "/draft", icon: Timer },
     ...(user?.isAdmin
       ? [{ name: "ADMIN SCORING", path: "/admin/scoring", icon: Wrench, kind: "admin" as const }]
       : []),

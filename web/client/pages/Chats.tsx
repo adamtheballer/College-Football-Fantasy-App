@@ -223,7 +223,14 @@ export function PrivateTradeOfferCard({
   );
 }
 
-export default function Chats() {
+type ChatsProps = {
+  /** Locks this shared chat surface to one league when rendered from a league tab. */
+  leagueId?: number;
+  /** Removes the global page controls when the league shell supplies its own tabs. */
+  embedded?: boolean;
+};
+
+export default function Chats({ leagueId: lockedLeagueId, embedded = false }: ChatsProps) {
   const { user } = useAuth();
   const { data: leagues = [], isLoading: leaguesLoading } = useLeagues(50, Boolean(user));
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
@@ -233,7 +240,8 @@ export default function Chats() {
   const searchParams = new URLSearchParams(
     typeof window === "undefined" ? "" : window.location.search,
   );
-  const requestedLeagueId = Number(searchParams.get("leagueId"));
+  const queryLeagueId = Number(searchParams.get("leagueId"));
+  const requestedLeagueId = lockedLeagueId ?? queryLeagueId;
   const requestedThreadId = Number(searchParams.get("threadId"));
   const [selectedLeagueId, setSelectedLeagueId] = useState<number | null>(activeLeagueId);
   const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
@@ -354,6 +362,9 @@ export default function Chats() {
     ? selectedThread.participants.find((participant) => participant.user_id !== user?.id)
     : null;
   const isSystemMessage = (messageType: string) => messageType !== "user";
+  const returnTo = lockedLeagueId
+    ? `/league/${lockedLeagueId}/chat`
+    : `/chats?leagueId=${selectedLeagueId ?? ""}&threadId=${selectedThreadId ?? ""}`;
 
   const sendDraftMessage = () => {
     const body = draftMessage.trim();
@@ -400,8 +411,8 @@ export default function Chats() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5 pb-24 pt-6 lg:pb-12">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className={cn("mx-auto max-w-7xl space-y-5 pb-24 lg:pb-12", embedded ? "pt-0" : "pt-6")}>
+      {!embedded ? <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
           <h1 className="bg-gradient-to-br from-white via-white to-primary/40 bg-clip-text text-5xl font-black uppercase italic tracking-tighter text-transparent">League Chat</h1>
           <p className="text-[10px] font-black uppercase tracking-[0.28em] text-muted-foreground/70">League conversation, manager messages, and binding events</p>
@@ -409,9 +420,9 @@ export default function Chats() {
         <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
           <RefreshCw className={cn("h-3.5 w-3.5 text-primary", (chatThreads.isFetching || messageUpdates.isFetching) && "animate-spin")} /> Live updates
         </div>
-      </div>
+      </div> : null}
 
-      <Card className="rounded-[1.75rem] border border-white/10 bg-card/45">
+      {!lockedLeagueId ? <Card className="rounded-[1.75rem] border border-white/10 bg-card/45">
         <CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(260px,1fr)_auto] md:items-end">
           <div className="space-y-2">
             <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">Selected league</p>
@@ -426,7 +437,7 @@ export default function Chats() {
             {threads.reduce((total, thread) => total + thread.unread_count, 0)} unread in this league
           </div>
         </CardContent>
-      </Card>
+      </Card> : null}
 
       {!selectedLeagueId ? (
         <Card className="rounded-[2rem] border border-white/10 bg-card/40"><CardContent className="p-8 text-sm text-muted-foreground">Join or create a league to start chatting.</CardContent></Card>
@@ -484,7 +495,7 @@ export default function Chats() {
                   {index === 0 || !sameDay(allMessages[index - 1].created_at, message.created_at) ? <div className="flex items-center gap-3 py-2"><span className="h-px flex-1 bg-white/10" /><span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">{dateLabel(message.created_at)}</span><span className="h-px flex-1 bg-white/10" /></div> : null}
                   <div className={cn("max-w-[88%] rounded-2xl border px-4 py-3", isSystemMessage(message.message_type) ? "mx-auto max-w-[96%] border-cfb-gold/30 bg-cfb-gold/10" : message.sender_user_id === user?.id ? "ml-auto border-primary/40 bg-primary/15" : "border-white/10 bg-white/[0.04]")}>
                     <div className="flex items-center justify-between gap-4 text-[9px] font-black uppercase tracking-[0.13em] text-muted-foreground/70"><span className="flex min-w-0 items-center gap-2">{!isSystemMessage(message.message_type) ? <ManagerAvatar avatarUrl={message.sender_avatar_url} managerName={message.sender_display_name} size="xs" /> : null}<span className="truncate">{isSystemMessage(message.message_type) ? message.message_type.replace("_", " ") : message.sender_user_id === user?.id ? "You" : message.sender_display_name ?? `Manager #${message.sender_user_id}`}{message.sender_fantasy_team_name ? ` · ${message.sender_fantasy_team_name}` : ""}</span></span><span>{formatTime(message.created_at)}</span></div>
-                    {isPrivateTradeMessage(message) ? <div className="mt-2"><PrivateTradeOfferCard message={message} currentUserId={user?.id} returnTo={`/chats?leagueId=${selectedLeagueId}&threadId=${selectedThreadId}`} /></div> : message.message_type === "trade_finalized" ? <div className="mt-2"><TradeFinalizedCard message={message} returnTo={`/chats?leagueId=${selectedLeagueId}&threadId=${selectedThreadId}`} /></div> : message.deleted_at ? <p className="mt-2 text-sm italic text-muted-foreground">Message deleted</p> : message.body ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">{message.body}</p> : null}
+                    {isPrivateTradeMessage(message) ? <div className="mt-2"><PrivateTradeOfferCard message={message} currentUserId={user?.id} returnTo={returnTo} /></div> : message.message_type === "trade_finalized" ? <div className="mt-2"><TradeFinalizedCard message={message} returnTo={returnTo} /></div> : message.deleted_at ? <p className="mt-2 text-sm italic text-muted-foreground">Message deleted</p> : message.body ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">{message.body}</p> : null}
                     {message.delivery_status === "sending" ? <p className="mt-2 flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.12em] text-primary"><LoaderCircle className="h-3 w-3 animate-spin" />Sending</p> : null}
                     {message.delivery_status === "failed" ? <div className="mt-2 flex items-center justify-between gap-2 text-[9px] font-black uppercase tracking-[0.12em] text-red-200"><span className="flex items-center gap-1"><CircleAlert className="h-3 w-3" />Failed to send</span><button type="button" onClick={() => handleRetry(message)} className="inline-flex items-center gap-1 rounded-md border border-red-300/40 px-2 py-1 hover:bg-red-500/10"><RotateCcw className="h-3 w-3" />Retry</button></div> : null}
                   </div>

@@ -36,7 +36,7 @@ export const TOUR_STEPS: TourStep[] = [
     target: guidedNavTarget("CHATS"),
     title: "Chats",
     description:
-      "Use Chats for league conversation, manager coordination, trade talk, and commissioner updates once league messaging is active.",
+      "Use Chats for league conversation, manager coordination, trade talk, and commissioner updates. Each active league also has its own Chat tab between Watchlist and Settings.",
   },
   {
     navItem: "MOCK DRAFT",
