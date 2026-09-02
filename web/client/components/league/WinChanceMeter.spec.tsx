@@ -34,9 +34,9 @@ describe("WinChanceMeter", () => {
     expect(screen.queryByTestId("win-chance-left-bar")).toBeNull();
   });
 
-  it("allows matchup pages to use their crimson opponent identity without changing the default meter", () => {
-    render(<WinChanceBar myPercent={45} opponentPercent={55} opponentColorClassName="bg-[#B42335]" testIdPrefix="crimson" />);
+  it("allows a custom opponent identity without changing the shared crimson default", () => {
+    render(<WinChanceBar myPercent={45} opponentPercent={55} opponentColorClassName="bg-[#DE3163]" testIdPrefix="crimson" />);
 
-    expect(screen.getByTestId("crimson-right-bar").className).toContain("bg-[#B42335]");
+    expect(screen.getByTestId("crimson-right-bar").className).toContain("bg-[#DE3163]");
   });
 });
