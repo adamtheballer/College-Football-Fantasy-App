@@ -1302,9 +1302,11 @@ def run_espn_scoring_cycle(
             week=week,
             corrected_provider_game_ids=corrected_provider_game_ids,
         )
+    if mode == "enabled":
         # Future outlook snapshots are intentionally downstream of certified
-        # fantasy-week finality.  A live, stale, or partial provider payload
-        # may update the current matchup but can never rewrite Week N+1.
+        # fantasy-week finality. Re-checking on later scoring cycles makes a
+        # post-final stat correction or a newly deployed projection formula
+        # take effect before the next game's projection locks.
         from collegefootballfantasy_api.app.services.weekly_outlook_refresh import refresh_post_final_outlook
 
         refresh_post_final_outlook(db, season=season, completed_week=week)

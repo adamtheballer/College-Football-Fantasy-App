@@ -536,7 +536,13 @@ export default function Chats({ leagueId: lockedLeagueId, embedded = false }: Ch
   };
 
   return (
-    <div className={cn("mx-auto max-w-7xl space-y-5 pb-24 lg:pb-12", embedded ? "pt-0" : "pt-6")}>
+    <div
+      data-testid="league-chat-content"
+      className={cn(
+        "space-y-5 pb-24 lg:pb-12",
+        embedded ? "w-full max-w-none pt-0" : "mx-auto max-w-7xl pt-6",
+      )}
+    >
       {!embedded ? <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
           <h1 className="bg-gradient-to-br from-white via-white to-primary/40 bg-clip-text text-5xl font-black uppercase italic tracking-tighter text-transparent">League Chat</h1>

@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 
+from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.player_trade_value import PlayerTradeValue
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.services.player_trade_value import IN_SEASON_VALUE_POLICY_VERSION
 from collegefootballfantasy_api.app.services.weekly_outlook_refresh import (
     POSTGAME_PROJECTION_VERSION,
+    performance_residual_adjustment,
     refresh_post_final_outlook,
 )
 from tests.api.scoring_helpers import create_scoring_fixture
@@ -62,7 +64,7 @@ def test_post_final_refresh_updates_next_week_and_values_only_after_every_matchu
     assert qb_projection.is_published is True
     assert qb_projection.baseline_source == "verified_week_1_stats"
     assert qb_projection.baseline_games_played == 1
-    assert qb_projection.model_version == "postgame_espn_v1"
+    assert qb_projection.model_version == "postgame_espn_v2"
     assert qb_projection.fantasy_points >= 0
     value = (
         db_session.query(PlayerTradeValue)
@@ -113,3 +115,70 @@ def test_post_final_refresh_preserves_a_locked_next_week_projection(db_session):
     assert locked.locked_at.replace(tzinfo=timezone.utc) == locked_at
     assert locked.fantasy_points == 17.3
     assert locked.baseline_source == "locked_live_game"
+
+
+def test_post_final_refresh_weighs_a_certified_projection_miss_into_the_next_week(db_session):
+    _league, players, _matchup = _finalized_week_one_fixture(db_session)
+    underperformer = players["qb"]
+    on_projection = players["away_qb"]
+    underperformer_stat = (
+        db_session.query(PlayerStat)
+        .filter_by(player_id=underperformer.id, season=2026, week=1)
+        .one()
+    )
+    on_projection_stat = (
+        db_session.query(PlayerStat)
+        .filter_by(player_id=on_projection.id, season=2026, week=1)
+        .one()
+    )
+    underperformer_stat.stats = {"fantasy_points": 6.0}
+    on_projection_stat.stats = {"fantasy_points": 20.0}
+    db_session.add_all(
+        [
+            WeeklyProjection(
+                player_id=underperformer.id,
+                season=2026,
+                week=1,
+                projection_version="PRESEASON",
+                is_published=True,
+                fantasy_points=20.0,
+            ),
+            WeeklyProjection(
+                player_id=on_projection.id,
+                season=2026,
+                week=1,
+                projection_version="PRESEASON",
+                is_published=True,
+                fantasy_points=20.0,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    result = refresh_post_final_outlook(db_session, season=2026, completed_week=1)
+    assert result["status"] == "refreshed"
+    refreshed = {
+        row.player_id: row
+        for row in db_session.query(WeeklyProjection).filter_by(
+            season=2026,
+            week=2,
+            projection_version=POSTGAME_PROJECTION_VERSION,
+        )
+    }
+
+    assert refreshed[underperformer.id].fantasy_points < refreshed[on_projection.id].fantasy_points
+    assert refreshed[underperformer.id].floor <= refreshed[underperformer.id].fantasy_points
+    assert refreshed[underperformer.id].ceiling >= refreshed[underperformer.id].fantasy_points
+
+
+def test_performance_residual_adjustment_is_weighted_and_bounded():
+    assert performance_residual_adjustment(
+        actual_points=6.0,
+        projected_points=20.0,
+        next_week_baseline=18.0,
+    ) == -3.08
+    assert performance_residual_adjustment(
+        actual_points=100.0,
+        projected_points=20.0,
+        next_week_baseline=18.0,
+    ) == 3.3

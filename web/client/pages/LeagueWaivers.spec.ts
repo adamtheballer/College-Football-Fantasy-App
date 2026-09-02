@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { waiverOpponentLabel, waiverProjectionLabel, waiverWeekPoints } from "./LeagueWaivers";
+import { waiverOpponentLabel, waiverProjectionLabel, waiverSearchMatches, waiverWeekPoints } from "./LeagueWaivers";
 
 describe("waiverProjectionLabel", () => {
   it("uses the backend projection status instead of presenting a bye as a missing projection", () => {
@@ -26,5 +26,20 @@ describe("waiverOpponentLabel", () => {
   it("shows the scheduled opponent and does not invent one when schedule data is unavailable", () => {
     expect(waiverOpponentLabel("Oklahoma")).toBe("Oklahoma");
     expect(waiverOpponentLabel(null)).toBe("—");
+  });
+});
+
+describe("waiverSearchMatches", () => {
+  it("matches player names and their own school, but never a scheduled opponent", () => {
+    const georgiaPlayerFacingTennesseeState = {
+      name: "Isaiah Canion",
+      school: "Georgia",
+      opponent: "Tennessee State",
+    };
+
+    expect(waiverSearchMatches({ name: "Mike Matthews", school: "Tennessee" }, "Tennessee")).toBe(true);
+    expect(waiverSearchMatches(georgiaPlayerFacingTennesseeState, "Tennessee")).toBe(false);
+    expect(waiverSearchMatches(georgiaPlayerFacingTennesseeState, "Canion")).toBe(true);
+    expect(waiverSearchMatches(georgiaPlayerFacingTennesseeState, "Georgia")).toBe(true);
   });
 });
