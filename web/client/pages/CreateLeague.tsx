@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { PlaybookDecor } from "@/components/fantasy/PlaybookDecor";
 import { cn } from "@/lib/utils";
-import { apiPost, getStoredAccessToken } from "@/lib/api";
+import { ApiError, apiPost, getStoredAccessToken } from "@/lib/api";
 import { createLeagueScoringToApi } from "@/lib/scoringSettings";
 import { useAuth } from "@/hooks/use-auth";
 import { LeagueCreateResponse } from "@/types/league";
@@ -214,16 +214,18 @@ function LeagueCreationLoadingOverlay() {
 type FieldProps = {
   label: string;
   helper?: string;
+  error?: string | null;
   children: React.ReactNode;
   className?: string;
 };
 
-function Field({ label, helper, children, className }: FieldProps) {
+function Field({ label, helper, error, children, className }: FieldProps) {
   return (
     <div className={cn("space-y-2", className)}>
       <Label className={fieldLabelClass}>{label}</Label>
       {children}
       {helper && <p className="text-xs leading-5 text-[#64748B]">{helper}</p>}
+      {error ? <p role="alert" className="text-xs font-semibold leading-5 text-[#FCA5A5]">{error}</p> : null}
     </div>
   );
 }
@@ -359,6 +361,7 @@ function CreateLeagueForm() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState<LeagueCreateResponse | null>(null);
   const [standardRulesAcknowledged, setStandardRulesAcknowledged] = useState(false);
 
@@ -463,6 +466,7 @@ function CreateLeagueForm() {
 
     setLoading(true);
     setError(null);
+    setFieldErrors({});
     try {
       const payload = {
         basics: {
@@ -502,8 +506,17 @@ function CreateLeagueForm() {
       queryClient.invalidateQueries({ queryKey: ["leagues"] });
       queryClient.setQueryData(["league", response.league.id], response.league);
       setSuccess(response);
-    } catch (err: any) {
-      setError(err.message || "Unable to create league.");
+    } catch (err: unknown) {
+      const message = err instanceof Error && err.message ? err.message : "Unable to create league.";
+      const field = err instanceof ApiError ? err.field : undefined;
+      if (field) {
+        setFieldErrors({ [field]: message });
+        if (field.startsWith("basics.")) setStep(0);
+        else if (field.startsWith("settings.")) setStep(1);
+        else if (field.startsWith("draft.")) setStep(2);
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -637,16 +650,20 @@ function CreateLeagueForm() {
                 />
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                  <Field label="League name">
+                  <Field label="League name" error={fieldErrors["basics.name"]}>
                     <Input
                       value={basics.name}
-                      onChange={(e) => setBasics((prev) => ({ ...prev, name: e.target.value }))}
+                      onChange={(e) => {
+                        setBasics((prev) => ({ ...prev, name: e.target.value }));
+                        setFieldErrors((current) => ({ ...current, "basics.name": "" }));
+                      }}
                       className={inputClass}
                     />
                   </Field>
                   <Field
                     label="League size"
                     helper={basics.max_teams === 14 ? "14-team leagues use a balanced partial round robin before the selected playoff bracket." : undefined}
+                    error={fieldErrors["basics.max_teams"]}
                   >
                     <Select
                       value={String(basics.max_teams)}
@@ -676,7 +693,7 @@ function CreateLeagueForm() {
                       </span>
                     </div>
                   </Field>
-                  <Field label="Description (optional)" className="md:col-span-2">
+                  <Field label="Description (optional)" error={fieldErrors["basics.description"]} className="md:col-span-2">
                     <Input
                       value={basics.description}
                       onChange={(e) => setBasics((prev) => ({ ...prev, description: e.target.value }))}
@@ -686,6 +703,7 @@ function CreateLeagueForm() {
                   <Field
                     label="League image URL (optional)"
                     helper="Paste a public HTTPS image address. Standard image links up to 2,048 characters are supported."
+                    error={fieldErrors["basics.icon_url"]}
                     className="md:col-span-2"
                   >
                     <Input
@@ -706,7 +724,7 @@ function CreateLeagueForm() {
                 />
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                  <Field label="Playoff teams">
+                  <Field label="Playoff teams" error={fieldErrors["settings.playoff_teams"]}>
                     <Select
                       value={String(settings.playoff_teams)}
                       onValueChange={(value) => setSettings((prev) => ({ ...prev, playoff_teams: Number(value) }))}
@@ -725,7 +743,7 @@ function CreateLeagueForm() {
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field label="Waiver system">
+                  <Field label="Waiver system" error={fieldErrors["settings.waiver_type"]}>
                     <Select
                       value={settings.waiver_type}
                       onValueChange={(value) => setSettings((prev) => ({ ...prev, waiver_type: value }))}
@@ -760,7 +778,7 @@ function CreateLeagueForm() {
                 ) : null}
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                  <Field label="Draft date">
+                  <Field label="Draft date" error={fieldErrors["draft.draft_datetime_utc"]}>
                     <Input
                       type="date"
                       value={draft.draft_date}
@@ -768,7 +786,7 @@ function CreateLeagueForm() {
                       className={inputClass}
                     />
                   </Field>
-                  <Field label="Draft time">
+                  <Field label="Draft time" error={fieldErrors["draft.draft_datetime_utc"]}>
                     <Input
                       type="time"
                       value={draft.draft_time}
@@ -776,7 +794,7 @@ function CreateLeagueForm() {
                       className={inputClass}
                     />
                   </Field>
-                  <Field label="Time zone">
+                  <Field label="Time zone" error={fieldErrors["draft.timezone"]}>
                     <Select
                       value={draft.timezone}
                       onValueChange={(value) => setDraft((prev) => ({ ...prev, timezone: value }))}
@@ -796,7 +814,7 @@ function CreateLeagueForm() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                  <Field label="Draft type">
+                  <Field label="Draft type" error={fieldErrors["draft.draft_type"]}>
                     <Select
                       value={draft.draft_type}
                       onValueChange={(value) => setDraft((prev) => ({ ...prev, draft_type: value }))}
@@ -811,7 +829,7 @@ function CreateLeagueForm() {
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field label="Draft order">
+                  <Field label="Draft order" error={fieldErrors["draft.draft_order_mode"]}>
                     <Select
                       value={draft.draft_order_mode}
                       onValueChange={(value: "random" | "custom") =>
@@ -836,7 +854,7 @@ function CreateLeagueForm() {
                         : "The full order is randomized once when you start the draft."}
                     </p>
                   </Field>
-                  <Field label="Pick timer (seconds)">
+                  <Field label="Pick timer (seconds)" error={fieldErrors["draft.pick_timer_seconds"]}>
                     <Input
                       type="number"
                       value={draft.pick_timer_seconds}

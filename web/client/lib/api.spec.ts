@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   apiGet,
+  apiPatch,
   apiDelete,
   apiPut,
   buildApiUrl,
@@ -90,6 +91,38 @@ describe("api client", () => {
       status: 422,
       message:
         "basics.max_teams: Value error, max_teams must be an even number of at least 2; draft.draft_datetime_utc: Input should be a valid datetime",
+    });
+  });
+
+  it("preserves structured actionable errors for field-level form feedback", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        detail: {
+          code: "manager_name_cooldown",
+          message: "Manager name changes are temporarily unavailable.",
+          field: "first_name",
+          retry_at: "2026-09-09T18:30:00+00:00",
+        },
+      }), { status: 429, headers: { "Content-Type": "application/json" } }),
+    );
+
+    await expect(apiPatch("/auth/me", { first_name: "New Name" })).rejects.toMatchObject({
+      status: 429,
+      code: "manager_name_cooldown",
+      field: "first_name",
+      retryAt: "2026-09-09T18:30:00+00:00",
+      message: "Manager name changes are temporarily unavailable.",
+    });
+  });
+
+  it("does not expose raw internal server errors to a user", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response("Internal Server Error", { status: 500, statusText: "Internal Server Error" }),
+    );
+
+    await expect(apiGet("/leagues")).rejects.toMatchObject({
+      status: 500,
+      message: "We couldn’t complete that action right now. Your information was not changed. Please try again.",
     });
   });
 

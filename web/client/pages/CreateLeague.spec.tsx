@@ -7,6 +7,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   apiPost: vi.fn(),
+  ApiError: class ApiError extends Error {
+    field?: string;
+    constructor(message: string, field?: string) {
+      super(message);
+      this.field = field;
+    }
+  },
 }));
 
 vi.mock("@/hooks/use-auth", () => ({
@@ -14,6 +21,7 @@ vi.mock("@/hooks/use-auth", () => ({
 }));
 
 vi.mock("@/lib/api", () => ({
+  ApiError: state.ApiError,
   apiPost: state.apiPost,
   getStoredAccessToken: () => "test-access-token",
 }));
@@ -120,5 +128,19 @@ describe("CreateLeague standard rules", () => {
         }),
       );
     });
+  });
+
+  it("returns a named API validation error to the matching league field", async () => {
+    state.apiPost.mockRejectedValueOnce(new state.ApiError("League names must be unique for your account.", "basics.name"));
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Draft" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Review" }));
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Create League" }));
+
+    await waitFor(() => expect(screen.getByText("League names must be unique for your account.")).toBeTruthy());
+    expect(screen.getByText("League Basics")).toBeTruthy();
+    expect(screen.queryByText("Internal Server Error")).toBeNull();
   });
 });

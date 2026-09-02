@@ -278,7 +278,18 @@ def update_current_user_profile(
                 seconds_remaining = max(1, int((ensure_aware(available_at) - now).total_seconds()))
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Manager name can only be changed once every 7 days.",
+                    # Keep this machine-readable so every client can show a
+                    # precise, localized message beside the name field rather
+                    # than degrading it into a generic server error.
+                    detail={
+                        "code": "manager_name_cooldown",
+                        "message": "Manager name changes are temporarily unavailable.",
+                        "field": "first_name",
+                        # Preserve the same serialization the profile
+                        # response uses, so clients can persist this value
+                        # verbatim and compare it without timezone churn.
+                        "retry_at": available_at.isoformat(),
+                    },
                     headers={"Retry-After": str(seconds_remaining)},
                 )
             current_user.first_name = next_name
