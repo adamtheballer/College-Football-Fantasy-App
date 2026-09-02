@@ -990,6 +990,7 @@ export default function LeagueWaivers() {
             playerClass: null,
             status: null,
             projection: selectedPlayer.projection,
+            hasWeeklyProjection: selectedPlayer.weekly_projected_fantasy_points !== null && selectedPlayer.weekly_projected_fantasy_points !== undefined,
             sheetProjectionStats: null,
           }}
           title="Available Player"

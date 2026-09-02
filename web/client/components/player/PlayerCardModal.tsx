@@ -22,6 +22,8 @@ export type PlayerCardModalPlayer = {
   playerClass?: string | null;
   status?: string | null;
   projection?: PlayerStats | null;
+  hasWeeklyProjection?: boolean;
+  seasonProjectedPoints?: number | null;
   sheetProjectionStats?: Record<string, number | null | undefined> | null;
   cfb27Overall?: number | null;
 };
@@ -297,18 +299,16 @@ export const resolvePlayerCardProjectionStats = (
 ) => {
   const sheetProjectionStats = player.sheetProjectionStats ?? card?.player.sheet_projection_stats ?? undefined;
   const projectedPoints =
-    player.projectedPoints ??
-    player.projection?.fpts ??
     card?.player.sheet_projected_season_points ??
+    player.seasonProjectedPoints ??
     statValue(sheetProjectionStats, ["fpts", "fantasy_points", "projected_points", "projectedFantasyPoints"]) ??
-    0;
-  const projection = player.projection ?? { fpts: projectedPoints };
+    null;
 
-  if (!player.projection && !sheetProjectionStats && !card?.player.sheet_projected_season_points) return null;
+  if (!sheetProjectionStats && projectedPoints === null) return null;
 
   return buildProjectedStats(
-    projection,
-    projectedPoints,
+    { fpts: projectedPoints ?? 0 },
+    projectedPoints ?? 0,
     sheetProjectionStats
   );
 };
@@ -385,7 +385,7 @@ export function PlayerCardModal({
     activeTab === "projections" || activeTab === "value",
   );
   const palette = getPlayerCardPalette(position);
-  const projectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
+  const seasonProjectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
   const currentValueRating = resolvePlayerCardCurrentValueRating(
     valueQuery.data?.current?.current_value_rating,
     card,
@@ -408,28 +408,34 @@ export function PlayerCardModal({
   // complete historical schedules. Only the current CFB season can surface a
   // schedule/game-by-game section.
   const shouldShowGameLogSchedule = selectedGameLogData?.season === 2026;
-  const projectionHighlights = [
-    ["Fantasy", projectionStats?.fpts ?? player.projectedPoints],
-    ["Floor", projectionStats?.floor],
-    ["Ceiling", projectionStats?.ceiling],
+  const weeklyProjectionStats = player.hasWeeklyProjection === false ? null : player.projection;
+  const weeklyProjectionHighlights = [
+    ["Fantasy", weeklyProjectionStats?.fpts ?? player.projectedPoints],
+    ["Floor", weeklyProjectionStats?.floor],
+    ["Ceiling", weeklyProjectionStats?.ceiling],
     [
       "Boom",
-      typeof projectionStats?.boomProb === "number" ? `${Math.round(projectionStats.boomProb * 100)}%` : null,
+      typeof weeklyProjectionStats?.boomProb === "number" ? `${Math.round(weeklyProjectionStats.boomProb * 100)}%` : null,
     ],
     [
       "Bust",
-      typeof projectionStats?.bustProb === "number" ? `${Math.round(projectionStats.bustProb * 100)}%` : null,
+      typeof weeklyProjectionStats?.bustProb === "number" ? `${Math.round(weeklyProjectionStats.bustProb * 100)}%` : null,
     ],
     ["Opponent", player.opponent],
   ] as Array<[string, unknown]>;
-  const visibleProjectionHighlights = projectionHighlights.filter(
+  const visibleWeeklyProjectionHighlights = weeklyProjectionHighlights.filter(
     ([, value]) => value !== null && value !== undefined && value !== "",
   );
   const projectionRows = statRowsForPosition(position || player.position || "");
-  const projectionDetailRows = projectionStats
+  const weeklyProjectionDetailRows = weeklyProjectionStats
     ? projectionRows
-        .map((row) => [row.label, statValue(projectionStats, row.projectionKeys)] as const)
-    .filter(([, value]) => value !== null)
+        .map((row) => [row.label, statValue(weeklyProjectionStats as unknown as Record<string, unknown>, row.projectionKeys)] as const)
+        .filter(([, value]) => value !== null)
+    : [];
+  const seasonProjectionDetailRows = seasonProjectionStats
+    ? projectionRows
+        .map((row) => [row.label, statValue(seasonProjectionStats, row.projectionKeys)] as const)
+        .filter(([, value]) => value !== null)
     : [];
   useEffect(() => {
     setActiveTab("summary");
@@ -489,7 +495,7 @@ export function PlayerCardModal({
           title={title}
         />
 
-        <nav className="flex gap-1 overflow-x-auto border-b border-white/10 bg-black/18 px-3 pt-1 sm:gap-3 sm:flex-wrap sm:overflow-visible sm:px-8 sm:pt-2">
+        <nav className="flex gap-1 overflow-x-auto border-b border-white/10 bg-black/18 px-3 pt-1 sm:gap-3 sm:flex-wrap sm:overflow-visible sm:px-8 sm:pt-2 lg:grid lg:grid-cols-7 lg:gap-0 lg:px-0 lg:pt-0">
           {visiblePlayerCardTabs(hasLeagueContext).map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -499,7 +505,7 @@ export function PlayerCardModal({
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2 py-2.5 text-[9px] font-semibold uppercase tracking-[0.06em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-transparent sm:gap-2 sm:px-1 sm:text-[10px] sm:tracking-[0.12em]",
+                  "relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2 py-2.5 text-[9px] font-semibold uppercase tracking-[0.06em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/80 sm:gap-2 sm:px-1 sm:text-[10px] sm:tracking-[0.12em] lg:justify-center lg:px-2",
                   active
                     ? "text-white after:bg-cfb-brand"
                     : "text-white/55 hover:text-white"
@@ -831,12 +837,14 @@ export function PlayerCardModal({
                   </p>
                 )}
               </div>
-              {projectionStats ? (
-                <div className="mt-5 space-y-4">
-                  {visibleProjectionHighlights.length ? (
-                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                      {visibleProjectionHighlights.map(([label, value]) => (
-                        <div key={label} className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              {visibleWeeklyProjectionHighlights.length || weeklyProjectionDetailRows.length ? (
+                <section className="mt-5" aria-label="Weekly projection">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cfb-brand">This week</p>
+                  <p className="mt-1 text-xs font-bold text-white/55">Matchup model projection</p>
+                  {visibleWeeklyProjectionHighlights.length ? (
+                    <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+                      {visibleWeeklyProjectionHighlights.map(([label, value]) => (
+                        <div key={label} className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.07] p-3">
                           <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
                           <p className="mt-2 truncate text-xl font-black tabular-nums text-white">
                             {typeof value === "number" ? formatStat(value) : formatPlayerCardValue(value)}
@@ -845,26 +853,43 @@ export function PlayerCardModal({
                       ))}
                     </div>
                   ) : null}
-                  {projectionDetailRows.length ? (
-                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                      {projectionDetailRows.map(([label, value]) => (
+                  {weeklyProjectionDetailRows.length ? (
+                    <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+                      {weeklyProjectionDetailRows.map(([label, value]) => (
                         <div key={label} className="rounded-2xl border border-white/10 bg-black/20 p-3">
                           <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
                           <p className="mt-2 text-xl font-black tabular-nums text-white">{formatStat(value)}</p>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <p className="rounded-2xl border border-cyan-300/15 bg-cyan-300/10 p-4 text-sm font-bold leading-6 text-cyan-100">
-                      Weekly projection is available from the matchup model. Position stat splits are shown when the projection feed supplies them.
-                    </p>
-                  )}
-                </div>
-              ) : (
+                  ) : null}
+                </section>
+              ) : null}
+              {seasonProjectionStats ? (
+                <section className="mt-6 border-t border-white/10 pt-5" aria-label="Season projection">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70">2026 season outlook</p>
+                  <p className="mt-1 text-xs font-bold text-white/55">Preseason projected totals</p>
+                  <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+                    {typeof seasonProjectionStats.fpts === "number" ? (
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">Fantasy points</p>
+                        <p className="mt-2 text-xl font-black tabular-nums text-white">{formatStat(seasonProjectionStats.fpts)}</p>
+                      </div>
+                    ) : null}
+                    {seasonProjectionDetailRows.map(([label, value]) => (
+                      <div key={label} className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
+                        <p className="mt-2 text-xl font-black tabular-nums text-white">{formatStat(value)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+              {!visibleWeeklyProjectionHighlights.length && !weeklyProjectionDetailRows.length && !seasonProjectionStats ? (
                 <p className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
-                  No detailed weekly stat split is linked to this card yet.
+                  No weekly matchup projection or season outlook is linked to this card yet.
                 </p>
-              )}
+              ) : null}
             </section>
           ) : activeTab === "history" ? (
             <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">

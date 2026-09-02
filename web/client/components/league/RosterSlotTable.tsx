@@ -562,6 +562,7 @@ export function RosterSlotTable({
             opponent: selectedPlayer.opponent,
             playerClass: null,
             status: selectedPlayer.status,
+            hasWeeklyProjection: true,
             projection: {
               fpts: selectedProjection,
               floor: selectedPlayer.floor ?? undefined,
