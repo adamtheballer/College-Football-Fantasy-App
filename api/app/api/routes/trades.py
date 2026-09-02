@@ -24,6 +24,8 @@ from collegefootballfantasy_api.app.schemas.trade import (
     TradeOfferCreate,
     TradeOfferList,
     TradeOfferRead,
+    TradeReviewVoteRequest,
+    TradeReviewVoteResponse,
 )
 from collegefootballfantasy_api.app.services.matchup_grades import build_matchup_row
 from collegefootballfantasy_api.app.services.scoring_service import calculate_player_fantasy_points
@@ -32,13 +34,12 @@ from collegefootballfantasy_api.app.services.injury_value import injury_value_mu
 from collegefootballfantasy_api.app.services.trade_service import (
     accept_trade_offer,
     cancel_trade_offer,
-    commissioner_approve_trade,
-    commissioner_veto_trade,
     counter_trade_offer,
     create_trade_offer,
     get_trade_offer,
     list_trade_offers,
     reject_trade_offer,
+    vote_on_trade_review,
 )
 
 router = APIRouter()
@@ -453,6 +454,20 @@ def accept_league_trade(
     return accept_trade_offer(db, _league_or_404(db, league_id), trade_id, current_user, payload or TradeActionRequest())
 
 
+@league_router.post(
+    "/leagues/{league_id}/trades/{trade_id}/review-vote",
+    response_model=TradeReviewVoteResponse,
+)
+def vote_on_league_trade_review(
+    league_id: int,
+    trade_id: int,
+    payload: TradeReviewVoteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+) -> TradeReviewVoteResponse:
+    return vote_on_trade_review(db, _league_or_404(db, league_id), trade_id, current_user, payload)
+
+
 @league_router.post("/leagues/{league_id}/trades/{trade_id}/reject", response_model=TradeOfferRead)
 def reject_league_trade(
     league_id: int,
@@ -494,12 +509,9 @@ def approve_league_trade(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_verified_user),
 ) -> TradeOfferRead:
-    return commissioner_approve_trade(
-        db,
-        _league_or_404(db, league_id),
-        trade_id,
-        current_user,
-        payload or TradeActionRequest(),
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="commissioner trade approval has been replaced by league voting in chat",
     )
 
 
@@ -511,4 +523,7 @@ def veto_league_trade(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_verified_user),
 ) -> TradeOfferRead:
-    return commissioner_veto_trade(db, _league_or_404(db, league_id), trade_id, current_user, payload or TradeActionRequest())
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="commissioner trade veto has been replaced by league voting in chat",
+    )

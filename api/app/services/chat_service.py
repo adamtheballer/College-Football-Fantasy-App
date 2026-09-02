@@ -21,6 +21,7 @@ from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.trade_offer import TradeOffer
 from collegefootballfantasy_api.app.models.trade_offer_item import TradeOfferItem
+from collegefootballfantasy_api.app.models.trade_review import TradeReview
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.chat import (
     ChatDirectThreadCreate,
@@ -1183,6 +1184,107 @@ def _trade_message_metadata(
         "processing_status": "processed" if offer.processed_at else "pending_transfer",
         "processed_at": offer.processed_at.isoformat() if offer.processed_at else None,
     }
+
+
+def _trade_review_message_metadata(db: Session, offer: TradeOffer) -> dict:
+    """Build the single league-chat card for an accepted trade's vote window."""
+    proposing = db.get(Team, offer.proposing_team_id)
+    receiving = db.get(Team, offer.receiving_team_id)
+    if proposing is None or receiving is None:
+        raise ValueError("trade teams must exist before a review chat message can be created")
+
+    votes = (
+        db.query(TradeReview)
+        .filter(TradeReview.trade_offer_id == offer.id, TradeReview.action.in_(("uphold", "veto")))
+        .order_by(TradeReview.id.asc())
+        .all()
+    )
+    eligible_voter_count = (
+        db.query(LeagueMember.user_id)
+        .filter(LeagueMember.league_id == offer.league_id)
+        .distinct()
+        .count()
+    )
+    # League creation requires at least two managers, but retain a safe
+    # lower bound for imported/pre-release leagues.
+    eligible_voter_count = max(1, eligible_voter_count)
+    veto_count = sum(vote.action == "veto" for vote in votes)
+    uphold_count = sum(vote.action == "uphold" for vote in votes)
+    if offer.status == "vetoed":
+        review_status = "vetoed"
+    elif offer.status == "processed":
+        review_status = "processed"
+    else:
+        review_status = "awaiting_votes"
+
+    return {
+        "card_type": "league_trade_review",
+        "event_key": f"trade:{offer.id}:league-review",
+        "trade_id": offer.id,
+        "proposing_team": {"id": proposing.id, "name": proposing.name},
+        "receiving_team": {"id": receiving.id, "name": receiving.name},
+        "proposing_team_sends": [
+            _trade_asset_metadata(item) for item in offer.items if item.team_id == proposing.id
+        ],
+        "receiving_team_sends": [
+            _trade_asset_metadata(item) for item in offer.items if item.team_id == receiving.id
+        ],
+        "review_status": review_status,
+        "review_ends_at": offer.process_after.isoformat() if offer.process_after else None,
+        "votes": {
+            "uphold_count": uphold_count,
+            "veto_count": veto_count,
+            "veto_threshold": (eligible_voter_count + 1) // 2,
+            "eligible_voter_count": eligible_voter_count,
+        },
+        # The client uses only the current user's entry to render their
+        # already-cast state; counts remain the visible league result.
+        "votes_by_user_id": {
+            str(vote.reviewer_user_id): vote.action
+            for vote in votes
+            if vote.reviewer_user_id is not None
+        },
+    }
+
+
+def create_trade_review_chat_message(db: Session, offer: TradeOffer) -> ChatMessage:
+    """Create the one public, idempotent vote card for an accepted trade."""
+    metadata_json = _trade_review_message_metadata(db, offer)
+    proposing_name = metadata_json["proposing_team"]["name"]
+    receiving_name = metadata_json["receiving_team"]["name"]
+    message = create_system_chat_message(
+        db,
+        league_id=offer.league_id,
+        message_type="system",
+        body=f"{proposing_name} and {receiving_name} finalized a trade for league review.",
+        event_key=metadata_json["event_key"],
+        metadata_json=metadata_json,
+    )
+    _record_chat_audit_event(
+        db,
+        league_id=offer.league_id,
+        thread_id=message.thread_id,
+        message_id=message.id,
+        action="league_trade_review_message_generated",
+        metadata_json={"trade_id": offer.id},
+        event_key=f"trade:{offer.id}:league-review:chat-audit",
+    )
+    return message
+
+
+def sync_trade_review_chat_message(db: Session, offer: TradeOffer) -> ChatMessage | None:
+    """Refresh vote counts and lifecycle state on the existing public card."""
+    message = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.event_key == f"trade:{offer.id}:league-review")
+        .one_or_none()
+    )
+    if message is None:
+        return None
+    message.metadata_json = _trade_review_message_metadata(db, offer)
+    message.updated_at = utcnow()
+    db.add(message)
+    return message
 
 
 def create_trade_finalized_chat_message(

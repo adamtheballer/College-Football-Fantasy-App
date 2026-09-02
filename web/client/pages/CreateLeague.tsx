@@ -43,11 +43,6 @@ const waiverOptions = [
     description: "Claims process in waiver order. A successful claim moves the team to the back.",
   },
 ];
-const tradeReviewOptions = [
-  { label: "Commissioner", value: "commissioner" },
-  { label: "None", value: "none" },
-];
-
 const timezoneOptions = [
   { label: "Eastern Time", value: "America/New_York" },
   { label: "Central Time", value: "America/Chicago" },
@@ -384,7 +379,6 @@ function CreateLeagueForm() {
   const [settings, setSettings] = useState({
     playoff_teams: 4,
     waiver_type: "faab",
-    trade_review_type: "commissioner",
   });
 
   const [draft, setDraft] = useState({
@@ -485,7 +479,7 @@ function CreateLeagueForm() {
           playoff_teams: settings.playoff_teams,
           waiver_type: settings.waiver_type,
           ...managedWaiverSchedule,
-          trade_review_type: settings.trade_review_type,
+          trade_review_type: "league_vote",
           superflex_enabled: false,
           kicker_enabled: true,
           defense_enabled: false,
@@ -741,23 +735,6 @@ function CreateLeagueForm() {
                       </SelectTrigger>
                       <SelectContent className={selectContentClass}>
                         {waiverOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value} className="text-sm font-medium">
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field label="Trade review">
-                    <Select
-                      value={settings.trade_review_type}
-                      onValueChange={(value) => setSettings((prev) => ({ ...prev, trade_review_type: value }))}
-                    >
-                      <SelectTrigger className={selectTriggerClass}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className={selectContentClass}>
-                        {tradeReviewOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value} className="text-sm font-medium">
                             {option.label}
                           </SelectItem>

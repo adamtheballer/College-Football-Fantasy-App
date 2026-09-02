@@ -46,7 +46,7 @@ class LeagueSettings(TimestampMixin, Base):
     waiver_process_hour: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
     faab_budget: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     allow_zero_dollar_bids: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    trade_review_type: Mapped[str] = mapped_column(String(50), default="commissioner")
+    trade_review_type: Mapped[str] = mapped_column(String(50), default="league_vote")
     trade_deadline_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     trade_deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

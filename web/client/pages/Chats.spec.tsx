@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
   selectedLeagueId: 1,
   sendMutate: vi.fn(),
   directMutate: vi.fn(),
+  voteMutate: vi.fn(),
   readMutate: vi.fn(),
   setActiveLeagueId: vi.fn(),
   failedMessage: false,
@@ -135,9 +136,10 @@ vi.mock("@/hooks/use-chat", () => ({
   useSendChatMessage: () => ({ mutate: state.sendMutate, isPending: false, isError: false }),
   useMarkChatThreadRead: () => ({ mutate: state.readMutate, isPending: false }),
   useCreateDirectChatThread: () => ({ mutate: state.directMutate, isPending: false, isError: false }),
+  useTradeReviewVote: () => ({ mutate: state.voteMutate, isPending: false, isError: false }),
 }));
 
-import Chats, { isPrivateTradeMessage, PrivateTradeOfferCard, TradeFinalizedCard } from "./Chats";
+import Chats, { isLeagueTradeReviewMessage, isPrivateTradeMessage, LeagueTradeReviewCard, PrivateTradeOfferCard, TradeFinalizedCard } from "./Chats";
 
 afterEach(() => {
   cleanup();
@@ -145,6 +147,7 @@ afterEach(() => {
   state.failedMessage = false;
   state.sendMutate.mockReset();
   state.directMutate.mockReset();
+  state.voteMutate.mockReset();
   state.readMutate.mockReset();
   state.setActiveLeagueId.mockReset();
 });
@@ -287,5 +290,44 @@ describe("PrivateTradeOfferCard", () => {
 
     expect(screen.getByText(label)).toBeTruthy();
     expect(screen.getByRole("link", { name: "View trade" })).toBeTruthy();
+  });
+});
+
+describe("LeagueTradeReviewCard", () => {
+  const message = {
+    league_id: 4,
+    body: "Avery Aces and Blake Bears finalized a trade for league review.",
+    metadata: {
+      card_type: "league_trade_review",
+      trade_id: 18,
+      proposing_team: { id: 8, name: "Avery Aces" },
+      receiving_team: { id: 9, name: "Blake Bears" },
+      proposing_team_sends: [{ player_id: 9, name: "Jeremiah Smith", position: "WR", school: "Ohio State" }],
+      receiving_team_sends: [{ player_id: 10, name: "Ahmad Hardy", position: "RB", school: "Missouri" }],
+      review_status: "awaiting_votes",
+      review_ends_at: "2026-09-06T12:00:00Z",
+      votes: { uphold_count: 0, veto_count: 0, veto_threshold: 5, eligible_voter_count: 10 },
+      votes_by_user_id: {},
+    },
+  };
+
+  it("posts a single league-manager vote and reveals the server count after voting", () => {
+    state.voteMutate.mockImplementation((payload, options) => options.onSuccess({
+      trade_id: payload.tradeId,
+      status: "accepted_pending",
+      current_user_vote: "uphold",
+      votes: { uphold_count: 1, veto_count: 0, veto_threshold: 5, eligible_voter_count: 10 },
+    }));
+    render(<LeagueTradeReviewCard message={message} currentUserId={1} />);
+
+    expect(isLeagueTradeReviewMessage({ message_type: "system", metadata: message.metadata } as Pick<ChatMessage, "message_type" | "metadata">)).toBe(true);
+    expect(screen.getByRole("button", { name: "Uphold" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Veto" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Uphold" }));
+
+    expect(state.voteMutate).toHaveBeenCalledWith({ tradeId: 18, action: "uphold" }, expect.any(Object));
+    expect(screen.getByRole("button", { name: "Uphold: 1" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Veto: 0" })).toBeTruthy();
+    expect(screen.getByText(/0\/5 vetoes needed/)).toBeTruthy();
   });
 });

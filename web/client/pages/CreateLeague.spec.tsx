@@ -48,13 +48,13 @@ describe("CreateLeague standard rules", () => {
     expect(leagueSizes).not.toContain(16);
   });
 
-  it("shows only playoffs, waiver system, and trade review on the settings step", () => {
+  it("shows only the configurable playoff and waiver rules on the settings step", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "Continue to Settings" }));
 
     expect(screen.getByText("Playoff teams")).toBeTruthy();
     expect(screen.getByText("Waiver system")).toBeTruthy();
-    expect(screen.getByText("Trade review")).toBeTruthy();
+    expect(screen.queryByText("Trade review")).toBeNull();
     expect(screen.queryByText("Roster format")).toBeNull();
     expect(screen.queryByText("Scoring settings")).toBeNull();
     expect(screen.queryByText("Processing time (local hour)")).toBeNull();
