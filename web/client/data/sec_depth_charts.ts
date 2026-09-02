@@ -373,8 +373,8 @@ export const secDepthCharts: TeamDepthChart[] = [
     conference: "SEC",
     positions: {
       QB: [
-        { depth: 1, name: "George MacIntyre", classYear: "Freshman", firstYearStarter: true },
-        { depth: 2, name: "Faizon Brandon", classYear: "Freshman" },
+        { depth: 1, name: "Faizon Brandon", classYear: "Freshman", firstYearStarter: true },
+        { depth: 2, name: "George MacIntyre", classYear: "Sophomore" },
       ],
       RB: [
         { depth: 1, name: "DeSean Bishop", classYear: "Junior" },

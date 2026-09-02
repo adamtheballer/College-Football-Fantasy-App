@@ -76,6 +76,24 @@ def _health_multiplier(status: str | None) -> float:
     return 1.0
 
 
+def _quarterback_role_multiplier(player: Player) -> float:
+    """Translate a confirmed QB depth role into a share of team QB volume.
+
+    Prior to this guard, every healthy quarterback was projected for the
+    team's full passing workload.  That makes an announced backup look like a
+    starter until a box score arrives.  A missing depth order deliberately
+    remains neutral so incomplete provider data does not suppress a player.
+    """
+
+    if player.position.upper() != "QB" or player.depth_order is None:
+        return 1.0
+    if player.depth_order <= 1:
+        return 1.0
+    if player.depth_order == 2:
+        return 0.18
+    return 0.06
+
+
 def _qb_rating(comp_pct: float, ypa: float, td_rate: float, int_rate: float) -> float:
     rating = (8.4 * ypa) + (330 * td_rate) + (100 * comp_pct) - (200 * int_rate)
     return round(rating, 2)
@@ -114,6 +132,7 @@ def build_weekly_projections(
         rush_share = usage.rush_share if usage else fallback_rush_share
         target_share = usage.target_share if usage else fallback_target_share
         talent = _talent_multiplier(player)
+        qb_role_multiplier = _quarterback_role_multiplier(player)
 
         injury = injuries_by_player.get(player.id)
         health = _health_multiplier(injury.status if injury else None)
@@ -173,7 +192,7 @@ def build_weekly_projections(
                 pass_td_rate *= defense.pass_td_multiplier
                 int_rate *= defense.pass_turnover_multiplier
 
-            pass_attempts = team_pass_attempts * health
+            pass_attempts = team_pass_attempts * health * qb_role_multiplier
             pass_yards = pass_attempts * ypa
             pass_tds = pass_attempts * pass_td_rate
             interceptions = pass_attempts * int_rate
