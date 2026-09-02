@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from math import erf, sqrt
 from typing import Any
 
 from collegefootballfantasy_api.app.models.defense_rating import DefenseRating
@@ -11,6 +10,7 @@ from collegefootballfantasy_api.app.models.usage_share import UsageShare
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.scoring import calculate_fantasy_points, get_scoring_rules
 from collegefootballfantasy_api.app.services.projections.efficiency import compute_efficiency
+from collegefootballfantasy_api.app.services.projections.ranges import weighted_projection_outcomes
 
 
 DEFAULT_QB = {"ypa": 7.5, "pass_td_rate": 0.05, "int_rate": 0.02, "rush_ypc": 4.5, "comp_pct": 0.62}
@@ -59,13 +59,6 @@ def _talent_multiplier(player: Player) -> float:
 
     overall = float(player.cfb27_overall or 80)
     return max(0.85, min(1.15, 1.0 + (overall - 80.0) / 100.0))
-
-
-def _normal_cdf(x: float, mean: float, sd: float) -> float:
-    if sd <= 0:
-        return 0.0
-    z = (x - mean) / (sd * sqrt(2))
-    return 0.5 * (1 + erf(z))
 
 
 def _health_multiplier(status: str | None) -> float:
@@ -148,17 +141,22 @@ def build_weekly_projections(
                 "fg_missed": 0.2,
             }
             fpts = calculate_fantasy_points(kicker_stats, rules, position="K")
-            sd = max(1.5, fpts * 0.28)
+            outcome_range = weighted_projection_outcomes(
+                fpts,
+                position=position,
+                expected_opportunities=sum(kicker_stats.values()),
+                availability_multiplier=health,
+            )
             projections.append(
                 WeeklyProjection(
                     player_id=player.id,
                     season=season,
                     week=week,
                     fantasy_points=fpts,
-                    floor=max(0.0, fpts - sd),
-                    ceiling=fpts + sd,
-                    boom_prob=1 - _normal_cdf(fpts * 1.4, fpts, sd),
-                    bust_prob=_normal_cdf(fpts * 0.6, fpts, sd),
+                    floor=outcome_range.floor,
+                    ceiling=outcome_range.ceiling,
+                    boom_prob=outcome_range.boom_prob,
+                    bust_prob=outcome_range.bust_prob,
                 )
             )
             continue
@@ -201,11 +199,12 @@ def build_weekly_projections(
             }
             fpts = calculate_fantasy_points(stats_row, rules, position="QB")
 
-            sd = max(2.0, fpts * 0.35)
-            floor = max(0.0, fpts - sd)
-            ceiling = fpts + sd
-            boom_prob = 1 - _normal_cdf(fpts * 1.5, fpts, sd)
-            bust_prob = _normal_cdf(fpts * 0.5, fpts, sd)
+            outcome_range = weighted_projection_outcomes(
+                fpts,
+                position=position,
+                expected_opportunities=expected_plays,
+                availability_multiplier=health,
+            )
 
             projections.append(
                 WeeklyProjection(
@@ -227,10 +226,10 @@ def build_weekly_projections(
                     rec_tds=0.0,
                     interceptions=interceptions,
                     fantasy_points=fpts,
-                    floor=floor,
-                    ceiling=ceiling,
-                    boom_prob=boom_prob,
-                    bust_prob=bust_prob,
+                    floor=outcome_range.floor,
+                    ceiling=outcome_range.ceiling,
+                    boom_prob=outcome_range.boom_prob,
+                    bust_prob=outcome_range.bust_prob,
                     qb_rating=qb_rating,
                 )
             )
@@ -284,11 +283,12 @@ def build_weekly_projections(
             }
             fpts = calculate_fantasy_points(stats_row, rules, position=position)
 
-            sd = max(1.5, fpts * 0.30)
-            floor = max(0.0, fpts - sd)
-            ceiling = fpts + sd
-            boom_prob = 1 - _normal_cdf(fpts * 1.5, fpts, sd)
-            bust_prob = _normal_cdf(fpts * 0.5, fpts, sd)
+            outcome_range = weighted_projection_outcomes(
+                fpts,
+                position=position,
+                expected_opportunities=expected_plays,
+                availability_multiplier=health,
+            )
 
             projections.append(
                 WeeklyProjection(
@@ -310,10 +310,10 @@ def build_weekly_projections(
                     rec_tds=rec_tds,
                     interceptions=0.0,
                     fantasy_points=fpts,
-                    floor=floor,
-                    ceiling=ceiling,
-                    boom_prob=boom_prob,
-                    bust_prob=bust_prob,
+                    floor=outcome_range.floor,
+                    ceiling=outcome_range.ceiling,
+                    boom_prob=outcome_range.boom_prob,
+                    bust_prob=outcome_range.bust_prob,
                     qb_rating=None,
                 )
             )

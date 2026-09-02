@@ -38,6 +38,7 @@ def test_preseason_baselines_cover_supported_draft_positions_without_provider_da
     assert {projection.player_id for projection in projections} == {1, 2, 3, 4, 5}
     assert all(projection.fantasy_points > 0 for projection in projections)
     assert all(projection.ceiling > projection.fantasy_points >= projection.floor for projection in projections)
+    assert all(projection.boom_prob > 0 and projection.bust_prob > 0 for projection in projections)
 
 
 def test_preseason_baselines_prefer_higher_ranked_players_at_the_same_position() -> None:

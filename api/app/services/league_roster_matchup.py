@@ -34,6 +34,7 @@ from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
 from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+from collegefootballfantasy_api.app.services.projections.ranges import weighted_projection_outcomes
 from collegefootballfantasy_api.app.domain.scoring_engine import (
     calculate_player_fantasy_points,
     normalize_player_stats,
@@ -620,9 +621,13 @@ def _serialize_roster_entry(
 ) -> RosterTabEntryRead:
     entry = roster_slot.entry
     projected = float(projection.fantasy_points) if projection and projection.fantasy_points is not None else None
-    floor = float(projection.floor or 0.0) if projection else 0.0
-    ceiling = float(projection.ceiling or 0.0) if projection else 0.0
     position = entry.player.position if entry and entry.player else None
+    outcome_range = weighted_projection_outcomes(
+        projection.fantasy_points if projection else None,
+        position=position,
+        expected_opportunities=projection.expected_plays if projection else None,
+        availability_multiplier=projection.availability_multiplier if projection else None,
+    )
     current_points = float(player_score.fantasy_points) if player_score else None
     live_final_points = None
     if live_projection is not None:
@@ -686,10 +691,10 @@ def _serialize_roster_entry(
         school=_display_school_name(entry.player.school) if entry and entry.player else None,
         position=entry.player.position if entry and entry.player else None,
         projected_points=projected,
-        floor=floor,
-        ceiling=ceiling,
-        boom_prob=float(projection.boom_prob or 0.0) if projection else 0.0,
-        bust_prob=float(projection.bust_prob or 0.0) if projection else 0.0,
+        floor=outcome_range.floor,
+        ceiling=outcome_range.ceiling,
+        boom_prob=outcome_range.boom_prob,
+        bust_prob=outcome_range.bust_prob,
         opponent=opponent,
         game_location=game_location,
         weekly_projected_fantasy_points=projected,
