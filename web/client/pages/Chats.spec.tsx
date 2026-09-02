@@ -153,6 +153,15 @@ afterEach(() => {
 });
 
 describe("Chats", () => {
+  it("expands embedded league chat to the shared league-tab content width", () => {
+    render(<Chats leagueId={1} embedded />);
+
+    const content = screen.getByTestId("league-chat-content");
+    expect(content.className).toContain("w-full");
+    expect(content.className).toContain("max-w-none");
+    expect(content.className).not.toContain("max-w-7xl");
+  });
+
   it("keeps the mobile composer at Safari's no-focus-zoom font size", () => {
     render(<Chats />);
 
