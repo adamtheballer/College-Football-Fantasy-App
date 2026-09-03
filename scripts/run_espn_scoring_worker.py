@@ -76,16 +76,30 @@ def resolve_scoring_window(db, *, now: datetime | None = None) -> tuple[int, int
     for row in candidates:
         windows.setdefault((row.season, row.week), []).append(row)
 
-    def priority(item: tuple[tuple[int, int], list[TeamSchedule]]):
+    def latest_priority(item: tuple[tuple[int, int], list[TeamSchedule]]):
         (season, week), window_rows = item
         latest_kickoff = max(_as_utc(row.kickoff_at) for row in window_rows)
         distinct_schools = len({row.team_name.strip().casefold() for row in window_rows if row.team_name.strip()})
-        # A canonical current-week import has the fuller schedule.  The
+        # A canonical current-week import has the fuller schedule. The
         # season/week fallback keeps the choice deterministic if malformed
         # duplicate windows have the same kickoff and school coverage.
         return latest_kickoff, distinct_schools, season, week
 
-    return max(windows.items(), key=priority)[0]
+    if live:
+        # Once football has started, keep processing the most recently started
+        # verified window rather than jumping ahead to the next slate.
+        return max(windows.items(), key=latest_priority)[0]
+
+    def upcoming_priority(item: tuple[tuple[int, int], list[TeamSchedule]]):
+        (season, week), window_rows = item
+        earliest_kickoff = min(_as_utc(row.kickoff_at) for row in window_rows)
+        distinct_schools = len({row.team_name.strip().casefold() for row in window_rows if row.team_name.strip()})
+        # Before Week 1 begins, choose the nearest verified kickoff. The
+        # previous max() selection chose the furthest game in the eight-day
+        # horizon and therefore ran Week 2 before Week 1 had even started.
+        return earliest_kickoff, -distinct_schools, season, week
+
+    return min(windows.items(), key=upcoming_priority)[0]
 
 
 def run_iteration(*, now: datetime | None = None, client: ESPNClient | None = None) -> EspnCycleResult | None:

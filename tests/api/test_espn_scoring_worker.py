@@ -37,6 +37,33 @@ def test_resolve_scoring_window_prefers_the_most_recent_verified_kickoff(db_sess
     assert resolve_scoring_window(db_session, now=NOW) == (2026, 1)
 
 
+def test_resolve_scoring_window_chooses_week_one_before_its_first_kickoff(db_session):
+    """The next week must be the nearest slate, not the far edge of the horizon."""
+    db_session.add_all(
+        [
+            TeamSchedule(
+                team_name="Texas",
+                season=2026,
+                week=1,
+                location="home",
+                is_bye=False,
+                kickoff_at=NOW + timedelta(days=1),
+            ),
+            TeamSchedule(
+                team_name="Oregon",
+                season=2026,
+                week=2,
+                location="away",
+                is_bye=False,
+                kickoff_at=NOW + timedelta(days=7),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    assert resolve_scoring_window(db_session, now=NOW) == (2026, 1)
+
+
 def test_resolve_scoring_window_does_not_guess_when_only_byes_or_unverified_dates_exist(db_session):
     db_session.add_all(
         [
