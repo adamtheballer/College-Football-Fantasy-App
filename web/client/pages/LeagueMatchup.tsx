@@ -199,7 +199,10 @@ function CompactMatchupScoreboard({
   onPreviousMatchup: () => void;
   onNextMatchup: () => void;
 }) {
-  const winChance = displayedProbabilityPair(myTeam?.win_probability, opponentTeam?.win_probability);
+  // The API normally supplies probabilities. A neutral fallback keeps an
+  // incomplete/injured lineup from replacing the matchup with an unavailable
+  // message while fresh roster totals are loading.
+  const winChance = displayedProbabilityPair(myTeam?.win_probability, opponentTeam?.win_probability) ?? { my: 50, opponent: 50 };
   const myTeamIsLeading = Boolean(winChance && winChance.my >= winChance.opponent);
 
   return (
@@ -277,7 +280,7 @@ function CompactMatchupScoreboard({
 
       <div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-t border-cfb-border-subtle pt-2 text-[9px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
         <span>{winChance ? `${winChance.my.toFixed(1)}%` : "—"}</span>
-        {winChance ? <WinChanceBar myPercent={myTeam?.win_probability} opponentPercent={opponentTeam?.win_probability} className="h-2" testIdPrefix="scoreboard-win-chance" /> : <span className="text-center normal-case tracking-normal">Win Probability available after lineups are set</span>}
+        <WinChanceBar myPercent={winChance.my} opponentPercent={winChance.opponent} className="h-2" testIdPrefix="scoreboard-win-chance" />
         <span>{winChance ? `${winChance.opponent.toFixed(1)}%` : "—"}</span>
       </div>
     </section>

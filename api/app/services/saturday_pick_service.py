@@ -20,6 +20,7 @@ from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameSta
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.saturday_pick import (
     SaturdayPickContest,
+    SaturdayPickContentAudit,
     SaturdayPickEntry,
     SaturdayPickPlayer,
     SponsorRewardEvent,
@@ -29,6 +30,9 @@ from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.schemas.saturday_pick import (
+    SaturdayPickCandidateRead,
+    SaturdayPickContentAuditRead,
+    SaturdayPickAdminReviewRead,
     SaturdayPickContestCreate,
     SaturdayPickContestRead,
     SaturdayPickEntryRead,
@@ -213,6 +217,161 @@ def create_contest(db: Session, payload: SaturdayPickContestCreate, actor: User)
                 game_id=schedule.game_id,
                 game_time=as_utc(schedule.kickoff_at),
                 projected_points=_weekly_projection(db, player.id, payload.season, payload.week_number),
+                scoring_status="SCHEDULED",
+                sort_order=sort_order,
+            )
+        )
+    db.flush()
+    return contest
+
+
+def list_review_candidates(db: Session, *, season: int, week: int, position: str) -> list[SaturdayPickCandidateRead]:
+    """Return only verified, playable same-position candidates for admin review."""
+
+    rows = db.scalars(
+        current_published_projections_query(season=season, week=week)
+        .where(WeeklyProjection.projection_status == "ACTIVE")
+        .order_by(WeeklyProjection.fantasy_points.desc())
+    ).all()
+    candidates: list[SaturdayPickCandidateRead] = []
+    for projection in rows:
+        player = db.get(Player, projection.player_id)
+        if not player or canonical_position(player.position) != position or _is_known_out(db, player.id, season, week):
+            continue
+        try:
+            schedule = _eligible_schedule(db, player, season, week)
+        except ValueError:
+            continue
+        if projection.fantasy_points is None:
+            continue
+        candidates.append(
+            SaturdayPickCandidateRead(
+                player_id=player.id,
+                player_name=player.name,
+                school=player.school,
+                position=position,
+                opponent=schedule.opponent_name or "",
+                kickoff_at=as_utc(schedule.kickoff_at),
+                projected_points=float(projection.fantasy_points),
+            )
+        )
+    return candidates
+
+
+def record_content_audit(
+    db: Session,
+    *,
+    contest: SaturdayPickContest | None,
+    actor: User,
+    season: int,
+    week: int,
+    action: str,
+    reason: str | None,
+    details: dict | None = None,
+) -> SaturdayPickContentAudit:
+    audit = SaturdayPickContentAudit(
+        contest_id=contest.id if contest else None,
+        actor_user_id=actor.id,
+        season=season,
+        week_number=week,
+        action=action,
+        reason=reason,
+        details_json=details,
+    )
+    db.add(audit)
+    db.flush()
+    return audit
+
+
+def review_snapshot(
+    db: Session,
+    *,
+    season: int,
+    week: int,
+    viewer: User,
+) -> SaturdayPickAdminReviewRead:
+    contest = (
+        db.query(SaturdayPickContest)
+        .filter(SaturdayPickContest.season == season, SaturdayPickContest.week_number == week)
+        .one_or_none()
+    )
+    position = contest.contest_position if contest else recommended_position(week)
+    audit_rows = (
+        db.query(SaturdayPickContentAudit)
+        .filter(SaturdayPickContentAudit.season == season, SaturdayPickContentAudit.week_number == week)
+        .order_by(SaturdayPickContentAudit.created_at.desc(), SaturdayPickContentAudit.id.desc())
+        .limit(100)
+        .all()
+    )
+    return SaturdayPickAdminReviewRead(
+        contest=contest_read(db, contest, viewer) if contest else None,
+        candidates=list_review_candidates(db, season=season, week=week, position=position),
+        sponsor_draft=(
+            {
+                "name": contest.sponsor_name,
+                "logo_url": contest.sponsor_logo_url,
+                "offer_text": contest.sponsor_offer_text,
+                "code": contest.sponsor_code,
+                "url": contest.sponsor_url,
+                "terms": contest.sponsor_terms,
+            }
+            if contest
+            else None
+        ),
+        audit=[
+            SaturdayPickContentAuditRead(
+                id=row.id,
+                action=row.action,
+                reason=row.reason,
+                actor_user_id=row.actor_user_id,
+                created_at=row.created_at,
+            )
+            for row in audit_rows
+        ],
+    )
+
+
+def replace_draft_contest(
+    db: Session,
+    *,
+    contest: SaturdayPickContest,
+    payload: SaturdayPickContestCreate,
+) -> SaturdayPickContest:
+    """Apply an admin review before publication without permitting live rewrites."""
+
+    if contest.status not in {"DRAFT", "SCHEDULED"}:
+        raise ValueError("Only an unpublished contest can be changed in review.")
+    if contest.season != payload.season or contest.week_number != payload.week_number:
+        raise ValueError("A review cannot move a contest to a different week.")
+    if contest.contest_position != payload.contest_position:
+        raise ValueError("A review cannot change the contest position.")
+    if db.query(SaturdayPickEntry.id).filter(SaturdayPickEntry.contest_id == contest.id).first():
+        raise ValueError("A contest with entries cannot be rewritten.")
+    featured = _validate_featured_players(db, payload=payload)
+    first_kickoff = min(as_utc(schedule.kickoff_at) for _, schedule in featured)
+    contest.title = payload.title.strip() or "Saturday Pick 6"
+    contest.lock_at = first_kickoff
+    contest.sponsor_name = payload.sponsor_name
+    contest.sponsor_logo_url = payload.sponsor_logo_url
+    contest.sponsor_offer_text = payload.sponsor_offer_text
+    contest.sponsor_code = payload.sponsor_code
+    contest.sponsor_url = payload.sponsor_url
+    contest.sponsor_terms = payload.sponsor_terms
+    for row in db.query(SaturdayPickPlayer).filter(SaturdayPickPlayer.contest_id == contest.id).all():
+        db.delete(row)
+    db.flush()
+    for sort_order, (player, schedule) in enumerate(featured, start=1):
+        db.add(
+            SaturdayPickPlayer(
+                contest_id=contest.id,
+                player_id=player.id,
+                canonical_position=contest.contest_position,
+                player_name_snapshot=player.name,
+                school_snapshot=player.school,
+                opponent_snapshot=schedule.opponent_name or "",
+                game_id=schedule.game_id,
+                game_time=as_utc(schedule.kickoff_at),
+                projected_points=_weekly_projection(db, player.id, contest.season, contest.week_number),
                 scoring_status="SCHEDULED",
                 sort_order=sort_order,
             )

@@ -787,6 +787,10 @@ export function usePlayerCard(playerId?: number | null, enabled = true) {
     queryKey: ["player-card", playerId, injurySeason, injuryWeek],
     enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
     staleTime: 5_000,
+    // An open player card is a live surface during games. Keep its stat line
+    // current without relying on a page reload or the game reaching final.
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: true,
     refetchOnMount: "always",
     queryFn: () => apiGet<PlayerCardResponse>(`/players/${playerId}/card`, {
       injury_season: injurySeason,
@@ -810,7 +814,7 @@ export function usePlayerGameLog(
     // the same three-minute cadence as live-score ingestion.
     staleTime: 0,
     refetchOnMount: "always",
-    refetchInterval: 180_000,
+    refetchInterval: 30_000,
     refetchIntervalInBackground: true,
     queryFn: () => apiGet<PlayerGameLogResponse>(`/players/${playerId}/game-log`, {
       ...(typeof season === "number" && Number.isFinite(season) ? { season } : {}),

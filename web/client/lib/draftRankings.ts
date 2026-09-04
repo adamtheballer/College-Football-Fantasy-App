@@ -260,34 +260,26 @@ const getProjectionAwareProvidedRank = (
   return Math.min(providedRank, computedRank + QB_PROJECTION_RANK_BUFFER);
 };
 
-const enforceQuarterbackProjectionOrder = <T extends { player: Player; projectedPoints: number }>(
+const enforcePositionProjectionOrder = <T extends { player: Player; projectedPoints: number }>(
   board: T[]
 ) => {
-  const quarterbackIndexes = board
-    .map((entry, index) => ({ entry, index }))
-    .filter(({ entry }) => entry.player.pos === "QB")
-    .map(({ index }) => index);
-
-  if (quarterbackIndexes.length <= 1) return board;
-
-  const sortedQuarterbacks = quarterbackIndexes
-    .map((index) => board[index])
-    .sort((left, right) => {
-      if (left.projectedPoints !== right.projectedPoints) {
-        return right.projectedPoints - left.projectedPoints;
-      }
-      const leftSourceRank = getProvidedBoardRank(left.player) ?? Number.POSITIVE_INFINITY;
-      const rightSourceRank = getProvidedBoardRank(right.player) ?? Number.POSITIVE_INFINITY;
-      if (leftSourceRank !== rightSourceRank) {
-        return leftSourceRank - rightSourceRank;
-      }
-      return left.player.name.localeCompare(right.player.name);
-    });
-
   const reordered = [...board];
-  quarterbackIndexes.forEach((index, qbIndex) => {
-    reordered[index] = sortedQuarterbacks[qbIndex];
-  });
+  for (const position of DRAFT_POSITIONS) {
+    const indexes = board
+      .map((entry, index) => ({ entry, index }))
+      .filter(({ entry }) => entry.player.pos === position)
+      .map(({ index }) => index);
+    const sorted = indexes
+      .map((index) => board[index])
+      .sort((left, right) => {
+        if (left.projectedPoints !== right.projectedPoints) return right.projectedPoints - left.projectedPoints;
+        // Equal forecasts keep the existing positional-value slot order. That
+        // preserves valid rating/ADP tie-breakers while only correcting a
+        // true projection inversion.
+        return 0;
+      });
+    indexes.forEach((index, positionIndex) => { reordered[index] = sorted[positionIndex]; });
+  }
   return reordered;
 };
 
@@ -590,7 +582,7 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
     })
     .map(({ entry }) => entry);
 
-  const projectionOrderedBoard = enforceQuarterbackProjectionOrder(
+  const projectionOrderedBoard = enforcePositionProjectionOrder(
     deferExcessEarlyQuarterbacks(
       [...positionAdjustedRanks, ...lowProjectionQbRanks],
       config

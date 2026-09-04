@@ -43,6 +43,7 @@ const Trade = lazyWithRouteRecovery(() => import("./pages/Trade"));
 const AdminScoring = lazyWithRouteRecovery(() => import("./pages/AdminScoring"));
 const ComingSoon = lazyWithRouteRecovery(() => import("./pages/ComingSoon"));
 const SaturdayPick6 = lazyWithRouteRecovery(() => import("./pages/SaturdayPick6"));
+const AdminSaturdayPick6 = lazyWithRouteRecovery(() => import("./pages/AdminSaturdayPick6"));
 const PrivacyPolicy = lazyWithRouteRecovery(() => import("./pages/PrivacyPolicy"));
 const TermsOfUse = lazyWithRouteRecovery(() => import("./pages/TermsOfUse"));
 const ProviderDisclosure = lazyWithRouteRecovery(() => import("./pages/ProviderDisclosure"));
@@ -225,6 +226,7 @@ const ApplicationRoutes = () => (
                 <Route path="/coming-soon" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
                 <Route path="/saturday-pick-6" element={<ProtectedRoute><SaturdayPick6 /></ProtectedRoute>} />
                 <Route path="/admin/scoring" element={<ProtectedRoute><AdminScoring /></ProtectedRoute>} />
+                <Route path="/admin/saturday-pick-6" element={<ProtectedRoute><AdminSaturdayPick6 /></ProtectedRoute>} />
                 <Route path="/stats" element={<Navigate to="/leagues" replace />} />
                 <Route path="/stats/players" element={<Navigate to="/leagues" replace />} />
                 <Route path="/login" element={<Login />} />

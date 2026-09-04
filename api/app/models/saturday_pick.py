@@ -94,3 +94,21 @@ class SponsorRewardEvent(TimestampMixin, Base):
     sponsor_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
     placement: Mapped[str | None] = mapped_column(String(100), nullable=True)
     metadata_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+class SaturdayPickContentAudit(TimestampMixin, Base):
+    """Immutable moderation record for the human Pick 6 release gate."""
+
+    __tablename__ = "saturday_pick_content_audits"
+    __table_args__ = (Index("ix_saturday_pick_content_audits_contest_created", "contest_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    contest_id: Mapped[int | None] = mapped_column(
+        ForeignKey("saturday_pick_contests.id", ondelete="SET NULL"), nullable=True
+    )
+    actor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    season: Mapped[int] = mapped_column(Integer, nullable=False)
+    week_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    details_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)

@@ -356,6 +356,20 @@ describe("buildDraftBoard", () => {
     expect(byName.get("Backup QB")?.masterDraftRank).toBe(board.length);
   });
 
+  it("keeps every position in descending rest-of-season projection order", () => {
+    const players: Player[] = ["QB", "RB", "WR", "TE", "K"].flatMap((position, positionIndex) => [
+      makePlayer(positionIndex * 10 + 1, position, 240 - positionIndex * 5, { name: `${position} Lower`, rank: 1, adp: 1 }),
+      makePlayer(positionIndex * 10 + 2, position, 290 - positionIndex * 5, { name: `${position} Higher`, rank: 50, adp: 50 }),
+    ]);
+    const board = buildDraftBoard(players, config);
+    for (const position of ["QB", "RB", "WR", "TE", "K"]) {
+      const ranked = board.filter((entry) => entry.pos === position);
+      for (let index = 1; index < ranked.length; index += 1) {
+        expect(ranked[index].projectedPoints).toBeLessThanOrEqual(ranked[index - 1].projectedPoints);
+      }
+    }
+  });
+
   it("uses sheet season projections for the draft board when present", () => {
     const board = buildDraftBoard(
       [

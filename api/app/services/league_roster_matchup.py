@@ -888,16 +888,15 @@ def _serialize_team_rosters(
     }
 
 
-def _starter_projection_total(roster: list[RosterTabEntryRead]) -> float | None:
+def _starter_projection_total(roster: list[RosterTabEntryRead]) -> float:
     """Sum one selected week's active starter projections, or report unavailable.
 
-    Empty template slots do not make an otherwise populated roster invalid, but
-    every actual starter must have a finite, non-negative non-BYE projection.
-    That keeps the displayed total and the win-probability input on precisely
-    the same weekly lineup records without fabricating missing values as zero.
+    An unavailable, BYE, or not-yet-projected starter contributes zero rather
+    than making the matchup unavailable. This is deliberate: an incomplete
+    lineup must lower a team's chance instead of preventing the matchup from
+    being evaluated for every manager in the league.
     """
     total = 0.0
-    starter_count = 0
     for entry in roster:
         if not entry.is_starter or entry.status == "EMPTY":
             continue
@@ -909,44 +908,36 @@ def _starter_projection_total(roster: list[RosterTabEntryRead]) -> float | None:
             or not math.isfinite(projected_points)
             or projected_points < 0
         ):
-            return None
-        starter_count += 1
+            continue
         total += float(projected_points)
-    return round(total, 2) if starter_count else None
+    return round(total, 2)
 
 
-def _starter_live_totals(roster: list[RosterTabEntryRead]) -> tuple[float | None, float | None, float | None, bool]:
+def _starter_live_totals(roster: list[RosterTabEntryRead]) -> tuple[float, float, float, bool]:
     """Return current, live-final, and original-pregame starter totals.
 
     Staggered kickoffs are handled explicitly: not-started players contribute
     zero current points but retain their pregame projection in the final total.
     """
     current = final = pregame = 0.0
-    starters = 0
     any_live = False
     for entry in roster:
         if not entry.is_starter or entry.status == "EMPTY":
             continue
-        starters += 1
         baseline = entry.pregame_projected_points
-        if baseline is None or not math.isfinite(baseline):
-            return None, None, None, any_live
+        baseline = float(baseline) if isinstance(baseline, (int, float)) and math.isfinite(baseline) and baseline >= 0 else 0.0
         pregame += baseline
         state = (entry.live_game_state or "").lower()
         if state in {"live", "final", "post"}:
             any_live = any_live or state == "live"
             actual = entry.current_fantasy_points
-            if actual is None or not math.isfinite(actual):
-                return None, None, None, any_live
+            actual = float(actual) if isinstance(actual, (int, float)) and math.isfinite(actual) else 0.0
             current += actual
             final_value = entry.live_projected_final_points if entry.live_projected_final_points is not None else actual
-            if not math.isfinite(final_value):
-                return None, None, None, any_live
+            final_value = float(final_value) if isinstance(final_value, (int, float)) and math.isfinite(final_value) else actual
             final += final_value
         else:
             final += baseline
-    if not starters:
-        return None, None, None, any_live
     return round(current, 2), round(final, 2), round(pregame, 2), any_live
 
 
