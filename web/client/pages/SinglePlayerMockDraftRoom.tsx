@@ -812,7 +812,7 @@ export default function SinglePlayerMockDraftRoom() {
               className={cn(
                   "rounded-3xl border border-cfb-border-subtle bg-cfb-surface-raised/95 px-6 py-3 text-center shadow-[0_10px_24px_rgba(0,0,0,0.30)] backdrop-blur-sm transition sm:px-8",
                 timerDanger
-                  ? "animate-pulse border-red-300/50 bg-red-400/10"
+                  ? "border-red-300/50 bg-red-400/10"
                     : "border-white/14"
               )}
             >

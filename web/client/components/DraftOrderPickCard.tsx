@@ -37,7 +37,7 @@ export function DraftOrderPickCard({
       <span
         aria-label={isCpu ? "Computer manager" : undefined}
         className={cn(
-          "flex shrink-0 items-center justify-center border border-white/14 bg-black/20 font-black text-amber-100 shadow-[0_0_10px_rgba(103,232,249,0.18)]",
+          "flex shrink-0 items-center justify-center border border-white/14 bg-black/20 font-black text-amber-100",
           compact ? "h-6 w-6 rounded-full text-[8px]" : "h-8 w-8 rounded-lg text-[10px]",
         )}
       >
