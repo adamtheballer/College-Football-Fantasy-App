@@ -295,6 +295,25 @@ def test_shadow_cycle_uses_one_per_game_lease_and_never_promotes_public_scores(d
     assert db_session.query(UnmatchedProviderRow).filter_by(feed="live_boxscore_player_stats").count() == 1
 
 
+def test_default_discovery_covers_unrostered_player_card_schools(db_session):
+    """Player cards cannot depend on an unrelated manager rostering a school."""
+
+    _verified_players(db_session)
+
+    result = run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="shadow",
+        client=FakeLiveESPN(),
+        worker_id="worker-a",
+        now=NOW,
+    )
+
+    assert result.discovered_games == result.claimed_games == result.successful_games == 1
+    assert result.normalized_rows == 2
+
+
 def test_enabled_cycle_fails_closed_before_public_promotion_when_preflight_is_not_ready(db_session):
     _verified_players(db_session)
 

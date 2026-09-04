@@ -366,17 +366,24 @@ def _identity(value: object) -> str:
     return "".join(character for character in str(value or "").lower() if character.isalnum())
 
 
-def rostered_school_keys(db: Session, *, season: int) -> set[str]:
-    """Return schools that can affect an active fantasy roster this season."""
+def catalog_school_keys(db: Session, *, season: int) -> set[str]:
+    """Return every current-season player-card school supported by the product.
 
-    rows = (
-        db.query(Player.school)
-        .join(RosterEntry, RosterEntry.player_id == Player.id)
-        .join(League, League.id == RosterEntry.league_id)
-        .filter(League.season_year == season, RosterEntry.status == "active")
-        .distinct()
-        .all()
-    )
+    ESPN discovery used to be limited to schools represented on an active
+    roster. That made an unrostered player look as if they had not played:
+    their card had a verified schedule row but no finalized box score until a
+    manager happened to roster somebody from that game. Player cards, waiver
+    decisions, and future drafts all require the complete catalog, so
+    discovery must be driven by the player universe rather than by a league's
+    current roster.
+
+    ``season`` stays part of the signature because provider work is still
+    scheduled per fantasy season. The canonical catalog itself is shared
+    across leagues, and therefore needs no league/roster join.
+    """
+
+    del season  # Provider work is season-scoped; catalog membership is shared.
+    rows = db.query(Player.school).filter(Player.school.isnot(None)).distinct().all()
     return {_identity(school) for (school,) in rows if _identity(school)}
 
 
@@ -1121,7 +1128,7 @@ def run_espn_scoring_cycle(
                 season=season,
                 week=week,
                 events=events,
-                relevant_team_names=relevant_team_names if relevant_team_names is not None else rostered_school_keys(db, season=season),
+                relevant_team_names=relevant_team_names if relevant_team_names is not None else catalog_school_keys(db, season=season),
                 now=current,
             )
             record_discovery_attempt(db, season=season, week=week, now=current, success=True)
