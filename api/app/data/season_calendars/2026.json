@@ -1910,7 +1910,7 @@
       "location": "home",
       "game_kind": "regular",
       "status": "scheduled",
-      "kickoff_at": "2026-09-05"
+      "kickoff_at": "2026-09-04T18:00:00-07:00"
     },
     {
       "team": "USC",
