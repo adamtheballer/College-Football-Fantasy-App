@@ -1290,7 +1290,7 @@ def run_espn_scoring_cycle(
         ):
             db.commit()
 
-    if mode == "enabled" and pending_promotion:
+    if mode == "enabled" and pending_promotion and week > 0:
         # Existing scoring is the sole public-score authority.  It reads the
         # newly promoted canonical totals and transactionally updates every
         # affected league from the same shared provider cache.

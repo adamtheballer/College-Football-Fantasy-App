@@ -69,6 +69,26 @@ describe("PlayerCardModal helpers", () => {
     expect(totals.totals).not.toContainEqual(["PASS YDS", 580]);
   });
 
+  it("retains a completed Week 0 result in the player game-log season summary", () => {
+    const totals = completedSeasonGameTotals([
+      {
+        schedule_id: 1,
+        week: 0,
+        location: "home",
+        location_label: "Home",
+        neutral_site: false,
+        conference_game: false,
+        game_status: "final",
+        stat_status: "final",
+        stats: { source: "espn_final_boxscore", updated_at: "2026-08-29T20:00:00Z", fantasy_points: 14.8, stats: { rushing_attempts: 17, rushing_yards: 98 } },
+      },
+    ], "RB");
+
+    expect(totals.gamesPlayed).toBe(1);
+    expect(totals.totals).toContainEqual(["RUSH ATT", 17]);
+    expect(totals.totals).toContainEqual(["RUSH YDS", 98]);
+  });
+
   it("labels player news with its Eastern report date and time", () => {
     expect(formatPlayerNewsReportTime("2026-08-24T16:58:00Z")).toBe("Report · 8/24/26, 12:58 PM ET");
     expect(formatPlayerNewsReportTime(null)).toBe("Report time unavailable");

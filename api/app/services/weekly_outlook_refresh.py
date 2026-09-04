@@ -13,6 +13,7 @@ from collegefootballfantasy_api.app.models.defense_rating import DefenseRating
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.team_environment import TeamEnvironment
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
@@ -118,6 +119,32 @@ def _week_is_certified_final(db: Session, *, season: int, week: int) -> bool:
     return bool(statuses) and all(status in FINAL_MATCHUP_STATUSES for status in statuses)
 
 
+def _completed_week_zero_teams(db: Session, *, season: int) -> set[str]:
+    """Return only teams with a verified final Week 0 player-game record.
+
+    This is intentionally not a league-finality check. Week 0 may update a
+    participating player's Week 1 outlook, but never creates or scores a
+    fantasy matchup.
+    """
+
+    rows = db.query(TeamSchedule).filter(
+        TeamSchedule.season == season,
+        TeamSchedule.week == 0,
+        TeamSchedule.is_bye.is_(False),
+    ).all()
+    game_ids = {row.game_id for row in rows if row.game_id is not None}
+    final_game_ids = {
+        row.game_id
+        for row in db.query(PlayerGameStat).filter(
+            PlayerGameStat.game_id.in_(game_ids or {-1}),
+            PlayerGameStat.season == season,
+            PlayerGameStat.week == 0,
+            PlayerGameStat.source == "espn_final_boxscore",
+        ).all()
+    }
+    return {row.team_name for row in rows if row.game_id in final_game_ids}
+
+
 def refresh_post_final_outlook(
     db: Session,
     *,
@@ -131,9 +158,12 @@ def refresh_post_final_outlook(
     intentional and idempotently replaces only this service's snapshot.
     """
     next_week = completed_week + 1
-    if completed_week < 1 or next_week > 13:
+    if completed_week < 0 or next_week > 13:
         return {"status": "not_applicable", "projected_week": next_week, "projections": 0, "values": 0}
-    if not _week_is_certified_final(db, season=season, week=completed_week):
+    week_zero_teams = _completed_week_zero_teams(db, season=season) if completed_week == 0 else set()
+    if completed_week == 0 and not week_zero_teams:
+        return {"status": "waiting_for_finality", "projected_week": next_week, "projections": 0, "values": 0}
+    if completed_week > 0 and not _week_is_certified_final(db, season=season, week=completed_week):
         return {"status": "waiting_for_finality", "projected_week": next_week, "projections": 0, "values": 0}
 
     schedules = db.query(TeamSchedule).filter(
@@ -141,6 +171,8 @@ def refresh_post_final_outlook(
         TeamSchedule.week == next_week,
     ).all()
     scheduled_teams = {row.team_name for row in schedules if not row.is_bye and row.opponent_name}
+    if completed_week == 0:
+        scheduled_teams.intersection_update(week_zero_teams)
     if not scheduled_teams:
         return {"status": "waiting_for_schedule", "projected_week": next_week, "projections": 0, "values": 0}
 
@@ -243,7 +275,7 @@ def refresh_post_final_outlook(
         candidate.model_version = POSTGAME_MODEL_VERSION
         candidate.is_published = True
         candidate.baseline_source = f"verified_week_{completed_week}_stats"
-        candidate.baseline_games_played = completed_week
+        candidate.baseline_games_played = max(1, completed_week)
         current = existing.get(candidate.player_id)
         if current is None:
             db.add(candidate)
@@ -262,12 +294,12 @@ def refresh_post_final_outlook(
             if value is not None:
                 setattr(current, column, value)
 
-    # Week-one values remain CFB27-only until every Week 1 fantasy matchup is
-    # certified final by the same lifecycle authority above.
-    value_result = calculate_weekly_trade_values(
-        db,
-        season=season,
-        week=completed_week,
+    # Week 0 is player-data only. It must not change trade values tied to a
+    # fantasy matchup period.
+    value_result = (
+        {"calculated": 0}
+        if completed_week == 0
+        else calculate_weekly_trade_values(db, season=season, week=completed_week)
     )
     db.flush()
     return {
