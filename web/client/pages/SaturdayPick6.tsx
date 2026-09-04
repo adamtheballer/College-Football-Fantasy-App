@@ -93,7 +93,9 @@ function SaturdayPick6ComingSoon({ embedded }: SaturdayPick6Props) {
         <img src={saturdayPick6Sponsor.logo_url} alt={saturdayPick6Sponsor.name} className="h-14 w-14 rounded-xl bg-white object-contain p-1" />
         <div><p className="text-sm font-black text-cfb-text-primary">{saturdayPick6Sponsor.name}</p><p className="mt-1 text-xs font-bold text-cyan-100">{saturdayPick6Sponsor.tagline}</p></div>
       </div>
-      {!embedded ? <Button asChild className="mt-7"><Link to="/">Back to dashboard</Link></Button> : null}
+      <Button asChild className="mt-7" variant={embedded ? "outline" : "default"}>
+        <Link to={embedded ? "/saturday-pick-6" : "/"}>{embedded ? "View Saturday Pick 6" : "Back to dashboard"}</Link>
+      </Button>
     </section>
   );
 }
@@ -186,12 +188,12 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
               {SATURDAY_PICK_6_HOW_IT_WORKS.replace("How it works: ", "")}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-6">
-            {sponsor ? <>
-              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-cfb-border-subtle bg-white p-1.5">{sponsorLogo ? <img src={sponsorLogo} alt={sponsor.name} className="h-full w-full object-contain" /> : <span className="text-sm font-black text-cfb-brand">{sponsor.name.slice(0, 2).toUpperCase()}</span>}</div>
+            <div className="flex flex-wrap items-center gap-6">
+              {sponsor ? <>
+              {embedded ? <Button asChild variant="outline" size="icon" className="h-20 w-20 shrink-0 rounded-lg border-cfb-border-subtle bg-white p-1.5 hover:bg-white" aria-label="Open Saturday Pick 6 event"><Link to="/saturday-pick-6">{sponsorLogo ? <img src={sponsorLogo} alt={sponsor.name} className="h-full w-full object-contain" /> : <span className="text-sm font-black text-cfb-brand">{sponsor.name.slice(0, 2).toUpperCase()}</span>}</Link></Button> : <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-cfb-border-subtle bg-white p-1.5">{sponsorLogo ? <img src={sponsorLogo} alt={sponsor.name} className="h-full w-full object-contain" /> : <span className="text-sm font-black text-cfb-brand">{sponsor.name.slice(0, 2).toUpperCase()}</span>}</div>}
               <div className="max-w-md"><p className="cfb-micro-label text-cfb-gold">Presented by</p><p className="mt-2 text-xl font-bold leading-tight text-white">{sponsor.name}</p>{sponsor.offer_text ? <p className="mt-2 text-sm font-semibold leading-6 text-cfb-text-secondary">{sponsor.offer_text}</p> : null}</div>
             </> : null}
-            <div className="flex flex-wrap items-center gap-3"><div className="rounded-lg border border-cfb-border-strong bg-cfb-surface px-4 py-3 text-right"><p className="cfb-micro-label">{isOpen ? "Locks in" : "Contest status"}</p><p className="mt-1 font-display text-xl font-black tabular-nums text-cfb-text-primary">{isOpen ? countdown.value : statusLabel(contest.status)}</p></div>{embedded && isOpen ? <Button asChild><Link to="/saturday-pick-6">{contest.entry ? "Change Your Pick" : "Make Your Pick"}</Link></Button> : null}</div>
+            <div className="flex flex-wrap items-center gap-3"><div className="rounded-lg border border-cfb-border-strong bg-cfb-surface px-4 py-3 text-right"><p className="cfb-micro-label">{isOpen ? "Locks in" : "Contest status"}</p><p className="mt-1 font-display text-xl font-black tabular-nums text-cfb-text-primary">{isOpen ? countdown.value : statusLabel(contest.status)}</p></div>{embedded ? <Button asChild><Link to="/saturday-pick-6">{isOpen ? contest.entry ? "Change Your Pick" : "Make Your Pick" : "View Event"}</Link></Button> : null}</div>
           </div>
         </div>
       </section>
