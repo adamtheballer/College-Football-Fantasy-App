@@ -18,6 +18,7 @@ from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.player import (
     PlayerCardAboutRead,
+    PlayerCardGameDisplayRead,
     PlayerCardInjuryRead,
     PlayerCardNewsRead,
     PlayerCardRead,
@@ -42,6 +43,7 @@ from collegefootballfantasy_api.app.services.historical_stats import (
     resolve_espn_player_id,
 )
 from collegefootballfantasy_api.app.services.player_game_log import build_player_game_log
+from collegefootballfantasy_api.app.services.player_game_display import player_game_display_state
 from collegefootballfantasy_api.app.services.player_trade_value import get_player_trade_values
 from collegefootballfantasy_api.app.services.player_trajectory import build_player_trajectory
 from collegefootballfantasy_api.app.services.draft_board_outlook import build_rest_of_season_draft_board
@@ -412,6 +414,11 @@ def get_player_card_endpoint(
             historical_stats.message = f"{historical_stats.message or 'ESPN historical stats unavailable.'} {exc}"
 
     card_player = _player_card_player_with_sheet_projection_fallback(db, player)
+    current_game = player_game_display_state(
+        db,
+        player=player,
+        season=datetime.now(timezone.utc).year,
+    )
     # Card reads are intentionally retrieval-only. The explicit batch job is
     # the sole generator so an opened card never creates unreviewed copy.
     season_outlook = get_persisted_player_season_outlook(
@@ -480,6 +487,7 @@ def get_player_card_endpoint(
             )
             for row in stat_rows
         ],
+        current_game=PlayerCardGameDisplayRead(**current_game.__dict__),
         season_outlook=(
             PlayerSeasonOutlookRead.model_validate(season_outlook)
             if season_outlook is not None

@@ -108,6 +108,14 @@ test.describe("player card modal", () => {
               message: null,
             },
             injuries: [],
+            current_game: {
+              state: "completed",
+              season: 2026,
+              week: 0,
+              opponent_name: "San José State",
+              stats: { receptions: 3, rec_yards: 50, rec_tds: 0 },
+              source: "espn_final_boxscore",
+            },
             season_stats: [
               {
                 season: 2025,
@@ -300,6 +308,8 @@ test.describe("player card modal", () => {
     await expect(dialog.getByText("6'3\"")).toBeVisible();
     await expect(dialog.getByText("215 lbs")).toBeVisible();
     await expect(dialog.getByText("Columbus, Ohio")).toBeVisible();
+    await expect(dialog.getByLabel("Current player game result")).toBeVisible();
+    await expect(dialog.getByText("Week 0 vs. San José State")).toBeVisible();
 
     const viewport = page.viewportSize();
     const box = await dialog.boundingBox();

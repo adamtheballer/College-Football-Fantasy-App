@@ -392,6 +392,12 @@ export function PlayerCardModal({
   );
   const aboutMessage = visiblePlayerCardAboutMessage(card?.about.message);
   const cardActions = [...(action ? [action] : []), ...actions];
+  const currentGame = card?.current_game;
+  const currentGameStats = currentGame?.state === "completed" && currentGame.stats
+    ? gameLogColumnsForPosition(position)
+      .map(([label, keys]) => [label, gameLogStatValue(currentGame.stats, keys)] as const)
+      .filter(([, value]) => value !== null && value !== undefined)
+    : [];
   const selectedGameLogData = gameLogQuery.data;
   const selectedGameLogColumns = useMemo(() => {
     const games = selectedGameLogData?.games ?? [];
@@ -571,6 +577,28 @@ export function PlayerCardModal({
             </section>
           ) : activeTab === "summary" ? (
             <div className="w-full">
+              {currentGame?.state === "completed" ? (
+                <section className="mb-3 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5" aria-label="Current player game result">
+                  <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Latest verified game</p>
+                  <p className="mt-2 text-sm font-black text-white">Week {currentGame.week} vs. {currentGame.opponent_name ?? "opponent"}</p>
+                  {currentGameStats.length ? (
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {currentGameStats.slice(0, 4).map(([label, value]) => (
+                        <div key={label} className="rounded-sm border border-cfb-border-subtle bg-cfb-surface p-2.5">
+                          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/45">{label}</p>
+                          <p className="mt-1 text-sm font-black tabular-nums text-white">{formatPlayerCardValue(value)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="mt-2 text-sm font-bold text-white/55">Final team result is verified; individual stats are still pending.</p>}
+                </section>
+              ) : currentGame?.state === "upcoming" ? (
+                <section className="mb-3 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5" aria-label="Upcoming player game">
+                  <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Upcoming game</p>
+                  <p className="mt-2 text-sm font-black text-white">Week {currentGame.week} vs. {currentGame.opponent_name ?? "opponent"}</p>
+                  {currentGame.kickoff_at ? <p className="mt-1 text-xs font-bold text-white/55">{new Date(currentGame.kickoff_at).toLocaleString()}</p> : null}
+                </section>
+              ) : null}
               <section className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5">
                 <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Bio</p>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">

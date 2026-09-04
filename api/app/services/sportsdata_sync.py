@@ -266,15 +266,26 @@ def sync_power4_schedule_from_sportsdata(db: Session, season: int) -> dict[str, 
 
     for row in rows:
         week_value = _pick_int(row, "Week", "GameWeek")
-        if week_value is None or week_value <= 0:
+        # Week 0 is a real player-game period for early teams. It is never a
+        # fantasy league week, so notification/lineup reconciliation below is
+        # intentionally restricted to positive league weeks.
+        if week_value is None or week_value < 0:
             skipped += 1
             continue
         affected_weeks.add(week_value)
 
         home_raw = _pick_str(row, "HomeTeamName", "HomeTeam", "HomeSchool")
         away_raw = _pick_str(row, "AwayTeamName", "AwayTeam", "AwaySchool")
-        home_team = resolve_power4_school(home_raw or "")
-        away_team = resolve_power4_school(away_raw or "")
+        resolved_home = resolve_power4_school(home_raw or "")
+        resolved_away = resolve_power4_school(away_raw or "")
+        # Keep a Power Four team's real non-P4 opener in the canonical game
+        # table. The previous all-P4 requirement silently discarded exactly
+        # the early Week 0 games whose player results we need to retain.
+        if not resolved_home and not resolved_away:
+            skipped += 1
+            continue
+        home_team = resolved_home or (home_raw or "").strip()
+        away_team = resolved_away or (away_raw or "").strip()
         if not home_team or not away_team:
             skipped += 1
             continue
@@ -314,7 +325,11 @@ def sync_power4_schedule_from_sportsdata(db: Session, season: int) -> dict[str, 
     # events and never sends provider HTTP from the sync transaction.
     from collegefootballfantasy_api.app.services.notification_service import rebuild_matchup_start_notifications_for_schedule
 
-    rebuild_matchup_start_notifications_for_schedule(db, season=season, weeks=affected_weeks)
+    rebuild_matchup_start_notifications_for_schedule(
+        db,
+        season=season,
+        weeks={week for week in affected_weeks if week > 0},
+    )
     return {"created": created, "updated": updated, "skipped": skipped}
 
 

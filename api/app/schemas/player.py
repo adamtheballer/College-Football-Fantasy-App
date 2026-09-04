@@ -105,6 +105,21 @@ class PlayerCardStatRowRead(BaseModel):
     updated_at: datetime
 
 
+class PlayerCardGameDisplayRead(BaseModel):
+    """Backend-owned current player-game context, independent of league week."""
+
+    state: str
+    season: int | None = None
+    week: int | None = None
+    game_id: int | None = None
+    opponent_name: str | None = None
+    kickoff_at: datetime | None = None
+    transition_at: datetime | None = None
+    stats: dict | None = None
+    source: str | None = None
+    updated_at: datetime | None = None
+
+
 class PlayerSeasonOutlookRead(BaseModel):
     """Public, persisted copy only; the evidence record remains server-side."""
 
@@ -136,5 +151,6 @@ class PlayerCardRead(BaseModel):
     injuries: list[PlayerCardInjuryRead]
     recent_news: list[PlayerCardNewsRead] = []
     season_stats: list[PlayerCardStatRowRead]
+    current_game: PlayerCardGameDisplayRead | None = None
     season_outlook: PlayerSeasonOutlookRead | None = None
     historical_stats: PlayerHistoricalStatsResponse | None = None

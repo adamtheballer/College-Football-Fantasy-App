@@ -285,6 +285,18 @@ export type PlayerCardResponse = {
     stats: Record<string, unknown>;
     updated_at: string;
   }>;
+  current_game?: {
+    state: "completed" | "upcoming" | "unavailable" | string;
+    season?: number | null;
+    week?: number | null;
+    game_id?: number | null;
+    opponent_name?: string | null;
+    kickoff_at?: string | null;
+    transition_at?: string | null;
+    stats?: Record<string, unknown> | null;
+    source?: string | null;
+    updated_at?: string | null;
+  } | null;
   historical_stats?: {
     player_id: number;
     provider: string;

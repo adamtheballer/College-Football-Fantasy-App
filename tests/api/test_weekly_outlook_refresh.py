@@ -1,9 +1,11 @@
 from datetime import datetime, timezone
 
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
+from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.player_trade_value import PlayerTradeValue
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.services.player_trade_value import IN_SEASON_VALUE_POLICY_VERSION
 from collegefootballfantasy_api.app.services.weekly_outlook_refresh import (
     POSTGAME_PROJECTION_VERSION,
@@ -77,6 +79,51 @@ def test_post_final_refresh_updates_next_week_and_values_only_after_every_matchu
         .one()
     )
     assert value.value >= 0
+
+
+def test_week_zero_final_updates_only_affected_players_week_one_outlook_without_league_scoring(db_session):
+    league, _home, _away, players, matchup = create_scoring_fixture(db_session)
+    week_zero_game = Game(
+        external_id="usc-week-zero", season=2026, week=0,
+        home_team="Test", away_team="Early Opponent", home_points=28, away_points=14,
+    )
+    db_session.add(week_zero_game)
+    db_session.flush()
+    db_session.add_all([
+        TeamSchedule(
+            team_name="Test", season=2026, week=0, game_id=week_zero_game.id,
+            opponent_name="Early Opponent", location="home", is_bye=False,
+            neutral_site=False, conference_game=False, date_confirmed=True,
+        ),
+        TeamSchedule(
+            team_name="Test", season=2026, week=1,
+            opponent_name="Week One Opponent", location="away", is_bye=False,
+            neutral_site=False, conference_game=False, date_confirmed=True,
+        ),
+        PlayerGameStat(
+            player_id=players["qb"].id, game_id=week_zero_game.id, season=2026, week=0,
+            source="espn_final_boxscore", stats={"PassingYards": 280, "PassingTouchdowns": 3},
+        ),
+        PlayerStat(
+            player_id=players["qb"].id, season=2026, week=0, source="espn_final_boxscore",
+            stats={"PassingYards": 280, "PassingTouchdowns": 3},
+        ),
+    ])
+    db_session.commit()
+
+    result = refresh_post_final_outlook(db_session, season=2026, completed_week=0)
+
+    assert result["status"] == "refreshed"
+    projection = db_session.query(WeeklyProjection).filter_by(
+        player_id=players["qb"].id,
+        season=2026,
+        week=1,
+        projection_version=POSTGAME_PROJECTION_VERSION,
+    ).one()
+    assert projection.baseline_source == "verified_week_0_stats"
+    assert projection.baseline_games_played == 1
+    assert db_session.query(PlayerTradeValue).filter_by(season=2026, week=0).count() == 0
+    assert matchup.status == "scheduled"
 
 
 def test_post_final_refresh_preserves_a_locked_next_week_projection(db_session):
