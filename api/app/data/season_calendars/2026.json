@@ -2,7 +2,7 @@
   "season": 2026,
   "format_version": "SEALED_CFB_SCHEDULE_V1",
   "source_identity": "Google Sheets: CFB 26-27 SCHEDULES (1JnoISIE2fr_l7ze5qtAe2DIN4nFlI3CaZMdvaNHEnZQ)",
-  "source_revision": "Google Drive revision 4 (2026-08-09T18:05:55.387Z)",
+  "source_revision": "Google Drive revision 4 (2026-08-09T18:05:55.387Z); USC official kickoff correction verified 2026-09-04",
   "games": [
     {
       "team": "Illinois",
@@ -1910,7 +1910,7 @@
       "location": "home",
       "game_kind": "regular",
       "status": "scheduled",
-      "kickoff_at": "2026-09-05"
+      "kickoff_at": "2026-09-04T18:00:00-07:00"
     },
     {
       "team": "USC",
