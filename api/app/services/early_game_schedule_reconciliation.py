@@ -100,6 +100,76 @@ def _find_early_schedule(
     return matches[0] if matches else None
 
 
+def _find_verified_early_schedule(
+    db: Session,
+    schedules: list[TeamSchedule],
+    *,
+    expected: SealedScheduleRow,
+    season: int,
+) -> TeamSchedule | None:
+    """Find an early-game row, accepting duplicate imports only with proof.
+
+    Some legacy imports created an empty Week 0 placeholder and a completed
+    Week 1 row for the same real-world Week 0 game.  The completed row is the
+    only safe repair candidate because it owns the verified player game stats.
+    Any other duplicate shape remains a hard stop rather than an inference.
+    """
+
+    matches = [row for row in schedules if _same_opponent(row, expected)]
+    if len(matches) <= 1:
+        return matches[0] if matches else None
+
+    verified: list[TeamSchedule] = []
+    for row in matches:
+        if row.game_id is None:
+            continue
+        game = db.get(Game, row.game_id)
+        has_player_stats = (
+            db.query(PlayerGameStat.id)
+            .filter(
+                PlayerGameStat.game_id == row.game_id,
+                PlayerGameStat.season == season,
+            )
+            .first()
+            is not None
+        )
+        if game is not None and game.schedule_status == "final" and has_player_stats:
+            verified.append(row)
+    if len(verified) == 1:
+        return verified[0]
+    raise EarlyGameScheduleReconciliationError(
+        f"ambiguous schedule rows for {expected.team} vs {expected.opponent}; "
+        "no single completed player-stat game can be proven authoritative"
+    )
+
+
+def _is_empty_duplicate_placeholder(
+    db: Session,
+    *,
+    schedule: TeamSchedule,
+    expected: SealedScheduleRow,
+    season: int,
+) -> bool:
+    """Whether a duplicate row is safe to remove in favor of verified data."""
+
+    if not _same_opponent(schedule, expected):
+        return False
+    if schedule.game_id is None:
+        return True
+    game = db.get(Game, schedule.game_id)
+    if game is not None and game.schedule_status == "final":
+        return False
+    return (
+        db.query(PlayerGameStat.id)
+        .filter(
+            PlayerGameStat.game_id == schedule.game_id,
+            PlayerGameStat.season == season,
+        )
+        .first()
+        is None
+    )
+
+
 def _move_compatibility_stats_to_week_zero(
     db: Session,
     *,
@@ -160,7 +230,12 @@ def reconcile_early_player_game_schedules(
     created_games = created_schedules = moved_game_stats = moved_stats = 0
 
     for expected in _real_week_zero_rows(season):
-        early_schedule = _find_early_schedule(schedules, expected=expected)
+        early_schedule = _find_verified_early_schedule(
+            db,
+            schedules,
+            expected=expected,
+            season=season,
+        )
         if early_schedule is None or early_schedule.game_id is None:
             unresolved.append(f"{expected.team}: missing verified Week 0 schedule/game for {expected.opponent}")
             continue
@@ -177,7 +252,16 @@ def reconcile_early_player_game_schedules(
             (row for row in schedules if _same_team(row.team_name, expected.team) and row.week == 0 and row.id != early_schedule.id),
             None,
         )
-        if incumbent_week_zero is not None and not incumbent_week_zero.is_bye:
+        if (
+            incumbent_week_zero is not None
+            and not incumbent_week_zero.is_bye
+            and not _is_empty_duplicate_placeholder(
+                db,
+                schedule=incumbent_week_zero,
+                expected=expected,
+                season=season,
+            )
+        ):
             unresolved.append(f"{expected.team}: conflicting non-bye Week 0 schedule row")
             continue
         if existing_next is not None and existing_next.week != 1:
@@ -202,6 +286,9 @@ def reconcile_early_player_game_schedules(
         if incumbent_week_zero is not None:
             db.delete(incumbent_week_zero)
             schedules.remove(incumbent_week_zero)
+            # Enforce delete-before-update for the (team, season, week) unique
+            # constraint.  The verified completed game is then moved into W0.
+            db.flush()
         old_week = early_schedule.week
         early_schedule.week = 0
         game.week = 0
