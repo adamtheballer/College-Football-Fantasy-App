@@ -36,6 +36,7 @@ def _legacy_usc_week_one(db_session):
     game = Game(
         external_id="401864494", season=2026, week=1, home_team="USC", away_team="San José State",
         start_date=datetime(2026, 8, 29, 19, tzinfo=timezone.utc), home_points=42, away_points=26,
+        schedule_status="final",
     )
     db_session.add_all([player, game])
     db_session.flush()
@@ -103,3 +104,34 @@ def test_reconciliation_dry_run_does_not_change_legacy_rows(db_session, monkeypa
     assert report.repaired_teams == ("USC",)
     assert db_session.get(Game, game.id).week == 1
     assert db_session.query(PlayerGameStat).filter_by(player_id=player.id).one().week == 1
+
+
+def test_reconciliation_uses_the_completed_row_when_a_week_zero_placeholder_is_duplicated(db_session, monkeypatch):
+    monkeypatch.setattr(reconciliation, "load_sealed_schedule_snapshot", lambda _season: _snapshot())
+    player, completed_game = _legacy_usc_week_one(db_session)
+    placeholder_game = Game(
+        external_id="placeholder-usc-sjs", season=2026, week=0,
+        home_team="USC", away_team="San José State",
+    )
+    db_session.add(placeholder_game)
+    db_session.flush()
+    db_session.add(
+        TeamSchedule(
+            team_name="USC", season=2026, week=0, game_id=placeholder_game.id,
+            opponent_name="San José State", location="home", is_bye=False,
+            game_date=datetime(2026, 8, 29).date(),
+        )
+    )
+    db_session.commit()
+
+    report = reconciliation.reconcile_early_player_game_schedules(db_session, season=2026, apply=True)
+    db_session.commit()
+
+    assert report.unresolved == ()
+    schedules = db_session.query(TeamSchedule).filter_by(team_name="USC", season=2026).all()
+    assert [(row.week, row.game_id) for row in schedules if row.opponent_name == "San José State"] == [
+        (0, completed_game.id)
+    ]
+    assert db_session.get(Game, completed_game.id).week == 0
+    assert db_session.get(Game, placeholder_game.id) is not None
+    assert db_session.query(PlayerGameStat).filter_by(player_id=player.id).one().week == 0
