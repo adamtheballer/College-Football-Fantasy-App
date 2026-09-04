@@ -16,11 +16,22 @@ from collegefootballfantasy_api.app.services.early_game_schedule_reconciliation 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--season", type=int, required=True)
+    parser.add_argument(
+        "--team",
+        action="append",
+        default=[],
+        help="Restrict the repair to a verified team (repeatable).",
+    )
     parser.add_argument("--apply", action="store_true", help="Persist only the reviewed reconciliation plan.")
     args = parser.parse_args()
     ensure_models_registered()
     with SessionLocal() as db:
-        report = reconcile_early_player_game_schedules(db, season=args.season, apply=args.apply)
+        report = reconcile_early_player_game_schedules(
+            db,
+            season=args.season,
+            apply=args.apply,
+            teams=set(args.team) or None,
+        )
         if args.apply:
             db.commit()
         else:

@@ -63,11 +63,17 @@ def _event_id(*, season: int, week: int, team: str, opponent: str) -> str:
     return f"sealed-{season}-w{week}-{slug(team)}-{slug(opponent)}"[:64]
 
 
-def _real_week_zero_rows(season: int) -> list[SealedScheduleRow]:
+def _real_week_zero_rows(
+    season: int,
+    *,
+    teams: set[str] | None = None,
+) -> list[SealedScheduleRow]:
+    requested_teams = {canonical_team_name(team) for team in teams} if teams else None
     return [
         row
         for row in load_sealed_schedule_snapshot(season).rows
         if row.week == 0 and row.opponent and row.location in {"home", "away", "neutral"}
+        and (requested_teams is None or canonical_team_name(row.team) in requested_teams)
     ]
 
 
@@ -216,6 +222,7 @@ def reconcile_early_player_game_schedules(
     *,
     season: int,
     apply: bool,
+    teams: set[str] | None = None,
 ) -> EarlyGameScheduleReconciliationReport:
     """Reconcile real Week 0 teams and their immediate next game.
 
@@ -229,7 +236,7 @@ def reconcile_early_player_game_schedules(
     unresolved: list[str] = []
     created_games = created_schedules = moved_game_stats = moved_stats = 0
 
-    for expected in _real_week_zero_rows(season):
+    for expected in _real_week_zero_rows(season, teams=teams):
         early_schedule = _find_verified_early_schedule(
             db,
             schedules,
