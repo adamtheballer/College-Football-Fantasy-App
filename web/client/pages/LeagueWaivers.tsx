@@ -165,6 +165,28 @@ export const waiverSearchMatches = (
     .some((value) => String(value).toLowerCase().includes(normalizedQuery));
 };
 
+/**
+ * Keep the provider's ranking for ordinary matches, but place an exact school
+ * match ahead of school-name variants. For example, a search for "Virginia"
+ * lists Virginia players before Virginia Tech and West Virginia.
+ */
+export const rankWaiverSearchResults = <T extends { school: string | null | undefined }>(
+  players: readonly T[],
+  query: string,
+) => {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return [...players];
+
+  return players
+    .map((player, index) => ({
+      player,
+      index,
+      priority: player.school?.trim().toLowerCase() === normalizedQuery ? 0 : 1,
+    }))
+    .sort((left, right) => left.priority - right.priority || left.index - right.index)
+    .map(({ player }) => player);
+};
+
 export default function LeagueWaivers() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
@@ -216,9 +238,10 @@ export default function LeagueWaivers() {
   );
   const filteredPlayers = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return players
+    const matches = players
       .filter((player) => position === "ALL" || (player.position ?? "").toUpperCase() === position)
       .filter((player) => waiverSearchMatches(player, query));
+    return rankWaiverSearchResults(matches, query);
   }, [players, position, search]);
 
   const topProjection = players.reduce<number | null>((top, player) => {
