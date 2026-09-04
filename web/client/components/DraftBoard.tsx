@@ -137,7 +137,7 @@ export function DraftBoard({
                           : slot.isUser
                             ? "border-cfb-brand/45 bg-cfb-brand/[0.08]"
                             : "border-cfb-border-subtle bg-cfb-surface",
-                      slot.isUser && slot.playerName && "shadow-[inset_0_0_0_1px_hsl(var(--brand-primary)/0.35)]",
+                      slot.isUser && slot.playerName && "border-cfb-brand/55",
                       slot.isCurrent && slot.playerName && "ring-1 ring-inset ring-cfb-gold/70",
                     )}
                   >
