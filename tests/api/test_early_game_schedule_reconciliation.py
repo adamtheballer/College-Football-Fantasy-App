@@ -63,7 +63,12 @@ def test_reconciliation_repairs_week_zero_history_and_next_game_without_league_w
     monkeypatch.setattr(reconciliation, "load_sealed_schedule_snapshot", lambda _season: _snapshot())
     player, original_game = _legacy_usc_week_one(db_session)
 
-    report = reconciliation.reconcile_early_player_game_schedules(db_session, season=2026, apply=True)
+    report = reconciliation.reconcile_early_player_game_schedules(
+        db_session,
+        season=2026,
+        apply=True,
+        teams={"USC"},
+    )
     db_session.commit()
 
     assert report.unresolved == ()
