@@ -41,5 +41,46 @@ describe("SaturdayPick6 unavailable states", () => {
     render(<MemoryRouter><SaturdayPick6 embedded /></MemoryRouter>);
 
     expect(screen.getByText(SATURDAY_PICK_6_COMING_SOON_MESSAGE)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "View Saturday Pick 6" }).getAttribute("href")).toBe("/saturday-pick-6");
+  });
+
+  it("makes the homepage sponsor tile open the full event where featured players are shown", () => {
+    contestQuery.data = {
+      id: 8,
+      status: "SCORING",
+      week_number: 1,
+      contest_position: "QB",
+      lock_at: "2026-09-05T16:00:00Z",
+      players: [{
+        id: 81,
+        player_id: 18,
+        canonical_position: "QB",
+        player_name: "Featured Player",
+        school: "West Georgia",
+        opponent: "Opponent",
+        game_time: "2026-09-05T16:00:00Z",
+        image_url: null,
+        projected_points: 21.4,
+        live_points: 10.2,
+        final_points: null,
+        scoring_status: "LIVE",
+        sort_order: 1,
+      }],
+      winning_player_ids: [],
+      entry: null,
+      sponsor: {
+        name: "West Georgia Cornhole",
+        logo_url: null,
+        offer_text: "Partner offer",
+        terms: null,
+        reward_unlocked: false,
+        code: null,
+        url: null,
+      },
+    };
+    render(<MemoryRouter><SaturdayPick6 embedded /></MemoryRouter>);
+
+    expect(screen.getByRole("link", { name: "Open Saturday Pick 6 event" }).getAttribute("href")).toBe("/saturday-pick-6");
+    expect(screen.getByRole("link", { name: "View Event" }).getAttribute("href")).toBe("/saturday-pick-6");
   });
 });
