@@ -68,11 +68,11 @@ const POSITION_STYLES: Record<string, string> = {
 };
 
 const POSITION_ROW_HOVER_STYLES: Record<string, string> = {
-  QB: "hover:bg-blue-400/[0.07] hover:shadow-[inset_2px_0_0_rgba(96,165,250,0.65)] focus:bg-blue-400/[0.10]",
-  RB: "hover:bg-emerald-400/[0.07] hover:shadow-[inset_2px_0_0_rgba(52,211,153,0.65)] focus:bg-emerald-400/[0.10]",
-  WR: "hover:bg-violet-400/[0.07] hover:shadow-[inset_2px_0_0_rgba(167,139,250,0.65)] focus:bg-violet-400/[0.10]",
-  TE: "hover:bg-amber-400/[0.07] hover:shadow-[inset_2px_0_0_rgba(251,191,36,0.65)] focus:bg-amber-400/[0.10]",
-  K: "hover:bg-slate-200/[0.07] hover:shadow-[inset_2px_0_0_rgba(226,232,240,0.65)] focus:bg-slate-200/[0.10]",
+  QB: "hover:bg-blue-400/[0.07] focus:bg-blue-400/[0.10]",
+  RB: "hover:bg-emerald-400/[0.07] focus:bg-emerald-400/[0.10]",
+  WR: "hover:bg-violet-400/[0.07] focus:bg-violet-400/[0.10]",
+  TE: "hover:bg-amber-400/[0.07] focus:bg-amber-400/[0.10]",
+  K: "hover:bg-slate-200/[0.07] focus:bg-slate-200/[0.10]",
 };
 
 const readStoredDraft = () => {
@@ -450,7 +450,7 @@ export default function SinglePlayerMockDraftRoom() {
                   className={cn(
                     "h-9 shrink-0 whitespace-nowrap rounded-full border px-3 text-[10px] font-bold uppercase tracking-[0.03em] transition sm:h-10 sm:px-4 sm:text-[10px] sm:font-black sm:tracking-[0.14em]",
                     position === value
-                      ? "border-amber-200/55 bg-amber-200 text-slate-950 shadow-[0_8px_18px_rgba(251,191,36,0.20)]"
+                      ? "border-amber-200/55 bg-amber-200 text-slate-950"
                       : "border-white/10 bg-white/5 text-muted-foreground hover:border-amber-200/35 hover:text-amber-100"
                   )}
                 >
@@ -514,7 +514,7 @@ export default function SinglePlayerMockDraftRoom() {
                 className={cn(
                   "grid min-h-[66px] cursor-pointer grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 outline-none transition-[background-color,box-shadow,color] duration-200 sm:min-h-0 sm:grid-cols-[56px_minmax(0,1fr)_72px_88px_120px] sm:items-center sm:gap-3 sm:px-5 sm:py-3",
                   positionHoverClass,
-                  isSelected && "bg-amber-300/[0.075] shadow-[inset_3px_0_0_rgba(251,191,36,0.72)]"
+                  isSelected && "border-l-2 border-l-amber-200/70 bg-amber-300/[0.075]"
                 )}
               >
                 <p className="self-center text-base font-bold tabular-nums text-muted-foreground sm:text-xl sm:font-black">{visibleRank}</p>
@@ -533,8 +533,8 @@ export default function SinglePlayerMockDraftRoom() {
                     className={cn(
                       "h-10 min-h-[44px] w-[78px] rounded-lg px-1 text-[8px] font-black uppercase tracking-[0.04em] sm:h-10 sm:min-h-0 sm:w-[140px] sm:rounded-xl sm:px-3 sm:text-[10px] sm:tracking-[0.14em]",
                       actionIsDraft
-                        ? "border border-cyan-100/35 bg-[#1b3349] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_5px_12px_rgba(2,6,23,0.24)] transition hover:border-cyan-100/60 hover:bg-[#294d69]"
-                        : "border border-white/15 bg-white/[0.06] text-cyan-50 transition hover:border-cyan-100/45 hover:bg-white/[0.12]"
+                        ? "border border-cfb-brand/55 bg-cfb-brand text-slate-950 transition hover:bg-cfb-brand/90"
+                        : "border border-cfb-border-subtle bg-cfb-surface text-cfb-text-primary transition hover:border-cfb-brand/45 hover:bg-cfb-surface-hover"
                     )}
                     disabled={actionIsDisabled}
                     onClick={(event) => {
@@ -622,7 +622,7 @@ export default function SinglePlayerMockDraftRoom() {
                 <Button variant="outline" className="h-10 flex-1 rounded-2xl text-[10px] font-black uppercase tracking-[0.14em]" onClick={() => toggleQueue(player.id)}>
                   Remove
                 </Button>
-                <Button className="h-10 flex-1 rounded-2xl border border-cyan-100/35 bg-[#1b3349] text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)]" disabled={!userOnClock || draftState.status !== "live" || !isLegalForCurrentPick} onClick={() => draftPlayer(player.id)}>
+                <Button className="h-10 flex-1 rounded-2xl bg-cfb-brand text-[10px] font-black uppercase tracking-[0.14em] text-slate-950 hover:bg-cfb-brand/90" disabled={!userOnClock || draftState.status !== "live" || !isLegalForCurrentPick} onClick={() => draftPlayer(player.id)}>
                   {isLegalForCurrentPick ? "Draft" : "No Slot"}
                 </Button>
               </div>
@@ -812,7 +812,7 @@ export default function SinglePlayerMockDraftRoom() {
               className={cn(
                   "rounded-3xl border border-cfb-border-subtle bg-cfb-surface-raised/95 px-6 py-3 text-center shadow-[0_10px_24px_rgba(0,0,0,0.30)] backdrop-blur-sm transition sm:px-8",
                 timerDanger
-                  ? "animate-pulse border-red-300/50 shadow-[0_0_58px_rgba(248,113,113,0.34)]"
+                  ? "animate-pulse border-red-300/50 bg-red-400/10"
                     : "border-white/14"
               )}
             >
@@ -831,8 +831,8 @@ export default function SinglePlayerMockDraftRoom() {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-3">
-            <div className="rounded-3xl border border-cyan-200/35 bg-cyan-400/10 px-6 py-4 text-right shadow-[0_0_42px_rgba(34,211,238,0.17)] backdrop-blur-xl">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100">
+            <div className="rounded-3xl border border-cfb-border-subtle bg-cfb-surface-raised/95 px-6 py-4 text-right shadow-[0_10px_24px_rgba(0,0,0,0.30)] backdrop-blur-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cfb-brand">
                 Your Draft Position: <span className="text-xl tabular-nums">{draftState.userTeamId}</span>
               </p>
               <p className="mt-1 text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
@@ -842,7 +842,7 @@ export default function SinglePlayerMockDraftRoom() {
             <div
               className={cn(
                 "rounded-3xl border border-cfb-border-subtle bg-cfb-surface-raised/95 px-6 py-4 text-right shadow-[0_10px_24px_rgba(0,0,0,0.30)] backdrop-blur-sm",
-                userOnClock && "border-amber-200/45 bg-amber-300/10 shadow-[0_0_28px_rgba(251,191,36,0.14)]"
+                userOnClock && "border-amber-200/45 bg-amber-300/10"
               )}
             >
               <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">On Clock</p>
@@ -916,7 +916,7 @@ export default function SinglePlayerMockDraftRoom() {
                       <div
                         role="status"
                         aria-label="Current pick scope"
-                        className="absolute top-1 left-1/2 z-10 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-amber-100/70 bg-[#0b121a] text-amber-100 shadow-[0_0_14px_rgba(251,191,36,0.30)]"
+                        className="absolute top-1 left-1/2 z-10 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-amber-100/70 bg-[#0b121a] text-amber-100"
                       >
                         <LocateFixed className="h-3 w-3" />
                       </div>
@@ -982,9 +982,9 @@ export default function SinglePlayerMockDraftRoom() {
                   className={cn(
                     "relative min-w-[142px] snap-start rounded-2xl border border-white/10 bg-[#131c27] p-3 shadow-[0_8px_18px_rgba(2,6,23,0.22)] transition",
                     isCurrent
-                      ? "border-amber-200/70 bg-amber-300/12 shadow-[0_0_28px_rgba(251,191,36,0.16)]"
+                      ? "border-amber-200/70 bg-amber-300/12"
                       : isUser
-                        ? "border-emerald-200/40 bg-emerald-300/10 shadow-[0_0_22px_rgba(52,211,153,0.14)]"
+                        ? "border-emerald-200/40 bg-emerald-300/10"
                       : "hover:border-white/25 hover:bg-white/[0.055]",
                     isLocked && "opacity-80"
                   )}
@@ -992,7 +992,7 @@ export default function SinglePlayerMockDraftRoom() {
                   {isCurrent && draftState.currentPick >= FIRST_CENTERED_DRAFT_PICK ? (
                     <div
                       aria-label="Current pick"
-                      className="absolute -top-3 left-1/2 z-10 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border border-amber-100/70 bg-[#0b121a] text-amber-100 shadow-[0_0_18px_rgba(251,191,36,0.30)]"
+                      className="absolute -top-3 left-1/2 z-10 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border border-amber-100/70 bg-[#0b121a] text-amber-100"
                     >
                       <LocateFixed className="h-3.5 w-3.5" />
                     </div>
@@ -1033,13 +1033,13 @@ export default function SinglePlayerMockDraftRoom() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="mock-draft-complete-title"
-            className="w-full max-w-[720px] overflow-hidden rounded-[2rem] border border-cyan-200/25 bg-[#071225]/92 text-center shadow-[0_0_90px_rgba(34,211,238,0.22),inset_0_1px_0_rgba(255,255,255,0.08)]"
+            className="w-full max-w-[720px] overflow-hidden rounded-[2rem] border border-cfb-border-subtle bg-cfb-surface-raised text-center shadow-[0_16px_44px_rgba(0,0,0,0.34)]"
           >
-            <div className="border-b border-cyan-100/10 bg-gradient-to-br from-cyan-400/12 via-blue-500/8 to-violet-500/10 px-8 py-10">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-cyan-200/35 bg-cyan-300/12 text-cyan-100 shadow-[0_0_48px_rgba(103,232,249,0.34)]">
+            <div className="border-b border-cfb-border-subtle bg-cfb-surface px-8 py-10">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-cfb-brand/30 bg-cfb-brand/10 text-cfb-brand">
                 <Trophy className="h-10 w-10" />
               </div>
-              <p className="mt-6 text-[10px] font-black uppercase tracking-[0.28em] text-cyan-200">
+              <p className="mt-6 text-[10px] font-black uppercase tracking-[0.28em] text-cfb-brand">
                 Mock Draft Complete
               </p>
               <h2
@@ -1056,7 +1056,7 @@ export default function SinglePlayerMockDraftRoom() {
             <div className="grid gap-3 px-8 py-6 sm:grid-cols-3">
               <Button
                 type="button"
-                className="h-12 rounded-2xl border border-cyan-100/35 bg-[#1b3349] px-6 text-[10px] font-black uppercase tracking-[0.16em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(2,6,23,0.34)] transition hover:border-cyan-100/60 hover:bg-[#294d69] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_22px_rgba(2,6,23,0.4)]"
+                className="h-12 rounded-2xl bg-cfb-brand px-6 text-[10px] font-black uppercase tracking-[0.16em] text-slate-950 hover:bg-cfb-brand/90"
                 onClick={viewDraftedRoster}
               >
                 <ClipboardList className="mr-2 h-4 w-4" />
@@ -1065,7 +1065,7 @@ export default function SinglePlayerMockDraftRoom() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-12 rounded-2xl border-cyan-200/20 bg-white/[0.04] px-6 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100 hover:border-cyan-200/40 hover:bg-cyan-400/12 hover:text-white"
+                className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface px-6 text-[10px] font-black uppercase tracking-[0.16em] text-cfb-text-primary hover:border-cfb-brand/45 hover:bg-cfb-surface-hover"
                 onClick={() => navigate("/draft")}
               >
                 Exit to Draft Center
@@ -1073,7 +1073,7 @@ export default function SinglePlayerMockDraftRoom() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-12 rounded-2xl border-cyan-200/20 bg-white/[0.04] px-6 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100 hover:border-cyan-200/40 hover:bg-cyan-400/12 hover:text-white"
+                className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface px-6 text-[10px] font-black uppercase tracking-[0.16em] text-cfb-text-primary hover:border-cfb-brand/45 hover:bg-cfb-surface-hover"
                 onClick={resetDraft}
               >
                 <RefreshCcw className="mr-2 h-4 w-4" />

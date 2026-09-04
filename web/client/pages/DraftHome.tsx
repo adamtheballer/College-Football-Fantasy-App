@@ -32,9 +32,9 @@ const OptionButton = ({
     onClick={onClick}
     className={cn(
       "h-11 min-w-0 rounded-xl border px-2 text-[9px] font-black uppercase tracking-[0.14em] transition sm:h-12 sm:rounded-2xl sm:px-5 sm:text-[11px] sm:tracking-[0.18em]",
-      "hover:-translate-y-0.5 hover:border-cfb-brand/45 hover:bg-cfb-brand/10 hover:shadow-[0_0_26px_hsl(var(--brand-primary)/0.16)]",
+      "hover:border-cfb-brand/55 hover:bg-cfb-brand/10",
       active
-        ? "border-cfb-brand/70 bg-cfb-brand/20 text-blue-50 shadow-[0_0_34px_hsl(var(--brand-primary)/0.22)]"
+        ? "border-cfb-brand bg-cfb-brand/15 text-cfb-text-primary"
         : "border-cfb-border-subtle bg-cfb-surface/70 text-cfb-text-secondary"
     )}
   >
@@ -61,9 +61,7 @@ export default function DraftHome() {
   );
 
   return (
-    <div className="relative mx-auto max-w-[1320px] space-y-4 px-4 py-5 pb-24 sm:space-y-6 sm:py-7 md:px-8">
-      <div className="pointer-events-none absolute left-0 top-6 h-52 w-52 rounded-full bg-sky-400/12 blur-[82px] sm:top-10 sm:h-72 sm:w-72 sm:blur-[92px]" />
-      <div className="pointer-events-none absolute right-0 top-32 h-56 w-56 rounded-full bg-blue-500/10 blur-[82px] sm:top-40 sm:h-80 sm:w-80 sm:blur-[100px]" />
+    <div className="mx-auto max-w-[1320px] space-y-4 px-4 py-5 pb-24 sm:space-y-6 sm:py-7 md:px-8">
 
       <header className="relative flex flex-col gap-3 sm:gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-1.5 sm:space-y-3">
@@ -82,7 +80,7 @@ export default function DraftHome() {
         </div>
         <Button
           asChild
-          className="h-12 w-full rounded-xl bg-gradient-to-r from-cfb-cyan to-cfb-brand px-5 text-[10px] font-black uppercase tracking-[0.16em] text-slate-950 shadow-[0_18px_42px_hsl(var(--brand-primary)/0.22)] hover:brightness-110 sm:h-14 sm:w-fit sm:rounded-2xl sm:px-7 sm:text-[11px] sm:tracking-[0.2em]"
+          className="h-12 w-full rounded-xl bg-cfb-brand px-5 text-[10px] font-black uppercase tracking-[0.16em] text-slate-950 hover:bg-cfb-brand/90 sm:h-14 sm:w-fit sm:rounded-2xl sm:px-7 sm:text-[11px] sm:tracking-[0.2em]"
         >
           <Link to={mockDraftUrl}>
             <Bot className="mr-3 h-5 w-5" />
@@ -91,11 +89,11 @@ export default function DraftHome() {
         </Button>
       </header>
 
-      <div className="relative space-y-4 xl:space-y-6">
-        <Card className="cfb-playbook-pattern overflow-hidden rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised/90 shadow-[0_0_54px_hsl(var(--brand-primary)/0.1)] sm:rounded-[2rem]">
+      <div className="space-y-4 xl:space-y-6">
+        <Card className="overflow-hidden rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised/90 sm:rounded-[2rem]">
           <CardContent className="space-y-4 p-4 sm:space-y-6 sm:p-6 md:p-8">
             <div className="flex items-start gap-3 sm:gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cfb-brand/30 bg-cfb-brand/15 text-blue-100 shadow-[0_0_20px_hsl(var(--brand-primary)/0.16)] sm:h-12 sm:w-12 sm:rounded-2xl">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cfb-brand/30 bg-cfb-brand/10 text-cfb-brand sm:h-12 sm:w-12 sm:rounded-2xl">
                 <Trophy className="h-5 w-5" />
               </div>
               <div>
@@ -117,7 +115,7 @@ export default function DraftHome() {
               <div className="grid gap-3 sm:grid-cols-2 sm:gap-5">
                 <section className="rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 p-3 sm:rounded-[1.5rem] sm:p-5">
                   <div className="mb-2 flex items-center gap-2 sm:mb-4 sm:gap-3">
-                  <Users className="h-4 w-4 text-cyan-200" />
+                  <Users className="h-4 w-4 text-cfb-brand" />
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-300 sm:text-[10px] sm:tracking-[0.24em]">League Size</p>
                   </div>
                   <div className="grid grid-cols-3 gap-2 sm:gap-3">
@@ -131,7 +129,7 @@ export default function DraftHome() {
 
                 <section className="rounded-xl border border-cfb-border-subtle bg-cfb-surface/70 p-3 sm:rounded-[1.5rem] sm:p-5">
                   <div className="mb-2 flex items-center gap-2 sm:mb-4 sm:gap-3">
-                  <Clock3 className="h-4 w-4 text-cyan-200" />
+                  <Clock3 className="h-4 w-4 text-cfb-brand" />
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-300 sm:text-[10px] sm:tracking-[0.24em]">Pick Clock</p>
                   </div>
                   <div className="grid grid-cols-3 gap-2 sm:gap-3">
@@ -147,12 +145,12 @@ export default function DraftHome() {
               <section className="rounded-xl border border-cfb-brand/25 bg-cfb-brand/[0.07] p-3 sm:rounded-[1.5rem] sm:p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-cyan-200 sm:text-[10px] sm:tracking-[0.24em]">Roster Fill</p>
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-cfb-brand sm:text-[10px] sm:tracking-[0.24em]">Roster Fill</p>
                     <p className="mt-1 text-xs font-bold leading-5 text-slate-300 sm:text-sm">
                       QB, 2 RB, 2 WR, TE, FLEX, K, and bench.
                     </p>
                   </div>
-                  <div className="shrink-0 rounded-xl border border-cyan-200/35 bg-slate-950/45 px-3 py-2 text-[9px] font-black uppercase tracking-[0.14em] text-cyan-50 sm:rounded-2xl sm:px-5 sm:py-3 sm:text-[11px] sm:tracking-[0.18em]">
+                  <div className="shrink-0 rounded-xl border border-cfb-border-subtle bg-cfb-surface px-3 py-2 text-[9px] font-black uppercase tracking-[0.14em] text-cfb-text-primary sm:rounded-2xl sm:px-5 sm:py-3 sm:text-[11px] sm:tracking-[0.18em]">
                     {MOCK_ROUNDS} Rounds
                   </div>
                 </div>
@@ -165,7 +163,7 @@ export default function DraftHome() {
           <Card className="overflow-hidden rounded-2xl border border-cfb-border-subtle bg-cfb-surface-raised/85 shadow-[0_24px_52px_rgba(2,6,23,0.2)] sm:rounded-[2rem]">
             <CardContent className="space-y-3 p-4 sm:space-y-5 sm:p-6 md:p-8">
               <div className="flex items-center justify-between gap-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.32em] text-cyan-200">
+                <p className="text-[10px] font-black uppercase tracking-[0.32em] text-cfb-brand">
                   Real League Drafts
                 </p>
                 <Button
@@ -189,7 +187,7 @@ export default function DraftHome() {
                     <Link
                       key={league.id}
                       to={`/league/${league.id}/draft`}
-                      className="block rounded-xl border border-white/10 bg-white/[0.055] p-3 transition hover:-translate-y-0.5 hover:border-cyan-200/40 hover:bg-cyan-300/10 hover:shadow-[0_0_26px_rgba(56,189,248,0.12)] sm:rounded-2xl sm:p-5"
+                      className="block rounded-xl border border-white/10 bg-white/[0.055] p-3 transition hover:border-cfb-brand/45 hover:bg-cfb-brand/[0.07] sm:rounded-2xl sm:p-5"
                     >
                       <p className="text-base font-black italic tracking-tight text-foreground sm:text-lg">{league.name}</p>
                       <p className="mt-1 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground sm:mt-2 sm:text-[10px] sm:tracking-[0.2em]">
@@ -204,7 +202,7 @@ export default function DraftHome() {
 
           <Card className="hidden overflow-hidden rounded-[2rem] border border-cfb-border-subtle bg-cfb-surface-raised/85 shadow-[0_30px_70px_rgba(2,6,23,0.22)] sm:block">
             <CardContent className="space-y-5 p-6 md:p-8">
-              <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.32em] text-cyan-200">
+              <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.32em] text-cfb-brand">
                 <ShieldCheck className="h-4 w-4" />
                 Current Mock Rules
               </p>
