@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { waiverOpponentLabel, waiverProjectionLabel, waiverSearchMatches, waiverWeekPoints } from "./LeagueWaivers";
+import {
+  rankWaiverSearchResults,
+  waiverOpponentLabel,
+  waiverProjectionLabel,
+  waiverSearchMatches,
+  waiverWeekPoints,
+} from "./LeagueWaivers";
 
 describe("waiverProjectionLabel", () => {
   it("uses the backend projection status instead of presenting a bye as a missing projection", () => {
@@ -41,5 +47,23 @@ describe("waiverSearchMatches", () => {
     expect(waiverSearchMatches(georgiaPlayerFacingTennesseeState, "Tennessee")).toBe(false);
     expect(waiverSearchMatches(georgiaPlayerFacingTennesseeState, "Canion")).toBe(true);
     expect(waiverSearchMatches(georgiaPlayerFacingTennesseeState, "Georgia")).toBe(true);
+  });
+});
+
+describe("rankWaiverSearchResults", () => {
+  it("places an exact school match ahead of similarly named schools without changing the remaining rank order", () => {
+    const results = rankWaiverSearchResults([
+      { name: "West Virginia player", school: "West Virginia" },
+      { name: "Virginia Tech player", school: "Virginia Tech" },
+      { name: "Virginia player", school: "Virginia" },
+      { name: "Another West Virginia player", school: "West Virginia" },
+    ], "Virginia");
+
+    expect(results.map((player) => player.school)).toEqual([
+      "Virginia",
+      "West Virginia",
+      "Virginia Tech",
+      "West Virginia",
+    ]);
   });
 });
