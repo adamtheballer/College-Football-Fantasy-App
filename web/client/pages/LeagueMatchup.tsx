@@ -88,7 +88,7 @@ function teamInitials(name: string | null | undefined) {
   return letters || "TM";
 }
 
-function displayedProbabilityPair(
+function probabilityPair(
   myPercent: number | null | undefined,
   opponentPercent: number | null | undefined,
 ) {
@@ -101,6 +101,15 @@ function displayedProbabilityPair(
   ) {
     return null;
   }
+  return { my: myPercent, opponent: opponentPercent };
+}
+
+function displayedProbabilityPair(
+  myPercent: number,
+  opponentPercent: number,
+) {
+  // Round one side and derive the other so the labels always add to 100.0%,
+  // while the meter itself continues to use the precise server values.
   const my = Math.round((myPercent + Number.EPSILON) * 10) / 10;
   return { my, opponent: Math.round((100 - my + Number.EPSILON) * 10) / 10 };
 }
@@ -199,7 +208,11 @@ function CompactMatchupScoreboard({
   onPreviousMatchup: () => void;
   onNextMatchup: () => void;
 }) {
-  const winChance = displayedProbabilityPair(myTeam?.win_probability, opponentTeam?.win_probability);
+  // The API normally supplies probabilities. A neutral fallback keeps an
+  // incomplete/injured lineup from replacing the matchup with an unavailable
+  // message while fresh roster totals are loading.
+  const winChance = probabilityPair(myTeam?.win_probability, opponentTeam?.win_probability) ?? { my: 50, opponent: 50 };
+  const displayedWinChance = displayedProbabilityPair(winChance.my, winChance.opponent);
   const myTeamIsLeading = Boolean(winChance && winChance.my >= winChance.opponent);
 
   return (
@@ -257,11 +270,11 @@ function CompactMatchupScoreboard({
           <span className="mt-0.5 font-ui text-[8px] font-bold uppercase tracking-[0.06em] text-cfb-text-muted">Win chance</span>
           <div className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-[10px] font-black tabular-nums sm:text-xs">
             <span className={myTeamIsLeading ? "text-emerald-300" : "text-cfb-crimson"}>
-              {winChance ? `${winChance.my.toFixed(1)}%` : "—"}
+              {`${displayedWinChance.my.toFixed(1)}%`}
             </span>
             <span className="text-cfb-text-muted">VS</span>
             <span className={myTeamIsLeading ? "text-cfb-crimson" : "text-emerald-300"}>
-              {winChance ? `${winChance.opponent.toFixed(1)}%` : "—"}
+              {`${displayedWinChance.opponent.toFixed(1)}%`}
             </span>
           </div>
         </div>
@@ -276,9 +289,9 @@ function CompactMatchupScoreboard({
       </div>
 
       <div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-t border-cfb-border-subtle pt-2 text-[9px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
-        <span>{winChance ? `${winChance.my.toFixed(1)}%` : "—"}</span>
-        {winChance ? <WinChanceBar myPercent={myTeam?.win_probability} opponentPercent={opponentTeam?.win_probability} className="h-2" testIdPrefix="scoreboard-win-chance" /> : <span className="text-center normal-case tracking-normal">Win Probability available after lineups are set</span>}
-        <span>{winChance ? `${winChance.opponent.toFixed(1)}%` : "—"}</span>
+        <span>{`${displayedWinChance.my.toFixed(1)}%`}</span>
+        <WinChanceBar myPercent={winChance.my} opponentPercent={winChance.opponent} className="h-2" testIdPrefix="scoreboard-win-chance" />
+        <span>{`${displayedWinChance.opponent.toFixed(1)}%`}</span>
       </div>
     </section>
   );

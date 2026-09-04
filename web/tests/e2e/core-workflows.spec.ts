@@ -142,7 +142,7 @@ test.describe("critical browser workflows", () => {
         body: JSON.stringify({ data: [] }),
       });
     });
-    await page.route("**/saturday-pick-6/current?**", async (route) => {
+    await page.route("**/saturday-pick-6/current*", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -222,7 +222,7 @@ test.describe("critical browser workflows", () => {
         sort_order: 1,
       }],
     };
-    await page.route("**/saturday-pick-6/current?**", async (route) => {
+    await page.route("**/saturday-pick-6/current*", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -270,7 +270,7 @@ test.describe("critical browser workflows", () => {
         { id: 2, player_id: 102, canonical_position: "RB", player_name: "Rival Runner", school: "Texas", opponent: "Ohio State", game_time: "2026-09-05T17:00:00Z", image_url: null, projected_points: 18.4, live_points: 22.3, final_points: 22.3, scoring_status: "FINAL", sort_order: 2 },
       ],
     };
-    await page.route("**/saturday-pick-6/current?**", async (route) => {
+    await page.route("**/saturday-pick-6/current*", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -355,7 +355,7 @@ test.describe("critical browser workflows", () => {
     await page.route("**/notifications/alerts?**", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [] }) });
     });
-    await page.route("**/saturday-pick-6/current?**", async (route) => {
+    await page.route("**/saturday-pick-6/current*", async (route) => {
       await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ detail: "No active contest" }) });
     });
 
@@ -395,7 +395,7 @@ test.describe("critical browser workflows", () => {
     await page.route("**/notifications/alerts?**", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [] }) });
     });
-    await page.route("**/saturday-pick-6/current?**", async (route) => {
+    await page.route("**/saturday-pick-6/current*", async (route) => {
       await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ detail: "No active contest" }) });
     });
 

@@ -53,22 +53,16 @@ export type SaturdayPickContest = {
   } | null;
 };
 
-export const SATURDAY_PICK_6_SEASON = 2026;
-export const SATURDAY_PICK_6_WEEK = 1;
-
 export function useSaturdayPickContest(enabled = true) {
   return useQuery({
-    queryKey: ["saturday-pick-6", SATURDAY_PICK_6_SEASON, SATURDAY_PICK_6_WEEK],
+    queryKey: ["saturday-pick-6", "current"],
     enabled,
     staleTime: 5_000,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status && ["OPEN", "LOCKED", "SCORING", "PROVISIONAL"].includes(status) ? 5_000 : false;
+      return status && ["OPEN", "LOCKED", "SCORING", "PROVISIONAL"].includes(status) ? 30_000 : false;
     },
-    queryFn: () => apiGet<SaturdayPickContest>("/saturday-pick-6/current", {
-      season: SATURDAY_PICK_6_SEASON,
-      week: SATURDAY_PICK_6_WEEK,
-    }),
+    queryFn: () => apiGet<SaturdayPickContest>("/saturday-pick-6/current"),
   });
 }
 

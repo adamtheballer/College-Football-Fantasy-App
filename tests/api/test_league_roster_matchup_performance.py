@@ -8,9 +8,28 @@ from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameSta
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.user import User
-from collegefootballfantasy_api.app.services.league_roster_matchup import build_matchup_tab_view
+from collegefootballfantasy_api.app.services.league_roster_matchup import (
+    _starter_live_totals,
+    _starter_projection_total,
+    build_matchup_tab_view,
+)
 from collegefootballfantasy_api.app.services.scoring_service import recalculate_league_week_scores
 from tests.api.scoring_helpers import create_scoring_fixture
+
+
+def test_missing_or_bye_starters_reduce_matchup_inputs_without_hiding_probability():
+    class Starter:
+        is_starter = True
+        status = "STARTER"
+        projection_status = "BYE"
+        projected_points = None
+        pregame_projected_points = None
+        live_game_state = None
+        current_fantasy_points = None
+        live_projected_final_points = None
+
+    assert _starter_projection_total([Starter()]) == 0.0
+    assert _starter_live_totals([Starter()]) == (0.0, 0.0, 0.0, False)
 
 
 def test_matchup_tab_uses_a_bounded_number_of_selects(client, db_session):

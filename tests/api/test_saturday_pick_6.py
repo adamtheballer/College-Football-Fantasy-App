@@ -7,6 +7,7 @@ from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.saturday_pick import SaturdayPickContest, SaturdayPickPlayer
+from collegefootballfantasy_api.app.models.saturday_pick import SaturdayPickContentAudit
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.saturday_pick import SaturdayPickContestCreate
@@ -95,6 +96,24 @@ def test_contest_readiness_is_select_only_and_does_not_allocate_contest_rows(db_
     assert not db_session.dirty
     assert db_session.query(SaturdayPickContest).count() == contest_count_before
     assert db_session.query(SaturdayPickPlayer).count() == featured_count_before
+
+
+def test_admin_review_preparation_creates_an_auditable_unpublished_contest(client, db_session):
+    _players, _kickoff = _featured_players(db_session)
+    headers = admin_headers(client)
+
+    prepared = client.post(
+        "/admin/saturday-pick-6/prepare",
+        json={"season": 2026, "week_number": 1, "reason": "Weekly candidate review"},
+        headers=headers,
+    )
+
+    assert prepared.status_code == 201
+    payload = prepared.json()
+    assert payload["contest"]["status"] == "SCHEDULED"
+    assert len(payload["contest"]["players"]) == 6
+    assert payload["audit"][0]["action"] == "prepared"
+    assert db_session.query(SaturdayPickContentAudit).count() == 1
 
 
 def test_admin_rejects_mixed_position_and_wrong_field_size(client, db_session):

@@ -13,8 +13,11 @@ from collegefootballfantasy_api.app.models.saturday_pick import SaturdayPickCont
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.saturday_pick import (
     SaturdayPickContestCreate,
+    SaturdayPickContestPrepare,
     SaturdayPickContestRead,
     SaturdayPickContestPublish,
+    SaturdayPickContestReviewUpdate,
+    SaturdayPickAdminReviewRead,
     SaturdayPickEntryRead,
     SaturdayPickEntryWrite,
     SaturdayPickRotationRead,
@@ -24,9 +27,13 @@ from collegefootballfantasy_api.app.services.saturday_pick_service import (
     contest_read,
     create_contest,
     finalize_contest,
+    list_review_candidates,
     publish_contest,
+    record_content_audit,
     refresh_contest_live_scores,
     recommended_position,
+    replace_draft_contest,
+    review_snapshot,
     save_entry,
 )
 from collegefootballfantasy_api.app.services.content_moderation import moderate_user_text, moderate_user_url
@@ -51,21 +58,21 @@ def _contest_or_404(db: Session, contest_id: int) -> SaturdayPickContest:
 
 @router.get("/current", response_model=SaturdayPickContestRead)
 def get_current_contest(
-    season: int = Query(default_factory=lambda: datetime.now().year, ge=2000, le=2100),
-    week: int = Query(1, ge=1, le=30),
+    season: int | None = Query(None, ge=2000, le=2100),
+    week: int | None = Query(None, ge=1, le=30),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> SaturdayPickContestRead:
     _require_public_enabled()
-    contest = (
-        db.query(SaturdayPickContest)
-        .filter(
-            SaturdayPickContest.season == season,
-            SaturdayPickContest.week_number == week,
-            SaturdayPickContest.status.in_(PUBLIC_CONTEST_STATUSES),
-        )
-        .one_or_none()
+    statuses = PUBLIC_CONTEST_STATUSES if season is not None or week is not None else (
+        "OPEN", "LOCKED", "SCORING", "PROVISIONAL", "FINAL"
     )
+    query = db.query(SaturdayPickContest).filter(SaturdayPickContest.status.in_(statuses))
+    if season is not None:
+        query = query.filter(SaturdayPickContest.season == season)
+    if week is not None:
+        query = query.filter(SaturdayPickContest.week_number == week)
+    contest = query.order_by(SaturdayPickContest.season.desc(), SaturdayPickContest.week_number.desc()).first()
     if not contest:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active Saturday Pick 6 contest")
     return contest_read(db, contest, current_user)
@@ -73,8 +80,8 @@ def get_current_contest(
 
 @router.get("/active", response_model=SaturdayPickContestRead)
 def get_active_contest(
-    season: int = Query(default_factory=lambda: datetime.now().year, ge=2000, le=2100),
-    week: int = Query(1, ge=1, le=30),
+    season: int | None = Query(None, ge=2000, le=2100),
+    week: int | None = Query(None, ge=1, le=30),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> SaturdayPickContestRead:
@@ -171,6 +178,93 @@ def create_contest_endpoint(
     return contest_read(db, contest, current_user)
 
 
+@admin_router.get("/review", response_model=SaturdayPickAdminReviewRead)
+def get_review(
+    season: int = Query(default_factory=lambda: datetime.now().year, ge=2000, le=2100),
+    week: int = Query(1, ge=1, le=30),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_user),
+) -> SaturdayPickAdminReviewRead:
+    return review_snapshot(db, season=season, week=week, viewer=current_user)
+
+
+@admin_router.post("/prepare", response_model=SaturdayPickAdminReviewRead, status_code=status.HTTP_201_CREATED)
+def prepare_review(
+    payload: SaturdayPickContestPrepare,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_user),
+) -> SaturdayPickAdminReviewRead:
+    existing = (
+        db.query(SaturdayPickContest)
+        .filter(SaturdayPickContest.season == payload.season, SaturdayPickContest.week_number == payload.week_number)
+        .one_or_none()
+    )
+    if existing:
+        return review_snapshot(db, season=payload.season, week=payload.week_number, viewer=current_user)
+    position = recommended_position(payload.week_number)
+    candidates = list_review_candidates(db, season=payload.season, week=payload.week_number, position=position)
+    if len(candidates) < 6:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Six eligible players with verified projections are required before preparation.")
+    try:
+        contest = create_contest(
+            db,
+            SaturdayPickContestCreate(
+                season=payload.season,
+                week_number=payload.week_number,
+                contest_position=position,
+                featured_player_ids=[candidate.player_id for candidate in candidates[:6]],
+                title="Saturday Pick 6",
+            ),
+            current_user,
+        )
+        record_content_audit(
+            db, contest=contest, actor=current_user, season=payload.season, week=payload.week_number,
+            action="prepared", reason=payload.reason, details={"position": position},
+        )
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return review_snapshot(db, season=payload.season, week=payload.week_number, viewer=current_user)
+
+
+@admin_router.put("/{contest_id}/review", response_model=SaturdayPickAdminReviewRead)
+def save_review(
+    contest_id: int,
+    payload: SaturdayPickContestReviewUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_user),
+) -> SaturdayPickAdminReviewRead:
+    contest = _contest_or_404(db, contest_id)
+    title = moderate_user_text(db, actor_user_id=current_user.id, field_name="saturday_pick_title", value=payload.title, required=True) or ""
+    reason = moderate_user_text(db, actor_user_id=current_user.id, field_name="saturday_pick_review_reason", value=payload.reason, required=True)
+    sponsor_name = moderate_user_text(db, actor_user_id=current_user.id, field_name="saturday_pick_sponsor_name", value=payload.sponsor_name)
+    sponsor_offer = moderate_user_text(db, actor_user_id=current_user.id, field_name="saturday_pick_sponsor_offer", value=payload.sponsor_offer_text)
+    sponsor_terms = moderate_user_text(db, actor_user_id=current_user.id, field_name="saturday_pick_sponsor_terms", value=payload.sponsor_terms)
+    sponsor_logo = moderate_user_url(db, actor_user_id=current_user.id, field_name="saturday_pick_sponsor_logo_url", value=payload.sponsor_logo_url)
+    sponsor_url = moderate_user_url(db, actor_user_id=current_user.id, field_name="saturday_pick_sponsor_url", value=payload.sponsor_url)
+    try:
+        replace_draft_contest(
+            db,
+            contest=contest,
+            payload=SaturdayPickContestCreate(
+                season=contest.season, week_number=contest.week_number, contest_position=contest.contest_position,
+                featured_player_ids=payload.featured_player_ids, title=title, sponsor_name=sponsor_name,
+                sponsor_logo_url=sponsor_logo, sponsor_offer_text=sponsor_offer, sponsor_code=payload.sponsor_code,
+                sponsor_url=sponsor_url, sponsor_terms=sponsor_terms,
+            ),
+        )
+        record_content_audit(
+            db, contest=contest, actor=current_user, season=contest.season, week=contest.week_number,
+            action="review_saved", reason=reason, details={"featured_player_ids": payload.featured_player_ids},
+        )
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return review_snapshot(db, season=contest.season, week=contest.week_number, viewer=current_user)
+
+
 @admin_router.post("/{contest_id}/publish", response_model=SaturdayPickContestRead)
 def publish_contest_endpoint(
     contest_id: int,
@@ -183,6 +277,10 @@ def publish_contest_endpoint(
         contest.lock_at = payload.lock_at
     try:
         publish_contest(db, contest)
+        record_content_audit(
+            db, contest=contest, actor=current_user, season=contest.season, week=contest.week_number,
+            action="published", reason=payload.reason,
+        )
         db.commit()
     except ValueError as exc:
         db.rollback()
@@ -198,6 +296,10 @@ def finalize_contest_endpoint(
 ) -> SaturdayPickContestRead:
     try:
         contest = finalize_contest(db, _contest_or_404(db, contest_id))
+        record_content_audit(
+            db, contest=contest, actor=current_user, season=contest.season, week=contest.week_number,
+            action="finalized", reason=None,
+        )
         db.commit()
     except ValueError as exc:
         db.rollback()

@@ -29,6 +29,25 @@ class SaturdayPickContestCreate(BaseModel):
 
 class SaturdayPickContestPublish(BaseModel):
     lock_at: datetime | None = None
+    reason: str | None = Field(default=None, max_length=1000)
+
+
+class SaturdayPickContestPrepare(BaseModel):
+    season: int = Field(ge=2000, le=2100)
+    week_number: int = Field(ge=1, le=30)
+    reason: str | None = Field(default=None, max_length=1000)
+
+
+class SaturdayPickContestReviewUpdate(BaseModel):
+    featured_player_ids: list[int] = Field(min_length=6, max_length=6)
+    title: str = Field(default="Saturday Pick 6", min_length=1, max_length=120)
+    sponsor_name: str | None = Field(default=None, max_length=120)
+    sponsor_logo_url: str | None = Field(default=None, max_length=500)
+    sponsor_offer_text: str | None = Field(default=None, max_length=500)
+    sponsor_code: str | None = Field(default=None, max_length=100)
+    sponsor_url: str | None = Field(default=None, max_length=500)
+    sponsor_terms: str | None = Field(default=None, max_length=1000)
+    reason: str = Field(min_length=3, max_length=1000)
 
 
 class SaturdayPickEntryWrite(BaseModel):
@@ -107,3 +126,28 @@ class SaturdayPickContestRead(BaseModel):
 class SaturdayPickRotationRead(BaseModel):
     default_rotation: list[SaturdayPickPosition]
     recommended_position: SaturdayPickPosition
+
+
+class SaturdayPickCandidateRead(BaseModel):
+    player_id: int
+    player_name: str
+    school: str
+    position: SaturdayPickPosition
+    opponent: str
+    kickoff_at: datetime
+    projected_points: float
+
+
+class SaturdayPickContentAuditRead(BaseModel):
+    id: int
+    action: str
+    reason: str | None = None
+    actor_user_id: int | None = None
+    created_at: datetime
+
+
+class SaturdayPickAdminReviewRead(BaseModel):
+    contest: SaturdayPickContestRead | None = None
+    candidates: list[SaturdayPickCandidateRead] = []
+    sponsor_draft: dict[str, str | None] | None = None
+    audit: list[SaturdayPickContentAuditRead] = []
