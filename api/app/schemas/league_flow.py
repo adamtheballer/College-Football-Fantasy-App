@@ -576,6 +576,17 @@ class RosterTabTeamRead(BaseModel):
     record: str | None = None
 
 
+class PlayerPopularityRead(BaseModel):
+    rostered_percent: float | None = None
+    start_percent: float | None = None
+
+
+class PlayerPopularitySnapshotRead(BaseModel):
+    as_of: datetime | None = None
+    coverage_started_at: datetime | None = None
+    status: str = "unavailable"
+
+
 class RosterTabEntryRead(BaseModel):
     id: int | None = None
     league_id: int | None = None
@@ -636,6 +647,7 @@ class RosterTabEntryRead(BaseModel):
     # roster-row game. This is deliberately display-ready rather than the
     # provider's full stat payload.
     final_game_stat_line: str | None = None
+    popularity: PlayerPopularityRead | None = None
     is_locked: bool = False
     acquisition_type: str = "ROSTER"
     draft_pick_id: int | None = None
@@ -660,6 +672,7 @@ class LeagueRosterTabRead(BaseModel):
     data: list[RosterTabEntryRead] = []
     slots: list[RosterTabEntryRead] = []
     team_rosters: list[LeagueRosterTeamRead] = []
+    popularity_snapshot: PlayerPopularitySnapshotRead | None = None
 
 
 class MatchupTeamRead(BaseModel):
@@ -736,8 +749,14 @@ class LeagueWaiverPlayerRead(BaseModel):
     # mislabeled as a projection in the waiver wire.
     final_fantasy_points: float | None = None
     projection_status: str = "UNAVAILABLE"
+    # The All Players research view includes league-rostered players.  They
+    # remain visible for trade research and watchlists but can never be added
+    # through the waiver workflow.
+    rostered_by_team_name: str | None = None
     availability_state: str = "waivers"
     available_at: datetime | None = None
+    popularity: PlayerPopularityRead | None = None
+    hot_pickup_count: int | None = None
 
 
 class LeagueWaiverPeriodRead(BaseModel):
@@ -765,6 +784,7 @@ class LeagueWaiversRead(BaseModel):
     waiver_rules: dict = {}
     total_available: int
     message: str | None = None
+    popularity_snapshot: PlayerPopularitySnapshotRead | None = None
 
 
 class LeagueScoreRecalculateResponse(BaseModel):

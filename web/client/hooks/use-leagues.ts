@@ -338,10 +338,13 @@ export function useLeagueWaiverTab(
   leagueId?: number,
   limit = 1000,
   offset = 0,
-  enabled = true
+  enabled = true,
+  scope: "waiver" | "all" | "hot" = "waiver",
+  week?: number,
+  hotWindowHours: 24 | 168 = 168,
 ) {
   return useQuery({
-    queryKey: ["league", leagueId, "waivers", limit, offset],
+    queryKey: ["league", leagueId, "waivers", limit, offset, scope, week ?? "current", hotWindowHours],
     enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
     staleTime: 30_000,
     retry: (failureCount, error) => {
@@ -354,6 +357,9 @@ export function useLeagueWaiverTab(
       apiGet<LeagueWaiverTabResponse>(`/leagues/${leagueId}/waivers`, {
         limit,
         offset,
+        scope,
+        ...(typeof week === "number" ? { week } : {}),
+        ...(scope === "hot" ? { hot_window_hours: hotWindowHours } : {}),
       }),
   });
 }

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Lock } from "lucide-react";
 
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
+import { PlayerPopularityMetrics } from "@/components/league/PlayerPopularityMetrics";
 import { usePlayerCard } from "@/hooks/use-players";
 import { useDropRosterPlayer, useUpdateLineup } from "@/hooks/use-roster-actions";
 import { getEligibleSlotsForPosition, normalizePosition } from "@/lib/rosterLegality";
@@ -503,6 +504,7 @@ export function RosterSlotTable({
                       {gameStatLine}
                     </span>
                   ) : null}
+                  {isRealPlayer ? <PlayerPopularityMetrics popularity={player.popularity} /> : null}
                   {hasRedZone ? (
                     <span className={cn(
                       "w-fit rounded bg-red-300/20 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.1em] text-red-100",
