@@ -135,6 +135,13 @@ export default function Settings() {
   const [accountDeletionError, setAccountDeletionError] = useState<string | null>(null);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const saveStateResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (saveStateResetTimeoutRef.current) {
+      clearTimeout(saveStateResetTimeoutRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     setManagerName(user?.firstName ?? "");
@@ -195,7 +202,13 @@ export default function Settings() {
     try {
       await updateProfile({ firstName: nextName, avatarUrl: nextAvatarUrl });
       setSaveState("saved");
-      setTimeout(() => setSaveState("idle"), 1500);
+      if (saveStateResetTimeoutRef.current) {
+        clearTimeout(saveStateResetTimeoutRef.current);
+      }
+      saveStateResetTimeoutRef.current = setTimeout(() => {
+        saveStateResetTimeoutRef.current = null;
+        setSaveState("idle");
+      }, 1500);
     } catch (error) {
       showProfileError(error, "Unable to save your profile. Your previous settings are still active.");
       setSaveState("error");
