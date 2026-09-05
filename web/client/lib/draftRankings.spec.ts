@@ -434,7 +434,7 @@ describe("buildDraftBoard", () => {
     );
   });
 
-  it("keeps the positional-value board intact while placing KJ Duff and Nick Marsh in their published slots", () => {
+  it("keeps editorial master-board moves below higher same-position projections", () => {
     const baselinePlayers = Array.from({ length: 80 }, (_, index) => {
       const rank = index + 1;
       const position = rank % 3 === 0 ? "QB" : rank % 2 === 0 ? "RB" : "WR";
@@ -463,7 +463,12 @@ describe("buildDraftBoard", () => {
     const controlByName = new Map(controlBoard.map((player) => [player.name, player]));
 
     expect(namedByName.get("KJ Duff")?.masterDraftRank).toBe(10);
-    expect(namedByName.get("Nick Marsh")?.masterDraftRank).toBe(11);
+    // Nick's editorial slot cannot leapfrog the higher-projected wide
+    // receivers in this fixture. A board placement is never a substitute for
+    // the current annual/rest-of-season forecast.
+    expect(namedByName.get("Nick Marsh")?.masterDraftRank).toBeGreaterThan(
+      namedByName.get("KJ Duff")?.masterDraftRank ?? 0
+    );
 
     // Reordering the two approved rows may shift nearby numeric ranks, but it
     // must never reorder any other player or replace the positional-value model.

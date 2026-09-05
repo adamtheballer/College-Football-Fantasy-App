@@ -153,7 +153,8 @@ test.describe("critical browser workflows", () => {
           title: "Saturday Pick 6",
           contest_position: "RB",
           status: "OPEN",
-          lock_at: "2026-09-05T16:00:00Z",
+          // Keep the mock contest open regardless of when the release suite runs.
+          lock_at: "2030-09-05T16:00:00Z",
           winning_player_ids: [],
           entry: null,
           sponsor: null,
@@ -196,7 +197,8 @@ test.describe("critical browser workflows", () => {
       title: "Saturday Pick 6",
       contest_position: "RB",
       status: "OPEN",
-      lock_at: "2026-09-05T16:00:00Z",
+      // Keep the mock contest open regardless of when the release suite runs.
+      lock_at: "2030-09-05T16:00:00Z",
       first_game_player: {
         id: 1,
         player_id: 101,

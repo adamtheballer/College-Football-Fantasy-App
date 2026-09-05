@@ -295,7 +295,7 @@ const MASTER_BOARD_EDITORIAL_MOVES = [
   { name: "nick marsh", position: "WR", targetRank: 11 },
 ] as const;
 
-const applyMasterBoardEditorialMoves = <T extends { player: Player }>(board: T[]) => {
+const applyMasterBoardEditorialMoves = <T extends { player: Player; projectedPoints: number }>(board: T[]) => {
   const adjusted = [...board];
 
   for (const move of MASTER_BOARD_EDITORIAL_MOVES) {
@@ -306,7 +306,23 @@ const applyMasterBoardEditorialMoves = <T extends { player: Player }>(board: T[]
     );
     if (currentIndex < 0) continue;
 
-    const targetIndex = clamp(move.targetRank - 1, 0, adjusted.length - 1);
+    const movedEntry = adjusted[currentIndex];
+    // Editorial placements can resolve a published tie or move a player
+    // within the positional-value board, but can never lift a player above a
+    // same-position player with a larger annual/rest-of-season projection.
+    // That keeps the visible board aligned with the yearly forecast after a
+    // projection refresh such as Cam Coleman's verified update.
+    const minimumIndexAfterHigherProjection = adjusted.reduce(
+      (minimumIndex, candidate, index) =>
+        candidate.player.pos === move.position && candidate.projectedPoints > movedEntry.projectedPoints
+          ? Math.max(minimumIndex, index + 1)
+          : minimumIndex,
+      0
+    );
+    const targetIndex = Math.max(
+      clamp(move.targetRank - 1, 0, adjusted.length - 1),
+      minimumIndexAfterHigherProjection
+    );
     if (targetIndex === currentIndex) continue;
 
     const [entry] = adjusted.splice(currentIndex, 1);
