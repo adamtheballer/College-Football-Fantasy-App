@@ -32,9 +32,10 @@ from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekSc
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId, UnmatchedProviderRow
 from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbeat
 from collegefootballfantasy_api.app.services.espn_live_scoring import ESPN_PROVIDER, MIN_GAME_POLL_INTERVAL_SECONDS, espn_week_freshness
-from collegefootballfantasy_api.app.services.fantasy_game_selection import fantasy_games_by_school
+from collegefootballfantasy_api.app.services.fantasy_game_selection import opening_scoring_games
 from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
 
 
@@ -151,18 +152,23 @@ def _schedule_reason_codes(db: Session, *, season: int, week: int) -> list[str]:
     # likewise discovers no relevant provider games in this state.
     if not active_schools:
         return []
-    games = db.query(Game).filter(
-        Game.season == season,
-        Game.week.in_((0, 1) if week == 1 else (week,)),
-    ).all()
-    selected_games = fantasy_games_by_school(db, season=season, week=week, games=games)
-    for school in active_schools:
-        # Preserve the existing behavior for a school that has no canonical
-        # schedule authority yet.  There is no provider event to promote for
-        # that school, so it cannot affect this promotion pass.
-        if school not in selected_games:
+    schedules = [
+        row
+        for row in db.query(TeamSchedule).filter(TeamSchedule.season == season, TeamSchedule.week == week).all()
+        if _school_key(row.team_name) in active_schools
+    ]
+    opening_games = opening_scoring_games(db, season=season, week=week)
+    for row in schedules:
+        school = _school_key(row.team_name)
+        # A completed opener is the selected Week 1 scoring game for this
+        # school.  Continue using TeamSchedule as the canonical authority for
+        # everyone else, because the raw games table deliberately contains
+        # multiple records that can represent the same school/week.
+        game = opening_games.get(school)
+        if game is None and row.is_bye:
             continue
-        game = selected_games[school]
+        if game is None:
+            game = db.get(Game, row.game_id) if row.game_id is not None else None
         if game is None or not str(game.external_id or "").isdigit() or game.start_date is None:
             return ["UNVERIFIED_ESPN_GAME_ID"]
         if (game.schedule_status or "").lower() in UNAVAILABLE_SCHEDULE_STATUSES:
