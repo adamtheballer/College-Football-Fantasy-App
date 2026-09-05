@@ -434,34 +434,52 @@ describe("buildDraftBoard", () => {
     );
   });
 
-  it("limits an elite one-week WR breakout to four spots above the published board rank", () => {
-    const players = [
-      makePlayer(100, "WR", 500, {
-        name: "KJ Duff Type Breakout",
-        rank: 10,
-        adp: 10,
-        restOfSeasonRank: 10,
-        restOfSeasonProjectedPoints: 500,
-      }),
-      ...Array.from({ length: 14 }, (_, index) => {
-        const rank = index + 1;
-        return makePlayer(rank, "WR", 320 - index, {
-          name: `Published WR ${rank}`,
-          rank,
-          adp: rank,
-          restOfSeasonRank: rank,
-          restOfSeasonProjectedPoints: 320 - index,
-        });
-      }),
-    ];
+  it("keeps the positional-value board intact while applying only the approved Nick Marsh and KJ Duff moves", () => {
+    const baselinePlayers = Array.from({ length: 80 }, (_, index) => {
+      const rank = index + 1;
+      const position = rank % 3 === 0 ? "QB" : rank % 2 === 0 ? "RB" : "WR";
+      return makePlayer(rank, position, 340 - rank, {
+        name: `Control Player ${rank}`,
+        rank,
+        adp: rank,
+        restOfSeasonRank: rank,
+        restOfSeasonProjectedPoints: 340 - rank,
+      });
+    });
+    const namedPlayers = baselinePlayers.map((player) => {
+      if (player.id === 8) return { ...player, name: "KJ Duff", pos: "WR" };
+      if (player.id === 45) return { ...player, name: "Nick Marsh", pos: "WR" };
+      return player;
+    });
+    const controlPlayers = baselinePlayers.map((player) => {
+      if (player.id === 8) return { ...player, name: "KJ Duff Control", pos: "WR" };
+      if (player.id === 45) return { ...player, name: "Nick Marsh Control", pos: "WR" };
+      return player;
+    });
 
-    const breakout = buildDraftBoard(players, config).find(
-      (player) => player.name === "KJ Duff Type Breakout"
+    const namedBoard = buildDraftBoard(namedPlayers, config);
+    const controlBoard = buildDraftBoard(controlPlayers, config);
+    const namedByName = new Map(namedBoard.map((player) => [player.name, player]));
+    const controlByName = new Map(controlBoard.map((player) => [player.name, player]));
+
+    expect(namedByName.get("KJ Duff")?.masterDraftRank).toBe(
+      (controlByName.get("KJ Duff Control")?.masterDraftRank ?? 0) + 5
+    );
+    expect(namedByName.get("Nick Marsh")?.masterDraftRank).toBe(
+      (controlByName.get("Nick Marsh Control")?.masterDraftRank ?? 0) - 10
     );
 
-    expect(breakout?.sourceBoardRank).toBe(10);
-    expect(breakout?.masterDraftRank).toBeGreaterThanOrEqual(6);
-    expect(breakout?.masterDraftRank).toBeLessThanOrEqual(10);
+    // Reordering the two approved rows may shift nearby numeric ranks, but it
+    // must never reorder any other player or replace the positional-value model.
+    expect(
+      namedBoard
+        .filter((player) => player.name !== "KJ Duff" && player.name !== "Nick Marsh")
+        .map((player) => player.id)
+    ).toEqual(
+      controlBoard
+        .filter((player) => player.name !== "KJ Duff Control" && player.name !== "Nick Marsh Control")
+        .map((player) => player.id)
+    );
   });
 
   it("does not rank a weekly snapshot when no approved season projection exists", () => {
