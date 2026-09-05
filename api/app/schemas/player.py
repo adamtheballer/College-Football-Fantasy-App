@@ -106,7 +106,11 @@ class PlayerCardStatRowRead(BaseModel):
 
 
 class PlayerCardGameDisplayRead(BaseModel):
-    """Backend-owned current player-game context, independent of league week."""
+    """Real-game context: live/awaiting_live/completed/upcoming/unavailable.
+
+    Live statistics are game-keyed and independent of league-week scoring.
+    Kickoff timestamps include a timezone; clients render them in local time.
+    """
 
     state: str
     season: int | None = None

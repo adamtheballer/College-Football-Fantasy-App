@@ -13,6 +13,7 @@ from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameSta
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.services.historical_stats import canonical_historical_season_rows
+from collegefootballfantasy_api.app.services.player_game_feed import PlayerGameFeed, accepted_player_game_feed, matching_weekly_stat
 from collegefootballfantasy_api.app.schemas.game_log import (
     PlayerGameLogRead,
     PlayerGameLogRowRead,
@@ -75,7 +76,7 @@ def _fantasy_points(stats: dict) -> float | None:
 
 
 def _stat_read(
-    stat: PlayerGameStat | PlayerStat | None,
+    stat: PlayerGameStat | PlayerStat | PlayerGameFeed | None,
     *,
     position: str,
     scoring_rules: dict | None,
@@ -406,11 +407,13 @@ def build_player_game_log(
         stats_by_game=stats_by_game,
         stats_by_week=stats_by_week,
     )
+    feeds = accepted_player_game_feed(db, player_id=player.id, season=selected_season, games=games_by_id)
     rows: list[PlayerGameLogRowRead] = []
     for schedule in player_schedules:
         game = games_by_id.get(schedule.game_id) if schedule.game_id is not None else None
         game_stat = stats_by_game.get(schedule.game_id) if schedule.game_id is not None else None
-        stat = game_stat or stats_by_week.get(schedule.week)
+        feed = feeds.get(schedule.game_id) if not schedule.is_bye else None
+        stat = game_stat or (feed if feed and feed.stats is not None else None) or matching_weekly_stat(stats_by_week.get(schedule.week), game)
         stat_read = _stat_read(stat, position=player.position, scoring_rules=scoring_rules)
         rows.append(
             PlayerGameLogRowRead(
@@ -427,8 +430,8 @@ def build_player_game_log(
                 conference_game=schedule.conference_game,
                 venue=schedule.venue,
                 tv_network=schedule.tv_network,
-                game_status=_game_status(schedule, game, stat),
-                stat_status=_stat_status(schedule, game, stat),
+                game_status=("active" if feed.state == "live" else "final") if feed else _game_status(schedule, game, stat),
+                stat_status=(("active" if feed.state == "live" else "final") if stat is not None else "missing") if feed else _stat_status(schedule, game, stat),
                 result=_game_result(schedule, game),
                 stats=stat_read,
             )

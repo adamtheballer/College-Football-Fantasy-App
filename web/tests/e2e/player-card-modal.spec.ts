@@ -76,6 +76,70 @@ const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]
 };
 
 test.describe("player card modal", () => {
+  test.use({ timezoneId: "America/New_York" });
+
+  test("keeps the live game on mobile and refreshes its stats and local date", async ({ page }, testInfo) => {
+    await page.clock.install({ time: new Date("2026-09-05T00:22:00Z") });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedAuthenticatedSession(page);
+    const player = { ...mockPlayer, name: "Isaiah Sategna III", school: "Oklahoma" };
+    let yards = 42;
+    let logRequests = 0;
+    await page.route("**/stats/**", (route) => route.fulfill({ json: { data: [] } }));
+    await page.route("**/projections/1**", (route) => route.fulfill({ json: { player_id: 1, fantasy_points: 19.7 } }));
+    await page.route("**/players**", async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.endsWith("/players/1/card")) {
+        await route.fulfill({ json: {
+          player, about: { height: "5'10\"", weight: "190 lbs", player_class: "Senior", position: "WR", team: "Oklahoma", source: "verified_sheet" },
+          injuries: [], recent_news: [], season_stats: [],
+          current_game: { state: "live", season: 2026, week: 1, game_id: 342, opponent_name: "UTEP",
+            kickoff_at: "2026-09-05T00:00:00Z", stats: { Receptions: 3, ReceivingYards: yards }, source: "espn_live_boxscore" },
+        } });
+      } else if (path.endsWith("/players/1/game-log")) {
+        logRequests += 1;
+        await route.fulfill({ json: {
+          player_id: 1, player_name: player.name, season: 2026, team_name: "Oklahoma", position: "WR", available_seasons: [2026],
+          games: [{ schedule_id: 501, game_id: 342, week: 1, date: "2026-09-05", kickoff_at: "2026-09-05T00:00:00Z",
+            opponent_name: "UTEP", location: "home", location_label: "Home", neutral_site: false, conference_game: false,
+            game_status: "active", stat_status: "active", result: null,
+            stats: { source: "espn_live_boxscore", updated_at: "2026-09-05T00:22:00Z", fantasy_points: null,
+              stats: { Receptions: 3, ReceivingYards: yards } } }],
+        } });
+      } else if (path.endsWith("/players/1")) {
+        await route.fulfill({ json: player });
+      } else {
+        await route.fulfill({ json: { data: [player], total: 1, limit: 200, offset: 0 } });
+      }
+    });
+    await page.goto("/draft/mock/single-player?new=1&teams=4&timer=60");
+    await page.getByRole("button", { name: /Isaiah Sategna III/i }).first().click();
+    const dialog = page.getByRole("dialog", { name: /Isaiah Sategna III player card/i });
+    await expect(dialog.getByLabel("Current player game")).toBeVisible();
+    await expect(dialog.getByText("Live game", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("Week 1 vs. UTEP")).toBeVisible();
+    await expect(dialog.getByText("Upcoming game", { exact: true })).toHaveCount(0);
+    await expect(dialog.getByText(/Michigan/)).toHaveCount(0);
+    await expect(dialog.getByText("42", { exact: true })).toBeVisible();
+    await dialog.getByRole("button", { name: "Game Log", exact: true }).click();
+    await expect(dialog.getByText("Sep 4, 2026 • Home", { exact: true })).toBeVisible();
+    await expect(dialog.getByText(/Sep 5, 2026/)).toHaveCount(0);
+    await expect(dialog.getByText("Live", { exact: true }).last()).toBeVisible();
+    await expect(dialog.getByText("42", { exact: true }).last()).toBeVisible();
+    const previousRequests = logRequests;
+    yards = 74;
+    await page.clock.runFor(30_100);
+    await expect.poll(() => logRequests).toBeGreaterThan(previousRequests);
+    await expect(dialog.getByText("74", { exact: true }).last()).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath("live-game-log-mobile.png"), fullPage: true });
+    await dialog.getByRole("button", { name: "Summary", exact: true }).click();
+    await expect(dialog.getByText("74", { exact: true })).toBeVisible();
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await dialog.getByRole("button", { name: "Game Log", exact: true }).click();
+    await expect(dialog.getByRole("cell", { name: "74", exact: true })).toBeVisible();
+    await expect(dialog.getByRole("cell", { name: "Live", exact: true })).toBeVisible();
+  });
+
   test("opens centered with canonical bio details and no provider profile control", async ({ page }, testInfo) => {
     await seedAuthenticatedSession(page);
     await page.route("**/stats/teams**", async (route) => {

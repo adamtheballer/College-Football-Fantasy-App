@@ -264,13 +264,22 @@ export const gameLogOpponentLabel = (row: { location: string; opponent_name?: st
   return `vs. ${row.opponent_name}`;
 };
 
-export const formatGameLogDate = (value?: string | null) => {
+export const formatGameLogDate = (value?: string | null, kickoffAt?: string | null, timeZone?: string) => {
+  if (kickoffAt) {
+    const kickoff = new Date(kickoffAt);
+    if (!Number.isNaN(kickoff.getTime())) {
+      return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", ...(timeZone ? { timeZone } : {}) }).format(kickoff);
+    }
+  }
   if (!value) return "Date TBD";
   const date = new Date(`${value}T12:00:00Z`);
   return Number.isNaN(date.getTime())
     ? "Date TBD"
     : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date);
 };
+
+export const gameLogResultLabel = (row: { result?: string | null; game_status: string }) =>
+  row.result ?? (row.game_status === "active" ? "Live" : row.game_status === "final" ? "Final" : "—");
 
 /**
  * Availability updates are reported against the product's primary audience in
@@ -393,7 +402,7 @@ export function PlayerCardModal({
   const aboutMessage = visiblePlayerCardAboutMessage(card?.about.message);
   const cardActions = [...(action ? [action] : []), ...actions];
   const currentGame = card?.current_game;
-  const currentGameStats = currentGame?.state === "completed" && currentGame.stats
+  const currentGameStats = currentGame && ["completed", "live", "awaiting_live"].includes(currentGame.state) && currentGame.stats
     ? gameLogColumnsForPosition(position)
       .map(([label, keys]) => [label, gameLogStatValue(currentGame.stats, keys)] as const)
       .filter(([, value]) => value !== null && value !== undefined)
@@ -577,10 +586,11 @@ export function PlayerCardModal({
             </section>
           ) : activeTab === "summary" ? (
             <div className="w-full">
-              {currentGame?.state === "completed" ? (
-                <section className="mb-3 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5" aria-label="Current player game result">
-                  <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Latest verified game</p>
+              {currentGame && ["completed", "live", "awaiting_live"].includes(currentGame.state) ? (
+                <section className="mb-3 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5" aria-label={currentGame.state === "completed" ? "Current player game result" : "Current player game"}>
+                  <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>{currentGame.state === "completed" ? "Latest verified game" : currentGame.state === "live" ? "Live game" : "Current game · awaiting live update"}</p>
                   <p className="mt-2 text-sm font-black text-white">Week {currentGame.week} vs. {currentGame.opponent_name ?? "opponent"}</p>
+                  {currentGame.kickoff_at ? <p className="mt-1 text-xs font-bold text-white/55">{new Date(currentGame.kickoff_at).toLocaleString()}</p> : null}
                   {currentGameStats.length ? (
                     <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                       {currentGameStats.slice(0, 4).map(([label, value]) => (
@@ -590,7 +600,7 @@ export function PlayerCardModal({
                         </div>
                       ))}
                     </div>
-                  ) : <p className="mt-2 text-sm font-bold text-white/55">Final team result is verified; individual stats are still pending.</p>}
+                  ) : <p className="mt-2 text-sm font-bold text-white/55">{currentGame.state === "completed" ? "Final team result is verified; individual stats are still pending." : "Waiting for this player's live stats. Updates refresh automatically."}</p>}
                 </section>
               ) : currentGame?.state === "upcoming" ? (
                 <section className="mb-3 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5" aria-label="Upcoming player game">
@@ -744,10 +754,10 @@ export function PlayerCardModal({
                             <td className="px-4 py-4 font-black tabular-nums text-white">{row.week}</td>
                             <td className="px-4 py-4">
                               <p className="font-black text-white">{gameLogOpponentLabel(row)}</p>
-                              <p className="mt-1 text-[10px] font-bold text-white/40">{formatGameLogDate(row.date)}</p>
+                              <p className="mt-1 text-[10px] font-bold text-white/40">{formatGameLogDate(row.date, row.kickoff_at)}</p>
                             </td>
                             <td className="whitespace-nowrap px-4 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-white/55">{row.location_label}</td>
-                            <td className="whitespace-nowrap px-4 py-4 text-xs font-black tabular-nums text-white/70">{row.result ?? "—"}</td>
+                            <td className="whitespace-nowrap px-4 py-4 text-xs font-black tabular-nums text-white/70">{gameLogResultLabel(row)}</td>
                             {selectedGameLogColumns.map(([label, keys]) => {
                               const value = row.location === "bye" ? null : gameLogStatValue(stats, keys);
                               return (
@@ -771,9 +781,9 @@ export function PlayerCardModal({
                           <div className="min-w-0">
                             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/45">Week {row.week}</p>
                             <p className="mt-1 truncate font-black text-white">{gameLogOpponentLabel(row)}</p>
-                            <p className="mt-1 text-xs font-bold text-white/45">{formatGameLogDate(row.date)} • {row.location_label}</p>
+                            <p className="mt-1 text-xs font-bold text-white/45">{formatGameLogDate(row.date, row.kickoff_at)} • {row.location_label}</p>
                           </div>
-                          <p className="shrink-0 text-right text-xs font-black tabular-nums text-white/70">{row.result ?? "—"}</p>
+                          <p className="shrink-0 text-right text-xs font-black tabular-nums text-white/70">{gameLogResultLabel(row)}</p>
                         </div>
                         {selectedGameLogColumns.length ? (
                           <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">

@@ -13,6 +13,7 @@ from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameSta
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.services.player_game_log import canonical_team_name
+from collegefootballfantasy_api.app.services.player_game_feed import PlayerGameFeed, accepted_player_game_feed, matching_weekly_stat
 
 
 PRE_KICKOFF_TRANSITION = timedelta(hours=24)
@@ -57,7 +58,7 @@ def player_game_display_state(
     season: int,
     now: datetime | None = None,
 ) -> PlayerGameDisplayState:
-    """Choose only this player's completed/upcoming card context.
+    """Choose this player's live, completed, or upcoming real-game context.
 
     This deliberately reads football schedule timestamps and never consults a
     fantasy matchup week. A final result remains visible until exactly 24
@@ -93,24 +94,45 @@ def player_game_display_state(
         .filter(PlayerStat.player_id == player.id, PlayerStat.season == season)
         .all()
     }
+    feeds = accepted_player_game_feed(db, player_id=player.id, season=season, games=games)
 
-    completed: tuple[TeamSchedule, PlayerGameStat | PlayerStat | None] | None = None
+    completed: tuple[TeamSchedule, PlayerGameStat | PlayerStat | PlayerGameFeed | None] | None = None
     upcoming: TeamSchedule | None = None
+    active: tuple[TeamSchedule, PlayerGameStat | PlayerStat | PlayerGameFeed | None, str] | None = None
     for schedule in schedules:
         if schedule.is_bye or schedule.location == "bye":
             continue
         game = games.get(schedule.game_id) if schedule.game_id is not None else None
         game_stat = game_stats.get(schedule.game_id) if schedule.game_id is not None else None
-        stat = game_stat or weekly_stats.get(schedule.week)
-        if _final_game(game, game_stat):
+        feed = feeds.get(schedule.game_id)
+        stat = game_stat or (feed if feed and feed.stats is not None else None) or matching_weekly_stat(weekly_stats.get(schedule.week), game)
+        if _final_game(game, game_stat) or (feed and feed.state == "final"):
             if completed is None or (_as_utc(schedule.kickoff_at) or datetime.min.replace(tzinfo=timezone.utc)) > (_as_utc(completed[0].kickoff_at) or datetime.min.replace(tzinfo=timezone.utc)):
                 completed = (schedule, stat)
             continue
         kickoff = _as_utc(schedule.kickoff_at)
         status = (game.schedule_status if game else "") or ""
+        if status.casefold() in INACTIVE_SCHEDULE_STATUSES:
+            continue
+        if (feed and feed.state == "live") or status.casefold() in {"live", "in", "in_progress"}:
+            active = (schedule, stat, "live")
+        elif kickoff is not None and kickoff <= current < kickoff + timedelta(hours=12) and active is None:
+            # Do not skip to next week while awaiting the first provider poll.
+            # A clock alone cannot prove that play has actually started.
+            active = (schedule, stat, "awaiting_live")
         if kickoff is not None and kickoff > current and status.casefold() not in INACTIVE_SCHEDULE_STATUSES:
             if upcoming is None or kickoff < (_as_utc(upcoming.kickoff_at) or datetime.max.replace(tzinfo=timezone.utc)):
                 upcoming = schedule
+
+    if active is not None:
+        schedule, stat, state = active
+        return PlayerGameDisplayState(
+            state=state, season=season, week=schedule.week, game_id=schedule.game_id,
+            opponent_name=schedule.opponent_name, kickoff_at=_as_utc(schedule.kickoff_at),
+            stats=dict(stat.stats) if stat is not None else None,
+            source=stat.source if stat is not None else None,
+            updated_at=stat.updated_at if stat is not None else None,
+        )
 
     if upcoming is not None:
         kickoff = _as_utc(upcoming.kickoff_at)
