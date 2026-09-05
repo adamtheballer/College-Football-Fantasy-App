@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 from fastapi import HTTPException, status
 
 from collegefootballfantasy_api.app.core.config import settings
@@ -258,12 +258,41 @@ def scoring_operations_report(db: Session, *, season: int, week: int, now: datet
     current = _utc(now) or _now()
     polls = (
         db.query(ProviderGamePoll)
+        # The operations report runs inside every worker iteration.  These
+        # tables retain complete ESPN payloads for audit/replay, but the
+        # report only needs polling metadata.  Hydrating raw JSON here grows
+        # with every game snapshot and can OOM-kill the worker before it
+        # records a completed cycle.
+        .options(
+            load_only(
+                ProviderGamePoll.id,
+                ProviderGamePoll.provider_game_id,
+                ProviderGamePoll.status,
+                ProviderGamePoll.last_success_at,
+                ProviderGamePoll.next_poll_at,
+                ProviderGamePoll.failure_count,
+                ProviderGamePoll.error_message,
+                ProviderGamePoll.accepted_snapshot_count,
+                ProviderGamePoll.duplicate_snapshot_count,
+                ProviderGamePoll.stale_snapshot_count,
+                ProviderGamePoll.ambiguous_snapshot_count,
+                ProviderGamePoll.pending_final_correction_count,
+            )
+        )
         .filter(ProviderGamePoll.provider == ESPN_PROVIDER, ProviderGamePoll.season == season, ProviderGamePoll.week == week)
         .all()
     )
     game_polls = [row for row in polls if not row.provider_game_id.startswith("discovery:")]
     snapshots = (
         db.query(ProviderGameSnapshot)
+        .options(
+            load_only(
+                ProviderGameSnapshot.id,
+                ProviderGameSnapshot.provider_game_id,
+                ProviderGameSnapshot.captured_at,
+                ProviderGameSnapshot.provider_as_of,
+            )
+        )
         .filter(ProviderGameSnapshot.provider == ESPN_PROVIDER, ProviderGameSnapshot.season == season, ProviderGameSnapshot.week == week)
         .all()
     )
