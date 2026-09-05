@@ -11,7 +11,9 @@ from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWee
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
+from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbeat
 from collegefootballfantasy_api.app.services.live_scoring_readiness import (
     PublicScoringPreflightError,
@@ -78,6 +80,105 @@ def test_public_preflight_accepts_verified_starter_and_healthy_dependencies(db_s
 
     assert report["ready"] is True
     assert report["reason_codes"] == []
+
+
+def test_public_preflight_uses_completed_opening_game_before_later_week_one_placeholder(db_session):
+    """A Week 1 placeholder cannot block the rest of the live scoring slate.
+
+    USC's late Week 1 game is a real player-card/game-log event, but its final
+    Week 0 opener is the only game eligible for fantasy Week 1 scoring.
+    """
+    league = _ready_baseline(db_session)
+    player = Player(name="USC Starter", school="USC", position="RB")
+    db_session.add(player)
+    db_session.flush()
+    team = Team(league_id=league.id, name="USC Team")
+    db_session.add(team)
+    db_session.flush()
+    db_session.add(RosterEntry(
+        league_id=league.id,
+        team_id=team.id,
+        player_id=player.id,
+        slot="RB",
+        status="active",
+    ))
+    opening_game = Game(
+        external_id="401864494",
+        season=2026,
+        week=0,
+        season_type="regular",
+        schedule_status="final",
+        home_team="USC",
+        away_team="San Jose State",
+        start_date=datetime(2026, 8, 29, 19, 0, tzinfo=timezone.utc),
+    )
+    later_week_one_game = Game(
+        external_id="sealed-2026-w1-usc-fresno-state",
+        season=2026,
+        week=1,
+        season_type="regular",
+        schedule_status="pre",
+        home_team="USC",
+        away_team="Fresno State",
+        start_date=datetime(2026, 9, 5, 1, 0, tzinfo=timezone.utc),
+    )
+    db_session.add_all([opening_game, later_week_one_game])
+    db_session.flush()
+    db_session.add_all([
+        TeamSchedule(
+            team_name="USC", season=2026, week=0, game_id=opening_game.id,
+            opponent_name="San Jose State", location="home", kickoff_at=opening_game.start_date,
+        ),
+        TeamSchedule(
+            team_name="USC", season=2026, week=1, game_id=later_week_one_game.id,
+            opponent_name="Fresno State", location="home", kickoff_at=later_week_one_game.start_date,
+        ),
+    ])
+    db_session.commit()
+
+    report = public_scoring_preflight(db_session, season=2026, week=1, now=NOW + timedelta(seconds=10))
+
+    assert report["ready"] is True
+    assert report["reason_codes"] == []
+
+
+def test_public_preflight_still_rejects_an_unverified_selected_scoring_game(db_session):
+    league = _ready_baseline(db_session)
+    player = Player(name="Unverified Game Starter", school="USC", position="RB")
+    db_session.add(player)
+    db_session.flush()
+    team = Team(league_id=league.id, name="USC Team")
+    db_session.add(team)
+    db_session.flush()
+    db_session.add(RosterEntry(
+        league_id=league.id,
+        team_id=team.id,
+        player_id=player.id,
+        slot="RB",
+        status="active",
+    ))
+    unverified_game = Game(
+        external_id="sealed-2026-w1-usc-fresno-state",
+        season=2026,
+        week=1,
+        season_type="regular",
+        schedule_status="pre",
+        home_team="USC",
+        away_team="Fresno State",
+        start_date=datetime(2026, 9, 5, 1, 0, tzinfo=timezone.utc),
+    )
+    db_session.add(unverified_game)
+    db_session.flush()
+    db_session.add(TeamSchedule(
+        team_name="USC", season=2026, week=1, game_id=unverified_game.id,
+        opponent_name="Fresno State", location="home", kickoff_at=unverified_game.start_date,
+    ))
+    db_session.commit()
+
+    report = public_scoring_preflight(db_session, season=2026, week=1, now=NOW + timedelta(seconds=10))
+
+    assert report["ready"] is False
+    assert report["reason_codes"] == ["UNVERIFIED_ESPN_GAME_ID"]
 
 
 def test_official_acquisition_guard_blocks_only_unverified_players_when_enabled(db_session, monkeypatch):
