@@ -1615,10 +1615,11 @@ test.describe("critical browser workflows", () => {
       if (player.player_name === "Bench Reserve") {
         return {
           ...player,
+          position: "RB",
           live_game_state: "live",
           current_fantasy_points: 4.1,
           live_points: 4.1,
-          game_stat_line: "4 REC · 67 REC YDS · 1 REC TD",
+          game_stat_line: "5 CAR · 34 RUSH YDS · 1 RUSH TD",
         };
       }
       return player;
@@ -1894,10 +1895,19 @@ test.describe("critical browser workflows", () => {
     await expect(liveStarterStatLine).toHaveAttribute("data-player-game-stat-line", "true");
     const liveBenchDetails = page.getByTestId("mobile-bench-lineup").locator("xpath=ancestor::details");
     await liveBenchDetails.locator("summary").click();
-    const liveBenchStatLine = page.getByTestId("mobile-bench-lineup").getByText("4 REC · 67 REC YDS · 1 REC TD", { exact: true });
+    const liveBenchStatLine = page.getByTestId("mobile-bench-lineup").getByText("5 CAR · 34 RUSH YDS · 1 RUSH TD", { exact: true });
     await expect(liveBenchStatLine).toBeVisible();
     await expect(liveBenchStatLine).toHaveAttribute("data-player-game-stat-line", "true");
+    await expect(page.getByTestId("mobile-bench-lineup").getByText(/^0 CAR/)).toHaveCount(0);
     await page.screenshot({ path: "test-results/live-matchup-current-and-projection.png", fullPage: true });
+
+    Object.assign(liveMyRoster.find((player) => player.player_name === "Bench Reserve")!, {
+      game_stat_line: "7 CAR · 34 RUSH YDS · 1 RUSH TD",
+    });
+    await page.reload();
+    await page.getByTestId("mobile-bench-lineup").locator("xpath=ancestor::details").locator("summary").click();
+    await expect(page.getByTestId("mobile-bench-lineup").getByText("7 CAR · 34 RUSH YDS · 1 RUSH TD", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("mobile-bench-lineup").getByText(/^5 CAR/)).toHaveCount(0);
 
     matchupPayload = kickoffOnlyPayload;
     await page.goto("/league/1/matchup");

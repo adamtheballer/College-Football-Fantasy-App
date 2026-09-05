@@ -151,6 +151,29 @@ def test_accepted_snapshot_persists_one_idempotent_model_result(db_session):
     assert row.game_progress == 0.25
 
 
+def test_live_rb_cache_preserves_carries_without_changing_fantasy_scoring(db_session):
+    player = Player(name="Carry Test", school="Test", position="RB")
+    game = Game(external_id="carry-event", season=2026, week=1, home_team="Test", away_team="Rival")
+    db_session.add_all([player, game])
+    db_session.flush()
+    raw = {"rushing_attempts": 5, "rush_yards": 34, "rush_tds": 1}
+    snapshot = ProviderGameSnapshot(
+        provider="espn", provider_game_id=game.external_id, season=2026, week=1,
+        status="live", event_state="live", event_period=1, event_clock="05:40",
+        accepted=True, snapshot_hash="c" * 64, captured_at=datetime.now(timezone.utc),
+        normalized_rows=[{"player_id": player.id, "stats": raw}],
+    )
+    db_session.add_all([snapshot, WeeklyProjection(
+        player_id=player.id, season=2026, week=1, fantasy_points=20, rush_attempts=18, rush_yards=100,
+    )])
+    db_session.commit()
+    assert persist_live_projections_for_snapshot(db_session, snapshot=snapshot) == 1
+    cached = db_session.query(LivePlayerProjection).one()
+    assert cached.current_stats_json["rushing_attempts"] == 5
+    assert calculate_player_fantasy_points(cached.current_stats_json, {}, "RB")[0] == pytest.approx(9.4)
+    assert persist_live_projections_for_snapshot(db_session, snapshot=snapshot) == 0
+
+
 def test_cached_snapshot_replay_evolves_from_kickoff_through_final_without_provider_io(db_session):
     player = Player(name="Jeremiah Smith", school="Ohio State", position="WR")
     game = Game(external_id="espn-replay", season=2026, week=1, home_team="Ohio State", away_team="Ball State")

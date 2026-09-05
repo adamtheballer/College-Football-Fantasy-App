@@ -258,7 +258,9 @@ def persist_live_projections_for_snapshot(db: Session, *, snapshot: ProviderGame
             provider_snapshot_hash=snapshot.snapshot_hash, provider_snapshot_at=snapshot_at,
             model_version=LIVE_PROJECTION_V1, projection_status=result.projection_status,
             game_period=snapshot.event_period, game_clock=snapshot.event_clock,
-            game_progress=result.game_progress, current_stats_json=normalize_player_stats(raw_stats, player.position),
+            # Scoring normalization intentionally omits non-scoring box-score
+            # fields such as carries. Keep them for roster/player displays.
+            game_progress=result.game_progress, current_stats_json={**raw_stats, **normalize_player_stats(raw_stats, player.position)},
             projected_final_stats_json=result.projected_final_stats, projected_remaining_stats_json=result.projected_remaining_stats,
             projected_remaining_fantasy_points=result.projected_remaining_fantasy_points,
             observability_json=result.observability, confidence=result.confidence, fallback_reason=result.fallback_reason,
