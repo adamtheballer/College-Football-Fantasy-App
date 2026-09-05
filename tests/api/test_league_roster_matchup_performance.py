@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import event
+import pytest
 
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.live_player_projection import LivePlayerProjection
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
+from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.user import User
@@ -248,6 +250,54 @@ def test_matchup_tab_exposes_current_stat_lines_for_live_starter_and_bench_rows(
     assert roster_by_player[players["qb"].id].game_stat_line == "184 PASS YDS · 2 PASS TD · 21 RUSH YDS · 1 RUSH TD"
     assert roster_by_player[players["bench"].id].live_game_state == "live"
     assert roster_by_player[players["bench"].id].game_stat_line == "4 REC · 67 REC YDS · 1 REC TD"
+
+
+@pytest.mark.parametrize("roster_key", ["rb", "bench"])
+def test_rb_carries_refresh_from_accepted_event_for_starter_and_bench(client, db_session, roster_key):
+    league, home, _away, players, _matchup = create_scoring_fixture(db_session)
+    player = players[roster_key]
+    player.position = "RB"
+    user = User(first_name="Carries", email="carries@example.com", password_hash="hash", api_token="carries")
+    db_session.add(user)
+    db_session.flush()
+    home.owner_user_id = user.id
+    game = Game(external_id="123456", season=2026, week=1, home_team="Test", away_team="Rival",
+                schedule_status="in_progress", start_date=datetime.now(timezone.utc) - timedelta(minutes=10))
+    db_session.add(game)
+    db_session.flush()
+    payload = {"header": {"competitions": [{"status": {"type": {"state": "in"}, "period": 1, "displayClock": "5:40"}}]}}
+    poll = ProviderGamePoll(provider="espn", provider_game_id=game.external_id, season=2026, week=1,
+                            status="live", accepted_snapshot_hash="accepted-1", latest_payload=payload)
+    def snapshot(key, carries, accepted=True, event_id=game.external_id):
+        return ProviderGameSnapshot(provider="espn", provider_game_id=event_id, season=2026, week=1,
+            status="live", event_state="live", accepted=accepted, snapshot_hash=key,
+            captured_at=datetime.now(timezone.utc), normalized_rows=[{"player_id": player.id,
+            "stats": {"rushing_attempts": carries, "rush_yards": 34, "rush_tds": 1}}])
+    db_session.add_all([poll, snapshot("accepted-1", 5), snapshot("rejected", 99, False),
+                       snapshot("other-event", 80, True, "654321")])
+    legacy = LivePlayerProjection(
+        player_id=player.id, game_id=game.id, season=2026, week=1, provider="espn",
+        provider_snapshot_hash="accepted-1", provider_snapshot_at=datetime.now(timezone.utc),
+        model_version="live_projection_v1", projection_status="LIVE", input_hash="legacy",
+        current_stats_json={"rush_yards": 34, "rush_tds": 1},
+        projected_final_stats_json={}, projected_remaining_stats_json={}, observability_json={},
+        calculated_at=datetime.now(timezone.utc),
+    )
+    db_session.add(legacy)
+    db_session.commit()
+    def read_line():
+        response = build_matchup_tab_view(db_session, league, user, selected_week=1)
+        row = next(row for row in response.my_roster if row.player_id == player.id)
+        return row.model_dump()["game_stat_line"]
+    # An old cache missing carries must not mask the accepted provider value.
+    assert read_line() == "5 CAR · 34 RUSH YDS · 1 RUSH TD"
+    assert "rushing_attempts" not in legacy.current_stats_json
+    assert not db_session.dirty
+    db_session.add(snapshot("accepted-2", 7))
+    poll.accepted_snapshot_hash = "accepted-2"
+    db_session.commit()
+    assert read_line() == "7 CAR · 34 RUSH YDS · 1 RUSH TD"
+    assert not db_session.dirty
 
 
 def test_matchup_tab_exposes_verified_final_stat_line_for_a_completed_roster_game(client, db_session):

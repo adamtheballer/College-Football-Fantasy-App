@@ -22,7 +22,7 @@ from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameSta
 from collegefootballfantasy_api.app.models.player_waiver_availability import PlayerWaiverAvailability
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.models.postseason import PostseasonMatchup
-from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll
+from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
@@ -104,6 +104,7 @@ class LiveGameContext:
     game_score: str | None = None
     game_down_distance: str | None = None
     game_is_halftime: bool = False
+    player_stats: dict[str, Any] | None = None
 
 
 def _live_projection_map(
@@ -263,8 +264,15 @@ def _live_game_context_by_player(
     }
     game_ids = {game_id for game_id in school_to_game_id.values() if game_id}
     polls = {
-        poll.provider_game_id: poll
-        for poll in db.query(ProviderGamePoll)
+        poll.provider_game_id: (poll, normalized_rows)
+        for poll, normalized_rows in db.query(ProviderGamePoll, ProviderGameSnapshot.normalized_rows)
+        .outerjoin(
+            ProviderGameSnapshot,
+            (ProviderGameSnapshot.provider == ProviderGamePoll.provider)
+            & (ProviderGameSnapshot.provider_game_id == ProviderGamePoll.provider_game_id)
+            & (ProviderGameSnapshot.snapshot_hash == ProviderGamePoll.accepted_snapshot_hash)
+            & ProviderGameSnapshot.accepted.is_(True),
+        )
         .filter(
             ProviderGamePoll.provider == ESPN_PROVIDER,
             ProviderGamePoll.season == season,
@@ -277,7 +285,7 @@ def _live_game_context_by_player(
     for player_id, school in player_schools.items():
         key = _school_key(school)
         game_id = school_to_game_id.get(key) if key else None
-        poll = polls.get(game_id) if game_id else None
+        poll, normalized_rows = polls.get(game_id, (None, None))
         if poll is None or not poll.accepted_snapshot_hash or not isinstance(poll.latest_payload, dict):
             contexts[player_id] = LiveGameContext()
             continue
@@ -289,6 +297,11 @@ def _live_game_context_by_player(
             game_context,
             has_possession=has_possession,
             in_red_zone=bool(game_context.in_red_zone and has_possession),
+            # Use the accepted exact-game row, including fields older live
+            # projection caches dropped. Do not write or rescore during GET.
+            player_stats=next((row["stats"] for row in (normalized_rows or [])
+                               if isinstance(row, dict) and str(row.get("player_id")) == str(player_id)
+                               and isinstance(row.get("stats"), dict)), None),
         )
     return contexts
 
@@ -663,7 +676,8 @@ def _serialize_roster_entry(
         final_game_stat_line
         if final_game_stat_line
         else _compact_game_stat_line(
-            live_projection.current_stats_json if live_projection else {},
+            live_game.player_stats if live_game and live_game.player_stats is not None
+            else live_projection.current_stats_json if live_projection else {},
             position,
         )
         if effective_game_state == "live"
