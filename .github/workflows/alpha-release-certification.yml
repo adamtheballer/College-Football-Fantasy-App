@@ -62,6 +62,7 @@ jobs:
           PYTHONPATH=. uv run pytest -q
           tests/api/test_espn_live_scoring.py
           tests/api/test_live_scoring_recalc.py
+          tests/api/test_opening_week_scoring.py
           tests/api/test_live_projection.py
           tests/api/test_weekly_outlook_refresh.py
       - name: Clean shutdown

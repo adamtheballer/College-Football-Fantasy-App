@@ -27,6 +27,7 @@ from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.team_week_score import TeamWeekScore
 from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_starts_for_players
+from collegefootballfantasy_api.app.services.fantasy_game_selection import fantasy_stat_weeks
 from collegefootballfantasy_api.app.services.notification_service import (
     queue_certified_matchup_final_notifications,
     rebuild_matchup_start_notifications,
@@ -117,16 +118,17 @@ def create_or_refresh_lineup_snapshots(db: Session, league_id: int, season: int,
 def _stat_map(db: Session, season: int, week: int, player_ids: set[int]) -> dict[int, PlayerStat]:
     if not player_ids:
         return {}
+    scoring_weeks = fantasy_stat_weeks(db, season=season, week=week, player_ids=player_ids)
     rows = (
         db.query(PlayerStat)
         .filter(
             PlayerStat.season == season,
-            PlayerStat.week == week,
+            PlayerStat.week.in_(set(scoring_weeks.values())),
             PlayerStat.player_id.in_(player_ids),
         )
         .all()
     )
-    return {row.player_id: row for row in rows}
+    return {row.player_id: row for row in rows if row.week == scoring_weeks[row.player_id]}
 
 
 def _relevant_scoring_player_ids(db: Session, league_id: int, season: int, week: int) -> set[int]:

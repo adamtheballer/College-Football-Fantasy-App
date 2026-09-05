@@ -63,6 +63,7 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
 )
 from collegefootballfantasy_api.app.schemas.waiver import WaiverDropCandidateRead
 from collegefootballfantasy_api.app.services.league_weeks import resolve_current_week
+from collegefootballfantasy_api.app.services.fantasy_game_selection import fantasy_games_by_school, fantasy_stat_weeks
 from collegefootballfantasy_api.app.services.espn_live_scoring import espn_week_freshness
 from collegefootballfantasy_api.app.services.injury_status import is_current_injury_designation, normalize_injury_status
 from collegefootballfantasy_api.app.services.league_workspace import build_standings_summary
@@ -106,17 +107,21 @@ class LiveGameContext:
 
 
 def _live_projection_map(
-    db: Session, *, season: int, week: int, player_ids: set[int]
+    db: Session, *, season: int, week: int, player_ids: set[int],
+    games: list[Game] | None = None, player_schools: dict[int, str | None] | None = None,
 ) -> dict[int, LivePlayerProjection]:
     if not player_ids:
         return {}
+    scoring_weeks = fantasy_stat_weeks(db, season=season, week=week, player_ids=player_ids, games=games, player_schools=player_schools)
     rows = db.query(LivePlayerProjection).filter(
         LivePlayerProjection.season == season,
-        LivePlayerProjection.week == week,
+        LivePlayerProjection.week.in_(set(scoring_weeks.values())),
         LivePlayerProjection.player_id.in_(player_ids),
     ).order_by(LivePlayerProjection.provider_snapshot_at.desc(), LivePlayerProjection.id.desc()).all()
     result: dict[int, LivePlayerProjection] = {}
     for row in rows:
+        if row.week != scoring_weeks[row.player_id]:
+            continue
         result.setdefault(row.player_id, row)
     return result
 
@@ -252,19 +257,10 @@ def _live_game_context_by_player(
 ) -> dict[int, LiveGameContext]:
     """Map rostered schools to accepted ESPN game snapshots without I/O."""
 
-    school_to_game_id: dict[str, str | None] = {}
-    if games is None:
-        games = db.query(Game).filter(Game.season == season, Game.week == week).all()
-    for game in games:
-        provider_game_id = str(game.external_id or "").strip() or None
-        for school in (game.home_team, game.away_team):
-            key = _school_key(school)
-            if not key:
-                continue
-            if key in school_to_game_id and school_to_game_id[key] != provider_game_id:
-                school_to_game_id[key] = None
-            else:
-                school_to_game_id[key] = provider_game_id
+    school_to_game_id = {
+        key: (str(game.external_id or "").strip() or None) if game else None
+        for key, game in fantasy_games_by_school(db, season=season, week=week, games=games).items()
+    }
     game_ids = {game_id for game_id in school_to_game_id.values() if game_id}
     polls = {
         poll.provider_game_id: poll
@@ -272,7 +268,6 @@ def _live_game_context_by_player(
         .filter(
             ProviderGamePoll.provider == ESPN_PROVIDER,
             ProviderGamePoll.season == season,
-            ProviderGamePoll.week == week,
             ProviderGamePoll.provider_game_id.in_(game_ids),
         )
         .all()
@@ -474,16 +469,18 @@ def _final_game_stat_line_map(
     week: int,
     player_ids: set[int],
     player_positions: dict[int, str | None],
+    games: list[Game] | None = None, player_schools: dict[int, str | None] | None = None,
 ) -> dict[int, str]:
     """Get one verified final box-score line per rostered player in one query."""
 
     if not player_ids:
         return {}
+    scoring_weeks = fantasy_stat_weeks(db, season=season, week=week, player_ids=player_ids, games=games, player_schools=player_schools)
     rows = (
         db.query(PlayerGameStat)
         .filter(
             PlayerGameStat.season == season,
-            PlayerGameStat.week == week,
+            PlayerGameStat.week.in_(set(scoring_weeks.values())),
             PlayerGameStat.player_id.in_(player_ids),
             PlayerGameStat.source == "espn_final_boxscore",
         )
@@ -492,6 +489,8 @@ def _final_game_stat_line_map(
     )
     lines: dict[int, str] = {}
     for row in rows:
+        if row.week != scoring_weeks[row.player_id]:
+            continue
         if row.player_id in lines:
             continue
         line = _compact_game_stat_line(row.stats or {}, player_positions.get(row.player_id))
@@ -520,11 +519,12 @@ def _final_waiver_score_map(
 
     if not player_ids:
         return {}
+    scoring_weeks = fantasy_stat_weeks(db, season=season, week=week, player_ids=player_ids)
     rows = (
         db.query(PlayerGameStat)
         .filter(
             PlayerGameStat.season == season,
-            PlayerGameStat.week == week,
+            PlayerGameStat.week.in_(set(scoring_weeks.values())),
             PlayerGameStat.player_id.in_(player_ids),
             PlayerGameStat.source == "espn_final_boxscore",
         )
@@ -533,6 +533,8 @@ def _final_waiver_score_map(
     )
     scores: dict[int, float] = {}
     for row in rows:
+        if row.week != scoring_weeks[row.player_id]:
+            continue
         if row.player_id in scores:
             continue
         points, _ = calculate_player_fantasy_points(
@@ -546,10 +548,8 @@ def _final_waiver_score_map(
     # fantasy total a meaningful zero rather than an unavailable projection.
     final_school_keys = {
         school_key
-        for game in db.query(Game).filter(Game.season == season, Game.week == week).all()
-        if (game.schedule_status or "").strip().lower() in {"final", "post"}
-        for school_key in (_school_key(game.home_team), _school_key(game.away_team))
-        if school_key
+        for school_key, game in fantasy_games_by_school(db, season=season, week=week).items()
+        if game is not None and (game.schedule_status or "").strip().lower() in {"final", "post"}
     }
     for player_id, school in player_schools.items():
         if player_id not in scores and _school_key(school) in final_school_keys:
@@ -749,19 +749,20 @@ def _serialize_team_roster(
         entry.player_id: entry.player.position if entry.player else None
         for entry in entries
     }
+    games = (
+        db.query(Game).filter(Game.season == league.season_year, Game.week.in_((0, 1) if week == 1 else (week,))).all()
+        if player_ids else []
+    )
     final_game_stat_lines = _final_game_stat_line_map(
         db,
         season=league.season_year,
         week=week,
         player_ids=player_ids,
         player_positions=player_positions,
+        games=games,
+        player_schools=player_schools,
     )
-    games = (
-        db.query(Game).filter(Game.season == league.season_year, Game.week == week).all()
-        if player_ids
-        else []
-    )
-    live_projection_by_player = _live_projection_map(db, season=league.season_year, week=week, player_ids=player_ids) if games else {}
+    live_projection_by_player = _live_projection_map(db, season=league.season_year, week=week, player_ids=player_ids, games=games, player_schools=player_schools) if games else {}
     settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first() if live_projection_by_player else None
     game_starts, opponents, game_locations = game_context_for_players(
         db,
@@ -825,19 +826,20 @@ def _serialize_team_rosters(
         for entries in entries_by_team.values()
         for entry in entries
     }
+    games = (
+        db.query(Game).filter(Game.season == league.season_year, Game.week.in_((0, 1) if week == 1 else (week,))).all()
+        if player_ids else []
+    )
     final_game_stat_lines = _final_game_stat_line_map(
         db,
         season=league.season_year,
         week=week,
         player_ids=player_ids,
         player_positions=player_positions,
+        games=games,
+        player_schools=player_schools,
     )
-    games = (
-        db.query(Game).filter(Game.season == league.season_year, Game.week == week).all()
-        if player_ids
-        else []
-    )
-    live_projection_by_player = _live_projection_map(db, season=league.season_year, week=week, player_ids=player_ids) if games else {}
+    live_projection_by_player = _live_projection_map(db, season=league.season_year, week=week, player_ids=player_ids, games=games, player_schools=player_schools) if games else {}
     settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first() if live_projection_by_player else None
     game_starts, opponents, game_locations = game_context_for_players(
         db,
