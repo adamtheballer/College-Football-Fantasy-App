@@ -17,7 +17,7 @@ from typing import Any, Literal
 
 import httpx
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.integrations.espn import (
@@ -52,6 +52,10 @@ ESPN_PROVIDER = "espn"
 MIN_GAME_POLL_INTERVAL_SECONDS = 180
 PRE_KICKOFF_POLL_INTERVAL_SECONDS = 900
 DEFAULT_GAME_LEASE_SECONDS = 120
+# A full ESPN game summary is large. Keep every worker iteration bounded so a
+# busy slate cannot retain every due payload and be OOM-killed before scores
+# are promoted.
+MAX_GAME_CLAIMS_PER_CYCLE = 5
 DISCOVERY_INTERVAL_SECONDS = 180
 FINAL_RECONCILIATION_INTERVAL_SECONDS = 900
 BLOCKED_PROVIDER_RETRY_SECONDS = 6 * 60 * 60
@@ -733,7 +737,7 @@ def claim_due_espn_games(
     week: int,
     worker_id: str | None = None,
     now: datetime | None = None,
-    limit: int = 20,
+    limit: int = MAX_GAME_CLAIMS_PER_CYCLE,
     lease_seconds: int = DEFAULT_GAME_LEASE_SECONDS,
 ) -> list[ClaimedGame]:
     """Claim due game polls with a durable lease before any HTTP is attempted."""
@@ -1029,6 +1033,7 @@ def _backfill_accepted_final_espn_game_stats(
     *,
     season: int,
     week: int,
+    limit: int = 1,
 ) -> bool:
     """Reconcile previously accepted final ESPN snapshots into player history.
 
@@ -1040,23 +1045,35 @@ def _backfill_accepted_final_espn_game_stats(
     """
 
     changed = False
+    # This is recovery for final games accepted before PlayerGameStat
+    # persistence existed. It must remain bounded: the previous implementation
+    # hydrated every final ESPN raw payload on every live polling cycle, which
+    # exhausted the Railway worker and froze unrelated live games.
     polls = (
         db.query(ProviderGamePoll)
+        .options(
+            load_only(
+                ProviderGamePoll.id,
+                ProviderGamePoll.provider,
+                ProviderGamePoll.provider_game_id,
+                ProviderGamePoll.season,
+                ProviderGamePoll.week,
+                ProviderGamePoll.status,
+                ProviderGamePoll.accepted_snapshot_hash,
+                ProviderGamePoll.latest_snapshot_hash,
+            )
+        )
         .filter(
             ProviderGamePoll.provider == ESPN_PROVIDER,
             ProviderGamePoll.season == season,
             ProviderGamePoll.week == week,
             ProviderGamePoll.status == "final",
         )
+        .order_by(ProviderGamePoll.id.asc())
         .all()
     )
+    repaired = 0
     for poll in polls:
-        snapshot = _accepted_snapshot(db, poll)
-        if snapshot is None or snapshot.event_state != "final":
-            continue
-        rows = snapshot.normalized_rows if isinstance(snapshot.normalized_rows, list) else []
-        if not rows:
-            continue
         game = (
             db.query(Game)
             .filter(
@@ -1068,6 +1085,47 @@ def _backfill_accepted_final_espn_game_stats(
         )
         if game is None:
             continue
+        # Existing final history is already correct and does not consume the
+        # one-game repair budget.
+        if (
+            db.query(PlayerGameStat.id)
+            .filter(
+                PlayerGameStat.game_id == game.id,
+                PlayerGameStat.season == season,
+                PlayerGameStat.week == week,
+            )
+            .first()
+            is not None
+        ):
+            continue
+        snapshot_hash = poll.accepted_snapshot_hash or poll.latest_snapshot_hash
+        if not snapshot_hash:
+            continue
+        # Player-card history needs accepted normalized rows, not the large
+        # raw ESPN response. Avoid hydrating raw_payload in the live worker.
+        snapshot = (
+            db.query(ProviderGameSnapshot)
+            .options(
+                load_only(
+                    ProviderGameSnapshot.id,
+                    ProviderGameSnapshot.event_state,
+                    ProviderGameSnapshot.normalized_rows,
+                )
+            )
+            .filter(
+                ProviderGameSnapshot.provider == ESPN_PROVIDER,
+                ProviderGameSnapshot.provider_game_id == poll.provider_game_id,
+                ProviderGameSnapshot.snapshot_hash == snapshot_hash,
+                ProviderGameSnapshot.accepted.is_(True),
+            )
+            .order_by(ProviderGameSnapshot.id.desc())
+            .first()
+        )
+        if snapshot is None or snapshot.event_state != "final":
+            continue
+        rows = snapshot.normalized_rows if isinstance(snapshot.normalized_rows, list) else []
+        if not rows:
+            continue
         changed = bool(
             persist_final_espn_player_game_stats(
                 db,
@@ -1077,19 +1135,9 @@ def _backfill_accepted_final_espn_game_stats(
                 normalized_rows=rows,
             )
         ) or changed
-        final_score = _final_score_from_summary(snapshot.raw_payload)
-        if final_score is None:
-            continue
-        home_points, away_points = final_score
-        if (
-            game.home_points != home_points
-            or game.away_points != away_points
-            or game.schedule_status != "final"
-        ):
-            game.home_points = home_points
-            game.away_points = away_points
-            game.schedule_status = "final"
-            changed = True
+        repaired += 1
+        if repaired >= max(1, limit):
+            break
     return changed
 
 
@@ -1128,7 +1176,10 @@ def _replay_accepted_punt_return_stats(
     Without this replay, an identical ESPN response is correctly classified
     as a duplicate and the newly recognized touchdown would wait for a later
     provider revision.  The returned rows still cross the standard readiness
-    gate and scoring transaction in ``run_espn_scoring_cycle``.
+    gate and scoring transaction in an explicit maintenance run. It is
+    intentionally not called from ``run_espn_scoring_cycle``: iterating every
+    retained raw ESPN payload on each live poll can exhaust the worker and
+    block all live scoring.
     """
 
     replay_rows: list[dict[str, Any]] = []
@@ -1258,7 +1309,6 @@ def run_espn_scoring_cycle(
     pending_final_game_stats: dict[int, list[dict[str, Any]]] = {}
     pending_final_game_scores: dict[int, tuple[int, int]] = {}
     corrected_provider_game_ids: set[str] = set()
-    accepted_provider_game_ids: set[str] = set()
     for claim in claims:
         try:
             response_metadata: dict[str, str] = {}
@@ -1303,7 +1353,6 @@ def run_espn_scoring_cycle(
             if decision.verified_final_correction:
                 corrected_provider_game_ids.add(claim.provider_game_id)
             if decision.accepted:
-                accepted_provider_game_ids.add(claim.provider_game_id)
                 pending_promotion.extend(normalized)
                 if _summary_status(summary, "scheduled") == "final":
                     game = (
@@ -1346,17 +1395,6 @@ def run_espn_scoring_cycle(
         except Exception as error:
             record_espn_game_failure(db, claim=claim, error=error, now=current)
             failed += 1
-
-    if mode == "enabled":
-        replay_rows, replay_final_rows = _replay_accepted_punt_return_stats(
-            db,
-            season=season,
-            week=week,
-            exclude_provider_game_ids=accepted_provider_game_ids,
-        )
-        if replay_rows:
-            pending_promotion.extend(replay_rows)
-            pending_final_game_stats.update(replay_final_rows)
 
     accepted_final_snapshot_exists = (
         db.query(ProviderGamePoll.id)
@@ -1414,6 +1452,7 @@ def run_espn_scoring_cycle(
             db,
             season=season,
             week=week,
+            limit=1,
         ):
             db.commit()
 
