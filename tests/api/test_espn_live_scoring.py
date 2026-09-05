@@ -901,6 +901,35 @@ def test_snapshot_ordering_keeps_the_latest_accepted_live_state_on_stale_and_amb
     assert _accepted_pass_yards(db_session) == 220.0
 
 
+def test_rejected_snapshots_keep_ordering_audit_without_retaining_full_provider_payload(db_session):
+    _verified_players(db_session)
+    first = _summary_at(period=2, clock="12:00", pass_yards=220)
+    run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="shadow",
+        client=FakeLiveESPN(summary=first),
+        now=NOW,
+        relevant_team_names={"texas"},
+    )
+
+    # Earlier game progress is rejected as stale. It remains observable for
+    # audit, but cannot consume storage with another full ESPN response.
+    stale = _summary_at(period=1, clock="10:00", pass_yards=80)
+    _run_summary(db_session, summary=stale, at=NOW + timedelta(seconds=180))
+
+    rejected = (
+        db_session.query(ProviderGameSnapshot)
+        .filter_by(provider_game_id="401", accepted=False)
+        .one()
+    )
+    assert rejected.classification == "STALE"
+    assert rejected.rejection_reason
+    assert rejected.raw_payload == {}
+    assert rejected.normalized_rows == []
+
+
 def test_later_live_progress_can_accept_a_legitimate_stat_decrease(db_session):
     _verified_players(db_session)
     run_espn_scoring_cycle(

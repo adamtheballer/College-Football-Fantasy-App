@@ -789,6 +789,16 @@ def _store_snapshot(
     now: datetime,
 ) -> ProviderGameSnapshot:
     snapshot_hash = _canonical_hash(summary)
+    # Rejected provider responses must be recorded for ordering/audit
+    # visibility, but retaining every full ESPN box score for an unchanged or
+    # ambiguous final response is unbounded storage growth. A completed game
+    # can be reconciled for days, yielding hundreds of identical ~500 KB JSON
+    # payloads that never become public scoring authority. Keep the immutable
+    # metadata, canonical hash, and rejection reason; retain the full payload
+    # only for an accepted snapshot, which is the only snapshot used for
+    # scoring, history repair, or long-play comparisons.
+    stored_payload = summary if decision.accepted else {}
+    stored_normalized_rows = normalized_rows if decision.accepted else []
     snapshot = ProviderGameSnapshot(
         provider=ESPN_PROVIDER,
         provider_game_id=row.provider_game_id,
@@ -808,8 +818,8 @@ def _store_snapshot(
         accepted=decision.accepted,
         rejection_reason=decision.reason if not decision.accepted else None,
         snapshot_hash=snapshot_hash,
-        raw_payload=summary,
-        normalized_rows=normalized_rows,
+        raw_payload=stored_payload,
+        normalized_rows=stored_normalized_rows,
     )
     db.add(snapshot)
     db.flush()
