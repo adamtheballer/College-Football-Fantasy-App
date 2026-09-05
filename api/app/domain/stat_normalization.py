@@ -17,6 +17,11 @@ OFFENSE_ALIASES = {
     "two_point_conversions": ["two_point_conversions", "TwoPointConversions", "TwoPointConversion"],
     "fumbles_lost": ["fumbles_lost", "FumblesLost", "fumblesLost"],
     "fumble_return_tds": ["fumble_return_tds", "FumbleReturnTouchdowns"],
+    # A punt return is a special-teams play, not a reception. These must stay
+    # separate from offensive rushing/receiving totals so PPR is never added
+    # to a return touchdown.
+    "punt_return_yards": ["punt_return_yards", "PuntReturnYards", "puntReturnYards", "PRYDS"],
+    "punt_return_tds": ["punt_return_tds", "punt_return_touchdowns", "PuntReturnTouchdowns", "puntReturnTD", "puntReturnTDs", "PRTD"],
 }
 
 KICKER_ALIASES = {

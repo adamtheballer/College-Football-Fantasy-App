@@ -84,6 +84,16 @@ def espn_summary_payload():
                             ],
                         },
                         {
+                            "name": "puntReturns",
+                            "keys": ["puntReturns", "puntReturnYards", "puntReturnTouchdowns"],
+                            "athletes": [
+                                {
+                                    "athlete": {"id": "202", "displayName": "Ryan Wingo"},
+                                    "stats": ["1", "73", "1"],
+                                }
+                            ],
+                        },
+                        {
                             "name": "kicking",
                             "keys": [
                                 "fieldGoalsMade/fieldGoalAttempts",
@@ -133,6 +143,9 @@ def test_extract_player_box_score_stats_from_espn_summary():
     assert by_name["Ryan Wingo"]["rec_yards"] == 90.0
     assert by_name["Ryan Wingo"]["rec_tds"] == 1.0
     assert by_name["Ryan Wingo"]["fumbles_lost"] == 1.0
+    assert by_name["Ryan Wingo"]["punt_return_attempts"] == 1.0
+    assert by_name["Ryan Wingo"]["punt_return_yards"] == 73.0
+    assert by_name["Ryan Wingo"]["punt_return_tds"] == 1.0
 
     assert by_name["Bert Auburn"]["xp_made"] == 3.0
     assert by_name["Bert Auburn"]["extra_points_made"] == 3.0
@@ -173,8 +186,11 @@ def test_espn_box_score_stats_score_with_league_rules():
 
     points, breakdown = calculate_player_fantasy_points(normalize_player_stats(receiver), {"ppr": 0.5})
 
-    assert points == 16.0
+    # 3 PPR + 9 receiving yards + 6 receiving TD - 2 fumble + 7.3 return
+    # yards + 6 punt-return TD. The return does not add a PPR reception.
+    assert points == 29.3
     assert breakdown["receptions"]["multiplier"] == 0.5
+    assert breakdown["punt_return_tds"]["points"] == 6.0
 
 
 def test_single_made_field_goal_uses_exact_espn_long_distance_when_play_detail_is_absent():

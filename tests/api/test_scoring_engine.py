@@ -47,6 +47,40 @@ def test_rb_wr_te_ppr_scoring_works():
     assert points == 21.0
 
 
+def test_punt_return_touchdown_scores_without_a_reception():
+    stats = normalize_player_stats(
+        {
+            "puntReturnYards": 73,
+            "puntReturnTouchdowns": 1,
+            # Pin the regression condition: a return is never a catch.
+            "receptions": 0,
+        },
+        "WR",
+    )
+
+    points, breakdown = calculate_player_fantasy_points(stats, {}, "WR")
+
+    assert stats["receptions"] == 0.0
+    assert stats["punt_return_yards"] == 73.0
+    assert stats["punt_return_tds"] == 1.0
+    assert breakdown["receptions"]["points"] == 0.0
+    assert breakdown["punt_return_yards"] == {"stat": 73.0, "multiplier": 0.1, "points": 7.3}
+    assert breakdown["punt_return_tds"] == {"stat": 1.0, "multiplier": 6, "points": 6.0}
+    assert points == 13.3
+
+
+def test_punt_return_touchdown_without_provider_yards_still_scores_six():
+    points, breakdown = calculate_player_fantasy_points(
+        normalize_player_stats({"puntReturnTouchdowns": 1}, "RB"),
+        {},
+        "RB",
+    )
+
+    assert breakdown["punt_return_yards"]["points"] == 0.0
+    assert breakdown["punt_return_tds"]["points"] == 6.0
+    assert points == 6.0
+
+
 def test_kicker_scoring_works_if_stat_fields_exist():
     stats = normalize_player_stats(
         {

@@ -25,6 +25,11 @@ OFFENSE_RULES: dict[str, float] = {
     "two_point_conversions": 2,
     "fumbles_lost": -2,
     "fumble_return_tds": 6,
+    # Special-teams returns are not receptions or rushing attempts. Keep
+    # their independent provider fields so a punt-return touchdown earns the
+    # same six points as another offensive touchdown without PPR leakage.
+    "punt_return_yards": 0.1,
+    "punt_return_tds": 6,
 }
 
 KICKER_RULES: dict[str, float] = {
@@ -84,6 +89,10 @@ SCORING_RULE_ALIASES = {
     "TwoPointConversions": "two_point_conversions",
     "FumblesLost": "fumbles_lost",
     "FumbleReturnTouchdowns": "fumble_return_tds",
+    "PuntReturnYards": "punt_return_yards",
+    "PuntReturnTouchdowns": "punt_return_tds",
+    "PuntReturnTD": "punt_return_tds",
+    "PuntReturnTDs": "punt_return_tds",
     "pass_td": "pass_tds",
     "passing_td": "pass_tds",
     "passing_tds": "pass_tds",

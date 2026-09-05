@@ -135,6 +135,8 @@ def _scoring_stats_from_historical_row(row: PlayerHistoricalSeasonStat) -> dict[
         "rec_yards": row.receiving_yards,
         "rec_tds": row.receiving_touchdowns,
         "fumbles_lost": row.fumbles_lost,
+        "punt_return_yards": row.punt_return_yards,
+        "punt_return_tds": row.punt_return_touchdowns,
         "fg_made_0_39": field_goals_0_39,
         "fg_made_40_49": row.field_goals_40_49,
         "fg_made_50_plus": row.field_goals_50_plus,

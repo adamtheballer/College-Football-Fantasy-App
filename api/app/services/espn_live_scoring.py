@@ -32,6 +32,8 @@ from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.lineup_week_snapshot import LineupWeekSnapshot
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
+from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
 from collegefootballfantasy_api.app.models.roster import RosterEntry
@@ -1091,6 +1093,130 @@ def _backfill_accepted_final_espn_game_stats(
     return changed
 
 
+_PUNT_RETURN_SCORING_FIELDS = ("punt_return_yards", "punt_return_tds")
+
+
+def _punt_return_scoring_values_differ(left: dict | None, right: dict | None) -> bool:
+    """Compare only the newly supported special-teams scoring fields.
+
+    This deliberately avoids a broad rewrite of accepted provider snapshots.
+    A source payload is replayed only when it contains a scoreable punt
+    return that old normalization code omitted from a public stat record.
+    """
+
+    def value(stats: dict | None, key: str) -> float:
+        raw = (stats or {}).get(key, 0)
+        try:
+            return float(raw or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    return any(value(left, field) != value(right, field) for field in _PUNT_RETURN_SCORING_FIELDS)
+
+
+def _replay_accepted_punt_return_stats(
+    db: Session,
+    *,
+    season: int,
+    week: int,
+    exclude_provider_game_ids: set[str] | None = None,
+) -> tuple[list[dict[str, Any]], dict[int, list[dict[str, Any]]]]:
+    """Return durable accepted rows missing punt-return scoring fields.
+
+    Provider snapshots are raw-payload audit records, so a deployed parser
+    improvement must be able to re-normalize the already accepted response.
+    Without this replay, an identical ESPN response is correctly classified
+    as a duplicate and the newly recognized touchdown would wait for a later
+    provider revision.  The returned rows still cross the standard readiness
+    gate and scoring transaction in ``run_espn_scoring_cycle``.
+    """
+
+    replay_rows: list[dict[str, Any]] = []
+    final_game_rows: dict[int, list[dict[str, Any]]] = {}
+    excluded = exclude_provider_game_ids or set()
+    polls = (
+        db.query(ProviderGamePoll)
+        .filter(
+            ProviderGamePoll.provider == ESPN_PROVIDER,
+            ProviderGamePoll.season == season,
+            ProviderGamePoll.week == week,
+            ProviderGamePoll.accepted_snapshot_hash.isnot(None),
+        )
+        .all()
+    )
+    for poll in polls:
+        if poll.provider_game_id in excluded:
+            continue
+        snapshot = _accepted_snapshot(db, poll)
+        if snapshot is None or not isinstance(snapshot.raw_payload, dict):
+            continue
+        # Avoid recording unresolved identity audit rows for every game. A
+        # replay is necessary only when ESPN actually supplied a scoreable
+        # punt-return total.
+        raw_rows = extract_player_box_score_stats(snapshot.raw_payload)
+        if not any(
+            _punt_return_scoring_values_differ(row, {})
+            for row in raw_rows
+        ):
+            continue
+        normalized_rows, _ = normalize_espn_summary_player_stats(
+            db,
+            season=season,
+            week=week,
+            summary=snapshot.raw_payload,
+            strict_identity=True,
+        )
+        if not normalized_rows:
+            continue
+        player_ids = {int(row["player_id"]) for row in normalized_rows}
+        current_stats = {
+            row.player_id: row.stats
+            for row in db.query(PlayerStat)
+            .filter(
+                PlayerStat.season == season,
+                PlayerStat.week == week,
+                PlayerStat.player_id.in_(player_ids),
+            )
+            .all()
+        }
+        game = (
+            db.query(Game)
+            .filter(
+                Game.external_id == poll.provider_game_id,
+                Game.season == season,
+                Game.week == week,
+            )
+            .one_or_none()
+        )
+        final_stats = {}
+        if game is not None and snapshot.event_state == "final":
+            final_stats = {
+                row.player_id: row.stats
+                for row in db.query(PlayerGameStat)
+                .filter(PlayerGameStat.game_id == game.id, PlayerGameStat.player_id.in_(player_ids))
+                .all()
+            }
+        requires_replay = any(
+            (
+                int(row["player_id"]) in current_stats
+                and _punt_return_scoring_values_differ(row["stats"], current_stats.get(int(row["player_id"])))
+            )
+            or (
+                game is not None
+                and snapshot.event_state == "final"
+                and int(row["player_id"]) in final_stats
+                and _punt_return_scoring_values_differ(row["stats"], final_stats.get(int(row["player_id"])))
+            )
+            for row in normalized_rows
+        )
+        if not requires_replay:
+            continue
+        replay_rows.extend(normalized_rows)
+        if game is not None and snapshot.event_state == "final":
+            final_game_rows[game.id] = normalized_rows
+    return replay_rows, final_game_rows
+
+
 def run_espn_scoring_cycle(
     db: Session,
     *,
@@ -1132,6 +1258,7 @@ def run_espn_scoring_cycle(
     pending_final_game_stats: dict[int, list[dict[str, Any]]] = {}
     pending_final_game_scores: dict[int, tuple[int, int]] = {}
     corrected_provider_game_ids: set[str] = set()
+    accepted_provider_game_ids: set[str] = set()
     for claim in claims:
         try:
             response_metadata: dict[str, str] = {}
@@ -1176,6 +1303,7 @@ def run_espn_scoring_cycle(
             if decision.verified_final_correction:
                 corrected_provider_game_ids.add(claim.provider_game_id)
             if decision.accepted:
+                accepted_provider_game_ids.add(claim.provider_game_id)
                 pending_promotion.extend(normalized)
                 if _summary_status(summary, "scheduled") == "final":
                     game = (
@@ -1218,6 +1346,17 @@ def run_espn_scoring_cycle(
         except Exception as error:
             record_espn_game_failure(db, claim=claim, error=error, now=current)
             failed += 1
+
+    if mode == "enabled":
+        replay_rows, replay_final_rows = _replay_accepted_punt_return_stats(
+            db,
+            season=season,
+            week=week,
+            exclude_provider_game_ids=accepted_provider_game_ids,
+        )
+        if replay_rows:
+            pending_promotion.extend(replay_rows)
+            pending_final_game_stats.update(replay_final_rows)
 
     accepted_final_snapshot_exists = (
         db.query(ProviderGamePoll.id)
