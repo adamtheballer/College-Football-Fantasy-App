@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
 
+import { normalizeHotWindowHours } from "./use-leagues";
+
+describe("normalizeHotWindowHours", () => {
+  it("sends only canonical hour counts while tolerating legacy native values", () => {
+    expect(normalizeHotWindowHours(24)).toBe(24);
+    expect(normalizeHotWindowHours("24h")).toBe(24);
+    expect(normalizeHotWindowHours(168)).toBe(168);
+    expect(normalizeHotWindowHours("7d")).toBe(168);
+    expect(normalizeHotWindowHours("unexpected")).toBe(168);
+  });
+});
+
 import {
   LIVE_MATCHUP_REFRESH_MS,
   hasLiveRosteredPlayer,

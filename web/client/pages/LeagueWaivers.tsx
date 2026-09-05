@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, Pencil, Search, Sparkles, UserPlus, Zap } from "lucide-react";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
@@ -55,6 +55,18 @@ type AvailablePlayerRow = {
 };
 
 type PlayerBoardScope = "waiver" | "all" | "hot";
+
+/** A rostered player is researchable in All Players and can open a trade flow. */
+export const waiverPlayerCanBeTraded = (
+  scope: PlayerBoardScope,
+  availabilityState?: string | null,
+) => scope === "all" && availabilityState === "rostered";
+
+/** Never expose transport or validation implementation details in the league UI. */
+export const waiverBoardLoadMessage = (scope: PlayerBoardScope) =>
+  scope === "hot"
+    ? "Hot Pickups are refreshing. Try again in a moment."
+    : "The player board is temporarily unavailable. Try again in a moment.";
 
 const positionTone = (position?: string | null) => {
   switch ((position ?? "").toUpperCase()) {
@@ -199,6 +211,7 @@ export const rankWaiverSearchResults = <T extends { school: string | null | unde
 
 export default function LeagueWaivers() {
   const { leagueId } = useParams();
+  const navigate = useNavigate();
   const parsedLeagueId = Number(leagueId);
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState<(typeof positions)[number]>("ALL");
@@ -691,9 +704,8 @@ export default function LeagueWaivers() {
             Loading league-specific available players…
           </p>
         ) : waiverQuery.isError ? (
-          <p className="px-5 py-6 text-sm font-black uppercase tracking-[0.16em] text-red-300">
-            Unable to load the league waiver pool
-            {waiverQuery.error instanceof Error ? `: ${waiverQuery.error.message}` : "."}
+          <p className="px-5 py-6 text-sm font-semibold text-cfb-text-secondary">
+            {waiverBoardLoadMessage(playerBoardScope)}
           </p>
         ) : filteredPlayers.length === 0 ? (
           <p className="px-5 py-6 text-sm text-slate-400">
@@ -1092,6 +1104,10 @@ export default function LeagueWaivers() {
           loading={selectedPlayerCardQuery.isLoading}
           onClose={() => setSelectedPlayer(null)}
           onRetry={() => void selectedPlayerCardQuery.refetch()}
+          action={waiverPlayerCanBeTraded(playerBoardScope, selectedPlayer.availability_state) ? {
+            label: "Trade Player",
+            onClick: () => navigate(`/trade/${parsedLeagueId}/${selectedPlayer.id}`),
+          } : null}
           player={{
             id: selectedPlayer.id,
             name: selectedPlayer.name,

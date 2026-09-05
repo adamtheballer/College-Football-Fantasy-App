@@ -434,7 +434,7 @@ describe("buildDraftBoard", () => {
     );
   });
 
-  it("keeps the positional-value board intact while applying only the approved Nick Marsh and KJ Duff moves", () => {
+  it("keeps the positional-value board intact while placing KJ Duff and Nick Marsh in their published slots", () => {
     const baselinePlayers = Array.from({ length: 80 }, (_, index) => {
       const rank = index + 1;
       const position = rank % 3 === 0 ? "QB" : rank % 2 === 0 ? "RB" : "WR";
@@ -462,12 +462,8 @@ describe("buildDraftBoard", () => {
     const namedByName = new Map(namedBoard.map((player) => [player.name, player]));
     const controlByName = new Map(controlBoard.map((player) => [player.name, player]));
 
-    expect(namedByName.get("KJ Duff")?.masterDraftRank).toBe(
-      (controlByName.get("KJ Duff Control")?.masterDraftRank ?? 0) + 5
-    );
-    expect(namedByName.get("Nick Marsh")?.masterDraftRank).toBe(
-      (controlByName.get("Nick Marsh Control")?.masterDraftRank ?? 0) - 10
-    );
+    expect(namedByName.get("KJ Duff")?.masterDraftRank).toBe(10);
+    expect(namedByName.get("Nick Marsh")?.masterDraftRank).toBe(11);
 
     // Reordering the two approved rows may shift nearby numeric ranks, but it
     // must never reorder any other player or replace the positional-value model.
