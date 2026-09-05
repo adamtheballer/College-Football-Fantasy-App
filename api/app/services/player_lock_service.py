@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
+from collegefootballfantasy_api.app.services.fantasy_game_selection import opening_scoring_games
 
 
 def as_utc(value: datetime) -> datetime:
@@ -55,16 +56,20 @@ def game_context_for_players(
         return empty, empty.copy(), empty.copy()
 
     if games is None:
-        games = db.query(Game).filter(Game.season == season, Game.week == week).all()
+        games = db.query(Game).filter(Game.season == season, Game.week.in_((0, 1) if week == 1 else (week,))).all()
+    opening = opening_scoring_games(db, season=season, week=week, games=games)
     starts_by_school: dict[str, datetime] = {}
     opponents_by_school: dict[str, str] = {}
     locations_by_school: dict[str, str] = {}
+    opening_ids = {game.id for game in opening.values()}
     for game in games:
+        if game.week != week and game.id not in opening_ids:
+            continue
         if (game.schedule_status or "").strip().lower() in {"cancelled", "canceled", "postponed", "tbd"}:
             continue
         home_key = _school_schedule_key(game.home_team)
         away_key = _school_schedule_key(game.away_team)
-        if home_key in school_keys:
+        if home_key in school_keys and (home_key not in opening or opening[home_key].id == game.id):
             locations_by_school.setdefault(home_key, "home")
             if away_key:
                 opponents_by_school.setdefault(home_key, _display_school_name(game.away_team))
@@ -72,7 +77,7 @@ def game_context_for_players(
                 start = as_utc(game.start_date)
                 if home_key not in starts_by_school or start < starts_by_school[home_key]:
                     starts_by_school[home_key] = start
-        if away_key in school_keys:
+        if away_key in school_keys and (away_key not in opening or opening[away_key].id == game.id):
             locations_by_school.setdefault(away_key, "away")
             if home_key:
                 opponents_by_school.setdefault(away_key, _display_school_name(game.home_team))

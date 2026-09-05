@@ -43,6 +43,7 @@ from collegefootballfantasy_api.app.services.espn_stats_sync import (
     persist_normalized_espn_player_stats,
 )
 from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
+from collegefootballfantasy_api.app.services.fantasy_game_selection import fantasy_games_by_school
 
 
 ESPN_PROVIDER = "espn"
@@ -511,22 +512,10 @@ def _provider_game_ids_for_players(
         player_id: _school_key(school)
         for player_id, school in db.query(Player.id, Player.school).filter(Player.id.in_(player_ids)).all()
     }
-    game_by_school: dict[str, str | None] = {}
-    for game in db.query(Game).filter(Game.season == season, Game.week == week).all():
-        if (game.schedule_status or "").strip().lower() in {"cancelled", "canceled", "postponed", "tbd"}:
-            continue
-        provider_game_id = str(game.external_id or "").strip() or None
-        for school in (game.home_team, game.away_team):
-            key = _school_key(school)
-            if not key:
-                continue
-            previous = game_by_school.get(key)
-            # More than one schedule candidate is not a safe authoritative
-            # mapping.  Treat it as unavailable until schedule data is fixed.
-            if key not in game_by_school:
-                game_by_school[key] = provider_game_id
-            elif previous != provider_game_id:
-                game_by_school[key] = None
+    game_by_school = {
+        key: (str(game.external_id or "").strip() or None) if game else None
+        for key, game in fantasy_games_by_school(db, season=season, week=week).items()
+    }
     return {player_id: game_by_school.get(school) if school else None for player_id, school in player_schools.items()}
 
 
@@ -555,7 +544,6 @@ def certify_espn_matchup_finality(
         .filter(
             ProviderGamePoll.provider == ESPN_PROVIDER,
             ProviderGamePoll.season == season,
-            ProviderGamePoll.week == week,
             ProviderGamePoll.status == "final",
         )
         .all()
