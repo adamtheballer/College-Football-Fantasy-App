@@ -167,6 +167,12 @@ const positionMultiplier: Record<string, number> = {
 };
 
 const PROJECTION_ORDERED_POSITIONS = new Set(["RB", "WR", "TE", "K"]);
+// The API's rest-of-season rank already captures the verified scoring model.
+// Scarcity can fine-tune that ordering, but it must not turn one strong game
+// into a leap from the fringe of the first round to the overall #2 pick.
+// Quarterbacks retain their separate starter/backup logic below.
+const RANK_ANCHORED_POSITIONS = new Set(["RB", "WR", "TE"]);
+const MAX_AUTHORITATIVE_RANK_UPWARD_MOVEMENT = 4;
 const POSITION_BOARD_SLOT_ADJUSTMENT: Record<string, number> = {
   QB: 28,
   WR: -3,
@@ -186,6 +192,13 @@ const getProvidedBoardRank = (player: Player) => {
       typeof candidate === "number" && Number.isFinite(candidate) && candidate > 0
   );
   return value ? Math.round(value) : null;
+};
+
+const getPublishedRestOfSeasonRank = (player: Player) => {
+  const rank = player.restOfSeasonRank;
+  return typeof rank === "number" && Number.isFinite(rank) && rank > 0
+    ? Math.round(rank)
+    : null;
 };
 
 const normalizeDraftIdentityText = (value: string | null | undefined) =>
@@ -281,6 +294,43 @@ const enforcePositionProjectionOrder = <T extends { player: Player; projectedPoi
     indexes.forEach((index, positionIndex) => { reordered[index] = sorted[positionIndex]; });
   }
   return reordered;
+};
+
+/**
+ * Keep the client-side value model from overruling a published rest-of-season
+ * board by an unrealistic amount. This is deliberately a one-way guard: a
+ * player may slide for risk or weak projection, while a breakout can move a
+ * RB/WR/TE up at most four overall slots before the next published forecast.
+ */
+const enforceAuthoritativeRankFloor = <T extends { player: Player }>(board: T[]) => {
+  const bounded = [...board];
+  let changed = true;
+  let passes = 0;
+
+  // Moving an entry down can pull another entry forward, so revisit the list
+  // until every source-rank floor holds. The pass cap is a defensive guard
+  // against any future malformed rank input.
+  while (changed && passes < bounded.length) {
+    changed = false;
+    passes += 1;
+    for (let index = 0; index < bounded.length; index += 1) {
+      const entry = bounded[index];
+      if (!RANK_ANCHORED_POSITIONS.has(entry.player.pos)) continue;
+      const sourceRank = getPublishedRestOfSeasonRank(entry.player);
+      if (sourceRank === null) continue;
+
+      const minimumIndex = Math.min(
+        bounded.length - 1,
+        Math.max(0, sourceRank - MAX_AUTHORITATIVE_RANK_UPWARD_MOVEMENT - 1)
+      );
+      if (index >= minimumIndex) continue;
+
+      bounded.splice(index, 1);
+      bounded.splice(minimumIndex, 0, entry);
+      changed = true;
+    }
+  }
+  return bounded;
 };
 
 /**
@@ -589,7 +639,7 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
     )
   );
 
-  const withRanks = projectionOrderedBoard.map((entry, index) => ({
+  const withRanks = enforceAuthoritativeRankFloor(projectionOrderedBoard).map((entry, index) => ({
     ...entry,
     draftRank: index + 1,
     masterDraftRank: index + 1,

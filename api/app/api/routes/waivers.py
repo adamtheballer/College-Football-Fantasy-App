@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -40,6 +42,7 @@ def get_league_waiver_tab_endpoint(
     limit: int = 50,
     offset: int = 0,
     week: int | None = None,
+    scope: Literal["waiver", "all"] = "waiver",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeagueWaiversRead:
@@ -49,12 +52,13 @@ def get_league_waiver_tab_endpoint(
         db,
         league,
         current_user,
-        # The waiver wire is the complete league-scoped free-agent pool.  The
-        # beta player universe is comfortably below this bound, and truncating
-        # at a single 50/100-player page hides valid available players.
+        # Both the waiver pool and all-player research view are intentionally
+        # bounded high enough for the current canonical universe. Truncating
+        # them at a single 50/100-player page hides valid player targets.
         limit=max(1, min(limit, 1000)),
         offset=max(0, offset),
         selected_week=week,
+        scope=scope,
     )
 
 

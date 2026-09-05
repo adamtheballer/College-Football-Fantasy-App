@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   rankWaiverSearchResults,
   waiverOpponentLabel,
+  waiverPlayerCanBeClaimed,
   waiverProjectionLabel,
   waiverSearchMatches,
   waiverWeekPoints,
@@ -47,6 +48,14 @@ describe("waiverSearchMatches", () => {
     expect(waiverSearchMatches(georgiaPlayerFacingTennesseeState, "Tennessee")).toBe(false);
     expect(waiverSearchMatches(georgiaPlayerFacingTennesseeState, "Canion")).toBe(true);
     expect(waiverSearchMatches(georgiaPlayerFacingTennesseeState, "Georgia")).toBe(true);
+  });
+});
+
+describe("waiverPlayerCanBeClaimed", () => {
+  it("keeps rostered All Players results research-only", () => {
+    expect(waiverPlayerCanBeClaimed("waivers")).toBe(true);
+    expect(waiverPlayerCanBeClaimed("free_agent")).toBe(true);
+    expect(waiverPlayerCanBeClaimed("rostered")).toBe(false);
   });
 });
 

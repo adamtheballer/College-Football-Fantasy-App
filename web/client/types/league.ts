@@ -485,6 +485,8 @@ export interface LeagueWaiverPlayer {
   /** Present only when a verified final box score exists for this week. */
   final_fantasy_points: number | null;
   projection_status: string;
+  /** Present in the All Players research view when the player is rostered in this league. */
+  rostered_by_team_name: string | null;
   availability_state: string;
   available_at: string | null;
 }

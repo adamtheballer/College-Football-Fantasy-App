@@ -1279,23 +1279,33 @@ def build_waivers_view(
     limit: int = 50,
     offset: int = 0,
     selected_week: int | None = None,
+    scope: str = "waiver",
 ) -> LeagueWaiversRead:
+    if scope not in {"waiver", "all"}:
+        raise ValueError("Waiver player scope must be 'waiver' or 'all'.")
     week = resolve_current_week(db, league, selected_week)
     team = _owned_team(db, league, user)
-    unavailable_player_ids = {
-        player_id
-        for (player_id,) in db.query(RosterEntry.player_id)
+    roster_rows = (
+        db.query(RosterEntry.player_id, Team.name, Team.owner_name)
+        .join(Team, Team.id == RosterEntry.team_id)
         .filter(RosterEntry.league_id == league.id)
         .all()
+    )
+    rostered_by_player = {
+        player_id: f"{owner_name}'s Team" if owner_name and team_name.endswith("'s Team") else team_name
+        for player_id, team_name, owner_name in roster_rows
     }
+    unavailable_player_ids = set(rostered_by_player)
     # Availability is league-roster scoped. A drafted player is unavailable only
     # while they are still rostered; once dropped, they re-enter the league's
     # waiver/free-agent lifecycle. Excluding every DraftPick here made the UI
     # show a different pool than the claim service validates.
-    eligible_players = db.query(Player).filter(
-        ~Player.id.in_(unavailable_player_ids),
-        canonical_fantasy_player_filter(league.season_year),
-    ).all()
+    player_query = db.query(Player).filter(canonical_fantasy_player_filter(league.season_year))
+    if scope == "waiver":
+        # The normal Waiver Wire remains the complete league-scoped free-agent
+        # pool.  All Players is a separate, read-only discovery mode.
+        player_query = player_query.filter(~Player.id.in_(unavailable_player_ids))
+    eligible_players = player_query.all()
     player_ids = {player.id for player in eligible_players}
     availability_by_player = {
         row.player_id: row
@@ -1407,6 +1417,8 @@ def build_waivers_view(
             for entry in _roster_rows(db, team.id)
         ]
     def availability_for_player(player_id: int) -> tuple[str, datetime | None]:
+        if player_id in unavailable_player_ids:
+            return "rostered", None
         return availability_states[player_id]
 
     def projection_for_player(player_id: int) -> tuple[float | None, str]:
@@ -1450,6 +1462,7 @@ def build_waivers_view(
                 weekly_projected_fantasy_points=projection_for_player(player.id)[0],
                 final_fantasy_points=final_score_by_player.get(player.id),
                 projection_status=projection_for_player(player.id)[1],
+                rostered_by_team_name=rostered_by_player.get(player.id),
                 availability_state=availability_for_player(player.id)[0],
                 available_at=availability_for_player(player.id)[1],
             )

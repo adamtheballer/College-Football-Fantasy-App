@@ -434,6 +434,36 @@ describe("buildDraftBoard", () => {
     );
   });
 
+  it("limits an elite one-week WR breakout to four spots above the published board rank", () => {
+    const players = [
+      makePlayer(100, "WR", 500, {
+        name: "KJ Duff Type Breakout",
+        rank: 10,
+        adp: 10,
+        restOfSeasonRank: 10,
+        restOfSeasonProjectedPoints: 500,
+      }),
+      ...Array.from({ length: 14 }, (_, index) => {
+        const rank = index + 1;
+        return makePlayer(rank, "WR", 320 - index, {
+          name: `Published WR ${rank}`,
+          rank,
+          adp: rank,
+          restOfSeasonRank: rank,
+          restOfSeasonProjectedPoints: 320 - index,
+        });
+      }),
+    ];
+
+    const breakout = buildDraftBoard(players, config).find(
+      (player) => player.name === "KJ Duff Type Breakout"
+    );
+
+    expect(breakout?.sourceBoardRank).toBe(10);
+    expect(breakout?.masterDraftRank).toBeGreaterThanOrEqual(6);
+    expect(breakout?.masterDraftRank).toBeLessThanOrEqual(10);
+  });
+
   it("does not rank a weekly snapshot when no approved season projection exists", () => {
     const board = buildDraftBoard(
       [makePlayer(1, "RB", 12.5, { sheetProjectedSeasonPoints: undefined, sheetProjectionStats: undefined, hasWeeklyProjection: true })],

@@ -606,6 +606,45 @@ def test_waiver_pool_sorts_the_full_selected_week_projection_set_before_paginati
     assert [row.id for row in week_two.available_players] == [low.id, high.id]
 
 
+def test_all_players_waiver_scope_includes_rostered_players_for_research_in_week_one_projection_order(db_session):
+    user = User(email="all-players-owner@example.com", first_name="All", password_hash="test", api_token="all-players-owner-token")
+    db_session.add(user)
+    db_session.flush()
+    league = League(name="All Players League", season_year=2026, commissioner_user_id=user.id, max_teams=1)
+    db_session.add(league)
+    db_session.flush()
+    team = Team(league_id=league.id, name="All Team", owner_user_id=user.id, owner_name="All")
+    rostered = canonical_player("Rostered Week One WR", "WR", "Texas")
+    available = canonical_player("Available Week One WR", "WR", "Oregon")
+    db_session.add_all((team, rostered, available))
+    db_session.flush()
+    db_session.add_all(
+        (
+            LeagueSettings(league_id=league.id, roster_slots_json={"WR": 1}, waiver_type="faab"),
+            RosterEntry(
+                league_id=league.id,
+                team_id=team.id,
+                player_id=rostered.id,
+                slot="WR",
+                slot_index=1,
+                status="active",
+            ),
+            WeeklyProjection(player_id=rostered.id, season=2026, week=1, is_published=True, fantasy_points=24.0),
+            WeeklyProjection(player_id=available.id, season=2026, week=1, is_published=True, fantasy_points=18.0),
+        )
+    )
+    db_session.commit()
+
+    waiver_only = build_waivers_view(db_session, league, user, selected_week=1)
+    all_players = build_waivers_view(db_session, league, user, selected_week=1, scope="all")
+
+    assert [row.id for row in waiver_only.available_players] == [available.id]
+    assert [row.id for row in all_players.available_players] == [rostered.id, available.id]
+    assert all_players.available_players[0].availability_state == "rostered"
+    assert all_players.available_players[0].rostered_by_team_name == "All Team"
+    assert all_players.available_players[1].availability_state in {"free_agent", "waivers"}
+
+
 def test_waiver_pool_returns_the_complete_beta_player_universe(db_session):
     user = User(
         email="full-waiver-pool-owner@example.com",

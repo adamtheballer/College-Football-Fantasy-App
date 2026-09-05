@@ -736,6 +736,10 @@ class LeagueWaiverPlayerRead(BaseModel):
     # mislabeled as a projection in the waiver wire.
     final_fantasy_points: float | None = None
     projection_status: str = "UNAVAILABLE"
+    # The All Players research view includes league-rostered players.  They
+    # remain visible for trade research and watchlists but can never be added
+    # through the waiver workflow.
+    rostered_by_team_name: str | None = None
     availability_state: str = "waivers"
     available_at: datetime | None = None
 
