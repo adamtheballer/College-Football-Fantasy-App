@@ -1397,6 +1397,23 @@ def test_waiver_available_players_are_scoped_to_current_league(client, db_sessio
     assert owned_player_id in second_available_ids
 
 
+def test_hot_pickups_accepts_legacy_window_values_without_blocking_the_waiver_tab(client):
+    token = create_user_and_token(client, "hot-window-legacy")
+    league = create_league(client, token, max_teams=2)
+
+    legacy_response = client.get(
+        f"/leagues/{league['id']}/waivers?scope=hot&hot_window_hours=7d",
+        headers=auth_headers(token),
+    )
+    canonical_response = client.get(
+        f"/leagues/{league['id']}/waivers?scope=hot&hot_window_hours=24",
+        headers=auth_headers(token),
+    )
+
+    assert legacy_response.status_code == 200
+    assert canonical_response.status_code == 200
+
+
 def test_roster_endpoint_returns_unavailable_projection_and_ir_capacity(client, db_session):
     owner_token = create_user_and_token(client, "roster-view-owner")
     league = create_league(client, owner_token, max_teams=2)

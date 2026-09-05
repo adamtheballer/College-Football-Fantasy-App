@@ -334,6 +334,11 @@ export function useLeagueSettingsTab(leagueId?: number, enabled = true) {
   });
 }
 
+export const normalizeHotWindowHours = (value: unknown): 24 | 168 => {
+  if (value === 24 || value === "24" || value === "24h" || value === "1d") return 24;
+  return 168;
+};
+
 export function useLeagueWaiverTab(
   leagueId?: number,
   limit = 1000,
@@ -343,8 +348,9 @@ export function useLeagueWaiverTab(
   week?: number,
   hotWindowHours: 24 | 168 = 168,
 ) {
+  const normalizedHotWindowHours = normalizeHotWindowHours(hotWindowHours);
   return useQuery({
-    queryKey: ["league", leagueId, "waivers", limit, offset, scope, week ?? "current", hotWindowHours],
+    queryKey: ["league", leagueId, "waivers", limit, offset, scope, week ?? "current", normalizedHotWindowHours],
     enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
     staleTime: 30_000,
     retry: (failureCount, error) => {
@@ -359,7 +365,7 @@ export function useLeagueWaiverTab(
         offset,
         scope,
         ...(typeof week === "number" ? { week } : {}),
-        ...(scope === "hot" ? { hot_window_hours: hotWindowHours } : {}),
+        ...(scope === "hot" ? { hot_window_hours: normalizedHotWindowHours } : {}),
       }),
   });
 }

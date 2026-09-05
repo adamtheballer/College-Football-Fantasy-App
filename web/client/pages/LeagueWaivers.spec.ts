@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   rankWaiverSearchResults,
+  waiverBoardLoadMessage,
   waiverOpponentLabel,
+  waiverPlayerCanBeTraded,
   waiverPlayerCanBeClaimed,
   waiverProjectionLabel,
   waiverSearchMatches,
@@ -56,6 +58,21 @@ describe("waiverPlayerCanBeClaimed", () => {
     expect(waiverPlayerCanBeClaimed("waivers")).toBe(true);
     expect(waiverPlayerCanBeClaimed("free_agent")).toBe(true);
     expect(waiverPlayerCanBeClaimed("rostered")).toBe(false);
+  });
+});
+
+describe("waiverPlayerCanBeTraded", () => {
+  it("offers a trade action only for rostered All Players results", () => {
+    expect(waiverPlayerCanBeTraded("all", "rostered")).toBe(true);
+    expect(waiverPlayerCanBeTraded("waiver", "rostered")).toBe(false);
+    expect(waiverPlayerCanBeTraded("all", "free_agent")).toBe(false);
+  });
+});
+
+describe("waiverBoardLoadMessage", () => {
+  it("keeps API validation details out of the league screen", () => {
+    expect(waiverBoardLoadMessage("hot")).toBe("Hot Pickups are refreshing. Try again in a moment.");
+    expect(waiverBoardLoadMessage("hot")).not.toMatch(/hot_window_hours|query\./i);
   });
 });
 

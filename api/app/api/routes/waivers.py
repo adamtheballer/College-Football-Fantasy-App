@@ -36,6 +36,20 @@ from collegefootballfantasy_api.app.services.content_moderation import moderate_
 router = APIRouter(prefix="/leagues/{league_id}/waivers")
 
 
+def normalize_hot_window_hours(value: str | int | None) -> int:
+    """Normalize the current and legacy Hot Pickups window representations.
+
+    Older native bundles sent the human-facing values (``24h`` and ``7d``),
+    while the current web client sends the canonical hour counts.  This is a
+    read-only discovery filter, so an unrecognized value must safely fall back
+    to the seven-day board instead of preventing the waiver tab from loading.
+    """
+    normalized = str(value or "").strip().lower()
+    if normalized in {"24", "24h", "1d", "1day", "1 day"}:
+        return 24
+    return 168
+
+
 @router.get("", response_model=LeagueWaiversRead)
 def get_league_waiver_tab_endpoint(
     league_id: int,
@@ -43,7 +57,7 @@ def get_league_waiver_tab_endpoint(
     offset: int = 0,
     week: int | None = None,
     scope: Literal["waiver", "all", "hot"] = "waiver",
-    hot_window_hours: Literal[24, 168] = Query(default=168),
+    hot_window_hours: str | int | None = Query(default="168"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeagueWaiversRead:
@@ -60,7 +74,7 @@ def get_league_waiver_tab_endpoint(
         offset=max(0, offset),
         selected_week=week,
         scope=scope,
-        hot_window_hours=hot_window_hours,
+        hot_window_hours=normalize_hot_window_hours(hot_window_hours),
     )
 
 

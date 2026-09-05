@@ -287,12 +287,12 @@ const enforcePositionProjectionOrder = <T extends { player: Player; projectedPoi
  * These are deliberate editorial changes to the published 2026 master board.
  * They run only after positional value, scarcity, projection ordering, and QB
  * depth rules have been applied, so they cannot replace that model or change
- * a player's projection. Apply KJ first because he is above Nick on the board;
- * that preserves the requested movement from the restored board for both rows.
+ * a player's projection. These are fixed published slots, not a second ranking
+ * system: the rest of the positional-value board remains in its model order.
  */
 const MASTER_BOARD_EDITORIAL_MOVES = [
-  { name: "kj duff", position: "WR", offset: 5 },
-  { name: "nick marsh", position: "WR", offset: -10 },
+  { name: "kj duff", position: "WR", targetRank: 10 },
+  { name: "nick marsh", position: "WR", targetRank: 11 },
 ] as const;
 
 const applyMasterBoardEditorialMoves = <T extends { player: Player }>(board: T[]) => {
@@ -306,7 +306,7 @@ const applyMasterBoardEditorialMoves = <T extends { player: Player }>(board: T[]
     );
     if (currentIndex < 0) continue;
 
-    const targetIndex = clamp(currentIndex + move.offset, 0, adjusted.length - 1);
+    const targetIndex = clamp(move.targetRank - 1, 0, adjusted.length - 1);
     if (targetIndex === currentIndex) continue;
 
     const [entry] = adjusted.splice(currentIndex, 1);
