@@ -3,6 +3,7 @@ import { Navigate, useParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, Pencil, Search, Sparkles, UserPlus, Zap } from "lucide-react";
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
+import { PlayerPopularityMetrics } from "@/components/league/PlayerPopularityMetrics";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
@@ -47,9 +48,13 @@ type AvailablePlayerRow = {
   rostered_by_team_name: string | null;
   availability_state: string;
   available_at: string | null;
+  popularity?: { rostered_percent: number | null; start_percent: number | null } | null;
+  hot_pickup_count?: number | null;
   rank: number;
   projection?: PlayerStats | null;
 };
+
+type PlayerBoardScope = "waiver" | "all" | "hot";
 
 const positionTone = (position?: string | null) => {
   switch ((position ?? "").toUpperCase()) {
@@ -197,7 +202,8 @@ export default function LeagueWaivers() {
   const parsedLeagueId = Number(leagueId);
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState<(typeof positions)[number]>("ALL");
-  const [playerScope, setPlayerScope] = useState<"waiver" | "all">("waiver");
+  const [playerBoardScope, setPlayerBoardScope] = useState<PlayerBoardScope>("waiver");
+  const [hotWindowHours, setHotWindowHours] = useState<24 | 168>(168);
   const [selectedPlayer, setSelectedPlayer] = useState<AvailablePlayerRow | null>(null);
   const [claimPlayer, setClaimPlayer] = useState<AvailablePlayerRow | null>(null);
   const [dropRosterEntryId, setDropRosterEntryId] = useState("none");
@@ -215,11 +221,12 @@ export default function LeagueWaivers() {
     1000,
     0,
     postDraft,
-    playerScope,
-    playerScope === "all" ? 1 : undefined,
+    playerBoardScope,
+    playerBoardScope === "all" ? 1 : undefined,
+    hotWindowHours,
   );
   const waiverData = waiverQuery.data;
-  const displayWeek = playerScope === "all" ? 1 : waiverData?.current_period?.week ?? 1;
+  const displayWeek = playerBoardScope === "all" ? 1 : waiverData?.current_period?.week ?? 1;
   const nextWaiverProcessAt = typeof waiverData?.waiver_rules.next_process_at === "string"
     ? waiverData.waiver_rules.next_process_at
     : null;
@@ -268,6 +275,12 @@ export default function LeagueWaivers() {
     counts[key] = (counts[key] ?? 0) + 1;
     return counts;
   }, {});
+  const boardTitle = playerBoardScope === "hot" ? "Hot Pickups" : playerBoardScope === "all" ? "All Players" : "Available Players";
+  const boardDescription = playerBoardScope === "hot"
+    ? `Most added players in completed leagues over the last ${hotWindowHours === 24 ? "24 hours" : "7 days"}.`
+    : playerBoardScope === "all"
+      ? "Every eligible player, ordered by Week 1 projection. Rostered players remain view-only for player research and watchlists."
+      : `Players are instant adds before their own kickoff. After kickoff, claims process at ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}.`;
 
   const handleWatchPlayer = async (playerId: number) => {
     if (watchlistsQuery.isError) {
@@ -555,19 +568,17 @@ export default function LeagueWaivers() {
         </p>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="cfb-display-title text-3xl text-cfb-text-primary sm:text-4xl">{playerScope === "all" ? "All Players" : "Available Players"}</h1>
+            <h1 className="cfb-display-title text-3xl text-cfb-text-primary sm:text-4xl">{boardTitle}</h1>
             <p className="mt-1.5 max-w-2xl text-sm text-cfb-text-secondary sm:mt-2">
-              {playerScope === "all"
-                ? "Every eligible player in this league, ordered by Week 1 projection. Rostered players stay available for player research and watchlists."
-                : `Unrostered players are instant adds until their own kickoff. Once a player’s game has started, claims process at ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}.`}
+              {boardDescription}
             </p>
           </div>
           <p className="text-xs font-semibold text-cfb-text-secondary sm:hidden">
-            {players.length} {playerScope === "all" ? "players" : "available"} · Top proj {topProjection?.toFixed(1) ?? "—"} · {waiverData?.claims.length ?? 0} claims
+            {players.length} {playerBoardScope === "all" ? "players" : playerBoardScope === "hot" ? "hot" : "available"} · Top proj {topProjection?.toFixed(1) ?? "—"} · {waiverData?.claims.length ?? 0} claims
           </p>
           <div className="hidden overflow-hidden rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised sm:grid sm:min-w-[390px] sm:grid-cols-3">
             <div className="px-4 py-3">
-              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">{playerScope === "all" ? "Players" : "Available"}</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">{playerBoardScope === "all" ? "Players" : playerBoardScope === "hot" ? "Hot" : "Available"}</p>
               <p className="mt-1 text-xl font-semibold tabular-nums text-cfb-text-primary">{players.length}</p>
             </div>
             <div className="border-x border-cfb-border-subtle px-4 py-3">
@@ -592,15 +603,51 @@ export default function LeagueWaivers() {
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <h2 className="text-[11px] font-black uppercase tracking-[0.18em] text-cfb-brand">
-                {playerScope === "all" ? "All Players" : "Available Players"}
+                {boardTitle}
               </h2>
               <p className="mt-1.5 text-xs font-semibold leading-5 text-cfb-text-secondary sm:mt-2">
-                {playerScope === "all"
-                  ? "Week 1 projection order includes every eligible player. Rostered players can be watched or opened for trade research."
-                  : `Players are instant adds before their own kickoff. After kickoff, claims process at ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}.`}
+                {boardDescription}
               </p>
             </div>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <div className="flex rounded-md border border-cfb-border-subtle bg-cfb-canvas p-1" role="tablist" aria-label="Player board">
+                {([
+                  ["waiver", "Waiver Wire"],
+                  ["all", "All Players"],
+                  ["hot", "Hot Pickups"],
+                ] as const).map(([scope, label]) => (
+                  <button
+                    key={scope}
+                    type="button"
+                    role="tab"
+                    aria-selected={playerBoardScope === scope}
+                    onClick={() => setPlayerBoardScope(scope)}
+                    className={[
+                      "rounded px-2.5 py-2 text-[9px] font-black uppercase tracking-[0.1em] transition-colors",
+                      playerBoardScope === scope ? "bg-cfb-brand text-cfb-canvas" : "text-cfb-text-secondary hover:text-cfb-text-primary",
+                    ].join(" ")}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {playerBoardScope === "hot" ? (
+                <div className="flex rounded-md border border-cfb-border-subtle bg-cfb-canvas p-1" aria-label="Hot pickups period">
+                  {([24, 168] as const).map((windowHours) => (
+                    <button
+                      key={windowHours}
+                      type="button"
+                      onClick={() => setHotWindowHours(windowHours)}
+                      className={[
+                        "rounded px-2.5 py-2 text-[9px] font-black uppercase tracking-[0.1em] transition-colors",
+                        hotWindowHours === windowHours ? "bg-cfb-surface-raised text-cfb-text-primary" : "text-cfb-text-secondary hover:text-cfb-text-primary",
+                      ].join(" ")}
+                    >
+                      {windowHours === 24 ? "24h" : "7d"}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               <div className="relative w-full sm:min-w-[280px]">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" />
                 <Input
@@ -610,33 +657,6 @@ export default function LeagueWaivers() {
                   className="h-10 rounded-md border-cfb-border-subtle bg-cfb-canvas pl-10 text-sm font-semibold text-cfb-text-primary placeholder:text-cfb-text-muted focus:border-cfb-brand/60 focus:ring-cfb-brand/20"
                 />
               </div>
-              <fieldset className="flex shrink-0 items-center gap-2" aria-label="Player pool">
-                <legend className="sr-only">Player pool</legend>
-                {([
-                  ["all", "All Players"],
-                  ["waiver", "Waiver Wire"],
-                ] as const).map(([scope, label]) => (
-                  <label
-                    key={scope}
-                    className={[
-                      "flex h-10 cursor-pointer items-center gap-2 rounded-md border px-3 text-[10px] font-black uppercase tracking-[0.1em] transition-colors",
-                      playerScope === scope
-                        ? "border-cfb-brand/60 bg-cfb-brand/10 text-cfb-brand"
-                        : "border-cfb-border-subtle bg-cfb-surface-raised text-cfb-text-secondary hover:border-cfb-border-strong hover:text-cfb-text-primary",
-                    ].join(" ")}
-                  >
-                    <input
-                      type="radio"
-                      name="waiver-player-scope"
-                      value={scope}
-                      checked={playerScope === scope}
-                      onChange={() => setPlayerScope(scope)}
-                      className="h-3.5 w-3.5 accent-cfb-brand"
-                    />
-                    {label}
-                  </label>
-                ))}
-              </fieldset>
               <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {positions.map((item) => {
                   const active = position === item;
@@ -660,6 +680,11 @@ export default function LeagueWaivers() {
               </div>
             </div>
           </div>
+          {playerBoardScope === "hot" && waiverData?.popularity_snapshot?.status !== "fresh" ? (
+            <p className="mt-3 rounded-md border border-cfb-border-subtle bg-cfb-canvas px-3 py-2 text-xs font-semibold text-cfb-text-secondary">
+              Hot Pickups will appear after the next completed daily popularity snapshot. No pickup history is being estimated before then.
+            </p>
+          ) : null}
         </div>
         {waiverQuery.isLoading ? (
           <p className="px-5 py-6 text-sm text-slate-400">
@@ -715,10 +740,14 @@ export default function LeagueWaivers() {
                       </span>
                     </div>
                     <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-[0.1em] text-cfb-text-muted">
-                      {player.rostered_by_team_name
-                        ? `Rostered by ${player.rostered_by_team_name}`
-                        : `${player.school ?? "School unavailable"} · ${player.opponent ? `vs ${player.opponent}` : "Opponent unavailable"}`}
+                      {`${player.school ?? "School unavailable"} · ${player.opponent ? `vs ${player.opponent}` : "Opponent unavailable"}`}
                     </p>
+                    {player.rostered_by_team_name ? (
+                      <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-[0.1em] text-cfb-text-muted">
+                        Rostered by {player.rostered_by_team_name}
+                      </p>
+                    ) : null}
+                    <PlayerPopularityMetrics popularity={player.popularity} />
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <div className="text-right">
@@ -811,8 +840,13 @@ export default function LeagueWaivers() {
                             {player.name}
                           </p>
                           <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
-                            {player.rostered_by_team_name ? `Rostered by ${player.rostered_by_team_name}` : "Available player"}
+                            {player.rostered_by_team_name
+                              ? `Rostered by ${player.rostered_by_team_name}`
+                              : player.hot_pickup_count
+                                ? `${player.hot_pickup_count} league pickup${player.hot_pickup_count === 1 ? "" : "s"}`
+                                : "Available player"}
                           </p>
+                          <PlayerPopularityMetrics popularity={player.popularity} />
                         </div>
                       </td>
                       <td className="px-4 py-3 align-middle text-sm font-semibold text-cfb-text-secondary">

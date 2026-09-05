@@ -60,6 +60,8 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     MatchupTeamRead,
     RosterTabEntryRead,
     RosterTabTeamRead,
+    PlayerPopularityRead as PlayerPopularitySchemaRead,
+    PlayerPopularitySnapshotRead as PlayerPopularitySnapshotSchemaRead,
 )
 from collegefootballfantasy_api.app.schemas.waiver import WaiverDropCandidateRead
 from collegefootballfantasy_api.app.services.league_weeks import resolve_current_week
@@ -80,6 +82,11 @@ from collegefootballfantasy_api.app.services.waiver_service import (
     waiver_window_state,
 )
 from collegefootballfantasy_api.app.services.league_rivalry import matchup_rivalry_context
+from collegefootballfantasy_api.app.services.player_popularity import (
+    hot_pickup_counts_for_ids,
+    hot_pickup_player_ids,
+    player_popularity_for_ids,
+)
 
 DEFAULT_ROSTER_SLOTS = {
     "QB": 1,
@@ -1005,6 +1012,31 @@ def build_roster_tab_view(
     )
     teams_by_id = {league_team.id: league_team for league_team in teams}
     rosters_by_team = _serialize_team_rosters(db, league, teams_by_id, week)
+    popularity_by_player, popularity_snapshot = player_popularity_for_ids(
+        db,
+        season=league.season_year,
+        player_ids={
+            entry.player_id
+            for roster in rosters_by_team.values()
+            for entry in roster
+            if entry.player_id is not None
+        },
+    )
+    for roster in rosters_by_team.values():
+        for entry in roster:
+            if entry.player_id is None:
+                continue
+            popularity = popularity_by_player.get(entry.player_id)
+            if popularity:
+                entry.popularity = PlayerPopularitySchemaRead(
+                    rostered_percent=popularity.rostered_percent,
+                    start_percent=popularity.start_percent,
+                )
+    popularity_snapshot_read = PlayerPopularitySnapshotSchemaRead(
+        as_of=popularity_snapshot.as_of,
+        coverage_started_at=popularity_snapshot.coverage_started_at,
+        status=popularity_snapshot.status,
+    )
     team_records = _team_records(db, league, set(teams_by_id))
     avatars_by_owner_id = _owner_avatar_urls(db, teams, user)
     team_rosters = [
@@ -1033,6 +1065,7 @@ def build_roster_tab_view(
             roster_slot_limits=slot_limits,
             ir_slots=int(slot_limits.get("IR", 0)),
             team_rosters=team_rosters,
+            popularity_snapshot=popularity_snapshot_read,
             message="No team found for your user in this league.",
         )
 
@@ -1054,6 +1087,7 @@ def build_roster_tab_view(
         ir_slots=int(slot_limits.get("IR", 0)),
         team_rosters=team_rosters,
         message=None if roster else "Roster is empty. It will populate after the draft.",
+        popularity_snapshot=popularity_snapshot_read,
     )
 
 
@@ -1280,9 +1314,11 @@ def build_waivers_view(
     offset: int = 0,
     selected_week: int | None = None,
     scope: str = "waiver",
+    hot_window_hours: int = 168,
 ) -> LeagueWaiversRead:
-    if scope not in {"waiver", "all"}:
-        raise ValueError("Waiver player scope must be 'waiver' or 'all'.")
+    scope = scope.lower()
+    if scope not in {"waiver", "all", "hot"}:
+        raise ValueError("Waiver player scope must be 'waiver', 'all', or 'hot'.")
     week = resolve_current_week(db, league, selected_week)
     team = _owned_team(db, league, user)
     roster_rows = (
@@ -1295,7 +1331,7 @@ def build_waivers_view(
         player_id: f"{owner_name}'s Team" if owner_name and team_name.endswith("'s Team") else team_name
         for player_id, team_name, owner_name in roster_rows
     }
-    unavailable_player_ids = set(rostered_by_player)
+    rostered_player_ids = set(rostered_by_player)
     # Availability is league-roster scoped. A drafted player is unavailable only
     # while they are still rostered; once dropped, they re-enter the league's
     # waiver/free-agent lifecycle. Excluding every DraftPick here made the UI
@@ -1304,7 +1340,12 @@ def build_waivers_view(
     if scope == "waiver":
         # The normal Waiver Wire remains the complete league-scoped free-agent
         # pool.  All Players is a separate, read-only discovery mode.
-        player_query = player_query.filter(~Player.id.in_(unavailable_player_ids))
+        player_query = player_query.filter(~Player.id.in_(rostered_player_ids or {-1}))
+    if scope == "hot":
+        hot_player_ids, _hot_snapshot = hot_pickup_player_ids(
+            db, season=league.season_year, window_hours=hot_window_hours
+        )
+        player_query = player_query.filter(Player.id.in_(hot_player_ids or {-1}))
     eligible_players = player_query.all()
     player_ids = {player.id for player in eligible_players}
     availability_by_player = {
@@ -1351,6 +1392,18 @@ def build_waivers_view(
         player_schools=player_schools,
         availability_by_player=availability_by_player,
         game_starts_by_player=game_starts_by_player,
+    )
+    # Player-waiver availability does not need to carry a row for every
+    # rostered player. All-player and Hot Pickups views still expose them for
+    # research/trade discovery, but never present an add/claim action.
+    for player_id in rostered_player_ids:
+        if player_id in player_ids:
+            availability_states[player_id] = ("rostered", None)
+    popularity_by_player, popularity_snapshot = player_popularity_for_ids(
+        db, season=league.season_year, player_ids=player_ids
+    )
+    hot_counts, _ = hot_pickup_counts_for_ids(
+        db, season=league.season_year, window_hours=hot_window_hours, player_ids=player_ids
     )
     current_period = (
         db.query(WaiverPeriod)
@@ -1417,8 +1470,6 @@ def build_waivers_view(
             for entry in _roster_rows(db, team.id)
         ]
     def availability_for_player(player_id: int) -> tuple[str, datetime | None]:
-        if player_id in unavailable_player_ids:
-            return "rostered", None
         return availability_states[player_id]
 
     def projection_for_player(player_id: int) -> tuple[float | None, str]:
@@ -1444,6 +1495,12 @@ def build_waivers_view(
         return (state, -(projected or 0.0), canonical_rank, player.name.casefold(), player.id)
 
     ordered_players = sorted(eligible_players, key=waiver_sort_key)
+    if scope == "hot":
+        # A hot-pickup board is ranked by the observed, published pickup count;
+        # projection remains the deterministic tie-breaker.
+        ordered_players.sort(
+            key=lambda player: (-hot_counts.get(player.id, 0), *waiver_sort_key(player))
+        )
     total = len(ordered_players)
     players = ordered_players[offset : offset + limit]
 
@@ -1465,6 +1522,15 @@ def build_waivers_view(
                 rostered_by_team_name=rostered_by_player.get(player.id),
                 availability_state=availability_for_player(player.id)[0],
                 available_at=availability_for_player(player.id)[1],
+                popularity=(
+                    PlayerPopularitySchemaRead(
+                        rostered_percent=popularity_by_player[player.id].rostered_percent,
+                        start_percent=popularity_by_player[player.id].start_percent,
+                    )
+                    if player.id in popularity_by_player
+                    else None
+                ),
+                hot_pickup_count=hot_counts.get(player.id) if scope == "hot" else None,
             )
             for player in players
         ],
@@ -1489,6 +1555,11 @@ def build_waivers_view(
         },
         total_available=total,
         message=None if team else "No team found for your user in this league.",
+        popularity_snapshot=PlayerPopularitySnapshotSchemaRead(
+            as_of=popularity_snapshot.as_of,
+            coverage_started_at=popularity_snapshot.coverage_started_at,
+            status=popularity_snapshot.status,
+        ),
     )
 
 

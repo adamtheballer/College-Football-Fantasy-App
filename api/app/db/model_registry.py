@@ -53,6 +53,7 @@ def ensure_models_registered() -> None:
         player_trade_value,
         player_availability_event,
         player_news_event,
+        player_popularity_snapshot,
         player_role_snapshot,
         player_season_outlook,
         player_week_score,

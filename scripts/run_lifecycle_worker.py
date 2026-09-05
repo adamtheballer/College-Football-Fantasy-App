@@ -20,6 +20,7 @@ from collegefootballfantasy_api.app.services.waiver_service import process_waive
 from collegefootballfantasy_api.app.services.worker_health import record_worker_heartbeat
 from collegefootballfantasy_api.app.services.postseason_service import advance_postseason_state
 from collegefootballfantasy_api.app.services.security_email_outbox import process_security_email_outbox_once
+from collegefootballfantasy_api.app.services.player_popularity import run_due_player_popularity_snapshot
 
 logger = logging.getLogger("collegefootballfantasy_api.lifecycle_worker")
 
@@ -36,7 +37,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def run_once() -> dict[str, dict[str, int]]:
+def run_once() -> dict[str, dict[str, int | str]]:
     with SessionLocal() as db:
         return {
             "drafts": process_expired_draft_picks_once(db),
@@ -46,6 +47,10 @@ def run_once() -> dict[str, dict[str, int]]:
             "trades": process_trade_offers_once(db),
             "postseason": advance_postseason_state(db),
             "security_email": process_security_email_outbox_once(db),
+            # A daily 06:00 UTC reconciler. This uses the existing lifecycle
+            # worker wake-up; it never adds a client poll loop or a second
+            # scheduler process.
+            "player_popularity": run_due_player_popularity_snapshot(db, season=2026),
         }
 
 

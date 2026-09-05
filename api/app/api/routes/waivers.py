@@ -1,6 +1,6 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.api.deps import (
@@ -42,7 +42,8 @@ def get_league_waiver_tab_endpoint(
     limit: int = 50,
     offset: int = 0,
     week: int | None = None,
-    scope: Literal["waiver", "all"] = "waiver",
+    scope: Literal["waiver", "all", "hot"] = "waiver",
+    hot_window_hours: Literal[24, 168] = Query(default=168),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeagueWaiversRead:
@@ -59,6 +60,7 @@ def get_league_waiver_tab_endpoint(
         offset=max(0, offset),
         selected_week=week,
         scope=scope,
+        hot_window_hours=hot_window_hours,
     )
 
 
