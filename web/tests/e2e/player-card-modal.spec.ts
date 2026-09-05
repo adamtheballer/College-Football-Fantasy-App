@@ -83,6 +83,15 @@ test.describe("player card modal", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await seedAuthenticatedSession(page);
     const player = { ...mockPlayer, name: "Isaiah Sategna III", school: "Oklahoma" };
+    // Keep the surrounding draft active while the clock advances for polling.
+    // A one-player board can be exhausted by the first bot pick, opening the
+    // unrelated draft-complete dialog over the player card.
+    const board = [player, ...Array.from({ length: 199 }, (_, index) => ({
+      ...mockPlayer,
+      id: index + 2,
+      name: `Available Player ${index + 2}`,
+      board_rank: index + 2,
+    }))];
     let yards = 42;
     let logRequests = 0;
     await page.route("**/stats/**", (route) => route.fulfill({ json: { data: [] } }));
@@ -109,7 +118,7 @@ test.describe("player card modal", () => {
       } else if (path.endsWith("/players/1")) {
         await route.fulfill({ json: player });
       } else {
-        await route.fulfill({ json: { data: [player], total: 1, limit: 200, offset: 0 } });
+        await route.fulfill({ json: { data: board, total: board.length, limit: 200, offset: 0 } });
       }
     });
     await page.goto("/draft/mock/single-player?new=1&teams=4&timer=60");
