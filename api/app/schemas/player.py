@@ -124,6 +124,15 @@ class PlayerCardGameDisplayRead(BaseModel):
     updated_at: datetime | None = None
 
 
+class PlayerCardSeasonRankRead(BaseModel):
+    """Cumulative, same-position fantasy rank after finalized weeks only."""
+
+    position: str
+    rank: int
+    fantasy_points: float
+    through_week: int
+
+
 class PlayerSeasonOutlookRead(BaseModel):
     """Public, persisted copy only; the evidence record remains server-side."""
 
@@ -155,6 +164,7 @@ class PlayerCardRead(BaseModel):
     injuries: list[PlayerCardInjuryRead]
     recent_news: list[PlayerCardNewsRead] = []
     season_stats: list[PlayerCardStatRowRead]
+    season_positional_rank: PlayerCardSeasonRankRead | None = None
     current_game: PlayerCardGameDisplayRead | None = None
     season_outlook: PlayerSeasonOutlookRead | None = None
     historical_stats: PlayerHistoricalStatsResponse | None = None

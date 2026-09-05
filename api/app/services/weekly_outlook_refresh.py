@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.models.defense_rating import DefenseRating
 from collegefootballfantasy_api.app.models.injury import Injury
-from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
@@ -19,6 +18,9 @@ from collegefootballfantasy_api.app.models.team_environment import TeamEnvironme
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.services.player_trade_value import calculate_weekly_trade_values
+from collegefootballfantasy_api.app.services.fantasy_week_finality import (
+    week_is_authoritatively_finalized,
+)
 from collegefootballfantasy_api.app.services.projections.engine import build_weekly_projections
 from collegefootballfantasy_api.app.services.projections.ranges import weighted_projection_outcomes
 from collegefootballfantasy_api.app.services.projections.usage import compute_usage_shares
@@ -27,7 +29,6 @@ from collegefootballfantasy_api.app.scoring import calculate_fantasy_points
 
 POSTGAME_PROJECTION_VERSION = "MIDWEEK"
 POSTGAME_MODEL_VERSION = "postgame_espn_v2"
-FINAL_MATCHUP_STATUSES = {"final", "stat_corrected"}
 PERFORMANCE_RESIDUAL_WEIGHT = 0.22
 MAX_RESIDUAL_SHARE = 0.75
 MAX_PROJECTION_ADJUSTMENT_SHARE = 0.30
@@ -110,13 +111,7 @@ def _apply_performance_residuals(
 
 
 def _week_is_certified_final(db: Session, *, season: int, week: int) -> bool:
-    statuses = [
-        str(status).casefold()
-        for (status,) in db.query(Matchup.status)
-        .filter(Matchup.season == season, Matchup.week == week)
-        .all()
-    ]
-    return bool(statuses) and all(status in FINAL_MATCHUP_STATUSES for status in statuses)
+    return week_is_authoritatively_finalized(db, season=season, week=week)
 
 
 def _completed_week_zero_teams(db: Session, *, season: int) -> set[str]:

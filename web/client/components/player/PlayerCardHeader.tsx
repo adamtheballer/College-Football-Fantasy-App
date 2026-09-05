@@ -21,6 +21,12 @@ export const CURRENT_VALUE_RATING_LABEL = "Current Value Rating";
 export const formatCurrentValueRating = (value?: number | null) =>
   typeof value === "number" && Number.isFinite(value) ? value.toFixed(0) : "N/A";
 
+export const formatPlayerCardPositionRank = (
+  rank?: PlayerCardResponse["season_positional_rank"],
+) => rank && Number.isInteger(rank.rank) && rank.rank > 0
+  ? `${rank.position.toUpperCase()} ${rank.rank}`
+  : "—";
+
 export const formatPlayerCardStatus = (value?: string | null) => {
   const normalized = (value ?? "")
     .trim()
@@ -69,17 +75,24 @@ export function PlayerCardHeader({
 }) {
   const playerStatus = resolvePlayerCardStatus(card, player.status);
   const statusSource = playerStatus;
+  const seasonRank = card?.season_positional_rank;
   const metricCards = [
     {
       label: "Proj",
       mobileLabel: "Proj",
       value: typeof player.projectedPoints === "number" ? player.projectedPoints.toFixed(1) : "—",
     },
-    {
-      label: CURRENT_VALUE_RATING_LABEL,
-      mobileLabel: "Value",
-      value: formatCurrentValueRating(currentValue),
-    },
+    seasonRank
+      ? {
+          label: "Rank",
+          mobileLabel: "Rank",
+          value: formatPlayerCardPositionRank(seasonRank),
+        }
+      : {
+          label: CURRENT_VALUE_RATING_LABEL,
+          mobileLabel: "Value",
+          value: formatCurrentValueRating(currentValue),
+        },
     { label: "Class", mobileLabel: "Class", value: card?.about.player_class ?? player.playerClass ?? "—" },
     { label: "Status", mobileLabel: "Status", value: playerStatus },
   ];
@@ -152,7 +165,11 @@ export function PlayerCardHeader({
                   {playerStatus}
                 </span>
                 {card?.about.jersey ? <span className="text-white/70">#{card.about.jersey}</span> : null}
-                {currentValue !== null && currentValue !== undefined ? <span className="text-white/70">Value {formatCurrentValueRating(currentValue)}</span> : null}
+                {seasonRank ? (
+                  <span className="text-white/70">Rank {formatPlayerCardPositionRank(seasonRank)}</span>
+                ) : currentValue !== null && currentValue !== undefined ? (
+                  <span className="text-white/70">Value {formatCurrentValueRating(currentValue)}</span>
+                ) : null}
               </div>
             </div>
           </div>
