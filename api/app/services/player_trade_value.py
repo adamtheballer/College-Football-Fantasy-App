@@ -7,7 +7,6 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.models.injury import Injury
-from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.player_trade_value import PlayerTradeValue
@@ -15,6 +14,9 @@ from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjec
 from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.schemas.player_trade_value import PlayerTradeValueHistoryRead, PlayerTradeValueRead
 from collegefootballfantasy_api.app.services.injury_value import injury_value_multiplier
+from collegefootballfantasy_api.app.services.fantasy_week_finality import (
+    week_is_authoritatively_finalized,
+)
 
 # Preserve the published policy identifier for existing histories. Official
 # availability is a controlled adjustment within that preseason policy, not a
@@ -74,11 +76,7 @@ def week_one_is_authoritatively_finalized(db: Session, *, season: int) -> bool:
     wall clock, provider availability, or a scoring-run success flag.  A
     scoring run can be successful while official corrections remain possible.
     """
-    statuses = [
-        str(status).casefold()
-        for (status,) in db.query(Matchup.status).filter(Matchup.season == season, Matchup.week == 1).all()
-    ]
-    return bool(statuses) and all(status in {"final", "stat_corrected"} for status in statuses)
+    return week_is_authoritatively_finalized(db, season=season, week=1)
 
 
 def active_value_policy_version(db: Session, *, season: int) -> str:

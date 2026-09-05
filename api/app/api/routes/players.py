@@ -22,6 +22,7 @@ from collegefootballfantasy_api.app.schemas.player import (
     PlayerCardInjuryRead,
     PlayerCardNewsRead,
     PlayerCardRead,
+    PlayerCardSeasonRankRead,
     PlayerSeasonOutlookRead,
     PlayerCardStatRowRead,
     PlayerCreate,
@@ -48,6 +49,7 @@ from collegefootballfantasy_api.app.services.player_trade_value import get_playe
 from collegefootballfantasy_api.app.services.player_trajectory import build_player_trajectory
 from collegefootballfantasy_api.app.services.draft_board_outlook import build_rest_of_season_draft_board
 from collegefootballfantasy_api.app.services.player_season_outlook import get_persisted_player_season_outlook
+from collegefootballfantasy_api.app.services.player_season_rank import season_positional_rank_for_player
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
 from collegefootballfantasy_api.app.services.auth_security import enforce_auth_rate_limit
 from collegefootballfantasy_api.app.services.injury_status import (
@@ -426,6 +428,12 @@ def get_player_card_endpoint(
         player_id=player.id,
         season_year=datetime.now(timezone.utc).year,
     )
+    season = datetime.now(timezone.utc).year
+    season_rank = season_positional_rank_for_player(
+        db,
+        player=player,
+        season=season,
+    )
     return PlayerCardRead(
         player=card_player,
         about=_map_espn_about(player, card_player, profile_payload, profile_message, espn_player_id=espn_id),
@@ -487,6 +495,16 @@ def get_player_card_endpoint(
             )
             for row in stat_rows
         ],
+        season_positional_rank=(
+            PlayerCardSeasonRankRead(
+                position=season_rank.position,
+                rank=season_rank.rank,
+                fantasy_points=season_rank.fantasy_points,
+                through_week=season_rank.through_week,
+            )
+            if season_rank is not None
+            else None
+        ),
         current_game=PlayerCardGameDisplayRead(**current_game.__dict__),
         season_outlook=(
             PlayerSeasonOutlookRead.model_validate(season_outlook)

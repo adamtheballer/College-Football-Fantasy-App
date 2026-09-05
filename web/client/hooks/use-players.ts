@@ -285,6 +285,12 @@ export type PlayerCardResponse = {
     stats: Record<string, unknown>;
     updated_at: string;
   }>;
+  season_positional_rank?: {
+    position: string;
+    rank: number;
+    fantasy_points: number;
+    through_week: number;
+  } | null;
   current_game?: {
     state: "live" | "awaiting_live" | "completed" | "upcoming" | "unavailable" | string;
     season?: number | null;
