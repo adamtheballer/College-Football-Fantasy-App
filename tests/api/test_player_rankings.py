@@ -11,8 +11,10 @@ from sqlalchemy import event
 from collegefootballfantasy_api.app.services import cfb27_player_sync
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
+from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
@@ -192,6 +194,84 @@ def test_draft_pool_exposes_rest_of_season_rank_after_verified_results(client, d
     assert rows["Duce Robinson"]["rest_of_season_as_of_week"] == 1
     assert rows["Duce Robinson"]["rest_of_season_projected_points"] < 240.0
     assert rows["Ryan Williams"]["rest_of_season_rank"] < rows["Duce Robinson"]["rest_of_season_rank"]
+
+
+def test_draft_board_reacts_to_an_individual_verified_final_without_using_live_partial_stats(client, db_session):
+    breakout = Player(
+        name="Final Breakout Receiver",
+        position="WR",
+        school="Rutgers",
+        sheet_source_sheet_id="canonical-preseason:2026:Big10",
+        sheet_projected_season_points=240.0,
+        raw_cfb27_rating=92,
+    )
+    live_only = Player(
+        name="Live Partial Receiver",
+        position="WR",
+        school="Maryland",
+        sheet_source_sheet_id="canonical-preseason:2026:Big10",
+        sheet_projected_season_points=240.0,
+        raw_cfb27_rating=92,
+    )
+    db_session.add_all([breakout, live_only])
+    db_session.flush()
+    for player in (breakout, live_only):
+        for week in range(1, 14):
+            db_session.add(WeeklyProjection(
+                player_id=player.id,
+                season=2026,
+                week=week,
+                projection_version="PRESEASON",
+                is_published=True,
+                fantasy_points=20.0,
+            ))
+    completed_game = Game(
+        external_id="401900001",
+        season=2026,
+        week=1,
+        season_type="regular",
+        schedule_status="final",
+        home_team="Rutgers",
+        away_team="Ohio",
+    )
+    db_session.add(completed_game)
+    db_session.flush()
+    db_session.add_all([
+        PlayerStat(
+            player_id=breakout.id,
+            season=2026,
+            week=1,
+            source="espn",
+            verified=True,
+            stats={"fantasy_points": 46.6},
+        ),
+        PlayerGameStat(
+            player_id=breakout.id,
+            game_id=completed_game.id,
+            season=2026,
+            week=1,
+            source="espn_final_boxscore",
+            stats={"fantasy_points": 46.6},
+        ),
+        PlayerStat(
+            player_id=live_only.id,
+            season=2026,
+            week=1,
+            source="espn",
+            verified=True,
+            stats={"fantasy_points": 46.6},
+        ),
+    ])
+    db_session.commit()
+
+    response = client.get("/players", params={"draft_eligible": "true", "sort": "draft_rank", "limit": 10})
+
+    assert response.status_code == 200
+    rows = {row["name"]: row for row in response.json()["data"]}
+    assert rows["Final Breakout Receiver"]["rest_of_season_as_of_week"] == 1
+    assert rows["Final Breakout Receiver"]["rest_of_season_projected_points"] == 351.7
+    assert rows["Final Breakout Receiver"]["rest_of_season_rank"] < rows["Live Partial Receiver"]["rest_of_season_rank"]
+    assert rows["Live Partial Receiver"]["rest_of_season_projected_points"] == 260.0
 
 
 def test_cfb27_source_contains_critical_compare_players():
