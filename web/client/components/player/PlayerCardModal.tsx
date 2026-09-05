@@ -168,6 +168,8 @@ export const gameLogColumnsForPosition = (position: string): readonly GameLogCol
     case "QB":
       return [
         ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
+        ["PR YDS", ["punt_return_yards", "PuntReturnYards", "puntReturnYards", "PRYDS"]],
+        ["PR TD", ["punt_return_tds", "punt_return_touchdowns", "PuntReturnTouchdowns", "puntReturnTD", "puntReturnTDs", "PRTD"]],
         ["CMP", ["completions", "passing_completions", "PassingCompletions"]],
         ["ATT", ["attempts", "passing_attempts", "PassingAttempts"]],
         ["PASS YDS", ["pass_yards", "passing_yards", "PassingYards"]],
@@ -180,6 +182,8 @@ export const gameLogColumnsForPosition = (position: string): readonly GameLogCol
     case "RB":
       return [
         ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
+        ["PR YDS", ["punt_return_yards", "PuntReturnYards", "puntReturnYards", "PRYDS"]],
+        ["PR TD", ["punt_return_tds", "punt_return_touchdowns", "PuntReturnTouchdowns", "puntReturnTD", "puntReturnTDs", "PRTD"]],
         ["RUSH ATT", ["rushing_attempts", "rush_attempts", "RushingAttempts"]],
         ["RUSH YDS", ["rush_yards", "rushing_yards", "RushingYards"]],
         ["RUSH TD", ["rush_tds", "rushing_touchdowns", "RushingTouchdowns"]],
@@ -190,6 +194,8 @@ export const gameLogColumnsForPosition = (position: string): readonly GameLogCol
     case "WR":
       return [
         ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
+        ["PR YDS", ["punt_return_yards", "PuntReturnYards", "puntReturnYards", "PRYDS"]],
+        ["PR TD", ["punt_return_tds", "punt_return_touchdowns", "PuntReturnTouchdowns", "puntReturnTD", "puntReturnTDs", "PRTD"]],
         ["TAR", ["targets", "receiving_targets", "ReceivingTargets"]],
         ["REC", ["receptions", "Receptions"]],
         ["REC YDS", ["rec_yards", "receiving_yards", "ReceivingYards"]],
@@ -201,6 +207,8 @@ export const gameLogColumnsForPosition = (position: string): readonly GameLogCol
     case "TE":
       return [
         ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
+        ["PR YDS", ["punt_return_yards", "PuntReturnYards", "puntReturnYards", "PRYDS"]],
+        ["PR TD", ["punt_return_tds", "punt_return_touchdowns", "PuntReturnTouchdowns", "puntReturnTD", "puntReturnTDs", "PRTD"]],
         ["TAR", ["targets", "receiving_targets", "ReceivingTargets"]],
         ["REC", ["receptions", "Receptions"]],
         ["REC YDS", ["rec_yards", "receiving_yards", "ReceivingYards"]],

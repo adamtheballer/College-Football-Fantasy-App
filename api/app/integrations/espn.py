@@ -322,6 +322,15 @@ ESPN_STAT_KEY_MAP = {
     "receivingYards": "rec_yards",
     "receivingTouchdowns": "rec_tds",
     "fumblesLost": "fumbles_lost",
+    # ESPN exposes special-teams production in a separate return category.
+    # Do not translate this to receiving or rushing: a punt return has no
+    # reception, but its yards and touchdown are fantasy-scoring events.
+    "puntReturns": "punt_return_attempts",
+    "puntReturnAttempts": "punt_return_attempts",
+    "puntReturnYards": "punt_return_yards",
+    "puntReturnTouchdowns": "punt_return_tds",
+    "puntReturnTD": "punt_return_tds",
+    "puntReturnTDs": "punt_return_tds",
 }
 
 
