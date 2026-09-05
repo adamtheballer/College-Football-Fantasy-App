@@ -286,7 +286,7 @@ export type PlayerCardResponse = {
     updated_at: string;
   }>;
   current_game?: {
-    state: "completed" | "upcoming" | "unavailable" | string;
+    state: "live" | "awaiting_live" | "completed" | "upcoming" | "unavailable" | string;
     season?: number | null;
     week?: number | null;
     game_id?: number | null;
@@ -820,10 +820,8 @@ export function usePlayerGameLog(
   return useQuery({
     queryKey: ["player-game-log", playerId, season, leagueId ?? null],
     enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
-    // A finalized box score is written by the server-side live worker. Never
-    // leave an open player card displaying the pre-final cache after that
-    // worker accepts a game's final result: refresh on every tab open and on
-    // the same three-minute cadence as live-score ingestion.
+    // Read accepted in-game snapshots as well as final box scores. Both card
+    // surfaces refresh every 30 seconds without requiring the modal to close.
     staleTime: 0,
     refetchOnMount: "always",
     refetchInterval: 30_000,

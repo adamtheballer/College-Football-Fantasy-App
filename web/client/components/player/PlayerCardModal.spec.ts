@@ -4,6 +4,7 @@ import { statValue } from "@/lib/playerProjectionStats";
 
 import {
   formatGameLogDate,
+  gameLogResultLabel,
   formatPlayerNewsReportTime,
   gameLogColumnsForPosition,
   gameLogOpponentLabel,
@@ -34,6 +35,15 @@ describe("PlayerCardModal helpers", () => {
     ]);
     expect(gameLogOpponentLabel({ location: "away", opponent_name: "Ohio State" })).toBe("at Ohio State");
     expect(formatGameLogDate("2026-09-05")).toBe("Sep 5, 2026");
+  });
+
+  it("uses the local kickoff date instead of the UTC calendar day", () => {
+    expect(formatGameLogDate("2026-09-05", "2026-09-05T00:00:00Z", "America/New_York")).toBe("Sep 4, 2026");
+    expect(formatGameLogDate("2026-09-05", "2026-09-05T00:00:00Z", "America/Los_Angeles")).toBe("Sep 4, 2026");
+    expect(formatGameLogDate("2026-09-05", "2026-09-05T00:00:00Z", "Asia/Tokyo")).toBe("Sep 5, 2026");
+    expect(formatGameLogDate("2026-09-05", "invalid")).toBe("Sep 5, 2026");
+    expect(gameLogResultLabel({ game_status: "active" })).toBe("Live");
+    expect(gameLogResultLabel({ game_status: "final", result: "W 24–7" })).toBe("W 24–7");
   });
 
   it("adds only completed final box scores into the 2026 season totals", () => {
