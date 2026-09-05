@@ -181,6 +181,47 @@ def test_public_preflight_still_rejects_an_unverified_selected_scoring_game(db_s
     assert report["reason_codes"] == ["UNVERIFIED_ESPN_GAME_ID"]
 
 
+def test_public_preflight_uses_canonical_schedule_for_normal_week_game(db_session):
+    """Duplicate raw game records must not block a verified schedule mapping."""
+    league = _ready_baseline(db_session)
+    player = Player(name="Texas Starter", school="Texas", position="RB")
+    db_session.add(player)
+    db_session.flush()
+    team = Team(league_id=league.id, name="Texas Team")
+    db_session.add(team)
+    db_session.flush()
+    db_session.add(RosterEntry(
+        league_id=league.id,
+        team_id=team.id,
+        player_id=player.id,
+        slot="RB",
+        status="active",
+    ))
+    canonical_game = db_session.query(Game).filter(Game.external_id == "401").one()
+    duplicate_game = Game(
+        external_id="402",
+        season=2026,
+        week=1,
+        season_type="regular",
+        schedule_status="pre",
+        home_team="Texas",
+        away_team="Texas A&M",
+        start_date=NOW,
+    )
+    db_session.add(duplicate_game)
+    db_session.flush()
+    db_session.add(TeamSchedule(
+        team_name="Texas", season=2026, week=1, game_id=canonical_game.id,
+        opponent_name="Ohio State", location="home", kickoff_at=canonical_game.start_date,
+    ))
+    db_session.commit()
+
+    report = public_scoring_preflight(db_session, season=2026, week=1, now=NOW + timedelta(seconds=10))
+
+    assert report["ready"] is True
+    assert report["reason_codes"] == []
+
+
 def test_official_acquisition_guard_blocks_only_unverified_players_when_enabled(db_session, monkeypatch):
     league = League(name="Official League", season_year=2026, status="active")
     unverified = Player(name="Identity Pending", school="Texas", position="WR")
