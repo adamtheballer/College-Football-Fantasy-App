@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
 import httpx
-from sqlalchemy import or_
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session, load_only
 
 from collegefootballfantasy_api.app.core.config import settings
@@ -39,6 +39,8 @@ from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGam
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbeat
+from collegefootballfantasy_api.app.services.worker_health import record_worker_heartbeat
 from collegefootballfantasy_api.app.services.espn_stats_sync import (
     persist_final_espn_player_game_stats,
     normalize_espn_summary_player_stats,
@@ -64,6 +66,7 @@ BLOCKED_PROVIDER_RETRY_SECONDS = 6 * 60 * 60
 # other transient retry so one bad game cannot disappear for hours while the
 # rest of the slate continues to refresh.
 MAX_TRANSIENT_GAME_RETRY_SECONDS = 15 * 60
+SNAPSHOT_RETENTION_WORKER_NAME = "espn_snapshot_retention"
 
 LiveScoringMode = Literal["shadow", "enabled"]
 SnapshotClassification = Literal["DUPLICATE", "NEWER", "STALE", "AMBIGUOUS", "VERIFIED_CORRECTION"]
@@ -131,6 +134,18 @@ class EspnFreshness:
     relevant_game_count: int
 
 
+@dataclass(frozen=True)
+class SnapshotRetentionResult:
+    """Bounded provider-cache cleanup result; canonical scoring is never touched."""
+
+    accepted_deleted: int
+    rejected_deleted: int
+
+    @property
+    def total_deleted(self) -> int:
+        return self.accepted_deleted + self.rejected_deleted
+
+
 def _school_key(value: str | None) -> str | None:
     if not value:
         return None
@@ -145,6 +160,124 @@ def _as_utc(value: datetime | None) -> datetime | None:
     if value is None:
         return None
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
+def prune_espn_snapshot_history(
+    db: Session,
+    *,
+    now: datetime | None = None,
+    retention_days: int | None = None,
+    max_accepted_per_game: int | None = None,
+    batch_size: int | None = None,
+) -> SnapshotRetentionResult:
+    """Bound the raw ESPN cache without altering canonical scoring records.
+
+    The newest accepted snapshot for each provider game is always retained: it
+    is the source for live-score reads, replay, and long-play comparisons.
+    Older accepted snapshots are kept only for a short audit window and capped
+    per game. Rejected snapshots contain only metadata after the storage guard,
+    but age out as well so the audit table's row count remains bounded.
+    """
+
+    current = _as_utc(now) or _utc_now()
+    days = retention_days if retention_days is not None else settings.scoring_snapshot_retention_days
+    accepted_limit = (
+        max_accepted_per_game
+        if max_accepted_per_game is not None
+        else settings.scoring_snapshot_max_accepted_per_game
+    )
+    limit = batch_size if batch_size is not None else settings.scoring_snapshot_retention_batch_size
+    if days < 1 or accepted_limit < 1 or limit < 1:
+        raise ValueError("snapshot retention limits must be positive")
+    cutoff = current - timedelta(days=days)
+
+    # Rank accepted snapshots newest-first per game. The current canonical
+    # snapshot is rank one and is never eligible, even after the audit window.
+    ranked_accepted = (
+        select(
+            ProviderGameSnapshot.id.label("id"),
+            ProviderGameSnapshot.captured_at.label("captured_at"),
+            func.row_number()
+            .over(
+                partition_by=(ProviderGameSnapshot.provider, ProviderGameSnapshot.provider_game_id),
+                order_by=(ProviderGameSnapshot.captured_at.desc(), ProviderGameSnapshot.id.desc()),
+            )
+            .label("snapshot_rank"),
+        )
+        .where(
+            ProviderGameSnapshot.provider == ESPN_PROVIDER,
+            ProviderGameSnapshot.accepted.is_(True),
+        )
+        .subquery()
+    )
+    accepted_candidates = (
+        select(ranked_accepted.c.id)
+        .where(
+            or_(
+                ranked_accepted.c.snapshot_rank > accepted_limit,
+                (ranked_accepted.c.captured_at < cutoff) & (ranked_accepted.c.snapshot_rank > 1),
+            )
+        )
+        .order_by(ranked_accepted.c.captured_at.asc(), ranked_accepted.c.id.asc())
+        .limit(limit)
+    )
+    accepted_deleted = db.execute(
+        delete(ProviderGameSnapshot).where(ProviderGameSnapshot.id.in_(accepted_candidates))
+    ).rowcount or 0
+
+    # Spend any remaining batch capacity on stale rejected audit metadata.
+    remaining = max(0, limit - accepted_deleted)
+    rejected_deleted = 0
+    if remaining:
+        rejected_candidates = (
+            select(ProviderGameSnapshot.id)
+            .where(
+                ProviderGameSnapshot.provider == ESPN_PROVIDER,
+                ProviderGameSnapshot.accepted.is_(False),
+                ProviderGameSnapshot.captured_at < cutoff,
+            )
+            .order_by(ProviderGameSnapshot.captured_at.asc(), ProviderGameSnapshot.id.asc())
+            .limit(remaining)
+        )
+        rejected_deleted = db.execute(
+            delete(ProviderGameSnapshot).where(ProviderGameSnapshot.id.in_(rejected_candidates))
+        ).rowcount or 0
+    db.commit()
+    return SnapshotRetentionResult(accepted_deleted=accepted_deleted, rejected_deleted=rejected_deleted)
+
+
+def run_due_espn_snapshot_retention(
+    db: Session,
+    *,
+    now: datetime | None = None,
+) -> SnapshotRetentionResult | None:
+    """Run the cache janitor at a durable, bounded interval from the worker."""
+
+    current = _as_utc(now) or _utc_now()
+    prior = (
+        db.query(WorkerHeartbeat)
+        .filter(WorkerHeartbeat.worker_name == SNAPSHOT_RETENTION_WORKER_NAME)
+        .one_or_none()
+    )
+    prior_success = _as_utc(prior.last_success_at) if prior is not None else None
+    if (
+        prior_success is not None
+        and prior_success > current - timedelta(seconds=settings.scoring_snapshot_retention_interval_seconds)
+    ):
+        return None
+    result = prune_espn_snapshot_history(db, now=current)
+    record_worker_heartbeat(
+        db,
+        worker_name=SNAPSHOT_RETENTION_WORKER_NAME,
+        success=True,
+        details={
+            "accepted_deleted": result.accepted_deleted,
+            "rejected_deleted": result.rejected_deleted,
+            "retention_days": settings.scoring_snapshot_retention_days,
+            "max_accepted_per_game": settings.scoring_snapshot_max_accepted_per_game,
+        },
+    )
+    return result
 
 
 def _parse_datetime(value: object) -> datetime | None:

@@ -91,6 +91,7 @@ def test_worker_registers_orm_models_before_its_first_schedule_query(monkeypatch
     monkeypatch.setattr(worker.settings, "scoring_provider", "espn")
     monkeypatch.setattr(worker, "ensure_models_registered", lambda: registered.append(True))
     monkeypatch.setattr(worker, "SessionLocal", fake_session)
+    monkeypatch.setattr(worker, "run_due_espn_snapshot_retention", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(worker, "resolve_scoring_window", lambda _db, now=None: None)
     monkeypatch.setattr(worker, "record_worker_heartbeat", lambda *_args, **_kwargs: None)
 
@@ -133,6 +134,7 @@ def test_worker_records_liveness_before_enabled_scoring_preflight(monkeypatch):
     monkeypatch.setattr(worker.settings, "scoring_provider", "espn")
     monkeypatch.setattr(worker, "ensure_models_registered", lambda: None)
     monkeypatch.setattr(worker, "SessionLocal", fake_session)
+    monkeypatch.setattr(worker, "run_due_espn_snapshot_retention", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(worker, "resolve_scoring_window", lambda _db, now=None: (2026, 1))
     monkeypatch.setattr(worker, "record_worker_heartbeat", capture_heartbeat)
     monkeypatch.setattr(worker, "run_espn_scoring_cycle", run_cycle)
@@ -158,6 +160,7 @@ def test_worker_records_a_failure_heartbeat_when_a_cycle_raises(monkeypatch):
     monkeypatch.setattr(worker.settings, "scoring_provider", "espn")
     monkeypatch.setattr(worker, "ensure_models_registered", lambda: None)
     monkeypatch.setattr(worker, "SessionLocal", fake_session)
+    monkeypatch.setattr(worker, "run_due_espn_snapshot_retention", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(worker, "resolve_scoring_window", lambda _db, now=None: (2026, 1))
     monkeypatch.setattr(worker, "record_worker_heartbeat", lambda *_args, **kwargs: heartbeats.append(kwargs))
     monkeypatch.setattr(worker, "run_espn_scoring_cycle", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("provider unavailable")))

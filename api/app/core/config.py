@@ -77,6 +77,13 @@ class Settings(BaseSettings):
     scoring_worker_interval_correction_seconds: int = 3600
     scoring_worker_retry_max_attempts: int = 3
     scoring_worker_retry_base_seconds: int = 5
+    # Raw accepted provider snapshots are useful for short-lived audit/replay,
+    # but must be bounded independently of canonical scoring history.  The
+    # worker retains the current snapshot for every game even after expiry.
+    scoring_snapshot_retention_days: int = 14
+    scoring_snapshot_max_accepted_per_game: int = 12
+    scoring_snapshot_retention_interval_seconds: int = 300
+    scoring_snapshot_retention_batch_size: int = 500
     lifecycle_worker_interval_seconds: int = 5
     # This capability exists solely for the disposable Compose browser suite.
     # It is guarded again at route level and may only be enabled when the
@@ -225,6 +232,34 @@ class Settings(BaseSettings):
     def validate_scoring_worker_interval_live_seconds(cls, value: int) -> int:
         if value < 180:
             raise ValueError("SCORING_WORKER_INTERVAL_LIVE_SECONDS must be at least 180")
+        return value
+
+    @field_validator("scoring_snapshot_retention_days")
+    @classmethod
+    def validate_scoring_snapshot_retention_days(cls, value: int) -> int:
+        if value < 1 or value > 90:
+            raise ValueError("SCORING_SNAPSHOT_RETENTION_DAYS must be between 1 and 90")
+        return value
+
+    @field_validator("scoring_snapshot_max_accepted_per_game")
+    @classmethod
+    def validate_scoring_snapshot_max_accepted_per_game(cls, value: int) -> int:
+        if value < 1 or value > 100:
+            raise ValueError("SCORING_SNAPSHOT_MAX_ACCEPTED_PER_GAME must be between 1 and 100")
+        return value
+
+    @field_validator("scoring_snapshot_retention_interval_seconds")
+    @classmethod
+    def validate_scoring_snapshot_retention_interval_seconds(cls, value: int) -> int:
+        if value < 60 or value > 86_400:
+            raise ValueError("SCORING_SNAPSHOT_RETENTION_INTERVAL_SECONDS must be between 60 and 86400")
+        return value
+
+    @field_validator("scoring_snapshot_retention_batch_size")
+    @classmethod
+    def validate_scoring_snapshot_retention_batch_size(cls, value: int) -> int:
+        if value < 1 or value > 5_000:
+            raise ValueError("SCORING_SNAPSHOT_RETENTION_BATCH_SIZE must be between 1 and 5000")
         return value
 
     @field_validator("email_delivery_mode")

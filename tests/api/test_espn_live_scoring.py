@@ -38,6 +38,7 @@ from collegefootballfantasy_api.app.services.espn_live_scoring import (
     certify_espn_matchup_finality,
     espn_week_freshness,
     queue_accepted_espn_long_play_notifications,
+    prune_espn_snapshot_history,
     _canonical_hash,
     _replay_accepted_punt_return_stats,
     run_espn_scoring_cycle,
@@ -55,6 +56,25 @@ NOW = datetime(2026, 8, 29, 17, 0, tzinfo=timezone.utc)
 
 def _utc(value):
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
+def _snapshot(*, game_id: str, captured_at: datetime, accepted: bool, suffix: str) -> ProviderGameSnapshot:
+    """Create a minimal provider-cache row for retention coverage."""
+
+    return ProviderGameSnapshot(
+        provider="espn",
+        provider_game_id=game_id,
+        season=2026,
+        week=1,
+        status="final",
+        captured_at=captured_at,
+        event_state="final",
+        classification="NEWER" if accepted else "STALE",
+        accepted=accepted,
+        snapshot_hash=(suffix * 64)[:64],
+        raw_payload={"snapshot": suffix},
+        normalized_rows=[],
+    )
 
 
 class FakeLiveESPN:
@@ -167,6 +187,49 @@ def _make_public_promotion_ready(db_session, *, at):
 def test_espn_status_names_with_the_provider_prefix_are_classified_as_live():
     assert _event_status({"status": {"type": {"name": "STATUS_IN_PROGRESS"}}}) == "live"
     assert _event_status({"status": {"type": {"name": "STATUS_FINAL", "completed": True}}}) == "final"
+
+
+def test_snapshot_retention_bounds_raw_cache_without_deleting_current_game_state(db_session):
+    """Provider-cache cleanup must never alter the newest accepted game state."""
+
+    db_session.add_all(
+        [
+            # Game A is above the per-game cap: keep only the two newest rows.
+            _snapshot(game_id="game-a", captured_at=NOW - timedelta(days=4), accepted=True, suffix="a"),
+            _snapshot(game_id="game-a", captured_at=NOW - timedelta(days=3), accepted=True, suffix="b"),
+            _snapshot(game_id="game-a", captured_at=NOW - timedelta(days=2), accepted=True, suffix="c"),
+            _snapshot(game_id="game-a", captured_at=NOW - timedelta(days=1), accepted=True, suffix="d"),
+            # Game B is old, but its latest accepted snapshot is retained for
+            # replay/audit even once it ages beyond the rolling window.
+            _snapshot(game_id="game-b", captured_at=NOW - timedelta(days=30), accepted=True, suffix="e"),
+            _snapshot(game_id="game-b", captured_at=NOW - timedelta(days=29), accepted=True, suffix="f"),
+            # Rejected metadata ages out; fresh rejected metadata remains.
+            _snapshot(game_id="game-c", captured_at=NOW - timedelta(days=30), accepted=False, suffix="g"),
+            _snapshot(game_id="game-c", captured_at=NOW - timedelta(days=1), accepted=False, suffix="h"),
+        ]
+    )
+    db_session.commit()
+
+    result = prune_espn_snapshot_history(
+        db_session,
+        now=NOW,
+        retention_days=14,
+        max_accepted_per_game=2,
+        batch_size=100,
+    )
+
+    assert result.accepted_deleted == 3
+    assert result.rejected_deleted == 1
+    remaining = {
+        (row.provider_game_id, row.snapshot_hash[0])
+        for row in db_session.query(ProviderGameSnapshot).order_by(ProviderGameSnapshot.id).all()
+    }
+    assert remaining == {
+        ("game-a", "c"),
+        ("game-a", "d"),
+        ("game-b", "f"),
+        ("game-c", "h"),
+    }
 
 
 def test_resolve_scoring_window_prefers_the_complete_current_week_when_stale_week_rows_tie(db_session):
