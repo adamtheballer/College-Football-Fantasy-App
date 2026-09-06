@@ -215,6 +215,22 @@ def test_multiple_made_field_goals_without_exact_individual_distances_are_marked
     assert kicker["espn_field_goal_distance_detail_reason"] == "made_field_goal_distance_unavailable"
 
 
+def test_top_level_scoring_plays_supply_exact_kicker_distances_when_drives_are_absent():
+    """Final ESPN summaries can omit drives while retaining scoringPlays."""
+
+    payload = espn_summary_payload()
+    payload.pop("drives")
+    payload["scoringPlays"] = [
+        {"id": "fg-32", "text": "Bert Auburn 32 Yd Field Goal"},
+        {"id": "fg-37", "text": "Bert Auburn 37 Yd Field Goal"},
+    ]
+
+    kicker = next(row for row in extract_player_box_score_stats(payload) if row["PlayerName"] == "Bert Auburn")
+
+    assert kicker["fg_made_31_40"] == 2
+    assert kicker["espn_field_goal_distance_detail_available"] is True
+
+
 class FakeESPNClient:
     def get_weekly_boxscore_summaries(self, season, week):
         return [espn_summary_payload()]

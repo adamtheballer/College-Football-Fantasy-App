@@ -390,44 +390,66 @@ def _field_goal_bucket(distance: int) -> str:
 
 
 def _field_goal_buckets_from_scoring_plays(summary: dict[str, Any]) -> dict[str, dict[str, int]]:
+    """Return exact made-field-goal buckets from every ESPN scoring-play shape.
+
+    ESPN final summaries are inconsistent: some expose completed scoring plays
+    under ``drives.previous`` while others put them only in top-level
+    ``scoringPlays``.  Both are authoritative play-by-play sources.  Ignoring
+    the latter turns a known kicker total into an unresolved game and blocks
+    every player in that matchup from finalizing.
+    """
+
     buckets: dict[str, dict[str, int]] = {}
+    scoring_plays: list[tuple[dict[str, Any], bool]] = []
+    top_level = summary.get("scoringPlays")
+    if isinstance(top_level, list):
+        scoring_plays.extend((play, True) for play in top_level if isinstance(play, dict))
     drives = summary.get("drives")
-    if not isinstance(drives, dict):
-        return buckets
-    previous = drives.get("previous")
-    if not isinstance(previous, list):
-        return buckets
-    for drive in previous:
-        if not isinstance(drive, dict):
+    if isinstance(drives, dict):
+        drive_rows = list(drives.get("previous") or [])
+        current = drives.get("current")
+        if isinstance(current, dict):
+            drive_rows.append(current)
+        for drive in drive_rows:
+            if not isinstance(drive, dict):
+                continue
+            plays = drive.get("plays")
+            if isinstance(plays, list):
+                scoring_plays.extend((play, False) for play in plays if isinstance(play, dict))
+
+    seen: set[str] = set()
+    for play, from_top_level in scoring_plays:
+        if not from_top_level and not play.get("scoringPlay"):
             continue
-        plays = drive.get("plays")
-        if not isinstance(plays, list):
+        text = str(play.get("text") or "")
+        if "Field Goal" not in text:
             continue
-        for play in plays:
-            if not isinstance(play, dict) or not play.get("scoringPlay"):
-                continue
-            text = str(play.get("text") or "")
-            if "Field Goal" not in text:
-                continue
-            distance_match = re.search(r"(\d+)\s+Yd Field Goal", text, re.IGNORECASE)
-            if not distance_match:
-                continue
-            distance = int(distance_match.group(1))
-            name = text[: distance_match.start()].strip(" ,-")
-            if not name:
-                continue
-            bucket = _field_goal_bucket(distance)
-            row = buckets.setdefault(
-                name.lower(),
-                {
-                    "fg_made_0_30": 0,
-                    "fg_made_31_40": 0,
-                    "fg_made_41_50": 0,
-                    "fg_made_51_60": 0,
-                    "fg_made_61_plus": 0,
-                },
-            )
-            row[bucket] += 1
+        clock = play.get("clock") if isinstance(play.get("clock"), dict) else {}
+        dedupe_key = str(play.get("id") or play.get("sequenceNumber") or "").strip()
+        if not dedupe_key:
+            dedupe_key = f"{text.casefold()}|{clock.get('displayValue') or clock.get('value') or ''}"
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        distance_match = re.search(r"(\d+)\s+Yd Field Goal", text, re.IGNORECASE)
+        if not distance_match:
+            continue
+        distance = int(distance_match.group(1))
+        name = text[: distance_match.start()].strip(" ,-")
+        if not name:
+            continue
+        bucket = _field_goal_bucket(distance)
+        row = buckets.setdefault(
+            name.lower(),
+            {
+                "fg_made_0_30": 0,
+                "fg_made_31_40": 0,
+                "fg_made_41_50": 0,
+                "fg_made_51_60": 0,
+                "fg_made_61_plus": 0,
+            },
+        )
+        row[bucket] += 1
     return buckets
 
 
