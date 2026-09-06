@@ -18,7 +18,11 @@ from collegefootballfantasy_api.app.db.model_registry import ensure_models_regis
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.integrations.espn import ESPNClient
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
-from collegefootballfantasy_api.app.services.espn_live_scoring import EspnCycleResult, run_espn_scoring_cycle
+from collegefootballfantasy_api.app.services.espn_live_scoring import (
+    EspnCycleResult,
+    run_due_espn_snapshot_retention,
+    run_espn_scoring_cycle,
+)
 from collegefootballfantasy_api.app.services.live_scoring_readiness import scoring_operations_report
 from collegefootballfantasy_api.app.services.worker_health import record_worker_heartbeat
 
@@ -110,13 +114,28 @@ def run_iteration(*, now: datetime | None = None, client: ESPNClient | None = No
     # process cannot appear healthy after logging a mapper-configuration error.
     ensure_models_registered()
     with SessionLocal() as db:
+        retention_result = None
+        try:
+            # Raw provider snapshots are only a short-lived cache. Keep this
+            # maintenance independent of an active game window so stale
+            # records age out during quiet periods as well. A janitor failure
+            # must never block scoring; its own durable heartbeat and logs
+            # make the condition observable for recovery.
+            retention_result = run_due_espn_snapshot_retention(db, now=now)
+        except Exception as error:  # pragma: no cover - operational failure path
+            db.rollback()
+            logger.exception("espn_snapshot_retention_failed", extra={"error": str(error)})
         window = resolve_scoring_window(db, now=now)
         if window is None:
             record_worker_heartbeat(
                 db,
                 worker_name="espn_scoring_processor",
                 success=True,
-                details={"state": "idle", "reason": "no_verified_schedule_window"},
+                details={
+                    "state": "idle",
+                    "reason": "no_verified_schedule_window",
+                    "snapshot_retention_deleted": retention_result.total_deleted if retention_result else 0,
+                },
             )
             db.commit()
             return None
@@ -175,6 +194,7 @@ def run_iteration(*, now: datetime | None = None, client: ESPNClient | None = No
                     "successful_games": result.successful_games,
                     "failed_games": result.failed_games,
                     "unmatched_rows": result.unmatched_rows,
+                    "snapshot_retention_deleted": retention_result.total_deleted if retention_result else 0,
                 },
             )
             db.commit()
