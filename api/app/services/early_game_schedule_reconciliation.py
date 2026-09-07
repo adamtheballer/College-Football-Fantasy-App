@@ -93,6 +93,65 @@ def _next_regular_row(*, season: int, team: str) -> SealedScheduleRow:
     return matches[0]
 
 
+def _matches_scheduled_game(game: Game, *, expected: SealedScheduleRow) -> bool:
+    """Whether an imported provider event is the sealed next game.
+
+    The sealed calendar supplies the intended team, opponent, and site while
+    ESPN supplies the durable numeric event id.  Require both rather than
+    replacing a schedule with a same-week game that merely shares one team.
+    """
+
+    opponent = str(expected.opponent or "")
+    if expected.location == "home":
+        return _same_team(game.home_team, expected.team) and _same_team(game.away_team, opponent)
+    if expected.location == "away":
+        return _same_team(game.away_team, expected.team) and _same_team(game.home_team, opponent)
+    return (
+        (_same_team(game.home_team, expected.team) and _same_team(game.away_team, opponent))
+        or (_same_team(game.away_team, expected.team) and _same_team(game.home_team, opponent))
+    )
+
+
+def _find_imported_next_game(
+    db: Session,
+    *,
+    season: int,
+    expected: SealedScheduleRow,
+) -> Game | None:
+    """Return the one provider-backed Week 1 event for a sealed matchup.
+
+    A Week 0 reconciliation must not manufacture a schedule placeholder when
+    the real ESPN event is already imported.  The latter is what powers live
+    player-card rows for both teams, even when one team's points are excluded
+    from fantasy Week 1 scoring.
+    """
+
+    matches = [
+        game
+        for game in db.query(Game).filter(Game.season == season, Game.week == 1).all()
+        if str(game.external_id or "").strip().isdecimal() and _matches_scheduled_game(game, expected=expected)
+    ]
+    if len(matches) > 1:
+        raise EarlyGameScheduleReconciliationError(
+            f"ambiguous imported Week 1 games for {expected.team} vs {expected.opponent}"
+        )
+    return matches[0] if matches else None
+
+
+def _next_schedule_timing(
+    *,
+    expected: SealedScheduleRow,
+    game: Game | None,
+) -> tuple[date | None, datetime | None]:
+    """Prefer a sealed kickoff but retain the imported provider time as fallback."""
+
+    game_date, kickoff = _calendar_date_and_kickoff(expected.kickoff_at)
+    if kickoff is None and game is not None and game.start_date is not None:
+        kickoff = game.start_date.astimezone(UTC) if game.start_date.tzinfo else game.start_date.replace(tzinfo=UTC)
+        game_date = kickoff.date()
+    return game_date, kickoff
+
+
 def _find_early_schedule(
     schedules: list[TeamSchedule],
     *,
@@ -255,6 +314,7 @@ def reconcile_early_player_game_schedules(
 
         next_row = _next_regular_row(season=season, team=expected.team)
         existing_next = _find_early_schedule(schedules, expected=next_row)
+        imported_next_game = _find_imported_next_game(db, season=season, expected=next_row)
         incumbent_week_zero = next(
             (row for row in schedules if _same_team(row.team_name, expected.team) and row.week == 0 and row.id != early_schedule.id),
             None,
@@ -286,8 +346,9 @@ def reconcile_early_player_game_schedules(
         if not apply:
             repaired.append(expected.team)
             if existing_next is None:
-                created_games += 1
                 created_schedules += 1
+                if imported_next_game is None:
+                    created_games += 1
             continue
 
         if incumbent_week_zero is not None:
@@ -310,22 +371,24 @@ def reconcile_early_player_game_schedules(
         moved_stats += compatibility_stats
 
         if existing_next is None:
-            next_date, next_kickoff = _calendar_date_and_kickoff(next_row.kickoff_at)
-            next_game = Game(
-                external_id=_event_id(
-                    season=season, week=1, team=next_row.team, opponent=str(next_row.opponent)
-                ),
-                season=season,
-                week=1,
-                season_type="regular",
-                schedule_status="scheduled",
-                start_date=next_kickoff,
-                home_team=next_row.team if next_row.location != "away" else str(next_row.opponent),
-                away_team=str(next_row.opponent) if next_row.location != "away" else next_row.team,
-                neutral_site=next_row.location == "neutral",
-            )
-            db.add(next_game)
-            db.flush()
+            next_game = imported_next_game
+            if next_game is None:
+                next_game = Game(
+                    external_id=_event_id(
+                        season=season, week=1, team=next_row.team, opponent=str(next_row.opponent)
+                    ),
+                    season=season,
+                    week=1,
+                    season_type="regular",
+                    schedule_status="scheduled",
+                    home_team=next_row.team if next_row.location != "away" else str(next_row.opponent),
+                    away_team=str(next_row.opponent) if next_row.location != "away" else next_row.team,
+                    neutral_site=next_row.location == "neutral",
+                )
+                db.add(next_game)
+                db.flush()
+                created_games += 1
+            next_date, next_kickoff = _next_schedule_timing(expected=next_row, game=next_game)
             existing_next = TeamSchedule(
                 team_name=next_row.team,
                 season=season,
@@ -342,8 +405,26 @@ def reconcile_early_player_game_schedules(
             )
             db.add(existing_next)
             schedules.append(existing_next)
-            created_games += 1
             created_schedules += 1
+        elif imported_next_game is not None and existing_next.game_id != imported_next_game.id:
+            existing_game = db.get(Game, existing_next.game_id) if existing_next.game_id is not None else None
+            has_existing_stats = bool(
+                existing_next.game_id is not None
+                and db.query(PlayerGameStat.id)
+                .filter(PlayerGameStat.game_id == existing_next.game_id, PlayerGameStat.season == season)
+                .first()
+            )
+            if existing_game is not None and str(existing_game.external_id or "").strip().isdecimal():
+                unresolved.append(f"{expected.team}: conflicting provider-backed Week 1 schedule row")
+                continue
+            if has_existing_stats:
+                unresolved.append(f"{expected.team}: placeholder Week 1 schedule unexpectedly has player stats")
+                continue
+            next_date, next_kickoff = _next_schedule_timing(expected=next_row, game=imported_next_game)
+            existing_next.game_id = imported_next_game.id
+            existing_next.game_date = next_date or existing_next.game_date
+            existing_next.kickoff_at = next_kickoff or existing_next.kickoff_at
+            existing_next.date_confirmed = bool(existing_next.kickoff_at)
         repaired.append(expected.team)
 
     if unresolved and apply:

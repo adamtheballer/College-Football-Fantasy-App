@@ -140,3 +140,35 @@ def test_reconciliation_uses_the_completed_row_when_a_week_zero_placeholder_is_d
     assert db_session.get(Game, completed_game.id).week == 0
     assert db_session.get(Game, placeholder_game.id) is not None
     assert db_session.query(PlayerGameStat).filter_by(player_id=player.id).one().week == 0
+
+
+def test_reconciliation_reuses_imported_next_game_for_player_card_visibility(db_session, monkeypatch):
+    monkeypatch.setattr(reconciliation, "load_sealed_schedule_snapshot", lambda _season: _snapshot())
+    _, original_game = _legacy_usc_week_one(db_session)
+    imported_next_game = Game(
+        external_id="401864495",
+        season=2026,
+        week=1,
+        home_team="USC",
+        away_team="Fresno State",
+        schedule_status="pre",
+        start_date=datetime(2026, 9, 5, 1, tzinfo=timezone.utc),
+    )
+    db_session.add(imported_next_game)
+    db_session.commit()
+
+    report = reconciliation.reconcile_early_player_game_schedules(
+        db_session,
+        season=2026,
+        apply=True,
+        teams={"USC"},
+    )
+    db_session.commit()
+
+    assert report.unresolved == ()
+    assert report.created_next_games == 0
+    assert report.created_next_schedules == 1
+    assert db_session.get(Game, original_game.id).week == 0
+    schedule = db_session.query(TeamSchedule).filter_by(team_name="USC", season=2026, week=1).one()
+    assert schedule.game_id == imported_next_game.id
+    assert schedule.kickoff_at.replace(tzinfo=timezone.utc) == imported_next_game.start_date.replace(tzinfo=timezone.utc)
