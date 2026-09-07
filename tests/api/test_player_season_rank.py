@@ -1,4 +1,7 @@
+from datetime import datetime, timezone
+
 from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
@@ -87,4 +90,43 @@ def test_player_card_exposes_only_finalized_cumulative_positional_rank(client, d
         "rank": 2,
         "fantasy_points": 40.0,
         "through_week": 2,
+    }
+
+
+def test_week_zero_opener_is_the_only_week_one_rank_input_for_early_team(client, db_session):
+    early_team = _rankable_player(name="Florida State Receiver", position="WR", school="Florida State")
+    normal_team = _rankable_player(name="SMU Receiver", position="WR", school="SMU")
+    db_session.add_all([early_team, normal_team])
+    db_session.add(
+        Game(
+            external_id="401864570",
+            season=2026,
+            week=0,
+            home_team="Florida State",
+            away_team="New Mexico State",
+            schedule_status="final",
+            start_date=datetime(2026, 8, 29, 23, tzinfo=timezone.utc),
+            home_points=34,
+            away_points=17,
+        )
+    )
+    db_session.flush()
+    db_session.add_all([
+        PlayerStat(player_id=early_team.id, season=2026, week=0, verified=True, stats={"fantasy_points": 30.0}),
+        # This is the later real-world Week 1 game. It is valid player-card
+        # history, but must not be a second fantasy Week 1 rank contribution.
+        PlayerStat(player_id=early_team.id, season=2026, week=1, verified=True, stats={"fantasy_points": 90.0}),
+        PlayerStat(player_id=normal_team.id, season=2026, week=1, verified=True, stats={"fantasy_points": 35.0}),
+    ])
+    _finalize_week(db_session, week=1)
+    db_session.commit()
+
+    early_rank = client.get(f"/players/{early_team.id}/card")
+    normal_rank = client.get(f"/players/{normal_team.id}/card")
+
+    assert early_rank.json()["season_positional_rank"] == {
+        "position": "WR", "rank": 2, "fantasy_points": 30.0, "through_week": 1,
+    }
+    assert normal_rank.json()["season_positional_rank"] == {
+        "position": "WR", "rank": 1, "fantasy_points": 35.0, "through_week": 1,
     }
