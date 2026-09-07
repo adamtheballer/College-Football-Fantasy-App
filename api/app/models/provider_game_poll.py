@@ -48,6 +48,13 @@ class ProviderGamePoll(TimestampMixin, Base):
     stale_snapshot_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     ambiguous_snapshot_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     pending_final_correction_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # A completed ESPN response is normally stable. Keep a small amount of
+    # durable state so a worker restart cannot turn an unordered correction
+    # into an immediate public scoring change.
+    pending_final_snapshot_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    pending_final_snapshot_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    final_stable_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    quarantine_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ProviderGameSnapshot(TimestampMixin, Base):

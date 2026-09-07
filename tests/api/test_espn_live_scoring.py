@@ -28,6 +28,8 @@ from collegefootballfantasy_api.app.services.espn_stats_sync import UnresolvedKi
 from collegefootballfantasy_api.app.services.espn_live_scoring import (
     MAX_TRANSIENT_GAME_RETRY_SECONDS,
     MIN_GAME_POLL_INTERVAL_SECONDS,
+    QUARANTINED_GAME_RETRY_SECONDS,
+    STABLE_FINAL_RECONCILIATION_INTERVAL_SECONDS,
     ProviderDataIncompleteError,
     SnapshotOrderMetadata,
     _failure_policy,
@@ -1202,14 +1204,20 @@ def test_timeout_marks_only_the_game_poll_delayed_and_does_not_retry_immediately
     assert _utc(poll.next_poll_at) >= NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS)
 
 
-def test_incomplete_provider_data_retries_at_the_next_live_poll_without_exponential_delay():
-    for failure_count in range(1, 8):
+def test_incomplete_provider_data_quarantines_only_after_repeated_identical_failures():
+    for failure_count in range(1, 3):
         status, retry_seconds = _failure_policy(
             ProviderDataIncompleteError("summary is temporarily incomplete"),
             failure_count=failure_count,
         )
         assert status == "delayed"
         assert retry_seconds == MIN_GAME_POLL_INTERVAL_SECONDS
+    status, retry_seconds = _failure_policy(
+        ProviderDataIncompleteError("summary is temporarily incomplete"),
+        failure_count=3,
+    )
+    assert status == "quarantined"
+    assert retry_seconds == QUARANTINED_GAME_RETRY_SECONDS
 
 
 def test_transient_provider_failures_have_a_bounded_retry_delay():
@@ -1277,7 +1285,7 @@ def test_final_provider_correction_that_removes_a_live_player_line_zeroes_only_t
         season=2026,
         week=1,
         mode="enabled",
-        client=FakeLiveESPN(summary=espn_summary_payload()),
+        client=FakeLiveESPN(summary=_final_summary(pass_yards=300)),
         now=NOW,
         relevant_team_names={"texas"},
     )
@@ -1304,11 +1312,51 @@ def test_final_provider_correction_that_removes_a_live_player_line_zeroes_only_t
 
     assert corrected.successful_games == 1
     db_session.refresh(poll)
+    assert poll.last_snapshot_classification == "AMBIGUOUS"
+    assert db_session.query(PlayerStat).filter_by(player_id=wingo.id, season=2026, week=1).one().stats["rec_yards"] > 0
+
+    _poll_due(db_session, at=NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS * 2))
+    _make_public_promotion_ready(db_session, at=NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS * 2))
+    confirmed = run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="enabled",
+        client=FakeLiveESPN(summary=corrected_final),
+        now=NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS * 2),
+        relevant_team_names={"texas"},
+    )
+    assert confirmed.successful_games == 1
+    db_session.refresh(poll)
+    assert poll.last_snapshot_classification == "VERIFIED_CORRECTION"
     assert poll.status == "final"
     assert db_session.query(PlayerStat).filter_by(player_id=wingo.id, season=2026, week=1).one().stats.get("rec_yards", 0) == 0
     final_line = db_session.query(PlayerGameStat).filter_by(player_id=wingo.id, season=2026, week=1).one()
     assert final_line.stats.get("rec_yards", 0) == 0
     assert db_session.query(PlayerStat).filter_by(player_id=arch.id, season=2026, week=1).one().stats["pass_yards"] == 300
+
+
+def test_duplicate_final_response_slows_reconciliation_and_discovery_does_not_wake_it(db_session):
+    _verified_players(db_session)
+    final = _final_summary(pass_yards=300)
+    run_espn_scoring_cycle(
+        db_session, season=2026, week=1, mode="shadow", client=FakeLiveESPN(summary=final), now=NOW, relevant_team_names={"texas"}
+    )
+    _run_summary(db_session, summary=final, at=NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS))
+    poll = db_session.query(ProviderGamePoll).filter_by(provider_game_id="401").one()
+    assert poll.final_stable_at is not None
+    assert _utc(poll.next_poll_at) == NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS + STABLE_FINAL_RECONCILIATION_INTERVAL_SECONDS)
+
+    due_at = _utc(poll.next_poll_at)
+    discover_relevant_espn_games(
+        db_session,
+        season=2026,
+        week=1,
+        events=[{"id": "401", "status": {"type": {"state": "post", "completed": True}}}],
+        now=NOW + timedelta(hours=1),
+    )
+    db_session.commit()
+    assert _utc(db_session.get(ProviderGamePoll, poll.id).next_poll_at) == due_at
 
 
 def test_two_claimers_cannot_claim_the_same_due_game(db_session):

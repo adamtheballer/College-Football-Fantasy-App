@@ -23,7 +23,11 @@ from collegefootballfantasy_api.app.services.espn_live_scoring import (
     run_due_espn_snapshot_retention,
     run_espn_scoring_cycle,
 )
-from collegefootballfantasy_api.app.services.live_scoring_readiness import scoring_operations_report
+from collegefootballfantasy_api.app.services.espn_pregame_identity import reconcile_pregame_espn_identities
+from collegefootballfantasy_api.app.services.live_scoring_readiness import (
+    emit_new_scoring_alert_incidents,
+    scoring_operations_report,
+)
 from collegefootballfantasy_api.app.services.worker_health import record_worker_heartbeat
 
 
@@ -167,10 +171,34 @@ def run_iteration(*, now: datetime | None = None, client: ESPNClient | None = No
                 worker_id="espn-scoring-scheduler",
                 now=now,
             )
+            identity_result = {"considered": 0, "verified": 0, "unresolved": 0}
+            # Identity resolution is network work too, but unlike game
+            # scoring it is optional and must remain rate-bounded. Run two
+            # exact-match checks once per 15-minute boundary before kickoff.
+            current_minute = (now or datetime.now(timezone.utc)).minute
+            if current_minute % 15 == 0:
+                try:
+                    identity_result = reconcile_pregame_espn_identities(
+                        db,
+                        season=season,
+                        week=week,
+                        client=espn,
+                        now=now,
+                    )
+                except Exception as identity_error:  # pragma: no cover - provider operational path
+                    db.rollback()
+                    logger.warning("espn_pregame_identity_reconciliation_failed error=%s", identity_error)
             # The admin report is also the durable alert-policy source.  Emit
             # structured worker logs only for actionable conditions; idle
             # no-game windows deliberately generate no alert noise.
-            for alert in scoring_operations_report(db, season=season, week=week, now=now).get("alerts", []):
+            report = scoring_operations_report(db, season=season, week=week, now=now)
+            for alert in emit_new_scoring_alert_incidents(
+                db,
+                season=season,
+                week=week,
+                alerts=report.get("alerts", []),
+                now=now,
+            ):
                 severity = alert["severity"]
                 logger.log(
                     logging.ERROR if severity in {"critical", "error"} else logging.WARNING,
@@ -183,7 +211,11 @@ def run_iteration(*, now: datetime | None = None, client: ESPNClient | None = No
             record_worker_heartbeat(
                 db,
                 worker_name="espn_scoring_processor",
-                success=result.failed_games == 0,
+                # A rejected summary from one game is degraded provider data,
+                # not a dead worker. Healthy games must continue updating and
+                # public readiness must distinguish process liveness from the
+                # isolated poll incident reported above.
+                success=True,
                 details={
                     "state": "completed",
                     "mode": settings.scoring_mode,
@@ -193,7 +225,9 @@ def run_iteration(*, now: datetime | None = None, client: ESPNClient | None = No
                     "claimed_games": result.claimed_games,
                     "successful_games": result.successful_games,
                     "failed_games": result.failed_games,
+                    "degraded_games": result.failed_games,
                     "unmatched_rows": result.unmatched_rows,
+                    "pregame_identity": identity_result,
                     "snapshot_retention_deleted": retention_result.total_deleted if retention_result else 0,
                 },
             )

@@ -139,10 +139,48 @@ def test_worker_records_liveness_before_enabled_scoring_preflight(monkeypatch):
     monkeypatch.setattr(worker, "record_worker_heartbeat", capture_heartbeat)
     monkeypatch.setattr(worker, "run_espn_scoring_cycle", run_cycle)
     monkeypatch.setattr(worker, "scoring_operations_report", lambda *_args, **_kwargs: {"alerts": []})
+    monkeypatch.setattr(worker, "emit_new_scoring_alert_incidents", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(worker, "reconcile_pregame_espn_identities", lambda *_args, **_kwargs: {"considered": 0, "verified": 0, "unresolved": 0})
 
     assert worker.run_iteration(now=NOW, client=object()) is not None
     assert heartbeats[-1]["success"] is True
     assert heartbeats[-1]["details"]["state"] == "completed"
+
+
+def test_worker_keeps_a_healthy_process_heartbeat_when_one_game_is_quarantined(monkeypatch):
+    heartbeats = []
+
+    class FakeSession:
+        def commit(self):
+            return None
+
+    @contextmanager
+    def fake_session():
+        yield FakeSession()
+
+    class FakeResult:
+        discovered_games = 2
+        claimed_games = 2
+        successful_games = 1
+        failed_games = 1
+        unmatched_rows = 0
+
+    monkeypatch.setattr(worker.settings, "scoring_mode", "shadow")
+    monkeypatch.setattr(worker.settings, "scoring_provider", "espn")
+    monkeypatch.setattr(worker, "ensure_models_registered", lambda: None)
+    monkeypatch.setattr(worker, "SessionLocal", fake_session)
+    monkeypatch.setattr(worker, "run_due_espn_snapshot_retention", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(worker, "resolve_scoring_window", lambda _db, now=None: (2026, 1))
+    monkeypatch.setattr(worker, "record_worker_heartbeat", lambda *_args, **kwargs: heartbeats.append(kwargs))
+    monkeypatch.setattr(worker, "run_espn_scoring_cycle", lambda *_args, **_kwargs: FakeResult())
+    monkeypatch.setattr(worker, "scoring_operations_report", lambda *_args, **_kwargs: {"alerts": []})
+    monkeypatch.setattr(worker, "emit_new_scoring_alert_incidents", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(worker, "reconcile_pregame_espn_identities", lambda *_args, **_kwargs: {"considered": 0, "verified": 0, "unresolved": 0})
+
+    worker.run_iteration(now=NOW.replace(minute=1), client=object())
+
+    assert heartbeats[-1]["success"] is True
+    assert heartbeats[-1]["details"]["degraded_games"] == 1
 
 
 def test_worker_records_a_failure_heartbeat_when_a_cycle_raises(monkeypatch):
