@@ -425,6 +425,22 @@ def reconcile_early_player_game_schedules(
             existing_next.game_date = next_date or existing_next.game_date
             existing_next.kickoff_at = next_kickoff or existing_next.kickoff_at
             existing_next.date_confirmed = bool(existing_next.kickoff_at)
+            # The old reconciler may have created an unlinked sealed fallback
+            # before the real ESPN event was imported. Leaving that game row
+            # behind makes the opponent's Week 1 event ambiguous, which can
+            # suppress its entirely legitimate fantasy scoring. Delete only
+            # the generated, stat-free fallback after its sole schedule link
+            # has moved to the provider-backed game.
+            if (
+                existing_game is not None
+                and str(existing_game.external_id or "").startswith("sealed-")
+            ):
+                db.flush()
+                remaining_schedule_links = db.query(TeamSchedule.id).filter(
+                    TeamSchedule.game_id == existing_game.id
+                ).first()
+                if remaining_schedule_links is None:
+                    db.delete(existing_game)
         repaired.append(expected.team)
 
     if unresolved and apply:
