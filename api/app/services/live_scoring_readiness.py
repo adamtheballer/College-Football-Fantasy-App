@@ -399,7 +399,10 @@ def scoring_operations_report(db: Session, *, season: int, week: int, now: datet
     # currently unresolved ordering evidence, not an old response that was
     # later superseded by a valid snapshot.
     active_stale_rejections = sum(row.last_snapshot_classification == "STALE" for row in game_polls)
-    active_ambiguous_quarantines = sum(row.last_snapshot_classification == "AMBIGUOUS" for row in game_polls)
+    active_ambiguous_quarantines = sum(
+        row.last_snapshot_classification == "AMBIGUOUS" and row.pending_final_snapshot_count > 0
+        for row in game_polls
+    )
     if active_stale_rejections >= 3:
         alerts.append({"severity": "warning", "code": "REPEATED_STALE_PROVIDER_SNAPSHOTS"})
     if active_ambiguous_quarantines >= 3:
