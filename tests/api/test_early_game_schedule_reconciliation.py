@@ -172,3 +172,57 @@ def test_reconciliation_reuses_imported_next_game_for_player_card_visibility(db_
     schedule = db_session.query(TeamSchedule).filter_by(team_name="USC", season=2026, week=1).one()
     assert schedule.game_id == imported_next_game.id
     assert schedule.kickoff_at.replace(tzinfo=timezone.utc) == imported_next_game.start_date.replace(tzinfo=timezone.utc)
+
+
+def test_reconciliation_replaces_and_removes_an_unlinked_sealed_next_game_placeholder(db_session, monkeypatch):
+    monkeypatch.setattr(reconciliation, "load_sealed_schedule_snapshot", lambda _season: _snapshot())
+    player, opening_game = _legacy_usc_week_one(db_session)
+    opening_game.week = 0
+    opening_schedule = db_session.query(TeamSchedule).filter_by(team_name="USC", season=2026, week=1).one()
+    opening_schedule.week = 0
+    db_session.query(PlayerGameStat).filter_by(player_id=player.id, game_id=opening_game.id).one().week = 0
+    db_session.query(PlayerStat).filter_by(player_id=player.id, season=2026, week=1).one().week = 0
+    placeholder = Game(
+        external_id="sealed-2026-w1-usc-fresno-state",
+        season=2026,
+        week=1,
+        home_team="USC",
+        away_team="Fresno State",
+        schedule_status="scheduled",
+    )
+    imported_next_game = Game(
+        external_id="401864495",
+        season=2026,
+        week=1,
+        home_team="USC",
+        away_team="Fresno State",
+        schedule_status="pre",
+        start_date=datetime(2026, 9, 5, 1, tzinfo=timezone.utc),
+    )
+    db_session.add_all([placeholder, imported_next_game])
+    db_session.flush()
+    db_session.add(
+        TeamSchedule(
+            team_name="USC",
+            season=2026,
+            week=1,
+            game_id=placeholder.id,
+            opponent_name="Fresno State",
+            location="home",
+            is_bye=False,
+        )
+    )
+    db_session.commit()
+
+    report = reconciliation.reconcile_early_player_game_schedules(
+        db_session,
+        season=2026,
+        apply=True,
+        teams={"USC"},
+    )
+    db_session.commit()
+
+    assert report.unresolved == ()
+    schedule = db_session.query(TeamSchedule).filter_by(team_name="USC", season=2026, week=1).one()
+    assert schedule.game_id == imported_next_game.id
+    assert db_session.get(Game, placeholder.id) is None
