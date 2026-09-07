@@ -69,6 +69,7 @@ def ensure_models_registered() -> None:
         roster,
         scheduled_notification,
         scoring_admin_audit,
+        scoring_alert_incident,
         scoring_run,
         saturday_pick,
         standing,

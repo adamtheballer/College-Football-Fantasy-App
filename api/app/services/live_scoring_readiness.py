@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import func, or_
@@ -32,6 +32,7 @@ from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekSc
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId, UnmatchedProviderRow
 from collegefootballfantasy_api.app.models.roster import RosterEntry
+from collegefootballfantasy_api.app.models.scoring_alert_incident import ScoringAlertIncident
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbeat
 from collegefootballfantasy_api.app.services.espn_live_scoring import ESPN_PROVIDER, MIN_GAME_POLL_INTERVAL_SECONDS, espn_week_freshness
@@ -41,6 +42,7 @@ from collegefootballfantasy_api.app.services.power4 import canonical_school_name
 
 WORKER_NAME = "espn_scoring_processor"
 WORKER_STALE_SECONDS = 120
+SCORING_ALERT_DEDUP_SECONDS = 15 * 60
 UNAVAILABLE_SCHEDULE_STATUSES = {"tbd", "postponed", "cancelled", "canceled"}
 
 
@@ -60,6 +62,62 @@ def _utc(value: datetime | None) -> datetime | None:
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def emit_new_scoring_alert_incidents(
+    db: Session,
+    *,
+    season: int,
+    week: int,
+    alerts: list[dict[str, str]],
+    now: datetime | None = None,
+) -> list[dict[str, str]]:
+    """Persist alert incidents and return only alerts due for one log emission.
+
+    The readiness report remains complete for the admin surface. This helper
+    controls worker log/notification volume only, preserving a count and
+    latest-seen time for every repeated provider condition across restarts.
+    """
+
+    current = _utc(now) or _now()
+    emitted: list[dict[str, str]] = []
+    for alert in alerts:
+        code = str(alert.get("code") or "UNKNOWN_SCORING_ALERT")
+        resource_key = str(alert.get("resource_key") or "week")[:500]
+        incident = (
+            db.query(ScoringAlertIncident)
+            .filter_by(
+                provider=ESPN_PROVIDER,
+                season=season,
+                week=week,
+                code=code,
+                resource_key=resource_key,
+            )
+            .one_or_none()
+        )
+        if incident is None:
+            incident = ScoringAlertIncident(
+                provider=ESPN_PROVIDER,
+                season=season,
+                week=week,
+                code=code,
+                resource_key=resource_key,
+                first_seen_at=current,
+                last_seen_at=current,
+                last_emitted_at=current,
+                occurrence_count=1,
+            )
+            db.add(incident)
+            emitted.append(alert)
+            continue
+        incident.last_seen_at = current
+        incident.occurrence_count += 1
+        last_emitted = _utc(incident.last_emitted_at)
+        if last_emitted is None or current - last_emitted >= timedelta(seconds=SCORING_ALERT_DEDUP_SECONDS):
+            incident.last_emitted_at = current
+            emitted.append(alert)
+    db.commit()
+    return emitted
 
 
 def _is_verified_mapping(mapping: PlayerProviderId | None) -> bool:
@@ -277,6 +335,8 @@ def scoring_operations_report(db: Session, *, season: int, week: int, now: datet
                 ProviderGamePoll.stale_snapshot_count,
                 ProviderGamePoll.ambiguous_snapshot_count,
                 ProviderGamePoll.pending_final_correction_count,
+                ProviderGamePoll.pending_final_snapshot_count,
+                ProviderGamePoll.quarantine_until,
             )
         )
         .filter(ProviderGamePoll.provider == ESPN_PROVIDER, ProviderGamePoll.season == season, ProviderGamePoll.week == week)
@@ -315,8 +375,13 @@ def scoring_operations_report(db: Session, *, season: int, week: int, now: datet
         alerts.append({"severity": "critical", "code": "SCORING_WORKER_HEARTBEAT_STALE"})
     if any(row.status == "blocked" for row in game_polls):
         alerts.append({"severity": "critical", "code": "PROVIDER_BLOCKED_403"})
-    if any(row.failure_count >= 3 for row in game_polls):
-        alerts.append({"severity": "error", "code": "REPEATED_GAME_POLL_FAILURE"})
+    repeated_failure_games = sorted(row.provider_game_id for row in game_polls if row.failure_count >= 3)
+    if repeated_failure_games:
+        alerts.append({
+            "severity": "error",
+            "code": "REPEATED_GAME_POLL_FAILURE",
+            "resource_key": ",".join(repeated_failure_games),
+        })
     if any("429" in error for error in errors):
         alerts.append({"severity": "warning", "code": "ESPN_RATE_LIMIT_429"})
     if any("403" in error for error in errors):
@@ -326,15 +391,18 @@ def scoring_operations_report(db: Session, *, season: int, week: int, now: datet
     if freshness.state in {"delayed", "stale"}:
         alerts.append({"severity": "warning", "code": f"PROVIDER_DATA_{freshness.state.upper()}"})
     if unmatched:
-        alerts.append({"severity": "warning", "code": "UNMATCHED_LIVE_PLAYER_ROWS"})
+        alerts.append({"severity": "warning", "code": "UNMATCHED_LIVE_PLAYER_ROWS", "resource_key": "open-identity-rows"})
     stale_rejections = sum(row.stale_snapshot_count for row in game_polls)
     ambiguous_quarantines = sum(row.ambiguous_snapshot_count for row in game_polls)
-    pending_final_corrections = sum(row.pending_final_correction_count for row in game_polls)
-    # A single rejected response can be normal CDN/provider behavior.  Repeated
-    # unresolved ordering evidence needs an operator without noisy live alerts.
-    if stale_rejections >= 3:
+    pending_final_corrections = sum(row.pending_final_snapshot_count for row in game_polls)
+    # Cumulative audit counters are intentionally never reset. Alert only on
+    # currently unresolved ordering evidence, not an old response that was
+    # later superseded by a valid snapshot.
+    active_stale_rejections = sum(row.last_snapshot_classification == "STALE" for row in game_polls)
+    active_ambiguous_quarantines = sum(row.last_snapshot_classification == "AMBIGUOUS" for row in game_polls)
+    if active_stale_rejections >= 3:
         alerts.append({"severity": "warning", "code": "REPEATED_STALE_PROVIDER_SNAPSHOTS"})
-    if ambiguous_quarantines >= 3:
+    if active_ambiguous_quarantines >= 3:
         alerts.append({"severity": "warning", "code": "REPEATED_AMBIGUOUS_PROVIDER_SNAPSHOTS"})
     if pending_final_corrections:
         alerts.append({"severity": "error", "code": "PENDING_FINAL_CORRECTION_REVIEW"})
@@ -358,6 +426,7 @@ def scoring_operations_report(db: Session, *, season: int, week: int, now: datet
             "stale_snapshot_rejection_count": stale_rejections,
             "ambiguous_snapshot_quarantine_count": ambiguous_quarantines,
             "pending_final_correction_count": pending_final_corrections,
+            "quarantined_game_count": sum(row.status == "quarantined" for row in game_polls),
         },
         "identity": {"open_unmatched_live_rows": unmatched},
         "freshness": {"state": freshness.state, "data_age_seconds": freshness.data_age_seconds, "relevant_game_count": freshness.relevant_game_count},

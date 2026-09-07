@@ -15,6 +15,7 @@ from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbeat
+from collegefootballfantasy_api.app.models.scoring_alert_incident import ScoringAlertIncident
 from collegefootballfantasy_api.app.services.live_scoring_readiness import (
     PublicScoringPreflightError,
     assert_public_scoring_ready,
@@ -22,6 +23,7 @@ from collegefootballfantasy_api.app.services.live_scoring_readiness import (
     flat_field_goal_league_audit,
     public_scoring_preflight,
     scoring_operations_report,
+    emit_new_scoring_alert_incidents,
 )
 
 
@@ -262,6 +264,26 @@ def test_operations_report_surfaces_provider_failures_without_idle_alert_spam(db
     assert {alert["code"] for alert in report["alerts"]} == {
         "REPEATED_GAME_POLL_FAILURE", "ESPN_RATE_LIMIT_429", "ESPN_TIMEOUT", "PROVIDER_DATA_DELAYED",
     }
+
+
+def test_scoring_alert_incidents_emit_once_per_window_and_retain_occurrences(db_session):
+    alert = {"severity": "error", "code": "REPEATED_GAME_POLL_FAILURE", "resource_key": "401"}
+
+    first = emit_new_scoring_alert_incidents(
+        db_session, season=2026, week=1, alerts=[alert], now=NOW,
+    )
+    second = emit_new_scoring_alert_incidents(
+        db_session, season=2026, week=1, alerts=[alert], now=NOW + timedelta(minutes=1),
+    )
+    third = emit_new_scoring_alert_incidents(
+        db_session, season=2026, week=1, alerts=[alert], now=NOW + timedelta(minutes=16),
+    )
+
+    incident = db_session.query(ScoringAlertIncident).one()
+    assert first == [alert]
+    assert second == []
+    assert third == [alert]
+    assert incident.occurrence_count == 3
 
 
 def test_flat_field_goal_audit_never_changes_league_rules(db_session):

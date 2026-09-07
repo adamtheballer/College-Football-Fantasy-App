@@ -60,6 +60,15 @@ DEFAULT_GAME_LEASE_SECONDS = 120
 MAX_GAME_CLAIMS_PER_CYCLE = 5
 DISCOVERY_INTERVAL_SECONDS = 180
 FINAL_RECONCILIATION_INTERVAL_SECONDS = 900
+# One exact duplicate after a final response is sufficient to establish a
+# stable provider result. Keep a slow safety reconciliation, not an expensive
+# forever-loop through completed game summaries.
+STABLE_FINAL_RECONCILIATION_INTERVAL_SECONDS = 24 * 60 * 60
+# An unordered final correction is intentionally observed twice. The shorter
+# interval is only used while a correction candidate is awaiting confirmation.
+PENDING_FINAL_CORRECTION_RETRY_SECONDS = MIN_GAME_POLL_INTERVAL_SECONDS
+REPEATED_INCOMPLETE_GAME_FAILURE_THRESHOLD = 3
+QUARANTINED_GAME_RETRY_SECONDS = 60 * 60
 BLOCKED_PROVIDER_RETRY_SECONDS = 6 * 60 * 60
 # A malformed but reachable provider response is different from a provider
 # block.  Keep retrying it at the normal live-game cadence, and cap every
@@ -462,12 +471,15 @@ def classify_snapshot_order(
     *,
     candidate_hash: str,
     candidate: SnapshotOrderMetadata,
+    pending_final_snapshot_hash: str | None = None,
+    pending_final_snapshot_count: int = 0,
+    previous_scoring_hash: str | None = None,
 ) -> SnapshotOrderDecision:
     """Fail closed: content difference alone is never proof of newer data."""
 
     if previous is None:
         return SnapshotOrderDecision("NEWER", True, "initial_complete_snapshot")
-    if previous.snapshot_hash == candidate_hash:
+    if (previous_scoring_hash or previous.snapshot_hash) == candidate_hash:
         return SnapshotOrderDecision("DUPLICATE", False, "identical_accepted_payload")
 
     revision_comparison = _revision_comparison(previous, candidate)
@@ -485,6 +497,12 @@ def classify_snapshot_order(
     if previous_state == "final":
         if candidate.event_state != "final":
             return SnapshotOrderDecision("STALE", False, "final_state_regression")
+        if pending_final_snapshot_hash == candidate_hash and pending_final_snapshot_count >= 1:
+            return SnapshotOrderDecision(
+                "VERIFIED_CORRECTION",
+                True,
+                "confirmed_final_correction_without_provider_revision",
+            )
         return SnapshotOrderDecision("AMBIGUOUS", False, "ambiguous_final_correction_without_provider_revision")
 
     progress_comparison = _progress_comparison(previous, candidate)
@@ -500,6 +518,41 @@ def classify_snapshot_order(
 def _canonical_hash(payload: dict[str, Any]) -> str:
     serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _scoring_snapshot_hash(
+    summary: dict[str, Any],
+    normalized_rows: list[dict[str, Any]],
+    *,
+    status: str,
+) -> str:
+    """Hash only provider state capable of changing fantasy scoring.
+
+    ESPN can change display-only response metadata after a final. Hashing the
+    entire raw response turns that harmless churn into a false correction and
+    creates needless final-game polling/alerts. The normalized player rows
+    and game progression state are the complete scoring authority.
+    """
+
+    header = summary.get("header") if isinstance(summary, dict) else {}
+    competition = (
+        header.get("competitions", [])[0]
+        if isinstance(header, dict) and isinstance(header.get("competitions"), list) and header.get("competitions")
+        else {}
+    )
+    status_payload = competition.get("status") if isinstance(competition, dict) else {}
+    status_payload = status_payload if isinstance(status_payload, dict) else {}
+    ordered_rows = sorted(
+        normalized_rows,
+        key=lambda item: int(item.get("player_id", 0)) if isinstance(item, dict) else 0,
+    )
+    return _canonical_hash({
+        "status": status,
+        "state": _summary_status(summary, status),
+        "period": status_payload.get("period"),
+        "clock": status_payload.get("displayClock"),
+        "rows": ordered_rows,
+    })
 
 
 def _identity(value: object) -> str:
@@ -748,6 +801,8 @@ def _failure_policy(error: Exception, *, failure_count: int) -> tuple[str, int]:
     # around game end, so retry on the next allowed game poll rather than
     # exponentially backing off and leaving a finished game stale.
     if isinstance(error, ProviderDataIncompleteError):
+        if failure_count >= REPEATED_INCOMPLETE_GAME_FAILURE_THRESHOLD:
+            return "quarantined", QUARANTINED_GAME_RETRY_SECONDS
         return "delayed", MIN_GAME_POLL_INTERVAL_SECONDS
     if isinstance(error, httpx.HTTPStatusError):
         status = error.response.status_code
@@ -853,13 +908,12 @@ def discover_relevant_espn_games(
             # A blocked provider path remains blocked until the backoff expires;
             # scoreboard discovery must not accidentally clear that safety
             # state. A stale scoreboard response also cannot reopen a final.
-            if row.status != "blocked" and not (row.status == "final" and status != "final"):
+            if row.status not in {"blocked", "quarantined"} and not (row.status == "final" and status != "final"):
                 row.status = status
-            if status == "final" and row.last_success_at is not None:
-                row.next_poll_at = min(
-                    _as_utc(row.next_poll_at) or now,
-                    now + timedelta(seconds=FINAL_RECONCILIATION_INTERVAL_SECONDS),
-                )
+            # Discovery must never wake a stable final game early. Its
+            # persisted reconciliation deadline is the durable authority.
+            if row.status == "final" and row.next_poll_at is None:
+                row.next_poll_at = now + timedelta(seconds=FINAL_RECONCILIATION_INTERVAL_SECONDS)
     return discovered
 
 
@@ -888,7 +942,7 @@ def claim_due_espn_games(
             # ESPN legitimately omits player box-score rows before kickoff;
             # requesting their summaries treats that normal pregame response
             # as a failure and can falsely mark the entire scoring week stale.
-            ProviderGamePoll.status.in_(("live", "final", "delayed")),
+            ProviderGamePoll.status.in_(("live", "final", "delayed", "quarantined")),
             or_(ProviderGamePoll.next_poll_at.is_(None), ProviderGamePoll.next_poll_at <= now),
             or_(ProviderGamePoll.lease_expires_at.is_(None), ProviderGamePoll.lease_expires_at <= now),
         )
@@ -919,9 +973,9 @@ def _store_snapshot(
     status: str,
     ordering: SnapshotOrderMetadata,
     decision: SnapshotOrderDecision,
+    snapshot_hash: str,
     now: datetime,
 ) -> ProviderGameSnapshot:
-    snapshot_hash = _canonical_hash(summary)
     # Rejected provider responses must be recorded for ordering/audit
     # visibility, but retaining every full ESPN box score for an unchanged or
     # ambiguous final response is unbounded storage growth. A completed game
@@ -1071,10 +1125,22 @@ def record_espn_game_success(
         raise LookupError("claimed ESPN game no longer exists")
     status = _summary_status(summary, row.status)
     ordering = _provider_order_metadata(summary, response_metadata)
+    candidate_hash = _scoring_snapshot_hash(summary, normalized_rows, status=status)
+    previous_snapshot = _accepted_snapshot(db, row)
+    previous_scoring_hash = None
+    if previous_snapshot is not None and previous_snapshot.raw_payload and previous_snapshot.normalized_rows:
+        previous_scoring_hash = _scoring_snapshot_hash(
+            previous_snapshot.raw_payload,
+            previous_snapshot.normalized_rows,
+            status=previous_snapshot.status,
+        )
     decision = classify_snapshot_order(
-        _accepted_snapshot(db, row),
-        candidate_hash=_canonical_hash(summary),
+        previous_snapshot,
+        candidate_hash=candidate_hash,
         candidate=ordering,
+        pending_final_snapshot_hash=row.pending_final_snapshot_hash,
+        pending_final_snapshot_count=row.pending_final_snapshot_count,
+        previous_scoring_hash=previous_scoring_hash,
     )
     snapshot = _store_snapshot(
         db,
@@ -1084,6 +1150,7 @@ def record_espn_game_success(
         status=status,
         ordering=ordering,
         decision=decision,
+        snapshot_hash=candidate_hash,
         now=now,
     )
     row.last_captured_at = now
@@ -1101,6 +1168,11 @@ def record_espn_game_success(
         row.ambiguous_snapshot_count += 1
         if (row.status == "final" or status == "final"):
             row.pending_final_correction_count += 1
+            if row.pending_final_snapshot_hash == candidate_hash:
+                row.pending_final_snapshot_count += 1
+            else:
+                row.pending_final_snapshot_hash = candidate_hash
+                row.pending_final_snapshot_count = 1
     else:
         row.accepted_snapshot_count += 1
     if decision.accepted:
@@ -1111,13 +1183,21 @@ def record_espn_game_success(
         # consumers; rejected captures never overwrite canonical data.
         row.latest_snapshot_hash = snapshot.snapshot_hash
         row.latest_payload = summary
-    interval = (
-        FINAL_RECONCILIATION_INTERVAL_SECONDS
-        if row.status == "final"
-        else PRE_KICKOFF_POLL_INTERVAL_SECONDS
-        if row.status == "scheduled"
-        else MIN_GAME_POLL_INTERVAL_SECONDS
-    )
+        row.pending_final_snapshot_hash = None
+        row.pending_final_snapshot_count = 0
+        if decision.verified_final_correction:
+            row.final_stable_at = None
+    if row.status == "final" and decision.classification == "DUPLICATE":
+        row.final_stable_at = now
+        interval = STABLE_FINAL_RECONCILIATION_INTERVAL_SECONDS
+    elif row.status == "final" and decision.classification == "AMBIGUOUS":
+        interval = PENDING_FINAL_CORRECTION_RETRY_SECONDS
+    elif row.status == "final":
+        interval = FINAL_RECONCILIATION_INTERVAL_SECONDS
+    elif row.status == "scheduled":
+        interval = PRE_KICKOFF_POLL_INTERVAL_SECONDS
+    else:
+        interval = MIN_GAME_POLL_INTERVAL_SECONDS
     row.next_poll_at = now + timedelta(seconds=interval)
     db.commit()
     return decision
@@ -1141,6 +1221,7 @@ def record_espn_game_failure(
     row.lease_owner = None
     row.lease_expires_at = None
     row.next_poll_at = now + timedelta(seconds=retry_seconds)
+    row.quarantine_until = row.next_poll_at if status == "quarantined" else None
     db.commit()
     return row
 
