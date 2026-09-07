@@ -1171,6 +1171,72 @@ def _assert_complete_espn_summary(
         raise ProviderDataIncompleteError("ESPN summary is missing a previously verified player row")
 
 
+def _reconcile_finally_removed_player_rows(
+    db: Session,
+    *,
+    claim: ClaimedGame,
+    summary: dict[str, Any],
+    normalized_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Represent an official final-feed removal as a zeroed player line.
+
+    ESPN can legitimately remove a previously published, nonzero live stat
+    line when it corrects the official box score after a game ends. The old
+    all-or-nothing completeness guard mistook that correction for a partial
+    response and prevented every player in the game from finalizing.
+
+    This narrow reconciliation applies only after ESPN explicitly reports a
+    final game and the response still contains a nonempty player box score.
+    The removed player is kept in the canonical row set with identifying
+    metadata only, so downstream scoring replaces the stale live totals with
+    zero instead of silently retaining them. Live and non-final partial
+    responses continue through the fail-closed completeness guard.
+    """
+
+    if _summary_status(summary, "scheduled") != "final":
+        return normalized_rows
+
+    poll = db.get(ProviderGamePoll, claim.id)
+    previous_snapshot = _accepted_snapshot(db, poll) if poll is not None else None
+    if previous_snapshot is None:
+        return normalized_rows
+
+    previous_rows = [
+        item
+        for item in (previous_snapshot.normalized_rows or [])
+        if isinstance(item, dict) and item.get("player_id") is not None and isinstance(item.get("stats"), dict)
+    ]
+    current_ids = {int(item["player_id"]) for item in normalized_rows}
+    unrostered_kicker_ids = _unrostered_kicker_ids(
+        db,
+        season=claim.season,
+        player_ids={int(item["player_id"]) for item in previous_rows},
+    )
+    removed_rows = [
+        item
+        for item in previous_rows
+        if int(item["player_id"]) not in current_ids and int(item["player_id"]) not in unrostered_kicker_ids
+    ]
+    if not removed_rows:
+        return normalized_rows
+
+    reconciled = list(normalized_rows)
+    for previous in removed_rows:
+        prior_stats = previous["stats"]
+        # Preserve only identity/context fields. Omitting every scoring field
+        # deliberately promotes this official correction as a zero stat line.
+        zero_stats = {
+            key: prior_stats[key]
+            for key in ("provider", "EventID", "ESPNPlayerID", "PlayerName", "Team", "School", "TeamAliases")
+            if key in prior_stats
+        }
+        zero_stats["provider"] = ESPN_PROVIDER
+        zero_stats["EventID"] = claim.provider_game_id
+        zero_stats["espn_field_goal_distance_detail_available"] = True
+        reconciled.append({"player_id": int(previous["player_id"]), "stats": zero_stats})
+    return reconciled
+
+
 def _backfill_accepted_final_espn_game_stats(
     db: Session,
     *,
@@ -1476,6 +1542,12 @@ def run_espn_scoring_cycle(
                 week=week,
                 summary=summary,
                 strict_identity=True,
+            )
+            normalized = _reconcile_finally_removed_player_rows(
+                db,
+                claim=claim,
+                summary=summary,
+                normalized_rows=normalized,
             )
             _assert_complete_espn_summary(
                 db,

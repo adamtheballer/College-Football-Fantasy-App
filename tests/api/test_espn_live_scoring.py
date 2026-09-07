@@ -1267,6 +1267,50 @@ def test_empty_or_partial_summary_preserves_last_verified_cumulative_totals(db_s
     assert db_session.query(PlayerStat).filter_by(player_id=wingo.id, season=2026, week=1).one().stats["rec_yards"] == first_wingo
 
 
+def test_final_provider_correction_that_removes_a_live_player_line_zeroes_only_that_player(db_session):
+    """A complete final ESPN feed may retract a stat credited during the game."""
+
+    arch, wingo = _verified_players(db_session)
+    _make_public_promotion_ready(db_session, at=NOW)
+    first = run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="enabled",
+        client=FakeLiveESPN(summary=espn_summary_payload()),
+        now=NOW,
+        relevant_team_names={"texas"},
+    )
+    assert first.promoted_rows == 2
+    assert db_session.query(PlayerStat).filter_by(player_id=wingo.id, season=2026, week=1).one().stats["rec_yards"] > 0
+
+    # ESPN's official final correction removes every fantasy-stat category for
+    # Wingo while retaining a complete box score for the rest of the game.
+    corrected_final = _final_summary(pass_yards=300)
+    for category in corrected_final["boxscore"]["players"][0]["statistics"]:
+        if category["name"] in {"receiving", "fumbles", "puntReturns"}:
+            category["athletes"] = []
+    poll = _poll_due(db_session, at=NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS))
+    _make_public_promotion_ready(db_session, at=NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS))
+    corrected = run_espn_scoring_cycle(
+        db_session,
+        season=2026,
+        week=1,
+        mode="enabled",
+        client=FakeLiveESPN(summary=corrected_final),
+        now=NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS),
+        relevant_team_names={"texas"},
+    )
+
+    assert corrected.successful_games == 1
+    db_session.refresh(poll)
+    assert poll.status == "final"
+    assert db_session.query(PlayerStat).filter_by(player_id=wingo.id, season=2026, week=1).one().stats.get("rec_yards", 0) == 0
+    final_line = db_session.query(PlayerGameStat).filter_by(player_id=wingo.id, season=2026, week=1).one()
+    assert final_line.stats.get("rec_yards", 0) == 0
+    assert db_session.query(PlayerStat).filter_by(player_id=arch.id, season=2026, week=1).one().stats["pass_yards"] == 300
+
+
 def test_two_claimers_cannot_claim_the_same_due_game(db_session):
     discover_relevant_espn_games(
         db_session,
