@@ -286,6 +286,25 @@ def test_scoring_alert_incidents_emit_once_per_window_and_retain_occurrences(db_
     assert incident.occurrence_count == 3
 
 
+def test_operations_report_does_not_alert_on_historical_ambiguous_snapshot_audit_rows(db_session):
+    _ready_baseline(db_session)
+    db_session.add(ProviderGamePoll(
+        provider="espn",
+        provider_game_id="401",
+        season=2026,
+        week=1,
+        status="final",
+        last_snapshot_classification="AMBIGUOUS",
+        ambiguous_snapshot_count=25,
+        pending_final_snapshot_count=0,
+    ))
+    db_session.commit()
+
+    report = scoring_operations_report(db_session, season=2026, week=1, now=NOW)
+
+    assert "REPEATED_AMBIGUOUS_PROVIDER_SNAPSHOTS" not in {alert["code"] for alert in report["alerts"]}
+
+
 def test_flat_field_goal_audit_never_changes_league_rules(db_session):
     flat = League(name="Legacy Flat FG", season_year=2026, status="pre_draft")
     tiered = League(name="Tiered FG", season_year=2026, status="active")
