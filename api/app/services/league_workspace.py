@@ -14,7 +14,10 @@ from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
-from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week, resolve_current_week
+from collegefootballfantasy_api.app.services.league_weeks import (
+    calendar_cfb_week,
+    resolve_matchup_display_week,
+)
 from collegefootballfantasy_api.app.schemas.league_flow import (
     DraftOrderEntryRead,
     DraftOrderRead,
@@ -258,7 +261,7 @@ def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspace
 
 
 def resolve_default_matchup_week(db: Session, league: League) -> int | None:
-    return resolve_current_week(db, league)
+    return resolve_matchup_display_week(db, league)
 
 
 def build_scoreboard_rows(db: Session, league: League, week: int | None = None) -> list[LeagueScoreboardRow]:

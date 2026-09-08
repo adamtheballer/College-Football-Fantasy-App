@@ -65,7 +65,11 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     PlayerPopularitySnapshotRead as PlayerPopularitySnapshotSchemaRead,
 )
 from collegefootballfantasy_api.app.schemas.waiver import WaiverDropCandidateRead
-from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week, resolve_current_week
+from collegefootballfantasy_api.app.services.league_weeks import (
+    calendar_cfb_week,
+    resolve_current_week,
+    resolve_matchup_display_week,
+)
 from collegefootballfantasy_api.app.services.fantasy_game_selection import fantasy_games_by_school, fantasy_stat_weeks
 from collegefootballfantasy_api.app.services.espn_live_scoring import espn_week_freshness
 from collegefootballfantasy_api.app.services.injury_status import is_current_injury_designation, normalize_injury_status
@@ -1133,7 +1137,10 @@ def build_matchup_tab_view(
     selected_week: int | None = None,
     matchup_id: int | None = None,
 ) -> LeagueMatchupTabRead:
-    week = resolve_current_week(db, league, selected_week)
+    # Hold the completed matchup through Tuesday while standings and scoring
+    # have already rolled over. Roster and waiver flows still use the active
+    # operational week; this is deliberately presentation-only.
+    week = resolve_matchup_display_week(db, league, selected_week)
     week_started = _week_has_started(db, season=league.season_year, week=week)
     freshness_read = LiveScoringFreshnessRead(
         state="unavailable",

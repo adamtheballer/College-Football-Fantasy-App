@@ -30,9 +30,10 @@ from collegefootballfantasy_api.app.scoring import calculate_fantasy_points
 POSTGAME_PROJECTION_VERSION = "MIDWEEK"
 POSTGAME_MODEL_VERSION = "postgame_espn_v2"
 # One certified performance miss informs the next projection, but Week 1 is
-# still a small sample. Reduce the residual's influence by five percentage
-# points so a single outlier cannot cause an abrupt ROS-board swing.
-PERFORMANCE_RESIDUAL_WEIGHT = 0.17
+# still a small sample. Limit a single performance to a conservative 12% of
+# its capped residual so it informs the next matchup without re-pricing a
+# whole fantasy lineup around one outlier.
+PERFORMANCE_RESIDUAL_WEIGHT = 0.12
 MAX_RESIDUAL_SHARE = 0.75
 MAX_PROJECTION_ADJUSTMENT_SHARE = 0.30
 
@@ -56,8 +57,8 @@ def performance_residual_adjustment(
     """Return a conservative Week N result adjustment for Week N+1.
 
     The next-game matchup model remains the primary forecast.  A certified
-    performance miss contributes 22% of its capped residual, so a 14-point
-    shortfall moves the next projection by about three points rather than
+    performance miss contributes 12% of its capped residual, so a 14-point
+    shortfall moves the next projection by less than two points rather than
     treating one outlier as a permanent new talent level.
     """
 

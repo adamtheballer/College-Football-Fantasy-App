@@ -4,6 +4,7 @@ import {
   Bell,
   Clock,
   ShieldCheck,
+  Trophy,
 } from "lucide-react";
 
 import { EmptyState, SkeletonState } from "@/components/states";
@@ -17,7 +18,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLeagueWorkspace, useLeagues } from "@/hooks/use-leagues";
 import { apiGet } from "@/lib/api";
 import type { LeagueDetail } from "@/types/league";
-import SaturdayPick6 from "./SaturdayPick6";
 
 type AlertItem = {
   id: number;
@@ -72,6 +72,27 @@ export const isUpcomingDraft = (league: LeagueDetail, now = Date.now()) => {
   const timestamp = new Date(scheduledAt).getTime();
   return Number.isFinite(timestamp) && timestamp > now;
 };
+
+export function SaturdayPick6HomeFeature() {
+  return (
+    <SurfaceCard variant="default" padding="default" className="border-cfb-gold/35 bg-cfb-surface-raised">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cfb-gold/45 bg-cfb-canvas text-cfb-gold">
+            <Trophy className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="cfb-micro-label text-cfb-gold">Saturday Pick 6</p>
+            <p className="mt-1 text-sm font-semibold text-cfb-text-secondary">Make your pick and view this week&apos;s contest.</p>
+          </div>
+        </div>
+        <Button asChild variant="outline" className="shrink-0 border-cfb-gold/50 text-cfb-gold hover:bg-cfb-gold/10 hover:text-cfb-gold">
+          <Link to="/saturday-pick-6">Open Pick 6</Link>
+        </Button>
+      </div>
+    </SurfaceCard>
+  );
+}
 
 function GuestHome() {
   return (
@@ -239,7 +260,7 @@ export default function Index() {
         )}
       </section>
 
-      <SaturdayPick6 embedded />
+      <SaturdayPick6HomeFeature />
 
       <section className="grid gap-4 xl:grid-cols-2">
         <SurfaceCard variant="default" padding="none">

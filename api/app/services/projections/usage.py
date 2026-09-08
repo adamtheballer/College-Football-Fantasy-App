@@ -13,6 +13,14 @@ from collegefootballfantasy_api.app.services.projections.constants import (
 )
 
 
+# A single final box score is informative, but it is not a complete role
+# forecast. Keep most of the established depth-chart prior in the first
+# postgame outlook so a one-game target/carry outlier cannot collapse the
+# following week's projection. This also protects provider payloads that omit
+# targets or carries for an otherwise valid final box score.
+SINGLE_GAME_USAGE_OBSERVED_WEIGHT = 0.35
+
+
 def _stat_value(stats: dict[str, Any], keys: list[str]) -> float:
     for key in keys:
         if key in stats and stats[key] is not None:
@@ -40,64 +48,38 @@ def compute_usage_shares(
             team_rush_attempts += _stat_value(stats, ["RushingAttempts", "RushAttempts"])
             team_targets += _stat_value(stats, ["ReceivingTargets", "Targets"])
 
-        # If no stats yet, fall back to defaults by position
-        if team_rush_attempts == 0.0:
-            rbs = [p for p in roster if p.position.upper() == "RB"]
-            for idx, rb in enumerate(sorted(rbs, key=lambda p: p.name)):
-                share = DEFAULT_RB_CARRY_SHARES[min(idx, len(DEFAULT_RB_CARRY_SHARES) - 1)]
-                shares.append(
-                    UsageShare(
-                        player_id=rb.id,
-                        season=season,
-                        week=week,
-                        rush_share=share,
-                        target_share=DEFAULT_RB_TARGET_SHARE / max(len(rbs), 1),
-                        red_zone_share=share,
-                        inside_five_share=share,
-                        snap_share=share,
-                        route_share=DEFAULT_RB_TARGET_SHARE / max(len(rbs), 1),
-                    )
-                )
-            wrs = [p for p in roster if p.position.upper() == "WR"]
-            for idx, wr in enumerate(sorted(wrs, key=lambda p: p.name)):
-                share = DEFAULT_WR_TARGET_SHARES[min(idx, len(DEFAULT_WR_TARGET_SHARES) - 1)]
-                shares.append(
-                    UsageShare(
-                        player_id=wr.id,
-                        season=season,
-                        week=week,
-                        rush_share=0.0,
-                        target_share=share,
-                        red_zone_share=share,
-                        inside_five_share=share,
-                        snap_share=share,
-                        route_share=share,
-                    )
-                )
-            tes = [p for p in roster if p.position.upper() == "TE"]
-            for idx, te in enumerate(sorted(tes, key=lambda p: p.name)):
-                share = DEFAULT_TE_TARGET_SHARE / max(len(tes), 1)
-                shares.append(
-                    UsageShare(
-                        player_id=te.id,
-                        season=season,
-                        week=week,
-                        rush_share=0.0,
-                        target_share=share,
-                        red_zone_share=share,
-                        inside_five_share=share,
-                        snap_share=share,
-                        route_share=share,
-                    )
-                )
-            continue
+        rbs = sorted((player for player in roster if player.position.upper() == "RB"), key=lambda player: player.name)
+        wrs = sorted((player for player in roster if player.position.upper() == "WR"), key=lambda player: player.name)
+        tes = sorted((player for player in roster if player.position.upper() == "TE"), key=lambda player: player.name)
+        fallback_rush_share = {
+            player.id: DEFAULT_RB_CARRY_SHARES[min(index, len(DEFAULT_RB_CARRY_SHARES) - 1)]
+            for index, player in enumerate(rbs)
+        }
+        fallback_target_share = {
+            **{player.id: DEFAULT_RB_TARGET_SHARE / max(len(rbs), 1) for player in rbs},
+            **{
+                player.id: DEFAULT_WR_TARGET_SHARES[min(index, len(DEFAULT_WR_TARGET_SHARES) - 1)]
+                for index, player in enumerate(wrs)
+            },
+            **{player.id: DEFAULT_TE_TARGET_SHARE / max(len(tes), 1) for player in tes},
+        }
 
         for player in roster:
             stats = player_stats.get(player.id, {})
             rush_attempts = _stat_value(stats, ["RushingAttempts", "RushAttempts"])
             targets = _stat_value(stats, ["ReceivingTargets", "Targets"])
-            rush_share = rush_attempts / max(team_rush_attempts, 1.0)
-            target_share = targets / max(team_targets, 1.0)
+            default_rush = fallback_rush_share.get(player.id, 0.0)
+            default_target = fallback_target_share.get(player.id, 0.0)
+            observed_rush = rush_attempts / team_rush_attempts if team_rush_attempts > 0 else default_rush
+            observed_target = targets / team_targets if team_targets > 0 else default_target
+            rush_share = (
+                (1.0 - SINGLE_GAME_USAGE_OBSERVED_WEIGHT) * default_rush
+                + SINGLE_GAME_USAGE_OBSERVED_WEIGHT * observed_rush
+            )
+            target_share = (
+                (1.0 - SINGLE_GAME_USAGE_OBSERVED_WEIGHT) * default_target
+                + SINGLE_GAME_USAGE_OBSERVED_WEIGHT * observed_target
+            )
             shares.append(
                 UsageShare(
                     player_id=player.id,
