@@ -5,6 +5,7 @@ from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.services import player_season_rank
@@ -160,4 +161,51 @@ def test_week_zero_opener_is_the_only_week_one_rank_input_for_early_team(client,
     }
     assert normal_rank.json()["season_positional_rank"] == {
         "position": "WR", "rank": 1, "fantasy_points": 35.0, "through_week": 1,
+    }
+
+
+def test_rank_uses_selected_final_game_when_weekly_stat_import_is_missing(client, db_session):
+    recovered = _rankable_player(name="Recovered USC Receiver", position="WR", school="USC")
+    ordinary = _rankable_player(name="Ordinary Receiver", position="WR", school="Miami")
+    db_session.add_all([recovered, ordinary])
+    db_session.add(
+        Game(
+            external_id="usc-week-zero-final",
+            season=2026,
+            week=0,
+            home_team="USC",
+            away_team="San Jose State",
+            schedule_status="final",
+            start_date=datetime(2026, 8, 29, 23, tzinfo=timezone.utc),
+            home_points=42,
+            away_points=26,
+        )
+    )
+    db_session.flush()
+    game = db_session.query(Game).filter_by(external_id="usc-week-zero-final").one()
+    db_session.add_all([
+        PlayerGameStat(
+            player_id=recovered.id,
+            game_id=game.id,
+            season=2026,
+            week=0,
+            source="espn_final_boxscore",
+            stats={"receptions": 7, "rec_yards": 118, "rec_tds": 1},
+        ),
+        PlayerStat(
+            player_id=ordinary.id,
+            season=2026,
+            week=1,
+            verified=True,
+            stats={"fantasy_points": 20.0},
+        ),
+    ])
+    _finalize_week(db_session, week=1)
+    db_session.commit()
+
+    response = client.get(f"/players/{recovered.id}/card")
+
+    assert response.status_code == 200
+    assert response.json()["season_positional_rank"] == {
+        "position": "WR", "rank": 1, "fantasy_points": 24.8, "through_week": 1,
     }
