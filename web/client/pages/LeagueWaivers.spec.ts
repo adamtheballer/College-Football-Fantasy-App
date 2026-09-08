@@ -8,6 +8,7 @@ import {
   waiverPlayerCanBeClaimed,
   waiverProjectionLabel,
   waiverSearchMatches,
+  waiverWeekPointsClassName,
   waiverWeekPoints,
 } from "./LeagueWaivers";
 
@@ -28,6 +29,11 @@ describe("waiverWeekPoints", () => {
 
   it("retains the projection state when no verified final total exists", () => {
     expect(waiverWeekPoints(null, undefined, "UNAVAILABLE")).toEqual({ label: "—", isFinal: false });
+  });
+
+  it("uses a green treatment for verified final scores and does not color forecasts as completed", () => {
+    expect(waiverWeekPointsClassName(waiverWeekPoints(18.76, 12.34, "ACTIVE"))).toBe("text-emerald-300");
+    expect(waiverWeekPointsClassName(waiverWeekPoints(null, 12.34, "ACTIVE"))).toBe("text-cfb-text-primary");
   });
 });
 

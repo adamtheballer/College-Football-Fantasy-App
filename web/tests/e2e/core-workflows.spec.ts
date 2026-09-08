@@ -3141,7 +3141,7 @@ test.describe("critical browser workflows", () => {
 
     const archManningRow = page.getByText("Arch Manning").locator("xpath=ancestor::tr");
     await expect(page.getByTestId("waiver-week-points-801")).toHaveText("26.4");
-    await expect(page.getByTestId("waiver-week-points-801")).toHaveClass(/text-cfb-brand/);
+    await expect(page.getByTestId("waiver-week-points-801")).toHaveClass(/text-emerald-300/);
     await archManningRow.getByRole("button", { name: /^Watch$/i }).click();
     await expect(archManningRow.getByRole("button", { name: /^Watching$/i })).toBeVisible();
 
@@ -3172,7 +3172,7 @@ test.describe("critical browser workflows", () => {
     await expect(mobileRow).toBeVisible();
     await expect(mobileRow.getByText("Arch Manning")).toBeVisible();
     await expect(page.getByTestId("waiver-mobile-week-points-801")).toHaveText("26.4");
-    await expect(page.getByTestId("waiver-mobile-week-points-801")).toHaveClass(/text-cfb-brand/);
+    await expect(page.getByTestId("waiver-mobile-week-points-801")).toHaveClass(/text-emerald-300/);
     await expect(mobileRow.getByRole("button", { name: /Remove Arch Manning from watchlist/i })).toBeVisible();
     const playerBoard = page.getByTestId("league-player-board");
     const playerBoardBox = await playerBoard.boundingBox();
