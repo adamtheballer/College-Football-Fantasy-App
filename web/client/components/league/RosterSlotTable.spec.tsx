@@ -151,6 +151,23 @@ describe("RosterSlotTable", () => {
     expect(formatRosterPointValue(outReceiver, "projected")).toBe("0.0");
   });
 
+  it("renders a true bye as BYE with no opponent rather than a missing projection", () => {
+    const byeReceiver = {
+      ...projectedReceiver,
+      opponent: null,
+      game_location: "bye" as const,
+      projection_status: "BYE",
+      projected_points: null,
+      weekly_projected_fantasy_points: null,
+    };
+    render(<RosterSlotTable title="Starters" players={[byeReceiver]} />);
+
+    expect(screen.getAllByText("BYE").length).toBeGreaterThan(0);
+    expect(screen.getByText("Ohio State · BYE")).toBeTruthy();
+    expect(screen.queryByText("TBD")).toBeNull();
+    expect(formatRosterPointValue(byeReceiver, "projected")).toBe("BYE");
+  });
+
   it("uses persisted live points when the caller marks the table as live", () => {
     const liveReceiver = { ...projectedReceiver, live_points: 21.37, live_scoring_status: "live" };
     render(<RosterSlotTable title="Starters" players={[liveReceiver]} pointMode="live" />);

@@ -56,6 +56,9 @@ const weeklyProjectionLabel = (player: LeagueRosterPlayer) => {
   );
 };
 
+const playerHasBye = (player: LeagueRosterPlayer) =>
+  player.game_location === "bye" || player.projection_status?.toUpperCase() === "BYE";
+
 export type RosterPointMode = "projected" | "live";
 
 export const formatRosterPointValue = (player: LeagueRosterPlayer, pointMode: RosterPointMode) => {
@@ -486,7 +489,9 @@ export function RosterSlotTable({
                   </span>
                   <span className="truncate text-[10px] font-bold text-cfb-text-muted md:hidden">
                     {isRealPlayer
-                      ? [displaySchoolName(player.school ?? player.player_school), player.opponent ? `vs ${player.opponent}` : "Opponent TBD"].filter(Boolean).join(" · ")
+                      ? playerHasBye(player)
+                        ? [displaySchoolName(player.school ?? player.player_school), "BYE"].filter(Boolean).join(" · ")
+                        : [displaySchoolName(player.school ?? player.player_school), player.opponent ? `vs ${player.opponent}` : "Opponent TBD"].filter(Boolean).join(" · ")
                       : "Open roster slot"}
                   </span>
                   {!isFinalGame && gameTime ? (
@@ -517,7 +522,7 @@ export function RosterSlotTable({
                 {showPositionColumn ? (
                   <span className={cn("hidden font-black md:block", style.text)}>{position}</span>
                 ) : null}
-                <span className="hidden text-cfb-text-muted md:block">{isRealPlayer ? player.opponent ?? "TBD" : "—"}</span>
+                <span className="hidden text-cfb-text-muted md:block">{isRealPlayer && !playerHasBye(player) ? player.opponent ?? "TBD" : ""}</span>
                 <span className={cn("flex flex-col items-end text-right font-black tabular-nums", hasActualPoints ? "text-cfb-brand" : pointValueClassName ?? style.text)}>
                   <span className="text-[8px] uppercase tracking-[0.12em] text-cfb-text-muted md:hidden">{pointMode === "live" ? "Live" : "Proj"}</span>
                   {isLiveGame ? <Lock data-lineup-lock aria-label="Game in progress — lineup locked" className="mb-0.5 h-3 w-3 text-cfb-text-muted" /> : null}

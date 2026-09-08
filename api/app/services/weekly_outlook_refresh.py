@@ -24,6 +24,7 @@ from collegefootballfantasy_api.app.services.fantasy_week_finality import (
 from collegefootballfantasy_api.app.services.projections.engine import build_weekly_projections
 from collegefootballfantasy_api.app.services.projections.ranges import weighted_projection_outcomes
 from collegefootballfantasy_api.app.services.projections.usage import compute_usage_shares
+from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
 from collegefootballfantasy_api.app.scoring import calculate_fantasy_points
 
 
@@ -74,6 +75,14 @@ _BLENDED_FORECAST_FIELDS = (
     "neutral_baseline",
     "fantasy_points",
 )
+
+
+def _school_key(name: str | None) -> str | None:
+    """Use a stable key across player, schedule, and provider data sources."""
+
+    if not name:
+        return None
+    return canonical_school_name(name) or normalize_school(name)
 
 
 def _verified_fantasy_points(stats: dict | None, *, position: str) -> float | None:
@@ -309,13 +318,27 @@ def refresh_post_final_outlook(
         TeamSchedule.season == season,
         TeamSchedule.week == next_week,
     ).all()
-    scheduled_teams = {row.team_name for row in schedules if not row.is_bye and row.opponent_name}
+    scheduled_team_keys = {
+        key
+        for row in schedules
+        if not row.is_bye and row.opponent_name
+        if (key := _school_key(row.team_name)) is not None
+    }
     if completed_week == 0:
-        scheduled_teams.intersection_update(week_zero_teams)
-    if not scheduled_teams:
+        scheduled_team_keys.intersection_update(
+            key for team_name in week_zero_teams if (key := _school_key(team_name)) is not None
+        )
+    if not scheduled_team_keys:
         return {"status": "waiting_for_schedule", "projected_week": next_week, "projections": 0, "values": 0}
 
-    players = db.query(Player).filter(Player.school.in_(scheduled_teams)).all()
+    # Do not use a case-sensitive SQL ``IN`` match here. The player pool
+    # intentionally preserves source labels, including uppercase school
+    # values, while TeamSchedule uses public display labels.
+    players = [
+        player
+        for player in db.query(Player).all()
+        if _school_key(player.school) in scheduled_team_keys
+    ]
     stats_by_player = {
         row.player_id: row.stats
         for row in db.query(PlayerStat).filter(

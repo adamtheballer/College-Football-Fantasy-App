@@ -6,6 +6,7 @@ import pytest
 
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.live_player_projection import LivePlayerProjection
+from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
 from collegefootballfantasy_api.app.models.standing import Standing
@@ -100,6 +101,48 @@ def test_missing_or_bye_starters_reduce_matchup_inputs_without_hiding_probabilit
 
     assert _starter_projection_total([Starter()]) == 0.0
     assert _starter_live_totals([Starter()]) == (0.0, 0.0, 0.0, False)
+
+
+def test_matchup_roster_serializes_a_schedule_bye_as_bye_not_missing_projection(db_session):
+    league, home, away, _players, _matchup = create_scoring_fixture(db_session)
+    user = User(
+        first_name="Bye",
+        email="bye-matchup@example.com",
+        password_hash="hash",
+        api_token="bye-matchup-token",
+    )
+    db_session.add(user)
+    db_session.flush()
+    home.owner_user_id = user.id
+    db_session.add_all(
+        [
+            TeamSchedule(
+                team_name="Test",
+                season=2026,
+                week=2,
+                location="bye",
+                is_bye=True,
+                date_confirmed=True,
+            ),
+            Matchup(
+                league_id=league.id,
+                season=2026,
+                week=2,
+                home_team_id=home.id,
+                away_team_id=away.id,
+                status="scheduled",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = build_matchup_tab_view(db_session, league, user, selected_week=2)
+
+    player_row = next(row for row in response.my_roster if row.player_id is not None)
+    assert player_row.game_location == "bye"
+    assert player_row.opponent is None
+    assert player_row.projection_status == "BYE"
+    assert player_row.projected_points is None
 
 
 def test_matchup_tab_uses_a_bounded_number_of_selects(client, db_session):
