@@ -9,6 +9,7 @@ from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.services.player_trade_value import IN_SEASON_VALUE_POLICY_VERSION
 from collegefootballfantasy_api.app.services.weekly_outlook_refresh import (
     POSTGAME_PROJECTION_VERSION,
+    _blend_initial_postgame_outlooks,
     performance_residual_adjustment,
     refresh_post_final_outlook,
 )
@@ -229,3 +230,68 @@ def test_performance_residual_adjustment_is_weighted_and_bounded():
         projected_points=20.0,
         next_week_baseline=18.0,
     ) == 1.8
+
+
+def test_initial_postgame_outlook_keeps_a_substantial_preseason_baseline(db_session):
+    _league, players, _matchup = _finalized_week_one_fixture(db_session)
+    player = players["qb"]
+    preseason = WeeklyProjection(
+        player_id=player.id,
+        season=2026,
+        week=2,
+        projection_version="PRESEASON",
+        fantasy_points=20.0,
+        pass_yards=240.0,
+        expected_plays=35.0,
+    )
+    candidate = WeeklyProjection(
+        player_id=player.id,
+        season=2026,
+        week=2,
+        projection_version=POSTGAME_PROJECTION_VERSION,
+        fantasy_points=8.0,
+        pass_yards=120.0,
+        expected_plays=20.0,
+    )
+
+    _blend_initial_postgame_outlooks(
+        projections=[candidate],
+        preseason_by_player_id={player.id: preseason},
+        players_by_id={player.id: player},
+    )
+
+    # A single disappointing game must inform the next week without replacing
+    # the established weekly baseline wholesale.
+    assert candidate.fantasy_points == 13.4
+    assert candidate.pass_yards == 174.0
+    assert candidate.expected_plays == 26.75
+
+
+def test_initial_postgame_outlook_does_not_restore_an_out_player(db_session):
+    _league, players, _matchup = _finalized_week_one_fixture(db_session)
+    player = players["qb"]
+    candidate = WeeklyProjection(
+        player_id=player.id,
+        season=2026,
+        week=2,
+        projection_version=POSTGAME_PROJECTION_VERSION,
+        projection_status="OUT",
+        availability_multiplier=0.0,
+        fantasy_points=0.0,
+    )
+
+    _blend_initial_postgame_outlooks(
+        projections=[candidate],
+        preseason_by_player_id={
+            player.id: WeeklyProjection(
+                player_id=player.id,
+                season=2026,
+                week=2,
+                projection_version="PRESEASON",
+                fantasy_points=20.0,
+            )
+        },
+        players_by_id={player.id: player},
+    )
+
+    assert candidate.fantasy_points == 0.0
