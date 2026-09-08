@@ -265,9 +265,10 @@ def _live_game_context_by_player(
 ) -> dict[int, LiveGameContext]:
     """Map rostered schools to accepted ESPN game snapshots without I/O."""
 
+    selected_games = fantasy_games_by_school(db, season=season, week=week, games=games)
     school_to_game_id = {
         key: (str(game.external_id or "").strip() or None) if game else None
-        for key, game in fantasy_games_by_school(db, season=season, week=week, games=games).items()
+        for key, game in selected_games.items()
     }
     game_ids = {game_id for game_id in school_to_game_id.values() if game_id}
     polls = {
@@ -291,10 +292,14 @@ def _live_game_context_by_player(
     parsed: dict[str, tuple[LiveGameContext, set[str]]] = {}
     for player_id, school in player_schools.items():
         key = _school_key(school)
+        selected_game = selected_games.get(key) if key else None
+        game_is_final = selected_game is not None and (selected_game.schedule_status or "").lower() in {"final", "post"}
         game_id = school_to_game_id.get(key) if key else None
         poll, normalized_rows = polls.get(game_id, (None, None))
         if poll is None or not poll.accepted_snapshot_hash or not isinstance(poll.latest_payload, dict):
-            contexts[player_id] = LiveGameContext()
+            # Finality belongs to the game, not to whether this player has a
+            # counting-stat row or a retained provider snapshot.
+            contexts[player_id] = LiveGameContext(state="final" if game_is_final else "unavailable")
             continue
         if game_id not in parsed:
             parsed[game_id] = _summary_live_context(poll.latest_payload)
@@ -302,6 +307,7 @@ def _live_game_context_by_player(
         has_possession = bool(key and key in possession_keys)
         contexts[player_id] = replace(
             game_context,
+            state="final" if game_is_final else game_context.state,
             has_possession=has_possession,
             in_red_zone=bool(game_context.in_red_zone and has_possession),
             # Use the accepted exact-game row, including fields older live
