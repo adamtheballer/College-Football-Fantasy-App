@@ -497,7 +497,19 @@ def _is_final_game(game: Game | None) -> bool:
     return bool(game and (game.schedule_status or "").lower() in FINAL_GAME_STATUSES)
 
 
-def _featured_scoring_status(*, featured: SaturdayPickPlayer, game: Game | None, has_stats: bool, now: datetime) -> str:
+def _featured_scoring_status(
+    *,
+    featured: SaturdayPickPlayer,
+    game: Game | None,
+    has_stats: bool,
+    known_out: bool,
+    now: datetime,
+) -> str:
+    # A sourced, effective OUT designation is conclusive for this player's
+    # contest score. It must not remain indistinguishable from a provider
+    # outage just because an injured player has no box-score row.
+    if known_out:
+        return "FINAL"
     if _is_final_game(game):
         return "FINAL" if has_stats else "DATA_DELAYED"
     if as_utc(featured.game_time) > now:
@@ -511,8 +523,11 @@ def refresh_contest_live_scores(db: Session, contest: SaturdayPickContest) -> di
     """Refresh live Pick 6 scoring from the canonical game-stat records.
 
     Missing provider data is intentionally represented as ``DATA_DELAYED`` and
-    never converted to a zero-point score. The lifecycle worker finalizes
-    only after all six game statuses and stat lines have been resolved.
+    never converted to a zero-point score. The sole exception is a sourced
+    in-week OUT designation: that establishes a player's fantasy result is
+    conclusively 0.0 even though no game-stat row exists. The lifecycle worker
+    still waits for every other featured player to resolve before awarding a
+    reward.
     """
 
     if contest.status == "FINAL":
@@ -536,12 +551,21 @@ def refresh_contest_live_scores(db: Session, contest: SaturdayPickContest) -> di
             row.game_id = game.id
         stat = _featured_stat(db, contest, row)
         points = _score_stat(stat, row.canonical_position)
-        next_status = _featured_scoring_status(featured=row, game=game, has_stats=points is not None, now=now)
-        resolved_games += int(_is_final_game(game))
+        known_out = _is_known_out(db, row.player_id, contest.season, contest.week_number)
+        if points is None and known_out:
+            points = 0.0
+        next_status = _featured_scoring_status(
+            featured=row,
+            game=game,
+            has_stats=points is not None,
+            known_out=known_out,
+            now=now,
+        )
+        resolved_games += int(_is_final_game(game) or known_out)
         if points is not None and row.live_points != points:
             row.live_points = points
             updated += 1
-        if _is_final_game(game) and points is not None and row.final_points != points:
+        if (_is_final_game(game) or known_out) and points is not None and row.final_points != points:
             row.final_points = points
             updated += 1
         if row.scoring_status != next_status:
@@ -656,9 +680,17 @@ def refresh_open_pick_contests(db: Session) -> dict[str, int]:
 
 def _score_featured_player(db: Session, contest: SaturdayPickContest, featured: SaturdayPickPlayer) -> float | None:
     game = _featured_game(db, contest, featured)
+    points = _score_stat(_featured_stat(db, contest, featured), featured.canonical_position)
+    if points is not None:
+        return points
+    # Do not award a fabricated zero for a general provider delay. An explicit
+    # availability event is the narrowly-scoped evidence that this player's
+    # result is final at zero for the contest week.
+    if _is_known_out(db, featured.player_id, contest.season, contest.week_number):
+        return 0.0
     if not _is_final_game(game):
         return None
-    return _score_stat(_featured_stat(db, contest, featured), featured.canonical_position)
+    return None
 
 
 def finalize_contest(db: Session, contest: SaturdayPickContest) -> SaturdayPickContest:

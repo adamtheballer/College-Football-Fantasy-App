@@ -5,6 +5,7 @@ from conftest import admin_headers
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.player_availability_event import PlayerAvailabilityEvent
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.saturday_pick import SaturdayPickContest, SaturdayPickPlayer
 from collegefootballfantasy_api.app.models.saturday_pick import SaturdayPickContentAudit
@@ -367,6 +368,62 @@ def test_nonzero_team_scores_do_not_prove_final_and_missing_stats_never_award(cl
                                  source="test-verified", stats={"rush_yards": 50}))
     db_session.commit()
     assert refresh_open_pick_contests(db_session)["finalized"] == 1
+
+
+def test_confirmed_out_featured_player_scores_zero_and_unblocks_winner_reward(client, db_session, monkeypatch):
+    """A sourced OUT is a real zero, unlike an unresolved provider stat delay."""
+    from collegefootballfantasy_api.app.services.saturday_pick_service import refresh_open_pick_contests
+
+    _enable_pick_6(monkeypatch, sponsors=True)
+    players, kickoff = _featured_players(db_session, final_games=True)
+    headers = admin_headers(client)
+    created = client.post(
+        "/admin/saturday-pick-6",
+        json=_create_payload(players, kickoff, sponsor_name="Example Sponsor", sponsor_code="OUT-ZERO-WINNER"),
+        headers=headers,
+    ).json()
+    contest_id = created["id"]
+    assert client.post(f"/admin/saturday-pick-6/{contest_id}/publish", json={}, headers=headers).status_code == 200
+
+    signup = client.post("/auth/signup", json={"first_name": "Correct", "email": "correct@example.com", "password": "StrongPass123!"})
+    user_headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
+    assert client.put(
+        f"/saturday-pick-6/{contest_id}/entry",
+        json={"selected_pick_player_id": created["players"][0]["id"]},
+        headers=user_headers,
+    ).status_code == 200
+
+    contest = db_session.get(SaturdayPickContest, contest_id)
+    contest.lock_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    # The selected first player is the unambiguous contest winner.
+    winning_featured = db_session.query(SaturdayPickPlayer).filter_by(contest_id=contest_id, player_id=players[0].id).one()
+    winning_stat = db_session.query(PlayerGameStat).filter_by(player_id=players[0].id, game_id=winning_featured.game_id).one()
+    winning_stat.stats = {"pass_yards": 1_000, "pass_tds": 5}
+    out_featured = db_session.query(SaturdayPickPlayer).filter_by(contest_id=contest_id, player_id=players[-1].id).one()
+    db_session.query(PlayerGameStat).filter_by(player_id=players[-1].id, game_id=out_featured.game_id).delete()
+    db_session.add(PlayerAvailabilityEvent(
+        player_id=players[-1].id,
+        season=2026,
+        week=1,
+        status="OUT",
+        source="test injury report",
+        effective_from_week=1,
+        effective_until_week=1,
+    ))
+    db_session.commit()
+
+    result = refresh_open_pick_contests(db_session)
+    db_session.refresh(contest)
+    db_session.refresh(out_featured)
+    assert result["finalized"] == 1
+    assert contest.status == "FINAL"
+    assert out_featured.live_points == 0.0
+    assert out_featured.final_points == 0.0
+    assert out_featured.scoring_status == "FINAL"
+
+    reward = client.get("/saturday-pick-6/rewards", headers=user_headers)
+    assert reward.status_code == 200
+    assert reward.json()[0]["sponsor"]["code"] == "OUT-ZERO-WINNER"
 
 
 def test_weekly_publication_uses_published_ranks_at_reset_and_is_idempotent(client, db_session, monkeypatch):

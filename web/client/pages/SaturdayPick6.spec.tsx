@@ -40,6 +40,10 @@ describe("SaturdayPick6 state helpers", () => {
     expect(displayPoints({ ...player, live_points: 21.6, final_points: 23.1, scoring_status: "FINAL" }, "FINAL")).toBe(23.1);
   });
 
+  it("renders a confirmed zero rather than a pending projection during scoring", () => {
+    expect(displayPoints({ ...player, live_points: 0, final_points: 0 }, "SCORING")).toBe(0);
+  });
+
   it("renders provider states as readable labels", () => {
     expect(statusLabel("DATA_DELAYED")).toBe("DATA DELAYED");
     expect(statusLabel("NOT_STARTED")).toBe("NOT STARTED");
