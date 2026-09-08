@@ -11,12 +11,21 @@ from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjec
 from collegefootballfantasy_api.app.scoring import calculate_fantasy_points, get_scoring_rules
 from collegefootballfantasy_api.app.services.projections.efficiency import compute_efficiency
 from collegefootballfantasy_api.app.services.projections.ranges import weighted_projection_outcomes
+from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
 
 
 DEFAULT_QB = {"ypa": 7.5, "pass_td_rate": 0.05, "int_rate": 0.02, "rush_ypc": 4.5, "comp_pct": 0.62}
 DEFAULT_RB = {"ypc": 4.5, "ypt": 6.5, "catch_rate": 0.72}
 DEFAULT_WR = {"ypt": 8.5, "catch_rate": 0.62}
 DEFAULT_TE = {"ypt": 7.5, "catch_rate": 0.68}
+
+
+def _school_key(name: str | None) -> str | None:
+    """Match provider, schedule, and player-team labels without case drift."""
+
+    if not name:
+        return None
+    return canonical_school_name(name) or normalize_school(name)
 
 
 def _preseason_team_environment(player: Player, season: int, week: int) -> TeamEnvironment:
@@ -111,6 +120,25 @@ def build_weekly_projections(
     week: int,
 ) -> list[WeeklyProjection]:
     opponent_by_team = opponent_by_team or {}
+    # These inputs originate in separate provider feeds.  Raw display names
+    # are not stable keys (for example, a player can be ``NOTRE DAME`` while
+    # the schedule is ``Notre Dame``). Normalize once at the boundary so a
+    # valid schedule cannot silently remove an entire school's projections.
+    team_env_by_school = {
+        key: value
+        for team_name, value in team_env_by_team.items()
+        if (key := _school_key(team_name)) is not None
+    }
+    defense_by_school = {
+        key: value
+        for team_name, value in defense_by_team.items()
+        if (key := _school_key(team_name)) is not None
+    }
+    opponents_by_school = {
+        key: opponent
+        for team_name, opponent in opponent_by_team.items()
+        if (key := _school_key(team_name)) is not None
+    }
     rules = get_scoring_rules()
     projections: list[WeeklyProjection] = []
 
@@ -119,7 +147,8 @@ def build_weekly_projections(
         if position not in {"QB", "RB", "WR", "TE", "K", "PK"}:
             continue
 
-        stored_team_env = team_env_by_team.get(player.school)
+        school_key = _school_key(player.school)
+        stored_team_env = team_env_by_school.get(school_key)
         team_env = (
             stored_team_env
             if stored_team_env
@@ -137,8 +166,8 @@ def build_weekly_projections(
         injury = injuries_by_player.get(player.id)
         health = _health_multiplier(injury.status if injury else None)
 
-        opp_team = opponent_by_team.get(player.school)
-        defense = defense_by_team.get(opp_team) if opp_team else None
+        opp_team = opponents_by_school.get(school_key)
+        defense = defense_by_school.get(_school_key(opp_team)) if opp_team else None
 
         team_pass_attempts = team_env.expected_plays * team_env.pass_rate
         team_rush_attempts = team_env.expected_plays * team_env.rush_rate

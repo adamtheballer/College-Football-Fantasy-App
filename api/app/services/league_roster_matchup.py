@@ -669,7 +669,17 @@ def _serialize_roster_entry(
     now: datetime | None = None,
 ) -> RosterTabEntryRead:
     entry = roster_slot.entry
-    projected = float(projection.fantasy_points) if projection and projection.fantasy_points is not None else None
+    is_bye = game_location == "bye"
+    # A bye is not unavailable data and it is not a zero-point forecast. It
+    # has its own presentation state, with no opponent and no numeric
+    # projection, on both roster and matchup responses.
+    projected = (
+        None
+        if is_bye
+        else float(projection.fantasy_points)
+        if projection and projection.fantasy_points is not None
+        else None
+    )
     position = entry.player.position if entry and entry.player else None
     outcome_range = weighted_projection_outcomes(
         projection.fantasy_points if projection else None,
@@ -748,7 +758,15 @@ def _serialize_roster_entry(
         opponent=opponent,
         game_location=game_location,
         weekly_projected_fantasy_points=projected,
-        projection_status=(live_projection.projection_status if live_projection else projection.projection_status if projection else "UNAVAILABLE"),
+        projection_status=(
+            "BYE"
+            if is_bye
+            else live_projection.projection_status
+            if live_projection
+            else projection.projection_status
+            if projection
+            else "UNAVAILABLE"
+        ),
         live_points=current_points,
         live_scoring_status=player_score.status if player_score else "unavailable",
         live_scoring_updated_at=player_score.calculated_at if player_score else None,

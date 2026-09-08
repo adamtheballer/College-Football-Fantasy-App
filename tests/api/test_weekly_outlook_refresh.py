@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
+from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_trade_value import PlayerTradeValue
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
@@ -81,6 +82,56 @@ def test_post_final_refresh_updates_next_week_and_values_only_after_every_matchu
         .one()
     )
     assert value.value >= 0
+
+
+def test_post_final_refresh_matches_uppercase_player_school_to_title_case_schedule(db_session):
+    _league, _players, _matchup = _finalized_week_one_fixture(db_session)
+    notre_dame_qb = Player(
+        name="Case Safe Quarterback",
+        position="QB",
+        school="NOTRE DAME",
+        raw_cfb27_rating=90,
+        cfb27_overall=90,
+    )
+    db_session.add(notre_dame_qb)
+    db_session.flush()
+    db_session.add_all(
+        [
+            TeamSchedule(
+                team_name="Notre Dame",
+                season=2026,
+                week=2,
+                opponent_name="Rice",
+                location="home",
+                is_bye=False,
+                neutral_site=False,
+                conference_game=False,
+                date_confirmed=True,
+            ),
+            PlayerStat(
+                player_id=notre_dame_qb.id,
+                season=2026,
+                week=1,
+                source="espn_final_boxscore",
+                verified=True,
+                stats={"pass_yards": 240, "pass_tds": 2, "interceptions": 0},
+            ),
+        ]
+    )
+    db_session.commit()
+
+    result = refresh_post_final_outlook(db_session, season=2026, completed_week=1)
+
+    assert result["status"] == "refreshed"
+    projection = db_session.query(WeeklyProjection).filter_by(
+        player_id=notre_dame_qb.id,
+        season=2026,
+        week=2,
+        projection_version=POSTGAME_PROJECTION_VERSION,
+    ).one()
+    assert projection.is_published is True
+    assert projection.projection_status == "ACTIVE"
+    assert projection.fantasy_points > 0
 
 
 def test_week_zero_final_updates_only_affected_players_week_one_outlook_without_league_scoring(db_session):

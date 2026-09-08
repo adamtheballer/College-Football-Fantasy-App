@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.schemas.player import PlayerRead
 from collegefootballfantasy_api.app.services.player_lock_service import game_context_for_players
 
@@ -75,3 +76,31 @@ def test_game_context_and_player_responses_use_notre_dame_title_case(db_session)
 
     assert opponents[wisconsin_player.id] == "Notre Dame"
     assert PlayerRead.model_validate(notre_dame_player).model_dump(mode="json")["school"] == "Notre Dame"
+
+
+def test_game_context_uses_a_schedule_bye_when_no_game_row_exists(db_session):
+    player = Player(name="Bye Week Seminole", position="WR", school="FLORIDA STATE")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        TeamSchedule(
+            team_name="Florida State",
+            season=2026,
+            week=2,
+            location="bye",
+            is_bye=True,
+            date_confirmed=True,
+        )
+    )
+    db_session.commit()
+
+    starts, opponents, locations = game_context_for_players(
+        db_session,
+        player_ids={player.id},
+        season=2026,
+        week=2,
+    )
+
+    assert starts[player.id] is None
+    assert opponents[player.id] is None
+    assert locations[player.id] == "bye"

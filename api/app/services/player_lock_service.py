@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
 from collegefootballfantasy_api.app.services.fantasy_game_selection import opening_scoring_games
 
@@ -85,6 +86,35 @@ def game_context_for_players(
                 start = as_utc(game.start_date)
                 if away_key not in starts_by_school or start < starts_by_school[away_key]:
                     starts_by_school[away_key] = start
+
+    # The canonical games table is preferred because it provides a provider
+    # game identity and authoritative kickoff.  A true bye has no Game row,
+    # however, so complete the context from the schedule for schools that
+    # were not found above.  Do this by normalized key rather than raw text:
+    # player imports may store e.g. ``FLORIDA STATE`` while schedules use
+    # ``Florida State``.
+    unresolved_school_keys = school_keys.difference(locations_by_school)
+    if unresolved_school_keys:
+        schedule_rows = (
+            db.query(TeamSchedule)
+            .filter(TeamSchedule.season == season, TeamSchedule.week == week)
+            .order_by(TeamSchedule.id.asc())
+            .all()
+        )
+        for schedule in schedule_rows:
+            school_key = _school_schedule_key(schedule.team_name)
+            if school_key not in unresolved_school_keys:
+                continue
+            locations_by_school[school_key] = "bye" if schedule.is_bye else schedule.location
+            if schedule.is_bye:
+                # The opponent field is intentionally blank for a bye.  The
+                # typed location is the unambiguous signal used by every
+                # roster and matchup surface to render BYE.
+                continue
+            if schedule.opponent_name:
+                opponents_by_school[school_key] = _display_school_name(schedule.opponent_name)
+            if schedule.kickoff_at is not None:
+                starts_by_school[school_key] = as_utc(schedule.kickoff_at)
 
     player_school_keys = {
         player_id: _school_schedule_key(player_schools.get(player_id))
