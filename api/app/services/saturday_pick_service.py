@@ -595,9 +595,16 @@ def ensure_weekly_contest(db: Session) -> int:
         try:
             schedule = _eligible_schedule(db, player, season, week)
         except ValueError:
-            continue
+            schedule = db.query(TeamSchedule).filter_by(
+                team_name=player.school, season=season, week=week,
+            ).one_or_none()
+            if schedule and (schedule.is_bye or schedule.location == "bye"):
+                continue
+            # Unknown opponent/kickoff is missing data, not evidence that a
+            # higher-ranked player should be replaced with a lower rank.
+            return 0
         if as_utc(schedule.kickoff_at) <= utc_now():
-            continue
+            return 0
         selected_ids.append(player_id)
         if len(selected_ids) == 6:
             break

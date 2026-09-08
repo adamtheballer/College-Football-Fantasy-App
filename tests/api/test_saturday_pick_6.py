@@ -385,8 +385,17 @@ def test_weekly_publication_uses_published_ranks_at_reset_and_is_idempotent(clie
                                        projection_version="FINAL", is_published=True, projection_status="ACTIVE"))
     db_session.commit()
     ordered = list(reversed(players))
+    replacement = Player(name="Lower ranked replacement", position="WR", school="Replacement school")
+    db_session.add(replacement)
+    db_session.flush()
+    db_session.add(TeamSchedule(team_name=replacement.school, season=2026, week=2,
+                               opponent_name="Other opponent", location="home", is_bye=False,
+                               kickoff_at=datetime(2026, 9, 12, 18, tzinfo=timezone.utc)))
+    db_session.add(WeeklyProjection(player_id=replacement.id, season=2026, week=2, fantasy_points=10,
+                                   projection_version="FINAL", is_published=True, projection_status="ACTIVE"))
+    db_session.flush()
     monkeypatch.setattr(service, "season_positional_ranks", lambda *args, **kwargs: {
-        p.id: PlayerSeasonPositionalRank("WR", i + 1, 100 - i, 1) for i, p in enumerate(ordered)
+        p.id: PlayerSeasonPositionalRank("WR", i + 1, 100 - i, 1) for i, p in enumerate([*ordered, replacement])
     })
     monkeypatch.setattr(service, "utc_now", lambda: datetime(2026, 9, 8, 11, 59, 59, tzinfo=timezone.utc))
     assert service.ensure_weekly_contest(db_session) == 0
@@ -396,6 +405,16 @@ def test_weekly_publication_uses_published_ranks_at_reset_and_is_idempotent(clie
     db_session.flush()
     assert service.ensure_weekly_contest(db_session) == 0
     first_projection.is_published = True
+    db_session.flush()
+    first_schedule = db_session.query(TeamSchedule).filter_by(team_name=ordered[0].school, week=2).one()
+    kickoff = first_schedule.kickoff_at
+    first_schedule.kickoff_at = None
+    db_session.flush()
+    assert service.ensure_weekly_contest(db_session) == 0
+    first_schedule.kickoff_at = datetime(2026, 9, 8, 11, tzinfo=timezone.utc)
+    db_session.flush()
+    assert service.ensure_weekly_contest(db_session) == 0
+    first_schedule.kickoff_at = kickoff
     db_session.flush()
     assert service.ensure_weekly_contest(db_session) == 1
     contest = db_session.query(SaturdayPickContest).filter_by(week_number=2).one()
