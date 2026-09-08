@@ -8,7 +8,8 @@ describe("SaturdayPick6HomeFeature", () => {
   it("links to Pick 6 without mounting the contest results on Home", () => {
     render(<MemoryRouter><SaturdayPick6HomeFeature /></MemoryRouter>);
 
-    expect(screen.getByRole("link", { name: "Open Pick 6" }).getAttribute("href")).toBe("/saturday-pick-6");
+    expect(screen.getByRole("link", { name: "Make Your Pick" }).getAttribute("href")).toBe("/saturday-pick-6");
+    expect(screen.getByRole("link", { name: "Open Saturday Pick 6 event" }).getAttribute("href")).toBe("/saturday-pick-6");
     expect(screen.queryByText("Live Results")).toBeNull();
   });
 });

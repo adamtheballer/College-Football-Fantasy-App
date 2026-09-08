@@ -86,9 +86,17 @@ export function SaturdayPick6HomeFeature() {
             <p className="mt-1 text-sm font-semibold text-cfb-text-secondary">Make your pick and view this week&apos;s contest.</p>
           </div>
         </div>
-        <Button asChild variant="outline" className="shrink-0 border-cfb-gold/50 text-cfb-gold hover:bg-cfb-gold/10 hover:text-cfb-gold">
-          <Link to="/saturday-pick-6">Open Pick 6</Link>
-        </Button>
+        <div className="flex shrink-0 items-center gap-3">
+          <Link
+            to="/saturday-pick-6"
+            className="text-xs font-semibold text-cfb-text-secondary underline-offset-4 hover:text-cfb-gold hover:underline"
+          >
+            Open Saturday Pick 6 event
+          </Link>
+          <Button asChild variant="outline" className="border-cfb-gold/50 text-cfb-gold hover:bg-cfb-gold/10 hover:text-cfb-gold">
+            <Link to="/saturday-pick-6">Make Your Pick</Link>
+          </Button>
+        </div>
       </div>
     </SurfaceCard>
   );
