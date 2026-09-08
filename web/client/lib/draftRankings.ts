@@ -178,9 +178,22 @@ const QB_STARTER_PROJECTION_FLOOR = 180;
 const QB_SOURCE_RANK_OUTLIER_GAP = 24;
 const QB_PROJECTION_RANK_BUFFER = 12;
 const EARLY_QB_ROUNDS = 6;
+// The first certified game can reveal a real role change, but it is too small
+// a sample to replace the published first-tier master board. Keep healthy
+// elite source players within a short, provisional range for that one-game
+// window. The guard expires as soon as the ROS service has two completed
+// weeks, leaving the established projection/positional-value model in charge.
+const ONE_GAME_STABILITY_WEEK = 1;
+const ONE_GAME_ELITE_SOURCE_RANK_CUTOFF = 6;
+const ONE_GAME_MAX_SOURCE_RANK_DISPLACEMENT = 3;
 
 const getProvidedBoardRank = (player: Player) => {
-  const candidates = [player.restOfSeasonRank, player.boardRank, player.adp, player.rank];
+  // Rest-of-season rank is a raw, cross-position projection-total ordering.
+  // It is useful to calculate a player's current forecast, but it is not a
+  // substitute for the reviewed master-board / positional-value source rank.
+  // Making it the primary rank after Week 1 let one weekly refresh replace an
+  // elite RB's established positional value with a low overall ROS total.
+  const candidates = [player.boardRank, player.adp, player.restOfSeasonRank, player.rank];
   const value = candidates.find(
     (candidate): candidate is number =>
       typeof candidate === "number" && Number.isFinite(candidate) && candidate > 0
@@ -327,6 +340,39 @@ const applyMasterBoardEditorialMoves = <T extends { player: Player; projectedPoi
 
     const [entry] = adjusted.splice(currentIndex, 1);
     adjusted.splice(targetIndex, 0, entry);
+  }
+
+  return adjusted;
+};
+
+const applyOneGameSourceRankStabilityGuard = <T extends { player: Player }>(board: T[]) => {
+  const adjusted = [...board];
+  const protectedEntries = adjusted
+    .filter((entry) => {
+      const sourceRank = getProvidedBoardRank(entry.player);
+      return (
+        entry.player.restOfSeasonAsOfWeek === ONE_GAME_STABILITY_WEEK &&
+        entry.player.status === "HEALTHY" &&
+        sourceRank !== null &&
+        sourceRank <= ONE_GAME_ELITE_SOURCE_RANK_CUTOFF
+      );
+    })
+    .sort((left, right) => (getProvidedBoardRank(left.player) ?? 0) - (getProvidedBoardRank(right.player) ?? 0));
+
+  for (const entry of protectedEntries) {
+    const currentIndex = adjusted.indexOf(entry);
+    if (currentIndex < 0) continue;
+
+    const sourceRank = getProvidedBoardRank(entry.player);
+    if (sourceRank === null) continue;
+    const latestAllowedIndex = Math.min(
+      adjusted.length - 1,
+      sourceRank - 1 + ONE_GAME_MAX_SOURCE_RANK_DISPLACEMENT
+    );
+    if (currentIndex <= latestAllowedIndex) continue;
+
+    adjusted.splice(currentIndex, 1);
+    adjusted.splice(latestAllowedIndex, 0, entry);
   }
 
   return adjusted;
@@ -638,7 +684,9 @@ export const buildDraftBoard = (players: Player[], config: DraftConfig): DraftPl
     )
   );
 
-  const withRanks = applyMasterBoardEditorialMoves(projectionOrderedBoard).map((entry, index) => ({
+  const withRanks = applyMasterBoardEditorialMoves(
+    applyOneGameSourceRankStabilityGuard(projectionOrderedBoard)
+  ).map((entry, index) => ({
     ...entry,
     draftRank: index + 1,
     masterDraftRank: index + 1,

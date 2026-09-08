@@ -200,7 +200,17 @@ export default function Settings() {
     setProfileError(null);
     setProfileErrorField(null);
     try {
-      await updateProfile({ firstName: nextName, avatarUrl: nextAvatarUrl });
+      const updatedUser = await updateProfile({ firstName: nextName, avatarUrl: nextAvatarUrl });
+      // A profile PATCH response is the source of truth. Never show a success
+      // state merely because the request completed: a gateway/cache regression
+      // that returns the old profile must stay visible to the manager instead
+      // of looking like a successful name change.
+      if (updatedUser.firstName !== nextName) {
+        throw new Error("Your manager name was not changed. Please try again.");
+      }
+      setManagerName(updatedUser.firstName);
+      setAvatarUrl(updatedUser.avatarUrl ?? "");
+      setManagerNameCooldownOverride(updatedUser.managerNameChangeAvailableAt ?? null);
       setSaveState("saved");
       if (saveStateResetTimeoutRef.current) {
         clearTimeout(saveStateResetTimeoutRef.current);
@@ -210,7 +220,11 @@ export default function Settings() {
         setSaveState("idle");
       }, 1500);
     } catch (error) {
-      showProfileError(error, "Unable to save your profile. Your previous settings are still active.");
+      showProfileError(
+        error,
+        "Unable to save your profile. Your previous settings are still active.",
+        "first_name"
+      );
       setSaveState("error");
     }
   };

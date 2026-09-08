@@ -31,8 +31,12 @@ from collegefootballfantasy_api.app.services.weekly_outlook_refresh import (
 )
 
 MAX_REGULAR_SEASON_WEEK = 13
-MAX_FORM_WEIGHT = 0.35
-FORM_WEIGHT_PER_VERIFIED_GAME = 0.35
+# A single Week 1 result is meaningful but should not dominate a twelve-game
+# rest-of-season forecast. Keep the adjustment five percentage points below
+# the prior setting while retaining a bounded response to verified role
+# changes.
+MAX_FORM_WEIGHT = 0.30
+FORM_WEIGHT_PER_VERIFIED_GAME = 0.30
 MAX_BREAKOUT_RESIDUAL_MULTIPLIER = 1.5
 MAX_SEASON_FORM_ADJUSTMENT_SHARE = 0.50
 

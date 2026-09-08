@@ -19,6 +19,7 @@ from collegefootballfantasy_api.app.models.live_player_projection import LivePla
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
+from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.models.player_waiver_availability import PlayerWaiverAvailability
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
 from collegefootballfantasy_api.app.models.postseason import PostseasonMatchup
@@ -571,15 +572,33 @@ def _final_waiver_score_map(
         )
         scores[row.player_id] = points
     # ESPN box scores can omit a player who appeared but recorded no counting
-    # stats.  A verified final team game still makes that player's actual
-    # fantasy total a meaningful zero rather than an unavailable projection.
+    # stats. A verified final team game makes that player's actual total a
+    # meaningful zero *only when the player has a verified ESPN identity*.
+    # Without that identity, a final team game cannot prove a zero: the
+    # provider may have supplied the athlete's row but the scorer deliberately
+    # excluded it. Returning no final score keeps the UI from publishing a
+    # false 0.0 while the identity repair is completed.
+    verified_espn_player_ids = {
+        player_id
+        for (player_id,) in db.query(PlayerProviderId.player_id)
+        .filter(
+            PlayerProviderId.provider == "espn",
+            PlayerProviderId.verification_status == "verified",
+            PlayerProviderId.player_id.in_(player_ids),
+        )
+        .all()
+    }
     final_school_keys = {
         school_key
         for school_key, game in fantasy_games_by_school(db, season=season, week=week).items()
         if game is not None and (game.schedule_status or "").strip().lower() in {"final", "post"}
     }
     for player_id, school in player_schools.items():
-        if player_id not in scores and _school_key(school) in final_school_keys:
+        if (
+            player_id not in scores
+            and player_id in verified_espn_player_ids
+            and _school_key(school) in final_school_keys
+        ):
             scores[player_id] = 0.0
     return scores
 

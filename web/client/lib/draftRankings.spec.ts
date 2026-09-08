@@ -434,6 +434,56 @@ describe("buildDraftBoard", () => {
     );
   });
 
+  it("keeps a healthy top-six source player in the first tier after only one certified week", () => {
+    const players: Player[] = [
+      ...Array.from({ length: 12 }, (_, index) =>
+        makePlayer(index + 1, "RB", 340 - index * 8, {
+          name: `Week One RB ${index + 1}`,
+          rank: index + 20,
+          adp: index + 20,
+          restOfSeasonAsOfWeek: 1,
+          restOfSeasonProjectedPoints: 340 - index * 8,
+        })
+      ),
+      makePlayer(100, "RB", 250, {
+        name: "Elite Source RB",
+        rank: 3,
+        boardRank: 3,
+        adp: 3,
+        restOfSeasonAsOfWeek: 1,
+        restOfSeasonProjectedPoints: 250,
+      }),
+    ];
+
+    const board = buildDraftBoard(players, config);
+    expect(board.find((player) => player.name === "Elite Source RB")?.masterDraftRank).toBeLessThanOrEqual(6);
+  });
+
+  it("lets the board fully re-rank an elite source player once a second week is certified", () => {
+    const players: Player[] = [
+      ...Array.from({ length: 12 }, (_, index) =>
+        makePlayer(index + 1, "RB", 340 - index * 8, {
+          name: `Week Two RB ${index + 1}`,
+          rank: index + 20,
+          adp: index + 20,
+          restOfSeasonAsOfWeek: 2,
+          restOfSeasonProjectedPoints: 340 - index * 8,
+        })
+      ),
+      makePlayer(100, "RB", 250, {
+        name: "Elite Source RB After Two Weeks",
+        rank: 3,
+        boardRank: 3,
+        adp: 3,
+        restOfSeasonAsOfWeek: 2,
+        restOfSeasonProjectedPoints: 250,
+      }),
+    ];
+
+    const board = buildDraftBoard(players, config);
+    expect(board.find((player) => player.name === "Elite Source RB After Two Weeks")?.masterDraftRank).toBeGreaterThan(6);
+  });
+
   it("keeps editorial master-board moves below higher same-position projections", () => {
     const baselinePlayers = Array.from({ length: 80 }, (_, index) => {
       const rank = index + 1;
