@@ -176,7 +176,7 @@ export const waiverWeekPoints = (
 /** Keep completed waiver totals visually distinct from in-progress forecasts. */
 export const waiverWeekPointsClassName = (weekPoints: ReturnType<typeof waiverWeekPoints>) => (
   weekPoints.isFinal
-    ? "text-emerald-300"
+    ? "text-cfb-brand"
     : weekPoints.label === "BYE"
       ? "text-amber-200"
       : weekPoints.label === "OUT"

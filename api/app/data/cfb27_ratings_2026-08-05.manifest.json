@@ -10,9 +10,9 @@
     ],
     "retrieved_at": "2026-08-05T04:36:26Z",
     "spreadsheet_revision": "347",
-    "sha256": "4aaabe76b187f97fd46f5438e8f71859ef3bf67b174d9b2340deb88df1dd77e3",
+    "sha256": "4e632275246a25ad9e8c7c57d006272288a380e2158b366e112859326fc2e152",
     "row_count": 814,
-    "dataset_version": "cfb27-2026-08-05-live-workbook-r4",
+    "dataset_version": "cfb27-2026-08-05-live-workbook-r4-legend-bey-correction",
     "approval_status": "approved",
     "export_batch_id": "2026-08-05-live-sheets-r361-r923-r347-refresh-043626z",
     "parent_export_batch_id": "2026-08-05-live-sheets-r361-r923-r347",
@@ -20,7 +20,8 @@
     "source_corrections": [
       {"player": "Bryson Williams", "field": "EA POSITION", "previous_value": "HB", "corrected_value": "WR", "rating_preserved": 77},
       {"player": "Jaylen Mbakwe", "field": "EA POSITION", "previous_value": "CB", "corrected_value": "WR", "rating_preserved": 80},
-      {"player": "Jack Cassidy", "field": "CFB27 rating row", "corrected_value": "K / 75"}
+      {"player": "Jack Cassidy", "field": "CFB27 rating row", "corrected_value": "K / 75"},
+      {"player": "Legend Bey", "field": "Ohio State RB3 identity", "previous_value": "Ja'Kobi Jackson / RB / 81", "corrected_value": "Legend Bey / RB / 78"}
     ]
   }
 }
