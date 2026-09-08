@@ -361,7 +361,12 @@ def test_nonzero_team_scores_do_not_prove_final_and_missing_stats_never_award(cl
     db_session.commit()
     assert refresh_open_pick_contests(db_session)["finalized"] == 0
     assert featured.scoring_status == "DATA_DELAYED"
+    assert contest.status == "PROVISIONAL"
     assert contest.winning_player_ids_json is None
+    db_session.add(PlayerGameStat(player_id=featured.player_id, game_id=game.id, season=2026, week=1,
+                                 source="test-verified", stats={"rush_yards": 50}))
+    db_session.commit()
+    assert refresh_open_pick_contests(db_session)["finalized"] == 1
 
 
 def test_weekly_publication_uses_published_ranks_at_reset_and_is_idempotent(client, db_session, monkeypatch):

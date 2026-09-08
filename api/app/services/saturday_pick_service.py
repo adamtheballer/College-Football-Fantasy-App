@@ -529,6 +529,7 @@ def refresh_contest_live_scores(db: Session, contest: SaturdayPickContest) -> di
     updated = 0
     live = 0
     final = 0
+    resolved_games = 0
     for row in rows:
         game = _featured_game(db, contest, row)
         if game and row.game_id != game.id:
@@ -536,6 +537,7 @@ def refresh_contest_live_scores(db: Session, contest: SaturdayPickContest) -> di
         stat = _featured_stat(db, contest, row)
         points = _score_stat(stat, row.canonical_position)
         next_status = _featured_scoring_status(featured=row, game=game, has_stats=points is not None, now=now)
+        resolved_games += int(_is_final_game(game))
         if points is not None and row.live_points != points:
             row.live_points = points
             updated += 1
@@ -550,8 +552,11 @@ def refresh_contest_live_scores(db: Session, contest: SaturdayPickContest) -> di
         if next_status == "FINAL":
             final += 1
 
-    if contest.status in {"LOCKED", "SCORING"} and (live or final):
-        contest.status = "SCORING"
+    if contest.status in {"LOCKED", "SCORING", "PROVISIONAL"}:
+        if resolved_games == 6:
+            contest.status = "PROVISIONAL"
+        elif live or final:
+            contest.status = "SCORING"
     db.flush()
     return {"updated": updated, "live": live, "final": final}
 
@@ -616,7 +621,7 @@ def ensure_weekly_contest(db: Session) -> int:
 def refresh_open_pick_contests(db: Session) -> dict[str, int]:
     contests = (
         db.query(SaturdayPickContest)
-        .filter(SaturdayPickContest.status.in_(("OPEN", "LOCKED", "SCORING")))
+        .filter(SaturdayPickContest.status.in_(("OPEN", "LOCKED", "SCORING", "PROVISIONAL")))
         .with_for_update(skip_locked=True).all()
     )
     totals = {"contests": len(contests), "updated": 0, "live": 0, "final": 0, "finalized": 0, "published": 0, "failed": 0}
