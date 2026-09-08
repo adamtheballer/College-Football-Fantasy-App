@@ -110,10 +110,10 @@ function GuestHome() {
           <div className="space-y-3">
             <p className="cfb-micro-label text-cfb-gold">College Fantasy Football</p>
             <h1 className="cfb-display-title max-w-2xl text-4xl sm:text-5xl">
-              Fantasy football for college football.
+              Own Saturday. Your league, your rules.
             </h1>
             <p className="max-w-xl text-base leading-7 text-cfb-text-secondary sm:text-lg">
-              Create a league, draft real CFB players, and compete every Saturday.
+              Draft real players, set your lineup, and run your league from kickoff to final.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -124,7 +124,7 @@ function GuestHome() {
               <Link to="/login">Log In</Link>
             </Button>
           </div>
-          <p className="text-sm text-cfb-text-muted">Create a league, draft your team, and compete all season.</p>
+          <p className="text-sm text-cfb-text-muted">Invite your managers, draft your team, and own every Saturday.</p>
         </div>
 
         <SurfaceCard variant="scoreboard" padding="default" className="space-y-5">

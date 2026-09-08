@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { PlayerTrajectoryChart } from "./PlayerTrajectoryChart";
@@ -57,6 +57,22 @@ describe("PlayerTrajectoryChart", () => {
     expect(chart.querySelectorAll("circle[fill='#ffffff']")).toHaveLength(1);
     expect(chart.querySelectorAll("circle[fill='#2f80ff']")).toHaveLength(1);
     expect(chart.querySelectorAll("title")[1]?.textContent).toContain("actual fantasy points");
+  });
+
+  it("shows a precise value on hover and lets touch users toggle that value", () => {
+    renderChart([{ week: 1, value: 18.4, source: "published" }]);
+
+    const point = screen.getByTestId("trajectory-point-baseline-1-0");
+    fireEvent.pointerEnter(point);
+    expect(screen.getByTestId("trajectory-point-value").textContent).toContain("18.4 pts");
+
+    fireEvent.pointerLeave(point);
+    expect(screen.queryByTestId("trajectory-point-value")).toBeNull();
+
+    fireEvent.click(point);
+    expect(screen.getByTestId("trajectory-point-value").textContent).toContain("18.4 pts");
+    fireEvent.click(point);
+    expect(screen.queryByTestId("trajectory-point-value")).toBeNull();
   });
 
   it("keeps the value-history legend separate from the weekly points semantics", () => {

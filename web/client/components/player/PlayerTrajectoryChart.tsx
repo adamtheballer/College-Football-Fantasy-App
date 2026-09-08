@@ -1,8 +1,15 @@
+import { useState } from "react";
+
 type TrajectoryPoint = {
   week: number;
   value: number | null;
   actualValue?: number | null;
   source?: "preseason" | "current" | "published" | "actual" | "bye";
+};
+
+type PlottedPoint = TrajectoryPoint & {
+  renderKey: string;
+  value: number;
 };
 
 const CHART_WIDTH = 760;
@@ -26,6 +33,8 @@ export function PlayerTrajectoryChart({
   valueFormatter: (value: number) => string;
   seriesKind?: "projection" | "value";
 }) {
+  const [hoveredPointKey, setHoveredPointKey] = useState<string | null>(null);
+  const [selectedPointKey, setSelectedPointKey] = useState<string | null>(null);
   const ordered = [...points].sort((left, right) => left.week - right.week);
   const plotWidth = CHART_WIDTH - PADDING.left - PADDING.right;
   const plotHeight = CHART_HEIGHT - PADDING.top - PADDING.bottom;
@@ -35,11 +44,15 @@ export function PlayerTrajectoryChart({
   const y = (value: number) => PADDING.top + (1 - Math.min(finiteValue(value), yMax) / yMax) * plotHeight;
   // Do not visually bridge weeks that have not produced a published snapshot.
   // A preseason card therefore renders one Week 0 dot, not a fictitious line.
-  const numericPoints = ordered.filter((point): point is TrajectoryPoint & { value: number } => point.source !== "actual" && typeof point.value === "number" && Number.isFinite(point.value));
-  const actualPoints = ordered.flatMap((point) => {
+  const numericPoints: PlottedPoint[] = ordered.flatMap((point, index) => (
+    point.source !== "actual" && typeof point.value === "number" && Number.isFinite(point.value)
+      ? [{ ...point, value: point.value, renderKey: `baseline-${point.week}-${index}` }]
+      : []
+  ));
+  const actualPoints: PlottedPoint[] = ordered.flatMap((point, index) => {
     const value = point.source === "actual" ? point.value : point.actualValue;
     return typeof value === "number" && Number.isFinite(value)
-      ? [{ ...point, value, source: "actual" as const }]
+      ? [{ ...point, value, source: "actual" as const, renderKey: `actual-${point.week}-${index}` }]
       : [];
   });
   const connectedLine = numericPoints.reduce((path, point, index) => {
@@ -53,6 +66,8 @@ export function PlayerTrajectoryChart({
   const isPreseasonOnly = ordered.length === 1 && ordered[0]?.week === 0;
   const isCurrentProjectionOnly = isPreseasonOnly && ordered[0]?.source === "current";
   const isProjection = seriesKind === "projection";
+  const activePointKey = hoveredPointKey ?? selectedPointKey;
+  const activePoint = plottedPoints.find((point) => point.renderKey === activePointKey) ?? null;
 
   const pointLabel = (point: TrajectoryPoint) => {
     if (point.source === "bye" || point.value === null) return "BYE";
@@ -66,6 +81,22 @@ export function PlayerTrajectoryChart({
     if (isProjection) return point.source === "actual" ? "#2f80ff" : "#ffffff";
     return point.source === "published" ? "#ffffff" : "#5ee7ff";
   };
+
+  const pointValueText = (point: TrajectoryPoint) => (
+    point.source === "bye" || point.value === null ? "BYE" : valueFormatter(point.value)
+  );
+  const pointAriaLabel = (point: PlottedPoint) => (
+    `${pointLabel(point)}: ${pointValueText(point)}. Select to ${selectedPointKey === point.renderKey ? "hide" : "show"} its value.`
+  );
+  const toggleSelectedPoint = (pointKey: string) => {
+    setSelectedPointKey((current) => current === pointKey ? null : pointKey);
+  };
+  const activeValueText = activePoint ? pointValueText(activePoint) : null;
+  const activeLabelWidth = activeValueText ? Math.max(46, activeValueText.length * 7 + 18) : 0;
+  const activeLabelX = activePoint
+    ? Math.max(PADDING.left, Math.min(x(activePoint.week) - activeLabelWidth / 2, CHART_WIDTH - PADDING.right - activeLabelWidth))
+    : 0;
+  const activeLabelY = activePoint ? Math.max(5, y(activePoint.value) - 32) : 0;
 
   return (
     <section className="rounded-3xl border border-cyan-200/20 bg-[#091323] p-4 sm:p-5" aria-label={ariaLabel}>
@@ -107,9 +138,31 @@ export function PlayerTrajectoryChart({
           </text>
           {hasConnectedWeeks ? <path d={connectedLine} fill="none" stroke="#5ee7ff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" /> : null}
           {numericPoints.map((point) => (
-            <g key={`baseline-${point.week}`}>
-              <title>{pointLabel(point)}: {point.source === "bye" || point.value === null ? "BYE" : valueFormatter(point.value)}</title>
-              {point.source === "bye" || point.value === null ? <text x={x(point.week)} y={y(0) - 8} textAnchor="middle" fill="rgba(226,232,240,0.62)" fontSize="9" fontWeight="800">BYE</text> : <circle cx={x(point.week)} cy={y(point.value)} r="6" fill={pointColor(point)} stroke="#08111f" strokeWidth="3" />}
+            <g key={point.renderKey}>
+              <title>{pointLabel(point)}: {pointValueText(point)}</title>
+              <circle
+                data-testid={`trajectory-point-${point.renderKey}`}
+                cx={x(point.week)}
+                cy={y(point.value)}
+                r="6"
+                fill={pointColor(point)}
+                stroke="#08111f"
+                strokeWidth="3"
+                role="button"
+                tabIndex={0}
+                aria-label={pointAriaLabel(point)}
+                aria-pressed={selectedPointKey === point.renderKey}
+                className="cursor-pointer"
+                onPointerEnter={() => setHoveredPointKey(point.renderKey)}
+                onPointerLeave={() => setHoveredPointKey(null)}
+                onClick={() => toggleSelectedPoint(point.renderKey)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    toggleSelectedPoint(point.renderKey);
+                  }
+                }}
+              />
             </g>
           ))}
           {ordered.filter((point) => point.source === "bye").map((point) => (
@@ -119,11 +172,41 @@ export function PlayerTrajectoryChart({
             </g>
           ))}
           {actualPoints.map((point) => (
-            <g key={`actual-${point.week}`}>
-              <title>{pointLabel(point)}: {valueFormatter(point.value)}</title>
-              <circle cx={x(point.week)} cy={y(point.value)} r="6" fill="#2f80ff" stroke="#08111f" strokeWidth="3" />
+            <g key={point.renderKey}>
+              <title>{pointLabel(point)}: {pointValueText(point)}</title>
+              <circle
+                data-testid={`trajectory-point-${point.renderKey}`}
+                cx={x(point.week)}
+                cy={y(point.value)}
+                r="6"
+                fill="#2f80ff"
+                stroke="#08111f"
+                strokeWidth="3"
+                role="button"
+                tabIndex={0}
+                aria-label={pointAriaLabel(point)}
+                aria-pressed={selectedPointKey === point.renderKey}
+                className="cursor-pointer"
+                onPointerEnter={() => setHoveredPointKey(point.renderKey)}
+                onPointerLeave={() => setHoveredPointKey(null)}
+                onClick={() => toggleSelectedPoint(point.renderKey)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    toggleSelectedPoint(point.renderKey);
+                  }
+                }}
+              />
             </g>
           ))}
+          {activePoint && activeValueText ? (
+            <g data-testid="trajectory-point-value" pointerEvents="none">
+              <rect x={activeLabelX} y={activeLabelY} width={activeLabelWidth} height="22" rx="6" fill="#07111f" stroke="rgba(94,231,255,0.75)" />
+              <text x={activeLabelX + activeLabelWidth / 2} y={activeLabelY + 15} textAnchor="middle" fill="#f8fafc" fontSize="11" fontWeight="800">
+                {activeValueText}
+              </text>
+            </g>
+          ) : null}
         </svg>
       </div>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-bold text-white/50">

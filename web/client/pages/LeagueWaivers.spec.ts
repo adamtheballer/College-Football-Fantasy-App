@@ -31,8 +31,8 @@ describe("waiverWeekPoints", () => {
     expect(waiverWeekPoints(null, undefined, "UNAVAILABLE")).toEqual({ label: "—", isFinal: false });
   });
 
-  it("uses a green treatment for verified final scores and does not color forecasts as completed", () => {
-    expect(waiverWeekPointsClassName(waiverWeekPoints(18.76, 12.34, "ACTIVE"))).toBe("text-emerald-300");
+  it("uses the blue actual-score treatment for verified final scores and does not color forecasts as completed", () => {
+    expect(waiverWeekPointsClassName(waiverWeekPoints(18.76, 12.34, "ACTIVE"))).toBe("text-cfb-brand");
     expect(waiverWeekPointsClassName(waiverWeekPoints(null, 12.34, "ACTIVE"))).toBe("text-cfb-text-primary");
   });
 });
