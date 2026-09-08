@@ -28,7 +28,7 @@ from collegefootballfantasy_api.app.scoring import calculate_fantasy_points
 
 
 POSTGAME_PROJECTION_VERSION = "MIDWEEK"
-POSTGAME_MODEL_VERSION = "postgame_espn_v2"
+POSTGAME_MODEL_VERSION = "postgame_espn_v3"
 # One certified performance miss informs the next projection, but Week 1 is
 # still a small sample. Limit a single performance to a conservative 12% of
 # its capped residual so it informs the next matchup without re-pricing a
@@ -38,10 +38,18 @@ MAX_RESIDUAL_SHARE = 0.75
 MAX_PROJECTION_ADJUSTMENT_SHARE = 0.30
 # Week 1 is useful new information, but the model built directly from one
 # game (usage, efficiency, and environment) is too volatile to replace the
-# sealed preseason weekly baseline on its own. Keep 45% of that established
-# baseline and let the postgame model supply the remaining 55%. This is a
-# forecast blend, not a UI floor: injuries and BYEs still take precedence.
-INITIAL_WEEK_POSTGAME_WEIGHT = 0.55
+# sealed preseason weekly baseline on its own. Keep 65% of that established
+# baseline and let the postgame model supply the remaining 35%. The sealed
+# baseline already accounts for the next opponent, so it must remain the
+# primary signal after only one certified performance. This is a forecast
+# blend, not a UI floor: injuries and BYEs still take precedence.
+INITIAL_WEEK_POSTGAME_WEIGHT = 0.35
+# A single Week 1 box score can expose a role change, but it should not make a
+# healthy player's Week 2 forecast swing wildly. Keep the initial published
+# Week 2 projection within 15% of the availability-adjusted preseason Week 2
+# baseline. Subsequent certified weeks are not capped by this first-week
+# small-sample guardrail.
+INITIAL_WEEK_MAX_PROJECTION_DRIFT_SHARE = 0.15
 
 _BLENDED_FORECAST_FIELDS = (
     "pass_attempts",
@@ -183,6 +191,56 @@ def _blend_initial_postgame_outlooks(
                     2,
                 ),
             )
+        player = players_by_id.get(candidate.player_id)
+        outcome_range = weighted_projection_outcomes(
+            candidate.fantasy_points,
+            position=player.position if player else None,
+            expected_opportunities=candidate.expected_plays,
+            availability_multiplier=availability_multiplier,
+        )
+        candidate.floor = outcome_range.floor
+        candidate.ceiling = outcome_range.ceiling
+        candidate.boom_prob = outcome_range.boom_prob
+        candidate.bust_prob = outcome_range.bust_prob
+
+
+def _bound_initial_week_projection_drift(
+    *,
+    projections: list[WeeklyProjection],
+    preseason_by_player_id: dict[int, WeeklyProjection],
+    players_by_id: dict[int, Player],
+) -> None:
+    """Keep the first postgame forecast from overreacting to one box score.
+
+    The published preseason projection for the upcoming opponent is the
+    anchor. A current injury availability multiplier is applied before the
+    bound, so a player with an authoritative availability reduction can still
+    fall appropriately. OUT and BYE forecasts remain untouched.
+    """
+
+    for candidate in projections:
+        preseason = preseason_by_player_id.get(candidate.player_id)
+        projection_status = (candidate.projection_status or "ACTIVE").upper()
+        availability_multiplier = (
+            1.0 if candidate.availability_multiplier is None else float(candidate.availability_multiplier)
+        )
+        if preseason is None or projection_status in {"OUT", "BYE"}:
+            continue
+        if availability_multiplier <= 0.0:
+            continue
+        preseason_points = float(preseason.fantasy_points or 0.0)
+        candidate_points = float(candidate.fantasy_points or 0.0)
+        if preseason_points <= 0.0 or candidate_points < 0.0:
+            continue
+
+        availability_adjusted_baseline = preseason_points * availability_multiplier
+        lower_bound = availability_adjusted_baseline * (1.0 - INITIAL_WEEK_MAX_PROJECTION_DRIFT_SHARE)
+        upper_bound = availability_adjusted_baseline * (1.0 + INITIAL_WEEK_MAX_PROJECTION_DRIFT_SHARE)
+        bounded_points = round(max(lower_bound, min(upper_bound, candidate_points)), 2)
+        if bounded_points == round(candidate_points, 2):
+            continue
+
+        candidate.fantasy_points = bounded_points
         player = players_by_id.get(candidate.player_id)
         outcome_range = weighted_projection_outcomes(
             candidate.fantasy_points,
@@ -352,6 +410,12 @@ def refresh_post_final_outlook(
         actual_by_player_id=actual_by_player_id,
         prior_projection_by_player_id=prior_projection_by_player_id,
     )
+    if completed_week <= 1:
+        _bound_initial_week_projection_drift(
+            projections=projections,
+            preseason_by_player_id=preseason_by_player_id,
+            players_by_id=players_by_id,
+        )
     existing = {
         row.player_id: row
         for row in db.query(WeeklyProjection).filter(
