@@ -1447,7 +1447,7 @@ def test_calendar_week_before_season_start_is_week_one():
 
 
 def test_calendar_week_increments_during_season():
-    assert calendar_cfb_week(2026, datetime(2026, 9, 8, tzinfo=timezone.utc)) >= 2
+    assert calendar_cfb_week(2026, datetime(2026, 9, 8, 4, tzinfo=timezone.utc)) >= 2
 
 
 def test_cfb_week_clock_uses_tuesday_to_saturday_game_window():

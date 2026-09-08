@@ -8,6 +8,13 @@ import { formatDisplayedProbabilityPair, WinChanceBar, WinChanceMeter } from "./
 afterEach(cleanup);
 
 describe("WinChanceMeter", () => {
+  it.each([[100, 0], [0, 100]])("renders the completed outcome %s/%s without hiding the bar", (left, right) => {
+    render(<WinChanceMeter myPercent={left} opponentPercent={right} />);
+    expect(screen.getByText(`${left.toFixed(1)}% / ${right.toFixed(1)}%`)).toBeTruthy();
+    expect(screen.getByTestId("win-chance-left-bar").style.width).toBe(`${left}%`);
+    expect(screen.getByTestId("win-chance-right-bar").style.width).toBe(`${right}%`);
+    expect(screen.queryByText("Win chance unavailable")).toBeNull();
+  });
   it("formats the screenshot case as complementary one-decimal percentages", () => {
     expect(formatDisplayedProbabilityPair(48.05, 51.95)).toEqual({ left: 48.1, right: 51.9 });
 

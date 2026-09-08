@@ -22,7 +22,8 @@ vi.mock("react-router-dom", () => ({
 
 vi.mock("@/components/league/LeagueTabs", () => ({ LeagueTabs: () => null }));
 vi.mock("@/components/league/SideBySideMatchup", () => ({ SideBySideMatchup: () => null }));
-vi.mock("@/components/league/WinChanceMeter", () => ({
+vi.mock("@/components/league/WinChanceMeter", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/components/league/WinChanceMeter")>(),
   WinChanceMeter: () => null,
   WinChanceBar: () => null,
 }));

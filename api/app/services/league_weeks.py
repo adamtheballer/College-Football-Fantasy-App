@@ -14,6 +14,7 @@ from collegefootballfantasy_api.app.models.matchup import Matchup
 CFB_WEEK_START_WEEKDAY = 1
 CFB_WEEK_END_WEEKDAY = 5
 MAX_CFB_REGULAR_SEASON_WEEK = 15
+FANTASY_WEEK_TIMEZONE = "America/New_York"
 
 
 @dataclass(frozen=True)
@@ -52,11 +53,13 @@ def season_week_one_start(season_year: int) -> datetime:
 
 
 def calendar_cfb_week(season_year: int, now: datetime | None = None) -> int:
-    now = now or datetime.now(timezone.utc)
-    season_start = season_week_one_start(season_year)
+    # Use the same Tuesday midnight Eastern boundary on every consumer,
+    # including when the server clock is already Tuesday in UTC.
+    now = _as_utc(now or datetime.now(timezone.utc)).astimezone(_timezone(FANTASY_WEEK_TIMEZONE))
+    season_start = season_week_one_start(season_year).replace(tzinfo=_timezone(FANTASY_WEEK_TIMEZONE))
     if now < season_start:
         return 1
-    elapsed_days = (now - season_start).days
+    elapsed_days = (now.date() - season_start.date()).days
     return max(1, min((elapsed_days // 7) + 1, MAX_CFB_REGULAR_SEASON_WEEK))
 
 

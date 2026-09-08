@@ -16,6 +16,8 @@ def _valid_projection(value: float | None) -> float | None:
 def calculate_matchup_win_probability(
     my_projected_points: float | None,
     opponent_projected_points: float | None,
+    *,
+    completed: bool = False,
 ) -> tuple[float, float] | None:
     """Return deterministic projected win chances from weekly lineup totals.
 
@@ -23,6 +25,19 @@ def calculate_matchup_win_probability(
     side and derive the other complement so the displayed values always total
     exactly 100.0%. A missing or invalid total is not a 50/50 matchup.
     """
+
+    # Completed fantasy totals can legitimately be negative (turnovers).
+    if completed:
+        try:
+            my_total = float(my_projected_points)
+            opponent_total = float(opponent_projected_points)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(my_total) or not math.isfinite(opponent_total):
+            return None
+        if my_total == opponent_total:
+            return 50.0, 50.0
+        return (100.0, 0.0) if my_total > opponent_total else (0.0, 100.0)
 
     my_total = _valid_projection(my_projected_points)
     opponent_total = _valid_projection(opponent_projected_points)

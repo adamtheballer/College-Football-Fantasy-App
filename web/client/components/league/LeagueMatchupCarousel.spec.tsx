@@ -30,6 +30,14 @@ const leagues = [
 afterEach(cleanup);
 
 describe("LeagueMatchupCarousel", () => {
+  it("shows a completed winner at 100 percent on the home card", () => {
+    const finalLeague = { ...leagues[0], current_user_summary: {
+      ...leagues[0].current_user_summary!, win_probability_for: 100, win_probability_against: 0,
+    } };
+    render(<LeagueMatchupCarousel leagues={[finalLeague]} activeLeagueId={17} onOpenLeague={vi.fn()} />);
+    expect(screen.getByText("100.0% / 0.0%")).toBeTruthy();
+    expect(screen.getByRole("img", {name: "Win chance: 100.0% to 0.0%"})).toBeTruthy();
+  });
   it("shows each league's canonical matchup summary in a horizontal swipe rail", () => {
     render(<LeagueMatchupCarousel leagues={leagues} activeLeagueId={17} onOpenLeague={vi.fn()} />);
 

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import pytest
 
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.game import Game
@@ -6,6 +7,27 @@ from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.services import player_season_rank
+
+
+@pytest.fixture(autouse=True)
+def rank_publication_clock(monkeypatch):
+    # Existing history fixtures represent completed weeks after their reset.
+    monkeypatch.setattr(player_season_rank, "calendar_cfb_week", lambda season: 15)
+
+
+def test_completed_rank_is_published_only_after_reset(db_session, monkeypatch):
+    from collegefootballfantasy_api.app.services.player_season_rank import season_positional_rank_for_player
+    player = _rankable_player(name="Rank boundary", position="WR", school="Miami")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(PlayerStat(player_id=player.id, season=2026, week=1, verified=True, stats={"fantasy_points": 20}))
+    _finalize_week(db_session, week=1)
+    db_session.commit()
+    monkeypatch.setattr(player_season_rank, "calendar_cfb_week", lambda season: 1)
+    assert season_positional_rank_for_player(db_session, player=player, season=2026) is None
+    monkeypatch.setattr(player_season_rank, "calendar_cfb_week", lambda season: 2)
+    assert season_positional_rank_for_player(db_session, player=player, season=2026).fantasy_points == 20
 
 
 def _rankable_player(*, name: str, position: str, school: str) -> Player:

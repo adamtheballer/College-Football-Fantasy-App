@@ -4,7 +4,7 @@ import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-
 
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
-import { WinChanceBar } from "@/components/league/WinChanceMeter";
+import { WinChanceBar, validProbability } from "@/components/league/WinChanceMeter";
 import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
 import { RivalWeekPatch } from "@/components/league/RivalWeekPatch";
 import { RivalryControls } from "@/components/league/RivalryControls";
@@ -93,10 +93,8 @@ function probabilityPair(
   opponentPercent: number | null | undefined,
 ) {
   if (
-    typeof myPercent !== "number" ||
-    typeof opponentPercent !== "number" ||
-    !Number.isFinite(myPercent) ||
-    !Number.isFinite(opponentPercent) ||
+    !validProbability(myPercent) ||
+    !validProbability(opponentPercent) ||
     Math.abs(myPercent + opponentPercent - 100) > 0.001
   ) {
     return null;
