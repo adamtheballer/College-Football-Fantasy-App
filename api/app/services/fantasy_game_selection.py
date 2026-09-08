@@ -64,9 +64,22 @@ def fantasy_games_by_school(
 ) -> dict[str, Game | None]:
     if games is None:
         games = db.query(Game).filter(Game.season == season, Game.week.in_((0, 1) if week == 1 else (week,))).all()
+    # Sheet imports can predate the provider's real event ID. An exact-match
+    # placeholder is not a second game, but two different provider events or
+    # opponents must still remain ambiguous. Do not delete historical rows.
+    def matchup_key(game: Game) -> frozenset[str | None]:
+        return frozenset((school_key(game.home_team), school_key(game.away_team)))
+
+    provider_matchups = {
+        matchup_key(game) for game in games
+        if game.season == season and game.week == week
+        and game.external_id and not game.external_id.startswith(("sheet-", "sealed-"))
+    }
     result: dict[str, Game | None] = {}
     for game in games:
-        if game.week != week:
+        if game.season != season or game.week != week:
+            continue
+        if (game.external_id or "").startswith("sheet-") and matchup_key(game) in provider_matchups:
             continue
         if (game.schedule_status or "").lower() in {"cancelled", "canceled", "postponed", "tbd"}:
             continue
