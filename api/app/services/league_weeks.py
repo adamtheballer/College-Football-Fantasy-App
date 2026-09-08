@@ -166,3 +166,40 @@ def resolve_current_week(
         return int(scheduled_week)
 
     return calendar_week
+
+
+def resolve_matchup_display_week(
+    db: Session,
+    league: League,
+    selected_week: int | None = None,
+    now: datetime | None = None,
+) -> int:
+    """Resolve the week shown by the home and Matchup surfaces.
+
+    Scoring, standings, waivers, and lineup locks advance at the normal
+    Tuesday 08:00 Eastern reset.  Managers should still be able to review the
+    complete prior-week matchup for the rest of Tuesday, so this display-only
+    resolver advances the home card and Matchup tab at the start of Wednesday.
+    """
+    if selected_week is not None and selected_week > 0:
+        return selected_week
+
+    active_week = resolve_current_week(db, league, now=now)
+    eastern_now = _as_utc(now or datetime.now(timezone.utc)).astimezone(
+        _timezone(FANTASY_WEEK_TIMEZONE)
+    )
+    if eastern_now.weekday() != CFB_WEEK_START_WEEKDAY or active_week <= 1:
+        return active_week
+
+    completed_week = active_week - 1
+    has_completed_week_matchup = (
+        db.query(Matchup.id)
+        .filter(
+            Matchup.league_id == league.id,
+            Matchup.season == league.season_year,
+            Matchup.week == completed_week,
+        )
+        .first()
+        is not None
+    )
+    return completed_week if has_completed_week_matchup else active_week

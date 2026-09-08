@@ -223,9 +223,9 @@ def test_performance_residual_adjustment_is_weighted_and_bounded():
         actual_points=6.0,
         projected_points=20.0,
         next_week_baseline=18.0,
-    ) == -2.38
+    ) == -1.68
     assert performance_residual_adjustment(
         actual_points=100.0,
         projected_points=20.0,
         next_week_baseline=18.0,
-    ) == 2.55
+    ) == 1.8

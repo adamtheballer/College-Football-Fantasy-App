@@ -36,7 +36,7 @@ def test_reset_stays_at_eight_eastern_across_dst(month, day, utc_hour, previous_
         assert state.week_starts_at == boundary
 
 
-def test_completed_matchup_stays_selected_until_eastern_reset(db_session, monkeypatch):
+def test_completed_matchup_stays_visible_through_tuesday_while_records_reset(db_session, monkeypatch):
     from collegefootballfantasy_api.app.services import league_weeks
     from collegefootballfantasy_api.app.services.league_workspace import resolve_default_matchup_week
 
@@ -58,6 +58,8 @@ def test_completed_matchup_stays_selected_until_eastern_reset(db_session, monkey
     assert resolve_default_matchup_week(db_session, league) == 1
     Clock.current = datetime(2026, 9, 8, 12, 0, tzinfo=timezone.utc)
     assert resolve_current_week(db_session, league) == 2
+    assert resolve_default_matchup_week(db_session, league) == 1
+    Clock.current = datetime(2026, 9, 9, 12, 0, tzinfo=timezone.utc)
     assert resolve_default_matchup_week(db_session, league) == 2
 
 
