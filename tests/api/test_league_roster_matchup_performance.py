@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 from sqlalchemy import event
 import pytest
@@ -12,11 +13,78 @@ from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.league_roster_matchup import (
     _starter_live_totals,
+    _starters_finished,
     _starter_projection_total,
     build_matchup_tab_view,
 )
 from collegefootballfantasy_api.app.services.scoring_service import recalculate_league_week_scores
 from tests.api.scoring_helpers import create_scoring_fixture
+
+
+def test_finished_players_keep_actual_totals_between_and_after_games():
+    def starter(state, actual=10, projection=30, live_final=40, **kwargs):
+        return SimpleNamespace(is_starter=True, status="active", projection_status="READY",
+            live_game_state=state, current_fantasy_points=actual,
+            pregame_projected_points=projection, live_projected_final_points=live_final, **kwargs)
+
+    finished = starter("final")
+    later = starter("scheduled")
+    assert _starter_live_totals([finished]) == (10, 10, 30, False)
+    assert _starter_live_totals([finished, later]) == (10, 40, 60, False)
+    assert _starters_finished([finished]) is True
+    assert _starters_finished([finished, later]) is False
+    assert _starters_finished([]) is False
+    bench = starter("live")
+    bench.is_starter = False
+    empty = starter("unavailable")
+    empty.status = "EMPTY"
+    assert _starters_finished([finished, bench, empty]) is True
+
+
+def test_final_matchup_returns_certain_winner_from_recorded_scores(db_session):
+    league, home, away, _players, matchup = create_scoring_fixture(db_session)
+    user = User(first_name="Final", email="final-odds@example.com", password_hash="hash", api_token="final-odds")
+    db_session.add(user)
+    db_session.flush()
+    home.owner_user_id = user.id
+    matchup.status = "final"
+    matchup.home_score, matchup.away_score = 123.4, 122.9
+    db_session.commit()
+    response = build_matchup_tab_view(db_session, league, user, selected_week=1)
+    assert response.my_team.current_points == 123.4
+    assert response.my_team.projected_total == 123.4
+    assert response.my_team.win_probability == 100
+    assert response.opponent_team.win_probability == 0
+
+
+def test_matchup_odds_settle_when_all_starters_finish_before_week_finalization(db_session, monkeypatch):
+    from collegefootballfantasy_api.app.services import league_roster_matchup as service
+    league, home, away, _players, matchup = create_scoring_fixture(db_session)
+    user = User(first_name="Settled", email="settled@example.com", password_hash="hash", api_token="settled")
+    db_session.add(user)
+    db_session.flush()
+    home.owner_user_id = user.id
+    matchup.status = "live"
+    db_session.commit()
+    original = service._serialize_team_rosters
+
+    def finished_rosters(*args, **kwargs):
+        rosters = original(*args, **kwargs)
+        return {team_id: [row.model_copy(update={
+            "live_game_state": "final" if row.is_starter else "live",
+            "current_fantasy_points": 10 if team_id == home.id else 20,
+            "pregame_projected_points": 5 if team_id == home.id else 100,
+            "live_projected_final_points": 200,
+        }) for row in roster] for team_id, roster in rosters.items()}
+
+    monkeypatch.setattr(service, "_serialize_team_rosters", finished_rosters)
+    response = build_matchup_tab_view(db_session, league, user, selected_week=1)
+    # Three home starters outscore the one away starter; live bench is ignored.
+    assert response.my_team.current_points == 30
+    assert response.opponent_team.current_points == 20
+    assert response.my_team.win_probability == 100
+    assert response.opponent_team.win_probability == 0
+    assert matchup.status == "live"
 
 
 def test_missing_or_bye_starters_reduce_matchup_inputs_without_hiding_probability():

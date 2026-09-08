@@ -19,6 +19,7 @@ from collegefootballfantasy_api.app.services.fantasy_week_finality import (
     latest_authoritatively_finalized_week,
 )
 from collegefootballfantasy_api.app.services.fantasy_game_selection import fantasy_stat_weeks
+from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week
 from collegefootballfantasy_api.app.services.player_pool_filters import (
     canonical_fantasy_player_filter,
 )
@@ -58,7 +59,7 @@ def season_positional_rank_for_player(
     the size of that position's pool.
     """
 
-    through_week = latest_authoritatively_finalized_week(db, season=season)
+    through_week = min(latest_authoritatively_finalized_week(db, season=season), calendar_cfb_week(season) - 1)
     if through_week < 1:
         return None
 

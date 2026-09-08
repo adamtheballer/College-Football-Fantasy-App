@@ -1946,6 +1946,17 @@ test.describe("critical browser workflows", () => {
     await expect(finalPregameProjection).toHaveClass(/text-cfb-brand/);
     await page.screenshot({ path: "test-results/final-matchup-stat-line.png", fullPage: true });
 
+    matchupPayload = {
+      ...finalPayload, status: "final",
+      my_team: { ...finalPayload.my_team, win_probability: 100 },
+      opponent_team: { ...scheduledPayload.opponent_team, win_probability: 0 },
+    };
+    await page.goto("/league/1/matchup");
+    await expect(page.getByRole("img", { name: "Win chance: 100.0% to 0.0%" })).toBeVisible();
+    expect(await page.getByTestId("scoreboard-win-chance-left-bar").evaluate(el => (el as HTMLElement).style.width)).toBe("100%");
+    expect(await page.getByTestId("scoreboard-win-chance-right-bar").evaluate(el => (el as HTMLElement).style.width)).toBe("0%");
+    await page.screenshot({ path: "test-results/completed-matchup-full-winner-meter.png", fullPage: true });
+
     matchupPayload = emptyPayload;
     await page.goto("/league/1/matchup");
     await expect(page.getByText(/No matchup scheduled/i)).toBeVisible();

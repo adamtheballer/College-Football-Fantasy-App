@@ -14,6 +14,7 @@ from collegefootballfantasy_api.app.models.standing import Standing
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.transaction import Transaction
 from collegefootballfantasy_api.app.models.user import User
+from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week, resolve_current_week
 from collegefootballfantasy_api.app.schemas.league_flow import (
     DraftOrderEntryRead,
     DraftOrderRead,
@@ -240,6 +241,7 @@ def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspace
             Matchup.season == league.season_year,
         ).scalar() or 0
     )
+    through_week = min(through_week, calendar_cfb_week(league.season_year) - 1)
     ranked = rank_regular_season(db, league, through_week)
     return [
         LeagueWorkspaceStandingSummaryRead(
@@ -256,26 +258,7 @@ def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspace
 
 
 def resolve_default_matchup_week(db: Session, league: League) -> int | None:
-    live_or_scheduled_week = (
-        db.query(func.min(Matchup.week))
-        .filter(
-            Matchup.league_id == league.id,
-            Matchup.season == league.season_year,
-            Matchup.status.in_(("live", "scheduled", "projected")),
-        )
-        .scalar()
-    )
-    if live_or_scheduled_week is not None:
-        return int(live_or_scheduled_week)
-
-    latest_any_week = (
-        db.query(func.max(Matchup.week))
-        .filter(Matchup.league_id == league.id, Matchup.season == league.season_year)
-        .scalar()
-    )
-    if latest_any_week is not None:
-        return int(latest_any_week)
-    return None
+    return resolve_current_week(db, league)
 
 
 def build_scoreboard_rows(db: Session, league: League, week: int | None = None) -> list[LeagueScoreboardRow]:

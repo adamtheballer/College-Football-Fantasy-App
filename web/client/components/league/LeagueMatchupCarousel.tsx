@@ -1,7 +1,7 @@
 import { ChevronRight, Trophy } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { WinChanceBar, formatDisplayedProbabilityPair } from "@/components/league/WinChanceMeter";
+import { WinChanceBar, formatDisplayedProbabilityPair, validProbability } from "@/components/league/WinChanceMeter";
 import type { LeagueDetail } from "@/types/league";
 
 const formatPoints = (value: number | null | undefined) =>
@@ -18,14 +18,8 @@ const probabilityPair = (league: LeagueDetail) => {
   const left = summary?.win_probability_for;
   const right = summary?.win_probability_against;
   if (
-    typeof left !== "number" ||
-    typeof right !== "number" ||
-    !Number.isFinite(left) ||
-    !Number.isFinite(right) ||
-    left < 5 ||
-    right < 5 ||
-    left > 95 ||
-    right > 95 ||
+    !validProbability(left) ||
+    !validProbability(right) ||
     Math.abs(left + right - 100) > 0.000001
   ) {
     return null;

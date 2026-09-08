@@ -45,3 +45,8 @@ def test_projected_win_probability_is_unavailable_for_invalid_or_missing_totals(
 def test_projected_win_probability_accepts_a_legitimate_zero_total():
     assert calculate_matchup_win_probability(0.0, 0.0) == (50.0, 50.0)
     assert math.isclose(calculate_matchup_win_probability(0.0, 1.0)[0], 49.5)
+
+
+@pytest.mark.parametrize("a,b,expected", [(100, 99, (100, 0)), (99, 100, (0, 100)), (10, 10, (50, 50)), (-2, -3, (100, 0))])
+def test_completed_matchup_uses_actual_winner(a, b, expected):
+    assert calculate_matchup_win_probability(a, b, completed=True) == expected

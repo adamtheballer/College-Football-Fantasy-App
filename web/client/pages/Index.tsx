@@ -8,7 +8,7 @@ import {
 
 import { EmptyState, SkeletonState } from "@/components/states";
 import { LeagueMatchupCarousel } from "@/components/league/LeagueMatchupCarousel";
-import { formatDisplayedProbabilityPair } from "@/components/league/WinChanceMeter";
+import { formatDisplayedProbabilityPair, validProbability } from "@/components/league/WinChanceMeter";
 import { Button } from "@/components/ui/button";
 import { PageHeader, PositionBadge, StatusBadge, SurfaceCard } from "@/components/fantasy";
 import { PublicLegalLinks } from "@/components/legal/PublicLegalLinks";
@@ -55,14 +55,8 @@ export const formatDashboardWinChance = (
   opponentPercent: number | null | undefined,
 ) => {
   if (
-    typeof myPercent !== "number" ||
-    typeof opponentPercent !== "number" ||
-    !Number.isFinite(myPercent) ||
-    !Number.isFinite(opponentPercent) ||
-    myPercent < 5 ||
-    opponentPercent < 5 ||
-    myPercent > 95 ||
-    opponentPercent > 95 ||
+    !validProbability(myPercent) ||
+    !validProbability(opponentPercent) ||
     Math.abs(myPercent + opponentPercent - 100) > 0.000001
   ) {
     return null;

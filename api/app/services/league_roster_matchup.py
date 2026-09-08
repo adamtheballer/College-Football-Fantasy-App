@@ -64,7 +64,7 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
     PlayerPopularitySnapshotRead as PlayerPopularitySnapshotSchemaRead,
 )
 from collegefootballfantasy_api.app.schemas.waiver import WaiverDropCandidateRead
-from collegefootballfantasy_api.app.services.league_weeks import resolve_current_week
+from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week, resolve_current_week
 from collegefootballfantasy_api.app.services.fantasy_game_selection import fantasy_games_by_school, fantasy_stat_weeks
 from collegefootballfantasy_api.app.services.espn_live_scoring import espn_week_freshness
 from collegefootballfantasy_api.app.services.injury_status import is_current_injury_designation, normalize_injury_status
@@ -356,6 +356,7 @@ def _team_records(db: Session, league: League, team_ids: set[int]) -> dict[int, 
         .filter(
             Standing.league_id == league.id,
             Standing.season == league.season_year,
+            Standing.week < calendar_cfb_week(league.season_year),
             Standing.team_id.in_(team_ids),
         )
         .order_by(Standing.team_id.asc(), Standing.week.desc(), Standing.id.desc())
@@ -956,12 +957,21 @@ def _starter_live_totals(roster: list[RosterTabEntryRead]) -> tuple[float, float
             actual = entry.current_fantasy_points
             actual = float(actual) if isinstance(actual, (int, float)) and math.isfinite(actual) else 0.0
             current += actual
-            final_value = entry.live_projected_final_points if entry.live_projected_final_points is not None else actual
+            final_value = entry.live_projected_final_points if state == "live" and entry.live_projected_final_points is not None else actual
             final_value = float(final_value) if isinstance(final_value, (int, float)) and math.isfinite(final_value) else actual
             final += final_value
         else:
             final += baseline
     return round(current, 2), round(final, 2), round(pregame, 2), any_live
+
+
+def _starters_finished(roster: list[RosterTabEntryRead]) -> bool:
+    starters = [entry for entry in roster if entry.is_starter and entry.status != "EMPTY"]
+    return bool(starters) and all(
+        (entry.live_game_state or "").lower() in {"final", "post"}
+        or entry.projection_status == "BYE"
+        for entry in starters
+    )
 
 
 def _week_has_started(db: Session, *, season: int, week: int) -> bool:
@@ -1220,13 +1230,22 @@ def build_matchup_tab_view(
     )
     my_roster = roster_by_team[primary_team.id]
     opponent_roster = roster_by_team.get(opponent.id, []) if opponent else []
-    my_current, my_live_total, my_pregame_total, my_has_live = _starter_live_totals(my_roster)
-    opponent_current, opponent_live_total, opponent_pregame_total, opponent_has_live = _starter_live_totals(opponent_roster)
-    my_total = my_live_total if my_has_live else my_pregame_total
-    opponent_total = opponent_live_total if opponent_has_live else opponent_pregame_total
+    my_current, my_live_total, my_pregame_total, _ = _starter_live_totals(my_roster)
+    opponent_current, opponent_live_total, opponent_pregame_total, _ = _starter_live_totals(opponent_roster)
+    my_total = my_live_total
+    opponent_total = opponent_live_total
+    matchup_final = (matchup.status or "").lower() in {"final", "stat_corrected"}
+    if matchup_final and matchup.home_score is not None and matchup.away_score is not None:
+        my_current = float(matchup.home_score if primary_team.id == matchup.home_team_id else matchup.away_score)
+        opponent_current = float(matchup.away_score if primary_team.id == matchup.home_team_id else matchup.home_score)
+    completed = matchup_final or (_starters_finished(my_roster) and _starters_finished(opponent_roster))
+    if completed:
+        my_total, opponent_total = my_current, opponent_current
+        my_live_total, opponent_live_total = my_current, opponent_current
     my_probability, opponent_probability = calculate_matchup_win_probability(
         my_total,
         opponent_total,
+        completed=completed,
     ) or (None, None)
 
     record_team_ids = {primary_team.id}
@@ -1282,7 +1301,7 @@ def build_matchup_tab_view(
         (entry.live_game_state or "").lower() == "live"
         for entry in [*my_roster, *opponent_roster]
     )
-    effective_status = "live" if any_rostered_game_live or my_has_live or opponent_has_live else matchup.status
+    effective_status = matchup.status if matchup_final else "live" if any_rostered_game_live else matchup.status
     return LeagueMatchupTabRead(
         league_id=league.id,
         season=league.season_year,

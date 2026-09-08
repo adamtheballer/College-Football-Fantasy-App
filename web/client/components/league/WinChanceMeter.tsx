@@ -1,5 +1,5 @@
-function validProbability(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value) && value >= 5 && value <= 95;
+export function validProbability(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
 }
 
 function formatDisplayedProbabilityPair(left: number, right: number) {

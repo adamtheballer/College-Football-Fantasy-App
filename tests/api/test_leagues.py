@@ -995,7 +995,10 @@ def test_delete_league_requires_commissioner(client):
     assert response.json()["detail"] == "commissioner only"
 
 
-def test_league_workspace_returns_real_matchup_and_standings(client, db_session):
+def test_league_workspace_returns_real_matchup_and_standings(client, db_session, monkeypatch):
+    from collegefootballfantasy_api.app.services import league_workspace
+    # Standings fixtures below represent history already published at reset.
+    monkeypatch.setattr(league_workspace, "calendar_cfb_week", lambda season: 4)
     token = create_user_and_token(client, "workspace")
     member_token = create_user_and_token(client, "member")
     league = create_league(client, token)
