@@ -1,7 +1,10 @@
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+import pytest
 
 from collegefootballfantasy_api.app.models.matchup import Matchup
-from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week, resolve_current_week
+from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week, current_cfb_week_state, resolve_current_week
 from tests.api.scoring_helpers import create_scoring_fixture
 
 
@@ -14,7 +17,23 @@ def test_opening_week_remains_week_one_through_the_following_monday():
     assert calendar_cfb_week(2026, datetime(2026, 9, 7, 23, 59, tzinfo=timezone.utc)) == 1
     assert calendar_cfb_week(2026, datetime(2026, 9, 8, 2, 46, tzinfo=timezone.utc)) == 1
     assert calendar_cfb_week(2026, datetime(2026, 9, 8, 3, 59, tzinfo=timezone.utc)) == 1
-    assert calendar_cfb_week(2026, datetime(2026, 9, 8, 4, 0, tzinfo=timezone.utc)) == 2
+    assert calendar_cfb_week(2026, datetime(2026, 9, 8, 4, 0, tzinfo=timezone.utc)) == 1
+    assert calendar_cfb_week(2026, datetime(2026, 9, 8, 11, 59, 59, tzinfo=timezone.utc)) == 1
+    assert calendar_cfb_week(2026, datetime(2026, 9, 8, 12, 0, 0, tzinfo=timezone.utc)) == 2
+
+
+@pytest.mark.parametrize("month,day,utc_hour,previous_week", [(9, 15, 12, 2), (10, 27, 12, 8), (11, 3, 13, 9)])
+def test_reset_stays_at_eight_eastern_across_dst(month, day, utc_hour, previous_week):
+    before = datetime(2026, month, day, utc_hour - 1, 59, 59, tzinfo=timezone.utc)
+    boundary = datetime(2026, month, day, utc_hour, tzinfo=timezone.utc)
+    assert calendar_cfb_week(2026, before) == previous_week
+    assert calendar_cfb_week(2026, boundary) == previous_week + 1
+    assert calendar_cfb_week(2026, boundary.replace(tzinfo=None)) == previous_week + 1
+    for zone in ("UTC", "America/New_York", "America/Los_Angeles"):
+        local_boundary = boundary.astimezone(ZoneInfo(zone))
+        state = current_cfb_week_state(2026, local_boundary, zone)
+        assert state.week == previous_week + 1
+        assert state.week_starts_at == boundary
 
 
 def test_completed_matchup_stays_selected_until_eastern_reset(db_session, monkeypatch):
@@ -28,7 +47,7 @@ def test_completed_matchup_stays_selected_until_eastern_reset(db_session, monkey
     db_session.commit()
 
     class Clock(datetime):
-        current = datetime(2026, 9, 8, 2, 46, tzinfo=timezone.utc)
+        current = datetime(2026, 9, 8, 11, 59, 59, tzinfo=timezone.utc)
 
         @classmethod
         def now(cls, tz=None):
@@ -37,7 +56,7 @@ def test_completed_matchup_stays_selected_until_eastern_reset(db_session, monkey
     monkeypatch.setattr(league_weeks, "datetime", Clock)
     assert resolve_current_week(db_session, league) == 1
     assert resolve_default_matchup_week(db_session, league) == 1
-    Clock.current = datetime(2026, 9, 8, 4, 0, tzinfo=timezone.utc)
+    Clock.current = datetime(2026, 9, 8, 12, 0, tzinfo=timezone.utc)
     assert resolve_current_week(db_session, league) == 2
     assert resolve_default_matchup_week(db_session, league) == 2
 
@@ -55,7 +74,7 @@ def test_records_and_standings_publish_at_the_same_reset(db_session, monkeypatch
     db_session.commit()
 
     class Clock(datetime):
-        current = datetime(2026, 9, 8, 2, 46, tzinfo=timezone.utc)
+        current = datetime(2026, 9, 8, 11, 59, 59, tzinfo=timezone.utc)
 
         @classmethod
         def now(cls, tz=None):
@@ -64,9 +83,11 @@ def test_records_and_standings_publish_at_the_same_reset(db_session, monkeypatch
     monkeypatch.setattr(league_weeks, "datetime", Clock)
     assert _team_records(db_session, league, {home.id})[home.id] == "0-0-0"
     assert all(row.wins == 0 for row in build_standings_summary(db_session, league))
-    Clock.current = datetime(2026, 9, 8, 4, tzinfo=timezone.utc)
+    Clock.current = datetime(2026, 9, 8, 12, tzinfo=timezone.utc)
     assert _team_records(db_session, league, {home.id})[home.id] == "1-0-0"
     assert next(row for row in build_standings_summary(db_session, league) if row.team_id == home.id).wins == 1
+    db_session.refresh(matchup)
+    assert (matchup.home_score, matchup.away_score) == (120, 100)
 
 
 def test_current_week_does_not_skip_the_calendar_active_matchup_when_scoring_is_delayed(db_session):
