@@ -17,6 +17,7 @@ def rank_publication_clock(monkeypatch):
 
 
 def test_completed_rank_is_published_only_after_reset(db_session, monkeypatch):
+    from collegefootballfantasy_api.app.services import league_weeks
     from collegefootballfantasy_api.app.services.player_season_rank import season_positional_rank_for_player
     player = _rankable_player(name="Rank boundary", position="WR", school="Miami")
     db_session.add(player)
@@ -24,9 +25,17 @@ def test_completed_rank_is_published_only_after_reset(db_session, monkeypatch):
     db_session.add(PlayerStat(player_id=player.id, season=2026, week=1, verified=True, stats={"fantasy_points": 20}))
     _finalize_week(db_session, week=1)
     db_session.commit()
-    monkeypatch.setattr(player_season_rank, "calendar_cfb_week", lambda season: 1)
+    class Clock(datetime):
+        current = datetime(2026, 9, 8, 11, 59, 59, tzinfo=timezone.utc)
+
+        @classmethod
+        def now(cls, tz=None):
+            return cls.current
+
+    monkeypatch.setattr(league_weeks, "datetime", Clock)
+    monkeypatch.setattr(player_season_rank, "calendar_cfb_week", league_weeks.calendar_cfb_week)
     assert season_positional_rank_for_player(db_session, player=player, season=2026) is None
-    monkeypatch.setattr(player_season_rank, "calendar_cfb_week", lambda season: 2)
+    Clock.current = datetime(2026, 9, 8, 12, tzinfo=timezone.utc)
     assert season_positional_rank_for_player(db_session, player=player, season=2026).fantasy_points == 20
 
 

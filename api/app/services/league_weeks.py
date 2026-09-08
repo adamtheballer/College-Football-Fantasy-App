@@ -15,6 +15,7 @@ CFB_WEEK_START_WEEKDAY = 1
 CFB_WEEK_END_WEEKDAY = 5
 MAX_CFB_REGULAR_SEASON_WEEK = 15
 FANTASY_WEEK_TIMEZONE = "America/New_York"
+FANTASY_WEEK_RESET_HOUR = 8
 
 
 @dataclass(frozen=True)
@@ -53,13 +54,12 @@ def season_week_one_start(season_year: int) -> datetime:
 
 
 def calendar_cfb_week(season_year: int, now: datetime | None = None) -> int:
-    # Use the same Tuesday midnight Eastern boundary on every consumer,
-    # including when the server clock is already Tuesday in UTC.
+    # Roll over at Tuesday 08:00 Eastern, leaving Monday-night games in the
+    # current fantasy week. Shift the local wall-clock date, not UTC elapsed
+    # hours, so the boundary stays at 08:00 across daylight-saving changes.
     now = _as_utc(now or datetime.now(timezone.utc)).astimezone(_timezone(FANTASY_WEEK_TIMEZONE))
-    season_start = season_week_one_start(season_year).replace(tzinfo=_timezone(FANTASY_WEEK_TIMEZONE))
-    if now < season_start:
-        return 1
-    elapsed_days = (now.date() - season_start.date()).days
+    effective_date = (now - timedelta(hours=FANTASY_WEEK_RESET_HOUR)).date()
+    elapsed_days = (effective_date - season_week_one_start(season_year).date()).days
     return max(1, min((elapsed_days // 7) + 1, MAX_CFB_REGULAR_SEASON_WEEK))
 
 
@@ -98,7 +98,9 @@ def current_cfb_week_state(
     current = _as_utc(now or datetime.now(timezone.utc)).astimezone(league_tz)
     week = calendar_cfb_week(season_year, current.astimezone(timezone.utc))
     week_start_date = season_week_one_start(season_year).date() + timedelta(days=(week - 1) * 7)
-    week_starts_at = datetime.combine(week_start_date, time.min, tzinfo=league_tz)
+    week_starts_at = datetime.combine(
+        week_start_date, time(FANTASY_WEEK_RESET_HOUR), tzinfo=_timezone(FANTASY_WEEK_TIMEZONE)
+    )
     week_ends_at = datetime.combine(week_start_date + timedelta(days=4), time.max, tzinfo=league_tz)
     trade_processing_opens_at = datetime.combine(week_start_date + timedelta(days=5), time.min, tzinfo=league_tz)
     return CfbWeekState(
