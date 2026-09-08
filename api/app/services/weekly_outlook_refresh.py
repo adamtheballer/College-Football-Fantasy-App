@@ -36,6 +36,36 @@ POSTGAME_MODEL_VERSION = "postgame_espn_v2"
 PERFORMANCE_RESIDUAL_WEIGHT = 0.12
 MAX_RESIDUAL_SHARE = 0.75
 MAX_PROJECTION_ADJUSTMENT_SHARE = 0.30
+# Week 1 is useful new information, but the model built directly from one
+# game (usage, efficiency, and environment) is too volatile to replace the
+# sealed preseason weekly baseline on its own. Keep 45% of that established
+# baseline and let the postgame model supply the remaining 55%. This is a
+# forecast blend, not a UI floor: injuries and BYEs still take precedence.
+INITIAL_WEEK_POSTGAME_WEIGHT = 0.55
+
+_BLENDED_FORECAST_FIELDS = (
+    "pass_attempts",
+    "rush_attempts",
+    "targets",
+    "receptions",
+    "expected_plays",
+    "expected_rush_per_play",
+    "expected_td_per_play",
+    "pass_yards",
+    "rush_yards",
+    "rec_yards",
+    "pass_tds",
+    "rush_tds",
+    "rec_tds",
+    "interceptions",
+    "field_goals_made_0_to_39",
+    "field_goals_made_40_to_49",
+    "field_goals_made_0_to_49",
+    "field_goals_made_50_plus",
+    "extra_points_made",
+    "neutral_baseline",
+    "fantasy_points",
+)
 
 
 def _verified_fantasy_points(stats: dict | None, *, position: str) -> float | None:
@@ -107,6 +137,58 @@ def _apply_performance_residuals(
             position=player.position if player else None,
             expected_opportunities=candidate.expected_plays,
             availability_multiplier=candidate.availability_multiplier,
+        )
+        candidate.floor = outcome_range.floor
+        candidate.ceiling = outcome_range.ceiling
+        candidate.boom_prob = outcome_range.boom_prob
+        candidate.bust_prob = outcome_range.bust_prob
+
+
+def _blend_initial_postgame_outlooks(
+    *,
+    projections: list[WeeklyProjection],
+    preseason_by_player_id: dict[int, WeeklyProjection],
+    players_by_id: dict[int, Player],
+) -> None:
+    """Temper the first postgame model pass with the sealed weekly baseline.
+
+    The current-game model is still able to move a projection meaningfully,
+    while a Week 1 role/efficiency outlier cannot turn a strong four-team
+    roster into an implausibly low Week 2 total. Do not blend an unavailable
+    player back into the lineup: authoritative OUT/BYE availability wins.
+    """
+
+    baseline_weight = 1.0 - INITIAL_WEEK_POSTGAME_WEIGHT
+    for candidate in projections:
+        preseason = preseason_by_player_id.get(candidate.player_id)
+        projection_status = (candidate.projection_status or "ACTIVE").upper()
+        availability_multiplier = (
+            1.0 if candidate.availability_multiplier is None else float(candidate.availability_multiplier)
+        )
+        if preseason is None or projection_status in {"OUT", "BYE"}:
+            continue
+        if availability_multiplier <= 0.0:
+            continue
+        for field in _BLENDED_FORECAST_FIELDS:
+            postgame_value = getattr(candidate, field, None)
+            preseason_value = getattr(preseason, field, None)
+            if postgame_value is None or preseason_value is None:
+                continue
+            setattr(
+                candidate,
+                field,
+                round(
+                    baseline_weight * float(preseason_value)
+                    + INITIAL_WEEK_POSTGAME_WEIGHT * float(postgame_value),
+                    2,
+                ),
+            )
+        player = players_by_id.get(candidate.player_id)
+        outcome_range = weighted_projection_outcomes(
+            candidate.fantasy_points,
+            position=player.position if player else None,
+            expected_opportunities=candidate.expected_plays,
+            availability_multiplier=availability_multiplier,
         )
         candidate.floor = outcome_range.floor
         candidate.ceiling = outcome_range.ceiling
@@ -195,6 +277,15 @@ def refresh_post_final_outlook(
             )
         ).all()
     }
+    preseason_by_player_id = {
+        row.player_id: row
+        for row in db.query(WeeklyProjection).filter(
+            WeeklyProjection.season == season,
+            WeeklyProjection.week == next_week,
+            WeeklyProjection.projection_version == "PRESEASON",
+            WeeklyProjection.player_id.in_([player.id for player in players]),
+        ).all()
+    }
     actual_by_player_id = {
         player.id: points
         for player in players
@@ -249,9 +340,15 @@ def refresh_post_final_outlook(
         season=season,
         week=next_week,
     )
+    players_by_id = {player.id: player for player in players}
+    _blend_initial_postgame_outlooks(
+        projections=projections,
+        preseason_by_player_id=preseason_by_player_id,
+        players_by_id=players_by_id,
+    )
     _apply_performance_residuals(
         projections=projections,
-        players_by_id={player.id: player for player in players},
+        players_by_id=players_by_id,
         actual_by_player_id=actual_by_player_id,
         prior_projection_by_player_id=prior_projection_by_player_id,
     )
