@@ -18,7 +18,7 @@ export default function PrivacyPolicy() {
         <p>When you use the service, we also process the information needed to operate your fantasy experience, including:</p>
         <LegalList>
           <li>league memberships, team ownership, league settings, and invitations;</li>
-          <li>roster and lineup activity, draft history, trades, waiver activity, rivalry choices, and Pick 6 selections when enabled;</li>
+          <li>roster and lineup activity, draft history, trades, waiver activity, and Pick 6 selections when enabled;</li>
           <li>matchup results, fantasy scores, career history, notification preferences and delivery history; and</li>
           <li>chat messages and other content you choose to submit in the service.</li>
         </LegalList>

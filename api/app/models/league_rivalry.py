@@ -1,3 +1,10 @@
+"""Retained database mappings for the retired permanent-rival feature.
+
+The feature has no routes, services, client UI, or scheduled behavior. These
+models remain registered only so existing production tables are left intact
+until their historical data can be deliberately purged with explicit approval.
+"""
+
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, text
@@ -40,9 +47,6 @@ class LeagueRivalry(TimestampMixin, Base):
     team_b_name_snapshot: Mapped[str] = mapped_column(String(200), nullable=False)
     manager_a_name_snapshot: Mapped[str] = mapped_column(String(200), nullable=False)
     manager_b_name_snapshot: Mapped[str] = mapped_column(String(200), nullable=False)
-    # The invite points back to the rivalry with the database FK. Keeping this
-    # audit ID scalar avoids a cyclic FK pair, which is not portable to the
-    # SQLite test/runtime used by local alpha validation.
     accepted_invite_id: Mapped[int] = mapped_column(Integer, unique=True)
     accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[str] = mapped_column(String(16), default="ACTIVE")

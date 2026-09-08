@@ -6,8 +6,6 @@ import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
 import { WinChanceBar, validProbability } from "@/components/league/WinChanceMeter";
 import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
-import { RivalWeekPatch } from "@/components/league/RivalWeekPatch";
-import { RivalryControls } from "@/components/league/RivalryControls";
 import { EmptyState, ErrorState, SkeletonState } from "@/components/states";
 import { SurfaceCard, type StatusBadgeVariant } from "@/components/fantasy";
 import {
@@ -423,8 +421,6 @@ export default function LeagueMatchup() {
         <LeagueTabs leagueId={parsedLeagueId} draftStatus={leagueQuery.data?.draft?.status} leagueStatus={leagueQuery.data?.status} />
       </div>
 
-      <div className="px-3 py-2 sm:px-5"><RivalryControls leagueId={parsedLeagueId} /></div>
-
       {matchupQuery.isError ? (
         <ErrorState
           title="Unable to load matchup"
@@ -463,7 +459,6 @@ export default function LeagueMatchup() {
               swipeStartX.current = null;
             }}
           >
-            <RivalWeekPatch rivalry={data.rivalry} leagueId={parsedLeagueId} matchupId={data.matchup_id} />
             {data.postseason ? (
               <div className="mx-3 mt-2 flex items-center justify-between border-y border-amber-300/30 bg-amber-300/[0.06] px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-amber-100 sm:mx-5">
                 <span>{data.postseason.matchup_type.replace(/_/g, " ")}</span>

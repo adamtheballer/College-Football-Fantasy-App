@@ -119,7 +119,7 @@ second scoring path.
   clear lock explanation. The format can regenerate only before the first
   regular-season matchup starts.
 - Matchup pages render server-derived postseason context; championship receives
-  an original app-owned gold treatment. Existing rivalry context may coexist but
+  an original app-owned gold treatment. Existing league context may coexist but
   cannot alter postseason scoring.
 
 ## Safety and Operations
@@ -145,7 +145,7 @@ second scoring path.
   loading, and failure states; it is readable on 320px through desktop screens
   with no document horizontal overflow.
 - Existing regular-season league creation, draft, roster, matchup, waiver,
-  trade, live score, rivalry, and career flows remain covered by regression.
+  trade, live score, and career flows remain covered by regression.
 
 ## Tracking
 

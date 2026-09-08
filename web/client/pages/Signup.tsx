@@ -135,7 +135,7 @@ export default function Signup() {
           </div>
 
           <div className="flex max-w-xl flex-wrap gap-3 [@media(max-height:760px)]:hidden">
-            {["CFB rankings", "Rivalry week", "Available players", "Draft room"].map((label) => (
+            {["CFB rankings", "League matchups", "Available players", "Draft room"].map((label) => (
               <span key={label} className="rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/75">
                 {label}
               </span>

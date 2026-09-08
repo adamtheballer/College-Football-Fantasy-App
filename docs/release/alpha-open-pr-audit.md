@@ -24,5 +24,5 @@ must not be merged merely because they contain a passing historical check.
 
 After a successful RC merge and deployment verification, close or archive each
 non-canonical draft with a link to the merged RC. This avoids accidentally
-reintroducing retired implementations of live scoring, Rival Week, profile
+reintroducing retired implementations of live scoring, profile
 state, navigation, or player enrichment.

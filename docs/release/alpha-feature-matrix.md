@@ -14,7 +14,7 @@ current release-candidate evidence rather than a production deployment claim.
 | Matchups and live scoring | Matchup/projection services, ESPN scoring worker | Live totals, timer, red-zone/possession state, projections | ESPN fixtures, projection, recalc and outlook tests | Full disposable worker replay pending |
 | Waivers and trades | Waiver, ownership and trade services | Scoped waiver/trade flows | Backend workflow tests; browser trade E2E | Automated coverage present; full golden path pending |
 | Playoffs and career profiles | Playoff, standings, career history services | Bracket and career screens | Backend schedule/postseason tests | Included in RC; migration rehearsal pending |
-| Rival Week and opening week | Rivalry models and lifecycle logic | Rival/Oppening Week patches | Unit/component coverage | Automated coverage present |
+| Opening week | Opening-week scoring lifecycle | Opening Week patch | Unit/component coverage | Automated coverage present |
 | Notifications and injury alerts | Notification worker and injury processing | Settings league selection and alerts views | Backend notification/injury tests | Worker lifecycle verification pending |
 | Chats and Saturday Pick 6 | Chat and Pick 6 routers | Chat and Pick 6 routes | API/browser tests | Automated coverage present |
 | Settings and manager avatars | User profile/settings APIs | Photo picker, initials fallback, diagnostics/legal links | Frontend + auth/profile tests | Native TestFlight verification pending |
