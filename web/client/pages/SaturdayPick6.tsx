@@ -5,11 +5,11 @@ import { Check, CircleX, Clock3, Copy, Lock, Radio, Trophy, UserRound } from "lu
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SkeletonState } from "@/components/states";
-import { type SaturdayPickPlayer, useSaveSaturdayPick, useSaturdayPickContest } from "@/hooks/use-saturday-pick";
+import { type SaturdayPickPlayer, useSaveSaturdayPick, useSaturdayPickContest, useSaturdayPickRewards } from "@/hooks/use-saturday-pick";
 import { getSaturdayPickSponsorLogo, saturdayPick6Sponsor } from "@/lib/saturday-pick-sponsor";
 
 export const SATURDAY_PICK_6_COMING_SOON_MESSAGE =
-  "Week 1 picks are coming soon. Six featured players will be available once weekly projections are published.";
+  "This week's picks are coming soon. Six featured players will be available once rankings and weekly projections are verified.";
 
 export const SATURDAY_PICK_6_HOW_IT_WORKS =
   "How it works: Choose one of six featured players before the first kickoff. If your player scores the most fantasy points that week, you unlock that week's featured brand discount code.";
@@ -34,7 +34,7 @@ export const positionLabel = (position: SaturdayPickPlayer["canonical_position"]
 }[position]);
 
 export const pickConfirmationMessage = (playerName: string) =>
-  `Your pick is in. Follow ${playerName} this Saturday.`;
+  `Your pick is in. Follow ${playerName} this week.`;
 
 export const lockDeadlineMessage = (playerName: string, lockAt: string) => {
   const parsed = new Date(lockAt);
@@ -48,6 +48,7 @@ export const lockDeadlineMessage = (playerName: string, lockAt: string) => {
 
 export const displayPoints = (player: SaturdayPickPlayer, contestStatus: string) => {
   if (contestStatus === "FINAL") return player.final_points;
+  if (["SCORING", "PROVISIONAL"].includes(contestStatus)) return player.live_points;
   return player.live_points ?? player.projected_points;
 };
 
@@ -102,6 +103,7 @@ function SaturdayPick6ComingSoon({ embedded }: SaturdayPick6Props) {
 
 export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) {
   const contestQuery = useSaturdayPickContest();
+  const rewardsQuery = useSaturdayPickRewards();
   const savePick = useSaveSaturdayPick();
   const contest = contestQuery.data;
   const [pendingPickId, setPendingPickId] = useState<number | null>(null);
@@ -109,6 +111,11 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
   const [resultDialogOpen, setResultDialogOpen] = useState(false);
   const countdown = useCountdown(contest?.lock_at);
   const selectedPickId = pendingPickId ?? contest?.entry?.selected_pick_player_id ?? null;
+  useEffect(() => {
+    setPendingPickId(null);
+    setSubmitError(null);
+    setResultDialogOpen(false);
+  }, [contest?.id]);
   const isOpen = contest?.status === "OPEN" && !countdown.expired;
   const isResults = Boolean(contest && ["SCORING", "PROVISIONAL", "FINAL"].includes(contest.status));
   const winnerIds = useMemo(() => new Set(contest?.winning_player_ids ?? []), [contest?.winning_player_ids]);
@@ -157,7 +164,7 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
     url: null,
   };
   const sponsorLogo = getSaturdayPickSponsorLogo(sponsor);
-  const revealSponsorReward = Boolean(contest.sponsor) && shouldRevealSponsorReward(contest.status, contest.entry);
+  const revealSponsorReward = shouldRevealSponsorReward(contest.status, contest.entry);
   const submit = async () => {
     if (!selectedPickId || !isOpen) return;
     setSubmitError(null);
@@ -174,6 +181,11 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
 
   return (
     <div className={embedded ? "space-y-7" : "mx-auto max-w-7xl space-y-7 pb-20 pt-5"}>
+      {rewardsQuery.data?.map((reward) => <section key={reward.id} className="rounded-xl border border-cfb-gold/35 bg-cfb-surface p-5" aria-label={`Week ${reward.week_number} winner reward`}>
+        <h2 className="text-xl font-bold text-cfb-gold">Congratulations, you won!</h2>
+        <p className="mt-2 text-cfb-text-secondary">Your Week {reward.week_number} · {reward.contest_position} pick finished first.</p>
+        {reward.sponsor?.reward_unlocked && reward.sponsor.code ? <div className="mt-3 flex flex-wrap items-center gap-3"><span className="text-cfb-text-secondary">{reward.sponsor.name} discount code:</span><code className="break-all font-bold text-cfb-text-primary">{reward.sponsor.code}</code><Button variant="outline" onClick={() => { void navigator.clipboard?.writeText(reward.sponsor!.code!); }}>Copy Code</Button></div> : <p className="mt-2 text-cfb-text-secondary">Your discount code is being prepared. Your win is saved.</p>}
+      </section>)}
       <section className="rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised p-6 sm:p-8">
         <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
@@ -181,7 +193,7 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
               <span className="inline-flex items-center gap-2 rounded-md border border-cfb-gold/45 bg-cfb-gold/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-yellow-100"><Trophy className="h-4 w-4" /> Saturday Pick 6</span>
               <span className="cfb-micro-label text-cyan-200">Week {contest.week_number} · {contest.contest_position} Week</span>
             </div>
-            <h1 className="mt-5 font-display text-3xl font-black tracking-[-0.04em] text-cfb-text-primary sm:text-4xl">{isResults ? "LIVE RESULTS" : isOpen ? "MAKE YOUR PICK" : contest.status === "SCHEDULED" ? "PICKS OPENING SOON" : "PICKS LOCKED"}</h1>
+            <h1 className="mt-5 font-display text-3xl font-black tracking-[-0.04em] text-cfb-text-primary sm:text-4xl">{contest.status === "FINAL" ? "FINAL RESULTS" : isResults ? "LIVE RESULTS" : isOpen ? "MAKE YOUR PICK" : contest.status === "SCHEDULED" ? "PICKS OPENING SOON" : "PICKS LOCKED"}</h1>
             <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-cfb-text-secondary sm:text-lg">Which featured {positionLabel(contest.contest_position)} will score the most fantasy points this week?</p>
             <p className="mt-4 max-w-2xl rounded-lg border border-cfb-border-subtle bg-cfb-surface px-4 py-3 text-sm leading-6 text-cfb-text-secondary">
               <span className="mr-2 font-bold text-cfb-text-primary">How it works</span>

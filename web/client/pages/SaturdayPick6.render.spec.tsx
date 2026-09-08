@@ -13,6 +13,7 @@ const contestQuery = vi.hoisted(() => ({
 
 vi.mock("@/hooks/use-saturday-pick", () => ({
   useSaturdayPickContest: () => contestQuery,
+  useSaturdayPickRewards: () => ({ data: [] }),
   useSaveSaturdayPick: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
