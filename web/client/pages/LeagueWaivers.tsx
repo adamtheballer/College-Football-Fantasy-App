@@ -173,6 +173,17 @@ export const waiverWeekPoints = (
   };
 };
 
+/** Keep completed waiver totals visually distinct from in-progress forecasts. */
+export const waiverWeekPointsClassName = (weekPoints: ReturnType<typeof waiverWeekPoints>) => (
+  weekPoints.isFinal
+    ? "text-emerald-300"
+    : weekPoints.label === "BYE"
+      ? "text-amber-200"
+      : weekPoints.label === "OUT"
+        ? "text-rose-200"
+        : "text-cfb-text-primary"
+);
+
 export const waiverOpponentLabel = (opponent: string | null | undefined) => opponent?.trim() || "—";
 
 /** Search only the player's own identity; a scheduled opponent is display-only. */
@@ -766,7 +777,7 @@ export default function LeagueWaivers() {
                       <p className="text-[8px] font-black uppercase tracking-[0.1em] text-cfb-text-muted">{weekPoints.isFinal ? "Final" : `W${displayWeek}`}</p>
                       <p
                         data-testid={`waiver-mobile-week-points-${player.id}`}
-                        className={`mt-0.5 text-base font-semibold tabular-nums ${weekPoints.isFinal ? "text-cfb-brand" : weekPoints.label === "BYE" ? "text-amber-200" : weekPoints.label === "OUT" ? "text-rose-200" : "text-cfb-text-primary"}`}
+                        className={`mt-0.5 text-base font-semibold tabular-nums ${waiverWeekPointsClassName(weekPoints)}`}
                       >
                         {weekPoints.label}
                       </p>
@@ -877,7 +888,7 @@ export default function LeagueWaivers() {
                       <td className={`w-40 px-4 py-3 align-middle ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
                         <span
                           data-testid={`waiver-week-points-${player.id}`}
-                          className={`text-lg font-semibold tabular-nums ${weekPoints.isFinal ? "text-cfb-brand" : weekPoints.label === "BYE" ? "text-amber-200" : weekPoints.label === "OUT" ? "text-rose-200" : "text-cfb-text-primary"}`}
+                          className={`text-lg font-semibold tabular-nums ${waiverWeekPointsClassName(weekPoints)}`}
                         >
                           {weekPoints.label}
                         </span>

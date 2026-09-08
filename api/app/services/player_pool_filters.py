@@ -28,6 +28,7 @@ _APPROVED_SCHOOLS = {
 _APPROVED_SCHOOL_KEYS = tuple(sorted(school.strip().lower() for school in _APPROVED_SCHOOLS))
 ELIGIBLE_FANTASY_POSITIONS = ("QB", "RB", "WR", "TE", "K")
 CANONICAL_PRESEASON_SOURCE_PREFIX = "canonical-preseason:"
+CANONICAL_CORRECTION_SOURCE_PREFIX = "canonical-correction:"
 LEGACY_CANONICAL_PRESEASON_SOURCE_PREFIX = "legacy-canonical-preseason:"
 
 
@@ -37,16 +38,23 @@ def approved_school_player_filter():
 
 
 def canonical_preseason_player_filter(season: int):
-    """Restrict a query to the reviewed immutable player snapshot for a season.
+    """Restrict a query to reviewed players and explicit auditable corrections.
 
     Provider syncs and historical imports may create or retain ``Player`` rows
-    for statistics and identity resolution.  They must never silently become
-    draftable or claimable.  The release bootstrap marks only rows reconciled
-    against the versioned identity + projection snapshots with this prefix.
+    for statistics and identity resolution. They must never silently become
+    draftable or claimable. The release bootstrap marks approved source rows;
+    a separately named correction marker is allowed only for an explicit,
+    versioned production correction such as a player omitted from the original
+    reviewed sheet. It is intentionally not a generic provider-import path.
     """
 
-    return Player.sheet_source_sheet_id.like(
-        f"{CANONICAL_PRESEASON_SOURCE_PREFIX}{int(season)}:%"
+    return or_(
+        Player.sheet_source_sheet_id.like(
+            f"{CANONICAL_PRESEASON_SOURCE_PREFIX}{int(season)}:%"
+        ),
+        Player.sheet_source_sheet_id.like(
+            f"{CANONICAL_CORRECTION_SOURCE_PREFIX}{int(season)}:%"
+        ),
     )
 
 
@@ -113,7 +121,10 @@ def is_canonical_fantasy_player(player: Player, season: int) -> bool:
     except (TypeError, ValueError):
         projected_points = 0.0
     return bool(
-        source_marker.startswith(f"{CANONICAL_PRESEASON_SOURCE_PREFIX}{int(season)}:")
+        (
+            source_marker.startswith(f"{CANONICAL_PRESEASON_SOURCE_PREFIX}{int(season)}:")
+            or source_marker.startswith(f"{CANONICAL_CORRECTION_SOURCE_PREFIX}{int(season)}:")
+        )
         and is_approved_fantasy_school(player.school)
         and (player.position or "").strip().upper() in ELIGIBLE_FANTASY_POSITIONS
         and projected_points > 0
