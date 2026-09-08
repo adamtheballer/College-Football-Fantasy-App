@@ -29,7 +29,10 @@ from collegefootballfantasy_api.app.scoring import calculate_fantasy_points
 
 POSTGAME_PROJECTION_VERSION = "MIDWEEK"
 POSTGAME_MODEL_VERSION = "postgame_espn_v2"
-PERFORMANCE_RESIDUAL_WEIGHT = 0.22
+# One certified performance miss informs the next projection, but Week 1 is
+# still a small sample. Reduce the residual's influence by five percentage
+# points so a single outlier cannot cause an abrupt ROS-board swing.
+PERFORMANCE_RESIDUAL_WEIGHT = 0.17
 MAX_RESIDUAL_SHARE = 0.75
 MAX_PROJECTION_ADJUSTMENT_SHARE = 0.30
 
@@ -74,7 +77,7 @@ def performance_residual_adjustment(
     )
     adjustment = capped_residual * PERFORMANCE_RESIDUAL_WEIGHT
     maximum_adjustment = float(next_week_baseline) * MAX_PROJECTION_ADJUSTMENT_SHARE
-    return max(-maximum_adjustment, min(maximum_adjustment, adjustment))
+    return round(max(-maximum_adjustment, min(maximum_adjustment, adjustment)), 2)
 
 
 def _apply_performance_residuals(

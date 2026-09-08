@@ -3145,6 +3145,28 @@ test.describe("critical browser workflows", () => {
     await archManningRow.getByRole("button", { name: /^Watch$/i }).click();
     await expect(archManningRow.getByRole("button", { name: /^Watching$/i })).toBeVisible();
 
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.getByRole("tab", { name: "All Players", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: /^All Players$/i })).toBeVisible();
+    const allPlayersScoreLayout = await page.getByTestId("waiver-week-points-801").evaluate((score) => {
+      const cell = score.closest("td");
+      return cell ? { textAlign: getComputedStyle(cell).textAlign, width: cell.getBoundingClientRect().width } : null;
+    });
+    expect(allPlayersScoreLayout).toEqual(expect.objectContaining({ textAlign: "left" }));
+    expect(allPlayersScoreLayout?.width).toBeGreaterThanOrEqual(150);
+
+    const boardScopeTabs = page.getByRole("tab", { name: /Waiver Wire|All Players|Hot Pickups/ });
+    await expect(boardScopeTabs).toHaveCount(3);
+    const scopeTabLayout = await boardScopeTabs.evaluateAll((tabs) => tabs.map((tab) => {
+      const box = tab.getBoundingClientRect();
+      return { width: box.width, height: box.height, scrollHeight: tab.scrollHeight, clientHeight: tab.clientHeight };
+    }));
+    expect(scopeTabLayout).toHaveLength(3);
+    for (const tab of scopeTabLayout) {
+      expect(tab.width).toBeGreaterThanOrEqual(110);
+      expect(tab.scrollHeight).toBeLessThanOrEqual(tab.clientHeight);
+    }
+
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileRow = page.getByTestId("waiver-mobile-player-row-801");
     await expect(mobileRow).toBeVisible();

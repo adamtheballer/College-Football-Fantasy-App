@@ -622,8 +622,8 @@ export default function LeagueWaivers() {
                 {boardDescription}
               </p>
             </div>
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <div className="flex rounded-md border border-cfb-border-subtle bg-cfb-canvas p-1" role="tablist" aria-label="Player board">
+            <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center 2xl:flex-nowrap">
+              <div className="grid w-full shrink-0 grid-cols-3 rounded-md border border-cfb-border-subtle bg-cfb-canvas p-1 sm:w-[360px]" role="tablist" aria-label="Player board">
                 {([
                   ["waiver", "Waiver Wire"],
                   ["all", "All Players"],
@@ -636,7 +636,7 @@ export default function LeagueWaivers() {
                     aria-selected={playerBoardScope === scope}
                     onClick={() => setPlayerBoardScope(scope)}
                     className={[
-                      "rounded px-2.5 py-2 text-[9px] font-black uppercase tracking-[0.1em] transition-colors",
+                      "flex min-h-10 min-w-0 items-center justify-center rounded px-2 py-2 text-center text-[9px] font-black uppercase leading-4 tracking-[0.08em] transition-colors",
                       playerBoardScope === scope ? "bg-cfb-brand text-cfb-canvas" : "text-cfb-text-secondary hover:text-cfb-text-primary",
                     ].join(" ")}
                   >
@@ -809,7 +809,7 @@ export default function LeagueWaivers() {
                   <th className="w-44 px-4 py-3">School</th>
                   <th className="w-44 px-4 py-3">Opponent</th>
                   <th className="w-24 px-4 py-3">POS</th>
-                  <th className="w-32 px-4 py-3 text-right">
+                  <th className={`w-40 px-4 py-3 ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
                     Week {displayWeek} Pts
                   </th>
                   <th className="w-56 px-5 py-3 text-right">Action</th>
@@ -874,7 +874,7 @@ export default function LeagueWaivers() {
                           {player.position ?? "-"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right align-middle">
+                      <td className={`w-40 px-4 py-3 align-middle ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
                         <span
                           data-testid={`waiver-week-points-${player.id}`}
                           className={`text-lg font-semibold tabular-nums ${weekPoints.isFinal ? "text-cfb-brand" : weekPoints.label === "BYE" ? "text-amber-200" : weekPoints.label === "OUT" ? "text-rose-200" : "text-cfb-text-primary"}`}

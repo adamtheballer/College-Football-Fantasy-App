@@ -11,6 +11,7 @@ from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
+from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.models.player_waiver_availability import PlayerWaiverAvailability
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
@@ -481,6 +482,7 @@ def test_waiver_pool_uses_verified_final_box_score_for_unrostered_player(db_sess
     team = Team(league_id=league.id, name="Final Waiver Team", owner_user_id=user.id, owner_name="Final")
     player = canonical_player("Final Score USC WR", "WR", "USC")
     scoreless_player = canonical_player("Scoreless USC WR", "WR", "USC")
+    unmapped_player = canonical_player("Unmapped USC WR", "WR", "USC")
     game = Game(
         season=2026,
         week=1,
@@ -490,12 +492,19 @@ def test_waiver_pool_uses_verified_final_box_score_for_unrostered_player(db_sess
         home_points=31,
         away_points=10,
     )
-    db_session.add_all((team, LeagueSettings(league_id=league.id, roster_slots_json={"WR": 1}), player, scoreless_player, game))
+    db_session.add_all((team, LeagueSettings(league_id=league.id, roster_slots_json={"WR": 1}), player, scoreless_player, unmapped_player, game))
     db_session.flush()
     db_session.add_all(
         (
+            PlayerProviderId(
+                player_id=scoreless_player.id,
+                provider="espn",
+                provider_player_id="scoreless-usc-wr",
+                verification_status="verified",
+            ),
             WeeklyProjection(player_id=player.id, season=2026, week=1, is_published=True, fantasy_points=11.5),
             WeeklyProjection(player_id=scoreless_player.id, season=2026, week=1, is_published=True, fantasy_points=4.5),
+            WeeklyProjection(player_id=unmapped_player.id, season=2026, week=1, is_published=True, fantasy_points=4.5),
             PlayerGameStat(
                 player_id=player.id,
                 game_id=game.id,
@@ -516,6 +525,7 @@ def test_waiver_pool_uses_verified_final_box_score_for_unrostered_player(db_sess
     assert row.final_fantasy_points == 18.3
     assert row.opponent == "Opponent"
     assert rows[scoreless_player.id].final_fantasy_points == 0.0
+    assert rows[unmapped_player.id].final_fantasy_points is None
 
 
 def test_waiver_view_resolves_instant_adds_from_each_players_kickoff(db_session):

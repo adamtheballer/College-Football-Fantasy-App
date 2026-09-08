@@ -104,6 +104,25 @@ describe("Settings beta preferences", () => {
     await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ firstName: "Updated Adam", avatarUrl: null }));
   });
 
+  it("does not report a manager-name save when the profile response retains the old name", async () => {
+    state.updateProfile.mockResolvedValueOnce({
+      id: 7,
+      firstName: "Adam",
+      avatarUrl: null,
+      managerNameChangeAvailableAt: null,
+    });
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+
+    fireEvent.change(screen.getByLabelText("Manager Name"), { target: { value: "Updated Adam" } });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirm name change/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("Your manager name was not changed. Please try again.");
+    });
+    expect(screen.queryByRole("button", { name: /^saved$/i })).toBeNull();
+  });
+
   it("opens the same confirmation before saving a manager-name change with Enter", () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
 

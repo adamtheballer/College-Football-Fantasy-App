@@ -269,7 +269,7 @@ def test_draft_board_reacts_to_an_individual_verified_final_without_using_live_p
     assert response.status_code == 200
     rows = {row["name"]: row for row in response.json()["data"]}
     assert rows["Final Breakout Receiver"]["rest_of_season_as_of_week"] == 1
-    assert rows["Final Breakout Receiver"]["rest_of_season_projected_points"] == 351.7
+    assert rows["Final Breakout Receiver"]["rest_of_season_projected_points"] == 335.8
     assert rows["Final Breakout Receiver"]["rest_of_season_rank"] < rows["Live Partial Receiver"]["rest_of_season_rank"]
     assert rows["Live Partial Receiver"]["rest_of_season_projected_points"] == 260.0
 
