@@ -9,6 +9,7 @@ from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.services.player_trade_value import IN_SEASON_VALUE_POLICY_VERSION
 from collegefootballfantasy_api.app.services.weekly_outlook_refresh import (
     POSTGAME_PROJECTION_VERSION,
+    _bound_initial_week_projection_drift,
     _blend_initial_postgame_outlooks,
     performance_residual_adjustment,
     refresh_post_final_outlook,
@@ -67,7 +68,7 @@ def test_post_final_refresh_updates_next_week_and_values_only_after_every_matchu
     assert qb_projection.is_published is True
     assert qb_projection.baseline_source == "verified_week_1_stats"
     assert qb_projection.baseline_games_played == 1
-    assert qb_projection.model_version == "postgame_espn_v2"
+    assert qb_projection.model_version == "postgame_espn_v3"
     assert qb_projection.fantasy_points >= 0
     value = (
         db_session.query(PlayerTradeValue)
@@ -262,9 +263,70 @@ def test_initial_postgame_outlook_keeps_a_substantial_preseason_baseline(db_sess
 
     # A single disappointing game must inform the next week without replacing
     # the established weekly baseline wholesale.
-    assert candidate.fantasy_points == 13.4
-    assert candidate.pass_yards == 174.0
-    assert candidate.expected_plays == 26.75
+    assert candidate.fantasy_points == 15.8
+    assert candidate.pass_yards == 198.0
+    assert candidate.expected_plays == 29.75
+
+
+def test_initial_postgame_outlook_bounds_week_two_drift_for_a_healthy_player(db_session):
+    _league, players, _matchup = _finalized_week_one_fixture(db_session)
+    player = players["qb"]
+    preseason = WeeklyProjection(
+        player_id=player.id,
+        season=2026,
+        week=2,
+        projection_version="PRESEASON",
+        fantasy_points=20.0,
+    )
+    candidate = WeeklyProjection(
+        player_id=player.id,
+        season=2026,
+        week=2,
+        projection_version=POSTGAME_PROJECTION_VERSION,
+        fantasy_points=8.0,
+        expected_plays=20.0,
+    )
+
+    _bound_initial_week_projection_drift(
+        projections=[candidate],
+        preseason_by_player_id={player.id: preseason},
+        players_by_id={player.id: player},
+    )
+
+    # A poor one-game usage estimate cannot turn a healthy 20-point Week 2
+    # baseline into a confusing 12-point projection.
+    assert candidate.fantasy_points == 17.0
+    assert candidate.floor <= candidate.fantasy_points <= candidate.ceiling
+
+
+def test_initial_postgame_outlook_drift_bound_respects_injury_availability(db_session):
+    _league, players, _matchup = _finalized_week_one_fixture(db_session)
+    player = players["qb"]
+    preseason = WeeklyProjection(
+        player_id=player.id,
+        season=2026,
+        week=2,
+        projection_version="PRESEASON",
+        fantasy_points=20.0,
+    )
+    candidate = WeeklyProjection(
+        player_id=player.id,
+        season=2026,
+        week=2,
+        projection_version=POSTGAME_PROJECTION_VERSION,
+        availability_multiplier=0.5,
+        fantasy_points=2.0,
+    )
+
+    _bound_initial_week_projection_drift(
+        projections=[candidate],
+        preseason_by_player_id={player.id: preseason},
+        players_by_id={player.id: player},
+    )
+
+    # The guardrail anchors to the current availability-adjusted baseline,
+    # not the healthy preseason total.
+    assert candidate.fantasy_points == 8.5
 
 
 def test_initial_postgame_outlook_does_not_restore_an_out_player(db_session):
