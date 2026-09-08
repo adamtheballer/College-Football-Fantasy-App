@@ -9,7 +9,7 @@ from collegefootballfantasy_api.app.api.deps import (
 )
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.db.session import get_db
-from collegefootballfantasy_api.app.models.saturday_pick import SaturdayPickContest
+from collegefootballfantasy_api.app.models.saturday_pick import SaturdayPickContest, SaturdayPickEntry
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.saturday_pick import (
     SaturdayPickContestCreate,
@@ -88,6 +88,21 @@ def get_active_contest(
     """Compatibility alias for the public active-contest contract."""
 
     return get_current_contest(season=season, week=week, db=db, current_user=current_user)
+
+
+@router.get("/rewards", response_model=list[SaturdayPickContestRead])
+def get_winner_rewards(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[SaturdayPickContestRead]:
+    """Keep a user's earned codes available after the featured week changes."""
+    _require_public_enabled()
+    contests = db.query(SaturdayPickContest).join(SaturdayPickEntry).filter(
+        SaturdayPickEntry.user_id == current_user.id,
+        SaturdayPickEntry.is_winner.is_(True),
+        SaturdayPickContest.status == "FINAL",
+    ).order_by(SaturdayPickContest.season.desc(), SaturdayPickContest.week_number.desc()).limit(30).all()
+    return [contest_read(db, contest, current_user) for contest in contests]
 
 
 @router.get("/{contest_id}", response_model=SaturdayPickContestRead)

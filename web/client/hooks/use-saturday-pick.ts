@@ -58,11 +58,18 @@ export function useSaturdayPickContest(enabled = true) {
     queryKey: ["saturday-pick-6", "current"],
     enabled,
     staleTime: 5_000,
-    refetchInterval: (query) => {
-      const status = query.state.data?.status;
-      return status && ["OPEN", "LOCKED", "SCORING", "PROVISIONAL"].includes(status) ? 30_000 : false;
-    },
+    // A finalized contest still needs to discover the next weekly publication.
+    refetchInterval: 30_000,
     queryFn: () => apiGet<SaturdayPickContest>("/saturday-pick-6/current"),
+  });
+}
+
+export function useSaturdayPickRewards() {
+  return useQuery({
+    queryKey: ["saturday-pick-6", "rewards"],
+    staleTime: 5_000,
+    refetchInterval: 30_000,
+    queryFn: () => apiGet<SaturdayPickContest[]>("/saturday-pick-6/rewards"),
   });
 }
 
@@ -73,7 +80,7 @@ export function useSaveSaturdayPick() {
       apiPut<NonNullable<SaturdayPickContest["entry"]>>(`/saturday-pick-6/${contestId}/entry`, { selected_pick_player_id: selectedPickPlayerId }),
     onSuccess: (entry) => {
       queryClient.setQueriesData<SaturdayPickContest>(
-        { queryKey: ["saturday-pick-6"] },
+        { queryKey: ["saturday-pick-6", "current"] },
         (contest) => contest ? { ...contest, entry } : contest
       );
       void queryClient.invalidateQueries({ queryKey: ["saturday-pick-6"] });

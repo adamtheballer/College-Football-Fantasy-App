@@ -35,6 +35,7 @@ def _featured_players(db_session, *, position="QB", final_games=False, with_week
             start_date=kickoff + timedelta(minutes=index),
             home_points=10 if final_games else None,
             away_points=20 if final_games else None,
+            schedule_status="final" if final_games else "scheduled",
         )
         db_session.add(game)
         db_session.flush()
@@ -99,7 +100,7 @@ def test_contest_readiness_is_select_only_and_does_not_allocate_contest_rows(db_
 
 
 def test_admin_review_preparation_creates_an_auditable_unpublished_contest(client, db_session):
-    _players, _kickoff = _featured_players(db_session)
+    _players, _kickoff = _featured_players(db_session, position="RB")
     headers = admin_headers(client)
 
     prepared = client.post(
@@ -299,6 +300,109 @@ def test_finalization_marks_tied_winners_and_hides_sponsor_code_from_losers(clie
     assert loser_contest["entry"]["is_winner"] is False
     assert loser_contest["sponsor"]["code"] is None
     assert losing_featured["final_points"] is not None
+    rewards = client.get("/saturday-pick-6/rewards", headers=winner_headers)
+    assert rewards.status_code == 200
+    assert rewards.json()[0]["sponsor"]["code"] == "WINNER-ONLY"
+    assert client.get("/saturday-pick-6/rewards", headers=loser_headers).json() == []
+    assert client.get("/saturday-pick-6/rewards").status_code == 401
+
+
+def test_rotation_is_rb_wr_qb_and_repeats():
+    from collegefootballfantasy_api.app.services.saturday_pick_service import recommended_position
+    assert [recommended_position(week) for week in range(1, 8)] == ["RB", "WR", "QB", "RB", "WR", "QB", "RB"]
+
+
+def test_worker_finalizes_verified_games_once_and_repairs_exact_sheet_links(client, db_session, monkeypatch):
+    from collegefootballfantasy_api.app.services.saturday_pick_service import refresh_open_pick_contests
+    _enable_pick_6(monkeypatch)
+    players, kickoff = _featured_players(db_session, final_games=True)
+    headers = admin_headers(client)
+    created = client.post("/admin/saturday-pick-6", json=_create_payload(players, kickoff), headers=headers).json()
+    client.post(f"/admin/saturday-pick-6/{created['id']}/publish", json={}, headers=headers)
+    contest = db_session.get(SaturdayPickContest, created["id"])
+    contest.lock_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    featured = db_session.query(SaturdayPickPlayer).filter_by(contest_id=contest.id).first()
+    actual_game = db_session.get(Game, featured.game_id)
+    actual_game.external_id = "12345678"
+    placeholder = Game(season=2026, week=1, external_id="sheet-old-event", home_team=actual_game.home_team,
+                       away_team=actual_game.away_team, start_date=actual_game.start_date)
+    db_session.add(placeholder)
+    db_session.flush()
+    featured.game_id = placeholder.id
+    db_session.commit()
+    result = refresh_open_pick_contests(db_session)
+    assert result["finalized"] == 1
+    assert contest.status == "FINAL"
+    assert featured.game_id == actual_game.id
+    assert featured.scoring_status == "FINAL"
+    finalized_at = contest.finalized_at
+    assert refresh_open_pick_contests(db_session)["finalized"] == 0
+    assert contest.finalized_at == finalized_at
+
+
+def test_nonzero_team_scores_do_not_prove_final_and_missing_stats_never_award(client, db_session, monkeypatch):
+    from collegefootballfantasy_api.app.services.saturday_pick_service import refresh_open_pick_contests
+    _enable_pick_6(monkeypatch)
+    players, kickoff = _featured_players(db_session, final_games=True)
+    headers = admin_headers(client)
+    created = client.post("/admin/saturday-pick-6", json=_create_payload(players, kickoff), headers=headers).json()
+    client.post(f"/admin/saturday-pick-6/{created['id']}/publish", json={}, headers=headers)
+    contest = db_session.get(SaturdayPickContest, created["id"])
+    contest.lock_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    featured = db_session.query(SaturdayPickPlayer).filter_by(contest_id=contest.id).first()
+    game = db_session.get(Game, featured.game_id)
+    game.schedule_status = "in_progress"
+    featured.game_time = contest.lock_at
+    db_session.commit()
+    assert refresh_open_pick_contests(db_session)["finalized"] == 0
+    assert featured.scoring_status == "LIVE"
+    game.schedule_status = "final"
+    db_session.query(PlayerGameStat).filter_by(player_id=featured.player_id).delete()
+    db_session.commit()
+    assert refresh_open_pick_contests(db_session)["finalized"] == 0
+    assert featured.scoring_status == "DATA_DELAYED"
+    assert contest.status == "PROVISIONAL"
+    assert contest.winning_player_ids_json is None
+    db_session.add(PlayerGameStat(player_id=featured.player_id, game_id=game.id, season=2026, week=1,
+                                 source="test-verified", stats={"rush_yards": 50}))
+    db_session.commit()
+    assert refresh_open_pick_contests(db_session)["finalized"] == 1
+
+
+def test_weekly_publication_uses_published_ranks_at_reset_and_is_idempotent(client, db_session, monkeypatch):
+    from collegefootballfantasy_api.app.services import saturday_pick_service as service
+    from collegefootballfantasy_api.app.services.player_season_rank import PlayerSeasonPositionalRank
+    _enable_pick_6(monkeypatch)
+    players, kickoff = _featured_players(db_session, position="RB")
+    headers = admin_headers(client)
+    template = client.post("/admin/saturday-pick-6", json=_create_payload(players, kickoff, position="RB"), headers=headers).json()
+    client.post(f"/admin/saturday-pick-6/{template['id']}/publish", json={}, headers=headers)
+    for player in players:
+        player.position = "WR"
+        db_session.add(TeamSchedule(team_name=player.school, season=2026, week=2, opponent_name="Next opponent",
+                                   kickoff_at=datetime(2026, 9, 12, 18, tzinfo=timezone.utc), location="home", is_bye=False))
+        db_session.add(WeeklyProjection(player_id=player.id, season=2026, week=2, fantasy_points=20,
+                                       projection_version="FINAL", is_published=True, projection_status="ACTIVE"))
+    db_session.commit()
+    ordered = list(reversed(players))
+    monkeypatch.setattr(service, "season_positional_ranks", lambda *args, **kwargs: {
+        p.id: PlayerSeasonPositionalRank("WR", i + 1, 100 - i, 1) for i, p in enumerate(ordered)
+    })
+    monkeypatch.setattr(service, "utc_now", lambda: datetime(2026, 9, 8, 11, 59, 59, tzinfo=timezone.utc))
+    assert service.ensure_weekly_contest(db_session) == 0
+    monkeypatch.setattr(service, "utc_now", lambda: datetime(2026, 9, 8, 12, tzinfo=timezone.utc))
+    first_projection = db_session.query(WeeklyProjection).filter_by(player_id=ordered[0].id, week=2).one()
+    first_projection.is_published = False
+    db_session.flush()
+    assert service.ensure_weekly_contest(db_session) == 0
+    first_projection.is_published = True
+    db_session.flush()
+    assert service.ensure_weekly_contest(db_session) == 1
+    contest = db_session.query(SaturdayPickContest).filter_by(week_number=2).one()
+    assert contest.contest_position == "WR"
+    assert contest.status == "OPEN"
+    assert [row.player_id for row in db_session.query(SaturdayPickPlayer).filter_by(contest_id=contest.id).order_by(SaturdayPickPlayer.sort_order)] == [p.id for p in ordered]
+    assert service.ensure_weekly_contest(db_session) == 0
 
 
 def test_live_refresh_uses_canonical_stats_without_zeroing_delayed_players(client, db_session, monkeypatch):

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import logging
 
 from sqlalchemy.orm import Session
 
@@ -43,11 +44,15 @@ from collegefootballfantasy_api.app.schemas.saturday_pick import (
 from collegefootballfantasy_api.app.domain.scoring_engine import calculate_player_fantasy_points
 from collegefootballfantasy_api.app.domain.scoring_rules import default_rules_bundle
 from collegefootballfantasy_api.app.domain.stat_normalization import normalize_player_stats
+from collegefootballfantasy_api.app.services.fantasy_game_selection import school_key
+from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week
+from collegefootballfantasy_api.app.services.player_season_rank import season_positional_ranks
 
 
 PUBLIC_POSITIONS = ("QB", "RB", "WR", "TE")
-DEFAULT_ROTATION = PUBLIC_POSITIONS
-FINAL_GAME_STATUSES = {"FINAL", "STAT_CORRECTED"}
+DEFAULT_ROTATION = ("RB", "WR", "QB")
+FINAL_GAME_STATUSES = {"final", "post", "stat_corrected"}
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -177,7 +182,7 @@ def validate_contest_readiness(db: Session, payload: SaturdayPickContestCreate) 
     return ContestReadiness(featured=featured, lock_at=earliest_kickoff)
 
 
-def create_contest(db: Session, payload: SaturdayPickContestCreate, actor: User) -> SaturdayPickContest:
+def create_contest(db: Session, payload: SaturdayPickContestCreate, actor: User | None) -> SaturdayPickContest:
     readiness = validate_contest_readiness(db, payload)
     featured = readiness.featured
     lock_at = readiness.lock_at
@@ -199,9 +204,9 @@ def create_contest(db: Session, payload: SaturdayPickContestCreate, actor: User)
         sponsor_terms=payload.sponsor_terms,
         position_overridden=payload.position_overridden,
         override_reason=payload.override_reason,
-        position_override_actor_id=actor.id if payload.position_overridden else None,
+        position_override_actor_id=actor.id if actor and payload.position_overridden else None,
         position_overridden_at=utc_now() if payload.position_overridden else None,
-        created_by_user_id=actor.id,
+        created_by_user_id=actor.id if actor else None,
     )
     db.add(contest)
     db.flush()
@@ -262,7 +267,7 @@ def record_content_audit(
     db: Session,
     *,
     contest: SaturdayPickContest | None,
-    actor: User,
+    actor: User | None,
     season: int,
     week: int,
     action: str,
@@ -271,7 +276,7 @@ def record_content_audit(
 ) -> SaturdayPickContentAudit:
     audit = SaturdayPickContentAudit(
         contest_id=contest.id if contest else None,
-        actor_user_id=actor.id,
+        actor_user_id=actor.id if actor else None,
         season=season,
         week_number=week,
         action=action,
@@ -438,8 +443,23 @@ def save_entry(db: Session, contest: SaturdayPickContest, user: User, selected_p
     return entry
 
 
-def _featured_stat(db: Session, contest: SaturdayPickContest, featured: SaturdayPickPlayer) -> PlayerGameStat | PlayerStat | None:
+def _featured_game(db: Session, contest: SaturdayPickContest, featured: SaturdayPickPlayer) -> Game | None:
+    """Resolve an old sheet link to its exact provider event, never another opponent."""
     game = db.get(Game, featured.game_id) if featured.game_id else None
+    if game and game.external_id and not game.external_id.startswith(("sheet-", "sealed-")):
+        return game
+    matchup = {school_key(featured.school_snapshot), school_key(featured.opponent_snapshot)}
+    candidates = [candidate for candidate in db.query(Game).filter(
+        Game.season == contest.season, Game.week == (game.week if game else contest.week_number),
+    ).all() if candidate.external_id and not candidate.external_id.startswith(("sheet-", "sealed-"))
+        and {school_key(candidate.home_team), school_key(candidate.away_team)} == matchup]
+    if len(candidates) == 1:
+        return candidates[0]
+    return game if not candidates else None
+
+
+def _featured_stat(db: Session, contest: SaturdayPickContest, featured: SaturdayPickPlayer) -> PlayerGameStat | PlayerStat | None:
+    game = _featured_game(db, contest, featured)
     stat = (
         db.query(PlayerGameStat)
         .filter(PlayerGameStat.player_id == featured.player_id, PlayerGameStat.game_id == game.id)
@@ -472,7 +492,9 @@ def _score_stat(stat: PlayerGameStat | PlayerStat | None, position: str) -> floa
 
 
 def _is_final_game(game: Game | None) -> bool:
-    return bool(game and game.home_points is not None and game.away_points is not None)
+    # Scores also exist mid-game. Only the provider's explicit final state
+    # permits prizes to unlock; elapsed time and non-null scores cannot.
+    return bool(game and (game.schedule_status or "").lower() in FINAL_GAME_STATUSES)
 
 
 def _featured_scoring_status(*, featured: SaturdayPickPlayer, game: Game | None, has_stats: bool, now: datetime) -> str:
@@ -489,8 +511,8 @@ def refresh_contest_live_scores(db: Session, contest: SaturdayPickContest) -> di
     """Refresh live Pick 6 scoring from the canonical game-stat records.
 
     Missing provider data is intentionally represented as ``DATA_DELAYED`` and
-    never converted to a zero-point score.  Finalization remains a separate,
-    explicitly-administered operation after every featured game is final.
+    never converted to a zero-point score. The lifecycle worker finalizes
+    only after all six game statuses and stat lines have been resolved.
     """
 
     if contest.status == "FINAL":
@@ -507,11 +529,15 @@ def refresh_contest_live_scores(db: Session, contest: SaturdayPickContest) -> di
     updated = 0
     live = 0
     final = 0
+    resolved_games = 0
     for row in rows:
-        game = db.get(Game, row.game_id) if row.game_id else None
+        game = _featured_game(db, contest, row)
+        if game and row.game_id != game.id:
+            row.game_id = game.id
         stat = _featured_stat(db, contest, row)
         points = _score_stat(stat, row.canonical_position)
         next_status = _featured_scoring_status(featured=row, game=game, has_stats=points is not None, now=now)
+        resolved_games += int(_is_final_game(game))
         if points is not None and row.live_points != points:
             row.live_points = points
             updated += 1
@@ -526,35 +552,110 @@ def refresh_contest_live_scores(db: Session, contest: SaturdayPickContest) -> di
         if next_status == "FINAL":
             final += 1
 
-    if contest.status in {"LOCKED", "SCORING"} and (live or final):
-        contest.status = "SCORING"
+    if contest.status in {"LOCKED", "SCORING", "PROVISIONAL"}:
+        if resolved_games == 6:
+            contest.status = "PROVISIONAL"
+        elif live or final:
+            contest.status = "SCORING"
     db.flush()
     return {"updated": updated, "live": live, "final": final}
+
+
+def ensure_weekly_contest(db: Session) -> int:
+    """Publish once at the shared Tuesday reset using the prior published ranks.
+
+    Existing contests (including manual drafts) are never replaced. Missing
+    verified inputs defer publication; they do not silently change the field.
+    """
+    if not settings.saturday_pick_6_enabled or not settings.saturday_pick_6_public_enabled:
+        return 0
+    season = utc_now().year
+    week = calendar_cfb_week(season, utc_now())
+    if week < 2 or week > 15:
+        return 0
+    template = db.query(SaturdayPickContest).filter(
+        SaturdayPickContest.season == season,
+        SaturdayPickContest.week_number < week,
+        SaturdayPickContest.published_at.isnot(None),
+    ).order_by(SaturdayPickContest.week_number.desc()).with_for_update(skip_locked=True).first()
+    if not template or db.query(SaturdayPickContest.id).filter(
+        SaturdayPickContest.season == season, SaturdayPickContest.week_number == week,
+    ).first():
+        return 0
+    position = recommended_position(week)
+    ranks = season_positional_ranks(db, season=season, position=position)
+    if not ranks or min(rank.through_week for rank in ranks.values()) < week - 1:
+        return 0
+    players = {player.id: player for player in db.query(Player).filter(Player.id.in_(ranks)).all()}
+    selected_ids: list[int] = []
+    for player_id in sorted(ranks, key=lambda player_id: ranks[player_id].rank):
+        player = players.get(player_id)
+        if not player or _is_known_out(db, player_id, season, week):
+            continue
+        try:
+            schedule = _eligible_schedule(db, player, season, week)
+        except ValueError:
+            continue
+        if as_utc(schedule.kickoff_at) <= utc_now():
+            continue
+        selected_ids.append(player_id)
+        if len(selected_ids) == 6:
+            break
+    if len(selected_ids) < 6 or any(_weekly_projection(db, player_id, season, week) is None for player_id in selected_ids):
+        return 0
+    payload = SaturdayPickContestCreate(
+        season=season, week_number=week, contest_position=position,
+        featured_player_ids=selected_ids,
+        title="Saturday Pick 6", sponsor_name=template.sponsor_name,
+        sponsor_logo_url=template.sponsor_logo_url, sponsor_offer_text=template.sponsor_offer_text,
+        sponsor_code=template.sponsor_code, sponsor_url=template.sponsor_url, sponsor_terms=template.sponsor_terms,
+    )
+    contest = create_contest(db, payload, None)
+    publish_contest(db, contest)
+    record_content_audit(db, contest=contest, actor=None, season=season, week=week,
+        action="automatic_weekly_publication", reason="Tuesday 08:00 Eastern positional-rank rotation",
+        details={"position": position, "rank_through_week": week - 1, "featured_player_ids": payload.featured_player_ids})
+    return 1
 
 
 def refresh_open_pick_contests(db: Session) -> dict[str, int]:
     contests = (
         db.query(SaturdayPickContest)
-        .filter(SaturdayPickContest.status.in_(("OPEN", "LOCKED", "SCORING")))
-        .all()
+        .filter(SaturdayPickContest.status.in_(("OPEN", "LOCKED", "SCORING", "PROVISIONAL")))
+        .with_for_update(skip_locked=True).all()
     )
-    totals = {"contests": len(contests), "updated": 0, "live": 0, "final": 0}
+    totals = {"contests": len(contests), "updated": 0, "live": 0, "final": 0, "finalized": 0, "published": 0, "failed": 0}
     for contest in contests:
-        result = refresh_contest_live_scores(db, contest)
-        for key in ("updated", "live", "final"):
-            totals[key] += result[key]
+        try:
+            with db.begin_nested():
+                result = refresh_contest_live_scores(db, contest)
+                if result["final"] == 6 and utc_now() >= as_utc(contest.lock_at):
+                    finalize_contest(db, contest)
+                    totals["finalized"] += 1
+                for key in ("updated", "live", "final"):
+                    totals[key] += result[key]
+        except Exception:
+            totals["failed"] += 1
+            logger.exception("pick_six_contest_refresh_failed contest_id=%s", contest.id)
+    try:
+        with db.begin_nested():
+            totals["published"] = ensure_weekly_contest(db)
+    except Exception:
+        totals["failed"] += 1
+        logger.exception("pick_six_weekly_publication_failed")
     db.commit()
     return totals
 
 
 def _score_featured_player(db: Session, contest: SaturdayPickContest, featured: SaturdayPickPlayer) -> float | None:
-    game = db.get(Game, featured.game_id) if featured.game_id else None
+    game = _featured_game(db, contest, featured)
     if not _is_final_game(game):
         return None
     return _score_stat(_featured_stat(db, contest, featured), featured.canonical_position)
 
 
 def finalize_contest(db: Session, contest: SaturdayPickContest) -> SaturdayPickContest:
+    contest = db.query(SaturdayPickContest).filter(SaturdayPickContest.id == contest.id).with_for_update().populate_existing().one()
     if contest.status == "FINAL":
         return contest
     refresh_contest_live_scores(db, contest)

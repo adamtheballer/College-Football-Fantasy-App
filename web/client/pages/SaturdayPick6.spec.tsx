@@ -30,8 +30,9 @@ describe("SaturdayPick6 state helpers", () => {
     expect(SATURDAY_PICK_6_HOW_IT_WORKS).toMatch(/^How it works: Choose /);
   });
 
-  it("uses a live score when available and preserves a missing live score as the projection", () => {
-    expect(displayPoints(player, "SCORING")).toBe(18.4);
+  it("never labels an unavailable score as the player's projected points", () => {
+    expect(displayPoints(player, "SCORING")).toBeNull();
+    expect(displayPoints(player, "OPEN")).toBe(18.4);
     expect(displayPoints({ ...player, live_points: 21.6, scoring_status: "LIVE" }, "SCORING")).toBe(21.6);
   });
 
@@ -47,7 +48,7 @@ describe("SaturdayPick6 state helpers", () => {
   it("uses the featured position and saved player in the player-facing pick confirmation", () => {
     expect(positionLabel("RB")).toBe("running back");
     expect(positionLabel("TE")).toBe("tight end");
-    expect(pickConfirmationMessage("Ahmad Hardy")).toBe("Your pick is in. Follow Ahmad Hardy this Saturday.");
+    expect(pickConfirmationMessage("Ahmad Hardy")).toBe("Your pick is in. Follow Ahmad Hardy this week.");
     expect(lockDeadlineMessage("Ahmad Hardy", "2026-09-05T16:00:00Z")).toContain("Ahmad Hardy's game starts at");
     expect(lockDeadlineMessage("Ahmad Hardy", "2026-09-05T16:00:00Z")).toContain("Pick before kickoff; then it will lock.");
   });
@@ -65,7 +66,7 @@ describe("SaturdayPick6 state helpers", () => {
     expect(isSaturdayPick6ComingSoon({ status: "SCHEDULED", players: [player] })).toBe(false);
     expect(isSaturdayPick6ComingSoon({ status: "OPEN", players: [player] })).toBe(false);
     expect(SATURDAY_PICK_6_COMING_SOON_MESSAGE).toBe(
-      "Week 1 picks are coming soon. Six featured players will be available once weekly projections are published.",
+      "This week's picks are coming soon. Six featured players will be available once rankings and weekly projections are verified.",
     );
   });
 

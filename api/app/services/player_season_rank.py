@@ -51,6 +51,12 @@ def season_positional_rank_for_player(
     player: Player,
     season: int,
 ) -> PlayerSeasonPositionalRank | None:
+    return season_positional_ranks(db, position=player.position, season=season).get(player.id)
+
+
+def season_positional_ranks(
+    db: Session, *, position: str, season: int,
+) -> dict[int, PlayerSeasonPositionalRank]:
     """Return a player's cumulative rank after a finalized fantasy week.
 
     The eligible player universe is the exact canonical public draft/waiver
@@ -61,17 +67,17 @@ def season_positional_rank_for_player(
 
     through_week = min(latest_authoritatively_finalized_week(db, season=season), calendar_cfb_week(season) - 1)
     if through_week < 1:
-        return None
+        return {}
 
-    position = (player.position or "").strip().upper()
+    position = (position or "").strip().upper()
     players = db.scalars(
         select(Player).where(
             canonical_fantasy_player_filter(season),
             Player.position == position,
         )
     ).all()
-    if not players or player.id not in {candidate.id for candidate in players}:
-        return None
+    if not players:
+        return {}
 
     player_ids = tuple(candidate.id for candidate in players)
     position_by_player_id = {candidate.id: position for candidate in players}
@@ -124,9 +130,9 @@ def season_positional_rank_for_player(
         candidate.id: rank
         for rank, candidate in enumerate(ordered, start=1)
     }
-    return PlayerSeasonPositionalRank(
-        position=position,
-        rank=rank_by_player_id[player.id],
-        fantasy_points=round(totals[player.id], 1),
-        through_week=through_week,
-    )
+    return {
+        player_id: PlayerSeasonPositionalRank(
+            position=position, rank=rank, fantasy_points=round(totals[player_id], 1), through_week=through_week,
+        )
+        for player_id, rank in rank_by_player_id.items()
+    }

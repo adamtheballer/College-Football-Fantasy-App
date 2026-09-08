@@ -249,7 +249,7 @@ test.describe("critical browser workflows", () => {
 
     await expect(page).toHaveURL(/\/saturday-pick-6$/);
     await expect(page.getByText("Your pick is in", { exact: true })).toBeVisible();
-    await expect(page.getByText("Your pick is in. Follow Ahmad Hardy this Saturday.", { exact: true })).toBeVisible();
+    await expect(page.getByText("Your pick is in. Follow Ahmad Hardy this week.", { exact: true })).toBeVisible();
     await expect(page.getByText(/Your pick can be changed until Ahmad Hardy's game starts at/).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "BUILD YOUR LEAGUE", exact: true })).not.toBeVisible();
   });
