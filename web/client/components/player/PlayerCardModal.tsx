@@ -163,13 +163,23 @@ const gameLogStatValue = (stats: Record<string, unknown> | null | undefined, key
 
 type GameLogColumn = readonly [label: string, keys: readonly string[]];
 
+const PUNT_RETURN_YARDS_COLUMN: GameLogColumn = [
+  "PR YDS",
+  ["punt_return_yards", "PuntReturnYards", "puntReturnYards", "PRYDS"],
+];
+const PUNT_RETURN_TOUCHDOWNS_COLUMN: GameLogColumn = [
+  "PR TD",
+  ["punt_return_tds", "punt_return_touchdowns", "PuntReturnTouchdowns", "puntReturnTD", "puntReturnTDs", "PRTD"],
+];
+
+/** Return touchdowns stay in the complete log, but are not a featured card stat. */
+export const isFeaturedCurrentGameStat = ([label]: GameLogColumn) => label !== "PR TD";
+
 export const gameLogColumnsForPosition = (position: string): readonly GameLogColumn[] => {
   switch (position.toUpperCase()) {
     case "QB":
       return [
         ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
-        ["PR YDS", ["punt_return_yards", "PuntReturnYards", "puntReturnYards", "PRYDS"]],
-        ["PR TD", ["punt_return_tds", "punt_return_touchdowns", "PuntReturnTouchdowns", "puntReturnTD", "puntReturnTDs", "PRTD"]],
         ["CMP", ["completions", "passing_completions", "PassingCompletions"]],
         ["ATT", ["attempts", "passing_attempts", "PassingAttempts"]],
         ["PASS YDS", ["pass_yards", "passing_yards", "PassingYards"]],
@@ -178,24 +188,24 @@ export const gameLogColumnsForPosition = (position: string): readonly GameLogCol
         ["RUSH ATT", ["rushing_attempts", "rush_attempts", "RushingAttempts"]],
         ["RUSH YDS", ["rush_yards", "rushing_yards", "RushingYards"]],
         ["RUSH TD", ["rush_tds", "rushing_touchdowns", "RushingTouchdowns"]],
+        PUNT_RETURN_YARDS_COLUMN,
+        PUNT_RETURN_TOUCHDOWNS_COLUMN,
       ] as const;
     case "RB":
       return [
         ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
-        ["PR YDS", ["punt_return_yards", "PuntReturnYards", "puntReturnYards", "PRYDS"]],
-        ["PR TD", ["punt_return_tds", "punt_return_touchdowns", "PuntReturnTouchdowns", "puntReturnTD", "puntReturnTDs", "PRTD"]],
         ["RUSH ATT", ["rushing_attempts", "rush_attempts", "RushingAttempts"]],
         ["RUSH YDS", ["rush_yards", "rushing_yards", "RushingYards"]],
         ["RUSH TD", ["rush_tds", "rushing_touchdowns", "RushingTouchdowns"]],
         ["REC", ["receptions", "Receptions"]],
         ["REC YDS", ["rec_yards", "receiving_yards", "ReceivingYards"]],
         ["REC TD", ["rec_tds", "receiving_touchdowns", "ReceivingTouchdowns"]],
+        PUNT_RETURN_YARDS_COLUMN,
+        PUNT_RETURN_TOUCHDOWNS_COLUMN,
       ] as const;
     case "WR":
       return [
         ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
-        ["PR YDS", ["punt_return_yards", "PuntReturnYards", "puntReturnYards", "PRYDS"]],
-        ["PR TD", ["punt_return_tds", "punt_return_touchdowns", "PuntReturnTouchdowns", "puntReturnTD", "puntReturnTDs", "PRTD"]],
         ["TAR", ["targets", "receiving_targets", "ReceivingTargets"]],
         ["REC", ["receptions", "Receptions"]],
         ["REC YDS", ["rec_yards", "receiving_yards", "ReceivingYards"]],
@@ -203,16 +213,18 @@ export const gameLogColumnsForPosition = (position: string): readonly GameLogCol
         ["RUSH ATT", ["rushing_attempts", "rush_attempts", "RushingAttempts"]],
         ["RUSH YDS", ["rush_yards", "rushing_yards", "RushingYards"]],
         ["RUSH TD", ["rush_tds", "rushing_touchdowns", "RushingTouchdowns"]],
+        PUNT_RETURN_YARDS_COLUMN,
+        PUNT_RETURN_TOUCHDOWNS_COLUMN,
       ] as const;
     case "TE":
       return [
         ["FPTS", ["fantasy_points", "fantasyPoints", "fpts"]],
-        ["PR YDS", ["punt_return_yards", "PuntReturnYards", "puntReturnYards", "PRYDS"]],
-        ["PR TD", ["punt_return_tds", "punt_return_touchdowns", "PuntReturnTouchdowns", "puntReturnTD", "puntReturnTDs", "PRTD"]],
         ["TAR", ["targets", "receiving_targets", "ReceivingTargets"]],
         ["REC", ["receptions", "Receptions"]],
         ["REC YDS", ["rec_yards", "receiving_yards", "ReceivingYards"]],
         ["REC TD", ["rec_tds", "receiving_touchdowns", "ReceivingTouchdowns"]],
+        PUNT_RETURN_YARDS_COLUMN,
+        PUNT_RETURN_TOUCHDOWNS_COLUMN,
       ] as const;
     case "K":
       return [
@@ -412,6 +424,7 @@ export function PlayerCardModal({
   const currentGame = card?.current_game;
   const currentGameStats = currentGame && ["completed", "live", "awaiting_live"].includes(currentGame.state) && currentGame.stats
     ? gameLogColumnsForPosition(position)
+      .filter(isFeaturedCurrentGameStat)
       .map(([label, keys]) => [label, gameLogStatValue(currentGame.stats, keys)] as const)
       .filter(([, value]) => value !== null && value !== undefined)
     : [];

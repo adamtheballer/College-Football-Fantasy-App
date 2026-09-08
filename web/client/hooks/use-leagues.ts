@@ -337,6 +337,11 @@ export function useLeagueWaiverTab(
     queryKey: ["league", leagueId, "waivers", limit, offset, scope, week ?? "current", normalizedHotWindowHours],
     enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
     staleTime: 30_000,
+    // Final box scores and scorer corrections can arrive while this board is
+    // open. Refresh the read-only board so a completed game's blue actual
+    // total replaces its pregame projection without requiring navigation.
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
     retry: (failureCount, error) => {
       if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
         return false;
