@@ -28,22 +28,6 @@ class DynastyCareerResponse(BaseModel):
     postseason_losses: int = 0
 
 
-class RivalryRow(BaseModel):
-    rival_user_id: int
-    rival_name: str
-    record_wins: int
-    record_losses: int
-    total_points_for: float
-    total_points_against: float
-    matchup_count: int
-    trash_talk_score: int
-
-
-class RivalryList(BaseModel):
-    data: list[RivalryRow]
-    total: int
-
-
 class UserAnalyticsRow(BaseModel):
     user_id: int
     name: str

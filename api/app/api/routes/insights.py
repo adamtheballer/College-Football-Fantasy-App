@@ -18,8 +18,6 @@ from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.insights import (
     AccoladesResponse,
     DynastyCareerResponse,
-    RivalryList,
-    RivalryRow,
     UserAnalyticsList,
     UserAnalyticsRow,
 )
@@ -336,89 +334,6 @@ def get_dynasty_career(
         postseason_wins=int(postseason.get("postseason_wins", 0)),
         postseason_losses=int(postseason.get("postseason_losses", 0)),
     )
-
-
-@router.get("/rivalries", response_model=RivalryList)
-def get_rivalries(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> RivalryList:
-    home_team = aliased(Team)
-    away_team = aliased(Team)
-    rows = (
-        db.query(
-            Matchup.home_score,
-            Matchup.away_score,
-            home_team.owner_user_id.label("home_user_id"),
-            away_team.owner_user_id.label("away_user_id"),
-            home_team.owner_name.label("home_owner_name"),
-            away_team.owner_name.label("away_owner_name"),
-        )
-        .join(home_team, home_team.id == Matchup.home_team_id)
-        .join(away_team, away_team.id == Matchup.away_team_id)
-        .filter(or_(home_team.owner_user_id == current_user.id, away_team.owner_user_id == current_user.id))
-        .all()
-    )
-
-    rivalry_map: dict[int, dict[str, float | int | str]] = defaultdict(
-        lambda: {
-            "wins": 0,
-            "losses": 0,
-            "points_for": 0.0,
-            "points_against": 0.0,
-            "matchups": 0,
-            "name": "Rival",
-        }
-    )
-    for row in rows:
-        home_user_id = row.home_user_id
-        away_user_id = row.away_user_id
-        if not home_user_id or not away_user_id or home_user_id == away_user_id:
-            continue
-        home_score = float(row.home_score or 0.0)
-        away_score = float(row.away_score or 0.0)
-
-        if home_user_id == current_user.id:
-            rival_id = away_user_id
-            points_for = home_score
-            points_against = away_score
-            won = home_score > away_score
-            rival_name = row.away_owner_name or f"User {away_user_id}"
-        else:
-            rival_id = home_user_id
-            points_for = away_score
-            points_against = home_score
-            won = away_score > home_score
-            rival_name = row.home_owner_name or f"User {home_user_id}"
-
-        entry = rivalry_map[rival_id]
-        entry["matchups"] += 1
-        entry["points_for"] += points_for
-        entry["points_against"] += points_against
-        entry["name"] = str(rival_name)
-        if won:
-            entry["wins"] += 1
-        else:
-            entry["losses"] += 1
-
-    output: list[RivalryRow] = []
-    for rival_id, entry in rivalry_map.items():
-        matchup_count = int(entry["matchups"])
-        trash_talk_score = min(100, (int(entry["wins"]) * 12) + matchup_count * 4)
-        output.append(
-            RivalryRow(
-                rival_user_id=rival_id,
-                rival_name=str(entry["name"]),
-                record_wins=int(entry["wins"]),
-                record_losses=int(entry["losses"]),
-                total_points_for=round(float(entry["points_for"]), 2),
-                total_points_against=round(float(entry["points_against"]), 2),
-                matchup_count=matchup_count,
-                trash_talk_score=trash_talk_score,
-            )
-        )
-    output.sort(key=lambda row: (row.matchup_count, row.trash_talk_score), reverse=True)
-    return RivalryList(data=output, total=len(output))
 
 
 @router.get("/users/leaderboard", response_model=UserAnalyticsList)

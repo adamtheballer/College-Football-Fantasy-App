@@ -86,7 +86,6 @@ from collegefootballfantasy_api.app.services.waiver_service import (
     waiver_player_availability_states,
     waiver_window_state,
 )
-from collegefootballfantasy_api.app.services.league_rivalry import matchup_rivalry_context
 from collegefootballfantasy_api.app.services.player_popularity import (
     hot_pickup_counts_for_ids,
     hot_pickup_player_ids,
@@ -1352,7 +1351,6 @@ def build_matchup_tab_view(
         provider_snapshot_at=provider_snapshot_at,
         next_refresh_at=(provider_snapshot_at + timedelta(seconds=180)) if provider_snapshot_at else None,
         message=None,
-        rivalry=matchup_rivalry_context(db, league, matchup, primary_team, opponent),
         postseason=postseason_context,
     )
 

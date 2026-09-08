@@ -9,7 +9,7 @@ import { OpeningWeekPatch } from "./OpeningWeekPatch";
 afterEach(cleanup);
 
 describe("OpeningWeekPatch", () => {
-  it("appears for the opening week without requiring a rivalry", () => {
+  it("appears for the opening week", () => {
     render(createElement(OpeningWeekPatch, { week: 1 }));
 
     expect(screen.getByTestId("opening-week-patch")).toBeTruthy();

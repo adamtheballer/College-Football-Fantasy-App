@@ -17,7 +17,6 @@ import type {
   LeagueSettingsTabResponse,
   LeagueWaiverTabResponse,
   LeagueWorkspace,
-  LeagueRivalryView,
 } from "@/types/league";
 
 export type DraftUpdatePayload = {
@@ -302,21 +301,6 @@ export function useLeaguePostseasonBracket(leagueId?: number, enabled = true) {
     retry: (failureCount, error) => !(error instanceof ApiError && [401, 403, 404].includes(error.status)) && failureCount < 2,
     queryFn: () => apiGet<LeaguePostseasonResponse>(`/leagues/${leagueId}/postseason/bracket`),
   });
-}
-
-export function useLeagueRivalry(leagueId?: number, enabled = true) {
-  return useQuery({ queryKey: ["league", leagueId, "rivalry"], enabled: enabled && typeof leagueId === "number", queryFn: () => apiGet<LeagueRivalryView>(`/leagues/${leagueId}/rivalry`) });
-}
-
-export function useRivalryActions(leagueId?: number) {
-  const queryClient = useQueryClient();
-  const invalidate = () => { queryClient.invalidateQueries({ queryKey: ["league", leagueId, "rivalry"] }); queryClient.invalidateQueries({ queryKey: ["league", leagueId, "matchup"] }); };
-  return {
-    invite: useMutation({ mutationFn: (recipientTeamId: number) => apiPost(`/leagues/${leagueId}/rivalry/invites`, { recipient_team_id: recipientTeamId }), onSuccess: invalidate }),
-    accept: useMutation({ mutationFn: (id: number) => apiPost(`/leagues/${leagueId}/rivalry/invites/${id}/accept`, {}), onSuccess: invalidate }),
-    decline: useMutation({ mutationFn: (id: number) => apiPost(`/leagues/${leagueId}/rivalry/invites/${id}/decline`, {}), onSuccess: invalidate }),
-    cancel: useMutation({ mutationFn: (id: number) => apiDelete(`/leagues/${leagueId}/rivalry/invites/${id}`), onSuccess: invalidate }),
-  };
 }
 
 export function useLeagueSettingsTab(leagueId?: number, enabled = true) {

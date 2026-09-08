@@ -294,7 +294,7 @@ def update_current_user_profile(
                 )
             current_user.first_name = next_name
             current_user.manager_name_changed_at = now
-            # League, roster, matchup, draft, chat, and rivalry reads all
+            # League, roster, matchup, draft, and chat reads all
             # resolve the manager's current team through this record. Keep the
             # denormalized owner name in sync and refresh generated ``Name's
             # Team`` labels, including labels made stale by earlier releases.
