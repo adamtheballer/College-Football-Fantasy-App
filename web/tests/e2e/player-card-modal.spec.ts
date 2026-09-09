@@ -131,7 +131,7 @@ test.describe("player card modal", () => {
     await expect(dialog.getByText(/Michigan/)).toHaveCount(0);
     await expect(dialog.getByText("42", { exact: true })).toBeVisible();
     await dialog.getByRole("button", { name: "Game Log", exact: true }).click();
-    await expect(dialog.getByText("Sep 4, 2026 • Home", { exact: true })).toBeVisible();
+    await expect(dialog.getByText(/^Sep 4, 2026 • 8:00 PM.* • Home$/)).toBeVisible();
     await expect(dialog.getByText(/Sep 5, 2026/)).toHaveCount(0);
     await expect(dialog.getByText("Live", { exact: true }).last()).toBeVisible();
     await expect(dialog.getByText("42", { exact: true }).last()).toBeVisible();
