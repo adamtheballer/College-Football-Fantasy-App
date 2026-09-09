@@ -137,9 +137,9 @@ export const liveGameStatusLabel = (player: LeagueRosterPlayer) => {
 
 /** The published kickoff, kept separate from the live game-state line. */
 export const formatRosterGameKickoff = (value?: string | null) => {
-  if (!value) return "Kickoff TBD";
+  if (!value) return "Time TBD";
   const kickoff = new Date(value);
-  if (Number.isNaN(kickoff.getTime())) return "Kickoff TBD";
+  if (Number.isNaN(kickoff.getTime())) return "Time TBD";
 
   const date = new Intl.DateTimeFormat(undefined, {
     weekday: "short",

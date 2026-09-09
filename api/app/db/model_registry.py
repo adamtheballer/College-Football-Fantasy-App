@@ -68,6 +68,7 @@ def ensure_models_registered() -> None:
         refresh_session,
         roster,
         scheduled_notification,
+        schedule_sync_issue,
         scoring_admin_audit,
         scoring_alert_incident,
         scoring_run,
