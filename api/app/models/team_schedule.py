@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
@@ -39,3 +39,12 @@ class TeamSchedule(TimestampMixin, Base):
     source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     primary_source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     date_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # ``team_schedules`` is the canonical display/lock authority.  Do not
+    # infer a kickoff from a date: a missing time remains explicitly TBD.
+    time_status: Mapped[str] = mapped_column(String(32), nullable=False, default="tbd")
+    schedule_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    schedule_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    manual_override: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    manual_override_reason: Mapped[str | None] = mapped_column(String(1000), nullable=True)

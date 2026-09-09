@@ -288,14 +288,27 @@ export const formatGameLogDate = (value?: string | null, kickoffAt?: string | nu
   if (kickoffAt) {
     const kickoff = new Date(kickoffAt);
     if (!Number.isNaN(kickoff.getTime())) {
-      return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", ...(timeZone ? { timeZone } : {}) }).format(kickoff);
+      const zone = timeZone ?? "America/New_York";
+      const date = new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        timeZone: zone,
+      }).format(kickoff);
+      const time = new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: zone,
+        timeZoneName: "short",
+      }).format(kickoff);
+      return `${date} • ${time}`;
     }
   }
-  if (!value) return "Date TBD";
+  if (!value) return "Date/Time TBD";
   const date = new Date(`${value}T12:00:00Z`);
   return Number.isNaN(date.getTime())
-    ? "Date TBD"
-    : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date);
+    ? "Date/Time TBD"
+    : `${new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date)} • Time TBD`;
 };
 
 export const gameLogResultLabel = (row: { result?: string | null; game_status: string }) =>
@@ -611,7 +624,7 @@ export function PlayerCardModal({
                 <section className="mb-3 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5" aria-label={currentGame.state === "completed" ? "Current player game result" : "Current player game"}>
                   <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>{currentGame.state === "completed" ? "Latest verified game" : currentGame.state === "live" ? "Live game" : "Current game · awaiting live update"}</p>
                   <p className="mt-2 text-sm font-black text-white">Week {currentGame.week} vs. {currentGame.opponent_name ?? "opponent"}</p>
-                  {currentGame.kickoff_at ? <p className="mt-1 text-xs font-bold text-white/55">{new Date(currentGame.kickoff_at).toLocaleString()}</p> : null}
+                  <p className="mt-1 text-xs font-bold text-white/55">{currentGame.kickoff_at ? formatGameLogDate(undefined, currentGame.kickoff_at) : "Time TBD"}</p>
                   {currentGameStats.length ? (
                     <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                       {currentGameStats.slice(0, 4).map(([label, value]) => (
@@ -627,7 +640,7 @@ export function PlayerCardModal({
                 <section className="mb-3 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5" aria-label="Upcoming player game">
                   <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Upcoming game</p>
                   <p className="mt-2 text-sm font-black text-white">Week {currentGame.week} vs. {currentGame.opponent_name ?? "opponent"}</p>
-                  {currentGame.kickoff_at ? <p className="mt-1 text-xs font-bold text-white/55">{new Date(currentGame.kickoff_at).toLocaleString()}</p> : null}
+                  <p className="mt-1 text-xs font-bold text-white/55">{currentGame.kickoff_at ? formatGameLogDate(undefined, currentGame.kickoff_at) : "Time TBD"}</p>
                 </section>
               ) : null}
               <section className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5">

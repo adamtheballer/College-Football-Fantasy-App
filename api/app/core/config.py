@@ -107,6 +107,12 @@ class Settings(BaseSettings):
     sportsdata_cache_ttl_days: int = 30
     sportsdata_reference_ttl_days: int = 30
     sportsdata_schedule_ttl_days: int = 30
+    # Schedule-time reconciliation has an explicit kill switch.  The lifecycle
+    # worker only invokes it during the weekly Tuesday--Saturday retry window.
+    schedule_sync_enabled: bool = False
+    schedule_sync_source: Literal["auto", "espn", "sportsdata"] = "auto"
+    schedule_sync_hour_et: int = 7
+    current_season_year: int = 2026
     sportsdata_standings_ttl_days: int = 30
     sportsdata_injury_ttl_days: int = 30
     provider_default_cache_ttl_days: int = 30
@@ -260,6 +266,13 @@ class Settings(BaseSettings):
     def validate_scoring_snapshot_retention_batch_size(cls, value: int) -> int:
         if value < 1 or value > 5_000:
             raise ValueError("SCORING_SNAPSHOT_RETENTION_BATCH_SIZE must be between 1 and 5000")
+        return value
+
+    @field_validator("schedule_sync_hour_et")
+    @classmethod
+    def validate_schedule_sync_hour_et(cls, value: int) -> int:
+        if value < 0 or value > 23:
+            raise ValueError("SCHEDULE_SYNC_HOUR_ET must be between 0 and 23")
         return value
 
     @field_validator("email_delivery_mode")

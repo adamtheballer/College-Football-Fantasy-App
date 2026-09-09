@@ -21,6 +21,7 @@ from collegefootballfantasy_api.app.services.worker_health import record_worker_
 from collegefootballfantasy_api.app.services.postseason_service import advance_postseason_state
 from collegefootballfantasy_api.app.services.security_email_outbox import process_security_email_outbox_once
 from collegefootballfantasy_api.app.services.player_popularity import run_due_player_popularity_snapshot
+from collegefootballfantasy_api.app.services.schedule_time_sync import run_due_schedule_sync
 
 logger = logging.getLogger("collegefootballfantasy_api.lifecycle_worker")
 
@@ -51,6 +52,10 @@ def run_once() -> dict[str, dict[str, int | str]]:
             # worker wake-up; it never adds a client poll loop or a second
             # scheduler process.
             "player_popularity": run_due_player_popularity_snapshot(db, season=2026),
+            # The schedule-time job is internally due-gated and persisted, so
+            # this cheap call cannot create a second cron loop or provider
+            # fetch on every lifecycle tick.
+            "schedule_time_sync": run_due_schedule_sync(db),
         }
 
 

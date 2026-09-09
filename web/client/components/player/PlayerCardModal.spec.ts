@@ -38,14 +38,14 @@ describe("PlayerCardModal helpers", () => {
     expect(isFeaturedCurrentGameStat(["REC TD", []])).toBe(true);
     expect(isFeaturedCurrentGameStat(["PR TD", []])).toBe(false);
     expect(gameLogOpponentLabel({ location: "away", opponent_name: "Ohio State" })).toBe("at Ohio State");
-    expect(formatGameLogDate("2026-09-05")).toBe("Sep 5, 2026");
+    expect(formatGameLogDate("2026-09-05")).toBe("Sep 5, 2026 • Time TBD");
   });
 
   it("uses the local kickoff date instead of the UTC calendar day", () => {
-    expect(formatGameLogDate("2026-09-05", "2026-09-05T00:00:00Z", "America/New_York")).toBe("Sep 4, 2026");
-    expect(formatGameLogDate("2026-09-05", "2026-09-05T00:00:00Z", "America/Los_Angeles")).toBe("Sep 4, 2026");
-    expect(formatGameLogDate("2026-09-05", "2026-09-05T00:00:00Z", "Asia/Tokyo")).toBe("Sep 5, 2026");
-    expect(formatGameLogDate("2026-09-05", "invalid")).toBe("Sep 5, 2026");
+    expect(formatGameLogDate("2026-09-05", "2026-09-05T00:00:00Z", "America/New_York")).toMatch(/^Sep 4, 2026 • 8:00 PM/);
+    expect(formatGameLogDate("2026-09-05", "2026-09-05T00:00:00Z", "America/Los_Angeles")).toMatch(/^Sep 4, 2026 • 5:00 PM/);
+    expect(formatGameLogDate("2026-09-05", "2026-09-05T00:00:00Z", "Asia/Tokyo")).toMatch(/^Sep 5, 2026 • 9:00 AM/);
+    expect(formatGameLogDate("2026-09-05", "invalid")).toBe("Sep 5, 2026 • Time TBD");
     expect(gameLogResultLabel({ game_status: "active" })).toBe("Live");
     expect(gameLogResultLabel({ game_status: "final", result: "W 24–7" })).toBe("W 24–7");
   });
