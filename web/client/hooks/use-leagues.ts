@@ -155,15 +155,29 @@ export function useLeagueWorkspace(leagueId?: number, enabled = true) {
   });
 }
 
+/**
+ * An omitted roster week means "the week the server currently resolves".
+ * That response must never remain fresh across the Tuesday rollover.
+ */
+export const rosterWeekQueryOptions = (week?: number) => {
+  const followsCurrentWeek = week === undefined;
+  return {
+    staleTime: followsCurrentWeek ? 0 : 30_000,
+    refetchOnMount: followsCurrentWeek ? "always" as const : true,
+    refetchOnWindowFocus: followsCurrentWeek ? "always" as const : true,
+  };
+};
+
 export function useLeagueRosterTab(
   leagueId?: number,
   week?: number,
   enabled = true
 ) {
+  const weekQueryOptions = rosterWeekQueryOptions(week);
   return useQuery({
     queryKey: ["league", leagueId, "roster", week ?? "auto"],
     enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
-    staleTime: 30_000,
+    ...weekQueryOptions,
     retry: (failureCount, error) => {
       if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
         return false;
