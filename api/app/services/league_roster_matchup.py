@@ -1448,6 +1448,25 @@ def build_waivers_view(
         player_schools=player_schools,
         scoring_rules=settings.scoring_json if settings else {},
     )
+    # Waiver availability always belongs to the active operational week, but
+    # the player-discovery boards also need a consistent last verified score
+    # immediately after the Tuesday reset.  Reusing ``selected_week=week - 1``
+    # for the whole view would incorrectly carry prior-week kickoff locks into
+    # the new waiver period, so fetch only the previous week's final totals as
+    # presentation metadata.
+    previous_final_score_by_player = (
+        _final_waiver_score_map(
+            db,
+            season=league.season_year,
+            week=week - 1,
+            player_ids=player_ids,
+            player_positions=player_positions,
+            player_schools=player_schools,
+            scoring_rules=settings.scoring_json if settings else {},
+        )
+        if week > 1
+        else {}
+    )
     now = datetime.now(timezone.utc)
     waiver_state = waiver_window_state(db, league, settings, now=now) if settings else None
     availability_states = waiver_player_availability_states(
@@ -1585,6 +1604,18 @@ def build_waivers_view(
                 position=player.position,
                 weekly_projected_fantasy_points=projection_for_player(player.id)[0],
                 final_fantasy_points=final_score_by_player.get(player.id),
+                latest_final_fantasy_points=(
+                    final_score_by_player.get(player.id)
+                    if player.id in final_score_by_player
+                    else previous_final_score_by_player.get(player.id)
+                ),
+                latest_final_week=(
+                    week
+                    if player.id in final_score_by_player
+                    else week - 1
+                    if player.id in previous_final_score_by_player
+                    else None
+                ),
                 projection_status=projection_for_player(player.id)[1],
                 rostered_by_team_name=rostered_by_player.get(player.id),
                 availability_state=availability_for_player(player.id)[0],

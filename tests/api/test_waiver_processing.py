@@ -528,6 +528,54 @@ def test_waiver_pool_uses_verified_final_box_score_for_unrostered_player(db_sess
     assert rows[unmapped_player.id].final_fantasy_points is None
 
 
+def test_waiver_pool_retains_last_verified_score_after_the_operational_week_advances(db_session):
+    """Discovery views keep completed totals without reviving prior-week locks."""
+
+    user = User(email="latest-final-waiver-owner@example.com", first_name="Latest", password_hash="test", api_token="latest-final-waiver-owner-token")
+    db_session.add(user)
+    db_session.flush()
+    league = League(name="Latest Final Waiver League", season_year=2026, commissioner_user_id=user.id, max_teams=1)
+    db_session.add(league)
+    db_session.flush()
+    player = canonical_player("Latest Final WR", "WR", "USC")
+    completed_game = Game(
+        season=2026,
+        week=1,
+        home_team="USC",
+        away_team="Opponent",
+        schedule_status="final",
+        home_points=31,
+        away_points=10,
+    )
+    db_session.add_all((
+        Team(league_id=league.id, name="Latest Final Team", owner_user_id=user.id, owner_name="Latest"),
+        LeagueSettings(league_id=league.id, roster_slots_json={"WR": 1}),
+        player,
+        completed_game,
+    ))
+    db_session.flush()
+    db_session.add_all((
+        WeeklyProjection(player_id=player.id, season=2026, week=2, is_published=True, fantasy_points=12.0),
+        PlayerGameStat(
+            player_id=player.id,
+            game_id=completed_game.id,
+            season=2026,
+            week=1,
+            source="espn_final_boxscore",
+            stats={"receptions": 4, "rec_yards": 83, "rec_tds": 1},
+        ),
+    ))
+    db_session.commit()
+
+    week_two_view = build_waivers_view(db_session, league, user, selected_week=2)
+    row = week_two_view.available_players[0]
+
+    assert row.weekly_projected_fantasy_points == 12.0
+    assert row.final_fantasy_points is None
+    assert row.latest_final_fantasy_points == 18.3
+    assert row.latest_final_week == 1
+
+
 def test_waiver_view_resolves_instant_adds_from_each_players_kickoff(db_session):
     current = datetime.now(timezone.utc)
     week = current_cfb_week_state(2026, now=current, timezone_name="America/New_York").week

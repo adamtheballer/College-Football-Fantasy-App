@@ -744,6 +744,12 @@ class LeagueWaiverPlayerRead(BaseModel):
     # separate from the forecast prevents a completed-game total from being
     # mislabeled as a projection in the waiver wire.
     final_fantasy_points: float | None = None
+    # The active waiver period can move to a new week before every player has
+    # a new game. Keep the most recent verified score separate from the
+    # active-week value so discovery boards can show a blue, truthful result
+    # without applying prior-week availability or kickoff state to a player.
+    latest_final_fantasy_points: float | None = None
+    latest_final_week: int | None = None
     projection_status: str = "UNAVAILABLE"
     # The All Players research view includes league-rostered players.  They
     # remain visible for trade research and watchlists but can never be added

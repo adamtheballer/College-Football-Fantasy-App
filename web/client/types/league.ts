@@ -489,6 +489,9 @@ export interface LeagueWaiverPlayer {
   weekly_projected_fantasy_points: number | null;
   /** Present only when a verified final box score exists for this week. */
   final_fantasy_points: number | null;
+  /** Most recent verified total, retained for discovery boards after the weekly reset. */
+  latest_final_fantasy_points: number | null;
+  latest_final_week: number | null;
   projection_status: string;
   /** Present in the All Players research view when the player is rostered in this league. */
   rostered_by_team_name: string | null;

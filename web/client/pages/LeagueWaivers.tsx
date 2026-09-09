@@ -44,6 +44,8 @@ type AvailablePlayerRow = {
   position: string | null;
   weekly_projected_fantasy_points: number | null;
   final_fantasy_points: number | null;
+  latest_final_fantasy_points: number | null;
+  latest_final_week: number | null;
   projection_status: string;
   rostered_by_team_name: string | null;
   availability_state: string;
@@ -163,13 +165,19 @@ export const waiverWeekPoints = (
   finalPoints: number | null | undefined,
   projectedPoints: number | null | undefined,
   projectionStatus: string | null | undefined,
+  latestFinalPoints?: number | null,
+  latestFinalWeek?: number | null,
 ) => {
   if (typeof finalPoints === "number" && Number.isFinite(finalPoints)) {
-    return { label: finalPoints.toFixed(1), isFinal: true };
+    return { label: finalPoints.toFixed(1), isFinal: true, finalWeek: latestFinalWeek ?? null };
+  }
+  if (typeof latestFinalPoints === "number" && Number.isFinite(latestFinalPoints)) {
+    return { label: latestFinalPoints.toFixed(1), isFinal: true, finalWeek: latestFinalWeek ?? null };
   }
   return {
     label: waiverProjectionLabel(projectedPoints, projectionStatus),
     isFinal: false,
+    finalWeek: null,
   };
 };
 
@@ -364,6 +372,8 @@ export default function LeagueWaivers() {
       position: null,
       weekly_projected_fantasy_points: 0,
       final_fantasy_points: null,
+      latest_final_fantasy_points: null,
+      latest_final_week: null,
       projection_status: "UNAVAILABLE",
       availability_state: "waivers",
       available_at: null,
@@ -518,6 +528,8 @@ export default function LeagueWaivers() {
                     claimPlayer?.final_fantasy_points,
                     claimPlayer?.weekly_projected_fantasy_points,
                     claimPlayer?.projection_status,
+                    claimPlayer?.latest_final_fantasy_points,
+                    claimPlayer?.latest_final_week,
                   );
                   return `${points.label} ${points.isFinal ? "final" : "projected"} points`;
                 })()}
@@ -731,6 +743,8 @@ export default function LeagueWaivers() {
                 player.final_fantasy_points,
                 player.weekly_projected_fantasy_points,
                 player.projection_status,
+                player.latest_final_fantasy_points,
+                player.latest_final_week,
               );
               const claimable = waiverPlayerCanBeClaimed(player.availability_state);
               const watching = watchedPlayerIds.has(player.id);
@@ -774,7 +788,7 @@ export default function LeagueWaivers() {
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <div className="text-right">
-                      <p className="text-[8px] font-black uppercase tracking-[0.1em] text-cfb-text-muted">{weekPoints.isFinal ? "Final" : `W${displayWeek}`}</p>
+                      <p className="text-[8px] font-black uppercase tracking-[0.1em] text-cfb-text-muted">{weekPoints.isFinal ? `W${weekPoints.finalWeek ?? displayWeek} final` : `W${displayWeek}`}</p>
                       <p
                         data-testid={`waiver-mobile-week-points-${player.id}`}
                         className={`mt-0.5 text-base font-semibold tabular-nums ${waiverWeekPointsClassName(weekPoints)}`}
@@ -821,7 +835,7 @@ export default function LeagueWaivers() {
                   <th className="w-44 px-4 py-3">Opponent</th>
                   <th className="w-24 px-4 py-3">POS</th>
                   <th className={`w-40 px-4 py-3 ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
-                    Week {displayWeek} Pts
+                    {playerBoardScope === "all" ? `Week ${displayWeek} Pts` : "Latest Pts"}
                   </th>
                   <th className="w-56 px-5 py-3 text-right">Action</th>
                 </tr>
@@ -833,6 +847,8 @@ export default function LeagueWaivers() {
                     player.final_fantasy_points,
                     player.weekly_projected_fantasy_points,
                     player.projection_status,
+                    player.latest_final_fantasy_points,
+                    player.latest_final_week,
                   );
                   const claimable = waiverPlayerCanBeClaimed(player.availability_state);
                   return (
