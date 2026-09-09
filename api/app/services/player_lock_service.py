@@ -87,14 +87,17 @@ def game_context_for_players(
                 if away_key not in starts_by_school or start < starts_by_school[away_key]:
                     starts_by_school[away_key] = start
 
-    # The canonical games table is preferred because it provides a provider
-    # game identity and authoritative kickoff.  A true bye has no Game row,
-    # however, so complete the context from the schedule for schools that
-    # were not found above.  Do this by normalized key rather than raw text:
-    # player imports may store e.g. ``FLORIDA STATE`` while schedules use
-    # ``Florida State``.
-    unresolved_school_keys = school_keys.difference(locations_by_school)
-    if unresolved_school_keys:
+    # The canonical games table is preferred because it provides provider game
+    # identity and usually the authoritative kickoff. A provider game can
+    # arrive without ``start_date`` though, while the imported team schedule
+    # has the confirmed kickoff. Complete both entirely missing game context
+    # and missing kickoff times from the schedule. Do this by normalized key
+    # rather than raw text: player imports may store e.g. ``FLORIDA STATE``
+    # while schedules use ``Florida State``.
+    schedule_context_keys = school_keys.difference(locations_by_school).union(
+        school_keys.difference(starts_by_school)
+    )
+    if schedule_context_keys:
         schedule_rows = (
             db.query(TeamSchedule)
             .filter(TeamSchedule.season == season, TeamSchedule.week == week)
@@ -103,17 +106,20 @@ def game_context_for_players(
         )
         for schedule in schedule_rows:
             school_key = _school_schedule_key(schedule.team_name)
-            if school_key not in unresolved_school_keys:
+            if school_key not in schedule_context_keys:
                 continue
-            locations_by_school[school_key] = "bye" if schedule.is_bye else schedule.location
+            locations_by_school.setdefault(
+                school_key,
+                "bye" if schedule.is_bye else schedule.location,
+            )
             if schedule.is_bye:
                 # The opponent field is intentionally blank for a bye.  The
                 # typed location is the unambiguous signal used by every
                 # roster and matchup surface to render BYE.
                 continue
-            if schedule.opponent_name:
+            if schedule.opponent_name and school_key not in opponents_by_school:
                 opponents_by_school[school_key] = _display_school_name(schedule.opponent_name)
-            if schedule.kickoff_at is not None:
+            if schedule.kickoff_at is not None and school_key not in starts_by_school:
                 starts_by_school[school_key] = as_utc(schedule.kickoff_at)
 
     player_school_keys = {

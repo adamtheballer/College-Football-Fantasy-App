@@ -37,6 +37,47 @@ def test_game_context_includes_kickoff_opponent_and_home_away_location(db_sessio
     assert locations == {home_player.id: "home", away_player.id: "away"}
 
 
+def test_game_context_falls_back_to_confirmed_schedule_kickoff_when_provider_game_has_no_time(db_session):
+    player = Player(name="Scheduled Texas QB", position="QB", school="Texas")
+    db_session.add(player)
+    db_session.flush()
+    kickoff = datetime(2026, 9, 5, 19, 30, tzinfo=timezone.utc)
+    db_session.add_all(
+        [
+            Game(
+                season=2026,
+                week=2,
+                home_team="Texas",
+                away_team="UTEP",
+                start_date=None,
+                schedule_status="scheduled",
+            ),
+            TeamSchedule(
+                team_name="Texas",
+                season=2026,
+                week=2,
+                opponent_name="UTEP",
+                location="home",
+                is_bye=False,
+                kickoff_at=kickoff,
+                date_confirmed=True,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    starts, opponents, locations = game_context_for_players(
+        db_session,
+        player_ids={player.id},
+        season=2026,
+        week=2,
+    )
+
+    assert starts[player.id] == kickoff
+    assert opponents[player.id] == "UTEP"
+    assert locations[player.id] == "home"
+
+
 def test_game_context_returns_the_full_contract_for_an_empty_roster(db_session):
     starts, opponents, locations = game_context_for_players(
         db_session,

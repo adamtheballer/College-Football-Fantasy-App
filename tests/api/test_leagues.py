@@ -1175,6 +1175,41 @@ def test_member_can_load_another_same_league_matchup_for_selected_week(client, d
     assert cross_league.status_code == 404
 
 
+def test_selected_own_matchup_keeps_viewer_team_on_the_left(client, db_session):
+    viewer_token = create_user_and_token(client, "matchup-viewer-left")
+    opponent_token = create_user_and_token(client, "matchup-viewer-left-opponent")
+    league = create_league(client, viewer_token, name="Viewer Left League", max_teams=2)
+    assert client.post(f"/leagues/{league['id']}/join", headers=auth_headers(opponent_token)).status_code == 200
+
+    viewer_team, opponent_team = (
+        db_session.query(Team)
+        .filter(Team.league_id == league["id"])
+        .order_by(Team.id.asc())
+        .all()
+    )
+    matchup = Matchup(
+        league_id=league["id"],
+        season=2026,
+        week=5,
+        home_team_id=opponent_team.id,
+        away_team_id=viewer_team.id,
+        status="projected",
+    )
+    db_session.add(matchup)
+    db_session.commit()
+
+    response = client.get(
+        f"/leagues/{league['id']}/matchup?week=5&matchup_id={matchup.id}",
+        headers=auth_headers(viewer_token),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["my_team"]["fantasy_team_id"] == viewer_team.id
+    assert body["opponent_team"]["fantasy_team_id"] == opponent_team.id
+    assert body["user_team"]["fantasy_team_id"] == viewer_team.id
+
+
 def test_league_workspace_requires_membership(client):
     owner_token = create_user_and_token(client, "owner")
     outsider_token = create_user_and_token(client, "outsider")
